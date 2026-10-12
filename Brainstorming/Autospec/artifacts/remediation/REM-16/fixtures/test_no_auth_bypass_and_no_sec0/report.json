@@ -1,0 +1,4304 @@
+{
+  "pack": "business",
+  "status": "NOT_VERIFIED",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "requirements": [
+    {
+      "id": "FUN-01",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Création client => 201, propriétaire issu de la session, open/normal/non affecté/version 1. Agent/admin => 403. Tester titre 4/5/120/121, description 19/20/5000/5001, blancs et retours ligne.",
+      "observed": [
+        {
+          "check": "creation",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "ticket": {
+              "id": "8789f7dc-d498-4dee-98c9-c0ecc06321b9",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Titre valide",
+              "description": "Description valide Description valide",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          },
+          "reproduction": "Alice POST /api/tickets; inspect server defaults",
+          "evidence": "X"
+        },
+        {
+          "check": "roles",
+          "passed": true,
+          "observed": {
+            "status": 403,
+            "body": {
+              "error": {
+                "code": "FORBIDDEN",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "a9b56b6785c1a2775a953c0134394538b1b4fd366c5608fb73cae1c946e2c7d2",
+            "after_digest": "a9b56b6785c1a2775a953c0134394538b1b4fd366c5608fb73cae1c946e2c7d2"
+          },
+          "reproduction": "camille POST /api/tickets is forbidden",
+          "evidence": "X"
+        },
+        {
+          "check": "roles",
+          "passed": true,
+          "observed": {
+            "status": 403,
+            "body": {
+              "error": {
+                "code": "FORBIDDEN",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "a9b56b6785c1a2775a953c0134394538b1b4fd366c5608fb73cae1c946e2c7d2",
+            "after_digest": "a9b56b6785c1a2775a953c0134394538b1b4fd366c5608fb73cae1c946e2c7d2"
+          },
+          "reproduction": "emma POST /api/tickets is forbidden",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "title_len": 4,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 4, description length 20; expected 422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "title_len": 5,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 5, description length 20; expected 201",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "title_len": 120,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 120, description length 20; expected 201",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "title_len": 121,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 121, description length 20; expected 422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "title_len": 5,
+            "description_len": 19
+          },
+          "reproduction": "POST title length 5, description length 19; expected 422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "title_len": 5,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 5, description length 20; expected 201",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "title_len": 5,
+            "description_len": 5000
+          },
+          "reproduction": "POST title length 5, description length 5000; expected 201",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "title_len": 5,
+            "description_len": 5001
+          },
+          "reproduction": "POST title length 5, description length 5001; expected 422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "title_len": 4,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 4, description length 20; expected 422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "title_len": 5,
+            "description_len": 80
+          },
+          "reproduction": "POST title length 5, description length 80; expected 422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "title_len": 9,
+            "description_len": 20
+          },
+          "reproduction": "POST title length 9, description length 20; expected 201",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-01.json",
+          "sha256": "2b2b555822e6a3c76162f7ed0faf5355a12ac913a75129afe920576f71da4957",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-01:creation",
+            "FUN-01:roles",
+            "FUN-01:bounds"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "FUN-02",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant => 404 ; aucune fiche précédente encore affichée.",
+      "observed": [
+        {
+          "check": "scope",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000069",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 005",
+                  "description": "Description fixture ticket 005",
+                  "status": "in_progress",
+                  "priority": "low",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000068",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 004",
+                  "description": "Description fixture ticket 004",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000067",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 003",
+                  "description": "Description fixture ticket 003",
+                  "status": "closed",
+                  "priority": "normal",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000066",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 002",
+                  "description": "Description fixture ticket 002",
+                  "status": "resolved",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000065",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 001",
+                  "description": "Description fixture ticket 001",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 000",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 6,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "alice GET tickets; fixture count 6",
+          "evidence": "X"
+        },
+        {
+          "check": "scope",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-00000000006f",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 011",
+                  "description": "Description fixture ticket 011",
+                  "status": "closed",
+                  "priority": "low",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006e",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 010",
+                  "description": "Description fixture ticket 010",
+                  "status": "resolved",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006d",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 009",
+                  "description": "Description fixture ticket 009",
+                  "status": "in_progress",
+                  "priority": "normal",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 008",
+                  "description": "Description fixture ticket 008",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006b",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 007",
+                  "description": "Description fixture ticket 007",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006a",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 006",
+                  "description": "Description fixture ticket 006",
+                  "status": "resolved",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000069",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 005",
+                  "description": "Description fixture ticket 005",
+                  "status": "in_progress",
+                  "priority": "low",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000068",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 004",
+                  "description": "Description fixture ticket 004",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000067",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 003",
+                  "description": "Description fixture ticket 003",
+                  "status": "closed",
+                  "priority": "normal",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000066",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 002",
+                  "description": "Description fixture ticket 002",
+                  "status": "resolved",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000065",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 001",
+                  "description": "Description fixture ticket 001",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 000",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 12,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "camille GET tickets; fixture count 12",
+          "evidence": "X"
+        },
+        {
+          "check": "scope",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-00000000006f",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 011",
+                  "description": "Description fixture ticket 011",
+                  "status": "closed",
+                  "priority": "low",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006e",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 010",
+                  "description": "Description fixture ticket 010",
+                  "status": "resolved",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006d",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 009",
+                  "description": "Description fixture ticket 009",
+                  "status": "in_progress",
+                  "priority": "normal",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 008",
+                  "description": "Description fixture ticket 008",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006b",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 007",
+                  "description": "Description fixture ticket 007",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006a",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 006",
+                  "description": "Description fixture ticket 006",
+                  "status": "resolved",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000069",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 005",
+                  "description": "Description fixture ticket 005",
+                  "status": "in_progress",
+                  "priority": "low",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000068",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 004",
+                  "description": "Description fixture ticket 004",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000067",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 003",
+                  "description": "Description fixture ticket 003",
+                  "status": "closed",
+                  "priority": "normal",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000066",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 002",
+                  "description": "Description fixture ticket 002",
+                  "status": "resolved",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000065",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 001",
+                  "description": "Description fixture ticket 001",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 000",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 12,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "emma GET tickets; fixture count 12",
+          "evidence": "X"
+        },
+        {
+          "check": "missing",
+          "passed": true,
+          "observed": {
+            "status": 404
+          },
+          "reproduction": "GET absent UUID after viewing a real ticket",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-02.json",
+          "sha256": "ae4dd9411df5f177daecd417b628681248f594da26477893bcc5be91405d8236",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-02:scope",
+            "FUN-02:missing"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "FUN-02:ui_clear (X)"
+      ]
+    },
+    {
+      "id": "FUN-03",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Priorités strictes, personnel seulement. Affectation vers agent/admin actif ou null ; client/inactif/UUID absent refusé sans écriture. Changement manuel d'affectation refusé si état initial ou résultant closed, priorité autorisée. Désaffectation système lors de désactivation : exception explicite.",
+      "observed": [
+        {
+          "check": "priority",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "body": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          },
+          "reproduction": "staff PATCH priority low",
+          "evidence": "X"
+        },
+        {
+          "check": "priority",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "body": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 3,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          },
+          "reproduction": "staff PATCH priority normal",
+          "evidence": "X"
+        },
+        {
+          "check": "priority",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "body": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "high",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 4,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          },
+          "reproduction": "staff PATCH priority high",
+          "evidence": "X"
+        },
+        {
+          "check": "priority",
+          "passed": true,
+          "observed": {
+            "status": 403,
+            "body": {
+              "error": {
+                "code": "FORBIDDEN",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c09fdf2a6354b668e751c4e3c60f7e7a314adbf09a2cb4f97bba7a658f4fa45e",
+            "after_digest": "c09fdf2a6354b668e751c4e3c60f7e7a314adbf09a2cb4f97bba7a658f4fa45e"
+          },
+          "reproduction": "reject priority high by alice",
+          "evidence": "X"
+        },
+        {
+          "check": "priority",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c09fdf2a6354b668e751c4e3c60f7e7a314adbf09a2cb4f97bba7a658f4fa45e",
+            "after_digest": "c09fdf2a6354b668e751c4e3c60f7e7a314adbf09a2cb4f97bba7a658f4fa45e"
+          },
+          "reproduction": "reject priority urgent by camille",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 200
+          },
+          "reproduction": "assign active camille or null",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 200
+          },
+          "reproduction": "assign active emma or null",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 200
+          },
+          "reproduction": "assign active None or null",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604",
+            "after_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604"
+          },
+          "reproduction": "reject client/inactive/missing assignable",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604",
+            "after_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604"
+          },
+          "reproduction": "reject client/inactive/missing assignable",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604",
+            "after_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604"
+          },
+          "reproduction": "reject client/inactive/missing assignable",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment",
+          "passed": true,
+          "observed": {
+            "status": 403,
+            "body": {
+              "error": {
+                "code": "FORBIDDEN",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604",
+            "after_digest": "e467707b64f5bded00b5da2aa9f170c585966b07bbcf228b9733a36e1abfb604"
+          },
+          "reproduction": "client cannot assign/unassign own ticket",
+          "evidence": "X"
+        },
+        {
+          "check": "closed",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "da801ad8bbc2a9ea3559b4650018c30a779671a179f0d14b66bfd813ed92c496",
+            "after_digest": "da801ad8bbc2a9ea3559b4650018c30a779671a179f0d14b66bfd813ed92c496"
+          },
+          "reproduction": "manual unassignment of closed ticket",
+          "evidence": "X"
+        },
+        {
+          "check": "closed",
+          "passed": true,
+          "observed": {
+            "status": 200
+          },
+          "reproduction": "priority change remains allowed on closed ticket",
+          "evidence": "X"
+        },
+        {
+          "check": "disable_exception",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "state": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "high",
+              "assignee_id": null,
+              "version": 3,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 2,
+              "message_count": 0
+            }
+          },
+          "reproduction": "disable assigned account clears even closed assignment",
+          "evidence": "X"
+        },
+        {
+          "check": "closed",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "a0347942bfbfed7e1f3a43f3d70fd6d4b41a301345218b3a16aae259e9b09afa",
+            "after_digest": "a0347942bfbfed7e1f3a43f3d70fd6d4b41a301345218b3a16aae259e9b09afa"
+          },
+          "reproduction": "effective manual assignment change with resulting closed state is forbidden atomically",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-03.json",
+          "sha256": "de299cf30fdc7a1e6aff48ec509ef0b9e6d557d6bb28dc17232ff821116c77b8",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-03:priority",
+            "FUN-03:assignment",
+            "FUN-03:closed",
+            "FUN-03:disable_exception"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "FUN-04",
+      "gate": "B",
+      "status": "PASS",
+      "expected": "Matrice 4×4 : cinq transitions effectives avec préconditions, quatre identités no-op, sept transitions refusées. Résolution impossible sans réponse publique du personnel ; note interne ou message client insuffisant. Fermé terminal.",
+      "observed": [
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "open",
+            "to": "open",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH open->open; expected 200, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "open",
+            "to": "in_progress",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH open->in_progress; expected 200, version/audit delta 1",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "open",
+            "to": "resolved",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH open->resolved; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "open",
+            "to": "closed",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH open->closed; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "in_progress",
+            "to": "open",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH in_progress->open; expected 200, version/audit delta 1",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "in_progress",
+            "to": "in_progress",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH in_progress->in_progress; expected 200, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "in_progress",
+            "to": "resolved",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH in_progress->resolved; expected 200, version/audit delta 1",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "in_progress",
+            "to": "closed",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH in_progress->closed; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "resolved",
+            "to": "open",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH resolved->open; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "resolved",
+            "to": "in_progress",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH resolved->in_progress; expected 200, version/audit delta 1",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "resolved",
+            "to": "resolved",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH resolved->resolved; expected 200, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "resolved",
+            "to": "closed",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH resolved->closed; expected 200, version/audit delta 1",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "closed",
+            "to": "open",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH closed->open; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "closed",
+            "to": "in_progress",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH closed->in_progress; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "closed",
+            "to": "resolved",
+            "status": 409,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH closed->resolved; expected 409, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "matrix",
+          "passed": true,
+          "observed": {
+            "from": "closed",
+            "to": "closed",
+            "status": 200,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            }
+          },
+          "reproduction": "PATCH closed->closed; expected 200, version/audit delta 0",
+          "evidence": "X"
+        },
+        {
+          "check": "preconditions",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "d71f8d77857adac32306170e609d9b4791b54b1de67abe6bd8491d6938795967",
+            "after_digest": "d71f8d77857adac32306170e609d9b4791b54b1de67abe6bd8491d6938795967"
+          },
+          "reproduction": "PATCH open->in_progress with preconditions {'assigned': False} must be atomic refusal",
+          "evidence": "X"
+        },
+        {
+          "check": "preconditions",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c0cbf23e8fc4e3dfbaeee51056c5c6f8e252a685baac33718659fd8f962e2f4f",
+            "after_digest": "c0cbf23e8fc4e3dfbaeee51056c5c6f8e252a685baac33718659fd8f962e2f4f"
+          },
+          "reproduction": "PATCH resolved->in_progress with preconditions {'assigned': False} must be atomic refusal",
+          "evidence": "X"
+        },
+        {
+          "check": "preconditions",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "8232decdba4905f0edefb7ac6cf6d91c90769602a533c2554da49418553e94b8",
+            "after_digest": "8232decdba4905f0edefb7ac6cf6d91c90769602a533c2554da49418553e94b8"
+          },
+          "reproduction": "PATCH in_progress->resolved with preconditions {'public_staff_reply': False} must be atomic refusal",
+          "evidence": "X"
+        },
+        {
+          "check": "preconditions",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "4304315ff4e1b726e5e4e3c777a6fc5c325d1c0cd7d6219225bb3ff4ace20596",
+            "after_digest": "4304315ff4e1b726e5e4e3c777a6fc5c325d1c0cd7d6219225bb3ff4ace20596"
+          },
+          "reproduction": "PATCH in_progress->resolved with preconditions {'public_staff_reply': False, 'internal_reply': True} must be atomic refusal",
+          "evidence": "X"
+        },
+        {
+          "check": "preconditions",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "0a746e7de0f2b67b5dfb66c2faa69aa3c0565225eb70e7974dae44c15978ae0c",
+            "after_digest": "0a746e7de0f2b67b5dfb66c2faa69aa3c0565225eb70e7974dae44c15978ae0c"
+          },
+          "reproduction": "PATCH in_progress->resolved with preconditions {'public_staff_reply': False, 'client_reply': True} must be atomic refusal",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-04.json",
+          "sha256": "875355e32a38aa3fcd272c96b9217e07f20c8ff5a0afa4f91d6ca0520f9b6661",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-04:matrix",
+            "FUN-04:preconditions"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "FUN-05",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Client répond sur son ticket non fermé ; personnel répond/annote sur tout ticket non fermé. Aucun changement implicite de statut. Auteur/date serveur. Tester contenu 0/1/5000/5001 et blancs ; visibilité par rôle.",
+      "observed": [
+        {
+          "check": "messages",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 0
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "alice posts public, no implicit workflow",
+          "evidence": "X"
+        },
+        {
+          "check": "identity",
+          "passed": true,
+          "observed": {
+            "id": "4a553938-6e38-43d0-84da-58ad3d85df11",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000001",
+            "content": "Réponse publique",
+            "visibility": "public",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          "reproduction": "message author from session, timestamp explicit UTC",
+          "evidence": "X"
+        },
+        {
+          "check": "messages",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 3,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 2,
+              "message_count": 2
+            }
+          },
+          "reproduction": "camille posts public, no implicit workflow",
+          "evidence": "X"
+        },
+        {
+          "check": "identity",
+          "passed": true,
+          "observed": {
+            "id": "00353c51-4211-48be-8986-d678d42ba45c",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000003",
+            "content": "Réponse publique",
+            "visibility": "public",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          "reproduction": "message author from session, timestamp explicit UTC",
+          "evidence": "X"
+        },
+        {
+          "check": "messages",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 3,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 2,
+              "message_count": 2
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 4,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 3,
+              "message_count": 3
+            }
+          },
+          "reproduction": "camille posts internal, no implicit workflow",
+          "evidence": "X"
+        },
+        {
+          "check": "identity",
+          "passed": true,
+          "observed": {
+            "id": "986acea7-c155-4e85-85c2-233c9adcc02c",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000003",
+            "content": "Réponse publique",
+            "visibility": "internal",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          "reproduction": "message author from session, timestamp explicit UTC",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "length": 0
+          },
+          "reproduction": "message bounds length 0 ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "length": 1
+          },
+          "reproduction": "message bounds length 1 ->201",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "length": 5000
+          },
+          "reproduction": "message bounds length 5000 ->201",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "length": 5001
+          },
+          "reproduction": "message bounds length 5001 ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "length": 4
+          },
+          "reproduction": "message bounds length 4 ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "visibility",
+          "passed": true,
+          "observed": {
+            "status": 403,
+            "body": {
+              "error": {
+                "code": "FORBIDDEN",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c",
+            "after_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c"
+          },
+          "reproduction": "client internal message forbidden",
+          "evidence": "X"
+        },
+        {
+          "check": "visibility",
+          "passed": true,
+          "observed": {
+            "status": 404,
+            "body": {
+              "error": {
+                "code": "NOT_FOUND",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c",
+            "after_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c"
+          },
+          "reproduction": "other client cannot message Alice ticket",
+          "evidence": "X"
+        },
+        {
+          "check": "identity",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c",
+            "after_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c"
+          },
+          "reproduction": "server-only message identity/date fields cannot be supplied",
+          "evidence": "X"
+        },
+        {
+          "check": "identity",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c",
+            "after_digest": "5d4533a4ac6f4e8753895827a600920f7b3274a7baf3c4d542164a645d276f8c"
+          },
+          "reproduction": "server-only message identity/date fields cannot be supplied",
+          "evidence": "X"
+        },
+        {
+          "check": "visibility",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00353c51-4211-48be-8986-d678d42ba45c",
+                "ticket_id": "00000000-0000-0000-0000-000000000064",
+                "author_id": "00000000-0000-0000-0000-000000000003",
+                "content": "Réponse publique",
+                "visibility": "public",
+                "created_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "0052e720-f8ea-4d86-b843-31cd52acffdd",
+                "ticket_id": "00000000-0000-0000-0000-000000000064",
+                "author_id": "00000000-0000-0000-0000-000000000003",
+                "content": "x",
+                "visibility": "public",
+                "created_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "4a553938-6e38-43d0-84da-58ad3d85df11",
+                "ticket_id": "00000000-0000-0000-0000-000000000064",
+                "author_id": "00000000-0000-0000-0000-000000000001",
+                "content": "Réponse publique",
+                "visibility": "public",
+                "created_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "6b808d47-1e94-4f51-b7b1-f969621412d4",
+                "ticket_id": "00000000-0000-0000-0000-000000000064",
+                "author_id": "00000000-0000-0000-0000-000000000003",
+                "content": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+                "visibility": "public",
+                "created_at": "2027-01-15T08:00:00+00:00"
+              }
+            ],
+            "total": 4,
+            "page": 1,
+            "page_size": 50
+          },
+          "reproduction": "client message list excludes internal before pagination",
+          "evidence": "X"
+        },
+        {
+          "check": "messages",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "TICKET_CLOSED",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c13c27879d3bbe864a232f68b350a50e43a9bcac7d7e2b97038730eb7871fdb8",
+            "after_digest": "c13c27879d3bbe864a232f68b350a50e43a9bcac7d7e2b97038730eb7871fdb8"
+          },
+          "reproduction": "new message on closed ticket refused",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-05.json",
+          "sha256": "eb17c9ea75ec7358501c7f4412b191807c257a1fab5bb92c1b10a392328c1cbf",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-05:messages",
+            "FUN-05:identity",
+            "FUN-05:bounds",
+            "FUN-05:visibility"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "FUN-06",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "Deux mutations PATCH effectives de même version, connexions DB distinctes, départ synchronisé : un succès/un 409, un incrément/événement. Course fermeture/message : fermeture gagnante => aucun message ; message gagnant => fermeture obsolète refusée. Vérifier DB/audit, pas seulement HTTP. UI conserve le brouillon.",
+      "observed": [
+        {
+          "check": "patch_race",
+          "passed": true,
+          "observed": {
+            "statuses": [
+              409,
+              200
+            ],
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 0
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 0
+            }
+          },
+          "reproduction": "barrier synchronized same-version PATCH on separate clients/DB connections",
+          "evidence": "X"
+        },
+        {
+          "check": "distinct_connections",
+          "passed": true,
+          "observed": {
+            "connections": [
+              350,
+              351
+            ]
+          },
+          "reproduction": "trusted SQL trace records distinct connection identities",
+          "evidence": "X"
+        },
+        {
+          "check": "close_wins",
+          "passed": true,
+          "observed": {
+            "statuses": [
+              200,
+              409
+            ],
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            }
+          },
+          "reproduction": "controlled distinct-connection close/message overlap: close commits first",
+          "evidence": "X"
+        },
+        {
+          "check": "message_wins",
+          "passed": true,
+          "observed": {
+            "statuses": [
+              409,
+              201
+            ],
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 0,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 2
+            }
+          },
+          "reproduction": "controlled distinct-connection close/message overlap: message commits first",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-06.json",
+          "sha256": "737f1bae772d00d46befac47aaf827916573107fd4e866c00a4466b69abf60ab",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-06:patch_race",
+            "FUN-06:distinct_connections",
+            "FUN-06:close_wins",
+            "FUN-06:message_wins"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "FUN-06:transactions (R)",
+        "FUN-06:ui_draft (X)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "FUN-07",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "Retry création ticket/message, même UUID/payload => même ID, un objet/audit, y compris requêtes simultanées. Autre contenu/visibilité/ticket cible => 409 IDEMPOTENCY_CONFLICT. Utilisateurs isolés. Auth/droits avant replay ; message déjà créé rejouable après fermeture, nouvelle clé refusée. Rejouer après redémarrage serveur avec clé conservée par le harnais ; aucune persistance navigateur du brouillon exigée.",
+      "observed": [
+        {
+          "check": "retry",
+          "passed": true,
+          "observed": {
+            "first": 201,
+            "retry": 200,
+            "same_state": true
+          },
+          "reproduction": "same user/UUID/normalized ticket payload replay",
+          "evidence": "X"
+        },
+        {
+          "check": "retry",
+          "passed": true,
+          "observed": {
+            "ticket_delta": 1,
+            "audit_delta": 1
+          },
+          "reproduction": "ticket create and replay materialize exactly one ticket/event",
+          "evidence": "X"
+        },
+        {
+          "check": "retry",
+          "passed": true,
+          "observed": {
+            "status": 200
+          },
+          "reproduction": "same normalized ticket payload with outer whitespace replays",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "1c94b03c61fd9f693dd8b8657821c720fb5aca2496a4363d757fa37bc4e0f4d5",
+            "after_digest": "1c94b03c61fd9f693dd8b8657821c720fb5aca2496a4363d757fa37bc4e0f4d5"
+          },
+          "reproduction": "same idempotency key changed title",
+          "evidence": "X"
+        },
+        {
+          "check": "users",
+          "passed": true,
+          "observed": {
+            "status": 201
+          },
+          "reproduction": "same key isolated per user",
+          "evidence": "X"
+        },
+        {
+          "check": "rights",
+          "passed": true,
+          "observed": {
+            "status": 403
+          },
+          "reproduction": "rights checked before key replay",
+          "evidence": "X"
+        },
+        {
+          "check": "users",
+          "passed": true,
+          "observed": {
+            "status": 201
+          },
+          "reproduction": "same user UUID isolated per operation type (ticket vs message)",
+          "evidence": "X"
+        },
+        {
+          "check": "rights",
+          "passed": true,
+          "observed": {
+            "status": 201
+          },
+          "reproduction": "prepare genuine Alice-owned message key",
+          "evidence": "X"
+        },
+        {
+          "check": "rights",
+          "passed": true,
+          "observed": {
+            "status": 404,
+            "body": {
+              "error": {
+                "code": "NOT_FOUND",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "14d8e0442c217eaf2ccf4ece96e8b0d3d198fb92272950c59063f05ef7809947",
+            "after_digest": "14d8e0442c217eaf2ccf4ece96e8b0d3d198fb92272950c59063f05ef7809947"
+          },
+          "reproduction": "existing Alice key targeting inaccessible Bob ticket checks authorization before replay/conflict",
+          "evidence": "X"
+        },
+        {
+          "check": "simultaneous",
+          "passed": true,
+          "observed": {
+            "statuses": [
+              200,
+              201
+            ]
+          },
+          "reproduction": "simultaneous same-key ticket creation returns one ID",
+          "evidence": "X"
+        },
+        {
+          "check": "simultaneous",
+          "passed": true,
+          "observed": {
+            "ticket_delta": 1
+          },
+          "reproduction": "distinct-connection simultaneous ticket retry creates one row/event",
+          "evidence": "X"
+        },
+        {
+          "check": "retry",
+          "passed": true,
+          "observed": {
+            "first": 201,
+            "retry": 200
+          },
+          "reproduction": "message retry one row/event/version",
+          "evidence": "X"
+        },
+        {
+          "check": "simultaneous",
+          "passed": true,
+          "observed": {
+            "statuses": [
+              201,
+              200
+            ],
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 4,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 3,
+              "message_count": 3
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 5,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 4,
+              "message_count": 4
+            }
+          },
+          "reproduction": "synchronized distinct-connection message retry one row/event/version",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "48818ca18766ceca1ba3f300d58a7f1e6dfe0f8314322f432c2203cb040b0e97",
+            "after_digest": "48818ca18766ceca1ba3f300d58a7f1e6dfe0f8314322f432c2203cb040b0e97"
+          },
+          "reproduction": "same message key different content/visibility/target",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "IDEMPOTENCY_CONFLICT",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "stable IDEMPOTENCY_CONFLICT code",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "48818ca18766ceca1ba3f300d58a7f1e6dfe0f8314322f432c2203cb040b0e97",
+            "after_digest": "48818ca18766ceca1ba3f300d58a7f1e6dfe0f8314322f432c2203cb040b0e97"
+          },
+          "reproduction": "same message key different content/visibility/target",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "IDEMPOTENCY_CONFLICT",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "stable IDEMPOTENCY_CONFLICT code",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "IDEMPOTENCY_CONFLICT",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "48818ca18766ceca1ba3f300d58a7f1e6dfe0f8314322f432c2203cb040b0e97",
+            "after_digest": "48818ca18766ceca1ba3f300d58a7f1e6dfe0f8314322f432c2203cb040b0e97"
+          },
+          "reproduction": "same message key different content/visibility/target",
+          "evidence": "X"
+        },
+        {
+          "check": "conflicts",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "IDEMPOTENCY_CONFLICT",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "stable IDEMPOTENCY_CONFLICT code",
+          "evidence": "X"
+        },
+        {
+          "check": "restart",
+          "passed": true,
+          "observed": {
+            "status": 200
+          },
+          "reproduction": "real server restart, same harness-retained key",
+          "evidence": "X"
+        },
+        {
+          "check": "closed_replay",
+          "passed": true,
+          "observed": {
+            "retry": 200,
+            "new": 409
+          },
+          "reproduction": "existing message replay allowed after closure, new key forbidden",
+          "evidence": "X"
+        },
+        {
+          "check": "rights",
+          "passed": true,
+          "observed": {
+            "status": 401,
+            "unchanged": true
+          },
+          "reproduction": "disabled user cannot replay existing key through old real cookie",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-07.json",
+          "sha256": "4a687e147a917bd7910c270fbaa8634c3f1932ebe167b3d6a728e33093b9a94c",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-07:retry",
+            "FUN-07:conflicts",
+            "FUN-07:users",
+            "FUN-07:rights",
+            "FUN-07:simultaneous",
+            "FUN-07:restart",
+            "FUN-07:closed_replay"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "FUN-07:durable_constraints (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "FUN-08",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "Historique append-only cohérent, acteur/avant/après/UTC ; forcer une erreur entre écriture métier et audit => rollback total. Injection de panne par fixture, aucune route de debug livrée.",
+      "observed": [
+        {
+          "check": "history",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "last_event": {
+              "id": 1,
+              "ticket_id": "00000000-0000-0000-0000-000000000064",
+              "actor_id": "00000000-0000-0000-0000-000000000003",
+              "type": "updated",
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "visibility": "public",
+              "before": {
+                "id": "00000000-0000-0000-0000-000000000064",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 000",
+                "description": "Description fixture ticket 000",
+                "status": "open",
+                "priority": "normal",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              "after": {
+                "id": "00000000-0000-0000-0000-000000000064",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 000",
+                "description": "Description fixture ticket 000",
+                "status": "open",
+                "priority": "high",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              }
+            }
+          },
+          "reproduction": "effective priority PATCH creates actor/before/after/UTC event",
+          "evidence": "X"
+        },
+        {
+          "check": "rollback",
+          "passed": true,
+          "observed": {
+            "status": 500,
+            "before_digest": "386c762bdeda34a7ecc3c324b26c72428a624e29f5db3ae5171838dc6e40b1b8",
+            "after_digest": "386c762bdeda34a7ecc3c324b26c72428a624e29f5db3ae5171838dc6e40b1b8"
+          },
+          "reproduction": "trusted fixture fault between business and audit; entire transaction rolls back",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-08.json",
+          "sha256": "4022db0f561a18e04f98c42a7a72901b116279b977f08785dd66392af0bdc1f7",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-08:history",
+            "FUN-08:rollback"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "FUN-08:append_only (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "FUN-09",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "Désactivation de l'assigné : sessions définitivement révoquées, tickets même fermés désaffectés/versionnés/audités atomiquement. Course affectation/désactivation : aucun ticket affecté à un inactif. Statut in_progress conservé. Réactivation ne réaffecte rien et ne ressuscite aucune session.",
+      "observed": [
+        {
+          "check": "disable",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "before": [
+              {
+                "id": "00000000-0000-0000-0000-000000000064",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 000",
+                "description": "Description fixture ticket 000",
+                "status": "open",
+                "priority": "normal",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000066",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 002",
+                "description": "Description fixture ticket 002",
+                "status": "resolved",
+                "priority": "low",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000067",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 003",
+                "description": "Description fixture ticket 003",
+                "status": "closed",
+                "priority": "normal",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000068",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 004",
+                "description": "Description fixture ticket 004",
+                "status": "open",
+                "priority": "high",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006a",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 006",
+                "description": "Description fixture ticket 006",
+                "status": "resolved",
+                "priority": "normal",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006c",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 008",
+                "description": "Description fixture ticket 008",
+                "status": "open",
+                "priority": "low",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006e",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 010",
+                "description": "Description fixture ticket 010",
+                "status": "resolved",
+                "priority": "high",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 0,
+                "message_count": 0
+              }
+            ],
+            "after": [
+              {
+                "id": "00000000-0000-0000-0000-000000000064",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 000",
+                "description": "Description fixture ticket 000",
+                "status": "open",
+                "priority": "normal",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000066",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 002",
+                "description": "Description fixture ticket 002",
+                "status": "resolved",
+                "priority": "low",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000067",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 003",
+                "description": "Description fixture ticket 003",
+                "status": "closed",
+                "priority": "normal",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000068",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 004",
+                "description": "Description fixture ticket 004",
+                "status": "open",
+                "priority": "high",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006a",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 006",
+                "description": "Description fixture ticket 006",
+                "status": "resolved",
+                "priority": "normal",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006c",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 008",
+                "description": "Description fixture ticket 008",
+                "status": "open",
+                "priority": "low",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006e",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 010",
+                "description": "Description fixture ticket 010",
+                "status": "resolved",
+                "priority": "high",
+                "assignee_id": null,
+                "version": 2,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00",
+                "audit_count": 1,
+                "message_count": 0
+              }
+            ]
+          },
+          "reproduction": "disable clears all assignments including closed and preserves in_progress",
+          "evidence": "X"
+        },
+        {
+          "check": "revocation",
+          "passed": true,
+          "observed": {
+            "status": 401
+          },
+          "reproduction": "pre-disable real session is permanently revoked",
+          "evidence": "X"
+        },
+        {
+          "check": "reactivate",
+          "passed": true,
+          "observed": {
+            "status": 401,
+            "assigned": []
+          },
+          "reproduction": "reactivation restores neither old sessions nor assignments",
+          "evidence": "X"
+        },
+        {
+          "check": "assignment_race",
+          "passed": true,
+          "observed": {
+            "statuses": [
+              409,
+              200
+            ],
+            "invalid": []
+          },
+          "reproduction": "overlapping assignment/deactivation has no inactive assignee",
+          "evidence": "X"
+        },
+        {
+          "check": "disable",
+          "passed": true,
+          "observed": {
+            "status": 500,
+            "before_digest": "652b68c2fe0a19888efc8613146546d10dab17e1c0f7847e3823309da95ef871",
+            "after_digest": "652b68c2fe0a19888efc8613146546d10dab17e1c0f7847e3823309da95ef871"
+          },
+          "reproduction": "failed disable rolls back users, revoked sessions, all tickets and audit together",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-09.json",
+          "sha256": "d4bcfc179296c267194f0468a63c758507edd121b155a2fdea31ffb9148e4adb",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-09:disable",
+            "FUN-09:revocation",
+            "FUN-09:reactivate",
+            "FUN-09:assignment_race"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "FUN-09:atomic_disable (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "FUN-10",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Recherche titre/description : casse ASCII insensible, Unicode exact sans exigence d'équivalence accentuée ; q vide, 100/101 caractères, apostrophe, %, _. Ni interprétation SQL, ni recherche dans les notes. Filtrage d'accès avant pagination.",
+      "observed": [
+        {
+          "check": "search",
+          "passed": true,
+          "observed": {
+            "q": "ascii",
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "ASCII marker shared",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 1,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal 'ascii', fixture IDs ['00000000-0000-0000-0000-000000000064']",
+          "evidence": "X"
+        },
+        {
+          "check": "search",
+          "passed": true,
+          "observed": {
+            "q": "Éclair",
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000065",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Unicode Éclair",
+                  "description": "Description fixture ticket 001",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 1,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal 'Éclair', fixture IDs ['00000000-0000-0000-0000-000000000065']",
+          "evidence": "X"
+        },
+        {
+          "check": "search",
+          "passed": true,
+          "observed": {
+            "q": "éclair",
+            "status": 200,
+            "body": {
+              "items": [],
+              "total": 0,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal 'éclair', fixture IDs []",
+          "evidence": "X"
+        },
+        {
+          "check": "literal",
+          "passed": true,
+          "observed": {
+            "q": "%",
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000066",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Literal % only",
+                  "description": "Description fixture ticket 002",
+                  "status": "resolved",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 1,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal '%', fixture IDs ['00000000-0000-0000-0000-000000000066']",
+          "evidence": "X"
+        },
+        {
+          "check": "literal",
+          "passed": true,
+          "observed": {
+            "q": "_",
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000067",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Literal _ only",
+                  "description": "Description fixture ticket 003",
+                  "status": "closed",
+                  "priority": "normal",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 1,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal '_', fixture IDs ['00000000-0000-0000-0000-000000000067']",
+          "evidence": "X"
+        },
+        {
+          "check": "literal",
+          "passed": true,
+          "observed": {
+            "q": "'",
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000068",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Literal ' only",
+                  "description": "Description fixture ticket 004",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 1,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal \"'\", fixture IDs ['00000000-0000-0000-0000-000000000068']",
+          "evidence": "X"
+        },
+        {
+          "check": "notes",
+          "passed": true,
+          "observed": {
+            "q": "INTERNAL_ONLY",
+            "status": 200,
+            "body": {
+              "items": [],
+              "total": 0,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal 'INTERNAL_ONLY', fixture IDs []",
+          "evidence": "X"
+        },
+        {
+          "check": "search",
+          "passed": true,
+          "observed": {
+            "q": "shared",
+            "status": 200,
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000069",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Last shared",
+                  "description": "Description fixture ticket 005",
+                  "status": "in_progress",
+                  "priority": "low",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "ASCII marker shared",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 2,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "search literal 'shared', fixture IDs ['00000000-0000-0000-0000-000000000064', '00000000-0000-0000-0000-000000000069']",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "length": 0,
+            "status": 200
+          },
+          "reproduction": "q length 0 ->200",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "length": 100,
+            "status": 200
+          },
+          "reproduction": "q length 100 ->200",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "length": 101,
+            "status": 422
+          },
+          "reproduction": "q length 101 ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "acl_before_page",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-000000000069",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Last shared",
+                "description": "Description fixture ticket 005",
+                "status": "in_progress",
+                "priority": "low",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              }
+            ],
+            "total": 2,
+            "page": 1,
+            "page_size": 1
+          },
+          "reproduction": "ACL before total/page_size=1, Bob also has matching shared ticket",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-10.json",
+          "sha256": "9348022c76ccbac1a8d108fc3a0ad20dc2327fa799dc3270f05ddd48c9db19c6",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-10:search",
+            "FUN-10:literal",
+            "FUN-10:notes",
+            "FUN-10:bounds",
+            "FUN-10:acl_before_page"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "FUN-11",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Filtres ET, page 1/0, page_size 1/50/51, page trop haute vide ; tri/total exacts. Créer >50 tickets temporaires, parcourir toutes les pages à données stables sans doublon/oubli. Pas de snapshot multi-requêtes exigé.",
+      "observed": [
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "params": {
+              "page": 1
+            },
+            "status": 200
+          },
+          "reproduction": "pagination bounds {'page': 1} ->200",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "params": {
+              "page": 0
+            },
+            "status": 422
+          },
+          "reproduction": "pagination bounds {'page': 0} ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "params": {
+              "page_size": 1
+            },
+            "status": 200
+          },
+          "reproduction": "pagination bounds {'page_size': 1} ->200",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "params": {
+              "page_size": 50
+            },
+            "status": 200
+          },
+          "reproduction": "pagination bounds {'page_size': 50} ->200",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "params": {
+              "page_size": 51
+            },
+            "status": 422
+          },
+          "reproduction": "pagination bounds {'page_size': 51} ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "params": {
+              "assigned_to_me": true,
+              "unassigned": true
+            },
+            "status": 422
+          },
+          "reproduction": "pagination bounds {'assigned_to_me': True, 'unassigned': True} ->422",
+          "evidence": "X"
+        },
+        {
+          "check": "filters",
+          "passed": true,
+          "observed": {
+            "params": {
+              "assigned_to_me": true
+            },
+            "status": 403
+          },
+          "reproduction": "staff-only assignment filters forbidden to client",
+          "evidence": "X"
+        },
+        {
+          "check": "filters",
+          "passed": true,
+          "observed": {
+            "params": {
+              "unassigned": true
+            },
+            "status": 403
+          },
+          "reproduction": "staff-only assignment filters forbidden to client",
+          "evidence": "X"
+        },
+        {
+          "check": "filters",
+          "passed": true,
+          "observed": {
+            "params": {
+              "status": "open",
+              "priority": "normal"
+            },
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-0000000000a0",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 060",
+                  "description": "Description fixture ticket 060",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000094",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 048",
+                  "description": "Description fixture ticket 048",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000088",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 036",
+                  "description": "Description fixture ticket 036",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000007c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 024",
+                  "description": "Description fixture ticket 024",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000070",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 012",
+                  "description": "Description fixture ticket 012",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 000",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 6,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "AND status/priority/assignment filters exact fixture IDs",
+          "evidence": "X"
+        },
+        {
+          "check": "filters",
+          "passed": true,
+          "observed": {
+            "params": {
+              "status": "in_progress",
+              "priority": "high"
+            },
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-000000000095",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 049",
+                  "description": "Description fixture ticket 049",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000089",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 037",
+                  "description": "Description fixture ticket 037",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000007d",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 025",
+                  "description": "Description fixture ticket 025",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000071",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 013",
+                  "description": "Description fixture ticket 013",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000065",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 001",
+                  "description": "Description fixture ticket 001",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 5,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "AND status/priority/assignment filters exact fixture IDs",
+          "evidence": "X"
+        },
+        {
+          "check": "filters",
+          "passed": true,
+          "observed": {
+            "params": {
+              "status": "open",
+              "assigned_to_me": true
+            },
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-0000000000a0",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 060",
+                  "description": "Description fixture ticket 060",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000009c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 056",
+                  "description": "Description fixture ticket 056",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000098",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 052",
+                  "description": "Description fixture ticket 052",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000094",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 048",
+                  "description": "Description fixture ticket 048",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000090",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 044",
+                  "description": "Description fixture ticket 044",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000008c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 040",
+                  "description": "Description fixture ticket 040",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000088",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 036",
+                  "description": "Description fixture ticket 036",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000084",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 032",
+                  "description": "Description fixture ticket 032",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000080",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 028",
+                  "description": "Description fixture ticket 028",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000007c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 024",
+                  "description": "Description fixture ticket 024",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000078",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 020",
+                  "description": "Description fixture ticket 020",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000074",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 016",
+                  "description": "Description fixture ticket 016",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000070",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 012",
+                  "description": "Description fixture ticket 012",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006c",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 008",
+                  "description": "Description fixture ticket 008",
+                  "status": "open",
+                  "priority": "low",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000068",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 004",
+                  "description": "Description fixture ticket 004",
+                  "status": "open",
+                  "priority": "high",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000064",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 000",
+                  "description": "Description fixture ticket 000",
+                  "status": "open",
+                  "priority": "normal",
+                  "assignee_id": "00000000-0000-0000-0000-000000000003",
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 16,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "AND status/priority/assignment filters exact fixture IDs",
+          "evidence": "X"
+        },
+        {
+          "check": "filters",
+          "passed": true,
+          "observed": {
+            "params": {
+              "priority": "high",
+              "unassigned": true
+            },
+            "body": {
+              "items": [
+                {
+                  "id": "00000000-0000-0000-0000-00000000009b",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 055",
+                  "description": "Description fixture ticket 055",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000095",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 049",
+                  "description": "Description fixture ticket 049",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000008f",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 043",
+                  "description": "Description fixture ticket 043",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000089",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 037",
+                  "description": "Description fixture ticket 037",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000083",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 031",
+                  "description": "Description fixture ticket 031",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000007d",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 025",
+                  "description": "Description fixture ticket 025",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000077",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 019",
+                  "description": "Description fixture ticket 019",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000071",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 013",
+                  "description": "Description fixture ticket 013",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-00000000006b",
+                  "owner_id": "00000000-0000-0000-0000-000000000002",
+                  "title": "Ticket 007",
+                  "description": "Description fixture ticket 007",
+                  "status": "closed",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                },
+                {
+                  "id": "00000000-0000-0000-0000-000000000065",
+                  "owner_id": "00000000-0000-0000-0000-000000000001",
+                  "title": "Ticket 001",
+                  "description": "Description fixture ticket 001",
+                  "status": "in_progress",
+                  "priority": "high",
+                  "assignee_id": null,
+                  "version": 1,
+                  "created_at": "2027-01-15T08:00:00+00:00",
+                  "updated_at": "2027-01-15T08:00:00+00:00"
+                }
+              ],
+              "total": 10,
+              "page": 1,
+              "page_size": 50
+            }
+          },
+          "reproduction": "AND status/priority/assignment filters exact fixture IDs",
+          "evidence": "X"
+        },
+        {
+          "check": "pagination",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "total": 61,
+            "page": 1
+          },
+          "reproduction": "stable >50 ticket page envelope",
+          "evidence": "X"
+        },
+        {
+          "check": "pagination",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "total": 61,
+            "page": 2
+          },
+          "reproduction": "stable >50 ticket page envelope",
+          "evidence": "X"
+        },
+        {
+          "check": "pagination",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "total": 61,
+            "page": 3
+          },
+          "reproduction": "stable >50 ticket page envelope",
+          "evidence": "X"
+        },
+        {
+          "check": "pagination",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "total": 61,
+            "page": 4
+          },
+          "reproduction": "stable >50 ticket page envelope",
+          "evidence": "X"
+        },
+        {
+          "check": "sort",
+          "passed": true,
+          "observed": {
+            "expected": [
+              "00000000-0000-0000-0000-0000000000a0",
+              "00000000-0000-0000-0000-00000000009f",
+              "00000000-0000-0000-0000-00000000009e",
+              "00000000-0000-0000-0000-00000000009d",
+              "00000000-0000-0000-0000-00000000009c",
+              "00000000-0000-0000-0000-00000000009b",
+              "00000000-0000-0000-0000-00000000009a",
+              "00000000-0000-0000-0000-000000000099",
+              "00000000-0000-0000-0000-000000000098",
+              "00000000-0000-0000-0000-000000000097",
+              "00000000-0000-0000-0000-000000000096",
+              "00000000-0000-0000-0000-000000000095",
+              "00000000-0000-0000-0000-000000000094",
+              "00000000-0000-0000-0000-000000000093",
+              "00000000-0000-0000-0000-000000000092",
+              "00000000-0000-0000-0000-000000000091",
+              "00000000-0000-0000-0000-000000000090",
+              "00000000-0000-0000-0000-00000000008f",
+              "00000000-0000-0000-0000-00000000008e",
+              "00000000-0000-0000-0000-00000000008d",
+              "00000000-0000-0000-0000-00000000008c",
+              "00000000-0000-0000-0000-00000000008b",
+              "00000000-0000-0000-0000-00000000008a",
+              "00000000-0000-0000-0000-000000000089",
+              "00000000-0000-0000-0000-000000000088",
+              "00000000-0000-0000-0000-000000000087",
+              "00000000-0000-0000-0000-000000000086",
+              "00000000-0000-0000-0000-000000000085",
+              "00000000-0000-0000-0000-000000000084",
+              "00000000-0000-0000-0000-000000000083",
+              "00000000-0000-0000-0000-000000000082",
+              "00000000-0000-0000-0000-000000000081",
+              "00000000-0000-0000-0000-000000000080",
+              "00000000-0000-0000-0000-00000000007f",
+              "00000000-0000-0000-0000-00000000007e",
+              "00000000-0000-0000-0000-00000000007d",
+              "00000000-0000-0000-0000-00000000007c",
+              "00000000-0000-0000-0000-00000000007b",
+              "00000000-0000-0000-0000-00000000007a",
+              "00000000-0000-0000-0000-000000000079",
+              "00000000-0000-0000-0000-000000000078",
+              "00000000-0000-0000-0000-000000000077",
+              "00000000-0000-0000-0000-000000000076",
+              "00000000-0000-0000-0000-000000000075",
+              "00000000-0000-0000-0000-000000000074",
+              "00000000-0000-0000-0000-000000000073",
+              "00000000-0000-0000-0000-000000000072",
+              "00000000-0000-0000-0000-000000000071",
+              "00000000-0000-0000-0000-000000000070",
+              "00000000-0000-0000-0000-00000000006f",
+              "00000000-0000-0000-0000-00000000006e",
+              "00000000-0000-0000-0000-00000000006d",
+              "00000000-0000-0000-0000-00000000006c",
+              "00000000-0000-0000-0000-00000000006b",
+              "00000000-0000-0000-0000-00000000006a",
+              "00000000-0000-0000-0000-000000000069",
+              "00000000-0000-0000-0000-000000000068",
+              "00000000-0000-0000-0000-000000000067",
+              "00000000-0000-0000-0000-000000000066",
+              "00000000-0000-0000-0000-000000000065",
+              "00000000-0000-0000-0000-000000000064"
+            ],
+            "observed": [
+              "00000000-0000-0000-0000-0000000000a0",
+              "00000000-0000-0000-0000-00000000009f",
+              "00000000-0000-0000-0000-00000000009e",
+              "00000000-0000-0000-0000-00000000009d",
+              "00000000-0000-0000-0000-00000000009c",
+              "00000000-0000-0000-0000-00000000009b",
+              "00000000-0000-0000-0000-00000000009a",
+              "00000000-0000-0000-0000-000000000099",
+              "00000000-0000-0000-0000-000000000098",
+              "00000000-0000-0000-0000-000000000097",
+              "00000000-0000-0000-0000-000000000096",
+              "00000000-0000-0000-0000-000000000095",
+              "00000000-0000-0000-0000-000000000094",
+              "00000000-0000-0000-0000-000000000093",
+              "00000000-0000-0000-0000-000000000092",
+              "00000000-0000-0000-0000-000000000091",
+              "00000000-0000-0000-0000-000000000090",
+              "00000000-0000-0000-0000-00000000008f",
+              "00000000-0000-0000-0000-00000000008e",
+              "00000000-0000-0000-0000-00000000008d",
+              "00000000-0000-0000-0000-00000000008c",
+              "00000000-0000-0000-0000-00000000008b",
+              "00000000-0000-0000-0000-00000000008a",
+              "00000000-0000-0000-0000-000000000089",
+              "00000000-0000-0000-0000-000000000088",
+              "00000000-0000-0000-0000-000000000087",
+              "00000000-0000-0000-0000-000000000086",
+              "00000000-0000-0000-0000-000000000085",
+              "00000000-0000-0000-0000-000000000084",
+              "00000000-0000-0000-0000-000000000083",
+              "00000000-0000-0000-0000-000000000082",
+              "00000000-0000-0000-0000-000000000081",
+              "00000000-0000-0000-0000-000000000080",
+              "00000000-0000-0000-0000-00000000007f",
+              "00000000-0000-0000-0000-00000000007e",
+              "00000000-0000-0000-0000-00000000007d",
+              "00000000-0000-0000-0000-00000000007c",
+              "00000000-0000-0000-0000-00000000007b",
+              "00000000-0000-0000-0000-00000000007a",
+              "00000000-0000-0000-0000-000000000079",
+              "00000000-0000-0000-0000-000000000078",
+              "00000000-0000-0000-0000-000000000077",
+              "00000000-0000-0000-0000-000000000076",
+              "00000000-0000-0000-0000-000000000075",
+              "00000000-0000-0000-0000-000000000074",
+              "00000000-0000-0000-0000-000000000073",
+              "00000000-0000-0000-0000-000000000072",
+              "00000000-0000-0000-0000-000000000071",
+              "00000000-0000-0000-0000-000000000070",
+              "00000000-0000-0000-0000-00000000006f",
+              "00000000-0000-0000-0000-00000000006e",
+              "00000000-0000-0000-0000-00000000006d",
+              "00000000-0000-0000-0000-00000000006c",
+              "00000000-0000-0000-0000-00000000006b",
+              "00000000-0000-0000-0000-00000000006a",
+              "00000000-0000-0000-0000-000000000069",
+              "00000000-0000-0000-0000-000000000068",
+              "00000000-0000-0000-0000-000000000067",
+              "00000000-0000-0000-0000-000000000066",
+              "00000000-0000-0000-0000-000000000065",
+              "00000000-0000-0000-0000-000000000064"
+            ]
+          },
+          "reproduction": "all pages updated_at DESC,id DESC, no omissions/duplicates",
+          "evidence": "X"
+        },
+        {
+          "check": "pagination",
+          "passed": true,
+          "observed": {
+            "items": [],
+            "total": 61,
+            "page": 9999,
+            "page_size": 20
+          },
+          "reproduction": "high page empty with unchanged total",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-11.json",
+          "sha256": "38ec8b6870954b4d83b90a6d88d24ee14d17507a70c8c96cf4c869045594da46",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-11:bounds",
+            "FUN-11:filters",
+            "FUN-11:pagination",
+            "FUN-11:sort"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "FUN-12",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "Dashboard : total = somme des quatre statuts dans le périmètre, y compris zéro. Actualisation après mutation/rechargement ; aucun total global accessible au client.",
+      "observed": [
+        {
+          "check": "dashboard",
+          "passed": true,
+          "observed": {
+            "total": 6,
+            "open": 2,
+            "in_progress": 2,
+            "resolved": 1,
+            "closed": 1
+          },
+          "reproduction": "alice scoped four status counts including zeros",
+          "evidence": "X"
+        },
+        {
+          "check": "dashboard",
+          "passed": true,
+          "observed": {
+            "total": 12,
+            "open": 3,
+            "in_progress": 3,
+            "resolved": 3,
+            "closed": 3
+          },
+          "reproduction": "camille scoped four status counts including zeros",
+          "evidence": "X"
+        },
+        {
+          "check": "refresh",
+          "passed": true,
+          "observed": {
+            "total": 7,
+            "open": 3,
+            "in_progress": 2,
+            "resolved": 1,
+            "closed": 1
+          },
+          "reproduction": "GET dashboard after ticket creation updates own counts",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-12.json",
+          "sha256": "38a49b98999c27b4e3f1dd3975a0b0b560ee4cd993e9b8c25370d111517cdf8d",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-12:dashboard",
+            "FUN-12:refresh"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "FUN-12:ui_refresh (X)"
+      ]
+    },
+    {
+      "id": "FUN-13",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "PATCH identique : version/historique inchangés ; version obsolète refusée même pour un payload neutre. PATCH multichamp invalide : aucune écriture partielle. Message effectif : un incrément de version.",
+      "observed": [
+        {
+          "check": "noop",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "before_digest": "2331ec6e2147dd375641b2acf7d2ff114593e6f2ca5eb039a1b856c6f864d0d9",
+            "after_digest": "2331ec6e2147dd375641b2acf7d2ff114593e6f2ca5eb039a1b856c6f864d0d9"
+          },
+          "reproduction": "same-version no-op leaves all business bytes unchanged",
+          "evidence": "X"
+        },
+        {
+          "check": "stale_noop",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "VERSION_CONFLICT",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "stale expected_version rejected even for current identical value",
+          "evidence": "X"
+        },
+        {
+          "check": "stale_noop",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "VERSION_CONFLICT",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "stable VERSION_CONFLICT code",
+          "evidence": "X"
+        },
+        {
+          "check": "atomic_patch",
+          "passed": true,
+          "observed": {
+            "status": 409,
+            "body": {
+              "error": {
+                "code": "INVALID_TRANSITION",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "invalid final workflow + valid priority must not partially apply",
+          "evidence": "X"
+        },
+        {
+          "check": "atomic_patch",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+          "evidence": "X"
+        },
+        {
+          "check": "atomic_patch",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+          "evidence": "X"
+        },
+        {
+          "check": "atomic_patch",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+          "evidence": "X"
+        },
+        {
+          "check": "atomic_patch",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+          "evidence": "X"
+        },
+        {
+          "check": "atomic_patch",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "body": {
+              "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Requête refusée"
+              }
+            },
+            "before_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3",
+            "after_digest": "c9a4ddd857bc11033ef74bb563bff7cfb82bc4393f620a873505eec3832e43f3"
+          },
+          "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+          "evidence": "X"
+        },
+        {
+          "check": "message_version",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "before": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 2,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 1,
+              "message_count": 1
+            },
+            "after": {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 3,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00",
+              "audit_count": 2,
+              "message_count": 2
+            }
+          },
+          "reproduction": "one effective message -> one version and one event",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-16\\fixtures\\test_no_auth_bypass_and_no_sec0\\FUN-13.json",
+          "sha256": "a69999217f9f97d4e48416e50db16e208c223e9fe2b6561b331359abd018e823",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "FUN-13:noop",
+            "FUN-13:stale_noop",
+            "FUN-13:atomic_patch",
+            "FUN-13:message_version"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    }
+  ],
+  "limits": [
+    "bounded contract probes, not an exhaustive arbitrary assertion verifier",
+    "historic PASS is not reused; every current native probe is executed"
+  ],
+  "kind": "independent-pack fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}

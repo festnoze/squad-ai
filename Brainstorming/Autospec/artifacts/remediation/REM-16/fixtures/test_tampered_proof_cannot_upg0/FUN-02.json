@@ -1,0 +1,424 @@
+{
+  "requirement_id": "FUN-02",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "scope",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "id": "00000000-0000-0000-0000-000000000069",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 005",
+              "description": "Description fixture ticket 005",
+              "status": "in_progress",
+              "priority": "low",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000068",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 004",
+              "description": "Description fixture ticket 004",
+              "status": "open",
+              "priority": "high",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000067",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 003",
+              "description": "Description fixture ticket 003",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000066",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 002",
+              "description": "Description fixture ticket 002",
+              "status": "resolved",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000065",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 001",
+              "description": "Description fixture ticket 001",
+              "status": "in_progress",
+              "priority": "high",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          ],
+          "total": 6,
+          "page": 1,
+          "page_size": 50
+        }
+      },
+      "reproduction": "alice GET tickets; fixture count 6",
+      "evidence": "X"
+    },
+    {
+      "check": "scope",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "id": "00000000-0000-0000-0000-00000000006f",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 011",
+              "description": "Description fixture ticket 011",
+              "status": "closed",
+              "priority": "low",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006e",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 010",
+              "description": "Description fixture ticket 010",
+              "status": "resolved",
+              "priority": "high",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006d",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 009",
+              "description": "Description fixture ticket 009",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006c",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 008",
+              "description": "Description fixture ticket 008",
+              "status": "open",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006b",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 007",
+              "description": "Description fixture ticket 007",
+              "status": "closed",
+              "priority": "high",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006a",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 006",
+              "description": "Description fixture ticket 006",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000069",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 005",
+              "description": "Description fixture ticket 005",
+              "status": "in_progress",
+              "priority": "low",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000068",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 004",
+              "description": "Description fixture ticket 004",
+              "status": "open",
+              "priority": "high",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000067",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 003",
+              "description": "Description fixture ticket 003",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000066",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 002",
+              "description": "Description fixture ticket 002",
+              "status": "resolved",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000065",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 001",
+              "description": "Description fixture ticket 001",
+              "status": "in_progress",
+              "priority": "high",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          ],
+          "total": 12,
+          "page": 1,
+          "page_size": 50
+        }
+      },
+      "reproduction": "camille GET tickets; fixture count 12",
+      "evidence": "X"
+    },
+    {
+      "check": "scope",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "items": [
+            {
+              "id": "00000000-0000-0000-0000-00000000006f",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 011",
+              "description": "Description fixture ticket 011",
+              "status": "closed",
+              "priority": "low",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006e",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 010",
+              "description": "Description fixture ticket 010",
+              "status": "resolved",
+              "priority": "high",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006d",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 009",
+              "description": "Description fixture ticket 009",
+              "status": "in_progress",
+              "priority": "normal",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006c",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 008",
+              "description": "Description fixture ticket 008",
+              "status": "open",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006b",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 007",
+              "description": "Description fixture ticket 007",
+              "status": "closed",
+              "priority": "high",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-00000000006a",
+              "owner_id": "00000000-0000-0000-0000-000000000002",
+              "title": "Ticket 006",
+              "description": "Description fixture ticket 006",
+              "status": "resolved",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000069",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 005",
+              "description": "Description fixture ticket 005",
+              "status": "in_progress",
+              "priority": "low",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000068",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 004",
+              "description": "Description fixture ticket 004",
+              "status": "open",
+              "priority": "high",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000067",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 003",
+              "description": "Description fixture ticket 003",
+              "status": "closed",
+              "priority": "normal",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000066",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 002",
+              "description": "Description fixture ticket 002",
+              "status": "resolved",
+              "priority": "low",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000065",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 001",
+              "description": "Description fixture ticket 001",
+              "status": "in_progress",
+              "priority": "high",
+              "assignee_id": null,
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            },
+            {
+              "id": "00000000-0000-0000-0000-000000000064",
+              "owner_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Ticket 000",
+              "description": "Description fixture ticket 000",
+              "status": "open",
+              "priority": "normal",
+              "assignee_id": "00000000-0000-0000-0000-000000000003",
+              "version": 1,
+              "created_at": "2027-01-15T08:00:00+00:00",
+              "updated_at": "2027-01-15T08:00:00+00:00"
+            }
+          ],
+          "total": 12,
+          "page": 1,
+          "page_size": 50
+        }
+      },
+      "reproduction": "emma GET tickets; fixture count 12",
+      "evidence": "X"
+    },
+    {
+      "check": "missing",
+      "passed": true,
+      "observed": {
+        "status": 404
+      },
+      "reproduction": "GET absent UUID after viewing a real ticket",
+      "evidence": "X"
+    }
+  ]
+}

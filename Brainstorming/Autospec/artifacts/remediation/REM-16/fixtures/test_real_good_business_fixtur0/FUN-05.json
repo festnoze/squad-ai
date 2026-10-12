@@ -1,0 +1,340 @@
+{
+  "requirement_id": "FUN-05",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "messages",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "before": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 1,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 0,
+          "message_count": 0
+        },
+        "after": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 2,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 1,
+          "message_count": 1
+        }
+      },
+      "reproduction": "alice posts public, no implicit workflow",
+      "evidence": "X"
+    },
+    {
+      "check": "identity",
+      "passed": true,
+      "observed": {
+        "id": "c49f5199-e7b3-48bb-9a1b-c9de47af5c1b",
+        "ticket_id": "00000000-0000-0000-0000-000000000064",
+        "author_id": "00000000-0000-0000-0000-000000000001",
+        "content": "Réponse publique",
+        "visibility": "public",
+        "created_at": "2027-01-15T08:00:00+00:00"
+      },
+      "reproduction": "message author from session, timestamp explicit UTC",
+      "evidence": "X"
+    },
+    {
+      "check": "messages",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "before": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 2,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 1,
+          "message_count": 1
+        },
+        "after": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 3,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 2,
+          "message_count": 2
+        }
+      },
+      "reproduction": "camille posts public, no implicit workflow",
+      "evidence": "X"
+    },
+    {
+      "check": "identity",
+      "passed": true,
+      "observed": {
+        "id": "149527b9-5c44-4291-8638-6c2f3d91556f",
+        "ticket_id": "00000000-0000-0000-0000-000000000064",
+        "author_id": "00000000-0000-0000-0000-000000000003",
+        "content": "Réponse publique",
+        "visibility": "public",
+        "created_at": "2027-01-15T08:00:00+00:00"
+      },
+      "reproduction": "message author from session, timestamp explicit UTC",
+      "evidence": "X"
+    },
+    {
+      "check": "messages",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "before": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 3,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 2,
+          "message_count": 2
+        },
+        "after": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 4,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 3,
+          "message_count": 3
+        }
+      },
+      "reproduction": "camille posts internal, no implicit workflow",
+      "evidence": "X"
+    },
+    {
+      "check": "identity",
+      "passed": true,
+      "observed": {
+        "id": "41c54860-9adb-42ba-b5e2-3a7f90710b21",
+        "ticket_id": "00000000-0000-0000-0000-000000000064",
+        "author_id": "00000000-0000-0000-0000-000000000003",
+        "content": "Réponse publique",
+        "visibility": "internal",
+        "created_at": "2027-01-15T08:00:00+00:00"
+      },
+      "reproduction": "message author from session, timestamp explicit UTC",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "length": 0
+      },
+      "reproduction": "message bounds length 0 ->422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "length": 1
+      },
+      "reproduction": "message bounds length 1 ->201",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "length": 5000
+      },
+      "reproduction": "message bounds length 5000 ->201",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "length": 5001
+      },
+      "reproduction": "message bounds length 5001 ->422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "length": 4
+      },
+      "reproduction": "message bounds length 4 ->422",
+      "evidence": "X"
+    },
+    {
+      "check": "visibility",
+      "passed": true,
+      "observed": {
+        "status": 403,
+        "body": {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756",
+        "after_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756"
+      },
+      "reproduction": "client internal message forbidden",
+      "evidence": "X"
+    },
+    {
+      "check": "visibility",
+      "passed": true,
+      "observed": {
+        "status": 404,
+        "body": {
+          "error": {
+            "code": "NOT_FOUND",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756",
+        "after_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756"
+      },
+      "reproduction": "other client cannot message Alice ticket",
+      "evidence": "X"
+    },
+    {
+      "check": "identity",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756",
+        "after_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756"
+      },
+      "reproduction": "server-only message identity/date fields cannot be supplied",
+      "evidence": "X"
+    },
+    {
+      "check": "identity",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756",
+        "after_digest": "8d68b77606e233378159843f5d0f7e2ffde2c8009471104929020958b7bf9756"
+      },
+      "reproduction": "server-only message identity/date fields cannot be supplied",
+      "evidence": "X"
+    },
+    {
+      "check": "visibility",
+      "passed": true,
+      "observed": {
+        "items": [
+          {
+            "id": "149527b9-5c44-4291-8638-6c2f3d91556f",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000003",
+            "content": "Réponse publique",
+            "visibility": "public",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          {
+            "id": "c00569c8-3203-48b6-acb7-e5e819aecb9b",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000003",
+            "content": "x",
+            "visibility": "public",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          {
+            "id": "c49f5199-e7b3-48bb-9a1b-c9de47af5c1b",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000001",
+            "content": "Réponse publique",
+            "visibility": "public",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          {
+            "id": "eb8b89e1-356e-4d55-918a-2a5fb4452b2c",
+            "ticket_id": "00000000-0000-0000-0000-000000000064",
+            "author_id": "00000000-0000-0000-0000-000000000003",
+            "content": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "visibility": "public",
+            "created_at": "2027-01-15T08:00:00+00:00"
+          }
+        ],
+        "total": 4,
+        "page": 1,
+        "page_size": 50
+      },
+      "reproduction": "client message list excludes internal before pagination",
+      "evidence": "X"
+    },
+    {
+      "check": "messages",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "TICKET_CLOSED",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "57f58e925ce73567b70100a10401c488d37dbf10aac4a195678ceda3bf66f5e5",
+        "after_digest": "57f58e925ce73567b70100a10401c488d37dbf10aac4a195678ceda3bf66f5e5"
+      },
+      "reproduction": "new message on closed ticket refused",
+      "evidence": "X"
+    }
+  ]
+}

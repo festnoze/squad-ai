@@ -1,0 +1,52 @@
+{
+  "requirement_id": "ARC-04",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "fresh_migration",
+      "passed": true,
+      "observed": {
+        "runner": {
+          "exit_code": 0,
+          "command": "migrate_fresh",
+          "fixture_only": true
+        },
+        "tables": [
+          "idempotency_keys",
+          "messages",
+          "sessions",
+          "ticket_events",
+          "tickets",
+          "users"
+        ]
+      },
+      "reproduction": "reviewed migration command on disposable empty DB",
+      "evidence": "X"
+    },
+    {
+      "check": "schema_version",
+      "passed": true,
+      "observed": {
+        "version": 1
+      },
+      "reproduction": "schema migration version visible independently",
+      "evidence": "X"
+    },
+    {
+      "check": "replay",
+      "passed": true,
+      "observed": {
+        "runner": {
+          "exit_code": 0,
+          "command": "migrate_replay",
+          "fixture_only": true
+        },
+        "before_digest": "cf138890f2223f2a4e16deda2c821ed73d2167cfe3408bf18f306e5cba39bdee",
+        "after_digest": "cf138890f2223f2a4e16deda2c821ed73d2167cfe3408bf18f306e5cba39bdee"
+      },
+      "reproduction": "rerun migration with all table rows/sessions/keys retained, no drop/reseed",
+      "evidence": "X"
+    }
+  ]
+}
