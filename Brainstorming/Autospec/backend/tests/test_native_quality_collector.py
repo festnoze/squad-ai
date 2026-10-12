@@ -160,6 +160,8 @@ async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remai
             return rows
         finally:await case.adapter.close();case.stop_http()
     collector.mutation_probe=probe
+    collector.source_snapshotter=lambda root:SimpleNamespace(digest=hashlib.sha256(json.dumps({"version":1,
+        "files":{p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path(root).rglob('*')) if p.is_file()}},sort_keys=True,separators=(',',':')).encode()).hexdigest())
     collector.copy_product=lambda source,target:Path(shutil.copytree(source,target)) # trusted fixture only; no links exist
     result=await collector._mutation(subject.snapshot)
     assert result["original_status"]=="PASS",result
@@ -174,3 +176,13 @@ async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remai
     report=await QualityVerifier(collector.contract,collector).verify(subject.snapshot)
     row=next(r for r in report["requirements"] if r["id"]=="TST-06")
     assert row["status"]=="PASS",row
+    # R can correctly reject the deliberately weakened source, but that is
+    # not a runtime mutation kill when native X and observations stay green.
+    source_only=json.loads(json.dumps(result))
+    source_only["mutated_results"]=source_only["original_results"]
+    for rid,item in source_only["mutated_results"].items():
+        item["status"]="FAIL"
+        for p in item["proofs"]:p["snapshot_hash"]=source_only["mutation_snapshot_hash"]
+    collector.records["authorization_mutation"]=source_only
+    false_claim=await QualityVerifier(collector.contract,collector).verify(subject.snapshot)
+    assert next(r for r in false_claim["requirements"] if r["id"]=="TST-06")["status"]=="FAIL"
