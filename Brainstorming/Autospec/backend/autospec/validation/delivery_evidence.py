@@ -616,6 +616,7 @@ class NativeTimingRecorder:
         self.root,self.snapshot,self.contract=Path(evidence_root).resolve(),snapshot_hash,contract_hash
         self.docker=docker;self.phases=[]
         self.lock=threading.Lock()
+        self._ingested=set()
 
     def _record(self,phase,started,elapsed,proofs):
         if not proofs: raise AdapterUnavailable("measured phase has no native operation artifacts")
@@ -662,9 +663,77 @@ class NativeTimingRecorder:
         if not _image_id(value.get("image_id")) or not re.fullmatch(r"[a-f0-9]{64}",value.get("environment_fingerprint","")):
             raise AdapterUnavailable("timing is not tied to an actual isolated environment")
         row=dict(timing,source_proofs=[asdict(source_proof)],scope="native split-clock receipt, not total operation estimate")
-        proof=_native_proof(self.root,"timing",row,self.snapshot,self.contract,checks=("OPS-06:"+phase,))
-        with self.lock:self.phases.append((row,proof))
+        key=("execution",_sha(json.dumps(value,sort_keys=True,ensure_ascii=True).encode()),phase)
+        with self.lock:
+            if key in self._ingested: raise AdapterUnavailable("native execution clock already ingested")
+            proof=_native_proof(self.root,"timing",row,self.snapshot,self.contract,checks=("OPS-06:"+phase,))
+            self.phases.append((row,proof));self._ingested.add(key)
         return proof
+
+    def ingest_delivery(self,receipt,source_proof:Proof,*,source_root):
+        """Retain exact native build subclocks once, without measuring the total.
+
+        Fresh source/image/manifest/lock/recipe admission is required. The two
+        install clocks measure environment preparation, including cache checks;
+        they do not invent uv/npm executions. Frontend build and final Docker
+        build clocks are separate, not the enclosing build_delivery_image call.
+        A frontend receipt contributes four clocks; a backend-only one, two.
+        Do not additionally measure_sync('build', build_delivery_image, ...).
+        """
+        import math
+        from ..agents.file_broker import ExecutionContext,FileBroker
+        if not isinstance(source_proof,Proof) or source_proof.type!="X" or source_proof.passed is not True or not source_proof.intact(snapshot_hash=self.snapshot,contract_hash=self.contract):
+            raise AdapterUnavailable("intact native delivery receipt required")
+        path=Path(source_proof.path).absolute()
+        if path.resolve()!=path or not path.is_relative_to(self.root):
+            raise AdapterUnavailable("native delivery receipt outside unaliased supervisor root")
+        FileBroker(ExecutionContext("delivery-clock-proof",self.root)).path(path.relative_to(self.root).as_posix())
+        payload=json.loads(path.read_bytes());actual=payload.get("value",payload)
+        if actual!=receipt: raise AdapterUnavailable("delivery clocks differ from exact native raw receipt")
+        checks=delivery_build_checks(receipt,Path(source_root),self.snapshot)
+        if not checks or any(row.get("passed") is not True for row in checks):
+            raise AdapterUnavailable("native delivery source/image/recipe admission failed")
+        commands={c["kind"]:c for c in receipt["commands"]}
+        backend=receipt.get("backend_dependency")
+        if backend!=commands["backend_install"]["builder"]:
+            raise AdapterUnavailable("backend preparation clock differs from admitted builder")
+        jobs=[("backend_dependency.timing","install",backend,commands["backend_install"])]
+        if "frontend_install" in commands:
+            frontend=receipt.get("frontend_build")
+            if not isinstance(frontend,dict) or frontend.get("dependency")!=commands["frontend_install"]["builder"] or {k:v for k,v in frontend.items() if k!="dependency"}!=commands["typecheck_frontend_build"]:
+                raise AdapterUnavailable("frontend preparation/build clocks differ from admitted commands")
+            jobs.extend([
+                ("frontend_build.dependency.timing","install",frontend["dependency"],commands["frontend_install"]),
+                ("frontend_build.timing","build",frontend,commands["typecheck_frontend_build"])])
+        jobs.append(("commands.image_build.timing","docker",commands["image_build"],commands["image_build"]))
+        digest=_sha(json.dumps(receipt,sort_keys=True,ensure_ascii=True).encode());pending=[]
+        for native_path,phase,container,command in jobs:
+            clock=container.get("timing")
+            if not isinstance(clock,dict) or clock.get("phase")!=phase:
+                raise AdapterUnavailable("exact native delivery subclock absent: "+native_path)
+            seconds=clock.get("seconds")
+            if isinstance(seconds,bool) or not isinstance(seconds,(int,float)) or not math.isfinite(seconds) or seconds<0:
+                raise AdapterUnavailable("invalid measured delivery seconds")
+            try:
+                start=datetime.fromisoformat(clock["started_at"].replace("Z","+00:00"));end=datetime.fromisoformat(clock["ended_at"].replace("Z","+00:00"))
+                if start.tzinfo is None or end.tzinfo is None or end<start: raise ValueError("invalid clock bounds")
+            except (ValueError,KeyError,TypeError) as exc:
+                raise AdapterUnavailable("native zoned delivery clock bounds absent") from exc
+            row=dict(clock,native_clock_path=native_path,native_kind=command["kind"],
+                image_id=receipt["image_id"] if phase=="docker" else command["image_id"],
+                environment_fingerprint=commands["backend_install"]["environment_fingerprint"] if phase=="docker" else command["environment_fingerprint"],
+                execution=command.get("execution","observed-command"),argv=command["argv"],return_code=command["rc"],
+                source_proofs=[asdict(source_proof)],scope="exact native delivery subclock; cache/layer preparation is not a new install rc; no enclosing total included")
+            pending.append((("delivery",digest,native_path),row))
+        # All clocks are validated before publication: a bad fourth clock must
+        # not leave three apparently complete phases behind.
+        with self.lock:
+            if any(key in self._ingested for key,_ in pending):
+                raise AdapterUnavailable("native delivery subclock already ingested")
+            proofs=[_native_proof(self.root,"timing",row,self.snapshot,self.contract,checks=("OPS-06:"+row["phase"],)) for _,row in pending]
+            self.phases.extend((row,proof) for (_,row),proof in zip(pending,proofs))
+            self._ingested.update(key for key,_ in pending)
+        return proofs
 
     async def measure(self,phase,operation,proof_provider):
         import time
