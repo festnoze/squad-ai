@@ -286,6 +286,17 @@ class ClaimArbiter:
             return any(c.mode == "exclusive" and path_matches(target.path, c.path)
                        for c in self._active.get(owner, ()))
 
+    async def authorize_batch(self, owner: str, paths: tuple[str, ...], *, project_root: Path) -> bool:
+        """One atomic pre-write decision for the whole broker batch."""
+        try:
+            targets = [canonical_claim(path, project_root=project_root, owner=owner) for path in paths]
+        except ClaimError:
+            return False
+        async with self._lock:
+            return bool(targets) and all(target.project_root == self._project_root and
+                any(c.mode == "exclusive" and path_matches(target.path, c.path)
+                    for c in self._active.get(owner, ())) for target in targets)
+
     async def snapshot(self) -> dict:
         async with self._lock:
             return {"version": 1,

@@ -41,6 +41,9 @@ def _us(sid, *, stream="", tasks=None, depends_on=None, gherkin="Feature: F\n  S
     return UserStory(
         id=sid, epic_id="EPIC-1", title=sid, gherkin=gherkin,
         stream=stream, tasks=tasks or [], depends_on=depends_on or [],
+        # Parallelism is meaningful only with genuinely disjoint, declared
+        # ownership. Unspecified root scope now serializes safely.
+        files_hint=[f"{'frontend/' if stream == 'frontend' else ''}units/{sid}/**"],
     )
 
 
@@ -48,6 +51,7 @@ def _task(tid, story_id, *, stream="", depends_on=None, gherkin="Feature: F\n  S
     return Task(
         id=tid, story_id=story_id, stream=stream, title=tid,
         gherkin=gherkin, depends_on=depends_on or [],
+        files_hint=[f"{'frontend/' if stream == 'frontend' else ''}units/{tid}/**"],
     )
 
 

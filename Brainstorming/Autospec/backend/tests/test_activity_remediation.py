@@ -8,6 +8,58 @@ from autospec.orchestrator.pipeline import Pipeline, _BUILD_ITEM
 from autospec import storage
 
 
+async def test_mediated_tool_wait_is_not_counted_as_a_provider_call():
+    from autospec.agents.runner import observe_provider
+    tool_wait, release = asyncio.Event(), asyncio.Event()
+    class Mediated:
+        reports_provider_turns = True
+        async def arun(self, *args, **kwargs):
+            await observe_provider(True)
+            assert pipeline._tracked._provider_calls == 1
+            await observe_provider(False)
+            tool_wait.set()
+            await release.wait()
+            await observe_provider(True)
+            assert pipeline._tracked._provider_calls == 1
+            await observe_provider(False)
+            return AgentResult("ok", cost_usd=.1)
+    pipeline = Pipeline(ProjectState(id="mediated-activity", name="test", goal="demo",
+                                    phase=PipelinePhase.BUILD, budget_usd=1), Mediated())
+    active = asyncio.create_task(pipeline._tracked.arun("p", "s"))
+    await asyncio.wait_for(tool_wait.wait(), 2)
+    row = next(iter(pipeline.state.agent_activity.values()))
+    assert row["phase"] == "mediated_tools"
+    assert row["logical_call_active"] is True
+    assert row["active_provider_calls"] == 0
+    assert pipeline._tracked._active_calls == 1  # budget remains reserved
+    waiting = asyncio.create_task(pipeline._tracked.arun("p", "s"))
+    await asyncio.sleep(0)
+    assert any(a["phase"] == "waiting_budget" and a["active_provider_calls"] == 0
+               for a in pipeline.state.agent_activity.values())
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+    release.set()
+    await active
+    assert pipeline._tracked._provider_calls == 0
+    assert pipeline.state.agent_activity == {}
+
+
+def test_restart_between_mediated_turns_preserves_usage_uncertainty(monkeypatch, tmp_path):
+    from autospec.config import settings
+    from autospec.api import server
+    monkeypatch.setattr(settings, "workspace_root", tmp_path)
+    monkeypatch.setattr(server, "pipelines", {})
+    storage.save_state(ProjectState(id="tool-interrupted", name="test", goal="demo",
+        phase=PipelinePhase.BUILD, agent_activity={"T1": {
+            "phase": "mediated_tools", "logical_call_active": True,
+            "active_provider_calls": 0}}))
+    server.recover_projects()
+    state = storage.load_state("tool-interrupted")
+    assert state.usage.unreported_calls == 1
+    assert state.generation_checkpoint["cost_incomplete"] is True
+
+
 async def test_checkpoint_failure_prevents_provider_spend(monkeypatch):
     from autospec.orchestrator import pipeline as module
     class Forbidden:

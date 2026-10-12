@@ -15,6 +15,7 @@ import time
 import zipfile
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -49,6 +50,8 @@ from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
 from ..forecast import forecast_iteration_cost
 from ..spec_import import parse_spec_import
+from ..contracts import ContractError, ContractFact, import_contract
+from ..orchestrator import acceptance
 from ..metrics import compute_metrics
 from .. import storage
 from ..storage import list_states, load_interactions, load_state, workspace_dir
@@ -145,7 +148,8 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
         changed = False
         interrupted_phase = state.phase.value if state.phase in _INTERRUPTED_PHASES else ""
         if state.phase in _INTERRUPTED_PHASES:
-            providers = [a for a in state.agent_activity.values() if a.get("phase") == "provider"]
+            providers = [a for a in state.agent_activity.values()
+                         if a.get("logical_call_active") or a.get("phase") == "provider"]
             if providers:
                 # The lost CLI's final usage was never accounted for. Preserve
                 # that uncertainty before clearing volatile activity; capped
@@ -304,6 +308,15 @@ def set_runner(runner: AgentRunner) -> None:
     _runner = runner
 
 
+class AcceptanceFactInput(BaseModel):
+    model_config = {"extra": "forbid"}
+    id: str
+    kind: str
+    expected: Any
+    requirement_ids: list[str]
+    source_excerpt: str
+
+
 class CreateProjectRequest(BaseModel):
     goal: str
     name: str = ""
@@ -314,6 +327,10 @@ class CreateProjectRequest(BaseModel):
     brief: str = ""  # I3: optional imported spec — seeds the brief, skips the interview
     brownfield_path: str = ""  # B1: existing repo to extend
     technical_stack: dict[str, str] = Field(default_factory=dict)
+    acceptance_reference: str = ""
+    acceptance_facts: list[AcceptanceFactInput] = Field(default_factory=list)
+    acceptance_reviewed_by: str = ""
+    acceptance_max_lots: int = Field(default=7, ge=1, le=100)
 
 
 class MessageRequest(BaseModel):
@@ -563,6 +580,14 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
         )
     except ValueError as exc:
         raise HTTPException(422, str(exc))
+    contract = None
+    if req.acceptance_reference or req.acceptance_facts or req.acceptance_reviewed_by:
+        try:
+            contract = import_contract(req.brief, req.acceptance_reference,
+                reviewed_by=req.acceptance_reviewed_by,
+                facts=[ContractFact.create(**fact.model_dump()) for fact in req.acceptance_facts])
+        except (ContractError, ValueError, TypeError) as exc:
+            raise HTTPException(422, f"Contrat d'acceptation invalide : {exc}") from exc
     state = ProjectState(
         id=new_id(_slug(name)),
         name=name,
@@ -571,10 +596,18 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
         product_profile=product_profile,
         budget_usd=max(0.0, req.budget_usd),
         budget_tokens=max(0, req.budget_tokens),
-        brief=parse_spec_import(req.brief),
+        brief=contract.brief if contract is not None else parse_spec_import(req.brief),
         brownfield_path=(req.brownfield_path or "").strip(),
         technical_stack=req.technical_stack,
+        acceptance_contract_hash=contract.contract_hash if contract is not None else "",
+        acceptance_max_lots=req.acceptance_max_lots,
     )
+    if contract is not None:
+        try:
+            await asyncio.to_thread(acceptance.contract_store(state.id).save, contract)
+        except (OSError, ContractError) as exc:
+            # No provider call or partially admitted pipeline after store failure.
+            raise HTTPException(503, "Oracle d'acceptation non persisté ; génération non lancée.") from exc
     state.chat.append(ChatMessage(role=ChatRole.USER, content=req.goal))
     pipeline = Pipeline(state, _runner)
     pipelines[state.id] = pipeline
