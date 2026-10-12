@@ -154,6 +154,23 @@ def test_interrupted_volume_creation_cleans_daemon_resource(tmp_path, docker_fak
     assert session.closed and docker_fake.volume is None
 
 
+def test_ingress_bridge_uses_isolated_base_python_not_product_import_path(tmp_path, docker_fake, monkeypatch):
+    captured = []
+    def spawn(argv, **kwargs):
+        captured.append(argv)
+        raise OSError('fixture stops before spawning any host process')
+    monkeypatch.setattr(runtime_module, 'spawn_owned_process', spawn)
+    left, right = socket.socketpair()
+    try:
+        with RuntimeSession(tmp_path, 'attested', ['python']) as session:
+            session._forward(left)
+            argv = captured[0]
+            assert argv[:7] == ['docker', 'exec', '--workdir', '/tmp', '-i', session.identifier, '/usr/local/bin/python']
+            assert argv[7:10] == ['-I', '-u', '-c']
+    finally:
+        left.close(); right.close()
+
+
 @pytest.mark.parametrize('options', [
     {'env': {'APP_ORIGIN': 'http://evil'}},
     {'env': {'SESSION_COOKIE_SECURE': 'false'}},
@@ -218,6 +235,10 @@ HTTPServer(('0.0.0.0',8000),Handler).serve_forever()
         with session:
             assert session.is_running()
             assert ready() == {'value': 0, 'origin': origin, 'cookie': 'false', 'uid': 65532}
+            # Factory injects a shadow module after the app's stdlib imports.
+            # A non-isolated bridge started from /app would execute this product
+            # file; the trusted transport must ignore it. Never imported host.
+            (stage / 'socket.py').write_text("raise RuntimeError('PRODUCT_SHADOW_MUST_NOT_RUN')\n")
             request = urllib.request.Request(origin, method='POST', headers={'Origin': origin})
             with urllib.request.urlopen(request, timeout=10) as response:
                 assert response.status == 204
@@ -226,6 +247,7 @@ HTTPServer(('0.0.0.0',8000),Handler).serve_forever()
             with pytest.raises(HTTPError) as refused:
                 urllib.request.urlopen(wrong, timeout=10)
             assert refused.value.code == 403
+            (stage / 'socket.py').unlink()
             first = session.identifier
             volume = session.volume_name
             inspect = _docker_call(['docker', 'container', 'inspect', first], capture_output=True, text=True, timeout=10)

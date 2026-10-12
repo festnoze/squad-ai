@@ -522,12 +522,14 @@ class RuntimeSession:
                         "exec(\"def upload():\\n try:\\n  while True:\\n   b=sys.stdin.buffer.read1(65536)\\n   if not b: break\\n   s.sendall(b)\\n except OSError: pass\\n finally:\\n  try: s.shutdown(socket.SHUT_WR)\\n  except OSError: pass\\n\"); "
                         "threading.Thread(target=upload,daemon=True).start(); "
                         "exec(\"while True:\\n b=s.recv(65536)\\n if not b: break\\n sys.stdout.buffer.write(b); sys.stdout.buffer.flush()\\n\")")
-                bridge = ["/opt/venv/bin/python", "-u", "-c", code]
+                # Isolated BASE interpreter: generated socket.py/threading.py
+                # or site customization cannot replace the ingress transport.
+                bridge = ["/usr/local/bin/python", "-I", "-u", "-c", code]
             else:
                 bridge = ["node", "-e", f"const s=require('net').connect({self.port},'127.0.0.1');s.on('connect',()=>{{process.stdin.pipe(s);s.pipe(process.stdout);}});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit());"]
             with self.operation_lock:
                 identifier = self._assert_owned()
-                process = spawn_owned_process([self.docker, "exec", "-i", identifier, *bridge],
+                process = spawn_owned_process([self.docker, "exec", "--workdir", "/tmp", "-i", identifier, *bridge],
                                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
                 with self.lock:
                     self.clients.add(process)

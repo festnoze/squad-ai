@@ -54,6 +54,8 @@ def test_clean_recipe_disables_hooks_builds_and_project_install(tmp_path):
     assert "UV_PROJECT_ENVIRONMENT=/opt/venv" in recipe
     assert "COPY ." not in recipe
     assert "USER 65532:65532" in recipe
+    assert '--python /usr/local/bin/python --target /opt/reporters --no-deps --no-build --no-config' in recipe
+    assert 'uv pip install --python /opt/venv/bin/python' not in recipe
     node = LinuxEnvironmentManager._recipe("sha256:" + "a" * 64, "node", "test", "b" * 64, manifest)
     assert "--ignore-scripts" in node and "--userconfig=/dev/null" in node
 

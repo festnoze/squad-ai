@@ -28,7 +28,7 @@ from .sandbox import _docker_call, _unavailable
 
 BASE_IMAGES = {"python": "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
                "node": "node:22-bookworm-slim"}
-RECIPE_VERSION = 3
+RECIPE_VERSION = 4
 FACTORY_FILES = {".autospec-bootstrap.json", ".autospec-environment.json", ".mcp.json",
                  "claude.md", "agents.md", "gemini.md"}
 
@@ -141,7 +141,8 @@ def _registry_url(url: str, ecosystem: str) -> None:
         raise _unavailable("Only credential-free public registry dependencies are supported")
 
 
-def admit_manifest(root: Path, ecosystem: str, *, require_lock: bool = True) -> tuple[Path, Path]:
+def admit_manifest(root: Path, ecosystem: str, *, require_lock: bool = True,
+                   validate_existing_lock: bool = True) -> tuple[Path, Path]:
     broker = FileBroker(ExecutionContext("dependency-manifest", Path(root)))
     names = ("pyproject.toml", "uv.lock") if ecosystem == "python" else ("package.json", "package-lock.json")
     manifest, lock = (broker.path(n) for n in names)
@@ -150,16 +151,20 @@ def admit_manifest(root: Path, ecosystem: str, *, require_lock: bool = True) -> 
     if ecosystem == "python":
         data = tomllib.loads(manifest.read_text(encoding="utf-8"))
         uv = data.get("tool", {}).get("uv", {})
-        if any(key in uv for key in ("sources", "index", "index-url", "extra-index-url", "workspace")):
-            raise _unavailable("Custom/local Python sources are not supported in clean validation")
+        safe_uv = {"package", "managed", "dev-dependencies", "override-dependencies", "constraint-dependencies",
+                   "environments", "required-environments"}
+        if set(uv) - safe_uv:
+            raise _unavailable("Custom/local Python sources or uv configuration are not supported in clean validation")
         dependencies = [*data.get("project", {}).get("dependencies", [])]
         for group in data.get("project", {}).get("optional-dependencies", {}).values():
             dependencies.extend(group)
         for group in data.get("dependency-groups", {}).values():
             dependencies.extend(x for x in group if isinstance(x, str))
+        for key in ("dev-dependencies", "override-dependencies", "constraint-dependencies"):
+            dependencies.extend(uv.get(key, []))
         if any(Requirement(value).url for value in dependencies):
             raise _unavailable("Direct URL Python dependencies are not supported")
-        if lock.exists():
+        if lock.exists() and validate_existing_lock:
             locked = tomllib.loads(lock.read_text(encoding="utf-8"))
             for package in locked.get("package", []):
                 source = package.get("source", {})
@@ -175,12 +180,17 @@ def admit_manifest(root: Path, ecosystem: str, *, require_lock: bool = True) -> 
         data = json.loads(manifest.read_text(encoding="utf-8"))
         if data.get("workspaces"):
             raise _unavailable("Node workspaces require a separate vetted builder")
+        if data.get("overrides") or data.get("resolutions"):
+            raise _unavailable("Node dependency overrides require a separately admitted resolver")
         for key in ("dependencies", "devDependencies", "optionalDependencies", "peerDependencies"):
             for version in data.get(key, {}).values():
                 if not isinstance(version, str) or not re.fullmatch(r"[0-9A-Za-z.*<>=~^|+ \-]+", version):
                     raise _unavailable("Non-registry Node dependencies are denied")
-        if lock.exists():
-            for package in json.loads(lock.read_text(encoding="utf-8")).get("packages", {}).values():
+        if lock.exists() and validate_existing_lock:
+            locked = json.loads(lock.read_text(encoding="utf-8"))
+            if locked.get("lockfileVersion") not in {2, 3} or not isinstance(locked.get("packages"), dict):
+                raise _unavailable("Only structured npm lock v2/v3 is supported")
+            for package in locked["packages"].values():
                 if package.get("link"):
                     raise _unavailable("Node lock links are denied")
                 if package.get("resolved"):
@@ -231,9 +241,24 @@ class LinuxEnvironmentManager:
         No product source/config or lifecycle scripts enter this networking phase.
         Export precisely the lockfile, never any other builder-produced file.
         """
-        manifest, lock = admit_manifest(root, ecosystem, require_lock=False)
-        if lock.exists():
+        return self._resolve_lock(root, ecosystem, replace=False)
+
+    def regenerate_lock(self, root: Path, ecosystem: str) -> Path:
+        """Merged manifest -> new admitted Linux lock, atomic exact replacement.
+
+        Caller must hold its project dependency lock. The old lock is never
+        removed/copied into the networking builder and survives every failure.
+        Source/config/hooks/credentials cannot enter this manifest-only phase.
+        """
+        return self._resolve_lock(root, ecosystem, replace=True)
+
+    def _resolve_lock(self, root: Path, ecosystem: str, *, replace: bool) -> Path:
+        manifest, lock = admit_manifest(root, ecosystem, require_lock=False,
+                                        validate_existing_lock=not replace)
+        if lock.exists() and not replace:
             return lock
+        original_manifest = manifest.read_bytes()
+        original_lock = lock.read_bytes() if lock.exists() else None
         base = self._base(ecosystem)
         with tempfile.TemporaryDirectory(prefix="autospec-lock-") as temporary:
             stage = Path(temporary).resolve()
@@ -250,14 +275,27 @@ class LinuxEnvironmentManager:
                 rc, out, err = _run_tracked(argv, "", str(stage), self.timeout)
                 if rc:
                     raise _unavailable(f"Dependency lock resolution failed: {out[-2000:]} {err[-2000:]}")
+                if (stage / manifest.name).read_bytes() != original_manifest:
+                    raise _unavailable("Resolver changed the merged manifest; refusing unmatched lock export")
                 admit_manifest(stage, ecosystem)
                 published = FileBroker(ExecutionContext("lock-export", Path(root))).path(lock.name)
                 source = FileBroker(ExecutionContext("lock-source", stage)).path(lock.name)
                 if source.stat().st_size > 20_000_000:
                     raise _unavailable("Lockfile exceeds export limit")
-                # No overwrite, a concurrent coordinator cannot be silently lost.
-                with published.open("xb") as output:
-                    output.write(source.read_bytes())
+                data = source.read_bytes()
+                if manifest.read_bytes() != original_manifest:
+                    raise _unavailable("Manifest changed during lock resolution; refusing stale export")
+                if replace:
+                    current = published.read_bytes() if published.exists() else None
+                    if current != original_lock:
+                        raise _unavailable("Lock changed during regeneration; refusing concurrent overwrite")
+                    from .dependencies import atomic_bytes
+                    atomic_bytes(published, data)
+                else:
+                    # Initial bootstrap may not overwrite a lock published by a
+                    # concurrent coordinator. Regeneration is an explicit path.
+                    with published.open("xb") as output:
+                        output.write(data)
                 return published
             finally:
                 _cleanup_container(self.docker, name, owner)
@@ -279,6 +317,8 @@ class LinuxEnvironmentManager:
         if not digests or not re.fullmatch(r"[a-z0-9./:_-]+@sha256:[a-f0-9]{64}", digests[0]):
             raise _unavailable("Trusted base requires its immutable registry digest")
         identity["toolchain_digest"] = digests[0]
+        identity["recipe_template_sha256"] = hashlib.sha256(
+            self._recipe(digests[0], ecosystem, mode, "FINGERPRINT", manifest).encode()).hexdigest()
         fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
         self.cache_root.mkdir(parents=True, exist_ok=True)
         cache = self.cache_root / fingerprint
@@ -318,7 +358,12 @@ class LinuxEnvironmentManager:
             common += "COPY pyproject.toml uv.lock ./\nENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy\n"
             common += "RUN uv sync --locked --no-build --no-install-project --no-config" + dev + (" --no-dev" if mode == "runtime" else "") + "\n"
             if mode == "test":
-                common += "RUN uv pip install --python /opt/venv/bin/python --no-build pytest-json-report==1.5.0 pytest-cov==7.0.0 coverage==7.10.6\n"
+                # Never query an interpreter into which untrusted project
+                # wheels/.pth have been installed during the network phase.
+                # The base interpreter installs pinned supervisor reporters
+                # into a separate directory without transitive resolution.
+                common += "RUN uv pip install --python /usr/local/bin/python --target /opt/reporters --no-deps --no-build --no-config pytest-json-report==1.5.0 pytest-cov==7.0.0 coverage==7.10.6\n"
+                common += "ENV PYTHONPATH=/opt/reporters\n"
             common += 'ENV PATH="/opt/venv/bin:$PATH"\n'
         else:
             common += "COPY package.json package-lock.json ./\nRUN npm ci --ignore-scripts --no-audit --no-fund --userconfig=/dev/null --globalconfig=/tmp/autospec-empty-global-npmrc" + (" --omit=dev" if mode == "runtime" else " --include=dev") + "\n"
