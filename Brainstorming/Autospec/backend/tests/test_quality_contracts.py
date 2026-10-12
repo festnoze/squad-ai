@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from autospec.validation.quality_contracts import QualityVerifier, quality_generation_requirements, source_e2e_scenarios
+from autospec.validation.quality_contracts import NativeQualityCollector,NativeSuiteSpec
 from autospec.validation.support_adapter import AdapterUnavailable, Proof
 from tests.fixtures.browser.app import browser_contract
 from tests.fixtures.browser.app import BrowserSubject,retain_browser_fixture_report
@@ -146,6 +147,17 @@ async def test_TST_05_admits_twelve_actual_browser_runs_and_intact_visual_proofs
                 runs.extend(report["scenarios"])
                 proofs.extend(Proof(**p) for r in report["scenarios"] for p in r["proofs"])
         fixture.observations["browser_e2e"]=runs
+        # Aggregate actual supervisor assertions as E2E, never pretend a Node
+        # NETNONE product test ran against this separate Python application.
+        mapping=fixture.root/"aggregation-placeholder.json";mapping.write_text('{}',encoding="utf-8")
+        reviewed=(await fixture.proofs("TST-05"))[0]
+        collector=NativeQualityCollector(contract,subject.adapter,None,product_root=subject.root,
+            evidence_root=tmp_path/"aggregate-proof",suites=(NativeSuiteSpec("backend",".","python",("subject.sqlite",),()),),
+            mapping_path=mapping,review=reviewed,e2e_mode="supervisor_browser")
+        collector.evidence_root.mkdir()
+        aggregate=collector._browser_suite(runs,subject.snapshot)
+        assert aggregate["scope"]=="supervisor_browser" and aggregate["collected"]==aggregate["passed"]==12
+        assert aggregate["return_code"]==0 and aggregate["failed"]==aggregate["not_verified"]==0
         base=fixture.proofs
         async def reviewed(rid):return await base(rid)+(proofs if rid=="TST-05" else [])
         fixture.proofs=reviewed

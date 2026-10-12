@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import pytest
 
-from autospec.validation.quality_contracts import NativeQualityCollector, NativeSuiteSpec, AuthorizationMutationSpec, QualityVerifier, write_quality_review_package
+from autospec.validation.quality_contracts import NativeQualityCollector, NativeSuiteSpec, AuthorizationMutationSpec, QualityVerifier, write_quality_review_package, supervisor_e2e_test_id
 from autospec.validation.support_adapter import AdapterUnavailable, Proof
 from tests.fixtures.browser.app import BrowserSubject,browser_contract
 
@@ -94,6 +94,38 @@ async def test_missing_coverage_inventory_file_is_never_removed_from_denominator
         {"path":"unit-placeholder","sha256":"0"*64})
     assert result["source_inventory"]==["auth.py","never_run.py"]
     assert "never_run.py" not in result["files"]
+
+
+@pytest.mark.parametrize("field,value",[("name","../escaped"),("name","x:y"),("root","../product"),("root","C:relative"),
+    ("root","backend//src"),("source_inventory",("auth.py","auth.py")),("source_inventory",("../auth.py",)),
+    ("source_inventory",("auth.py:stream",))])
+def test_native_profile_rejects_unreviewable_structural_paths(field,value):
+    fields=dict(name="backend",root="backend",ecosystem="python",source_inventory=("auth.py",),domains=("auth",))
+    fields[field]=value
+    with pytest.raises(ValueError):NativeSuiteSpec(**fields)
+
+
+def test_collector_rejects_duplicate_suite_names_before_any_execution(tmp_path):
+    collector,subject,runner=plan(tmp_path)
+    with pytest.raises(ValueError):NativeQualityCollector(collector.contract,subject.adapter,runner,
+        product_root=collector.product_root,evidence_root=tmp_path/"new-evidence",suites=collector.suites*2,
+        mapping_path=collector.mapping_path,review=collector.review)
+
+
+def test_supervisor_e2e_aggregation_preserves_fail_and_not_verified_without_fake_native_pass(tmp_path):
+    collector,subject,_=plan(tmp_path);collector.evidence_root.mkdir()
+    runs=[dict(id=f"E2E-{i:02d}",mode=mode,status="NOT_VERIFIED") for mode in ["alone","together"] for i in range(1,7)]
+    runs[0]["status"]="FAIL";runs[1]["status"]="NOT_VERIFIED"
+    suite=collector._browser_suite(runs,subject.snapshot)
+    assert suite["scope"]=="supervisor_browser"
+    assert suite["collected"]==12 and suite["passed"]==0 and suite["failed"]==1 and suite["not_verified"]==11
+    assert suite["return_code"]==1
+    assert suite["outcomes"][supervisor_e2e_test_id("E2E-01","alone")]=="failed"
+    assert suite["outcomes"][supervisor_e2e_test_id("E2E-02","alone")]=="not_verified"
+    runs[0]["status"]="NOT_VERIFIED"
+    assert collector._browser_suite(runs,subject.snapshot)["return_code"] is None
+    runs[0]["status"]="PASS"
+    with pytest.raises(AdapterUnavailable):collector._browser_suite(runs,subject.snapshot)
 
 
 async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remains_intact(tmp_path):

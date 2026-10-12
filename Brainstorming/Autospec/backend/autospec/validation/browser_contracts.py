@@ -190,7 +190,8 @@ class _BrowserCase:
     async def capture(self, page, tag):
         root = self.v.harness.adapter.evidence_root
         root.mkdir(parents=True, exist_ok=True)
-        path = root / (self.rid + "-" + tag + "-" + uuid4().hex + ".png")
+        # RID:sous-probe remains a proof tag, never an NTFS alternate stream.
+        path = root / (self.rid.replace(":","-") + "-" + tag + "-" + uuid4().hex + ".png")
         masks = [page.locator("input[type=password]")] + [page.get_by_text(a.password, exact=False)
                  for a in self.v.harness.adapter.manifest.accounts.values()]
         await page.screenshot(path=str(path), full_page=True, mask=masks)
