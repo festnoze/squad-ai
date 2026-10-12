@@ -5,6 +5,7 @@ from autospec.agents.runner import FakeRunner
 from autospec.models import ProjectState
 from autospec.orchestrator import docker_deploy
 from autospec.orchestrator.pipeline import Pipeline
+from autospec.orchestrator import acceptance
 from autospec.validation import delivery_raccord
 
 
@@ -60,3 +61,77 @@ async def test_failed_update_preserves_previous_service_but_cancel_removes_new_o
     assert state.deployed_container==previous and state.deploy_status=="failed" and not state.delivery_ready
     assert state.deployed_image==("sha256:"+"d"*64 if previous else "")
     assert state.deploy_host_port==(19232 if previous else 0) and len(calls)==int(cancel_after_return)
+
+
+@pytest.mark.parametrize("kind", ["cli", "library"])
+async def test_contract_package_uses_exact_journal_even_after_crash_before_state_flush(tmp_path, monkeypatch, kind):
+    state = ProjectState(id="package-crash-"+kind, name="meta", goal="meta",
+        acceptance_contract_hash="a"*64, technical_stack={"kind":kind})
+    pipeline = Pipeline(state, FakeRunner())
+    root = acceptance.supervisor_root(state.id)/"packages"
+    calls = []
+    def inspect(project_id, *, packaging_root):
+        assert packaging_root == root
+        calls.append(("inspect",project_id))
+        return docker_deploy.DockerDeployResult(True,"journal-attested synthetic package",
+            image="sha256:"+"b"*64,packaged=True)
+    def stop(project_id, *, packaging_root):
+        assert packaging_root == root
+        calls.append(("detach",project_id))
+        return docker_deploy.DockerDeployResult(True,"only owned alias detached",packaged=True)
+    monkeypatch.setattr(docker_deploy,"inspect_packaged_image",inspect)
+    monkeypatch.setattr(docker_deploy,"inspect_deployment",lambda *a,**k:pytest.fail("package entered web/legacy inspection"))
+    monkeypatch.setattr(docker_deploy,"recover_publication",lambda *a,**k:pytest.fail("package started web runtime"))
+    monkeypatch.setattr(docker_deploy,"undeploy",stop)
+    await pipeline.arecover_publication()
+    await pipeline.areconcile_deploy()
+    assert state.deploy_status=="packaged" and state.deployed_image=="sha256:"+"b"*64
+    assert not state.deployed_container and state.deploy_host_port==0
+    await pipeline.aundeploy()
+    assert calls==[("inspect",state.id),("detach",state.id)] and not state.deploy_status
+    assert not state.deployed_image and not pipeline.runner.calls
+
+
+async def test_contract_web_with_empty_cid_never_uses_legacy_removal(tmp_path, monkeypatch):
+    state = ProjectState(id="web-before-state-flush", name="meta", goal="meta",
+        acceptance_contract_hash="a"*64, technical_stack={"kind":"fullstack"})
+    pipeline = Pipeline(state, FakeRunner())
+    def stop(project_id, *, publication_root):
+        assert publication_root==acceptance.supervisor_root(state.id)/"publication"
+        return docker_deploy.DockerDeployResult(True,"exact owned journal stopped")
+    monkeypatch.setattr(docker_deploy,"undeploy",stop)
+    await pipeline.aundeploy()
+    assert not state.deploy_status and not pipeline.runner.calls
+
+
+@pytest.mark.parametrize("new_alias", [True, False])
+async def test_late_package_cancel_detaches_only_a_fresh_call_alias(tmp_path, monkeypatch, new_alias):
+    import inspect
+    state = ProjectState(id="package-late-cancel", name="meta", goal="meta",
+        acceptance_contract_hash="a"*64, technical_stack={"kind":"cli"})
+    pipeline = Pipeline(state, FakeRunner())
+    qualified = dict(image_id="sha256:"+"b"*64,snapshot_hash="c"*64,
+        runtime_command=["/opt/venv/bin/python","main.py"])
+    async def load(*args):return qualified
+    monkeypatch.setattr(delivery_raccord,"load_qualified_delivery_image",load)
+    monkeypatch.setattr(pipeline,"_acceptance_contract",lambda:object())
+    signature=inspect.signature(docker_deploy.deploy_and_verify)
+    alias="autospec/meta:qualified-"+"d"*32
+    calls=[]
+    def package(*args,**kwargs):
+        signature.bind(*args,**kwargs)
+        assert kwargs["packaging_root"]==acceptance.supervisor_root(state.id)/"packages"
+        assert not any(k.startswith("publication_") for k in kwargs)
+        pipeline._stop_requested=True
+        return docker_deploy.DockerDeployResult(True,"synthetic package",image=qualified["image_id"],
+            packaged=True,created_package_alias=alias if new_alias else "")
+    def stop(project_id, *, packaging_root, expected_package_alias, expected_package_image_id):
+        assert project_id==state.id and packaging_root==acceptance.supervisor_root(state.id)/"packages"
+        assert expected_package_alias==alias and expected_package_image_id==qualified["image_id"]
+        calls.append(alias)
+        return docker_deploy.DockerDeployResult(True,"only new alias detached",packaged=True)
+    monkeypatch.setattr(docker_deploy,"deploy_and_verify",package)
+    monkeypatch.setattr(docker_deploy,"undeploy",stop)
+    assert not await pipeline._adocker_qualified_delivery(tmp_path,kind="cli")
+    assert calls==([alias] if new_alias else [])
+    assert state.deploy_status=="failed" and not state.delivery_ready and not pipeline.runner.calls

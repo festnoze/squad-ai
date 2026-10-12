@@ -56,6 +56,18 @@ NETNONE resources. XML and JSON are raw copies, not reconstructed summaries.
   API/plan limits and final admission modules. The first command used a
   nonexistent audit test filename and collected no tests; it is not a PASS
   checkpoint. The corrected explicit target list produced this XML.
+- `owned-publication-parent-20261012.xml`: **18 PASS / 1 FAIL**, 75.46 s,
+  including both real Docker tests PASS (baked image/persistence/process-death
+  recovery and migration before an application refusing an empty DB). A Windows
+  `WinError 5` in `atomic_json` failed a mocked fixture setup before its adversarial
+  mutation. This failed checkpoint is retained; a bounded atomic-replace
+  robustness fix and replay are required, not a retry labelled silently green.
+- `owned-raccord-packages-v1.xml`: **68 PASS / 3 native opt-in SKIP**, 12.23 s.
+  The root now selects external package or publication registries from the
+  structured stack even when state flush never persisted an image/CID. No
+  contract cleanup uses legacy names. Late package cancellation removes only
+  a fresh-call alias receipt; a previously existing package is preserved.
+  This unit replay does not replace the teammate's native package proof.
 
 ## Factory frontend
 

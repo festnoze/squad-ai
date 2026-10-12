@@ -241,13 +241,9 @@ def _default_model_ladder() -> list[str]:
 class Settings:
     bmad_dir: Path = field(default_factory=_default_bmad_dir)
     workspace_root: Path = field(default_factory=_default_workspace_root)
-    # FACTORY_IMPROVEMENTS (completes fixes #10/#13) - at backend boot, kill
-    # every leftover process whose command line points INSIDE `workspace_root`
-    # (a smoke run leaked by a previous backend, a uvicorn reload supervisor, a
-    # repair agent's child...). Without this the next gate meets a port already
-    # held and parks the project as "infra". Never touches a process outside the
-    # workspace root, nor the current process and its ancestors. Skipped in
-    # fake-agents mode. OFF = historic boot (the port-scoped killer only).
+    # Legacy compatibility flag; the path-based sweep is now a no-op. Unknown
+    # processes never become owned just because their command line mentions a
+    # workspace. Startup recovery uses exact external journals/owned handles.
     orphan_sweep_on_boot: bool = field(
         default_factory=lambda: _env_bool("ORPHAN_SWEEP_ON_BOOT", True)
     )
