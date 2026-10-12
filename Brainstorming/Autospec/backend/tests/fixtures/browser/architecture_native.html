@@ -1,0 +1,30 @@
+<!doctype html><html lang="fr"><body>
+<form id="auth"><label>Email<input id="email"></label><label>Mot de passe<input id="password" type="password"></label><button id="login">Connexion</button></form>
+<section id="tickets" hidden><button id="ticket-nav">Tickets</button><span id="current-user-name"></span></section>
+<p id="error" hidden role="alert"></p>
+<script>
+// Constant independent Linux fixture; no intercepted/synthesized API responses.
+async function init() {
+  const response=await fetch('/api/auth/me',{credentials:'same-origin'});
+  if (!response.ok) return;
+  const me=await response.json();
+  document.getElementById('current-user-name').textContent=me.display_name;
+  document.getElementById('auth').hidden=true;
+  document.getElementById('tickets').hidden=false;
+  if(location.pathname.startsWith('/tickets/')) {
+    const result=await fetch('/api/tickets/'+location.pathname.split('/')[2],{credentials:'same-origin'});
+    const body=await result.json();
+    if(!result.ok) {
+      document.getElementById('error').textContent=body.error.message;
+      document.getElementById('error').hidden=false;
+    }
+  }
+}
+document.getElementById('auth').onsubmit=async event=>{
+  event.preventDefault();
+  const response=await fetch('/api/auth/login',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:document.getElementById('email').value,password:document.getElementById('password').value})});
+  if(response.ok) await init();
+};
+init();
+</script></body></html>
