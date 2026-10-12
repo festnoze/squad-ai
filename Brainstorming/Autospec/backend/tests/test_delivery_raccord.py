@@ -23,6 +23,17 @@ def roots(tmp_path, requirement="OPS-01"):
 async def test_actual_failed_build_is_published_without_fake_image_or_acceptance(tmp_path,monkeypatch):
     source,snapshot,contract,root=roots(tmp_path)
     calls=[]
+    # A synthetic reviewed binding isolates command provenance mechanics, not
+    # an actual product's external-source approval.
+    from types import SimpleNamespace
+    from autospec.validation import product_harness
+    atomic_json(root/"product-bindings.json",{})
+    class Binding:
+        @staticmethod
+        def from_dict(value):
+            return SimpleNamespace(snapshot_hash=snapshot,contract_hash=contract.contract_hash,
+                runtime_command=("python","main.py"),validate=lambda source: None)
+    monkeypatch.setattr(product_harness,"ReviewedProductBindings",Binding)
     def build(product,tag,**options):
         calls.append((product,tag,options))
         atomic_json(options["evidence_root"]/"delivery-build.json",dict(version=1,status="FAIL",
@@ -99,6 +110,6 @@ async def test_pipeline_calls_native_collection_before_independent_final_gate(tm
     monkeypatch.setattr(pipeline,"_await_reviewed_configuration",review)
     monkeypatch.setattr(coordinator,"verify_project",verify)
     assert await pipeline._aindependent_acceptance_phase()
-    assert order==["build","review","native","judge"] and not pipeline.runner.calls
+    assert order==["review","build","native","judge"] and not pipeline.runner.calls
     # Cached intact independent evidence is readmitted without executing again.
     assert await pipeline._aindependent_acceptance_phase() and len(order)==4

@@ -38,11 +38,16 @@ async def collect_native_delivery_build(contract, source, snapshot, root, *, tim
         return {"status":"NOT_REQUIRED","receipt":None,"limits":[]}
     output=root/"native-delivery"/snapshot/uuid4().hex
     tag="autospec/qualification:"+uuid4().hex
+    from .product_harness import ReviewedProductBindings
+    binding=ReviewedProductBindings.from_dict(json.loads((root/"product-bindings.json").read_bytes()))
+    if (binding.snapshot_hash,binding.contract_hash)!=(snapshot,contract.contract_hash):
+        raise AdapterUnavailable("image command requires exact current reviewed bindings")
+    binding.validate(source)
     # No producer Dockerfile or host dependency tree is executed. The factory
     # builder consumes filtered source only after manifest-only locked install.
     ok,_=await asyncio.to_thread(build_delivery_image,source,tag,
         docker=settings.docker_cmd,timeout=settings.test_suite_timeout_s,
-        evidence_root=output,snapshot_hash=snapshot)
+        evidence_root=output,snapshot_hash=snapshot,runtime_command=list(binding.runtime_command))
     path=output/"delivery-build.json"
     if not path.is_file() or path.stat().st_size>16_000_000:
         raise AdapterUnavailable("native build receipt unavailable")

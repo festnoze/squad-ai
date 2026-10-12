@@ -4426,6 +4426,10 @@ class Pipeline:
                 from ..validation.delivery_raccord import (native_timing_recorder,
                     collect_native_delivery_build,collect_native_final_facts)
                 timing_recorder=native_timing_recorder(contract,snapshot.digest,supervisor)
+                # The baked command is a reviewed operational fact. Advisory
+                # collection precedes review; final-image construction follows
+                # it, so verification cannot silently repair CMD by overriding.
+                await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
                 try:
                     native_build=await collect_native_delivery_build(contract,source,snapshot.digest,
                         supervisor,timing_recorder=timing_recorder)
@@ -4436,7 +4440,6 @@ class Pipeline:
                         "limits":["native delivery build unavailable: "+type(exc).__name__]}
                     self.monitor.event("native_delivery_build_unavailable",snapshot_hash=snapshot.digest,
                         category=type(exc).__name__)
-                await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
                 facts=await collect_native_final_facts(self.state,contract,source,snapshot.digest,
                     supervisor,build=native_build,timing_recorder=timing_recorder)
                 self.monitor.event("native_final_facts",status=facts["status"],
