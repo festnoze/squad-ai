@@ -582,9 +582,9 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
         for raw in audit["artifacts"]:
             proof=store._proof(raw,"OBS:audit_raw")
             if proof.type!="X" or not proof.passed: raise AdapterUnavailable("raw audit observation was not obtained")
-        dangerous=[f for f in audit["findings"] if f.get("severity","").lower() in {"critical","high"} and f.get("exploitable") is True and not f.get("arbitration")]
-        if any(type(f.get("exploitable")) is not bool for f in audit["findings"]): raise AdapterUnavailable("audit exploitability assessment unavailable")
-        check(checks,"audit_no_unarbitrated_exploitable_high",not dangerous,{"date":audit["date"],"tool":audit["tool"],"findings":audit["findings"]})
+        from .delivery_evidence import audit_disposition_checks
+        checks.extend(audit_disposition_checks(audit, evidence_root=supervisor_root,
+            snapshot_hash=snapshot_hash, contract_hash=contract.contract_hash))
     except Exception as exc: limits.append("README/configuration/audit unavailable: "+type(exc).__name__)
     await finish("OPS-05",checks,limits,repro=("reproduce documented argv inside isolation and inspect dated dependency audit with independent source review",))
     checks=[];limits=[]

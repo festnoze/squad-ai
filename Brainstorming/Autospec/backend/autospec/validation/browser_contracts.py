@@ -175,7 +175,8 @@ class PlaywrightHarness:
             raise AdapterUnavailable("reviewed UI binding missing: " + name)
         return page.locator(self.bindings[name])
 
-    async def page(self, case, viewport):
+    async def page(self, case, viewport, *, auto_navigate=True):
+        if type(auto_navigate) is not bool: raise ValueError("explicit browser navigation flag required")
         if self.browser is None: await self.start()
         context = await self.browser.new_context(viewport={"width": viewport, "height": 900},service_workers="block")
         self.contexts.append(context)
@@ -210,7 +211,7 @@ class PlaywrightHarness:
             case.requests.append({"method": request.method, "path": path, "payload": self.redact(payload),
                                   "query": self.redact(parse_qs(urlsplit(request.url).query))})
         page.on("request", request)
-        await page.goto(self.adapter.base_url + self.routes["home"])
+        if auto_navigate: await page.goto(self.adapter.base_url + self.routes["home"])
         return page
 
     async def guard_probe_route(self,route,case):

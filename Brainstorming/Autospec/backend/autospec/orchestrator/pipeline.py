@@ -3906,7 +3906,7 @@ class Pipeline:
 
     async def _adelivery_gates(self, *, all_iterations: bool = False) -> bool:
         """Run the FULL delivery-gate chain on the current iteration:
-        smoke run → runtime acceptance → Definition of Done → Docker delivery.
+        smoke → runtime → DoD → independent qualification → publication.
 
         Single source of truth for gate ORDER, shared by the main lifecycle and
         the rebuild/resume finishers — an iteration completed through a story
@@ -3922,6 +3922,13 @@ class Pipeline:
             return False
         if not self._apply_definition_of_done(all_iterations=all_iterations):
             return False
+        if self.state.acceptance_contract_hash:
+            if not await self._aindependent_acceptance_phase():
+                return False
+            # Qualification includes the final image even when public delivery
+            # is explicitly disabled. It is not a claim of public deployment.
+            if not self._setting("docker_delivery"):
+                return True
         # Docker delivery gate (D1): build the accepted delivery into an image,
         # deploy it on the shared network and network-verify it; a failure parks
         # the iteration in needs_attention (no-op unless DOCKER_DELIVERY /
@@ -3936,13 +3943,11 @@ class Pipeline:
                     "requiert une validation humaine (bouton « Déployer »).",
                 )
             if self.state.acceptance_contract_hash:
-                self._block_delivery("Image finale non vérifiée : validation humaine requise.", source="acceptance")
+                self._block_delivery("Image qualifiée, publication non autorisée : validation humaine requise.", source="acceptance")
                 return False
             return True
         if not await self._adocker_delivery_phase():
             return False
-        if self.state.acceptance_contract_hash:
-            return await self._aindependent_acceptance_phase()
         return True
 
     async def _alifecycle(self) -> None:
@@ -10346,6 +10351,9 @@ class Pipeline:
                 self._sync()
             return True
 
+        if self.state.acceptance_contract_hash:
+            return await self._adocker_qualified_delivery(ws, kind=kind)
+
         self.monitor.phase("docker")
         port = self._resolve_web_port(ws)
         # Regenerate the managed Dockerfile for the resolved kind (container port
@@ -10504,6 +10512,47 @@ class Pipeline:
         self.state.regressions.append(msg)
         self._notify("error", "Livraison Docker échouée", msg[:200])
         return False
+
+    async def _adocker_qualified_delivery(self, ws: Path, *, kind: str) -> bool:
+        """Publish only re-admitted immutable qualification, without paid repair.
+
+        No Dockerfile regeneration, runtime override, shared network probe or
+        legacy rebuild is permitted on this path. A missing publication
+        isolation capability is a visible infrastructure limit, never green.
+        """
+        from ..validation.delivery_raccord import load_qualified_delivery_image
+        try:
+            qualified = await load_qualified_delivery_image(self._acceptance_contract(), ws,
+                acceptance.supervisor_root(self.state.id))
+            result = await asyncio.to_thread(docker_deploy.deploy_and_verify, self.state, ws,
+                network="none", host_port=0, kind=kind,
+                qualified_image_id=qualified["image_id"], expected_snapshot=qualified["snapshot_hash"],
+                expected_runtime_command=qualified["runtime_command"], cancel_event=self._docker_cancel)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            detail = "Qualification Docker non réadmise : " + type(exc).__name__
+            delivery_state.set_deploy(self.state, status="failed", detail=detail)
+            self._block_delivery(detail, source="docker")
+            self._sync()
+            return False
+        self.monitor.event("docker", ok=result.ok, infra=result.infra, immutable=True,
+            packaged=result.packaged, detail=result.detail[:300])
+        if result.cancelled or self._stop_requested:
+            detail = "Publication interrompue ; aucune nouvelle application déployée."
+        else:
+            detail = result.detail
+        delivery_state.set_deploy(self.state, status="packaged" if result.packaged else "failed",
+            image=result.image, detail=detail)
+        if not result.ok or result.cancelled or self._stop_requested:
+            self._block_delivery(detail, source="docker")
+            if result.infra:
+                self._apark_infra("docker", detail)
+            self._sync()
+            return False
+        self._log("docker", "✅ Image qualifiée conservée : " + detail)
+        self._sync()
+        return True
 
     @staticmethod
     def _terminate_tree(proc) -> None:

@@ -198,7 +198,7 @@ async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("finding,expected",[(None,"PASS"),("high","FAIL"),("unavailable","NOT_VERIFIED")])
+@pytest.mark.parametrize("finding,expected",[(None,"PASS"),("high","FAIL"),("denied","FAIL"),("unavailable","NOT_VERIFIED"),("unsigned","NOT_VERIFIED")])
 async def test_operations_docs_audit_never_compensated_by_health_or_fixture(tmp_path,finding,expected):
     from dataclasses import asdict
     from autospec.validation.coordinator import _operations
@@ -209,15 +209,27 @@ async def test_operations_docs_audit_never_compensated_by_health_or_fixture(tmp_
         path=root/(name+".json");write_json(path,payload)
         return Proof(kind,str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,CONTRACT,checks)
     audit=raw("raw-audit",{"actual":"meta unit fixture raw audit"},checks=("OBS:audit_raw",))
+    from autospec.validation.delivery_evidence import apply_audit_review, audit_review_subject
+    dangerous=finding in {"high","denied","unsigned"}
+    native_audit=dict(status="UNAVAILABLE" if finding=="unavailable" else "AVAILABLE",
+        date="2026-10-12T00:00:00Z",tool="independent fixture audit",report_valid=True,
+        return_code=1 if dangerous else 0,artifacts=[asdict(audit)],
+        findings=[dict(scope="python",package="synthetic",id="META-01",severity="unknown",exploitable=None,arbitration=None)] if dangerous else [])
+    arbitration=None
+    if finding=="denied": arbitration=dict(decision="deny_release",owner="synthetic actor",rationale="Refused, not permission",
+        date="2026-10-12T00:00:00Z",disposition="rejected",approved=False)
+    assessments=[dict(scope="python",package="synthetic",id="META-01",severity="high",exploitable=True,
+        rationale="Synthetic admission counterexample only",arbitration=arbitration)] if dangerous else []
+    classification=raw("classification",dict(assessments=assessments),"R",("OPS-05:audit:"+audit_review_subject(native_audit),))
+    classified=apply_audit_review(native_audit,classification,evidence_root=root,snapshot_hash=snapshot,contract_hash=CONTRACT)
+    if finding=="unsigned": classified["findings"][0]["arbitration"]={"decision":"approved"}
     value=dict(readme=dict(path="README.md",sha256=hashlib.sha256((source/"README.md").read_bytes()).hexdigest()),
         # Typed schema-admission protocol only, not a benchmark execution.
         documented_commands=[dict(obligation=name,argv=["fixture-protocol",name],return_code=0)
             for name in ("install","tests","coverage","e2e","launch","seed","migration","backup","restore")],
         configuration=[dict(path="config.py",source_sha256=hashlib.sha256((source/"config.py").read_bytes()).hexdigest(),secrets_found=[])],
         fixtures_explicit=True,accounts_before_fixture=0,
-        audit=dict(status="UNAVAILABLE" if finding=="unavailable" else "AVAILABLE",date="2026-10-12T00:00:00Z",tool="independent fixture audit",
-            report_valid=True,return_code=1 if finding=="high" else 0,artifacts=[asdict(audit)],
-            findings=[] if finding!="high" else [dict(severity="high",exploitable=True,arbitration=None)]))
+        audit=classified)
     obs=raw("docs-audit",dict(name="docs_audit",parameters={},value=value,snapshot_hash=snapshot,contract_hash=CONTRACT),checks=("OBS:docs_audit",))
     review=raw("source-review",{"scope":"independent meta-admission only; not actual product audit"},"R",("OPS-05:README","OPS-05:audit"))
     write_json(root/"observations.json",dict(snapshot_hash=snapshot,contract_hash=CONTRACT,observations={"docs_audit":asdict(obs)}))

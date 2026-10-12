@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="52.983" timestamp="2026-10-12T12:45:27.685489+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_independence" name="test_scheduler_never_coruns_declared_overlap" time="49.722"><failure message="TimeoutError">C:\Program Files\Python314\Lib\asyncio\tasks.py:488: in wait_for
+    return await fut
+           ^^^^^^^^^
+autospec\orchestrator\pipeline.py:5481: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+autospec\orchestrator\pipeline.py:6065: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Program Files\Python314\Lib\asyncio\tasks.py:432: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python314\Lib\asyncio\tasks.py:521: in _wait
+    await waiter
+E   asyncio.exceptions.CancelledError
+
+The above exception was the direct cause of the following exception:
+tests\test_independence.py:208: in test_scheduler_never_coruns_declared_overlap
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+C:\Program Files\Python314\Lib\asyncio\tasks.py:487: in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Program Files\Python314\Lib\asyncio\timeouts.py:115: in __aexit__
+    raise TimeoutError from exc_val
+E   TimeoutError</failure></testcase></testsuite></testsuites>
