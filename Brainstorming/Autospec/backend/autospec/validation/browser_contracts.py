@@ -287,7 +287,7 @@ class BrowserVerifier:
                 if rid not in BROWSER_IDS: raise ValueError("unsupported browser requirement")
                 case, limits = _BrowserCase(self, rid), []
                 if (not isinstance(self.profile, dict) or not {"timeout_ms","desktop_width","mobile_width","client_ticket_count",
-                        "search_a","search_b","search_a_marker","search_b_marker"} <= set(self.profile) or rid not in requirements):
+                        "staff_ticket_count"} <= set(self.profile) or rid not in requirements):
                     limits.append("reviewed browser source profile missing")
                 else:
                     try:
@@ -346,6 +346,12 @@ class BrowserVerifier:
 
     def ui(self, page, name): return self.harness.control(page, name)
 
+    def operational_probe(self, name):
+        probes = self.harness.adapter.manifest.metadata.get("browser_probes")
+        if not isinstance(probes, dict) or name not in probes:
+            raise AdapterUnavailable("reviewed fixture browser probe metadata missing: " + name)
+        return probes[name]
+
     async def detail_ready(self, page):
         expected=self.created_titles.get(page)
         pattern=re.compile("^"+re.escape(expected)+"$") if expected else re.compile(r"\S")
@@ -381,9 +387,9 @@ class BrowserVerifier:
         await self.ui(p, "messages").get_by_text("Browser public response", exact=True).wait_for()
         c.check("response_confirmation", True)
         c.check("french_document",await p.evaluate("document.documentElement.lang.startsWith('fr')"))
-        labels=self.profile.get("french_action_labels")
+        labels=self.operational_probe("french_action_labels")
         if not isinstance(labels,dict) or not labels:
-            raise AdapterUnavailable("independently reviewed French action label profile missing")
+            raise AdapterUnavailable("independently reviewed French action label bindings missing")
         for name, expected in labels.items():
             c.check("french_action_"+name,(await self.ui(p,name).inner_text()).strip(),expected)
         for actor in ["camille","emma"]:
@@ -555,7 +561,10 @@ class BrowserVerifier:
     async def _ux06(self, c):
         p = await c.page(); await self.login(c, p, "alice")
         delivered_a = asyncio.Event(); release_a = asyncio.Event(); completed_a = asyncio.Event()
-        a, b = self.profile["search_a"], self.profile["search_b"]
+        a, b = self.operational_probe("search_a"), self.operational_probe("search_b")
+        marker_a, marker_b = self.operational_probe("search_a_marker"), self.operational_probe("search_b_marker")
+        if any(not isinstance(x,str) or not x for x in (a,b,marker_a,marker_b)) or a==b or marker_a==marker_b:
+            raise AdapterUnavailable("distinct reviewed search probes required")
         async def reverse(route):
             if not await self.harness.guard_probe_route(route,c):return
             response = await route.fetch(max_redirects=0)
@@ -573,10 +582,10 @@ class BrowserVerifier:
         b_body = await (await response_b.value).json()
         await p.wait_for_function("args=>document.querySelector(args[0])?.textContent===String(args[1])",
                                  arg=[self.harness.bindings["total"], b_body["total"]])
-        await self.ui(p, "ticket_list").get_by_text(self.profile["search_b_marker"], exact=False).wait_for()
+        await self.ui(p, "ticket_list").get_by_text(marker_b, exact=False).wait_for()
         release_a.set(); await asyncio.wait_for(completed_a.wait(), 3); await asyncio.sleep(1)
         text = await self.ui(p, "ticket_list").inner_text()
-        c.check("late_a_cannot_replace_b", self.profile["search_b_marker"] in text and self.profile["search_a_marker"] not in text)
+        c.check("late_a_cannot_replace_b", marker_b in text and marker_a not in text)
         c.check("search_in_url", parse_qs(urlsplit(p.url).query).get("q"), [b])
         await p.reload(); c.check("search_survives_reload", await self.ui(p, "search").input_value(), b)
         await self.ui(p,"search").fill("")

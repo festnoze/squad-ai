@@ -109,6 +109,7 @@ class BrowserSubject(SQLiteSupportSubject):
     async def prepare(self, case_id, **options):
         options = dict(options, assigned=False, search_scenario=True)
         manifest=await super().prepare(case_id, **options)
+        manifest.metadata["browser_probes"] = json.loads(Path(__file__).with_name("profile.json").read_text(encoding="utf-8"))["browser_probes"]
         con=self.connect()
         try:
             con.executemany("INSERT INTO user_names VALUES(?,?)",[(a.id,name.capitalize()) for name,a in manifest.accounts.items()]);con.commit()

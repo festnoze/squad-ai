@@ -15,6 +15,7 @@ import re
 import secrets
 import sqlite3
 import time
+import zlib
 import httpx
 from dataclasses import asdict, dataclass, field
 from pathlib import Path, PurePosixPath
@@ -22,6 +23,8 @@ from typing import Any, Awaitable, Callable, Protocol
 from uuid import uuid4
 
 from .support_adapter import AdapterUnavailable, FixtureAccount, FixtureManifest, HttpxSupportAdapter, Proof
+from .entropy_protocol import (ENTROPY_BOOTSTRAP, ENTROPY_INSTALL, ENTROPY_PRIMITIVES,
+    ENTROPY_CHECK, correlate_entropy, entropy_execution_proof)
 
 
 class OwnedRuntime(Protocol):
@@ -79,17 +82,23 @@ class InstrumentationBinding:
     races: dict[str, tuple[tuple[str, str], ...]] = field(default_factory=dict)
     race_winners: dict[str, dict[str, tuple[str, str]]] = field(default_factory=dict)
     proxy_headers: bool = True  # match the reviewed server; do not silently harden product
+    entropy_module: str = ""
+    entropy_attribute: str = ""
+    entropy_primitive: str = ""  # exact captured stdlib primitive, never a product declaration
 
     def validate(self):
         for module, attribute in ((self.app_module, self.app_attribute),
                                   (self.clock_module, self.clock_attribute),
-                                  (self.password_module, self.password_attribute)):
+                                  (self.password_module, self.password_attribute),
+                                  (self.entropy_module, self.entropy_attribute)):
             if bool(module) != bool(attribute) or (module and (
                 not _MODULE.fullmatch(module) or not _NAME.fullmatch(attribute))):
                 raise ValueError("explicit reviewed module:symbol binding required")
         if not self.app_module or self.clock_kind not in {"epoch", "utc_datetime"}:
             raise ValueError("Python ASGI instrumentation binding required")
         if type(self.proxy_headers) is not bool: raise ValueError("explicit reviewed ASGI proxy-header mode required")
+        if bool(self.entropy_module) != bool(self.entropy_primitive) or (self.entropy_primitive and self.entropy_primitive not in ENTROPY_PRIMITIVES):
+            raise ValueError("entropy instrumentation requires an exact reviewed CSPRNG binding")
         if any(not _NAME.fullmatch(t) for t in (*self.business_tables, *([self.audit_table] if self.audit_table else []))):
             raise ValueError("invalid fault-injection table")
         for name, routes in self.races.items():
@@ -236,10 +245,11 @@ con.close(); print(json.dumps(result,ensure_ascii=True))
 TRUSTED_ASGI_LAUNCHER = r'''
 import asyncio, contextvars, datetime, importlib, json, os, re, socket, sqlite3, sys, threading, time, uuid
 import uvicorn
+__ENTROPY_BOOTSTRAP__
 b=json.loads(sys.argv[1]); guard=threading.RLock(); local=threading.local()
 state={'clock':0.,'faults':{},'pragmas':[],'trace':[],'trace_enabled':False,'race_connections':[],
  'dummy_hash_verifications':0,'race':None,'barrier':None,'race_arrivals':0,'broken_races':0,
- 'winner':None,'winner_done':None,'write_lock':None,'busy_events':[]}
+ 'winner':None,'winner_done':None,'write_lock':None,'busy_events':[],'session_entropy':[]}
 request_race=contextvars.ContextVar('autospec_request_race',default=False)
 original=sqlite3.connect
 def refresh(con):
@@ -292,6 +302,7 @@ def connect(*args,**kw):
  return con
 sqlite3.connect=connect; sqlite3.dbapi2.connect=connect
 sys.path.insert(0,'/app') # explicit product import, only after trusted stdlib/deps
+__ENTROPY_INSTALL__
 if b.get('clock_module'):
  module=importlib.import_module(b['clock_module']); fn=getattr(module,b['clock_attribute'])
  if not callable(fn): raise RuntimeError('clock binding is not callable')
@@ -378,7 +389,7 @@ def server():
    client.sendall(json.dumps(result).encode()+b'\n')
 threading.Thread(target=server,daemon=True).start()
 uvicorn.run(wrapped,host='127.0.0.1',port=int(b['port']),log_level='warning',access_log=False,proxy_headers=b['proxy_headers'])
-'''
+'''.replace('__ENTROPY_BOOTSTRAP__', ENTROPY_BOOTSTRAP).replace('__ENTROPY_INSTALL__', ENTROPY_INSTALL)
 
 
 _CONTROL = r'''
@@ -690,6 +701,18 @@ class ProductHarness:
         return result
 
     async def observe(self, name, **params):
+        if name=="session_entropy":
+            hook=self.bindings.instrumentation
+            if not hook or not hook.entropy_module:
+                raise AdapterUnavailable("reviewed native CSPRNG instrumentation capability absent")
+            await self._identity()
+            observation=correlate_entropy(await self._control("observe",name="session_entropy"),params.get("token_sha256"))
+            snapshot,contract=await self._snapshot(),await self._contract()
+            native=entropy_execution_proof(self.evidence_root,observation,snapshot,contract)
+            reviews=[p for p in await self.proofs("SEC-05") if p.type=="R" and p.passed is True and
+                ENTROPY_CHECK in p.checks and p.intact(snapshot_hash=snapshot,contract_hash=contract)]
+            await self._identity()
+            return {**observation,"proofs":[asdict(p) for p in [native,*reviews]]}
         if name=="ip_transport_scope":
             return dict(default="real-public-loopback-ingress",alternate="real-linux-kernel-loopback",
                 actual_source_ips=sorted(self._ip_transport_observations),
@@ -1057,7 +1080,18 @@ def instrumented_command(binding: InstrumentationBinding, *, port=8000, database
     if not 1<=port<=65535: raise ValueError("invalid internal port")
     if PurePosixPath(database_path).parent!=PurePosixPath("/var/lib/autospec-validation") or ".." in PurePosixPath(database_path).parts:
         raise ValueError("factory-owned SQLite path required")
-    return ["/opt/venv/bin/python","-I","-u","-c",TRUSTED_ASGI_LAUNCHER,json.dumps({**binding.__dict__,"port":port,"database_path":database_path})]
+    # Runtime argv is bounded per argument. Split only this constant trusted
+    # diagnostic launcher, never a product script or a user-supplied program.
+    # Hash verification in NETNONE pins the decompressed bytes before exec.
+    raw=TRUSTED_ASGI_LAUNCHER.encode("utf-8")
+    encoded=base64.b64encode(zlib.compress(raw)).decode("ascii")
+    bootstrap=("import sys,base64,zlib,hashlib; "
+        "p=zlib.decompress(base64.b64decode(''.join(sys.argv[1:-1]),validate=True)); "
+        f"assert len(p)=={len(raw)} and hashlib.sha256(p).hexdigest()=='{hashlib.sha256(raw).hexdigest()}'; "
+        "sys.argv=[sys.argv[0],sys.argv[-1]]; exec(compile(p,'<trusted-ASGI-supervisor>','exec'))")
+    return ["/opt/venv/bin/python","-I","-u","-c",bootstrap,
+        *[encoded[i:i+4000] for i in range(0,len(encoded),4000)],
+        json.dumps({**binding.__dict__,"port":port,"database_path":database_path})]
 
 
 class OwnedProductHarnessSession:

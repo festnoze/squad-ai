@@ -18,6 +18,7 @@ from uuid import uuid4
 
 from ..contracts import AcceptanceContract
 from .support_adapter import AdapterUnavailable, Proof, SupportAdapter
+from .entropy_protocol import validate_entropy_evidence
 
 
 SECURITY_IDS = tuple(f"SEC-{i:02d}" for i in range(1, 16))
@@ -54,6 +55,7 @@ class _Case:
         self.v, self.rid = verifier, rid
         self.checks: list[dict] = []
         self.reproduction: list[dict] = []
+        self.proofs: list[Proof] = []
 
     def expect(self, name, observed, expected):
         self.checks.append({"check": name, "passed": observed == expected,
@@ -196,7 +198,7 @@ class SecurityVerifier:
                     # A provider/HTTP exception is not an observed product FAIL.
                     limits.append(f"execution incomplete: {type(exc).__name__}")
             await self._identity()
-            proofs = []
+            proofs = list(c.proofs)
             if c.checks or c.reproduction:
                 payload = {"id": rid, "contract_hash": self.pinned_contract_hash, "snapshot_hash": self.snapshot,
                            "checks": c.checks, "reproduction": c.reproduction}
@@ -213,7 +215,8 @@ class SecurityVerifier:
                 limits.append(f"external evidence unavailable: {type(exc).__name__}")
             for proof in external:
                 try:
-                    intact = proof.intact(snapshot_hash=self.snapshot, contract_hash=self.pinned_contract_hash) and rid in proof.checks
+                    intact = proof.intact(snapshot_hash=self.snapshot, contract_hash=self.pinned_contract_hash) and any(
+                        tag == rid or tag.startswith(rid + ":") for tag in proof.checks)
                 except (OSError, AttributeError, TypeError):
                     intact = False
                 if intact:
@@ -362,7 +365,6 @@ class SecurityVerifier:
             observed = cookie[attribute].casefold() if attribute == "samesite" else cookie[attribute]
             c.expect("cookie_" + attribute, observed, expected)
         c.expect("https_secure", bool(cookie["secure"]), self.adapter.base_url.startswith("https://"))
-        c.expect("token_minimum_bits_shape", len(cookie.value) >= self.profile["session"]["min_token_chars"], True)
         records = await c.observe("session_storage", token=cookie.value)
         c.expect("server_token_not_raw", bool(records) and all(r["stored"] != cookie.value for r in records), True)
         second = await self._login("alice")
@@ -376,6 +378,12 @@ class SecurityVerifier:
         c.expect("absolute_expiry_not_sliding", r.status_code, self.status("unauthorized"))
         for mode in await c.observe("cookie_modes"):
             c.expect("secure_mode_" + mode["mode"], mode["secure"], self.profile["session"]["modes"][mode["mode"]])
+        token_sha256 = hashlib.sha256(cookie.value.encode("utf-8")).hexdigest()
+        entropy = await c.observe("session_entropy", token_sha256=token_sha256)
+        c.proofs.extend(validate_entropy_evidence(entropy, token_sha256=token_sha256,
+            snapshot=self.snapshot, contract=self.pinned_contract_hash))
+        c.expect("cryptographic_session_entropy", entropy["cryptographic"], True)
+        c.expect("session_minimum_entropy_bits", entropy["entropy_bits"] >= self.profile["session"]["min_entropy_bits"], True)
 
     async def _sec06(self, c):
         response = await self._login("alice")
@@ -580,7 +588,16 @@ class SecurityVerifier:
             c.expect("private_no_store_" + str(actor), "no-store" in r.headers.get("cache-control", ""), True)
         await self.adapter.set_fault("db_read", True)
         r = await c.request("alice", "GET", self.route("tickets"))
-        c.expect("controlled_db_error", r.status_code in self.profile["statuses"]["db_fault"], True)
+        # The sources fix 503 for DB_BUSY only. Other DB failures must be
+        # controlled errors, but the oracle does not invent a 500/503 choice.
+        try: body = r.json()
+        except ValueError: body = None
+        error = body.get("error") if isinstance(body, dict) else None
+        c.expect("controlled_db_error", 400 <= r.status_code <= 599 and isinstance(error, dict) and
+                 isinstance(error.get("code"), str) and bool(error["code"]) and
+                 isinstance(error.get("message"), str) and bool(error["message"]), True)
+        if isinstance(error, dict) and error.get("code") == "DB_BUSY":
+            c.expect("db_busy_source_status", r.status_code, self.profile["statuses"]["db_busy"])
         c.expect("error_no_store", "no-store" in r.headers.get("cache-control", ""), True)
         c.expect("error_no_private_detail", not any(marker in r.text for marker in
                  ["Traceback", "SELECT ", "sqlite3.", "SECRET_SQL_PRIVATE_PATH"]), True)

@@ -8,6 +8,7 @@ import json
 import secrets
 import sqlite3
 import threading
+from dataclasses import asdict
 from pathlib import Path
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ from fastapi.responses import JSONResponse, Response
 
 from autospec.contracts import ContractFact, ContractStore, import_contract
 from autospec.validation.support_adapter import AdapterUnavailable, FixtureAccount, FixtureManifest, HttpxSupportAdapter, Proof
+from autospec.validation.entropy_protocol import correlate_entropy, entropy_execution_proof
 
 
 HASHER = PasswordHasher(time_cost=2, memory_cost=19456, parallelism=1)
@@ -61,6 +63,7 @@ class SecurityApplication:
         self.counter_lock = threading.Lock()
         self.db_fault = False
         self.logs = []
+        self.entropy_records = []
         self.local_http_explicit = True
         self.allowed_origin = "https://localhost"
         self.manifest = FixtureManifest()
@@ -96,6 +99,7 @@ class SecurityApplication:
             raise AdapterUnavailable("this oracle fixture isolates one family only")
         self._schema()
         self.now, self.limiters, self.logs, self.dummy_count = 1_791_000_000.0, {}, [], 0
+        self.entropy_records = []
         self.race_point, self.barrier, self.race_connections = "", None, []
         accounts = {actor: FixtureAccount(str(uuid4()), actor + "@example.test", password,
                     "admin" if actor == "admin" else "agent" if actor.startswith("agent") else "client")
@@ -185,7 +189,13 @@ class SecurityApplication:
                     self.limiters[ip] = (count + 1, start)
                     return self.error("LOGIN_FAILED", 401)
                 self.limiters[ip] = (0 if self.broken == "SEC-04" else count, start)
-                token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+                nbytes = 16 if self.broken == "entropy_small" else 32
+                generated = secrets.token_urlsafe(nbytes)
+                self.entropy_records.append(dict(generator="secrets.token_urlsafe", nbytes=nbytes,
+                    default_argument=False, entropy_bits=nbytes*8, cryptographic=True,
+                    encoded_sha256={"utf8":hashlib.sha256(generated.encode("utf-8")).hexdigest()}))
+                token = generated[:10] if self.broken == "entropy_truncated" else generated
+                csrf = secrets.token_urlsafe(32)
                 db.execute("INSERT INTO sessions VALUES (?,?,?,?)", (hashlib.sha256(token.encode()).hexdigest(), account["id"], csrf, self.now + 28800))
                 response = JSONResponse({"id": account["id"], "csrf_token": csrf})
                 secure = request.url.scheme == "https" or not self.local_http_explicit
@@ -282,7 +292,10 @@ class SecurityApplication:
         @app.get("/api/tickets")
         def list_tickets(request: Request):
             if self.db_fault:
-                return JSONResponse({"error": {"code": "DB_ERROR", "message": "Traceback SELECT SECRET_SQL_PRIVATE_PATH" if self.broken == "SEC-15" else "Service indisponible"}}, status_code=500)
+                status={"db_fault_502":502,"db_busy_503":503,"db_fault_success":200}.get(self.broken,500)
+                if self.broken=="db_fault_html": return Response("opaque failure",status_code=status)
+                code="DB_BUSY" if self.broken.startswith("db_busy_") else "DB_ERROR"
+                return JSONResponse({"error": {"code": code, "message": "Traceback SELECT SECRET_SQL_PRIVATE_PATH" if self.broken == "SEC-15" else "Service indisponible"}}, status_code=status)
             with self.connect() as db:
                 actor, error = self.guard(request, db)
                 if error and self.broken != "SEC-08":
@@ -513,11 +526,19 @@ class SecurityApplication:
             path.write_text(json.dumps({"requirement": rid, "fixture_source": str(Path(__file__).resolve()),
                 "fixture_source_hash": snapshot, "symbol": "SecurityApplication._app", "scope": "oracle-fixture validation only, not product acceptance"}), encoding="utf-8")
             return [Proof("R", str(path), hashlib.sha256(path.read_bytes()).hexdigest(), snapshot, contract.contract_hash,
-                          (rid,), detail="Source-linked fixture proof; independent product review still required for campaign")]
+                          (rid,"SEC-05:entropy") if rid=="SEC-05" else (rid,),
+                          detail="Source-linked fixture proof; independent product review still required for campaign")]
+        async def observations(name, **params):
+            if name != "session_entropy": return await self.observe(name, **params)
+            if self.broken == "entropy_missing": raise AdapterUnavailable("native capability intentionally absent")
+            value=correlate_entropy(self.entropy_records,params.get("token_sha256"))
+            native=entropy_execution_proof(self.root.parent/"execution-proofs",value,snapshot,contract.contract_hash)
+            if self.broken == "entropy_forged": value["entropy_bits"]=4096
+            return {**value,"proofs":[asdict(native),*[asdict(p) for p in await evidence("SEC-05")]]}
         self.allowed_origin = base_url
         adapter = HttpxSupportAdapter(base_url=base_url, auth_path="/api/auth/login", origin=self.allowed_origin,
             csrf_field="csrf_token", evidence_root=self.root.parent / "execution-proofs", prepare=self.prepare,
-            observe=self.observe, snapshot=attest_snapshot, oracle=attest_contract, command=self.command, clock=self.clock,
+            observe=observations, snapshot=attest_snapshot, oracle=attest_contract, command=self.command, clock=self.clock,
             proofs=evidence, race=self.arm_race, fault=self.fault, db_connect=self.connect,
             transport_factory=None if real_http else lambda ip: httpx.ASGITransport(app=self.app, client=(ip, 12345), raise_app_exceptions=False))
         return adapter, snapshot, oracle
