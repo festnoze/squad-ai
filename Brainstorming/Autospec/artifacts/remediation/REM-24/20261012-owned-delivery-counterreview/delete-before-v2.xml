@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="8" time="3.753" timestamp="2026-10-12T14:14:34.129445+02:00" hostname="635ROM-IT-L157"><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-False-fullstack]" time="0.250"><failure message="AssertionError: contract journal cleanup ignored before UI state flush&#10;assert 0 == 1&#10; +  where 0 = len([])">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72A79E00&gt;
+kind = 'fullstack', flushed = False, live_pipeline = False
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+&gt;       assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+E       AssertionError: contract journal cleanup ignored before UI state flush
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:46: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-False-cli]" time="0.042"><failure message="AssertionError: contract journal cleanup ignored before UI state flush&#10;assert 0 == 1&#10; +  where 0 = len([])">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72AAC950&gt;
+kind = 'cli', flushed = False, live_pipeline = False
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+&gt;       assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+E       AssertionError: contract journal cleanup ignored before UI state flush
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:46: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-True-fullstack]" time="0.162"><failure message="AssertionError: qualified contract deletion entered legacy name/latest path&#10;assert 'publication_root' in {}">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte2')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72BE46B0&gt;
+kind = 'fullstack', flushed = True, live_pipeline = False
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+        assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+        argument = "packaging_root" if kind == "cli" else "publication_root"
+&gt;       assert argument in withdrawals[0], "qualified contract deletion entered legacy name/latest path"
+E       AssertionError: qualified contract deletion entered legacy name/latest path
+E       assert 'publication_root' in {}
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:48: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-True-cli]" time="0.044"><failure message="AssertionError: qualified contract deletion entered legacy name/latest path&#10;assert 'packaging_root' in {}">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte3')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED71F1CA50&gt;
+kind = 'cli', flushed = True, live_pipeline = False
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+        assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+        argument = "packaging_root" if kind == "cli" else "publication_root"
+&gt;       assert argument in withdrawals[0], "qualified contract deletion entered legacy name/latest path"
+E       AssertionError: qualified contract deletion entered legacy name/latest path
+E       assert 'packaging_root' in {}
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:48: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-False-fullstack]" time="0.021"><failure message="AssertionError: contract journal cleanup ignored before UI state flush&#10;assert 0 == 1&#10; +  where 0 = len([])">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte4')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72A872F0&gt;
+kind = 'fullstack', flushed = False, live_pipeline = True
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+&gt;       assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+E       AssertionError: contract journal cleanup ignored before UI state flush
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:46: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-False-cli]" time="0.029"><failure message="AssertionError: contract journal cleanup ignored before UI state flush&#10;assert 0 == 1&#10; +  where 0 = len([])">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte5')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72BCEEB0&gt;
+kind = 'cli', flushed = False, live_pipeline = True
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+&gt;       assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+E       AssertionError: contract journal cleanup ignored before UI state flush
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:46: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-True-fullstack]" time="0.017"><failure message="AssertionError: qualified contract deletion entered legacy name/latest path&#10;assert 'publication_root' in {}">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte6')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72C77F50&gt;
+kind = 'fullstack', flushed = True, live_pipeline = True
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+        assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+        argument = "packaging_root" if kind == "cli" else "publication_root"
+&gt;       assert argument in withdrawals[0], "qualified contract deletion entered legacy name/latest path"
+E       AssertionError: qualified contract deletion entered legacy name/latest path
+E       assert 'publication_root' in {}
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:48: AssertionError</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-True-cli]" time="0.023"><failure message="AssertionError: qualified contract deletion entered legacy name/latest path&#10;assert 'packaging_root' in {}">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3363/test_delete_contract_uses_exte7')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001ED72C79D30&gt;
+kind = 'cli', flushed = True, live_pipeline = True
+
+    @pytest.mark.parametrize("kind", ["fullstack", "cli"])
+    @pytest.mark.parametrize("flushed", [False, True])
+    @pytest.mark.parametrize("live_pipeline", [False, True])
+    async def test_delete_contract_uses_external_journal_even_before_state_flush(
+        tmp_path, monkeypatch, kind, flushed, live_pipeline
+    ):
+        project = "delete-contract-counterproof"
+        state = ProjectState(
+            id=project, name="trusted meta fixture", goal="no generation",
+            acceptance_contract_hash="a" * 64, technical_stack={"kind": kind},
+            deployed_image="sha256:" + "b" * 64 if flushed else "",
+            deployed_container="c" * 64 if flushed and kind == "fullstack" else "",
+            deploy_status=("deployed" if kind == "fullstack" else "packaged") if flushed else "",
+        )
+        calls = []
+        async def dispose():
+            calls.append(("dispose", {}))
+        pipeline = SimpleNamespace(state=state, adispose=dispose)
+        monkeypatch.setattr(server, "pipelines", {project: pipeline} if live_pipeline else {})
+        monkeypatch.setattr(server, "load_state", lambda _id: state)
+        monkeypatch.setattr(server, "_force_delete_workspace", lambda _id: True)
+        monkeypatch.setattr(server.bus, "publish", lambda _event: None)
+        def undeploy(_id, **options):
+            assert _id == project
+            calls.append(("withdraw", options))
+            return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
+        monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        ) as client:
+            response = await client.delete("/api/projects/" + project)
+        assert response.status_code == 200, response.text
+        withdrawals = [options for action, options in calls if action == "withdraw"]
+        assert len(withdrawals) == 1, "contract journal cleanup ignored before UI state flush"
+        argument = "packaging_root" if kind == "cli" else "publication_root"
+&gt;       assert argument in withdrawals[0], "qualified contract deletion entered legacy name/latest path"
+E       AssertionError: qualified contract deletion entered legacy name/latest path
+E       assert 'packaging_root' in {}
+
+..\..\..\..\..\autospec-rem-contracts\squad-ai\Brainstorming\Autospec\artifacts\remediation\REM-24\20261012-owned-delivery-counterreview\test_delete_contract_counterproof.py:48: AssertionError</failure></testcase></testsuite></testsuites>
