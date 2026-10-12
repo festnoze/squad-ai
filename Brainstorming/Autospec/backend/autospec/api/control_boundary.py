@@ -134,7 +134,8 @@ class ControlPolicy:
             server_port = server[1] if server[1] is not None else (443 if scheme == "https" else 80)
             if type(server_port) is not int or not 1 <= server_port <= 65535:
                 return False
-            configured = any(config_host == host and config_port in {None, effective}
+            configured = any(config_host == host and
+                             effective == (server_port if config_port is None else config_port)
                              for config_host, config_port in map(_authority, self.authorities))
             # Vite forwards the trusted frontend Host, rather than changing it
             # to the upstream API port. Only approved exact GUI authorities

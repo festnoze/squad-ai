@@ -129,6 +129,14 @@ async def test_explicit_custom_authority_is_not_an_implicit_custom_origin():
     assert gui.status_code == 200 and observed == ["route reached"]
 
 
+async def test_configured_hostname_without_port_still_requires_actual_server_port():
+    app, effects = guarded(ControlPolicy((), ("factory.example",)))
+    rejected = await request(app, headers={"Host":"factory.example:19533"}, client=("192.0.2.1",1))
+    assert rejected.status_code == 403 and not effects
+    approved = await request(app, headers={"Host":"factory.example:8100"}, client=("192.0.2.1",1))
+    assert approved.status_code == 200 and effects == ["route reached"]
+
+
 @pytest.mark.parametrize("name,value", [
     ("AUTOSPEC_CONTROL_ORIGINS", "*"), ("AUTOSPEC_CONTROL_ORIGINS", '["*"]'),
     ("AUTOSPEC_CONTROL_ORIGINS", '["null"]'), ("AUTOSPEC_CONTROL_ORIGINS", '["http://localhost:5183/"]'),
