@@ -105,6 +105,31 @@ def test_istanbul_invalid_maps_and_counts_are_not_evidence(defect):
         _istanbul_coverage(report, {'src/business.js': 'hash'}, {'src/business.js': 1})
 
 
+def test_v4_implicit_else_retains_actual_counter_without_inventing_source_position():
+    report=_report();value=report['/tmp/product/src/business.js'];branch=value['branchMap']['0']
+    branch.update(type='if',line=1,loc=copy.deepcopy(branch['locations'][0]))
+    branch['locations'][1]={'start':{},'end':{}}
+    with pytest.raises(ValueError,match='Unqualified'):_istanbul_coverage(report,{'src/business.js':'hash'},{'src/business.js':1})
+    result=_istanbul_coverage(report,{'src/business.js':'hash'},{'src/business.js':1},v4_implicit_else=True)
+    assert result['files']['src/business.js']['summary']['num_branches']==2
+    assert result['files']['src/business.js']['summary']['covered_branches']==1
+    value['b']['0'][1]=1
+    result=_istanbul_coverage(report,{'src/business.js':'hash'},{'src/business.js':1},v4_implicit_else=True)
+    assert result['files']['src/business.js']['summary']['covered_branches']==2
+
+
+@pytest.mark.parametrize('defect',['type','first','extra','parent','line'])
+def test_v4_implicit_branch_malformed_or_unanchored_shapes_remain_refused(defect):
+    report=_report();branch=report['/tmp/product/src/business.js']['branchMap']['0']
+    branch.update(type='if',line=1,loc=copy.deepcopy(branch['locations'][0]));branch['locations'][1]={'start':{},'end':{}}
+    if defect=='type':branch['type']='switch'
+    elif defect=='first':branch['locations'][0]={'start':{},'end':{}}
+    elif defect=='extra':branch['locations'][1]['extra']=True
+    elif defect=='parent':branch['loc']['start']['line']=100
+    elif defect=='line':branch['line']=100
+    with pytest.raises(ValueError):_istanbul_coverage(report,{'src/business.js':'hash'},{'src/business.js':1},v4_implicit_else=True)
+
+
 @pytest.mark.parametrize('coverage_version', [None, '3.0.0'])
 def test_node_coverage_provider_must_be_explicit_exact_locked(tmp_path, monkeypatch, coverage_version):
     root = tmp_path / 'product'; root.mkdir(); (root/'src').mkdir()
