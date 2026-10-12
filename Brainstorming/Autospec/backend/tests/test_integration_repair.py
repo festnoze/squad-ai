@@ -34,10 +34,15 @@ def repair_env(monkeypatch):
 
     async def _agit_snapshot(self, ws, label):
         git_calls.append(("snapshot", label))
+        # Preserve the actual rollback ownership check. A fake checkpoint
+        # must have its own marker and exact root observation, like real Git.
+        (ws / ".git").mkdir(parents=True, exist_ok=True)
         return True
 
     async def _agit(self, ws, *args):
         git_calls.append(args)
+        if args == ("rev-parse", "--show-toplevel"):
+            return 0, str(ws.resolve())
         return 0, ""
 
     async def _arun_pytest(self, ws=None):
@@ -145,6 +150,7 @@ async def test_repair_rolls_back_when_fix_breaks_the_suite(monkeypatch, repair_e
 
     assert await pipeline._aruntime_acceptance_phase() is False
     assert pipeline._delivery_blocked is True
+    assert ("rev-parse", "--show-toplevel") in git_calls
     assert ("reset", "--hard", "HEAD") in git_calls
     assert ("clean", "-fd") in git_calls
 
@@ -251,6 +257,7 @@ async def test_repair_checks_frontend_suite(monkeypatch, repair_env):
     assert await pipeline._aruntime_acceptance_phase() is False
     assert pipeline._delivery_blocked is True
     # Rollback déclenché par la suite frontend rouge malgré pytest vert.
+    assert ("rev-parse", "--show-toplevel") in git_calls
     assert ("reset", "--hard", "HEAD") in git_calls
 
 
