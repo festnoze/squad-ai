@@ -13,7 +13,8 @@ import subprocess
 import tempfile
 import threading
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+import hashlib
 from pathlib import Path
 
 from ..agents.file_broker import ExecutionContext, FileBroker
@@ -31,6 +32,8 @@ class IsolatedSuiteResult:
     output: str
     fingerprint: str
     image: str
+    source_fingerprint: str = ""
+    coverage: dict | None = None
 
 
 def _node_command(command: list[str], *, report: bool = False, dist: bool = False) -> list[str]:
@@ -58,18 +61,34 @@ class IsolatedValidator:
         self.timeout = timeout
 
     def run_suite(self, root: Path, ecosystem: str, mode: str, reportpath: Path,
-                  *, test_args: tuple[str, ...] = ()) -> IsolatedSuiteResult:
+                  *, test_args: tuple[str, ...] = (), coveragepath: Path | None = None,
+                  coverage_source: str = ".") -> IsolatedSuiteResult:
         root, reportpath = Path(root).absolute(), Path(reportpath).absolute()
         if reportpath.resolve().is_relative_to(root.resolve()):
             raise _unavailable("Suite evidence must be stored outside producer writable root")
+        if coveragepath is not None:
+            coveragepath = Path(coveragepath).absolute()
+            if ecosystem != "python" or coveragepath.resolve().is_relative_to(root.resolve()):
+                raise _unavailable("Python coverage evidence must be outside producer root")
         environment = self.manager.prepare(root, ecosystem, mode)
         with tempfile.TemporaryDirectory(prefix="autospec-suite-") as temporary:
             stage = snapshot_product(root, Path(temporary) / "product")
             stale = FileBroker(ExecutionContext("suite-report-freshness", stage)).path("suite-report.json")
             if stale.exists():
                 stale.unlink()  # a cached/product report is never a fresh proof
+            if coveragepath is not None:
+                stale_coverage = FileBroker(ExecutionContext("coverage-freshness", stage)).path("suite-coverage.json")
+                if stale_coverage.exists():
+                    stale_coverage.unlink()
+            # Bind evidence to the exact staged pre-execution source, not merely
+            # its dependency image. Mutated temporary outputs aren't hashed.
+            source_files = {file.relative_to(stage).as_posix(): hashlib.sha256(file.read_bytes()).hexdigest()
+                            for file in sorted(stage.rglob("*")) if file.is_file()}
+            source_fingerprint = hashlib.sha256(json.dumps(source_files,sort_keys=True).encode()).hexdigest()
             if ecosystem == "python":
                 command = ["/opt/venv/bin/python", "-m", "pytest", "--json-report", "--json-report-file=suite-report.json", *test_args]
+                if coveragepath is not None:
+                    command += [f"--cov={coverage_source}", "--cov-branch", "--cov-report=json:suite-coverage.json", "--cov-report="]
                 parser = pytest_evidence
             else:
                 package = json.loads((stage / "package.json").read_text(encoding="utf-8"))
@@ -92,10 +111,50 @@ class IsolatedValidator:
                     evidence = SuiteEvidence({}, 0, rc, report_valid=False)
                     atomic_json(reportpath, {"invalid_report": True, "exit_code": rc})
                 else:
-                    data = json.loads(report.read_text(encoding="utf-8"))
-                    atomic_json(reportpath, data)
-                    evidence = parser(reportpath, rc)
-            return IsolatedSuiteResult(evidence, output, environment.fingerprint, environment.image)
+                    try:
+                        data = json.loads(report.read_text(encoding="utf-8"))
+                        atomic_json(reportpath, data)
+                        evidence = parser(reportpath, rc)
+                    except (OSError, ValueError, TypeError):
+                        evidence = SuiteEvidence({}, 0, rc, report_valid=False)
+                        atomic_json(reportpath, {"invalid_report": True, "exit_code": rc})
+            coverage = None
+            if coveragepath is not None:
+                try:
+                    report = FileBroker(ExecutionContext("coverage-export", stage)).path("suite-coverage.json")
+                    if report.stat().st_size > 20_000_000:
+                        raise ValueError("coverage exceeds limit")
+                    coverage = json.loads(report.read_text(encoding="utf-8"))
+                    totals = coverage["totals"]
+                    for key in ("covered_lines", "num_statements", "missing_lines", "num_branches", "covered_branches"):
+                        if not isinstance(totals[key], int) or totals[key] < 0:
+                            raise ValueError("invalid coverage counts")
+                    if not isinstance(coverage["files"], dict):
+                        raise ValueError("invalid coverage files")
+                    atomic_json(coveragepath, coverage)
+                except (OSError, KeyError, TypeError, ValueError):
+                    coverage = None
+                    evidence = replace(evidence, report_valid=False)
+                    output += "\nCOVERAGE_EVIDENCE_INVALID: missing/invalid fresh coverage report"
+                    atomic_json(coveragepath, {"invalid_report": True})
+            return IsolatedSuiteResult(evidence, output, environment.fingerprint, environment.image, source_fingerprint, coverage)
+
+    def collect_python(self, root: Path, reportpath: Path) -> tuple[tuple[str, ...], IsolatedSuiteResult]:
+        """Trusted pytest JSON collection, not regex/static source discovery.
+
+        Unsupported/custom item formats or incomplete collection fail closed.
+        Reports and collected IDs remain subject to supervisor baseline checks.
+        """
+        result = self.run_suite(root, "python", "test", reportpath, test_args=("--collect-only", "-q"))
+        data = json.loads(Path(reportpath).read_text(encoding="utf-8"))
+        identifiers = set()
+        for collector in data.get("collectors", []):
+            for item in collector.get("result", []):
+                if item.get("type") in {"Function", "TestCaseFunction", "DoctestItem"}:
+                    identifiers.add(item["nodeid"])
+        if result.evidence.exit_code or not result.evidence.report_valid or result.evidence.collection_errors or len(identifiers) != result.evidence.collected or not identifiers:
+            raise _unavailable("Incomplete/unsupported pytest collection; no baseline can be claimed")
+        return tuple(sorted(identifiers)), result
 
     def run_command(self, root: Path, ecosystem: str, command: list[str], *, mode: str = "test",
                     exports: tuple[str, ...] = ()) -> tuple[int, str, LinuxEnvironment]:
@@ -105,6 +164,8 @@ class IsolatedValidator:
         A caller must enumerate artefacts or use build_frontend for dist only.
         """
         environment = self.manager.prepare(Path(root), ecosystem, mode)
+        if ecosystem == "node" and exports:
+            raise _unavailable("Node arbitrary exports unsupported; use build_frontend for dist only")
         with tempfile.TemporaryDirectory(prefix="autospec-command-") as temporary:
             stage = snapshot_product(Path(root), Path(temporary) / "product")
             rc, out, err = run_isolated(_node_command(command) if ecosystem == "node" else command,
@@ -132,8 +193,21 @@ class IsolatedValidator:
         environment = self.manager.prepare(Path(root), "node", "test")
         with tempfile.TemporaryDirectory(prefix="autospec-vite-") as temporary:
             stage = snapshot_product(Path(root), Path(temporary) / "product")
-            # Never npm run: package scripts aren't allowed to change the recipe.
-            command = _node_command(["node", "/opt/node_modules/vite/bin/vite.js", "build"], dist=True)
+            stale_dist = stage / "dist"
+            if stale_dist.exists():
+                # snapshot_product has rejected every link/reparse/hardlink;
+                # this resolved path is inside the disposable stage only.
+                if not stale_dist.resolve().is_relative_to(stage):
+                    raise _unavailable("Unsafe stale dist path")
+                shutil.rmtree(stale_dist)
+            # Never npm run: package scripts cannot change the trusted recipe.
+            # tsc -b honours project references (plain --noEmit can silently
+            # check zero files for a solution-style tsconfig). Vite alone only
+            # transpiles and must never claim TypeScript validation success.
+            build = ["node", "/opt/node_modules/vite/bin/vite.js", "build"]
+            if (stage / "tsconfig.json").is_file():
+                build = ["/bin/sh", "-c", "node /opt/node_modules/typescript/bin/tsc -b --pretty false && exec node /opt/node_modules/vite/bin/vite.js build"]
+            command = _node_command(build, dist=True)
             rc, out, err = run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout)
             result = Path(tempfile.mkdtemp(prefix="autospec-dist-"))
             if rc == 0:
