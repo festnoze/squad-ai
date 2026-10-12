@@ -587,6 +587,7 @@ class ProductHarness:
             transport_factory=lambda ip:httpx.AsyncHTTPTransport(local_address=ip,
                 limits=httpx.Limits(max_keepalive_connections=0)) if ip=="127.0.0.1" else LinuxLoopbackTransport(self,ip))
         self.adapter.live_sqlite=True # supervisor capability, never a product claim
+        self.adapter.supervised_runtime=runtime # exact owned namespace; no browser host fallback
 
     async def _identity(self):
         if await self._snapshot()!=self.bindings.snapshot_hash or await self._contract()!=self.bindings.contract_hash:
