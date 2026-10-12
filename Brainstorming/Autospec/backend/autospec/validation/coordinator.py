@@ -127,7 +127,8 @@ class SupervisorEvidenceStore:
     """Read-only native/review receipts in a producer-inaccessible root.
 
     proofs.json maps RID -> serialized Proof objects. observations.json maps
-    known names -> X Proof for a JSON payload {name,parameters,value, hashes}.
+    known names -> X Proof (or list of X Proofs for distinct parameters) for a
+    JSON payload {name,parameters,value, hashes}.
     The payload itself is hashed, never an unattested success boolean from a
     product command. The independent runner owns these files, not the product.
     """
@@ -162,14 +163,69 @@ class SupervisorEvidenceStore:
         index=self._read(self.root/"observations.json")
         if (index.get("snapshot_hash"),index.get("contract_hash"))!=(self.snapshot,self.contract):
             raise AdapterUnavailable("native observation index identity changed")
-        value=index.get("observations",{}).get(name)
-        if value is None: raise AdapterUnavailable("native observation absent: "+name)
-        proof=self._proof(value,"OBS:"+name)
-        if proof.type!="X" or not proof.passed: raise AdapterUnavailable("native observation was not obtained")
-        payload=self._read(proof.path)
-        if payload.get("name")!=name or payload.get("parameters",{})!=params or (payload.get("snapshot_hash"),payload.get("contract_hash"))!=(self.snapshot,self.contract) or "value" not in payload:
-            raise AdapterUnavailable("native payload observation/parameters identity mismatch")
-        return payload["value"]
+        values=index.get("observations",{}).get(name)
+        if values is None: raise AdapterUnavailable("native observation absent: "+name)
+        if not isinstance(values,list): values=[values]
+        matched=[]
+        for value in values:
+            proof=self._proof(value,"OBS:"+name)
+            if proof.type!="X" or not proof.passed: raise AdapterUnavailable("native observation was not obtained")
+            payload=self._read(proof.path)
+            if payload.get("name")!=name or (payload.get("snapshot_hash"),payload.get("contract_hash"))!=(self.snapshot,self.contract) or "value" not in payload:
+                raise AdapterUnavailable("native payload observation identity mismatch")
+            if payload.get("parameters",{})==params: matched.append(payload["value"])
+        if len(matched)!=1: raise AdapterUnavailable("native observation parameters absent or ambiguous")
+        return matched[0]
+
+    async def record_native_observation(self,name,value,*,parameters=None,source_proofs=()):
+        """Supervisor runner publication, never a producer-command callback.
+
+        Every observation must cite already obtained external native artifacts.
+        ``passed`` on the wrapper means obtained, not that its value is green;
+        failed test/coverage/E2E values are retained and checked by the pack.
+        This API does not issue R or infer missing measurements.
+        """
+        if name not in EXTERNAL_OBSERVATIONS or not source_proofs:
+            raise AdapterUnavailable("named native observation and actual artifacts required")
+        parameters={} if parameters is None else parameters
+        if not isinstance(parameters,dict): raise AdapterUnavailable("explicit observation parameters required")
+        for proof in source_proofs:
+            if not isinstance(proof,Proof) or proof.type not in {"X","V"} or not Path(proof.path).resolve().is_relative_to(self.root) or not proof.intact(snapshot_hash=self.snapshot,contract_hash=self.contract):
+                raise AdapterUnavailable("native source artifact absent, outside root, or stale")
+        from ..orchestrator.dependencies import atomic_json
+        payload=dict(name=name,parameters=parameters,value=value,snapshot_hash=self.snapshot,
+            contract_hash=self.contract,source_proofs=[asdict(p) for p in source_proofs],
+            scope="obtained native observation; no independent review or requirement PASS issued")
+        path=self.root/"native-observations"/(name+"-"+uuid4().hex+".json")
+        atomic_json(path,payload)
+        proof=Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),self.snapshot,self.contract,("OBS:"+name,))
+        index_path=self.root/"observations.json"
+        index=self._read(index_path) if index_path.exists() else dict(snapshot_hash=self.snapshot,contract_hash=self.contract,observations={})
+        if (index.get("snapshot_hash"),index.get("contract_hash"))!=(self.snapshot,self.contract):
+            raise AdapterUnavailable("native index cannot cross snapshot/contract identities")
+        values=index["observations"].get(name,[])
+        if not isinstance(values,list): values=[values]
+        kept=[]
+        for previous in values:
+            old=self._proof(previous,"OBS:"+name);data=self._read(old.path)
+            if data.get("parameters",{})!=parameters: kept.append(previous)
+        index["observations"][name]=kept+[asdict(proof)]
+        atomic_json(index_path,index)
+        return proof
+
+    async def publish_native_proof(self,rid,proof):
+        """Append an already obtained X/V, never manufacture independent R."""
+        if proof.type not in {"X","V"}: raise AdapterUnavailable("native publication cannot issue review authority")
+        self._proof(asdict(proof),rid)
+        from ..orchestrator.dependencies import atomic_json
+        path=self.root/"proofs.json"
+        index=self._read(path) if path.exists() else dict(snapshot_hash=self.snapshot,contract_hash=self.contract,proofs={})
+        if (index.get("snapshot_hash"),index.get("contract_hash"))!=(self.snapshot,self.contract):
+            raise AdapterUnavailable("proof publication cannot cross identities")
+        rows=index["proofs"].setdefault(rid,[])
+        if not any(row.get("path")==proof.path and row.get("sha256")==proof.sha256 for row in rows): rows.append(asdict(proof))
+        atomic_json(path,index)
+        return proof
 
 
 class EvidenceAdapter:
@@ -233,6 +289,60 @@ async def verify_vertical(state,contract,snapshot_root,snapshot_hash,evidence_ro
             scope="no health-only or inferred milestone success")
 
 
+async def sqlite_quality_probe(state,contract,snapshot_root,snapshot_hash,evidence_root)->dict:
+    """NativeQualityCollector SQLite port with its own actual Linux lifetime.
+
+    A callback on an active shared runtime cannot attest future cleanup. This
+    function creates a distinct owned DB, runs real HTTP transactions, exports
+    it, restarts the app on that DB, then verifies cleanup before returning.
+    The case and actor are independently reviewed fixture inputs, not defaults.
+    """
+    import asyncio
+    from dataclasses import replace
+    context,store=_context(contract,snapshot_root,snapshot_hash,evidence_root,
+        instrumented=True,phase="quality-sqlite")
+    async with context as h:
+        await h.adapter.prepare_case("TST-04")
+        actor=h.manifest.metadata.get("quality_actor")
+        if actor not in h.manifest.accounts: raise AdapterUnavailable("explicit real SQLite fixture actor absent")
+        payload=dict(title="Independent SQLite quality "+uuid4().hex,
+            description="Real isolated HTTP transaction, owned SQLite restart and cleanup probe",client_request_id=str(uuid4()))
+        response=await h.adapter.request(actor,"POST","/api/tickets",json=payload)
+        if response.status_code!=201 or not isinstance(response.json().get("id"),str):
+            raise AdapterUnavailable("real SQLite quality transaction unavailable")
+        connection_ids=sorted({row["connection_id"] for row in await h.observe("app_connection_pragmas")})
+        if len(connection_ids)<2: raise AdapterUnavailable("actual distinct application connections were not observed")
+        persistence=await h.verify_persistence(snapshot_hash,contract.contract_hash,ticket_id=response.json()["id"],actor=actor)
+        export=await h.export_sqlite(h.evidence_root/("quality-"+uuid4().hex+".sqlite"))
+        rt=h.runtime;identifier=rt.identifier;volume=rt.volume_name
+        inspect=await asyncio.to_thread(rt.inspect_configuration)
+        if inspect.get("container_id")!=identifier or inspect.get("volume",{}).get("Name")!=volume:
+            raise AdapterUnavailable("quality runtime ownership attestation missing")
+        native=[replace(Proof(**p),checks=("TST-04:real_restart",)+tuple(p["checks"])) for p in persistence["proofs"]]
+    # close completed above. Inspect the exact remembered IDs; never prune,
+    # adopt a replacement or infer absence from a Docker daemon timeout.
+    from ..orchestrator.sandbox import _docker_call
+    result=await asyncio.to_thread(_docker_call,[rt.docker,"container","inspect",identifier],
+        capture_output=True,text=True,check=False,timeout=3)
+    container_absent=result.returncode!=0 and "no such" in result.stderr.lower()
+    volume_absent=await asyncio.to_thread(rt._volume_attestation) is None
+    cleanup=rt.closed and container_absent and volume_absent and not rt.volume_requested
+    if not cleanup: raise AdapterUnavailable("exact owned SQLite runtime cleanup could not be verified")
+    value=dict(database_path=str(export),isolated_root=str(context.evidence_root.resolve()),isolated=True,
+        connection_ids=connection_ids,restart_verified=persistence["status"]=="PASS",cleanup_owned_only=cleanup,
+        database_sha256=hashlib.sha256(export.read_bytes()).hexdigest(),
+        scope="actual application transactions on a distinct reviewed owned validation DB; native suite fixture assertions require separate R")
+    path=context.evidence_root/("TST-04-"+uuid4().hex+".json")
+    path.write_bytes(json.dumps(dict(snapshot_hash=snapshot_hash,contract_hash=contract.contract_hash,
+        observed=value,container_id=identifier,volume=volume,container_absent=container_absent,
+        volume_absent=volume_absent),sort_keys=True).encode())
+    native.append(Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot_hash,contract.contract_hash,
+        ("TST-04:real_sqlite_connections_restart_cleanup",),value["restart_verified"]))
+    for proof in native: await store.publish_native_proof("TST-04",proof)
+    await store.record_native_observation("real_sqlite_test_environment",value,source_proofs=native)
+    return value
+
+
 def _unverified(requirement,snapshot,contract,limit):
     return dict(id=requirement.id,gate=requirement.gate,status="NOT_VERIFIED",expected=requirement.expected,
         observed=[],reproduction=[],proofs=[],impact="acceptance evidence unavailable",limits=[limit],
@@ -248,6 +358,53 @@ def _merge(target,contribution):
     if contribution.get("status")=="FAIL": target["status"]="FAIL"
     elif target["status"]=="PASS" and contribution.get("status")!="PASS": target["status"]="NOT_VERIFIED"
     # Missing native checks cannot be retroactively satisfied by a UI receipt.
+
+
+async def _execute_e2e(contract,harness,store,snapshot_hash,*,modes=("alone","together"),scenario_ids=None,image_id=None):
+    """Execute browser-owned source scenarios, publish their actual artifacts.
+
+    Native and image runs are sequential; each scenario uses the verifier's
+    explicit independent fixture reset. No browser receipt substitutes SEC/FUN
+    probes, and a missing mapping remains a recorded NOT_VERIFIED scenario.
+    """
+    from .browser_contracts import PlaywrightHarness,BrowserVerifier
+    from .quality_contracts import source_e2e_scenarios
+    expected={s["id"]:s["expected"] for s in source_e2e_scenarios(contract)}
+    selected=set(scenario_ids or expected);runs=[];proofs=[];quality_proofs=[]
+    if not selected<=set(expected): raise AdapterUnavailable("unknown source E2E scenario requested")
+    requests=[(mode,group) for mode in modes for group in ([[sid] for sid in sorted(selected)] if mode=="alone" else [sorted(selected)])]
+    for mode,group in requests:
+        browser=PlaywrightHarness(EvidenceAdapter(harness.adapter,store),
+            bindings=harness.bindings.browser_bindings,routes=harness.bindings.browser_routes)
+        report=await BrowserVerifier(contract,browser).verify_e2e(snapshot_hash,mode=mode,scenario_ids=group)
+        if (report.get("snapshot_hash"),report.get("contract_hash"))!=(snapshot_hash,contract.contract_hash):
+            raise AdapterUnavailable("native browser E2E identity changed")
+        rows=report.get("scenarios",[])
+        if len(rows)!=len(group) or {r.get("id") for r in rows}!=set(group):
+            raise AdapterUnavailable("native E2E IDs missing/duplicated")
+        for row in rows:
+            if row.get("expected")!=expected[row["id"]] or row.get("mode")!=mode or (row.get("snapshot_hash"),row.get("contract_hash"))!=(snapshot_hash,contract.contract_hash):
+                raise AdapterUnavailable("E2E source expectation/mode/identity drift")
+            if row.get("status") not in {"PASS","FAIL","NOT_VERIFIED"}: raise AdapterUnavailable("invalid native E2E status")
+            if row["status"]=="PASS" and (row.get("real_ui_api_db") is not True or row.get("nominal_mocks") is not False
+                    or row.get("fixture_reset_before") is not True or row.get("nonblank") is not True
+                    or row.get("unhandled_console_errors")!=[] or not row.get("observed")
+                    or any(c.get("passed") is not True for c in row["observed"])
+                    or not {"X","V"}<={p.get("type") for p in row.get("proofs",[])}
+                    or any(p.get("passed") is not True or not p.get("checks") for p in row.get("proofs",[]))):
+                raise AdapterUnavailable("incomplete native E2E success claim rejected")
+            for value in row.get("proofs",[]):
+                proof=Proof(**value)
+                if not Path(proof.path).resolve().is_relative_to(store.root) or not proof.intact(snapshot_hash=snapshot_hash,contract_hash=contract.contract_hash):
+                    raise AdapterUnavailable("native E2E artifact unavailable or outside supervisor")
+                proofs.append(proof)
+                if row["status"]!="NOT_VERIFIED" and any(tag.startswith("TST-05:") for tag in proof.checks):
+                    quality_proofs.append(proof)
+            if image_id: row={**row,"image_id":image_id}
+            runs.append(row)
+    await store.record_native_observation("browser_e2e",runs,parameters={"image_id":image_id} if image_id else {},source_proofs=proofs)
+    store.contributions.setdefault("TST-05",[]).extend(quality_proofs)
+    return runs
 
 
 async def _operation_row(requirement,store,checks,limits,*,extra_proofs=(),reproduction=()):
@@ -389,8 +546,8 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
             async def smoke(adapter,snapshot,oracle): return await _browser_smoke(h,snapshot,oracle)
             vertical=await h.verify_vertical(snapshot_hash,contract.contract_hash,browser_smoke=smoke)
             checks=[];limits=[];extra=[]
-            check(checks,"production_vertical",vertical["status"]=="PASS",{"status":vertical["status"],"stages":[dict(name=s["name"],passed=s["passed"]) for s in vertical["stages"]]})
             if vertical["status"]=="NOT_VERIFIED": limits.extend(vertical["limits"])
+            else: check(checks,"production_vertical",vertical["status"]=="PASS",{"status":vertical["status"],"stages":[dict(name=s["name"],passed=s["passed"]) for s in vertical["stages"]]})
             for stage in vertical["stages"]:
                 extra.extend(replace(Proof(**p),checks=("OPS-03:"+stage["name"],)+tuple(p["checks"])) for p in stage["proofs"])
             response=await h.adapter.request(None,"GET","/api/health",authenticate=False)
@@ -398,13 +555,15 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
             response=await h.adapter.request(None,"GET","/api/tickets",authenticate=False)
             check(checks,"private_API_anonymous",response.status_code==401,{"status":response.status_code})
             try:
-                runs=await store.observe("browser_e2e")
+                runs=await _execute_e2e(contract,h,store,snapshot_hash,modes=("alone",),
+                    scenario_ids=("E2E-01","E2E-02"),image_id=build["image_id"])
                 for eid in ("E2E-01","E2E-02"):
                     rows=[r for r in runs if r.get("id")==eid and r.get("image_id")==build["image_id"]]
                     if not rows: raise AdapterUnavailable("production-image E2E scenario absent: "+eid)
                     if any(r.get("status") not in {"PASS","FAIL"} for r in rows): raise AdapterUnavailable("production E2E scenario unavailable")
                     check(checks,eid,all(r["status"]=="PASS" and r.get("real_ui_api_db") is True and r.get("nominal_mocks") is False and r.get("unhandled_console_errors")==[] for r in rows),rows)
-            except AdapterUnavailable as exc: limits.append(str(exc))
+                    extra.extend(replace(Proof(**p),checks=("OPS-03:"+eid,)+tuple(p["checks"])) for row in rows for p in row["proofs"])
+            except Exception as exc: limits.append("production image source E2E unavailable: "+type(exc).__name__)
             await finish("OPS-03",checks,limits,extra,repro=("final baked image real UI/API/DB vertical, anonymous API 401, health 200, source E2E-01 and E2E-02 on identical image",))
             try:
                 persistence=await h.verify_operations_persistence(snapshot_hash,contract.contract_hash)
@@ -456,6 +615,9 @@ async def verify_project(state,contract,snapshot_root,snapshot_hash,evidence_roo
                 # Quality can consume independently stored native records. No
                 # invented coverage/E2E success if runner has not produced them.
             except Exception as exc: limits.append("browser unavailable: "+type(exc).__name__)
+            try:
+                await _execute_e2e(contract,harness,store,snapshot_hash)
+            except Exception as exc: limits.append("source six-scenario E2E execution unavailable: "+type(exc).__name__)
             try:
                 report=await QualityVerifier(contract,adapter).verify(snapshot_hash)
                 for row in report["requirements"]:

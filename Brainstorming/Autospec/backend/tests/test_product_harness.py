@@ -45,14 +45,14 @@ def fixture_definition():
     rows=[dict(id=tickets[name+str(i)],owner_id={"$ref":"accounts."+name+".id"},
         title="Fixture "+name+str(i),description="Independent fixture description") for name in ("alice","bob") for i in range(6)]
     return dict(accounts=accounts,tickets=tickets,metadata=dict(provisioning=["migrate_fresh","bootstrap","seed"],
-        bootstrap_actor="emma",vertical_actor="alice",fixture_scope="independent metatest, not benchmark product"),
+        bootstrap_actor="emma",vertical_actor="alice",quality_actor="alice",fixture_scope="independent metatest, not benchmark product"),
         commands=dict(migrate_fresh={},bootstrap=dict(credentials={"$ref":"accounts.emma"}),
                       seed=dict(payload=dict(accounts={"$ref":"accounts"},tickets=rows))))
 
 
 def reviewed_fixture_file(root,source,snapshot,definition=None):
     definition=definition or fixture_definition()
-    content=dict(snapshot_hash=snapshot,contract_hash=CONTRACT,cases={"VERTICAL":definition,"INSTRUMENTED":definition,"ARC-03":definition})
+    content=dict(snapshot_hash=snapshot,contract_hash=CONTRACT,cases={"VERTICAL":definition,"INSTRUMENTED":definition,"ARC-03":definition,"TST-04":definition})
     digest=hashlib.sha256(json.dumps(content,sort_keys=True,ensure_ascii=True).encode()).hexdigest()
     review_path=root/"fixture-review.json"; write_json(review_path,{"scope":"independent test fixture-input review","fingerprint":digest})
     proof=Proof("R",str(review_path),hashlib.sha256(review_path.read_bytes()).hexdigest(),snapshot,CONTRACT,
@@ -92,6 +92,12 @@ def test_profile_mapping_mutation_requires_new_independent_review(simple_profile
     with pytest.raises(AdapterUnavailable): replace(b,ticket_path="/fake/{id}").validate(source)
     b.tables["tickets"].columns["version"]="priority"
     with pytest.raises(AdapterUnavailable): b.validate(source)
+
+
+def test_instrumentation_cannot_guess_product_proxy_header_mode(simple_profile):
+    _,_,_,binding=simple_profile
+    payload=asdict(binding);payload["instrumentation"].pop("proxy_headers")
+    with pytest.raises(AdapterUnavailable): ReviewedProductBindings.from_dict(payload)
 
 
 def test_review_artifact_and_source_hash_drift_are_fail_closed(simple_profile):
@@ -238,6 +244,16 @@ async def test_real_baked_image_has_no_stage_overlay_and_persists(linux_fixture_
                     await bad.adapter.prepare_case("VERTICAL")
                     verdict=await bad.verify_operations_persistence(snapshot,CONTRACT)
                     assert verdict["status"]=="FAIL",(bug,verdict)
+                    observed=verdict["observed"][0]
+                    assert observed["initial_records_committed"] is (bug!="lost_note")
+                    assert observed["lifecycle_rows_preserved"] is (bug!="reset_on_start")
+                    if os.environ.get("AUTOSPEC_PRODUCT_HARNESS_EVIDENCE_ROOT"):
+                        dest=Path(os.environ["AUTOSPEC_PRODUCT_HARNESS_EVIDENCE_ROOT"])/bug
+                        dest.mkdir(parents=True,exist_ok=True)
+                        for proof in verdict["proofs"]:
+                            path=Path(proof["path"]);shutil.copyfile(path,dest/path.name)
+                            proof["path"]=str(dest/path.name)
+                        write_json(dest/"ops04.json",verdict)
     finally:
         # Only this UUID tag; never prune or remove an unknown shared image.
         _docker_call(["docker","image","rm",tag],capture_output=True,text=True,check=False,timeout=10)
