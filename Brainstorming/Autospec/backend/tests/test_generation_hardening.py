@@ -113,6 +113,21 @@ async def test_manifest_conflict_is_auto_resolved_at_merge(tmp_path, monkeypatch
     """Deux items parallèles ajoutent chacun une dépendance : le conflit sur
     pyproject.toml est UNION-fusionné au lieu de re-queuer le travail vert."""
     monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    # This metatest observes real Git merge/union/lock staging, not a Linux
+    # dependency install. Stub only the explicit factory resolver port, and
+    # prove it receives the merged manifest rather than a producer script.
+    from autospec.orchestrator.validation_environment import LinuxEnvironmentManager
+    resolved = []
+    def regenerate_lock(_manager, root, ecosystem):
+        assert ecosystem == "python"
+        text = (root / "pyproject.toml").read_text(encoding="utf-8")
+        assert '"fastapi>=0.110"' in text and '"redis>=5.0"' in text
+        resolved.append(root.resolve())
+        lock = root / "uv.lock"
+        lock.write_text("version=1\nrevision=3\n# synthetic resolver-port metatest, not installed product dependencies\n", encoding="utf-8")
+        return lock
+    monkeypatch.setattr(LinuxEnvironmentManager, "regenerate_lock", regenerate_lock)
     pipeline = Pipeline(_state("mani-e2e"), ScriptedRunner())
     ws = workspace_dir("mani-e2e")
     ws.mkdir(parents=True, exist_ok=True)
@@ -147,6 +162,9 @@ async def test_manifest_conflict_is_auto_resolved_at_merge(tmp_path, monkeypatch
     assert merged is True and conflicts == []          # auto-résolu, pas requeué
     final = (ws / "pyproject.toml").read_text(encoding="utf-8")
     assert '"fastapi>=0.110"' in final and '"redis>=5.0"' in final
+    assert resolved == [ws.resolve()]
+    code, tracked = await pipeline._agit(ws, "ls-files", "--", "uv.lock")
+    assert code == 0 and tracked.strip() == "uv.lock"
 
 
 # ------------------------------------------------- point 3 : scaffold plugin
