@@ -419,7 +419,23 @@ def _quality_seal(store,seal,source_root):
     mapping=Path(data["mapping_path"]).resolve()
     if not mapping.is_relative_to(store.root) or hashlib.sha256(mapping.read_bytes()).hexdigest()!=data["mapping_sha256"]:
         raise AdapterUnavailable("quality assertion mapping changed")
-    suites=tuple(NativeSuiteSpec(**s) for s in data["suites"])
+    records=data.get("suites")
+    fields={"name","root","ecosystem","source_inventory","domains","test_args","coverage_source"}
+    if (not isinstance(records,list) or not 1<=len(records)<=3 or any(not isinstance(s,dict) or set(s)!=fields for s in records)):
+        raise AdapterUnavailable("typed native suites with exact fields required")
+    suites=[]
+    for record in records:
+        if any(not isinstance(record[field],list) for field in ("source_inventory","domains","test_args")):
+            raise AdapterUnavailable("typed native suite JSON arrays required")
+        if (len(record["domains"])>200 or any(not isinstance(domain,str) or len(domain)>4096 or "\x00" in domain for domain in record["domains"])):
+            raise AdapterUnavailable("typed native suite domain values required")
+        try:
+            suites.append(NativeSuiteSpec(**{**record,**{field:tuple(record[field]) for field in ("source_inventory","domains","test_args")}}))
+        except (ValueError,TypeError) as exc:
+            raise AdapterUnavailable("typed native suite values invalid") from exc
+    suites=tuple(suites)
+    if len({suite.name for suite in suites})!=len(suites):
+        raise AdapterUnavailable("distinct native suite names required")
     mutation=AuthorizationMutationSpec(**data["mutation"]) if data.get("mutation") else None
     digest=native_quality_plan_hash(suites,mapping,mutation)
     if digest!=data["plan_hash"]: raise AdapterUnavailable("quality plan content/fingerprint mismatch")

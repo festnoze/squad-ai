@@ -63,10 +63,12 @@ def receipt_fixture(tmp_path):
         image_id=commands[1]["image_id"],environment_fingerprint=commands[1]["environment_fingerprint"],
         argv=_node_command(["/bin/sh","-c","node /opt/node_modules/typescript/bin/tsc -b --pretty false && exec node /opt/node_modules/vite/bin/vite.js build"],dist=True)))
     image="sha256:"+"d"*64
-    recipe=f'FROM autospec/clean-env:{commands[0]["environment_fingerprint"]}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nCMD ["/opt/venv/bin/python", "main.py"]\nLABEL autospec.snapshot={snapshot}\n'
+    runtime=["/opt/venv/bin/python","main.py"]
+    recipe=f'FROM autospec/clean-env:{commands[0]["environment_fingerprint"]}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nENTRYPOINT []\nCMD {json.dumps(runtime)}\nLABEL autospec.snapshot={snapshot}\n'
     commands.append(dict(kind="image_build",rc=0,isolated=True,argv=["docker","build","--pull=false","--network=none","-t","meta/image","."],recipe_sha256=hashlib.sha256(recipe.encode()).hexdigest()))
-    images[image]=dict(Id=image,Config=dict(Labels={"autospec.snapshot":snapshot}))
+    images[image]=dict(Id=image,Config=dict(Labels={"autospec.snapshot":snapshot},Cmd=runtime,Entrypoint=[]))
     receipt=dict(version=1,status="PASS",snapshot_hash=snapshot,image_id=image,image_tag="meta/image",isolated=True,
+        runtime_command=runtime,runtime_command_mode="explicit-factory",
         no_host_dependencies=True,manifest_only_install=True,locks_sha256={"uv.lock":hashlib.sha256((root/"uv.lock").read_bytes()).hexdigest(),
         "frontend/package-lock.json":hashlib.sha256((front/"package-lock.json").read_bytes()).hexdigest()},commands=commands,
         frontend_files={"frontend/dist/index.html":"f"*64})
@@ -91,6 +93,27 @@ def test_native_layer_builder_is_observed_not_install_exit_code(receipt_fixture)
     assert command["rc"] is None
     command["builder"]["rc"]=1
     assert not all(r["passed"] for r in delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__))
+
+
+@pytest.mark.parametrize("fault",["missing_command","legacy_default","shell","different_cmd","inherited_entrypoint","recipe_legacy_cmd"])
+def test_baked_runtime_identity_not_an_overridden_or_legacy_launcher(receipt_fixture,fault):
+    root,snapshot,receipt,images=receipt_fixture
+    if fault=="missing_command":receipt.pop("runtime_command")
+    elif fault=="legacy_default":receipt["runtime_command_mode"]="legacy-default"
+    elif fault=="shell":receipt["runtime_command"]=["/bin/sh","-c","python main.py"]
+    elif fault=="different_cmd":images[receipt["image_id"]]["Config"]["Cmd"]=["/opt/venv/bin/python","another.py"]
+    elif fault=="inherited_entrypoint":images[receipt["image_id"]]["Config"]["Entrypoint"]=["docker-entrypoint.sh"]
+    elif fault=="recipe_legacy_cmd":
+        receipt["commands"][-1]["recipe_sha256"]=hashlib.sha256(b"old factory recipe with fixed CMD").hexdigest()
+    try:rows=delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__)
+    except AdapterUnavailable:return
+    assert any(row["passed"] is False for row in rows)
+
+
+def test_docker_omitted_empty_entrypoint_is_absence_not_inherited_script(receipt_fixture):
+    root,snapshot,receipt,images=receipt_fixture
+    images[receipt["image_id"]]["Config"].pop("Entrypoint")
+    assert all(row["passed"] for row in delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__))
 
 
 @pytest.mark.parametrize("fault",["fictional_install_rc","missing_inputs","wrong_lock","wrong_manifest","wrong_recipe","duplicate","missing_typecheck","failed_tsc","wrong_image","wrong_snapshot_label","drift_source"])
@@ -131,7 +154,8 @@ def test_real_build_and_current_image_attestations_admitted(tmp_path):
     snapshot=source_snapshot(root).digest
     tag="autospec/delivery-check:"+uuid.uuid4().hex
     try:
-        ok,output=build_delivery_image(root,tag,evidence_root=tmp_path/"evidence",snapshot_hash=snapshot,timeout=600)
+        ok,output=build_delivery_image(root,tag,evidence_root=tmp_path/"evidence",snapshot_hash=snapshot,timeout=600,
+            runtime_command=["/opt/venv/bin/python","main.py"])
         assert ok,output
         receipt=json.loads((tmp_path/"evidence/delivery-build.json").read_text())
         rows=delivery_build_checks(receipt,root,snapshot)

@@ -24,6 +24,14 @@ from .support_adapter import AdapterUnavailable, Proof
 REQUIRED_DOC_OBLIGATIONS=frozenset({"install","tests","coverage","e2e","launch","seed","migration","backup","restore"})
 
 
+class NativeTimingUnavailable(AdapterUnavailable):
+    """An admitted native operation has no usable diagnostic subclock.
+
+    This never denotes a stale/contradictory source, receipt, recipe or image.
+    A collector may retain the operation X and report PARTIAL/NOT_VERIFIED.
+    """
+
+
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -144,10 +152,20 @@ def delivery_build_checks(receipt: dict, source_root: Path, snapshot_hash: str,
     if not isinstance(argv, list) or len(argv) != 7 or argv[1:] != ["build", "--pull=false", "--network=none", "-t", receipt.get("image_tag"), "."] or type(command.get("rc")) is not int:
         raise AdapterUnavailable("actual confined final-image builder required")
     base = "autospec/clean-env:" + commands["backend_install"]["environment_fingerprint"]
-    runtime = ["/opt/venv/bin/python", "main.py"] if ecology == "python" else ["node", "main.js"]
-    recipe = f'FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nCMD {json.dumps(runtime)}\nLABEL autospec.snapshot={snapshot_hash}\n'
+    runtime=receipt.get("runtime_command")
+    if (receipt.get("runtime_command_mode")!="explicit-factory" or not isinstance(runtime,list)
+            or not 1<=len(runtime)<=200 or any(not isinstance(arg,str) or "\x00" in arg or len(arg)>4096 for arg in runtime)
+            or runtime[0]!=("/opt/venv/bin/python" if ecology=="python" else "node")):
+        raise AdapterUnavailable("explicit source-reviewed factory runtime argv required; legacy launcher is not acceptance")
+    node_link="USER 0:0\nRUN ln -s /opt/node_modules /node_modules\n" if ecology=="node" else ""
+    recipe = f'FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\n{node_link}ENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nENTRYPOINT []\nCMD {json.dumps(runtime)}\nLABEL autospec.snapshot={snapshot_hash}\n'
     check("image_builder", command["rc"] == 0 and command.get("isolated") is True and command.get("recipe_sha256") == _sha(recipe.encode()), dict(argv=argv, rc=command["rc"], recipe_sha256=command.get("recipe_sha256")))
     actual = image_lookup(receipt["image_id"])
+    config=actual.get("Config",{})
+    # Docker JSON may omit an actually empty ENTRYPOINT (Go templates expose
+    # null). Fresh image inspection + exact recipe/Cmd still attest absence.
+    check("baked_runtime_command",config.get("Cmd")==runtime and config.get("Entrypoint") in (None,[]),
+          dict(expected=runtime,cmd=config.get("Cmd"),entrypoint=config.get("Entrypoint"),mode=receipt["runtime_command_mode"]))
     check("current_delivery_image", actual.get("Id") == receipt["image_id"] and actual.get("Config", {}).get("Labels", {}).get("autospec.snapshot") == snapshot_hash,
           dict(image_id=actual.get("Id"), snapshot_label=actual.get("Config", {}).get("Labels", {}).get("autospec.snapshot")))
     return rows
@@ -710,15 +728,15 @@ class NativeTimingRecorder:
         for native_path,phase,container,command in jobs:
             clock=container.get("timing")
             if not isinstance(clock,dict) or clock.get("phase")!=phase:
-                raise AdapterUnavailable("exact native delivery subclock absent: "+native_path)
+                raise NativeTimingUnavailable("exact native delivery subclock absent: "+native_path)
             seconds=clock.get("seconds")
             if isinstance(seconds,bool) or not isinstance(seconds,(int,float)) or not math.isfinite(seconds) or seconds<0:
-                raise AdapterUnavailable("invalid measured delivery seconds")
+                raise NativeTimingUnavailable("invalid measured delivery seconds")
             try:
                 start=datetime.fromisoformat(clock["started_at"].replace("Z","+00:00"));end=datetime.fromisoformat(clock["ended_at"].replace("Z","+00:00"))
                 if start.tzinfo is None or end.tzinfo is None or end<start: raise ValueError("invalid clock bounds")
             except (ValueError,KeyError,TypeError) as exc:
-                raise AdapterUnavailable("native zoned delivery clock bounds absent") from exc
+                raise NativeTimingUnavailable("native zoned delivery clock bounds absent") from exc
             row=dict(clock,native_clock_path=native_path,native_kind=command["kind"],
                 image_id=receipt["image_id"] if phase=="docker" else command["image_id"],
                 environment_fingerprint=commands["backend_install"]["environment_fingerprint"] if phase=="docker" else command["environment_fingerprint"],

@@ -74,7 +74,11 @@ def test_bad_delivery_clock_never_publishes_partial_phases(timed_receipt,fault):
     elif fault=="failed_build":receipt["status"]="FAIL"
     proof=proof_for(receipt,snapshot,root)
     if fault=="raw_drift":last["seconds"]=17
-    with pytest.raises(AdapterUnavailable):timer.ingest_delivery(receipt,proof,source_root=source)
+    # NaN is not even equal to its JSON-decoded self, so the exact-raw guard
+    # rejects that nonstandard receipt before diagnostic clock ingestion.
+    timing_faults={"phase","negative","boolean","timezone","reverse","missing"}
+    with pytest.raises(AdapterUnavailable) as caught:timer.ingest_delivery(receipt,proof,source_root=source)
+    assert isinstance(caught.value,module.NativeTimingUnavailable) is (fault in timing_faults)
     assert timer.phases==[]
 
 
@@ -123,7 +127,8 @@ def test_real_delivery_receipt_four_clocks_admitted_and_retained(tmp_path):
     manager.ensure_lock(source,"python");manager.ensure_lock(source/"frontend","node")
     snapshot=source_snapshot(source).digest;root=tmp_path/"supervisor";tag="autospec/delivery-clocks:"+uuid.uuid4().hex
     try:
-        ok,out=build_delivery_image(source,tag,evidence_root=root,snapshot_hash=snapshot,timeout=600)
+        ok,out=build_delivery_image(source,tag,evidence_root=root,snapshot_hash=snapshot,timeout=600,
+            runtime_command=["/opt/venv/bin/python","main.py"])
         assert ok,out
         receipt=json.loads((root/"delivery-build.json").read_bytes())
         timer=module.NativeTimingRecorder(evidence_root=root,snapshot_hash=snapshot,contract_hash="c"*64)
