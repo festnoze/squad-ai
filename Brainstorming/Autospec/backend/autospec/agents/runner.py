@@ -22,10 +22,10 @@ import tempfile
 from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Awaitable, Callable, Protocol
 
 from ..config import settings
-from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for, active_dependency_handler
+from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for, active_dependency_handler, active_claim_handler
 
 
 class ProcessRegistry:
@@ -134,6 +134,18 @@ active_skills_enabled: contextvars.ContextVar[bool | None] = contextvars.Context
 active_budget_usd: contextvars.ContextVar[float | None] = contextvars.ContextVar(
     "autospec_active_budget_usd", default=None
 )
+
+# Logical agent sessions include file mediation and dependency waits. Only a
+# model turn occupies the provider; the supervisor owns this observer.
+active_provider_observer: contextvars.ContextVar[Callable[[bool], Awaitable[None]] | None] = contextvars.ContextVar(
+    "autospec_provider_observer", default=None
+)
+
+
+async def observe_provider(active: bool) -> None:
+    observer = active_provider_observer.get()
+    if observer is not None:
+        await observer(active)
 
 
 _active_call_cancel: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
@@ -718,6 +730,8 @@ class ClaudeCliRunner:
     tools/settings and is not an isolation attestation.
     """
 
+    reports_provider_turns = True
+
     def __init__(self) -> None:
         self._sessions: dict[str, tuple[str | None, list[str]]] = {}
 
@@ -745,8 +759,12 @@ class ClaudeCliRunner:
             if len(transcript.encode("utf-8")) > 4_000_000:
                 raise AgentError("Mediated conversation size limit exceeded", usage=total)
             try:
-                result = await self._turn(transcript, system_prompt + (FILE_PROTOCOL if broker else ""),
-                                          cwd, model, remaining)
+                await observe_provider(True)
+                try:
+                    result = await self._turn(transcript, system_prompt + (FILE_PROTOCOL if broker else ""),
+                                              cwd, model, remaining)
+                finally:
+                    await observe_provider(False)
             except AgentError as exc:
                 if exc.usage:
                     self._accumulate(total, exc.usage)
@@ -756,8 +774,8 @@ class ClaudeCliRunner:
             total.text = result.text
             history.append(f"ASSISTANT:\n{result.text}")
             try:
-                call = json.loads(result.text)
-            except (json.JSONDecodeError, TypeError):
+                call = extract_json(result.text)
+            except (AgentError, TypeError):
                 call = None
             if not isinstance(call, dict) or "tool" not in call:
                 self._sessions[sid] = (root, history)
@@ -771,8 +789,9 @@ class ClaudeCliRunner:
                 if remaining <= 0:
                     raise AgentError("Mediated-turn budget exhausted", usage=total, budget_exhausted=True)
             try:
-                if call["tool"] == "dependency_request":
-                    handler = active_dependency_handler.get()
+                if call["tool"] in {"dependency_request", "claim_expand"}:
+                    handler = (active_dependency_handler.get() if call["tool"] == "dependency_request"
+                               else active_claim_handler.get())
                     if handler is None:
                         raise AgentError("DEPENDENCY_COORDINATOR_UNAVAILABLE: no trusted dependency handler",
                                          code="DEPENDENCY_COORDINATOR_UNAVAILABLE", usage=total)
@@ -783,7 +802,7 @@ class ClaudeCliRunner:
                     if len(response.encode("utf-8")) > 256_000:
                         raise AgentError("Dependency coordinator response size exceeded", usage=total)
                 else:
-                    response = broker.apply(call)
+                    response = await asyncio.to_thread(broker.apply, call)
             except IsolationViolation as exc:
                 raise AgentError(str(exc), usage=total, code=exc.code) from exc
             history.append(f"TOOL RESULT:\n{response}")

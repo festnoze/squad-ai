@@ -161,6 +161,27 @@ async def test_repair_disabled_blocks_immediately(monkeypatch, repair_env):
     assert runner.calls == []  # no repair agent dispatched
 
 
+async def test_global_repair_deadline_cancels_provider_and_does_not_ship(monkeypatch, repair_env):
+    import asyncio
+    from autospec.orchestrator import repair_policy
+    original = repair_policy.RepairLedger
+    def tiny_ledger(attempts, deadline):
+        import time
+        return original(attempts, time.monotonic() + .05)
+    monkeypatch.setattr(repair_policy, "RepairLedger", tiny_ledger)
+    class Pending:
+        async def arun(self, *args, **kwargs):
+            await asyncio.sleep(2)
+            pytest.fail("deadline must cancel provider")
+    pipeline = Pipeline(_state("repair-deadline"), Pending())
+    async def verify():
+        pytest.fail("verification must not run after deadline")
+    result, detail = await asyncio.wait_for(pipeline._arepair_delivery("runtime", "login 500", verify), .5)
+    assert not result and "REPAIR_DEADLINE_EXCEEDED" in detail
+    assert pipeline.state.usage.unreported_calls == 1
+    assert pipeline.state.agent_activity == {}
+
+
 async def test_repair_skipped_without_git(monkeypatch, repair_env):
     async def _no_git(self, ws, label):
         return False

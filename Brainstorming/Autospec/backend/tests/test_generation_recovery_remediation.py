@@ -18,6 +18,8 @@ def test_restart_marks_delivery_interrupted_without_provider_or_resume(tmp_path,
     assert "interrompue" in state.error
     assert state.generation_checkpoint["run_id"] == "run-1"
     assert state.generation_checkpoint["status"] == "interrupted"
+    assert state.usage.unreported_calls == 1
+    assert state.generation_checkpoint["cost_incomplete"] is True
     recovered = storage.load_state(state.id)
     assert recovered.generation_checkpoint == state.generation_checkpoint
     assert server.pipelines[state.id]._task is None
@@ -26,3 +28,15 @@ def test_restart_marks_delivery_interrupted_without_provider_or_resume(tmp_path,
 def test_old_state_without_checkpoint_remains_loadable():
     state = ProjectState.model_validate({"id": "old", "name": "old", "goal": "old"})
     assert state.generation_checkpoint == state.agent_activity == {}
+
+
+def test_governance_worker_is_interrupted_and_cost_uncertainty_survives_restart(monkeypatch):
+    state = ProjectState(id="govern-worker", name="govern", goal="demo", phase=PipelinePhase.GOVERN,
+                         budget_usd=1, agent_activity={"G1": {"phase": "provider"}, "G2": {"phase": "provider"},
+                                                      "G3": {"phase": "waiting_budget"}})
+    monkeypatch.setattr(server, "pipelines", {})
+    server.recover_projects([state])
+    assert state.phase == PipelinePhase.STOPPED
+    assert state.usage.unreported_calls == 2
+    assert state.generation_checkpoint["interrupted_provider_calls"] == 2
+    assert state.agent_activity == {}

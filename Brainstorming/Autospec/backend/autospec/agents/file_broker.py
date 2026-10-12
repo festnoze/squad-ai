@@ -18,6 +18,10 @@ class IsolationViolation(RuntimeError):
     code = "ISOLATION_VIOLATION"
 
 
+class ClaimViolation(IsolationViolation):
+    code = "CLAIM_REPLAN"
+
+
 @dataclass(frozen=True)
 class ExecutionContext:
     run_id: str
@@ -48,6 +52,12 @@ active_execution: contextvars.ContextVar[ExecutionContext | None] = contextvars.
 active_dependency_handler: contextvars.ContextVar[Callable[[Path, dict], object] | None] = contextvars.ContextVar(
     "autospec_dependency_handler", default=None,
 )
+active_write_authorizer: contextvars.ContextVar[Callable[[tuple[str, ...]], None] | None] = contextvars.ContextVar(
+    "autospec_write_authorizer", default=None,
+)
+active_claim_handler: contextvars.ContextVar[Callable[[Path, dict], object] | None] = contextvars.ContextVar(
+    "autospec_claim_handler", default=None,
+)
 
 FILE_PROTOCOL = """
 --- MEDIATED FILE PROTOCOL ---
@@ -65,12 +75,17 @@ identity. Pending requests are NOT installed and are NOT evidence of success.
 Wait for the tool result before continuing. Tests and installs are performed
 separately by the trusted orchestrator. Do not claim you ran them. Once done,
 return the requested final answer WITHOUT a "tool" key.
+File ownership is enforced before every write. To add a path to your reserved
+scope, request {"tool":"claim_expand","paths":["relative/path"],"reason":"why"}
+BEFORE writing. A refusal grants no permission; keep existing work and stop.
 """
 
 _PROTECTED = {".git", ".claude", ".codex", ".agents", ".aws", ".ssh", ".azure",
               ".npmrc", ".pypirc", ".netrc", "credentials.json", ".credentials.json",
               ".autospec", "autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl", "acceptance-contract.json",
-              "contract-baseline.json", "independent-oracle", "verification-snapshot"}
+              "contract-baseline.json", "independent-oracle", "verification-snapshot",
+              ".autospec-bootstrap.json", ".autospec-environment.json", ".mcp.json",
+              "claude.md", "agents.md", "gemini.md"}
 _DEVICE = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
            *(f"lpt{i}" for i in range(1, 10))}
 MAX_FILES = 100
@@ -154,6 +169,9 @@ class FileBroker:
                 prepared.append((self.path(item.get("path")), data))
             # Validate the entire batch before any mutation (traversal late in
             # a request cannot leave an apparently successful partial edit).
+            authorizer = active_write_authorizer.get()
+            if authorizer is not None:
+                authorizer(tuple(target.relative_to(self.root).as_posix() for target, _ in prepared))
             for target, data in prepared:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 self.path(target.relative_to(self.root).as_posix())

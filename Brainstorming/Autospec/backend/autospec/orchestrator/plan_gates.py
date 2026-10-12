@@ -341,8 +341,13 @@ def admit_plan(plan: dict, contract: AcceptanceContract, policy: PlanPolicy, *,
                 errors.append(f"{tid}: canonical file claims missing")
             for glob in globs:
                 try:
+                    forbidden = tuple(incompatible_prefixes)
+                    if not roots[stream]:
+                        # A root-zoned backend does not own nested frontend or
+                        # other stream roots merely because they share the repo.
+                        forbidden += tuple(root for root in roots.values() if root)
                     canonical_claim(glob, project_root=project_root, owner=tid, stream_root=roots[stream],
-                                    incompatible_prefixes=incompatible_prefixes)
+                                    incompatible_prefixes=forbidden)
                 except ClaimError as exc:
                     errors.append(f"{tid}: {exc}")
     if not contract.facts:

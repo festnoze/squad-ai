@@ -20,3 +20,14 @@ it("keeps incomplete cost visible after calls have disappeared", () => {
   render(<AgentExecutionPanel incomplete />);
   expect(screen.getByRole("status")).toHaveTextContent(/Recorded cost is incomplete/);
 });
+
+it("never labels file/test/merge waits as provider execution", () => {
+  render(<AgentExecutionPanel activities={Object.fromEntries(
+    ["waiting_claim", "dependency", "tests", "waiting_merge", "repair"].map(phase => [phase,
+      {version: 1, phase, since: Date.now()/1000, active_provider_calls: 0, cost_incomplete: false}]))} />);
+  expect(screen.getByText(/0 active provider calls/)).toBeVisible();
+  expect(screen.getByText(/Waiting for file ownership/)).toBeVisible();
+  expect(screen.getByText(/Running isolated tests/)).toBeVisible();
+  expect(screen.getByText(/Waiting for merge ownership/)).toBeVisible();
+  expect(screen.queryByText(/Provider call in progress/)).not.toBeInTheDocument();
+});

@@ -40,6 +40,24 @@ _SECRET_PATTERNS = """.env
 **/.npmrc
 .pypirc
 **/.pypirc
+.claude
+**/.claude
+.codex
+**/.codex
+.agents
+**/.agents
+.azure
+**/.azure
+.netrc
+**/.netrc
+acceptance-contract.json
+**/acceptance-contract.json
+contract-baseline.json
+**/contract-baseline.json
+independent-oracle
+**/independent-oracle
+verification-snapshot
+**/verification-snapshot
 """
 _LEGACY_DOCKERIGNORE = """.git
 .venv

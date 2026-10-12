@@ -24,7 +24,7 @@ import asyncio
 from pathlib import Path
 
 from ..config import settings
-from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for, active_dependency_handler
+from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for, active_dependency_handler, active_claim_handler
 from .runner import (
     AgentError,
     AgentResult,
@@ -33,6 +33,7 @@ from .runner import (
     CodexCliRunner,
     RunnerCapabilities,
     extract_json,
+    observe_provider,
 )
 
 TOOL_PROTOCOL = FILE_PROTOCOL
@@ -78,6 +79,8 @@ class _LangChainRunner:
     (``BaseChatModel``); the import happens lazily so the backend stays
     importable when the provider's package is not installed.
     """
+
+    reports_provider_turns = True
 
     def __init__(self) -> None:
         self._sessions: dict[str, list] = {}  # session id -> LangChain messages
@@ -131,7 +134,11 @@ class _LangChainRunner:
         total_in = total_out = 0
         text = ""
         for _ in range(settings.provider_tool_rounds):
-            text, n_in, n_out = await self._achat(messages)
+            await observe_provider(True)
+            try:
+                text, n_in, n_out = await self._achat(messages)
+            finally:
+                await observe_provider(False)
             total_in += n_in
             total_out += n_out
             messages.append(AIMessage(content=text))
@@ -143,8 +150,9 @@ class _LangChainRunner:
                 break  # not JSON at all: final (prose) answer
             if "tool" not in call:
                 break  # final answer
-            if call["tool"] == "dependency_request":
-                handler = active_dependency_handler.get()
+            if call["tool"] in {"dependency_request", "claim_expand"}:
+                handler = (active_dependency_handler.get() if call["tool"] == "dependency_request"
+                           else active_claim_handler.get())
                 if handler is None:
                     raise AgentError("DEPENDENCY_COORDINATOR_UNAVAILABLE: no trusted dependency handler",
                                      code="DEPENDENCY_COORDINATOR_UNAVAILABLE")
@@ -154,7 +162,7 @@ class _LangChainRunner:
                     request["task_id"] = context.task_id
                 result = json.dumps(await asyncio.to_thread(handler, cwd, request), ensure_ascii=False)
             else:
-                result = _apply_tool(cwd, call)
+                result = await asyncio.to_thread(_apply_tool, cwd, call)
             messages.append(HumanMessage(content=f"Résultat de l'outil :\n{result}"))
         else:
             # Tool-round cap reached with the model still asking for tools.

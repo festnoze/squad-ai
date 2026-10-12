@@ -21,7 +21,7 @@ import subprocess
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from ..agents import prompts
@@ -31,11 +31,14 @@ from ..agents.runner import (
     AgentRunner,
     ProcessRegistry,
     active_budget_usd,
+    active_provider_observer,
     active_processes,
     active_skills_enabled,
     extract_json,
 )
 from ..agents.personas import FALLBACK_PERSONAS, persona
+from ..agents.file_broker import (ExecutionContext, ClaimViolation, IsolationViolation,
+    active_execution, active_dependency_handler, active_write_authorizer, active_claim_handler)
 from ..config import settings
 from .. import observability
 from ..models import (
@@ -99,6 +102,7 @@ from . import stack as stack_selection
 from . import brownfield
 from . import sandbox
 from . import repair_policy
+from . import acceptance, claims, plan_gates, dependencies
 from .events import bus
 
 logger = logging.getLogger(__name__)
@@ -675,6 +679,7 @@ class _UsageTracker:
     def __init__(self, pipeline: "Pipeline"):
         self.pipeline = pipeline
         self._active_calls = 0
+        self._provider_calls = 0
         self._budgeted_call = False
         self._idle = asyncio.Event()
         self._idle.set()
@@ -695,7 +700,7 @@ class _UsageTracker:
         ):
             self.pipeline.state.agent_activity[activity_key] = {
                 "version": 1, "phase": "waiting_budget", "since": waiting_since,
-                "owner": sorted(self._call_owners), "active_provider_calls": self._active_calls,
+                "owner": sorted(self._call_owners), "active_provider_calls": self._provider_calls,
                 "cost_incomplete": bool(self.pipeline.state.usage.unreported_calls),
             }
             self.pipeline._sync()
@@ -712,20 +717,48 @@ class _UsageTracker:
         self._idle.clear()
         self._call_owners.add(activity_key)
         self.pipeline.state.agent_activity[activity_key] = {
-            "version": 1, "phase": "provider", "since": time.time(),
-            "active_provider_calls": self._active_calls,
+            "version": 1, "phase": "preparing", "since": time.time(),
+            "logical_call_active": True,
+            "active_provider_calls": self._provider_calls,
             "cost_incomplete": bool(self.pipeline.state.usage.unreported_calls),
         }
         self.pipeline._sync()
+        turn_active = False
+
+        async def provider_turn(active: bool) -> None:
+            nonlocal turn_active
+            if active == turn_active:
+                return
+            turn_active = active
+            self._provider_calls += 1 if active else -1
+            row = self.pipeline.state.agent_activity[activity_key]
+            row.update(phase="provider" if active else "mediated_tools", since=time.time())
+            for activity in self.pipeline.state.agent_activity.values():
+                activity["active_provider_calls"] = self._provider_calls
+            self.pipeline._sync()
+            if active:
+                # Each paid turn has a durable marker, including after a tool
+                # round whose earlier usage has not yet been reconciled.
+                await asyncio.get_running_loop().run_in_executor(
+                    _PERSIST_EXECUTOR, save_state_checkpoint, self.pipeline.state.id,
+                    self.pipeline.state.model_dump_json(indent=2),
+                )
+
+        observer_token = active_provider_observer.set(provider_turn)
         try:
+            if not getattr(self.pipeline.runner, "reports_provider_turns", False):
+                await provider_turn(True)
             return await self._arun(prompt, system_prompt, cwd, session_id, model)
         finally:
             # Synchronous release cannot itself be interrupted by cancellation.
+            active_provider_observer.reset(observer_token)
+            if turn_active:
+                self._provider_calls -= 1
             self._active_calls -= 1
             self._call_owners.discard(activity_key)
             self.pipeline.state.agent_activity.pop(activity_key, None)
             for activity in self.pipeline.state.agent_activity.values():
-                activity["active_provider_calls"] = self._active_calls
+                activity["active_provider_calls"] = self._provider_calls
             if not self._active_calls:
                 self._budgeted_call = False
                 self._idle.set()
@@ -796,7 +829,32 @@ class _UsageTracker:
         remaining = (max(0.0, self.pipeline.state.budget_usd - self.pipeline.state.usage.cost_usd)
                      if self.pipeline.state.budget_usd else None)
         budget_token = active_budget_usd.set(remaining)
+        tool_tokens = []
+        transient_claim = False
         try:
+            if cwd is not None:
+                context, transient_claim = await self.pipeline._aprepare_tool_context(Path(cwd), item_id, role)
+                loop = asyncio.get_running_loop()
+
+                def supervised(coro):
+                    # Brokers execute in a worker thread, never block the loop
+                    # that owns the atomic claim/dependency coordinators.
+                    future = asyncio.run_coroutine_threadsafe(coro, loop)
+                    try:
+                        return future.result(timeout=240)
+                    except BaseException:
+                        future.cancel()
+                        raise
+
+                tool_tokens = [
+                    (active_execution, active_execution.set(context)),
+                    (active_write_authorizer, active_write_authorizer.set(
+                        lambda paths: supervised(self.pipeline._aauthorize_agent_write(item_id, paths, role)))),
+                    (active_dependency_handler, active_dependency_handler.set(
+                        lambda root, call: supervised(self.pipeline._aresolve_dependency(root, call, item_id, role)))),
+                    (active_claim_handler, active_claim_handler.set(
+                        lambda root, call: supervised(self.pipeline._aexpand_agent_claim(item_id, call, role)))),
+                ]
             # Drain preceding checkpoint writes before launching a tool-capable
             # provider. A hard exit cannot leave this call wholly unrecorded.
             await asyncio.get_running_loop().run_in_executor(
@@ -806,6 +864,10 @@ class _UsageTracker:
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
+        except IsolationViolation as exc:
+            # Capability setup failed BEFORE entering the provider. Do not
+            # fabricate an unreported paid call or consume a dev retry.
+            raise AgentError(str(exc), code=exc.code) from exc
         except AgentError as exc:
             effective_cost = self._account(exc.usage, role, iteration, failed=True)
             if exc.budget_exhausted:
@@ -840,6 +902,12 @@ class _UsageTracker:
             )
             raise
         finally:
+            for variable, token in reversed(tool_tokens):
+                variable.reset(token)
+            if transient_claim:
+                await self.pipeline._claim_arbiter.release(item_id)
+                self.pipeline._notify_claims_changed()
+                self.pipeline._claim_roots.pop(item_id, None)
             active_skills_enabled.reset(skills_token)
             active_processes.reset(process_token)
             active_budget_usd.reset(budget_token)
@@ -899,6 +967,10 @@ class Pipeline:
         # truly interrupted (project switch / API shutdown), not just left to
         # finish. Populated per call by _UsageTracker (via the runner contextvar).
         self._agent_procs = ProcessRegistry()
+        self._claim_arbiter = arbitration.ClaimArbiter(project_root=workspace_dir(state.id))
+        self._claim_roots: dict[str, str] = {}
+        self._claims_changed = asyncio.Event()
+        self._dependency_lock = asyncio.Lock()
         try:
             for rec in load_interactions(state.id):
                 self.interactions.add_existing(AgentInteraction.model_validate(rec))
@@ -1363,6 +1435,15 @@ class Pipeline:
 
     # ------------------------------------------------------- stage tracking (B1)
 
+    def _activity(self, phase: str, *, owner: list[str] | None = None) -> dict:
+        return {"version": 1, "phase": phase, "since": time.time(), "owner": owner or [],
+                "active_provider_calls": self._tracked._provider_calls,
+                "cost_incomplete": bool(self.state.usage.unreported_calls)}
+
+    def _notify_claims_changed(self):
+        prior, self._claims_changed = self._claims_changed, asyncio.Event()
+        prior.set()
+
     def _set_stage(
         self, item, stage: BuildStage, persona: str = "", *, sync: bool = True
     ) -> None:
@@ -1375,6 +1456,17 @@ class Pipeline:
         item.current_stage = stage
         item.stage_started_at = time.time()
         item.current_persona = persona
+        key = f"stage:{item.id}"
+        if stage in {BuildStage.QUEUED, BuildStage.DONE, BuildStage.FAILED}:
+            self.state.agent_activity.pop(key, None)
+            self.state.agent_activity.pop(f"repair:{item.id}", None)
+        else:
+            phase = {BuildStage.VERIFYING: "tests", BuildStage.MERGE_WAIT: "waiting_merge",
+                     BuildStage.MERGING: "merging"}.get(stage, "preparing")
+            self.state.agent_activity[key] = self._activity(phase,
+                owner=[self._merge_lock.owner] if phase == "waiting_merge" and self._merge_lock.owner else [])
+            self.monitor.event("work_phase", item_id=item.id, phase=phase, role=persona,
+                               active_provider_calls=self._tracked._provider_calls)
         if stage not in self._DEV_SLOT_STAGES:
             # P1-B: this worker just stopped occupying a dev slot (it entered the
             # merge queue, or it reached a terminal stage). Wake the stream
@@ -1392,6 +1484,12 @@ class Pipeline:
         item.recovery = RecoveryState(
             attempt=attempt, max_attempts=max_attempts, kind=kind
         )
+        key = f"repair:{item.id}"
+        if kind:
+            self.state.agent_activity[key] = dict(self._activity("repair"), kind=kind,
+                attempt=attempt, max_attempts=max_attempts)
+        else:
+            self.state.agent_activity.pop(key, None)
         if sync:
             self._sync()
 
@@ -4123,10 +4221,145 @@ class Pipeline:
         )
         self._sync()
 
+    def _acceptance_contract(self):
+        try:
+            return acceptance.load_contract(self.state)
+        except (OSError, ValueError, TypeError) as exc:
+            self._block_delivery(f"Oracle d'acceptation indisponible ou altéré ({type(exc).__name__}).", source="contract")
+            raise DeliveryBlocked() from exc
+
+    _FILE_WRITERS = frozenset({"dev", "dev-frontend", "qa", "tech-writer"})
+    _MANIFEST_NAMES = frozenset({"pyproject.toml", "uv.lock", "package.json", "package-lock.json",
+                                 "go.mod", "go.sum", "Cargo.toml", "Cargo.lock"})
+
+    def _protected_tool_paths(self, root: Path) -> tuple[str, ...]:
+        protected = set(self.state.constitution_test_paths)
+        for directory, dirs, names in os.walk(root, followlinks=False):
+            dirs[:] = [d for d in dirs if d not in {".git", ".venv", "node_modules", ".autospec", "__pycache__"}
+                       and not (Path(directory) / d).is_symlink()]
+            protected.update((Path(directory) / name).relative_to(root).as_posix()
+                             for name in names if name in self._MANIFEST_NAMES)
+        baseline = acceptance.supervisor_root(self.state.id) / "protected-test-files.json"
+        if baseline.is_file():
+            protected.update(json.loads(baseline.read_text(encoding="utf-8"))["files"])
+        return tuple(sorted(protected))
+
+    async def _aprepare_tool_context(self, root: Path, owner: str, role: str):
+        root = root.absolute()
+        transient = False
+        if role in self._FILE_WRITERS:
+            current = await self._claim_arbiter.snapshot()
+            if owner not in current["active"]:
+                target = self._find_item_target(owner)
+                graph = work_streams.build_work_graph(self.state, break_cycles=False)
+                zone = self._story_stream(self._item_subject(graph.items[owner])).file_root if target and owner in graph.items else ""
+                self._claim_roots[owner] = zone or ""
+                patterns = list(getattr(target, "files_hint", []) or []) if target else []
+                if role == "tech-writer":
+                    patterns = ["README.md"]
+                if not patterns:
+                    patterns = [f"{zone}/**" if zone else "**"]
+                reserved = [claims.canonical_claim(path, project_root=workspace_dir(self.state.id),
+                    owner=owner, stream_root=zone or "") for path in patterns]
+                decision = await self._claim_arbiter.reserve(owner, reserved)
+                if decision.status != "granted":
+                    raise ClaimViolation(f"{decision.status}: {decision.reason}")
+                transient = True
+        run_id = self.state.generation_checkpoint.get("run_id") or f"project-{self.state.id}"
+        return ExecutionContext(run_id=run_id, project_root=root, task_id=owner,
+                                protected_paths=self._protected_tool_paths(root)), transient
+
+    async def _aauthorize_agent_write(self, owner: str, paths: tuple[str, ...], role: str):
+        if role not in self._FILE_WRITERS:
+            raise IsolationViolation("This review/planning role has no write capability")
+        zone = self._claim_roots.get(owner, "")
+        forbidden = tuple(s.file_root for s in self.state.streams if s.file_root and s.file_root != zone) if not zone else ()
+        try:
+            for path in paths:
+                claims.canonical_claim(path, project_root=workspace_dir(self.state.id), owner=owner,
+                    stream_root=zone, incompatible_prefixes=forbidden)
+        except claims.ClaimError as exc:
+            raise ClaimViolation(str(exc)) from exc
+        if not await self._claim_arbiter.authorize_batch(owner, paths, project_root=workspace_dir(self.state.id)):
+            raise ClaimViolation("CLAIM_REPLAN: write not reserved; request claim_expand BEFORE mutation")
+
+    async def _aexpand_agent_claim(self, owner: str, call: dict, role: str):
+        if role not in self._FILE_WRITERS or call.get("task_id") != owner:
+            raise IsolationViolation("Untrusted claim request identity/role")
+        paths, reason = call.get("paths"), call.get("reason")
+        if (not isinstance(paths, list) or not 1 <= len(paths) <= 100 or
+            any(not isinstance(path, str) for path in paths) or not isinstance(reason, str) or not reason.strip()):
+            raise IsolationViolation("Invalid claim expansion request")
+        zone = self._claim_roots.get(owner, "")
+        forbidden = tuple(s.file_root for s in self.state.streams if s.file_root and s.file_root != zone) if not zone else ()
+        try:
+            requested = [claims.canonical_claim(path, project_root=workspace_dir(self.state.id), owner=owner,
+                stream_root=zone, incompatible_prefixes=forbidden, reason=reason) for path in paths]
+        except claims.ClaimError as exc:
+            raise ClaimViolation(str(exc)) from exc
+        decision = await self._claim_arbiter.reserve(owner, requested, expand=True)
+        self.monitor.event("claim_expand", item_id=owner, status=decision.status,
+                           blockers=list(decision.blockers), paths=[claim.path for claim in requested])
+        if decision.status != "granted":
+            raise ClaimViolation(f"{decision.status}: {decision.reason}; preserve work, release and requeue")
+        target = self._find_item_target(owner)
+        if target is not None:
+            target.files_hint = sorted(set(target.files_hint) | {claim.path for claim in requested})
+        self._sync()
+        return asdict(decision)
+
+    async def _aresolve_dependency(self, root: Path, call: dict, owner: str, role: str):
+        if role not in self._FILE_WRITERS or call.get("task_id") != owner:
+            raise IsolationViolation("Untrusted dependency request identity/role")
+        try:
+            request = dependencies.DependencyRequest(**call)
+        except (TypeError, ValueError, dependencies.DependencyError) as exc:
+            raise IsolationViolation(f"Invalid dependency request: {exc}") from exc
+        try:
+            from .validation_environment import dependency_resolver
+        except ImportError as exc:
+            raise IsolationViolation("DEPENDENCY_COORDINATOR_UNAVAILABLE: isolated Linux resolver unavailable") from exc
+        import hashlib
+        identity = hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:24]
+        sidecar = acceptance.supervisor_root(self.state.id) / "dependencies" / identity
+        coordinator = dependencies.DependencyCoordinator(root, sidecar, runner=dependency_resolver)
+        async with self._dependency_lock:
+            self.state.agent_activity[f"dependency:{owner}"] = dict(
+                self._activity("dependency", owner=["manifest-owner"]), package=request.package)
+            self._sync()
+            try:
+                await asyncio.to_thread(coordinator.submit, request)
+                records = await asyncio.to_thread(coordinator.resolve_pending, f"supervisor:{self.state.id}")
+                await asyncio.to_thread(coordinator.require_ready, owner)
+                return next(record for record in records if record["request"] == asdict(request))
+            except dependencies.DependencyError as exc:
+                raise IsolationViolation(str(exc)) from exc
+            finally:
+                self.state.agent_activity.pop(f"dependency:{owner}", None)
+                self._sync()
+
+    def _admit_contract_plan(self, plan, contract, policy):
+        roots = {stream.id: stream.file_root for stream in self.state.streams}
+        roots.setdefault("", "")
+        try:
+            findings = tuple(plan_gates.PlanFinding(**value) for value in self.state.plan_findings)
+        except (TypeError, ValueError) as exc:
+            self._block_delivery("Registre de findings invalide ; aucune admission implicite.", source="plan")
+            raise DeliveryBlocked() from exc
+        return plan_gates.admit_plan(plan, contract, policy, findings=findings,
+            project_root=workspace_dir(self.state.id), stream_roots=roots,
+            incompatible_prefixes=("backend",) if self.state.backend_language == BackendLanguage.PYTHON else ())
+
     async def _aplan_phase(self) -> None:
         self.state.phase = PipelinePhase.PLAN
         self._sync()
         pkg = workspace.package_name(self.state)
+        contract = self._acceptance_contract()
+        policy = acceptance.plan_policy(self.state, contract) if contract else None
+        if contract is not None and not contract.facts:
+            self._block_delivery("Contrat source non formalisé/revu : planification refusée avant appel provider.", source="plan")
+            raise DeliveryBlocked()
+        contract_prompt = plan_gates.plan_contract_prompt(contract, policy) if contract else ""
         await self._amaybe_build_constitution()  # W3: standard-once, enforced every round
         plan: dict = {}
         # PO pipeline (RFC po-pipeline-v2): the multi-stage PO replaces the
@@ -4142,6 +4375,8 @@ class Pipeline:
                     pkg,
                     workspace_root=workspace_dir(self.state.id),
                     log=self._log,
+                    contract=contract,
+                    plan_policy=policy,
                 )
                 pipeline_used = True
                 self.state.calibration_for().degradations += len(report.degradations)
@@ -4154,15 +4389,28 @@ class Pipeline:
                     f"{len(report.resizes)} resize, {len(report.flagged)} re-spéc ciblée(s), "
                     f"{len(report.degradations)} dégradation(s).",
                 )
+            except plan_pipeline.PlanAdmissionError as exc:
+                self.state.plan_admission = asdict(exc.admission)
+                self._block_delivery("Admission du plan refusée : " + "; ".join(exc.admission.errors), source="plan")
+                raise DeliveryBlocked() from exc
             except plan_pipeline.PlanPipelineError as exc:
+                if contract is not None:
+                    self._block_delivery(f"Planification sous contrat indisponible : {exc}", source="plan")
+                    raise DeliveryBlocked() from exc
                 self._log("po-pipeline", f"Pipeline PO en échec ({exc}) — repli sur le PO mono-passe.")
         if not pipeline_used:
             result = await self._tracked.arun(
-                prompts.po_plan(self.state, pkg),
+                prompts.po_plan(self.state, pkg) + contract_prompt,
                 system_prompt=persona("sm"),
             )
             plan_text = await self._arefine_plan(result.text, pkg)
             plan = extract_json(plan_text)
+        if contract is not None:
+            admission = self._admit_contract_plan(plan, contract, policy)
+            self.state.plan_admission = asdict(admission)
+            if admission.status != "pass":
+                self._block_delivery("Admission du plan refusée : " + "; ".join(admission.errors or admission.warnings), source="plan")
+                raise DeliveryBlocked()
         if not any(epic.get("stories") for epic in plan.get("epics", []) if isinstance(epic, dict)):
             self._block_delivery("Le plan ne contient aucune story exécutable ; aucune livraison créée.", source="plan")
             raise DeliveryBlocked()
@@ -4181,7 +4429,7 @@ class Pipeline:
         # The PO pipeline decomposes stories into tasks regardless of the
         # streams flag (S1 owns the granularity); the legacy path keeps the
         # streams gate so the flag-off parse stays byte-identical.
-        parse_tasks = pipeline_used or self._setting("streams_enabled")
+        parse_tasks = contract is not None or pipeline_used or self._setting("streams_enabled")
         for epic_data in plan.get("epics", []):
             epic_id = _unique_id(
                 epic_data.get("id") or f"EPIC-{len(taken_epic_ids) + 1}",
@@ -4233,12 +4481,14 @@ class Pipeline:
                             task_data.get("acceptance_criteria", [])
                         ),
                         gherkin=task_data.get("gherkin", ""),
-                        depends_on=[task_id_map.get(d, d) for d in task_data.get("depends_on", [])],
+                        depends_on=[task_id_map.get(d, id_map.get(d, d)) for d in task_data.get("depends_on", [])],
                         files_hint=[
                             str(g) for g in (task_data.get("file_globs") or []) if str(g).strip()
                         ],
                         complexity=str(task_data.get("complexity") or ""),
                         estimated_files=int(task_data.get("estimated_files") or 0),
+                        requirement_ids=list(task_data.get("requirement_ids") or story_data.get("requirement_ids") or []),
+                        uses_contracts=list(task_data.get("uses_contracts") or story_data.get("uses_contracts") or []),
                     )
                 )
             # P4b: serialize file-overlapping tasks of THIS story (the deterministic
@@ -4265,6 +4515,9 @@ class Pipeline:
                 # [] when off, so the flag-off parse is byte-identical to today).
                 stream=str(story_data.get("stream") or "") if parse_tasks else "",
                 tasks=_build_tasks(story_id, story_data),
+                files_hint=list(story_data.get("file_globs") or []),
+                requirement_ids=list(story_data.get("requirement_ids") or []),
+                uses_contracts=list(story_data.get("uses_contracts") or []),
                 # PO pipeline: first-order complexity + S2 degradation marker
                 # ("" / 0 / False on the legacy path — fields simply absent).
                 complexity=str(story_data.get("complexity") or ""),
@@ -4282,6 +4535,18 @@ class Pipeline:
         # Deps may point to already-done stories from previous iterations.
         scheduler.sanitize_dependencies(self.state.stories + new_stories)
         self.state.stories.extend(new_stories)
+        if contract is not None:
+            remap = lambda value: task_id_map.get(value, id_map.get(value, value))
+            milestones = plan.get("milestones", {})
+            self.state.plan_admission.update(
+                milestones={"foundation": [remap(v) for v in milestones.get("foundation", [])],
+                            "vertical": remap(milestones.get("vertical", ""))},
+                lots=[{"id": lot["id"], "members": [remap(v) for v in lot["members"]]}
+                      for lot in plan.get("lots", [])],
+                shared_contracts=[dict(shared, owner=remap(shared.get("owner", "")),
+                    consumers=[remap(v) for v in shared.get("consumers", [])])
+                    for shared in plan.get("shared_contracts", [])],
+            )
         workspace.write_feature_files(self.state, new_stories)
         # ST-5: sanity-check the produced work graph (dangling deps / cycle).
         if self._setting("streams_enabled"):
@@ -4359,9 +4624,19 @@ class Pipeline:
         )
 
     async def _arefine_plan(self, initial_text: str, pkg: str) -> str:
+        contract = self._acceptance_contract()
+        policy = acceptance.plan_policy(self.state, contract) if contract else None
+        fragment = plan_gates.plan_contract_prompt(contract, policy) if contract else ""
+
+        async def _admission(text: str) -> bool:
+            try:
+                return self._admit_contract_plan(extract_json(text), contract, policy).status == "pass"
+            except AgentError:
+                return False
+
         async def _revise(previous: str, critique: str) -> str:
             res = await self._tracked.arun(
-                prompts.po_revise(self.state, pkg, previous, critique),
+                prompts.po_revise(self.state, pkg, previous, critique) + fragment,
                 system_prompt=persona("sm"),
             )
             return res.text
@@ -4374,7 +4649,11 @@ class Pipeline:
             initial_text=initial_text,
             revise=_revise,
             emit=self._emit_refine,
+            admission=_admission if contract else None,
         )
+        if contract is not None and outcome.stopped_reason in {"judge_error", "critic_error", "constraint_rejected"}:
+            self._block_delivery(f"Revue de plan non admissible : {outcome.stopped_reason}.", source="plan")
+            raise DeliveryBlocked()
         self._note_refine_degraded("po", outcome)
         if outcome.stopped_reason != "disabled":
             self.state.plan_quality = outcome.score
@@ -6851,7 +7130,67 @@ class Pipeline:
             return True, out, real, False
         return False, out, real, not real
 
+    def _canonical_item_claims(self, item):
+        target = self._item_target(item)
+        stream = self._story_stream(self._item_subject(item))
+        zone = stream.file_root or ""
+        self._claim_roots[item.id] = zone
+        patterns = list(getattr(target, "files_hint", []) or [])
+        if not patterns:
+            patterns = [f"{zone}/**" if zone else "**"]
+        forbidden = tuple(s.file_root for s in self.state.streams if s.file_root and s.file_root != zone) if not zone else ()
+        return [claims.canonical_claim(pattern, project_root=workspace_dir(self.state.id),
+                    owner=item.id, stream_root=zone, incompatible_prefixes=forbidden) for pattern in patterns]
+
     async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
+        """Reserve canonical claims before dispatch; release after worker cleanup."""
+        target = self._item_target(item)
+        try:
+            declared = self._canonical_item_claims(item)
+            deadline = time.monotonic() + max(30, min(1200, settings.agent_timeout_s * 2))
+            while True:
+                changed = self._claims_changed
+                decision = await self._claim_arbiter.reserve(item.id, declared)
+                if decision.status != "waiting_claim":
+                    break
+                self.state.agent_activity[f"claim:{item.id}"] = self._activity(
+                    "waiting_claim", owner=list(decision.blockers))
+                self.monitor.event("claim_wait", item_id=item.id, status=decision.status,
+                                   blockers=list(decision.blockers), attempt=decision.attempt)
+                self._sync()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise claims.ClaimError("bounded ownership wait expired")
+                try:
+                    await asyncio.wait_for(changed.wait(), timeout=remaining)
+                except TimeoutError as exc:
+                    raise claims.ClaimError("bounded ownership wait expired") from exc
+        except claims.ClaimError as exc:
+            self.state.agent_activity.pop(f"claim:{item.id}", None)
+            target.status = StoryStatus.FAILED
+            target.last_error = f"CLAIM_REJECTED: {exc}"
+            self._sync()
+            return
+        if decision.status != "granted":
+            target.last_error = f"{decision.status}: {decision.reason} ({', '.join(decision.blockers)})"
+            if decision.status in {"replan", "rejected"}:
+                target.status = StoryStatus.FAILED
+            self.state.agent_activity.pop(f"claim:{item.id}", None)
+            self.monitor.event("claim_wait", item_id=item.id, status=decision.status,
+                               blockers=list(decision.blockers), attempt=decision.attempt)
+            self._sync()
+            return
+        try:
+            self.state.agent_activity.pop(f"claim:{item.id}", None)
+            await self._abuild_work_item_reserved(item)
+        finally:
+            await self._claim_arbiter.release(item.id)
+            self._notify_claims_changed()
+            self._claim_roots.pop(item.id, None)
+            self.state.agent_activity.pop(f"claim:{item.id}", None)
+            self._sync()
+
+    async def _abuild_work_item_reserved(self, item: "work_streams.WorkItem") -> None:
         """ST-9/10/11: build ONE work item in its own git worktree, then merge.
 
         Worktree lifecycle (ST-10): add a worktree on a fresh per-item branch off
@@ -7174,7 +7513,18 @@ class Pipeline:
                     self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             target.last_error = str(exc)
-            if settings.agent_provider == "claude code" and session_monitor.is_usage_limit_error(str(exc)):
+            if exc.code == "CLAIM_REPLAN":
+                self._refund_dev_attempt(target, subject)
+                target.requeue_attempts += 1
+                subject.requeue_attempts = target.requeue_attempts
+                if worktree is not None:
+                    await self._acommit_wip(worktree, item.id)
+                    keep_branch = True
+                target.status = subject.status = (StoryStatus.TODO if target.requeue_attempts <= 3 else StoryStatus.FAILED)
+                self._set_stage(target, BuildStage.QUEUED if target.status == StoryStatus.TODO else BuildStage.FAILED, sync=False)
+                self.monitor.event("claim_replan", item_id=item.id, attempt=target.requeue_attempts,
+                                   preserved=keep_branch, status=target.status.value)
+            elif settings.agent_provider == "claude code" and session_monitor.is_usage_limit_error(str(exc)):
                 target.attempts = max(0, target.attempts - 1)
                 subject.attempts = max(0, subject.attempts - 1)
                 target.status = subject.status = StoryStatus.TODO
@@ -9289,118 +9639,124 @@ class Pipeline:
         if reason := ledger.denied_reason():
             self._log(source, f"Réparation non admise : {reason}.")
             return False, detail
-        # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
-        # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
-        if self._smoke_looks_like_infra(report):
-            self._log(source, "Échec de forme infra — aucune tentative de réparation dépensée.")
-            return False, detail
-        ws = workspace_dir(self.state.id)
-        if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
-            self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
-            return False, detail
-        pkg = workspace.package_name(self.state)
-        for attempt in range(1, attempts + 1):
-            await self._checkpoint()
-            if self._stop_requested:
-                return False, detail
-            if reason := ledger.denied_reason():
-                self.monitor.event("repair_stopped", source=source, reason=reason,
-                                   attempts=ledger.attempts, fingerprint=ledger.failures[-1].fingerprint)
-                self._log(source, f"Réparation arrêtée : {reason}.")
-                return False, detail
-            ledger.admit()
-            repairs = list(self.state.generation_checkpoint.get("repairs", []))
-            repairs.append({"source": source, "attempt": attempt, "at": time.time(),
-                            "category": ledger.failures[-1].category,
-                            "fingerprint": ledger.failures[-1].fingerprint})
-            self.state.generation_checkpoint["repairs"] = repairs[-50:]
-            self._sync()
-            self._log(
-                source,
-                f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
-            )
-            self._chat(
-                ChatRole.SYSTEM,
-                f"🔧 Gate {source} en échec — agent Dev dépêché pour réparer "
-                f"(tentative {attempt}/{attempts}).",
-            )
-            self.monitor.event(
-                # QUEUE du rapport, pas la tête : la tête d'un log de gate n'est
-                # que du bruit de démarrage (warnings npm/node), l'erreur réelle
-                # est à la FIN (D9, run supervisé 2026-07-20).
-                "integration_fix", source=source, attempt=attempt, detail=detail[-600:]
-            )
-            try:
-                await self._tracked.arun(
-                    (prompt_builder or prompts.dev_fix_integration)(
-                        pkg,
-                        detail,
-                        architecture=self.state.architecture,
-                        attempt=attempt,
-                        max_attempts=attempts,
-                        # V3-F4.3: the primary stream's component memory ("" when
-                        # KNOWLEDGE and GOVERNANCE are off — prompt byte-identical).
-                        knowledge=prompts.knowledge_context(
-                            self.state,
-                            stream=self.state.primary_stream_id,
-                            audience="dev",
-                        ),
-                    ) + repair_policy.REPAIR_INVARIANTS,
-                    system_prompt=persona("dev"),
-                    cwd=ws,
-                )
-            except AgentError as exc:
-                self._log(source, f"Agent de réparation indisponible : {exc}")
-                return False, detail
-            green, pytest_out, _ = await self._arun_pytest()
-            suite_out, suite_name = pytest_out, "pytest"
-            # Finding 3 : le filet de sécurité ne doit pas être backend-only. Si le
-            # projet a un frontend, sa suite Vitest + build doit AUSSI rester verte,
-            # sinon la réparation a pu casser l'UI sans qu'un test backend le voie.
-            if green and self._has_frontend():
-                fe_green, fe_out, _ = await self._arun_frontend_tests()
-                if not fe_green:
-                    green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
-            if not green:
-                await self._agit(ws, "reset", "--hard", "HEAD")
-                await self._agit(ws, "clean", "-fd")
-                self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
-                detail = (
-                    f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
-                    f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
-                )
-                ledger.observe(suite_out)
-                continue
-            await self._agit(ws, "add", "-A")
-            await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
-            ok, new_detail = await averify()
-            self.monitor.event(
-                "integration_fix_verify",
-                source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[-600:],
-            )
-            # Bascule tardive vers l'INFRA (D10b) : un verdict de re-vérification
-            # de forme infra (port tenu par un tiers, daemon down, marqueur
-            # __INFRA__ du gate JS) ne se répare pas par un agent - on interrompt
-            # la boucle SANS dépenser les tentatives restantes ; l'appelant gare.
-            if not ok:
-                shaped = str(new_detail or "")
-                if shaped.startswith("__INFRA__") or self._smoke_looks_like_infra(shaped):
+        try:
+            async with asyncio.timeout(ledger.remaining_seconds):
+                # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
+                # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
+                if self._smoke_looks_like_infra(report):
+                    self._log(source, "Échec de forme infra — aucune tentative de réparation dépensée.")
+                    return False, detail
+                ws = workspace_dir(self.state.id)
+                if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
+                    self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
+                    return False, detail
+                pkg = workspace.package_name(self.state)
+                for attempt in range(1, attempts + 1):
+                    await self._checkpoint()
+                    if self._stop_requested:
+                        return False, detail
+                    if reason := ledger.denied_reason():
+                        self.monitor.event("repair_stopped", source=source, reason=reason,
+                                           attempts=ledger.attempts, fingerprint=ledger.failures[-1].fingerprint)
+                        self._log(source, f"Réparation arrêtée : {reason}.")
+                        return False, detail
+                    ledger.admit()
+                    repairs = list(self.state.generation_checkpoint.get("repairs", []))
+                    repairs.append({"source": source, "attempt": attempt, "at": time.time(),
+                                    "category": ledger.failures[-1].category,
+                                    "fingerprint": ledger.failures[-1].fingerprint})
+                    self.state.generation_checkpoint["repairs"] = repairs[-50:]
+                    self._sync()
                     self._log(
                         source,
-                        "Échec de forme infra au re-verify - boucle de réparation "
-                        "interrompue (aucune tentative supplémentaire dépensée).",
+                        f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
                     )
-                    return False, shaped or detail
-            if ok:
-                self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
-                self._chat(
-                    ChatRole.SYSTEM,
-                    f"🔧 Gate {source} réparé et revalidé (tentative {attempt}).",
-                )
-                return True, new_detail
-            detail = new_detail or detail
-            ledger.observe(detail)
-        return False, detail
+                    self._chat(
+                        ChatRole.SYSTEM,
+                        f"🔧 Gate {source} en échec — agent Dev dépêché pour réparer "
+                        f"(tentative {attempt}/{attempts}).",
+                    )
+                    self.monitor.event(
+                        # QUEUE du rapport, pas la tête : la tête d'un log de gate n'est
+                        # que du bruit de démarrage (warnings npm/node), l'erreur réelle
+                        # est à la FIN (D9, run supervisé 2026-07-20).
+                        "integration_fix", source=source, attempt=attempt, detail=detail[-600:]
+                    )
+                    try:
+                        await self._tracked.arun(
+                            (prompt_builder or prompts.dev_fix_integration)(
+                                pkg,
+                                detail,
+                                architecture=self.state.architecture,
+                                attempt=attempt,
+                                max_attempts=attempts,
+                                # V3-F4.3: the primary stream's component memory ("" when
+                                # KNOWLEDGE and GOVERNANCE are off — prompt byte-identical).
+                                knowledge=prompts.knowledge_context(
+                                    self.state,
+                                    stream=self.state.primary_stream_id,
+                                    audience="dev",
+                                ),
+                            ) + repair_policy.REPAIR_INVARIANTS,
+                            system_prompt=persona("dev"),
+                            cwd=ws,
+                        )
+                    except AgentError as exc:
+                        self._log(source, f"Agent de réparation indisponible : {exc}")
+                        return False, detail
+                    green, pytest_out, _ = await self._arun_pytest()
+                    suite_out, suite_name = pytest_out, "pytest"
+                    # Finding 3 : le filet de sécurité ne doit pas être backend-only. Si le
+                    # projet a un frontend, sa suite Vitest + build doit AUSSI rester verte,
+                    # sinon la réparation a pu casser l'UI sans qu'un test backend le voie.
+                    if green and self._has_frontend():
+                        fe_green, fe_out, _ = await self._arun_frontend_tests()
+                        if not fe_green:
+                            green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
+                    if not green:
+                        await self._agit(ws, "reset", "--hard", "HEAD")
+                        await self._agit(ws, "clean", "-fd")
+                        self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
+                        detail = (
+                            f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
+                            f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
+                        )
+                        ledger.observe(suite_out)
+                        continue
+                    await self._agit(ws, "add", "-A")
+                    await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
+                    ok, new_detail = await averify()
+                    self.monitor.event(
+                        "integration_fix_verify",
+                        source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[-600:],
+                    )
+                    # Bascule tardive vers l'INFRA (D10b) : un verdict de re-vérification
+                    # de forme infra (port tenu par un tiers, daemon down, marqueur
+                    # __INFRA__ du gate JS) ne se répare pas par un agent - on interrompt
+                    # la boucle SANS dépenser les tentatives restantes ; l'appelant gare.
+                    if not ok:
+                        shaped = str(new_detail or "")
+                        if shaped.startswith("__INFRA__") or self._smoke_looks_like_infra(shaped):
+                            self._log(
+                                source,
+                                "Échec de forme infra au re-verify - boucle de réparation "
+                                "interrompue (aucune tentative supplémentaire dépensée).",
+                            )
+                            return False, shaped or detail
+                    if ok:
+                        self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
+                        self._chat(
+                            ChatRole.SYSTEM,
+                            f"🔧 Gate {source} réparé et revalidé (tentative {attempt}).",
+                        )
+                        return True, new_detail
+                    detail = new_detail or detail
+                    ledger.observe(detail)
+                return False, detail
+        except TimeoutError:
+            self.monitor.event("repair_stopped", source=source, reason="deadline", attempts=ledger.attempts)
+            self._log(source, "Réparation arrêtée : délai global atteint, appel et ressources annulés.")
+            return False, detail + "\nREPAIR_DEADLINE_EXCEEDED"
 
     # ------------------------------------------------- Smoke-run gate (runnability)
 
