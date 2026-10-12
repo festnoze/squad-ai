@@ -1,12 +1,21 @@
 # Préparation de contre-revue du launcher — pas un lancement
 
-12 octobre 2026, cible préparatoire 88b79de1 puis admission 9c05c5fc. Aucune création de campagne,
+12 octobre 2026, cible préparatoire 88b79de1 puis admission 9c05c5fc et fix a79ce3b9. Aucune création de campagne,
 pipeline.start, runner.arun, providerCLI, test/init/auth réseau ou génération
 n'est exécutée par ce document. Le wrapper generation-only est maintenant
-présent dans 9c05c5fc, avec un P1 unknown persona confirmé dans la contre-revue
-séparée : fallback dev et cache préchauffé doivent être corrigés. Le launcher
+présent dans 9c05c5fc. Le P1 unknown persona de la contre-revue indépendante
+est corrigé dans a79ce3b9 : AFTER 91 PASS, deux RED inchangés désormais PASS,
+fallback générique et garde avant cache également vérifiés offline. Le launcher
 concret reste absent ; son chemin/SHA final devra être fourni pour une revue
 indépendante et les contre-tests offline avant démarrage.
+Complément cible96af8140 : les deuxURLs ASGI de la revue utilisent désormais
+le Host loopback admis, sans exception production. Le replay91 passe mais
+un nouveau P1 à index de routage froid fait échouer le premier QA autorisé
+(test existant seul :1FAIL) ; voir `20261012-independent-generation-policy/ORIGIN-AND-COLD-CACHE.md`.
+Ce défaut historique est corrigé dans d9b89375 : mêmes91 IDs PASS, QA seul
+processus frais1PASS, transitions/atomicité7PASS ; voir le rapport indépendant
+`20261012-independent-generation-policy/COLD-CACHE-AFTER.md`. Aucun lancement
+ou auth n'a été fait ; le launcher concret reste à qualifier en lecture seule.
 
 ## Prérequis d'admission à relire
 

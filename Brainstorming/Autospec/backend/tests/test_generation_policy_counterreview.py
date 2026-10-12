@@ -36,7 +36,7 @@ async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch
         pytest.fail('a forbidden provider constructor was reached')
     for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
         monkeypatch.setattr(providers, name, forbidden)
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://127.0.0.1') as client:
         response = await client.post('/api/provider', json={'provider': provider})
     assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
     assert server._runner is current and pipeline.runner is current
@@ -53,7 +53,7 @@ async def test_endpoint_model_switch_cannot_make_next_inference_non_sonnet(monke
     # make_runner still executes its real policy guard, with only the final
     # trusted CLI object replaced by an entirely offline recording port.
     monkeypatch.setattr(providers, 'ClaudeCliRunner', lambda: inner)
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://127.0.0.1') as client:
         response = await client.post('/api/provider', json={'provider': 'claude code', 'model': 'opus'})
     assert response.status_code == 200  # current API stores the requested setting
     with pytest.raises(AgentError, match='GENERATION_ONLY'):

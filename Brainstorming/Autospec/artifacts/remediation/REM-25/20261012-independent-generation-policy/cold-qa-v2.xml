@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="1.746" timestamp="2026-10-12T15:30:20.575472+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_generation_policy_counterreview" name="test_real_runner_argv_shape_pins_sonnet_and_excludes_api_keys[qa]" time="0.024"><failure message="autospec.agents.runner.AgentError: GENERATION_ONLY: rôle de campagne inconnu ou de revue non autorisé.">tests\test_generation_policy_counterreview.py:100: in test_real_runner_argv_shape_pins_sonnet_and_excludes_api_keys
+    await pipeline._tracked.arun('Generate only; QA is not independent R.', persona(role))
+autospec\orchestrator\pipeline.py:718: in arun
+    _persona_role(system_prompt), self.pipeline.state.phase.value)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\orchestrator\pipeline.py:667: in _persona_role
+    _PERSONA_BY_PROMPT[persona(name)] = name
+                       ^^^^^^^^^^^^^
+autospec\agents\personas.py:272: in persona
+    raise AgentError("GENERATION_ONLY: rôle de campagne inconnu ou de revue non autorisé.",
+E   autospec.agents.runner.AgentError: GENERATION_ONLY: rôle de campagne inconnu ou de revue non autorisé.</failure></testcase></testsuite></testsuites>
