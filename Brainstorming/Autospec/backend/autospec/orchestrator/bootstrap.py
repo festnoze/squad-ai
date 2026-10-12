@@ -35,7 +35,7 @@ FRONTEND_VERSIONS = {
     "react": "18.3.1", "react-dom": "18.3.1", "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "16.3.2", "@types/react": "18.3.31", "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "4.7.0", "jsdom": "25.0.1", "typescript": "5.9.3",
-    "vite": "6.4.4", "vitest": "4.1.11",
+    "vite": "6.4.4", "vitest": "4.1.11", "@vitest/coverage-v8": "4.1.11",
 }
 SAFE_ENV_KEYS = {
     "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
