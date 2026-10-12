@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="12.032" timestamp="2026-10-12T12:36:39.445371+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_bootstrap_independent_counterprobe" name="test_native_bootstrap_rejects_literal_ok_without_actual_api_response" time="10.978"><failure message="AssertionError: Regex pattern did not match.&#10;  Expected regex: 'deadline exceeded'&#10;  Actual message: 'ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (observe_api: Error; private driver output withheld)'">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3301/test_native_bootstrap_rejects_0')
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_BOOTSTRAP_COUNTERPROOF")!="1",reason="Explicit real NETNONE static-OK counterexample opt-in")
+    @pytest.mark.asyncio
+    async def test_native_bootstrap_rejects_literal_ok_without_actual_api_response(tmp_path):
+        inspected=_docker_call(["docker","image","inspect","ghcr.io/astral-sh/uv:python3.12-bookworm-slim","--format","{{.Id}}"],
+            capture_output=True,text=True,timeout=5,check=False)
+        assert inspected.returncode==0,"pre-existing official factory image required"
+        source=tmp_path/"empty-stage";source.mkdir()
+        runtime=RuntimeSession(source,inspected.stdout.strip(),["/usr/local/bin/python","-I","-u","-c",SERVER],application_origin=True)
+        try:
+            runtime.__enter__()
+            expected = {"status": "ok", "service": "autospec-bootstrap", "database": "ok", "probe": "supervisor-counterexample-nonce"}
+            with pytest.raises(bootstrap.BootstrapFailure, match="deadline exceeded") as rejected:
+&gt;               await bootstrap._browser_preflight(runtime,timeout_s=25,require_api=True,expected_health=expected)
+
+tests\test_bootstrap_independent_counterprobe.py:44: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+session = &lt;autospec.orchestrator.isolated_validation.RuntimeSession object at 0x00000171CB3486E0&gt;
+
+    async def _browser_preflight(session, *, timeout_s: float, require_api: bool, expected_health: dict | None = None) -&gt; str:
+        """Actual UI rendering on the exact owned runtime, never host Chromium."""
+        from types import SimpleNamespace
+        from .isolated_validation import RuntimeSession
+        from ..validation.browser_contracts import PlaywrightHarness
+    
+        if not isinstance(session,RuntimeSession):
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: actual owned browser runtime required",infra=True)
+        if type(timeout_s) not in {int,float} or not 0 &lt; timeout_s &lt;= 3600 or type(require_api) is not bool:
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: bounded browser preflight required",infra=True)
+        if require_api and (not isinstance(expected_health,dict) or set(expected_health)!={"status","service","database","probe"}
+                or expected_health.get("status")!="ok" or expected_health.get("service")!="autospec-bootstrap"
+                or expected_health.get("database") not in {"ok","none"}
+                or not isinstance(expected_health.get("probe"),str) or not expected_health["probe"]):
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: supervisor nonce-bound API response required",infra=True)
+        parent=session._assert_owned()
+        actual=session.inspect_configuration()
+        if actual["container_id"]!=parent or actual["network_mode"]!="none" or actual["running"] is not True or actual["published_ports"]:
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: exact active NETNONE browser parent required",infra=True)
+        # Supervisor capability; no flag or namespace comes from model output.
+        adapter=SimpleNamespace(base_url=session.origin,supervised_runtime=session,manifest=SimpleNamespace(accounts={}))
+        harness=PlaywrightHarness(adapter,bindings={},routes={"home":"/"})
+        checks=[]
+        case=SimpleNamespace(console_errors=[],requests=[],check=lambda tag,observed,expected:checks.append(observed==expected))
+        stage="open_page"
+        async def render():
+            nonlocal stage
+            page=await harness.page(case,1280)
+            stage="configure_page"
+            page.set_default_timeout(max(1,min(15000,int(timeout_s*1000))))
+            errors=[]
+            page.on("console",lambda message:errors.append(True) if message.type=="error" else None)
+            if require_api:
+                from urllib.parse import urlsplit
+                origin=urlsplit(session.origin)
+                def api_response(response):
+                    url=urlsplit(response.url)
+                    return (url.scheme,url.netloc,url.path)==(origin.scheme,origin.netloc,"/api/health") and response.request.method=="GET"
+                # The application itself must fetch its API during this navigation.
+                # A supervisor request or a hardcoded "OK" string is not that chain.
+                async with page.expect_response(api_response,timeout=max(1,int(timeout_s*1000))) as observed:
+                    stage="navigate_for_api"
+                    response=await page.goto(session.origin,wait_until="networkidle")
+                    stage="observe_api"
+                health=await observed.value
+                stage="read_api_json"
+                if health.status!=200 or await health.json()!=expected_health:
+                    raise BootstrapFailure("Actual frontend API response differs from supervisor nonce-bound health")
+            else:
+                stage="navigate"
+                response=await page.goto(session.origin,wait_until="networkidle")
+            if response is None or response.status!=200:
+                raise BootstrapFailure("Browser entrypoint does not return HTTP 200")
+            stage="render_root"
+            await page.wait_for_function("""() =&gt; {
+                const root=document.getElementById('root');
+                return root &amp;&amp; root.childElementCount&gt;0 &amp;&amp; (root.innerText.trim() || root.querySelector('canvas,svg,img'));
+            }""")
+            if require_api:
+                stage="render_api_status"
+                await page.wait_for_function("() =&gt; /Frontend → API(?: → base de données)? : OK/.test(document.body.innerText)")
+            if errors or case.console_errors or not all(checks):
+                raise BootstrapFailure("Browser console/page/network violation observed (untrusted text withheld)")
+            stage="attest_browser"
+            environment=harness.browser_environment
+            current=session.inspect_configuration()
+            if (environment.get("host_chromium") is not False or environment.get("parent_id")!=parent
+                    or environment.get("network_mode")!="container:"+parent or environment.get("client_network_exposed") is not False
+                    or session._assert_owned()!=parent or current["container_id"]!=parent or current["network_mode"]!="none"
+                    or current["running"] is not True or current["published_ports"]):
+                raise BootstrapFailure("ISOLATION_UNAVAILABLE: actual Docker browser receipt absent",infra=True)
+            return "Chromium Docker: production UI rendered" + (" ; frontend → API probe OK" if require_api else "") + "; exact NETNONE parent " + parent
+        try:
+            return await asyncio.wait_for(render(),timeout=timeout_s)
+        except asyncio.TimeoutError as exc:
+            raise BootstrapFailure("Isolated browser preflight deadline exceeded",infra=True) from exc
+        except BootstrapFailure:
+            raise
+        except Exception as exc:
+&gt;           raise BootstrapFailure("ISOLATION_UNAVAILABLE: Docker browser preflight unavailable ("+stage+": "+type(exc).__name__+"; private driver output withheld)",infra=True) from None
+E           autospec.orchestrator.bootstrap.BootstrapFailure: ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (observe_api: Error; private driver output withheld)
+
+..\..\..\..\..\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\autospec\orchestrator\bootstrap.py:953: BootstrapFailure
+
+During handling of the above exception, another exception occurred:
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3301/test_native_bootstrap_rejects_0')
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_BOOTSTRAP_COUNTERPROOF")!="1",reason="Explicit real NETNONE static-OK counterexample opt-in")
+    @pytest.mark.asyncio
+    async def test_native_bootstrap_rejects_literal_ok_without_actual_api_response(tmp_path):
+        inspected=_docker_call(["docker","image","inspect","ghcr.io/astral-sh/uv:python3.12-bookworm-slim","--format","{{.Id}}"],
+            capture_output=True,text=True,timeout=5,check=False)
+        assert inspected.returncode==0,"pre-existing official factory image required"
+        source=tmp_path/"empty-stage";source.mkdir()
+        runtime=RuntimeSession(source,inspected.stdout.strip(),["/usr/local/bin/python","-I","-u","-c",SERVER],application_origin=True)
+        try:
+            runtime.__enter__()
+            expected = {"status": "ok", "service": "autospec-bootstrap", "database": "ok", "probe": "supervisor-counterexample-nonce"}
+&gt;           with pytest.raises(bootstrap.BootstrapFailure, match="deadline exceeded") as rejected:
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           AssertionError: Regex pattern did not match.
+E             Expected regex: 'deadline exceeded'
+E             Actual message: 'ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (observe_api: Error; private driver output withheld)'
+
+tests\test_bootstrap_independent_counterprobe.py:43: AssertionError</failure></testcase></testsuite></testsuites>

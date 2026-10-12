@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="16.688" timestamp="2026-10-12T12:39:24.240065+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_bootstrap_independent_counterprobe" name="test_native_bootstrap_rejects_literal_ok_without_actual_api_response" time="15.785"><failure message="AssertionError: assert (1 &gt;= 2)&#10; +  where 1 = len(['/'])">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3303/test_native_bootstrap_rejects_0')
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_BOOTSTRAP_COUNTERPROOF")!="1",reason="Explicit real NETNONE static-OK counterexample opt-in")
+    @pytest.mark.asyncio
+    async def test_native_bootstrap_rejects_literal_ok_without_actual_api_response(tmp_path):
+        inspected=_docker_call(["docker","image","inspect","ghcr.io/astral-sh/uv:python3.12-bookworm-slim","--format","{{.Id}}"],
+            capture_output=True,text=True,timeout=5,check=False)
+        assert inspected.returncode==0,"pre-existing official factory image required"
+        source=tmp_path/"empty-stage";source.mkdir()
+        runtime=RuntimeSession(source,inspected.stdout.strip(),["/usr/local/bin/python","-I","-u","-c",SERVER],application_origin=True)
+        try:
+            runtime.__enter__()
+            expected = {"status": "ok", "service": "autospec-bootstrap", "database": "ok", "probe": "supervisor-counterexample-nonce"}
+            with pytest.raises(bootstrap.BootstrapFailure) as rejected:
+                await bootstrap._browser_preflight(runtime,timeout_s=25,require_api=True,expected_health=expected)
+            rc,out,err=runtime.exec(["/usr/local/bin/python","-I","-c","print(open('/tmp/bootstrap-counter-requests.json').read())"])
+            assert rc==0,err
+            paths=json.loads(out)
+&gt;           assert len(paths) &gt;= 2 and not any(path.startswith("/api/") for path in paths)
+E           AssertionError: assert (1 &gt;= 2)
+E            +  where 1 = len(['/'])
+
+tests\test_bootstrap_independent_counterprobe.py:48: AssertionError</failure></testcase></testsuite></testsuites>
