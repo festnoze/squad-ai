@@ -1,0 +1,12 @@
+{
+  "scope": "Trusted constant-supervisor counter-probe, not generated-product acceptance",
+  "observer_before": "8699637303a19ffd4739cf9a44144e5fe93b740e",
+  "replacement": "SystemRandom.randbytes.__func__.__code__ = (lambda self,n: b'x'*n).__code__",
+  "host_application_import": false,
+  "execution": "Disposable Python -I child containing only constant supervisor bootstrap/install and this explicit mutation",
+  "return_code": 0,
+  "incorrect_observation_before_fix": {"generator": "secrets.token_urlsafe", "nbytes": 32, "default_argument": false, "entropy_bits": 256, "cryptographic": true, "encoded_sha256": {"utf8": "af6393bf9a7c6cc7f55717e8eb3bacd060f93823142e7c40c9fa361c4b6f129d"}},
+  "expected": "Refuse native cryptographic attestation because dependency code changed despite stable method identity",
+  "resolution_code": "87cd9b8d111938ae29ca7557422ec6bd3b8f125c",
+  "final_evidence": "20261012-entropy-dependencies-final.xml and 20261012-native-entropy-hardened/replaced/native-observation.json"
+}
