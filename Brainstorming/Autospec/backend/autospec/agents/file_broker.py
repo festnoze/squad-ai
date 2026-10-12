@@ -83,7 +83,9 @@ BEFORE writing. A refusal grants no permission; keep existing work and stop.
 _PROTECTED = {".git", ".claude", ".codex", ".agents", ".aws", ".ssh", ".azure",
               ".npmrc", ".pypirc", ".netrc", "credentials.json", ".credentials.json",
               ".autospec", "autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl", "acceptance-contract.json",
-              "contract-baseline.json", "independent-oracle", "verification-snapshot"}
+              "contract-baseline.json", "independent-oracle", "verification-snapshot",
+              ".autospec-bootstrap.json", ".autospec-environment.json", ".mcp.json",
+              "claude.md", "agents.md", "gemini.md"}
 _DEVICE = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
            *(f"lpt{i}" for i in range(1, 10))}
 MAX_FILES = 100

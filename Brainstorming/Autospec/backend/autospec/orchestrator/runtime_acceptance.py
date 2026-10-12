@@ -23,9 +23,8 @@ logger = logging.getLogger(__name__)
 def _run_node(command: list[str], *, cancel_event: threading.Event, timeout: float,
               **kwargs) -> subprocess.CompletedProcess[str]:
     """Bound the Node gate and all servers it owns, including cancellation."""
-    from .docker_deploy import _kill_tree
-    process_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
-    proc = subprocess.Popen(command, **kwargs, **process_options)
+    from ..agents.runner import spawn_owned_process, close_owned_process
+    proc = spawn_owned_process(command, cancel=cancel_event, **kwargs)
     deadline = time.monotonic() + timeout
     finished = False
     try:
@@ -42,8 +41,7 @@ def _run_node(command: list[str], *, cancel_event: threading.Event, timeout: flo
             except subprocess.TimeoutExpired:
                 continue
     finally:
-        if not finished or proc.poll() is None:
-            _kill_tree(proc)
+        close_owned_process(proc)
         if proc.stdout is not None:
             proc.stdout.close()
 
@@ -140,91 +138,12 @@ async def arun_runtime_acceptance(
     if not runnable:
         return RuntimeAcceptanceResult(ok=True, detail=reason, skipped=True)
 
-    # Finding 6 : un backend web non-python ne peut pas être vérifié à l'exécution
-    # par ce gate (le script JS pilote un serveur python/node). On journalise un
-    # AVERTISSEMENT plutôt que de bloquer silencieusement.
-    lang = toolchain.normalize(state.backend_language.value)
-    if lang != "python" and not state.technical_stack and _frontend_root(state, ws) is None:
-        logger.warning(
-            "Runtime acceptance : backend %s non-python détecté sans frontend — "
-            "vérification à l'exécution indisponible pour ce langage.",
-            lang,
-        )
-        return RuntimeAcceptanceResult(
-            ok=True,
-            detail=f"backend {lang} non-python : vérification runtime indisponible",
-            skipped=True,
-        )
-
-    script = BACKEND_DIR / "scripts" / "runtime_acceptance.js"
-    if not script.exists():
-        return RuntimeAcceptanceResult(ok=False, detail=f"script introuvable : {script}")
-
-    frontend = _frontend_root(state, ws)
-    kind = (state.technical_stack or {}).get("kind", "")
-    backend_web = False if kind == "frontend" else (
-        kind in {"api", "fullstack"} or _backend_web_candidate(ws)
+    # Every product build/server/migration/seed stays behind the Linux boundary.
+    # The old JS gate could launch Python/npm on the host; it is no longer used.
+    from .bootstrap import verify_runtime
+    result = await verify_runtime(
+        state, ws,
+        timeout_s=settings.runtime_acceptance_timeout_s if timeout_s is None else timeout_s,
+        repair_dependencies=True,
     )
-    node_path = PROJECT_DIR / "frontend" / "node_modules"
-    from .pipeline import _minimal_env
-    env = _minimal_env()
-    timeout = settings.runtime_acceptance_timeout_s if timeout_s is None else timeout_s
-    if node_path.exists():
-        existing = env.get("NODE_PATH", "")
-        env["NODE_PATH"] = str(node_path) if not existing else str(node_path) + os.pathsep + existing
-    # Contrat JS #2/#3 : le port résolu (même source que le smoke) et le parcours
-    # Gherkin des stories DONE sont passés par variable d'environnement.
-    env["RUNTIME_BACKEND_PORT"] = str(resolve_web_port(ws))
-    env["PORT"] = env["RUNTIME_BACKEND_PORT"]
-    env["RUNTIME_BACKEND_COMMAND"] = json.dumps(toolchain.run_command(lang))
-    env["RUNTIME_BACKEND_LANGUAGE"] = lang
-    env["RUNTIME_NPM_COMMAND"] = settings.npm_cmd
-    env["RUNTIME_JOURNEY"] = _done_journey(state)
-    if frontend is not None and backend_web:
-        env["AUTOSPEC_STATIC_DIR"] = str(frontend / "dist")
-    cancelled = threading.Event()
-
-    def _run() -> subprocess.CompletedProcess[str]:
-        return _run_node(
-            [
-                settings.node_cmd,
-                str(script),
-                str(ws),
-                str(int(timeout * 1000)),
-                str(frontend or ""),
-                "1" if backend_web else "0",
-            ],
-            cwd=str(ws),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            env=env,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout + 15,
-            cancel_event=cancelled,
-        )
-
-    worker = asyncio.create_task(asyncio.to_thread(_run))
-    try:
-        proc = await asyncio.shield(worker)
-    except asyncio.CancelledError:
-        cancelled.set()
-        try:
-            await asyncio.shield(worker)
-        except (OSError, subprocess.TimeoutExpired):
-            pass
-        raise
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        # Un lancement impossible (node/playwright absent) est une panne d'infra,
-        # pas un bug de câblage réparable.
-        return RuntimeAcceptanceResult(ok=False, detail=str(exc), infra=True)
-    # Convention de code de sortie du gate JS (contrat #4) : 0 = OK, 1 = échec
-    # d'intégration RÉPARABLE, 2 = panne d'INFRA/environnement (playwright/node
-    # absent, ou port occupé par un process externe) — NON réparable.
-    infra = proc.returncode == 2
-    return RuntimeAcceptanceResult(
-        ok=proc.returncode == 0,
-        detail=(proc.stdout or "").strip(),
-        infra=infra,
-    )
+    return RuntimeAcceptanceResult(result.ok, result.detail, result.skipped, result.infra)

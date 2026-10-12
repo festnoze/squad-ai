@@ -69,32 +69,20 @@ def _pause(seconds: float) -> None:
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:
-    """Kill the CLI and children even when stdout is still open."""
-    try:
-        if os.name == "nt":
-            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                           capture_output=True, timeout=5)
-        else:
-            os.killpg(proc.pid, signal.SIGKILL)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    if proc.poll() is None:
-        proc.kill()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        pass
+    """Close only the retained process handle and its preassigned owned Job."""
+    from ..agents.runner import close_owned_process
+    close_owned_process(proc)
 
 
 def _run_process(args: list[str], *, timeout: float, cwd=None, on_line=None) -> tuple[int, str]:
     """Stream bounded output while an independent deadline supervises the CLI."""
     if _cancelled():
         return -2, "Docker operation cancelled"
-    kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+    from ..agents.runner import spawn_owned_process
     try:
-        proc = subprocess.Popen(args, cwd=str(cwd) if cwd is not None else None,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                **kwargs)
+        proc = spawn_owned_process(args, cwd=str(cwd) if cwd is not None else None,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   cancel=getattr(_operation, "cancel_event", None))
     except OSError as exc:
         return -1, f"Docker CLI unavailable: {exc}"
     chunks: deque[str] = deque(maxlen=64)
@@ -119,7 +107,11 @@ def _run_process(args: list[str], *, timeout: float, cwd=None, on_line=None) -> 
     reader.start()
     deadline = time.monotonic() + max(timeout, 0.01)
     failure = ""
+    parent_closed = False
     while proc.poll() is None or not done.is_set():
+        if proc.poll() is not None and not parent_closed:
+            _kill_tree(proc)  # descendants cannot hold stdout after leader exit
+            parent_closed = True
         if _cancelled():
             failure = "Docker operation cancelled"
             break
@@ -129,8 +121,7 @@ def _run_process(args: list[str], *, timeout: float, cwd=None, on_line=None) -> 
         done.wait(min(0.05, max(0.001, deadline - time.monotonic())))
         if done.is_set() and proc.poll() is None:
             _pause(0.01)
-    if failure:
-        _kill_tree(proc)
+    _kill_tree(proc)
     reader.join(timeout=1)
     if done.is_set() and proc.stdout is not None:
         proc.stdout.close()
@@ -273,9 +264,15 @@ def build_image(
     if cancel_event is not None:
         _operation.cancel_event = cancel_event
     try:
-        rc, out = _run_process([settings.docker_cmd, "build", "-t", image, "."],
-                               cwd=ws, timeout=timeout, on_line=on_line)
-        return rc == 0, out[-4000:]
+        from .isolated_validation import build_delivery_image
+        try:
+            ok, output = build_delivery_image(ws, image, docker=settings.docker_cmd, timeout=timeout)
+        except (OSError, RuntimeError, ValueError) as exc:
+            return False, str(exc)
+        if on_line:
+            for line in output.splitlines():
+                on_line(line)
+        return ok, output[-4000:]
     finally:
         _operation.cancel_event = previous
 
@@ -310,6 +307,8 @@ def replace_container(
             "on-failure:3",
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
+            "--user", "65532:65532", "--read-only",
+            "--tmpfs", "/tmp:rw,nosuid,nodev,size=256m,mode=1777",
             "--memory", "512m", "--cpus", "1", "--pids-limit", "256",
             *(["--mount", f"type=volume,source={data_volume},target=/app/data",
                "--env", "DATABASE_URL=sqlite:////app/data/app.db"] if data_volume else []),

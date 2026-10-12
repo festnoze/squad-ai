@@ -596,121 +596,24 @@ async def _await_cleanup(task: asyncio.Task):
     return result
 
 
-async def _stop_impl(process: asyncio.subprocess.Process) -> None:
-    job = getattr(process, "_autospec_job", None)
-    if job is not None:
-        try:
-            job.terminate()
-        except OSError:
-            pass
-        finally:
-            # Kill-on-close also covers a parent that has already exited.
-            job.close()
-            process._autospec_job = None
-    elif os.name == "nt" and process.returncode is None:
-        # Kill the process tree (npm/uv/cargo all spawn descendants).
-        killer = None
-        try:
-            killer = await asyncio.create_subprocess_exec("taskkill", "/PID", str(process.pid), "/T", "/F", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            await asyncio.wait_for(killer.wait(), timeout=5)
-        except (OSError, asyncio.TimeoutError):
-            if killer is not None and killer.returncode is None:
-                killer.kill()
-                await asyncio.wait_for(killer.wait(), timeout=2)
-    elif os.name != "nt":
-        try:
-            # The process group can outlive its original leader.
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    if process.returncode is None:
-        try:
-            process.kill()
-        except ProcessLookupError:
-            pass
-    await asyncio.wait_for(process.wait(), timeout=5)
+async def _stop_impl(process) -> None:
+    from ..agents.runner import close_owned_process
+    await asyncio.to_thread(close_owned_process, process)
 
 
-async def _stop(process: asyncio.subprocess.Process) -> None:
+async def _stop(process) -> None:
     await _await_cleanup(asyncio.create_task(_stop_impl(process)))
 
 
-async def _spawn(argv: list[str], cwd: Path, env: dict[str, str]) -> asyncio.subprocess.Process:
-    command = _argv(argv)
-    job = None
-    if os.name == "nt":
-        from ..agents.runner import _WindowsJob
-
-        job = _WindowsJob()
-        kwargs = {"creationflags": 0x00000004}  # CREATE_SUSPENDED until assigned
-    else:
-        kwargs = {"start_new_session": True}
-    process = None
-    spawning = asyncio.create_task(asyncio.create_subprocess_exec(
-        *command, cwd=str(cwd), env=env, stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT, **kwargs,
-    ))
-    try:
-        process = await asyncio.shield(spawning)
-        process._autospec_job = job
-        if job is not None:
-            job.assign_and_resume(process)
-        return process
-    except BaseException:
-        # A cancellation while asyncio creates its transport must not lose the
-        # late process handle. A suspended Windows child has no descendants yet.
-        async def finish_spawn_and_cleanup():
-            nonlocal process
-            try:
-                if process is None:
-                    process = await spawning
-                process._autospec_job = job
-                await _stop(process)
-            finally:
-                if job is not None:
-                    job.close()
-        await _await_cleanup(asyncio.create_task(finish_spawn_and_cleanup()))
-        raise
-
-
-async def _drain(process: asyncio.subprocess.Process, tail: list[str]) -> None:
-    assert process.stdout is not None
-    while chunk := await process.stdout.read(4096):
-        tail.append(chunk.decode("utf-8", errors="replace"))
-        if len(tail) > 16:
-            del tail[0]
-
-
-async def _close_process(process: asyncio.subprocess.Process, reader: asyncio.Task) -> None:
-    await _stop(process)
-    try:
-        await asyncio.wait_for(reader, timeout=2)
-    except asyncio.TimeoutError:
-        reader.cancel()
+async def _spawn(argv: list[str], cwd: Path, env: dict[str, str]):
+    # Retained solely to reject legacy integrations instead of silently falling
+    # back to host execution. RuntimeSession is the only product runtime API.
+    raise BootstrapFailure("ISOLATION_UNAVAILABLE: host product spawning is disabled", infra=True)
 
 
 async def _command(argv: list[str], cwd: Path, env: dict[str, str], deadline: float, cancel: asyncio.Event | None) -> str:
     _check_budget(deadline, cancel)
-    process = await _spawn(argv, cwd, env)
-    tail: list[str] = []
-    reader = asyncio.create_task(_drain(process, tail))
-    try:
-        while process.returncode is None:
-            _check_budget(deadline, cancel)
-            await asyncio.sleep(0.05)
-        # A completed npm/uv parent may leave descendants holding its pipe. Kill
-        # those descendants before waiting for EOF, not only on timeout.
-        await _stop(process)
-        while not reader.done():
-            _check_budget(deadline, cancel)
-            await asyncio.sleep(0.05)
-        await reader
-        output = "".join(tail)[-12000:]
-        if process.returncode:
-            raise BootstrapFailure(f"Commande échouée ({process.returncode}) : {' '.join(argv)}\n{output}", exit_code=process.returncode)
-        return output
-    finally:
-        await _await_cleanup(asyncio.create_task(_close_process(process, reader)))
+    raise BootstrapFailure("ISOLATION_UNAVAILABLE: host product commands are disabled", infra=True)
 
 
 def _check_budget(deadline: float, cancel: asyncio.Event | None) -> None:
@@ -789,44 +692,36 @@ async def verify(state: Any, ws: Path, *, timeout_s: float = 180, cancel: asynci
 
 async def verify_runtime(state: Any, ws: Path, *, timeout_s: float = 120, cancel: asyncio.Event | None = None,
                          repair_dependencies: bool = False) -> BootstrapResult:
-    """Rebuild and execute the existing product without scaffolding/install/tests.
+    """Execute existing sources using clean locked Linux dependency images.
 
-    Used after business implementation: Python runs its existing venv, native
-    binaries and React bundles are rebuilt, and the same HTTP/DB/proxy contract
-    must still work. No source files or dependency declarations are rewritten.
-    Explicit resume may repair missing local environments using existing locks;
-    it never requires the initial demo screen to replace business features.
+    No scaffold, native venv, source rewrite or unlocked resolution occurs.
+    Missing local image caches can be rebuilt from existing locks. The initial
+    demonstration screen is never required from an evolved business product.
     """
     return await _verify(state, ws, timeout_s=timeout_s, cancel=cancel, runtime_only=True,
                          repair_dependencies=repair_dependencies)
 
 
 def _runtime_dependencies_missing(state: Any, ws: Path) -> bool:
-    """Detect missing local prerequisites without executing generated code."""
+    """Locks, not a host .venv/node_modules, are the runtime prerequisite.
+
+    Linux image availability/attestation is verified or rebuilt by the confined
+    manager. This read-only check never executes product source or tools.
+    """
     stack = _stack(state)
     backend = "none" if stack.get("kind") == "frontend" else stack.get("backend", "python")
-    if backend == "python":
-        # A venv interpreter may legitimately be a symlink to system Python.
-        if not (ws / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")).is_file():
-            return True
-    elif backend == "node":
-        package = json.loads(_safe_path(ws, "package.json").read_text(encoding="utf-8"))
-        if not isinstance(package, dict):
-            raise ValueError("Le manifeste Node doit être un objet JSON")
-        if (package.get("dependencies") or package.get("devDependencies")) and not _safe_path(ws, "node_modules").is_dir():
-            return True
+    lock = "uv.lock" if backend == "python" else "package-lock.json" if backend == "node" else ""
+    if lock and not _safe_path(ws, lock).is_file():
+        return True
     if stack.get("frontend") == "react":
-        frontend = _frontend_rel(state, ws)
-        if not _safe_path(ws, frontend + "/node_modules/vite/bin/vite.js").is_file():
-            return True
+        return not _safe_path(ws, _frontend_rel(state, ws) + "/package-lock.json").is_file()
     return False
 
 
 async def _verify(state: Any, ws: Path, *, timeout_s: float, cancel: asyncio.Event | None, runtime_only: bool,
                   repair_dependencies: bool = False) -> BootstrapResult:
-    # Remember the verification contract separately from the install strategy:
-    # repairing a deleted venv does not turn a product back into the initial UI.
-    expect_initial_screen = not runtime_only
+    # Preparation remains deterministic and non-executing. Runtime never writes
+    # scaffolds back into a delivered product or trusts a product Dockerfile.
     if runtime_only:
         if not _stack(state) or getattr(state, "brownfield_path", "") or getattr(state, "product_profile", "") == "brownfield":
             return BootstrapResult(True, "Aucun bootstrap runtime à vérifier", skipped=True)
@@ -843,150 +738,143 @@ async def _verify(state: Any, ws: Path, *, timeout_s: float, cancel: asyncio.Eve
         prepared = prepare(state, ws)
     if not prepared.ok or prepared.skipped:
         return prepared
+    if cancel and cancel.is_set():
+        raise asyncio.CancelledError
+    from ..agents.runner import _await_tracked
+    try:
+        detail = await asyncio.wait_for(
+            _await_tracked(lambda: _isolated_preflight(state, ws, timeout_s, runtime_only)),
+            timeout=max(.1, timeout_s),
+        )
+        return BootstrapResult(True, detail, fingerprint=prepared.fingerprint, files=prepared.files)
+    except asyncio.TimeoutError:
+        return BootstrapResult(False, "Préflight isolé : délai maximal dépassé (ressources possédées nettoyées)", infra=True, fingerprint=prepared.fingerprint)
+    except BootstrapFailure as exc:
+        return BootstrapResult(False, str(exc), infra=exc.infra, fingerprint=prepared.fingerprint)
+    except (OSError, ValueError, RuntimeError) as exc:
+        return BootstrapResult(False, f"Préflight isolé : {exc}", infra=True, fingerprint=prepared.fingerprint)
+
+
+def _isolated_preflight(state: Any, ws: Path, timeout_s: float, runtime_only: bool) -> str:
+    import tempfile
+    import urllib.request
+    from ..agents.runner import _run_tracked, AgentError
+    from .isolated_validation import IsolatedValidator, RuntimeSession
+    from .validation_environment import snapshot_product
+
     stack = _stack(state)
     backend = "none" if stack.get("kind") == "frontend" else stack.get("backend", "python")
-    web = stack.get("kind", "api") not in ("cli", "library", "library-fast")
-    deadline = time.monotonic() + max(0.1, timeout_s)
-    env = {key: value for key, value in os.environ.items() if key.upper() in SAFE_ENV_KEYS}
-    env.update({"PYTHONUNBUFFERED": "1", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8", "HOST": "127.0.0.1", "CI": "1"})
-    processes: list[tuple[asyncio.subprocess.Process, asyncio.Task, list[str]]] = []
-    steps: list[str] = []
+    if backend not in {"python", "node", "none"}:
+        raise BootstrapFailure(f"ISOLATION_UNAVAILABLE: toolchain Linux {backend} non provisionnée", infra=True)
+    deadline = time.monotonic() + max(.1, timeout_s)
+    # Cache/report files are factory-owned, not under the producer root.
+    cache = Path(tempfile.gettempdir()) / "autospec-linux-environments"
+    validator = IsolatedValidator(cache, docker=settings.docker_cmd, timeout=timeout_s)
+    steps = []
+    def budget():
+        from ..agents.runner import _active_call_cancel
+        worker_cancel = _active_call_cancel.get()
+        if worker_cancel and worker_cancel.is_set():
+            raise asyncio.CancelledError
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BootstrapFailure("Préflight interrompu : délai maximal dépassé", infra=True)
+        validator.timeout = validator.manager.timeout = remaining
+        return remaining
+    if backend != "none":
+        budget()
+        if not runtime_only:
+            validator.manager.ensure_lock(ws, backend)
+        environment = validator.manager.prepare(ws, backend, "test")
+        if not runtime_only:
+            with tempfile.TemporaryDirectory(prefix="autospec-evidence-") as temporary:
+                budget()
+                if stack.get("kind") in {"cli", "library", "library-fast"}:
+                    command = ["/opt/venv/bin/python", "main.py", "--help"] if backend == "python" else ["node", "main.js", "--help"]
+                    rc, output, _ = validator.run_command(ws, backend, command)
+                    if rc:
+                        raise BootstrapFailure(output, exit_code=rc)
+                else:
+                    suite = validator.run_suite(ws, backend, "test", Path(temporary) / "suite.json", test_args=("tests/test_bootstrap.py",) if backend == "python" else ())
+                    if suite.evidence.exit_code or not suite.evidence.report_valid or not suite.evidence.outcomes:
+                        raise BootstrapFailure(suite.output, exit_code=suite.evidence.exit_code)
+            steps.append(f"{backend}: clean Linux locked dependencies / tests OK ({environment.fingerprint})")
+    dist = None
+    frontend = ws / _frontend_rel(state, ws) if stack.get("frontend") == "react" else None
     try:
-        if runtime_only and repair_dependencies and _runtime_dependencies_missing(state, ws):
-            runtime_only = False
-            steps.append("Reprise : restauration des dépendances locales manquantes")
-
-        async def command(argv: list[str], root: Path = ws, *, install: bool = False) -> str:
-            try:
-                return await _command(argv, root, env, deadline, cancel)
-            except BootstrapFailure as exc:
-                if install:
-                    exc.infra = True
-                raise
-
-        if backend == "python":
-            if not runtime_only and not (ws / "uv.lock").exists():
-                await command([settings.uv_cmd, "lock"], install=True)
-            if not runtime_only:
-                await command([settings.uv_cmd, "sync", "--locked"], install=True)
-            if web and not runtime_only:
-                await command([settings.uv_cmd, "run", "--frozen", "pytest", "-q", "tests/test_bootstrap.py"])
-            elif not web and not runtime_only:
-                await command([settings.uv_cmd, "run", "--frozen", "python", "main.py", "--help"])
-            if runtime_only:
-                python = ws / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-                if not python.is_file():
-                    raise BootstrapFailure("Environnement Python absent ; relancer le préflight complet", infra=True)
-                start = [str(python), "main.py"]
-            else:
-                start = [settings.uv_cmd, "run", "--frozen", "python", "main.py"]
-        elif backend == "go":
-            if not runtime_only:
-                await command([settings.go_cmd, "test", "./..."])
-            else:
-                env.update({"GOPROXY": "off", "GOTOOLCHAIN": "local"})
-            binary = ws / ".autospec" / ("bootstrap.exe" if os.name == "nt" else "bootstrap")
-            _safe_path(ws, ".autospec").mkdir(parents=True, exist_ok=True)
-            await command([settings.go_cmd, "build", "-mod=readonly", "-o", str(binary), "."])
-            start = [str(binary)]
-        elif backend == "rust":
-            if not runtime_only and not (ws / "Cargo.lock").exists():
-                await command([settings.cargo_cmd, "generate-lockfile"], install=True)
-            if not runtime_only:
-                await command([settings.cargo_cmd, "test", "--locked"])
-            await command([settings.cargo_cmd, "build", "--locked", *(["--offline"] if runtime_only else [])])
-            start = [str(ws / "target" / "debug" / (workspace.package_name(state) + (".exe" if os.name == "nt" else "")))]
-        elif backend == "node":
-            if not runtime_only and not (ws / "package-lock.json").exists():
-                await command([settings.npm_cmd, "install", "--package-lock-only", "--no-audit", "--no-fund"], install=True)
-            if not runtime_only:
-                await command([settings.npm_cmd, "ci", "--no-audit", "--no-fund"], install=True)
-                await command([settings.npm_cmd, "test"])
-            start = [settings.node_cmd, "main.js"]
-        elif backend == "none":
-            start = []
-        else:
-            raise BootstrapFailure(f"Toolchain non supportée : {backend}")
-        if start:
-            steps.append(f"{backend} : reconstruction OK" if runtime_only else f"{backend} : dépendances et contrôle initial OK")
-        if start and not web and (runtime_only or backend != "python"):
-            await command([*start, "--help"])
-            steps.append("Point d'entrée exécutable : OK")
-
-        frontend = ws / _frontend_rel(state, ws) if stack.get("frontend") == "react" else None
         if frontend:
-            if not runtime_only and not (frontend / "package-lock.json").exists():
-                await command([settings.npm_cmd, "install", "--package-lock-only", "--no-audit", "--no-fund"], frontend, install=True)
+            budget()
             if not runtime_only:
-                await command([settings.npm_cmd, "ci", "--no-audit", "--no-fund"], frontend, install=True)
-                await command([settings.npm_cmd, "test"], frontend)
-            await command([settings.npm_cmd, "run", "build"], frontend)
-            steps.append("React : build OK" if runtime_only else "React : tests et build OK")
-
-        async def server(argv: list[str], root: Path, local_env: dict[str, str]) -> asyncio.subprocess.Process:
-            process = await _spawn(argv, root, local_env)
-            tail: list[str] = []
-            reader = asyncio.create_task(_drain(process, tail))
-            processes.append((process, reader, tail))
-            return process
-
-        backend_port = _port()
-        probe_token = uuid.uuid4().hex
-        if web and start:
-            env["PORT"] = str(backend_port)
-            # Reject another project's healthy server if a port races at bind.
-            env["AUTOSPEC_BOOTSTRAP_TOKEN"] = probe_token
-            # The preflight has its own database so checking never touches product data.
+                validator.manager.ensure_lock(frontend, "node")
+            if not runtime_only:
+                with tempfile.TemporaryDirectory(prefix="autospec-fe-evidence-") as temporary:
+                    suite = validator.run_suite(frontend, "node", "test", Path(temporary) / "suite.json")
+                    if suite.evidence.exit_code or not suite.evidence.report_valid or not suite.evidence.outcomes:
+                        raise BootstrapFailure(suite.output, exit_code=suite.evidence.exit_code)
+            budget()
+            rc, output, dist, frontend_env = validator.build_frontend(frontend)
+            if rc:
+                raise BootstrapFailure(output, exit_code=rc)
+            steps.append("React: isolated tests/build OK")
+        if stack.get("kind") in {"cli", "library", "library-fast"}:
+            return "\n".join(steps)
+        with tempfile.TemporaryDirectory(prefix="autospec-live-") as temporary:
+            stage = snapshot_product(ws if backend != "none" else frontend, Path(temporary) / "product")
+            if dist:
+                target = stage / "frontend" / "dist" if backend != "none" else stage / "dist"
+                if target.exists():
+                    shutil.rmtree(target)
+                shutil.copytree(dist / "dist", target)
+            token = uuid.uuid4().hex
+            env = {"PORT": "8000", "HOST": "0.0.0.0", "AUTOSPEC_BOOTSTRAP_TOKEN": token}
             if stack.get("database") == "sqlite":
-                env["DATABASE_URL"] = "sqlite:///" + str(ws / ".autospec/bootstrap.db")
-            if frontend:
-                env["AUTOSPEC_STATIC_DIR"] = str(frontend / "dist")
-            process = await server(start, ws, env)
-            await _wait_health(backend_port, stack.get("database", "none"), process, deadline, cancel, probe_token)
-            steps.append("API → SQLite : SELECT 1 OK" if stack.get("database") == "sqlite" else "API HTTP : OK")
-        if frontend:
-            port = _port()
-            frontend_env = {**env, "VITE_BACKEND_URL": f"http://127.0.0.1:{backend_port}"}
-            process = await server([settings.npm_cmd, "run", "preview", "--", "--host", "127.0.0.1", "--port", str(port), "--strictPort"], frontend, frontend_env)
-            if start and web:
-                await _wait_health(port, stack.get("database", "none"), process, deadline, cancel, probe_token)
-                steps.append("Frontend → proxy /api → API → stockage : OK")
-            while True:
-                _check_budget(deadline, cancel)
-                if process.returncode is not None:
-                    raise BootstrapFailure("Le serveur frontend s'est arrêté avant le contrôle HTTP")
-                try:
-                    status, body = await _get(port, "/")
-                    if status == 200 and b'id="root"' in body and b"/assets/" in body:
+                env["DATABASE_URL"] = "sqlite:////tmp/bootstrap.db"
+            if frontend and backend != "none":
+                env["AUTOSPEC_STATIC_DIR"] = "/app/frontend/dist"
+            if backend == "python":
+                command, ecosystem = ["/opt/venv/bin/python", "main.py"], "python"
+            elif backend == "node":
+                command, ecosystem = ["node", "main.js"], "node"
+            else:
+                environment, ecosystem = frontend_env, "node"
+                # Factory static server; product package scripts never run host.
+                static = "const h=require('http'),f=require('fs'),p=require('path');h.createServer((q,r)=>{let n=decodeURIComponent(q.url.split('?')[0]);let a=p.resolve('/app/dist','.'+n);if(!a.startsWith('/app/dist/'))a='/app/dist/index.html';if(!f.existsSync(a)||f.statSync(a).isDirectory())a='/app/dist/index.html';r.setHeader('Content-Type',a.endsWith('.js')?'application/javascript':a.endsWith('.css')?'text/css':'text/html');f.createReadStream(a).pipe(r);}).listen(8000,'0.0.0.0');"
+                command = ["node", "-e", static]
+            budget()
+            with RuntimeSession(stage, environment.image, command, ecosystem=ecosystem, docker=settings.docker_cmd, env=env) as session:
+                last = ""
+                while True:
+                    budget()
+                    try:
+                        with urllib.request.urlopen(session.origin + ("/api/health" if backend != "none" else "/"), timeout=2) as response:
+                            body = response.read(128 * 1024)
+                        if backend != "none":
+                            expected = {"status": "ok", "service": "autospec-bootstrap", "database": "ok" if stack.get("database") == "sqlite" else "none", "probe": token}
+                            if json.loads(body) != expected:
+                                raise ValueError(f"unexpected health body: {body[:500]!r}")
                         break
-                except (OSError, ValueError, asyncio.TimeoutError):
-                    pass
-                await asyncio.sleep(0.1)
-            steps.append("Frontend : page compilée accessible en HTTP")
-            browser_env = dict(env)
-            browser_env["NODE_PATH"] = str(PROJECT_DIR / "frontend" / "node_modules")
-            browser_script = BACKEND_DIR / "scripts" / "bootstrap_browser_check.js"
-            budget_ms = int(max(100, min(15000, (deadline - time.monotonic()) * 1000)))
-            try:
-                browser_output = await _command([
-                    settings.node_cmd, str(browser_script), f"http://127.0.0.1:{port}",
-                    str(budget_ms), "1" if start and web and expect_initial_screen else "0",
-                ], ws, browser_env, deadline, cancel)
-            except BootstrapFailure as exc:
-                if exc.exit_code == 2:
-                    exc.infra = True
-                raise
-            steps.append(browser_output.strip())
-        return BootstrapResult(True, "\n".join(steps), fingerprint=prepared.fingerprint, files=prepared.files)
-    except BootstrapFailure as exc:
-        logs = "\n".join("".join(tail)[-4000:] for _, _, tail in processes)
-        return BootstrapResult(False, str(exc) + ("\n" + logs if logs else ""), infra=exc.infra, fingerprint=prepared.fingerprint)
-    except NotImplementedError:
-        return BootstrapResult(False, "La boucle asyncio active ne permet pas les sous-processus. Sous Windows, utiliser le serveur sans --reload (boucle Proactor).", infra=True, fingerprint=prepared.fingerprint)
-    except (OSError, ValueError) as exc:
-        return BootstrapResult(False, f"Préflight : {exc}", infra=isinstance(exc, OSError), fingerprint=prepared.fingerprint)
+                    except (OSError, ValueError) as exc:
+                        last = str(exc)
+                        if deadline - time.monotonic() < .3:
+                            raise BootstrapFailure(last + "\n" + session.logs())
+                        time.sleep(.1)
+                steps.append("API → SQLite : SELECT 1 OK" if stack.get("database") == "sqlite" else "isolated HTTP OK")
+                if frontend:
+                    budget()
+                    # Trusted installed driver from factory, never generated cwd.
+                    browser_env = {k:v for k,v in os.environ.items() if k.upper() in {"PATH","SYSTEMROOT","WINDIR","TEMP","TMP","LOCALAPPDATA"}}
+                    browser_env["NODE_PATH"] = str(PROJECT_DIR / "frontend" / "node_modules")
+                    driver = Path(__file__).with_name("isolated_browser.cjs")
+                    from ..agents.runner import _agent_environment
+                    context = _agent_environment.set(browser_env)
+                    try:
+                        rc, out, err = _run_tracked([settings.node_cmd, str(driver), session.origin, str(int(min(15, budget())*1000)), "1" if backend != "none" and not runtime_only else "0"], "", temporary, budget())
+                    finally:
+                        _agent_environment.reset(context)
+                    if rc:
+                        raise BootstrapFailure(out + err, infra=rc == 2, exit_code=rc)
+                    steps.append(out.strip())
+            return "\n".join(steps)
     finally:
-        async def cleanup_servers():
-            for process, reader, _ in reversed(processes):
-                await _close_process(process, reader)
-        await _await_cleanup(asyncio.create_task(cleanup_servers()))
+        if dist is not None:
+            shutil.rmtree(dist)
