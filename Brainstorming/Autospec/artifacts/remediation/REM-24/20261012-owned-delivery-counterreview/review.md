@@ -4,9 +4,9 @@
 
 Aucun appel LLM, génération payante, exécution du produit sur Windows, modification de la campagne historique, arrêt global, suppression de ressource étrangère ou édition du tableau partagé. Les seuls nouveaux fichiers sont ce rapport et les contre-tests/proofs de superviseur dans mon propre worktree. Docker/suppression/provider sont remplacés dans les contre-tests ; le test d'annulation utilise un thread inerte et libère toujours sa barrière.
 
-## Conclusion provisoire et périmètre
+## Conclusion et périmètre
 
-Trois P1 distincts ont été reproduits et transmis aux propriétaires. Le parent corrige DELETE et le drainage ; rem_execution corrige l'intention de retrait et les quatre gaps déjà attribués. Pas de nouvelle faiblesse démontrée de confinement dans le périmètre relu. **La clôture REM-24 n'est pas déduite de cette revue** : la globale finale sur révision corrigée reste nécessaire, et la preuve stricte des trois interruptions effectives REM-03 doit être distinguée des labels de checkpoint.
+Trois P1 distincts de lifecycle ont été reproduits puis corrigés par leurs propriétaires, et les contre-tests passent sur la cible propre `88b79de1c84dd813042710df8468e7d618d5728c`. Une quatrième faiblesse de garde API est reproduite ci-dessous et devient un lot correctif distinct, explicitement attribué par le parent. Pas de nouveau défaut démontré dans la frontière Docker automatisée. **La clôture REM-24 n'est pas déduite de cette revue** : la garde API, la globale finale et la preuve stricte des trois interruptions effectives REM-03 restent à terminer.
 
 Lecture critique principale : `owned_publication.py`, `owned_packages.py`, façades contractuelles de `docker_deploy.py`, appels `arecover_publication`, `areconcile_deploy`, `aundeploy`, `_adocker_qualified_delivery`, API de suppression/déploiement/reprise, lien GUI, `delivery_raccord.py`, intégrité des reports/cache et rapports natifs. Mes propres modules contracts/claims/browser/quality/security ne reçoivent pas ici une seconde « revue indépendante » de leur auteur ; leurs résultats sont seulement classés comme preuves de fabrique, et les raccords parent sont relus.
 
@@ -71,3 +71,27 @@ Les rapports intermédiaires rouges restent conservés. Les opt-ins natifs d'une
 | REM-23 | Libérable en décision OFF/différée explicite | Réservations/races/late receipt/crash, coût connu préservé ; production Claude non qualifiée pour hard billing, donc sérialisation conservée, gain production non mesuré. |
 
 REM-24 reste en contre-revue tant que correctifs/tests communs/complément REM-03 ne sont pas arbitrés. REM-25 reste la seule évaluation d'une nouvelle sortie : même v0.2, 57 lignes complètes, 56 B/M PASS requis, OPS-06 séparé. Les centaines de PASS de fabrique de ce dossier ne deviennent **aucun** PASS produit.
+
+## Annexe — confirmation sur cible stable et quatrième garde
+
+Révision propre avant et après le replay : `88b79de1c84dd813042710df8468e7d618d5728c`. Le correctif lifecycle est dans `f43ba62c` / intégration `ffaa49af`, les raccords parent dans `b32d9f55`. Relecture du dernier code : `stopping` est durable avant mutation et non réadmissible ; les retries de stop restent explicites. `created_publication_container` est un reçu de création de cet appel, jamais une différence avec le state UI ; cleanup sous verrou compare le CID courant. Reuse re-hashe la source après inspection/readiness, tandis qu'une adoption annulée ne supprime pas le daemon/DB préexistant. La façade parent conserve `intended_active_only` et transmet l'annulation.
+
+Mon replay : **118 PASS / 3 SKIP, rc0, 31,55 s**, `owned-delivery-corrected-88b79de1.xml`. Les trois skips sont les deux probes publication Docker et le probe package Docker, explicitement opt-in ; ils ont été exécutés séparément dans le replay pair **58 PASS / 194,06 s** (`REM-01/20261012-owned-lifecycle-native-v3.xml`). Les dix variantes de mes trois contre-tests initialement rouges sont toutes exécutées et PASS. Les modules rejoués sont owned_publication, owned_packages, publication_raccord_recovery, owned_delivery_lifecycle_guards, budget_cache_resume_guards et delivery_raccord. Le parent conserve aussi son replay combiné **146 PASS / 18,70 s**, `owned-budget-cache-root-v3.xml`. Les tests sont de mécanique de fabrique, pas des verdicts du produit.
+
+Hashes des sources au replay stable :
+
+| Fichier | SHA256 |
+|---|---|
+| owned_publication.py | a1207843c6b16ef3ef4cde49063d661d296241d9716e8891e8764a9bc3ad3436 |
+| owned_packages.py | 468ccefcfb014edcbf57651ad7391ae6fbfc8c43c19ee425f7d398c79abb3dff |
+| docker_deploy.py | 4b07c07318ee0e0910e18d3181d9c532c7d6082e21c187c87bc69692f5ef775a |
+| pipeline.py | cfb29e6e3a52782ef9f74bc1f00fa8c1b30d3bbc926c480f5e74bb48c610092a |
+| api/server.py | ccd615be27930e0a15167f7167dc715cdd524fa7c32d598dd296705a2078da69 |
+| final_gate.py | 4dd17b1685d63e4cab2c93190dd184c12d9c133b643ac03474ab6e01029c553e |
+| delivery_raccord.py | 34313afa1d3d46ab0cc151a69eb835d7d61e08e7b6728c7ab35cc84e3ecfde97 |
+
+**P1 — API de contrôle accessible en mutation simple depuis une origine étrangère.** CORS seul empêche la lecture, pas l'exécution d'un POST simple. Après ouverture volontaire du produit dans le navigateur utilisateur, hors harness Docker, une page peut demander `/api/projects/<id>/undeploy`. Le contre-test ASGI n'exécute aucun JS ni Docker : callback inerte atteint depuis une origine produit loopback, un tiers HTTPS et `null`, **3 FAIL / 0,75 s** (`foreign-origin-before.xml`, `test_foreign_origin_counterproof.py`). Les IDs sont connus dans cette fixture ; ce test ne prétend pas prouver la découverte automatique d'autres projets ni une compromission du navigateur.
+
+Le parent confirme que cette protection fait partie du périmètre avant campagne et m'attribue sa correction à partir de `88b79de1`. Origin absent reste permis aux clients locaux ; Origin présent doit être usine explicitement approuvé/configuré ou origine serveur loopback exacte. Host non-loopback/DNS-rebinding, y compris GET sans Origin, doit être refusé sans configuration explicite. Pas d'exception `test/testserver`, de bypass ASGI, d'authentification magique ni de CORS wildcard. La migration de clients de tests usine vers `127.0.0.1` ne modifie pas les fixtures produit. REM-01/21/24 restent donc conditionnés à ce nouveau lot et au replay final. Cette attribution n'est pas une quatrième correction déjà terminée.
+
+L'attribut Git local `*.xml -text` conserve désormais les octets CRLF bruts des traces pytest. Le premier commit avait normalisé ces quatre XML ; ce second checkpoint restaure les octets actuels originaux sans changer les verdicts ni les sources. Les preuves précédentes restent dans l'historique ; aucun rouge n'est effacé.
