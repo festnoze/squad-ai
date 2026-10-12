@@ -618,9 +618,10 @@ _FORCE_MODEL: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 # Reverse map: the exact system-prompt string ``persona(name)`` returns → the
 # persona name. Lets ``_UsageTracker`` label every call's agent role without
-# touching the ~25 call sites. Built lazily (personas are lru_cached, so the same
-# string object/content comes back each time).
-_PERSONA_BY_PROMPT: dict[str, str] = {}
+# touching the ~25 call sites. Persona bodies are cached, but this map is
+# refreshed atomically per policy; generic/restricted modes cannot prime each
+# other or leave a partially built map after a rejected role.
+_PERSONA_BY_PROMPT: dict[bool, dict[str, str]] = {}
 
 
 class DeliveryBlocked(Exception):
@@ -662,10 +663,15 @@ def prompts_arbiter_fix_test(story, pkg: str, acceptance: str, instructions: str
 
 
 def _persona_role(system_prompt: str) -> str:
-    if not _PERSONA_BY_PROMPT:
-        for name in FALLBACK_PERSONAS:
-            _PERSONA_BY_PROMPT[persona(name)] = name
-    return _PERSONA_BY_PROMPT.get(system_prompt, "")
+    restricted = settings.generation_only_agents
+    if restricted:
+        from ..agents.generation_policy import GENERATION_ROLES
+        names = [name for name in FALLBACK_PERSONAS if name in GENERATION_ROLES]
+    else:
+        names = list(FALLBACK_PERSONAS)
+    current = {persona(name): name for name in names}
+    _PERSONA_BY_PROMPT[restricted] = current
+    return current.get(system_prompt, "")
 
 
 class _UsageTracker:
