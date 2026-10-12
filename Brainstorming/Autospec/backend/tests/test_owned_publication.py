@@ -44,15 +44,17 @@ class FakeDocker:
             labels=dict(arg.split('=',1) for arg in argv if arg.startswith('autospec.'))
             self.volumes[argv[-1]]={'Name':argv[-1],'Driver':'local','CreatedAt':'2026-10-12T01:00:00Z','Labels':labels,'Options':None}
             return 0,argv[-1]+'\n',''
-        if argv[1]=='run' and '-d' in argv:
+        if argv[1]=='run' and '--rm' not in argv:
             self.counter+=1;identifier=f'{self.counter:064x}'
             labels=dict(arg.split('=',1) for arg in argv if arg.startswith('autospec.'))
             name=argv[argv.index('--name')+1]
             mount=argv[argv.index('--mount')+1];volume=mount.split('source=',1)[1].split(',',1)[0]
             env=[argv[i+1] for i,arg in enumerate(argv) if arg=='--env']
+            migration='-d' not in argv
             self.containers[identifier]={'Id':identifier,'Name':'/'+name,'Created':f'2026-10-12T01:00:0{self.counter}Z',
-                'Image':self.spec.image_id,'State':{'Running':True},'Config':{'Labels':labels,'User':'65532:65532',
-                    'Cmd':list(self.spec.runtime_command),'Entrypoint':None,'WorkingDir':'/app','Env':env},
+                'Image':self.spec.image_id,'State':{'Running':not migration},'Config':{'Labels':labels,'User':'65532:65532',
+                    'Cmd':argv[argv.index(self.spec.image_id)+1:] if migration else list(self.spec.runtime_command),
+                    'Entrypoint':[argv[argv.index('--entrypoint')+1]] if migration else None,'WorkingDir':'/app','Env':env},
                 'HostConfig':{'ReadonlyRootfs':True,'CapDrop':['ALL'],'CapAdd':None,'Privileged':False,
                     'SecurityOpt':['no-new-privileges=true'],'NetworkMode':'none','PortBindings':{},'Binds':None,
                     'Devices':[],'DeviceRequests':None,'ExtraHosts':None,'Links':None,'PidMode':'','IpcMode':'private',
@@ -60,7 +62,7 @@ class FakeDocker:
                     'Tmpfs':{'/tmp':'rw,nosuid,nodev,size=256m,mode=1777'}},
                 'Mounts':[{'Type':'volume','Name':volume,'Destination':runtime.RuntimeSession.DATABASE_DIRECTORY,
                     'RW':True,'Source':'/var/lib/docker/volumes/'+volume+'/_data'}]}
-            return 0,identifier+'\n',''
+            return (self.exec_rc,'mock migration output','') if migration else (0,identifier+'\n','')
         if argv[1]=='exec':return self.exec_rc,'mock output',''
         return 0,'',''
     def call(self,argv,**kwargs):
@@ -178,8 +180,14 @@ def test_migration_exactly_once_only_on_new_volume_and_unknown_blocks_resume(tmp
     source,spec,fake,registry=setup(tmp_path,monkeypatch,migration_command=command)
     try:
         registry.publish('project',source,spec);registry.stop('project');registry.recover('project')
-        execs=[a for a in fake.calls if a[1]=='exec']
-        assert len(execs)==1 and execs[0][-2:]==list(command)
+        migrations=[a for a in fake.calls if a[1]=='run' and '--rm' not in a and '-d' not in a]
+        assert len(migrations)==1 and migrations[0][migrations[0].index('--entrypoint')+1]==command[0]
+        assert migrations[0][-1]==command[1]
+        starts=[a for a in fake.calls if a[1]=='run' and '-d' in a]
+        assert fake.calls.index(migrations[0])<fake.calls.index(starts[0])
+        receipt=registry._read('project')['migration_receipt']
+        assert receipt['argv']==list(command) and receipt['return_code']==0
+        assert receipt['container_id'] not in fake.containers
         registry.release_ingress('project')
         row=registry._read('project');row['migration']='pending';registry._write(row);before=len(fake.calls)
         with pytest.raises(PublicationError,match='RECOVERY_BLOCKED'):registry.recover('project')
@@ -196,6 +204,24 @@ def test_failed_migration_preserves_data_and_requires_explicit_disposition(tmp_p
         assert registry._read('project')['migration']=='failed' and fake.volumes and not fake.containers
         with pytest.raises(PublicationError,match='RECOVERY_BLOCKED'):registry.recover('project')
     finally:cleanup(registry)
+
+
+def test_interrupted_prelaunch_migration_cleans_exact_daemon_resource_but_keeps_pending_data(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch,migration_command=('/opt/venv/bin/python','migration.py'))
+    original=fake.tracked
+    def interrupt(argv,*args):
+        result=original(argv,*args)
+        if argv[1]=='run' and '--rm' not in argv and '-d' not in argv:
+            raise subprocess.TimeoutExpired(argv,1)
+        return result
+    monkeypatch.setattr(runtime,'_run_tracked',interrupt)
+    with pytest.raises(subprocess.TimeoutExpired):registry.publish('project',source,spec)
+    row=registry._read('project')
+    assert row['migration']=='pending' and row['migration_container_name'] and fake.volumes and not fake.containers
+    assert not any(a[1]=='run' and '-d' in a for a in fake.calls)
+    with pytest.raises(PublicationError,match='RECOVERY_BLOCKED'):registry.recover('project')
+    registry.stop('project');registry.destroy_data('project')
+    assert not fake.volumes
 
 
 def test_cancelled_creation_retains_external_intent_no_product_execution(tmp_path,monkeypatch):
@@ -344,6 +370,57 @@ print(json.dumps(blocked))
         registry.stop('project');registry.destroy_data('project')
         for kind,identifier in [('container',cid) for cid in identifiers]+[('volume',volume)]:
             assert publication._inspect('docker',kind,identifier) is None
+    finally:
+        cleanup(registry)
+        sandbox._docker_call(['docker','image','rm',tag],capture_output=True,text=True,timeout=10,check=False)
+
+
+@pytest.mark.skipif(os.environ.get('AUTOSPEC_REAL_LINUX_VALIDATION')!='1',reason='Opt-in migration-before-plain-image proof, product only inside Docker')
+def test_real_schema_migration_precedes_app_that_refuses_empty_database(tmp_path):
+    source=tmp_path/'source';source.mkdir()
+    (source/'pyproject.toml').write_text('[project]\nname="prelaunch-migration-proof"\nversion="1.0.0"\nrequires-python=">=3.12"\ndependencies=[]\n')
+    # Startup reads an existing schema in READ ONLY mode and exits if absent.
+    # It cannot create/seed/repair it itself. Never imported/run on the host.
+    (source/'main.py').write_text('''import os,sqlite3,json
+from http.server import HTTPServer,BaseHTTPRequestHandler
+path=os.environ['DATABASE_URL'].removeprefix('sqlite:///')
+with sqlite3.connect('file:'+path+'?mode=ro',uri=True) as db:db.execute('select count(*) from items').fetchone()
+class Handler(BaseHTTPRequestHandler):
+ def do_GET(self):
+  with sqlite3.connect('file:'+path+'?mode=ro',uri=True) as db:count=db.execute('select count(*) from items').fetchone()[0]
+  self.send_response(200);self.end_headers();self.wfile.write(json.dumps({'count':count}).encode())
+HTTPServer(('0.0.0.0',int(os.environ['PORT'])),Handler).serve_forever()
+''')
+    (source/'migrate.py').write_text("import os,sqlite3\nwith sqlite3.connect(os.environ['DATABASE_URL'].removeprefix('sqlite:///')) as db:db.execute('create table items(id integer primary key)')\n")
+    from autospec.orchestrator.isolated_validation import IsolatedValidator,build_delivery_image
+    validator=IsolatedValidator(tmp_path/'cache',timeout=300);validator.manager.ensure_lock(source,'python')
+    snapshot=source_snapshot(source).digest;tag='autospec/prelaunch-proof:'+uuid4().hex
+    registry=PublicationRegistry(tmp_path/'supervisor');command=('/opt/venv/bin/python','main.py')
+    try:
+        ok,output=build_delivery_image(source,tag,runtime_command=command,evidence_root=tmp_path/'build',snapshot_hash=snapshot)
+        assert ok,output
+        image=json.loads((tmp_path/'build/delivery-build.json').read_bytes())['image_id']
+        spec=PublicationSpec(image,snapshot,'c'*64,command,8000,False,
+            '/var/lib/autospec-validation/support.sqlite','/api/health',('/opt/venv/bin/python','migrate.py'))
+        row=registry.publish('project',source,spec,timeout=30)
+        assert row['migration']=='completed' and row['migration_receipt']['return_code']==0
+        assert row['migration_receipt']['argv']==['/opt/venv/bin/python','migrate.py']
+        assert row['migration_receipt']['container_id']!=row['container_id']
+        assert publication._inspect('docker','container',row['migration_receipt']['container_id']) is None
+        info=publication._LIVE[registry._key('project')].inspect_configuration()
+        assert info['runtime_command']==list(command) and info['runtime_entrypoint'] in (None,[])
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(row['origin']+'/api/health',timeout=10) as response:assert json.load(response)=={'count':0}
+        registry.stop('project');again=registry.recover('project',timeout=30)
+        # Re-running CREATE TABLE would fail; recovery must reuse the recorded
+        # migration and DB, launch plain CMD only, and still be healthy.
+        assert again['migration_receipt']==row['migration_receipt']
+        with opener.open(again['origin']+'/api/health',timeout=10) as response:assert json.load(response)=={'count':0}
+        if os.environ.get('AUTOSPEC_PUBLICATION_PROOF_ROOT'):
+            from autospec.orchestrator.dependencies import atomic_json
+            atomic_json(Path(os.environ['AUTOSPEC_PUBLICATION_PROOF_ROOT'])/'publication-prelaunch-native.json',
+                {'initial':row,'after_restart':again,'configuration':info,'schema_row_count':0,
+                 'source_unchanged':source_snapshot(source).digest==snapshot})
     finally:
         cleanup(registry)
         sandbox._docker_call(['docker','image','rm',tag],capture_output=True,text=True,timeout=10,check=False)

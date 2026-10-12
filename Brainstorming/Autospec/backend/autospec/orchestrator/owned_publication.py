@@ -14,9 +14,10 @@ import math
 import re
 import threading
 import time
+import uuid
 import urllib.error
 import urllib.request
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from ..agents.file_broker import ExecutionContext, FileBroker
@@ -64,6 +65,8 @@ class PublicationSpec:
             raise PublicationError('PUBLICATION_HEALTH_BINDING_REQUIRED: literal same-origin reviewed path')
         if self.migration_command is not None:
             object.__setattr__(self,'migration_command',tuple(_runtime_argv(self.migration_command)))
+            if self.migration_command[0]!=self.runtime_command[0]:
+                raise PublicationError('PUBLICATION_MIGRATION_EXECUTOR_UNSUPPORTED: exact reviewed ecosystem interpreter required')
 
     @property
     def ecosystem(self):
@@ -114,7 +117,7 @@ def _volume(docker,record):
     return identity
 
 
-def _container(docker,record,spec):
+def _container(docker,record,spec,*,migration=False):
     value=_inspect(docker,'container',record['container_id'] or record['container_name'])
     if value is None:return None
     config,host=value.get('Config',{}),value.get('HostConfig',{})
@@ -126,8 +129,9 @@ def _container(docker,record,spec):
         record['container_id'] is not None and value['Id']!=record['container_id'] or
         not isinstance(value.get('Created'),str) or not value['Created'] or
         record['container_created'] is not None and value['Created']!=record['container_created'] or
-        value.get('Image')!=spec.image_id or config.get('Cmd')!=list(spec.runtime_command) or
-        config.get('Entrypoint') not in (None,[]) or config.get('User')!='65532:65532' or config.get('WorkingDir')!='/app' or
+        value.get('Image')!=spec.image_id or config.get('Cmd')!=list(spec.runtime_command[1:] if migration else spec.runtime_command) or
+        (config.get('Entrypoint')!=[spec.runtime_command[0]] if migration else config.get('Entrypoint') not in (None,[])) or
+        config.get('User')!='65532:65532' or config.get('WorkingDir')!='/app' or
         config.get('Labels',{}).get('autospec.run_id')!=record['owner'] or config.get('Labels',{}).get('autospec.kind')!='sandbox' or
         any(env.get(k)!=v for k,v in expected_env.items()) or
         host.get('NetworkMode')!='none' or host.get('ReadonlyRootfs') is not True or host.get('Privileged') is not False or
@@ -185,8 +189,12 @@ class PublicationRegistry:
             raise PublicationError('PUBLICATION_JOURNAL_INVALID')
         try:
             row=json.loads(path.read_text(encoding='utf-8'))
+            if isinstance(row,dict):
+                row.setdefault('migration_container_name',None)
+                row.setdefault('migration_receipt',None)
             fields={'version','project_id','spec','owner','container_name','container_id','container_created',
-                    'container_fingerprint','volume_name','volume_identity','host_port','origin','status','migration','reason'}
+                    'container_fingerprint','volume_name','volume_identity','host_port','origin','status','migration','reason',
+                    'migration_container_name','migration_receipt'}
             if not isinstance(row,dict) or set(row)!=fields or row['version']!=1 or row['project_id']!=project_id:
                 raise ValueError('schema')
             spec=PublicationSpec(**row['spec'])
@@ -201,7 +209,9 @@ class PublicationRegistry:
                 row['container_id'] is not None and not _SHA.fullmatch(row['container_id']) or
                 row['container_fingerprint'] is not None and not _SHA.fullmatch(row['container_fingerprint']) or
                 row['container_created'] is not None and not isinstance(row['container_created'],str) or
-                row['volume_identity'] is not None and not isinstance(row['volume_identity'],dict)):
+                row['volume_identity'] is not None and not isinstance(row['volume_identity'],dict) or
+                row['migration_container_name'] is not None and not re.fullmatch(r'autospec-sandbox-[a-f0-9]{32}',row['migration_container_name']) or
+                row['migration_receipt'] is not None and not isinstance(row['migration_receipt'],dict)):
                 raise ValueError('identities')
             if spec.payload()!=row['spec']:raise ValueError('canonical spec')
             return row
@@ -284,19 +294,24 @@ class PublicationRegistry:
             row={'version':1,'project_id':project_id,'spec':spec.payload(),'owner':session.owner,
                  'container_name':session.name,'container_id':None,'container_created':None,'container_fingerprint':None,
                  'volume_name':session.volume_name,'volume_identity':None,'host_port':session.host_port,'origin':session.origin,
-                 'status':'creating','migration':'not_started' if spec.migration_command else 'none','reason':''}
+                 'status':'creating','migration':'not_started' if spec.migration_command else 'none','reason':'',
+                 'migration_container_name':None,'migration_receipt':None}
             try:
                 self._write(row)  # ownership intent precedes daemon-side effects
                 if cancel_event is not None and cancel_event.is_set():raise PublicationError('PUBLICATION_CANCELLED')
-                session.__enter__()
-                self._capture(row,spec)
+                session.prepare_owned_database()
+                row['volume_identity']=_volume(self.docker,row)
                 self._write(row)
                 if spec.migration_command:
                     if cancel_event is not None and cancel_event.is_set():raise PublicationError('PUBLICATION_CANCELLED')
-                    row['migration']='pending';self._write(row)
-                    rc,_,_=session.exec(list(spec.migration_command),timeout=timeout)
-                    row['migration']='completed' if rc==0 else 'failed';self._write(row)
-                    if rc:raise PublicationError('PUBLICATION_MIGRATION_FAILED: no seed/repair fallback')
+                    row['migration']='pending';row['migration_container_name']='autospec-sandbox-'+uuid.uuid4().hex;self._write(row)
+                    receipt=session.run_database_command(list(spec.migration_command),container_name=row['migration_container_name'],timeout=timeout)
+                    row['migration_receipt']=receipt
+                    row['migration']='completed' if receipt['return_code']==0 else 'failed'
+                    row['migration_container_name']=None;self._write(row)
+                    if receipt['return_code']:raise PublicationError('PUBLICATION_MIGRATION_FAILED: no seed/repair fallback')
+                session.__enter__()  # exact baked CMD only AFTER migration completed
+                self._capture(row,spec);self._write(row)
                 self._healthy(session,spec,timeout,cancel_event)
                 if source_snapshot(source).digest!=spec.snapshot_hash:
                     raise PublicationError('PUBLICATION_SOURCE_CHANGED_DURING_LAUNCH')
@@ -390,6 +405,13 @@ class PublicationRegistry:
             volume=_volume(self.docker,row)
             if row['volume_identity'] is not None and volume is None:raise PublicationError('PUBLICATION_OWNED_VOLUME_MISSING')
             actual=_container(self.docker,row,spec)
+            if row['migration_container_name'] is not None:
+                if spec.migration_command is None:raise PublicationError('PUBLICATION_MIGRATION_IDENTITY_INVALID')
+                temporary={**row,'container_name':row['migration_container_name'],'container_id':None,
+                    'container_created':None,'container_fingerprint':None}
+                migration=_container(self.docker,temporary,replace(spec,runtime_command=spec.migration_command,migration_command=None),migration=True)
+                if migration:_cleanup_container(self.docker,migration[0]['Id'],row['owner'])
+                row['migration_container_name']=None
             current=_LIVE.pop(self._key(project_id),None)
             if current is not None and not current.closed:current.close(preserve_database=True)
             elif actual:_cleanup_container(self.docker,actual[0]['Id'],row['owner'])
