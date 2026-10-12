@@ -1075,6 +1075,7 @@ class Pipeline:
         self._claim_roots: dict[str, str] = {}
         self._claims_changed = asyncio.Event()
         self._dependency_lock = asyncio.Lock()
+        self._qa_provenance_lock = asyncio.Lock()
         try:
             for rec in load_interactions(state.id):
                 self.interactions.add_existing(AgentInteraction.model_validate(rec))
@@ -4405,7 +4406,24 @@ class Pipeline:
                 cached = None
             if cached is None or not cached.ready:
                 from ..validation.coordinator import verify_project
+                from ..validation.delivery_raccord import (native_timing_recorder,
+                    collect_native_delivery_build,collect_native_final_facts)
+                timing_recorder=native_timing_recorder(contract,snapshot.digest,supervisor)
+                try:
+                    native_build=await collect_native_delivery_build(contract,source,snapshot.digest,
+                        supervisor,timing_recorder=timing_recorder)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    native_build={"status":"NOT_VERIFIED","receipt":None,
+                        "limits":["native delivery build unavailable: "+type(exc).__name__]}
+                    self.monitor.event("native_delivery_build_unavailable",snapshot_hash=snapshot.digest,
+                        category=type(exc).__name__)
                 await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
+                facts=await collect_native_final_facts(self.state,contract,source,snapshot.digest,
+                    supervisor,build=native_build,timing_recorder=timing_recorder)
+                self.monitor.event("native_final_facts",status=facts["status"],
+                    snapshot_hash=snapshot.digest,limits=facts["limits"])
                 reports = await verify_project(self.state, contract, source, snapshot.digest, supervisor)
                 atomic_json(reports_path, reports)
             admission = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
@@ -4491,6 +4509,14 @@ class Pipeline:
             raise ClaimViolation(str(exc)) from exc
         if not await self._claim_arbiter.authorize_batch(owner, paths, project_root=workspace_dir(self.state.id)):
             raise ClaimViolation("CLAIM_REPLAN: write not reserved; request claim_expand BEFORE mutation")
+        if role == "qa":
+            # Supervisor-authenticated conservative write intent, before any
+            # batch mutation. Actual byte hashes are frozen only by native
+            # admission, including helpers outside test filename conventions.
+            # Producer JSON cannot invent an author/role or edit this journal.
+            from .qa_provenance import record_qa_write_intent
+            async with self._qa_provenance_lock:
+                await asyncio.to_thread(record_qa_write_intent,acceptance.supervisor_root(self.state.id),paths)
 
     async def _aexpand_agent_claim(self, owner: str, call: dict, role: str):
         if role not in self._FILE_WRITERS or call.get("task_id") != owner:
