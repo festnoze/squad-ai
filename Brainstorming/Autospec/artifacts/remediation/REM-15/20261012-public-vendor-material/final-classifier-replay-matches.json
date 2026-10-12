@@ -1,0 +1,763 @@
+[
+  {
+    "receipt": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\remediation-20261011\\root-security-native-final-v1\\test_real_image_layer_scan_exa0\\harness\\evidence\\security-scan-572ac18b6633491080b863a63f286605.json",
+    "receipt_sha256": "16e3182247828e557002ccf5aaa72e464d045a2fba9eedbdd8f3bf7996bf3310",
+    "snapshot_hash": "25fba877a1e9042dcde148a3f7f8308881bd1799aa835737432f2bbc84ac62d5",
+    "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "provenance": {
+      "cookie_mode_logs": [],
+      "image": {
+        "archive_bytes": 205117952,
+        "archive_sha256": "e36be88771d498f1f71d46a17ff8247d158a3366f7f056b0a5e686539fa5fee7",
+        "complete": true,
+        "image_id": "sha256:a8100195ab762a3858cac2419f1666fcd89d0e015ad4f7d5edf6281591da356c",
+        "runtime_container_id": "119622fb1be78c9fcd5da3affbfe77efdf6caea2610bf80d91fc61bcb5d620ee",
+        "runtime_image_id": "sha256:8832cd4757805ac9dff2bcb4ed793e14c5e1146d46c1ea6312862418d3a3c46b",
+        "source_snapshot": "25fba877a1e9042dcde148a3f7f8308881bd1799aa835737432f2bbc84ac62d5"
+      },
+      "instrumented_runtime": false,
+      "logs": {
+        "bytes": 194,
+        "complete": true,
+        "container_id": "119622fb1be78c9fcd5da3affbfe77efdf6caea2610bf80d91fc61bcb5d620ee",
+        "image_id": "sha256:8832cd4757805ac9dff2bcb4ed793e14c5e1146d46c1ea6312862418d3a3c46b",
+        "owner": "283da5143bfe4dfb99357c7eb61362af"
+      }
+    },
+    "library": [
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "scope": "image",
+        "sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3"
+      }
+    ],
+    "findings": [
+      {
+        "file": "blobs/sha256/5138d6eda784ccced14deddbf38a2a861ad4c615256e52e6251a5f581036c13f:opt/vendor/cache/native-canary",
+        "kind": "known_probe_secret",
+        "match_bytes": 42,
+        "offset": 0,
+        "scope": "image",
+        "value_sha256": "4e111b6c133aca797d58a858280b06d98a8e954f47ad7a8715a9159ec8edbf44"
+      },
+      {
+        "file": "blobs/sha256/5138d6eda784ccced14deddbf38a2a861ad4c615256e52e6251a5f581036c13f:opt/vendor/cache/native-canary",
+        "kind": "private_key",
+        "match_bytes": 150,
+        "material_sha256": "25242f688ccf9ab20d60751ab2435449f4b48b959e6d85b7c7a0f2aae96e63d5",
+        "offset": 43,
+        "pem_type": "RSA PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "a5f89664efa2894fde61a6feba27e1fd632a6a050d286c492886aa5c0a71c584"
+      }
+    ],
+    "detector_candidates": [
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 200,
+        "material_sha256": "87e288dc7dbc29a24241b596ec8c84f949d9f09f34fc0cf69242481fb2274770",
+        "offset": 1578656,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "a4d138d7ef9748464117b44fb9c0a4b5b85a1599a127d02690abaa96d03c16e6"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 155,
+        "material_sha256": "d245e52c341a76645e1b0e56c58dc964cd4f3ecaea64a9c6d6db9897d4948a8a",
+        "offset": 1578880,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "fa0b06a72461ec0a963dcfccb8d5b61bd88a6074fc7271573bff68ab86b8c1af"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 151,
+        "material_sha256": "0294b4406902e33bb02f89eaf4c691328790d7a9cd01b873d68edac994f310a1",
+        "offset": 1579040,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "ef237ea8db4f2ae9ee100e8ced96d29b5dceb0e6a948443e6b8a00b1791f9ec9"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 354,
+        "material_sha256": "60c323abe4854b03743005874156ef6e0343bc9c05c09a2a43335cdda19342b3",
+        "offset": 1579360,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "f8766749b0c6f9b5661364568226af0ba7ae8d87c0073df24e440de4417521cd"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 282,
+        "material_sha256": "995b8d5b08ac126a74f39d812fc8cce270d026093d810f366de923bb0fe47f60",
+        "offset": 1579872,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "293216817f0d585f0b54f225582f59e7b2e2a795b5f8002e2d71c5e3d49ce9b0"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 202,
+        "material_sha256": "09416ba3e0782523c56225fb168cd58cda7796e938db1b53f79b6abbaed2bbc7",
+        "offset": 1580224,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "a0b9679665e29ac220dfb0b366317e1b9dd5fe31e9def8b2e511669a041389ae"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 190,
+        "material_sha256": "7e38af7715bbb425a6aa8060b7c0af60aeb81d39975c55e83edcb9eae7a5e9f8",
+        "offset": 1580512,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "934b3e9bfd9936c5e30c7f0ed7d36a05e2044f755c0aa433e1d6bef6a68d1391"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 226,
+        "material_sha256": "458022ddcb5598b39253bc027eb02c4f3dba00e2bdbaef239a35bc91c9bd4f3a",
+        "offset": 1580800,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "91ea1699ff6b1a34b4a1d500a9c75a808441e47b9ea68da6fb0195e01ce1dc61"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 1211,
+        "material_sha256": "09f1c1a4680df80b9e8e6e587d3a787de7402a919e366426ad807a1c0f8c98c1",
+        "offset": 1581120,
+        "pem_type": "DSA PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "7c4c63ee462e0e700cd9e29c8e0f730b3f1b484c4abdd83f1e69fcd477c061fa"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 1674,
+        "material_sha256": "2859ff03b44c8f0e4f96604b8cced325ef4d01ca935422b2041d88d8809f8fa1",
+        "offset": 1582624,
+        "pem_type": "RSA PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "d039c8119a029ab9f9c83c04d67002d887b6bc6026c4264402ab27cdf24cf138"
+      },
+      {
+        "file": "blobs/sha256/5138d6eda784ccced14deddbf38a2a861ad4c615256e52e6251a5f581036c13f:opt/vendor/cache/native-canary",
+        "kind": "known_probe_secret",
+        "match_bytes": 42,
+        "offset": 0,
+        "scope": "image",
+        "value_sha256": "4e111b6c133aca797d58a858280b06d98a8e954f47ad7a8715a9159ec8edbf44"
+      },
+      {
+        "file": "blobs/sha256/5138d6eda784ccced14deddbf38a2a861ad4c615256e52e6251a5f581036c13f:opt/vendor/cache/native-canary",
+        "kind": "private_key",
+        "match_bytes": 150,
+        "material_sha256": "25242f688ccf9ab20d60751ab2435449f4b48b959e6d85b7c7a0f2aae96e63d5",
+        "offset": 43,
+        "pem_type": "RSA PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "a5f89664efa2894fde61a6feba27e1fd632a6a050d286c492886aa5c0a71c584"
+      }
+    ],
+    "public_non_credentials": [
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 200,
+        "material_sha256": "87e288dc7dbc29a24241b596ec8c84f949d9f09f34fc0cf69242481fb2274770",
+        "offset": 1578656,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "gost12_512_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "a4d138d7ef9748464117b44fb9c0a4b5b85a1599a127d02690abaa96d03c16e6"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 155,
+        "material_sha256": "d245e52c341a76645e1b0e56c58dc964cd4f3ecaea64a9c6d6db9897d4948a8a",
+        "offset": 1578880,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "gost12_256_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "fa0b06a72461ec0a963dcfccb8d5b61bd88a6074fc7271573bff68ab86b8c1af"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 151,
+        "material_sha256": "0294b4406902e33bb02f89eaf4c691328790d7a9cd01b873d68edac994f310a1",
+        "offset": 1579040,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "gost01_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "ef237ea8db4f2ae9ee100e8ced96d29b5dceb0e6a948443e6b8a00b1791f9ec9"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 354,
+        "material_sha256": "60c323abe4854b03743005874156ef6e0343bc9c05c09a2a43335cdda19342b3",
+        "offset": 1579360,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp521r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "f8766749b0c6f9b5661364568226af0ba7ae8d87c0073df24e440de4417521cd"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 282,
+        "material_sha256": "995b8d5b08ac126a74f39d812fc8cce270d026093d810f366de923bb0fe47f60",
+        "offset": 1579872,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp384r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "293216817f0d585f0b54f225582f59e7b2e2a795b5f8002e2d71c5e3d49ce9b0"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 202,
+        "material_sha256": "09416ba3e0782523c56225fb168cd58cda7796e938db1b53f79b6abbaed2bbc7",
+        "offset": 1580224,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp224r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "a0b9679665e29ac220dfb0b366317e1b9dd5fe31e9def8b2e511669a041389ae"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 190,
+        "material_sha256": "7e38af7715bbb425a6aa8060b7c0af60aeb81d39975c55e83edcb9eae7a5e9f8",
+        "offset": 1580512,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp192r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "934b3e9bfd9936c5e30c7f0ed7d36a05e2044f755c0aa433e1d6bef6a68d1391"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 226,
+        "material_sha256": "458022ddcb5598b39253bc027eb02c4f3dba00e2bdbaef239a35bc91c9bd4f3a",
+        "offset": 1580800,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp256r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "91ea1699ff6b1a34b4a1d500a9c75a808441e47b9ea68da6fb0195e01ce1dc61"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 1211,
+        "material_sha256": "09f1c1a4680df80b9e8e6e587d3a787de7402a919e366426ad807a1c0f8c98c1",
+        "offset": 1581120,
+        "pem_type": "DSA PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "dsa_2048_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "7c4c63ee462e0e700cd9e29c8e0f730b3f1b484c4abdd83f1e69fcd477c061fa"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 1674,
+        "material_sha256": "2859ff03b44c8f0e4f96604b8cced325ef4d01ca935422b2041d88d8809f8fa1",
+        "offset": 1582624,
+        "pem_type": "RSA PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "rsa_2048_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "d039c8119a029ab9f9c83c04d67002d887b6bc6026c4264402ab27cdf24cf138"
+      }
+    ],
+    "complete": true,
+    "scopes": [
+      "source",
+      "image",
+      "logs"
+    ],
+    "independent_check": {
+      "candidate_partition_preserved": true,
+      "library_inventory_unique": true,
+      "class_checks": [
+        {
+          "symbol": "gost12_512_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "gost12_256_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "gost01_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp521r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp384r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp224r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp192r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp256r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "dsa_2048_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "rsa_2048_privkey",
+          "exact": true
+        }
+      ],
+      "all_classes_exact": true,
+      "scope": "Fixture classifier replay only; not SEC01 product PASS or product R"
+    }
+  },
+  {
+    "receipt": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\remediation-20261011\\root-security-native-final-v1\\test_real_image_layer_scan_exa0\\harness\\evidence\\security-scan-d1df81d82b5745f1839b38aa128e508e.json",
+    "receipt_sha256": "077ea3d0848d67f46f705d68701646dbe519a6972f0120596b717adbc2905a24",
+    "snapshot_hash": "25fba877a1e9042dcde148a3f7f8308881bd1799aa835737432f2bbc84ac62d5",
+    "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "provenance": {
+      "cookie_mode_logs": [],
+      "image": {
+        "archive_bytes": 205111296,
+        "archive_sha256": "90a673134d1035e5dfc4625bad4215445d2a16d8caa0bc43ce030aa33bef0604",
+        "complete": true,
+        "image_id": "sha256:d6746b0247761f16cdf0126a2773caa965405a4f9f883d3315f2004d54cceaeb",
+        "runtime_container_id": "119622fb1be78c9fcd5da3affbfe77efdf6caea2610bf80d91fc61bcb5d620ee",
+        "runtime_image_id": "sha256:8832cd4757805ac9dff2bcb4ed793e14c5e1146d46c1ea6312862418d3a3c46b",
+        "source_snapshot": "25fba877a1e9042dcde148a3f7f8308881bd1799aa835737432f2bbc84ac62d5"
+      },
+      "instrumented_runtime": false,
+      "logs": {
+        "bytes": 194,
+        "complete": true,
+        "container_id": "119622fb1be78c9fcd5da3affbfe77efdf6caea2610bf80d91fc61bcb5d620ee",
+        "image_id": "sha256:8832cd4757805ac9dff2bcb4ed793e14c5e1146d46c1ea6312862418d3a3c46b",
+        "owner": "283da5143bfe4dfb99357c7eb61362af"
+      }
+    },
+    "library": [
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "scope": "image",
+        "sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3"
+      }
+    ],
+    "findings": [],
+    "detector_candidates": [
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 200,
+        "material_sha256": "87e288dc7dbc29a24241b596ec8c84f949d9f09f34fc0cf69242481fb2274770",
+        "offset": 1578656,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "a4d138d7ef9748464117b44fb9c0a4b5b85a1599a127d02690abaa96d03c16e6"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 155,
+        "material_sha256": "d245e52c341a76645e1b0e56c58dc964cd4f3ecaea64a9c6d6db9897d4948a8a",
+        "offset": 1578880,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "fa0b06a72461ec0a963dcfccb8d5b61bd88a6074fc7271573bff68ab86b8c1af"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 151,
+        "material_sha256": "0294b4406902e33bb02f89eaf4c691328790d7a9cd01b873d68edac994f310a1",
+        "offset": 1579040,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "ef237ea8db4f2ae9ee100e8ced96d29b5dceb0e6a948443e6b8a00b1791f9ec9"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 354,
+        "material_sha256": "60c323abe4854b03743005874156ef6e0343bc9c05c09a2a43335cdda19342b3",
+        "offset": 1579360,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "f8766749b0c6f9b5661364568226af0ba7ae8d87c0073df24e440de4417521cd"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 282,
+        "material_sha256": "995b8d5b08ac126a74f39d812fc8cce270d026093d810f366de923bb0fe47f60",
+        "offset": 1579872,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "293216817f0d585f0b54f225582f59e7b2e2a795b5f8002e2d71c5e3d49ce9b0"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 202,
+        "material_sha256": "09416ba3e0782523c56225fb168cd58cda7796e938db1b53f79b6abbaed2bbc7",
+        "offset": 1580224,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "a0b9679665e29ac220dfb0b366317e1b9dd5fe31e9def8b2e511669a041389ae"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 190,
+        "material_sha256": "7e38af7715bbb425a6aa8060b7c0af60aeb81d39975c55e83edcb9eae7a5e9f8",
+        "offset": 1580512,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "934b3e9bfd9936c5e30c7f0ed7d36a05e2044f755c0aa433e1d6bef6a68d1391"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 226,
+        "material_sha256": "458022ddcb5598b39253bc027eb02c4f3dba00e2bdbaef239a35bc91c9bd4f3a",
+        "offset": 1580800,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "91ea1699ff6b1a34b4a1d500a9c75a808441e47b9ea68da6fb0195e01ce1dc61"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 1211,
+        "material_sha256": "09f1c1a4680df80b9e8e6e587d3a787de7402a919e366426ad807a1c0f8c98c1",
+        "offset": 1581120,
+        "pem_type": "DSA PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "7c4c63ee462e0e700cd9e29c8e0f730b3f1b484c4abdd83f1e69fcd477c061fa"
+      },
+      {
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "kind": "private_key",
+        "match_bytes": 1674,
+        "material_sha256": "2859ff03b44c8f0e4f96604b8cced325ef4d01ca935422b2041d88d8809f8fa1",
+        "offset": 1582624,
+        "pem_type": "RSA PRIVATE KEY",
+        "scope": "image",
+        "value_sha256": "d039c8119a029ab9f9c83c04d67002d887b6bc6026c4264402ab27cdf24cf138"
+      }
+    ],
+    "public_non_credentials": [
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 200,
+        "material_sha256": "87e288dc7dbc29a24241b596ec8c84f949d9f09f34fc0cf69242481fb2274770",
+        "offset": 1578656,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "gost12_512_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "a4d138d7ef9748464117b44fb9c0a4b5b85a1599a127d02690abaa96d03c16e6"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 155,
+        "material_sha256": "d245e52c341a76645e1b0e56c58dc964cd4f3ecaea64a9c6d6db9897d4948a8a",
+        "offset": 1578880,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "gost12_256_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "fa0b06a72461ec0a963dcfccb8d5b61bd88a6074fc7271573bff68ab86b8c1af"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 151,
+        "material_sha256": "0294b4406902e33bb02f89eaf4c691328790d7a9cd01b873d68edac994f310a1",
+        "offset": 1579040,
+        "pem_type": "PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "gost01_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "ef237ea8db4f2ae9ee100e8ced96d29b5dceb0e6a948443e6b8a00b1791f9ec9"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 354,
+        "material_sha256": "60c323abe4854b03743005874156ef6e0343bc9c05c09a2a43335cdda19342b3",
+        "offset": 1579360,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp521r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "f8766749b0c6f9b5661364568226af0ba7ae8d87c0073df24e440de4417521cd"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 282,
+        "material_sha256": "995b8d5b08ac126a74f39d812fc8cce270d026093d810f366de923bb0fe47f60",
+        "offset": 1579872,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp384r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "293216817f0d585f0b54f225582f59e7b2e2a795b5f8002e2d71c5e3d49ce9b0"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 202,
+        "material_sha256": "09416ba3e0782523c56225fb168cd58cda7796e938db1b53f79b6abbaed2bbc7",
+        "offset": 1580224,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp224r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "a0b9679665e29ac220dfb0b366317e1b9dd5fe31e9def8b2e511669a041389ae"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 190,
+        "material_sha256": "7e38af7715bbb425a6aa8060b7c0af60aeb81d39975c55e83edcb9eae7a5e9f8",
+        "offset": 1580512,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp192r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "934b3e9bfd9936c5e30c7f0ed7d36a05e2044f755c0aa433e1d6bef6a68d1391"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 226,
+        "material_sha256": "458022ddcb5598b39253bc027eb02c4f3dba00e2bdbaef239a35bc91c9bd4f3a",
+        "offset": 1580800,
+        "pem_type": "EC PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "ecdsa_secp256r1_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "91ea1699ff6b1a34b4a1d500a9c75a808441e47b9ea68da6fb0195e01ce1dc61"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 1211,
+        "material_sha256": "09f1c1a4680df80b9e8e6e587d3a787de7402a919e366426ad807a1c0f8c98c1",
+        "offset": 1581120,
+        "pem_type": "DSA PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "dsa_2048_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "7c4c63ee462e0e700cd9e29c8e0f730b3f1b484c4abdd83f1e69fcd477c061fa"
+      },
+      {
+        "classification": "PUBLIC_NON_CREDENTIAL_SELF_TEST",
+        "file": "blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgnutls.so.30.34.3",
+        "file_sha256": "750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3",
+        "independent_review": "REM-15/20261012-public-vendor-material/REVIEW.md",
+        "kind": "private_key",
+        "limits": "public material identity only; no application credential or full binary provenance approval",
+        "match_bytes": 1674,
+        "material_sha256": "2859ff03b44c8f0e4f96604b8cced325ef4d01ca935422b2041d88d8809f8fa1",
+        "offset": 1582624,
+        "pem_type": "RSA PRIVATE KEY",
+        "scope": "image",
+        "source_sha256": "c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0",
+        "source_symbol": "rsa_2048_privkey",
+        "source_url": "https://raw.githubusercontent.com/gnutls/gnutls/ca61668d7764fc29fb4cc2aa396cb035e176636d/lib/crypto-selftests-pk.c",
+        "value_sha256": "d039c8119a029ab9f9c83c04d67002d887b6bc6026c4264402ab27cdf24cf138"
+      }
+    ],
+    "complete": true,
+    "scopes": [
+      "source",
+      "image",
+      "logs"
+    ],
+    "independent_check": {
+      "candidate_partition_preserved": true,
+      "library_inventory_unique": true,
+      "class_checks": [
+        {
+          "symbol": "gost12_512_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "gost12_256_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "gost01_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp521r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp384r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp224r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp192r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "ecdsa_secp256r1_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "dsa_2048_privkey",
+          "exact": true
+        },
+        {
+          "symbol": "rsa_2048_privkey",
+          "exact": true
+        }
+      ],
+      "all_classes_exact": true,
+      "scope": "Fixture classifier replay only; not SEC01 product PASS or product R"
+    }
+  }
+]

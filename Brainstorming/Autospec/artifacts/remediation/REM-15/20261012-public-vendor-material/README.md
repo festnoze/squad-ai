@@ -11,7 +11,9 @@ Source primaire : [GnuTLS, commit ca61668d7764fc29fb4cc2aa396cb035e176636d](http
 - `root-security-proposal-v2.xml` : 74 PASS, 1 FAIL, 2 SKIP en 3,80 s. Le nouveau cas avec observations cookie et `auth_required=False` est correctement refusé par ValueError avant le contrôle oracle ; la fixture attendait l'autre refus AdapterUnavailable.
 - `root-security-proposal-v3.xml` : 75 PASS, 2 SKIP en 3,56 s après correction du type d'erreur attendu dans le test, sans changement de production. Inclut NULL explicite / modes observés, altération de cookie invalidant R et absence d'un mode refusée.
 
-Le nominal Docker final est encore en cours de qualification : le reçu brut v3 a montré une régression de regex omettant quatre PEM inline complets. Il est conservé et ne vaut ni nominal dix candidats, ni PASS SEC-01. La correction doit avoir son reçu distinct avant lancement REM-25.
+Le reçu brut v3 a montré une régression de regex omettant quatre PEM inline complets. Il est conservé et ne vaut ni nominal dix candidats, ni PASS SEC-01. Correction intégrée `7b1ea54c` (auteur b638e381) : reconnaissance de PEM complets inline, carry33536, logs/CSRF/cookies privés des trois modes capturés avant fermeture, débordement ou logs manquants NV.
+
+Replays distincts : auteur brut v4 **30 PASS en 179,103 s** (REM-15/20261012-native-security-observations) ; parent avec classification exacte **30 PASS en 245,137 s** (REM-15/20261012-parent-native-security). Les dix candidats source-exacts restent présents. Le négatif garde deux findings inconnus (secret fictif et PEM fictif). Addendum indépendant vérifie la partition complète et les dix empreintes PEM/DER, sans R/PASS SEC-01 produit. Parent unités intégrées : **100 PASS, 7 SKIP en 3,86 s**, dont refus d’un scan ancien externe, absence/corruption de binding et invariants de revue.
 
 ## Limites
 
