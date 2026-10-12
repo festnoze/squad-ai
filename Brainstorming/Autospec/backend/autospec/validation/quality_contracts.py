@@ -168,6 +168,7 @@ class NativeQualityCollector:
             raise ValueError("independent test mapping must be outside product root")
         self.browser_factory,self.sqlite_probe=browser_factory,sqlite_probe
         self.mutation,self.mutation_probe,self.copy_product=mutation,mutation_probe,copy_product
+        self.source_snapshotter=None  # production default is final_gate.source_snapshot
         self.records,self.errors,self.extra_proofs={}, {}, {}
 
     @property
@@ -345,9 +346,13 @@ class NativeQualityCollector:
             if root!=pinned_target or root.is_relative_to(self.product_root) or _link(root):
                 raise ValueError("mutation copier did not return the distinct pinned owned stage")
             target=self._source(root,spec.path)
-            target.write_text(original.decode("utf-8").replace(spec.before,spec.after,1),encoding="utf-8")
+            target.write_bytes(original.decode("utf-8").replace(spec.before,spec.after,1).encode("utf-8"))
             mutated_file=self._artifact(target)
-            mutation_hash=hashlib.sha256((snapshot+mutated_file["sha256"]+self.plan_hash).encode()).hexdigest()
+            snapshotter=self.source_snapshotter
+            if snapshotter is None:
+                from .final_gate import source_snapshot
+                snapshotter=source_snapshot
+            mutation_hash=snapshotter(root).digest
             mutated=await self.mutation_probe(root,mutation_hash,self.contract.contract_hash)
             # Persist only the reviewed changed source file, never a DB/cookie.
             retained=self.evidence_root/("mutation-"+uuid4().hex+".txt")
@@ -361,8 +366,8 @@ class NativeQualityCollector:
                         snapshot_hash=identity,contract_hash=self.contract.contract_hash) for p in row.get("proofs",[])):
                     raise AdapterUnavailable("mutation outcome without intact executed X proof: "+rid)
         after=hashlib.sha256(source.read_bytes()).hexdigest()
-        nominal_status="FAIL" if any(r["status"]=="FAIL" for r in nominal.values()) else "PASS" if all(r["status"]=="PASS" for r in nominal.values()) else "NOT_VERIFIED"
-        mutated_status="FAIL" if any(r["status"]=="FAIL" for r in mutated.values()) else "PASS" if all(r["status"]=="PASS" for r in mutated.values()) else "NOT_VERIFIED"
+        nominal_status="PASS" if all(_runtime_probe_passed(r,rid,snapshot,self.contract.contract_hash) for rid,r in nominal.items()) else "FAIL"
+        mutated_status="FAIL" if any(_runtime_probe_failed(r,rid,mutation_hash,self.contract.contract_hash) for rid,r in mutated.items()) else "PASS"
         if "NOT_VERIFIED" in {nominal_status,mutated_status}:raise AdapterUnavailable("mutation experiment lacks an executed original/copy verdict")
         return dict(temporary_copy=True,original_before_sha256=before,original_after_sha256=after,
             original_file=self._artifact(source),mutated_file=mutated_file,mutated_sha256=mutated_file["sha256"],
@@ -381,6 +386,18 @@ class NativeQualityCollector:
 
     async def snapshot_hash(self):return await self.adapter.snapshot_hash()
     async def contract_hash(self):return await self.adapter.contract_hash()
+
+
+def _runtime_probe_passed(row,rid,snapshot,contract):
+    return bool(row.get("observed")) and all(c.get("passed") is True for c in row["observed"]) and any(
+        (p:=Proof(**raw)).type=="X" and p.passed is True and p.intact(snapshot_hash=snapshot,contract_hash=contract)
+        and any(t==rid or t.startswith(rid+":") for t in p.checks) for raw in row.get("proofs",[]))
+
+
+def _runtime_probe_failed(row,rid,snapshot,contract):
+    return any(c.get("passed") is False for c in row.get("observed",[])) and any(
+        (p:=Proof(**raw)).type=="X" and p.passed is False and p.intact(snapshot_hash=snapshot,contract_hash=contract)
+        and any(t==rid or t.startswith(rid+":") for t in p.checks) for raw in row.get("proofs",[]))
 
 
 def source_e2e_scenarios(contract):
@@ -591,8 +608,11 @@ class QualityVerifier:
                         snapshot_hash=identity,contract_hash=self.contract_hash) and any(t==rid or t.startswith(rid+":") for t in Proof(**p).checks)
                         for p in row.get("proofs",[])):
                     raise AdapterUnavailable("missing exact mutation execution proof: "+rid)
-        check("actual_original_probe_outcomes",all(r["status"]=="PASS" for r in mutation["original_results"].values()),True)
-        check("actual_mutation_probe_outcomes",any(r["status"]=="FAIL" for r in mutation["mutated_results"].values()),True)
+        original_snapshot=await self.adapter.snapshot_hash()
+        check("actual_original_probe_outcomes",all(_runtime_probe_passed(r,rid,original_snapshot,self.contract_hash)
+              for rid,r in mutation["original_results"].items()),True)
+        check("actual_mutation_probe_outcomes",any(_runtime_probe_failed(r,rid,mutation["mutation_snapshot_hash"],self.contract_hash)
+              for rid,r in mutation["mutated_results"].items()),True)
 
     def _artifact_intact(self,ref):
         path=Path(ref["path"]).resolve()

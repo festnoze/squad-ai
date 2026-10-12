@@ -851,7 +851,8 @@ class BrowserVerifier:
         c.check("e2e_switch_no_alice",await self._private_clean(p,[title]))
 
     async def _dashboard_check(self,c,p,expected):
-        await self.ui(p,"dashboard_total").filter(has_text=re.compile(r"\S")).wait_for()
+        try:await self.ui(p,"dashboard_total").filter(has_text=re.compile("^"+str(expected["total"])+"$")).wait_for()
+        except Exception:pass  # record the actual mismatching counter below
         c.check("dashboard_total",int(await self.ui(p,"dashboard_total").inner_text()),expected["total"])
         observed=[]
         for state in ["open","in_progress","resolved","closed"]:
