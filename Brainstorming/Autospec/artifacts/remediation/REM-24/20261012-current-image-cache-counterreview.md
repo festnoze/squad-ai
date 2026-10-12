@@ -42,3 +42,38 @@ These mocks establish a missing supervision call/invariant, not a native Docker
 availability probe and not a global product verdict. Historical observations of
 a successful build remain valid historical observations; they do not establish
 availability of the delivery artifact now.
+
+## Independent after replay
+
+Parent corrected the supervision port on OPS-01/02/03/04 and made the current
+admission receipt agree with current readiness (old admission receipts archived;
+historical reports/proofs retained). Clean integration Git SHA verified before
+the replay and still clean afterwards:
+`a79ce3b907948dcecf855fec176864320a99f10a`.
+
+The EXACT independent counter-test from `ea62417d`, with no assertion edits,
+passed **4 tests in 0.96 s**:
+`20261012-current-image-cache-after-a79ce3b9.xml`. Captured passing observations
+are retained: image port called once, current state/admission NOT_VERIFIED, no
+model, rebuild, fact collection or verification invocation, historical report
+bytes unchanged.
+
+A separate invocation of the parent's current-admission and owned lifecycle
+guards passed **19 tests in 1.99 s**:
+`20261012-current-receipt-lifecycle-after-a79ce3b9.xml`. This includes both current
+receipt failure checks, both journal types before DELETE, repeated cancellation
+with owned worker drainage, exact fresh-call cleanup versus preserved reuse,
+and startup recovery drainage preserving the old CID.
+
+An earlier after replay passed four tests on a dirty intermediate parent
+worktree (`20261012-current-image-cache-after.xml`); it is not attributed to a
+clean Git revision. Attempting to combine test files from two worktrees in one
+pytest invocation failed before collection because both registered the same
+`tests.conftest` module. The final invocations used separate test roots, explicit
+parent imports, and no parent pytest cache writes. No production source was
+changed or assertions weakened to resolve that test-launch configuration issue.
+
+Read-only counter-review of the parent coupling found no remaining P0/P1 in
+this scoped image-cache/DELETE/cancellation/stop-intent path after these changes.
+This does not replace the final global regression, independent source review,
+native Origin validation, or fresh 57-requirement support-product campaign.
