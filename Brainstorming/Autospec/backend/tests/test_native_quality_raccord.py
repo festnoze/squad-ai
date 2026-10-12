@@ -18,6 +18,7 @@ from autospec.orchestrator.isolated_validation import IsolatedValidator
 from autospec.orchestrator.test_integrity import SuiteEvidence
 from autospec.validation import native_quality_raccord as raccord
 from autospec.validation.coordinator import SupervisorEvidenceStore
+from autospec.validation.delivery_evidence import NativeTimingRecorder
 from autospec.validation.final_gate import source_snapshot
 from autospec.validation.quality_contracts import NativeSuiteSpec, native_quality_plan_hash
 from autospec.validation.support_adapter import AdapterUnavailable, Proof
@@ -116,6 +117,33 @@ async def test_missing_observed_argv_is_never_reconstructed(tmp_path):
     assert any('native artifact unavailable' in limit for limit in result['limits'])
 
 
+async def test_split_native_clocks_enter_shared_recorder_without_double_counting(tmp_path):
+    source,snapshot,contract,control,port=fixture_plan(tmp_path)
+    clock=NativeTimingRecorder(evidence_root=control,snapshot_hash=snapshot,contract_hash=contract.contract_hash)
+    result=await raccord.collect_native_quality(None,contract,source,snapshot,control,validator=port,timing_recorder=clock)
+    assert result['status']=='PARTIAL'
+    assert {row['phase']:row['seconds'] for row,_ in clock.phases}=={'tests':1.25,'install':.5}
+    with pytest.raises(AdapterUnavailable,match='all actual diagnostic phases'):await clock.publish()
+
+
+async def test_e2e_handoff_uses_keyword_only_sealed_plan_api(tmp_path,monkeypatch):
+    source,snapshot,contract,control,port=fixture_plan(tmp_path)
+    calls=[]
+    class Collector:
+        def __init__(self,*args,**kwargs):
+            self.errors={};self.records={'browser_e2e':[{'scope':'offline handoff stub only'}]};self.extra_proofs={}
+        async def collect(self,*args):pass
+        async def observe(self,name):return self.records[name]
+    async def publish(store,runs,*,plan_path,review,source_root):
+        calls.append((runs,plan_path,review,source_root))
+    monkeypatch.setattr(raccord,'NativeQualityCollector',Collector)
+    monkeypatch.setattr(raccord.coordinator,'publish_reviewed_e2e',publish)
+    result=await raccord.collect_native_quality(None,contract,source,snapshot,control,validator=port)
+    assert result['status']=='OBTAINED' and port.calls==[]
+    assert calls[0][1]==control/'source-reviews'/snapshot/'quality'/'quality-review-package.json'
+    assert calls[0][2].type=='R' and calls[0][3]==source
+
+
 def experiment(tmp_path, *, failed=False):
     observed=[dict(check='ownership',passed=not failed,observed=not failed,expected=True)]
     path=tmp_path/'experiment.json';atomic_json(path,dict(snapshot_hash='a'*64,contract_hash='b'*64,checks=observed))
@@ -194,7 +222,8 @@ async def test_real_linux_collection_exports_exact_command_coverage_and_intact_x
     digest=native_quality_plan_hash((NativeSuiteSpec('backend','.','python',('logic.py',),('auth',),coverage_source='logic'),),mapping)
     plan['plan_hash']=digest;plan['review']['checks']=['QUALITY:plan:'+digest,'TST-01:native_review','TST-02:mapping','TST-03:inventory']
     atomic_json(control/'quality-plan.json',plan)
-    result=await raccord.collect_native_quality(None,contract,source,snapshot,control,validator=validator)
+    clock=NativeTimingRecorder(evidence_root=control,snapshot_hash=snapshot,contract_hash=contract.contract_hash)
+    result=await raccord.collect_native_quality(None,contract,source,snapshot,control,validator=validator,timing_recorder=clock)
     store=SupervisorEvidenceStore(control,snapshot,contract.contract_hash)
     suite=(await store.observe('native_suites'))[0]
     assert suite['passed']==1 and suite['failed']==0 and suite['report_valid'] is True
@@ -203,4 +232,5 @@ async def test_real_linux_collection_exports_exact_command_coverage_and_intact_x
     assert all(Proof(**p).intact(snapshot_hash=snapshot,contract_hash=contract.contract_hash) for p in receipt['proofs'])
     coverage=await store.observe('coverage');assert coverage['backend']['lines']=={'total':2,'covered':2}
     assert result['status']=='PARTIAL' and all(row['seconds']>0 for row in result['timings'])
+    assert {row['phase'] for row,_ in clock.phases}=={'tests','install'}
     assert source_snapshot(source).digest==snapshot
