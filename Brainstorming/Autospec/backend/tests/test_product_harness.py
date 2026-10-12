@@ -130,6 +130,25 @@ def test_no_product_python_import_happens_on_host(simple_profile):
     with pytest.raises(ValueError): CommandBinding(("python","main.py")).validate()
 
 
+@pytest.mark.asyncio
+async def test_adapter_exposes_exact_supervised_runtime_for_confined_browser(simple_profile):
+    # Constructor protocol only: this stand-in grants no runnable browser or
+    # nominal application/SQLite verdict. A real RuntimeSession is required by
+    # the browser isolation implementation before it can execute any UI.
+    from types import SimpleNamespace
+    root,source,snapshot,binding=simple_profile
+    runtime=SimpleNamespace(database_path=binding.database_path,exec=lambda *a,**k:None,origin="http://127.0.0.1:1")
+    async def identity():return snapshot
+    async def oracle():return CONTRACT
+    async def fixtures(*a,**k):raise AdapterUnavailable("protocol-only unavailable fixture")
+    harness=ProductHarness(runtime,binding,snapshot_root=source,evidence_root=root/"evidence",
+        fixture_factory=fixtures,snapshot_hash=identity,contract_hash=oracle)
+    assert harness.adapter.supervised_runtime is runtime
+    assert harness.adapter.live_sqlite is True
+    assert not hasattr(harness.adapter,"trusted_fixture_local_browser")
+    await harness.adapter.close()
+
+
 REAL=pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_PRODUCT_HARNESS")!="1",reason="opt-in real Linux/Chromium fixture campaign")
 
 
