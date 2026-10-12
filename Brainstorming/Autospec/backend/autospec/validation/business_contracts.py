@@ -163,9 +163,14 @@ class ProbePack:
                     "before_digest": digest(before), "after_digest": digest(after)}, reproduction)
         return response
 
-    async def verify(self, snapshot_hash: str) -> dict:
+    async def verify(self, snapshot_hash: str, *, ids=None) -> dict:
         if not re.fullmatch(r"[0-9a-f]{64}", snapshot_hash):
             raise ValueError("snapshot_hash must be SHA256")
+        selected = list(self.checks) if ids is None else ids
+        if (not isinstance(selected, (list, tuple)) or not selected or
+                any(not isinstance(rid, str) or rid not in self.checks for rid in selected) or
+                len(selected) != len(set(selected))):
+            raise ValueError("explicit unique supported requirement IDs required")
         self._observed = {rid: [] for rid in self.checks}
         self._limits = {rid: [] for rid in self.checks}
         try:
@@ -174,7 +179,8 @@ class ProbePack:
         except (AdapterUnavailable,OSError,httpx.HTTPError) as exc:
             identity_ok, identity = False, str(exc)
         results = []
-        for rid, names in self.checks.items():
+        for rid in selected:
+            names = self.checks[rid]
             self._rid = rid
             if identity_ok:
                 handler = getattr(self, "_" + rid.replace("-", ""), None)
@@ -187,7 +193,7 @@ class ProbePack:
                         self._limits[rid].append(f"observable shape/port cannot be verified: {type(exc).__name__}: {exc}")
                     except (OSError, httpx.HTTPError, sqlite3.Error, TimeoutError) as exc:
                         self._limits[rid].append(f"execution prerequisite unavailable: {type(exc).__name__}")
-                else:
+                elif not set(names) <= self.review_checks:
                     self._limits[rid].append("independent source review required")
             else:
                 self._limits[rid].append(f"snapshot/contract identity mismatch or unavailable: {identity}")
@@ -202,7 +208,7 @@ class ProbePack:
             proofs: list[Proof] = []
             if entries:
                 root = Path(self.adapter.evidence_root).resolve() / snapshot_hash / self.pack
-                path = root / f"{rid}.json"
+                path = root / f"{rid}-{uuid4().hex}.json"
                 # Supervisor-owned evidence root is never mounted product-writable.
                 data = dict(requirement_id=rid, snapshot_hash=snapshot_hash,
                             contract_hash=self.contract.contract_hash, observed=entries)
@@ -214,6 +220,12 @@ class ProbePack:
                         tuple(dict.fromkeys(f"{rid}:{e['check']}" for e in entries)), all(e["passed"] for e in entries)))
                 except OSError:
                     self._limits[rid].append("supervisor evidence root unavailable; native artifact cannot be retained")
+            # Completeness is a fact about this execution, never about supplied
+            # PASS/R/UI receipts. Failed native assertions remain failed; this
+            # metadata cannot authorize them or fill an unexecuted API/DB check.
+            native_names = set(names) - self.review_checks - self.ui_checks
+            native_complete = bool(identity_ok and not self._limits[rid] and
+                native_names <= {entry["check"] for entry in entries})
             if identity_ok:
                 try:
                     supplied = await self.adapter.proofs(rid)
@@ -248,6 +260,7 @@ class ProbePack:
                         missing.append(marker)
             status = "FAIL" if failed else "NOT_VERIFIED" if missing or self._limits[rid] or not identity_ok else "PASS"
             results.append(dict(id=rid, gate=requirement.gate, status=status, expected=requirement.expected,
+                                native_complete=native_complete,
                 observed=entries, reproduction=[e["reproduction"] for e in entries if not e["passed"]],
                 proofs=[asdict(p) for p in proofs], impact=("contractual invariant violated" if failed else
                 "no observed counterexample; coverage must remain complete"),
