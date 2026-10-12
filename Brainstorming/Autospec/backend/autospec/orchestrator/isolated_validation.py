@@ -40,12 +40,15 @@ class IsolatedSuiteResult:
     coverage: dict | None = None
 
 
-def _node_command(command: list[str], *, report: bool = False, dist: bool = False) -> list[str]:
+def _node_command(command: list[str], *, report: bool = False, dist: bool = False,
+                  coverage_directory: str | None = None) -> list[str]:
     # Native Linux tmpfs source avoids broken cross-filesystem symlinks in
     # Docker Desktop Windows binds. Deps stay image-owned /opt read-only, with
     # only Vite's cache redirected to /tmp. Export only selected report/dist.
     setup = 'mkdir -p /tmp/product /tmp/vite-cache; cp -r /app/. /tmp/product/; ln -s /opt/node_modules /tmp/product/node_modules; cd /tmp/product; '
-    if not report and not dist:
+    if coverage_directory is not None and not re.fullmatch(r"/tmp/autospec-coverage-[a-f0-9]{32}", coverage_directory):
+        raise _unavailable("Coverage export requires a fresh factory-owned directory")
+    if not report and not dist and coverage_directory is None:
         script = setup + 'exec "$@"'
     else:
         script = setup + '"$@"; status=$?; '
@@ -53,32 +56,84 @@ def _node_command(command: list[str], *, report: bool = False, dist: bool = Fals
             script += 'if [ -f suite-report.json ] && [ ! -L suite-report.json ]; then cp suite-report.json /app/suite-report.json; fi; '
         if dist:
             script += 'if [ "$status" = 0 ] && [ -d dist ] && [ ! -L dist ]; then cp -r dist /app/dist; fi; '
+        if coverage_directory is not None:
+            file = coverage_directory + "/coverage-final.json"
+            script += f'if [ -f {file} ] && [ ! -L {file} ]; then cp {file} /app/suite-coverage.json; fi; '
         script += 'exit "$status"'
     return ["/bin/sh", "-c", script, "autospec", *command]
 
 
-def _coverage_inventory(stage: Path, source: str) -> dict[str, str]:
+def _coverage_inventory(stage: Path, source: str, ecosystem: str = "python") -> dict[str, str]:
     if source == ".":
         location = stage
     elif isinstance(source, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:[./][A-Za-z_][A-Za-z0-9_]*)*", source):
-        relative = source.replace(".", "/")
+        relative = source.replace(".", "/") if ecosystem == "python" else source
         broker = FileBroker(ExecutionContext("coverage-source", stage))
         location = broker.path(relative)
-        if not location.exists():
+        if not location.exists() and ecosystem == "python":
             location = broker.path(relative + ".py")
     else:
-        raise _unavailable("Coverage requires an explicit contained Python source/module")
-    files = location.rglob("*.py") if location.is_dir() else [location]
+        raise _unavailable("Coverage requires an explicit contained source/module")
+    files = location.rglob("*") if location.is_dir() else [location]
     inventory = {}
     for path in files:
-        if (not path.is_file() or path.suffix != ".py" or path.name == "conftest.py" or
+        extensions = {".py"} if ecosystem == "python" else {".js", ".jsx", ".cjs", ".mjs", ".ts", ".tsx", ".cts", ".mts"}
+        if (not path.is_file() or path.suffix not in extensions or path.name == "conftest.py" or
             path.name.startswith("test_") or path.name.endswith("_test.py") or
-            any(part in {"tests", "test", "__pycache__"} for part in path.relative_to(stage).parts)):
+            any(part in {"tests", "test", "__tests__", "__pycache__"} for part in path.relative_to(stage).parts) or
+            ecosystem == "node" and (any(marker in path.name for marker in (".test.", ".spec.", ".config.")) or
+                path.name.endswith(".d.ts") or path.name.lower().startswith(("setuptests.", "testsetup.")))):
             continue
         inventory[path.relative_to(stage).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
     if not inventory:
         raise _unavailable("Coverage has no admitted production source inventory")
     return inventory
+
+
+def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[str, int]) -> dict:
+    """Normalize executable-line and branch-arm counts, including untouched files.
+
+    Source-only totals are recalculated later. Test/native/helper files cannot
+    inflate the denominator. Maps outside the pre-execution source fail closed.
+    """
+    files = {}
+    for raw_path, value in data.items():
+        normal = raw_path.replace("\\", "/").removeprefix("/tmp/product/").removeprefix("/app/")
+        if normal not in inventory:
+            continue
+        if normal in files:
+            raise ValueError("Duplicate Istanbul source identity")
+        statements, maps, branches, branch_maps = value["s"], value["statementMap"], value["b"], value["branchMap"]
+        if not all(isinstance(item, dict) for item in (statements, maps, branches, branch_maps)):
+            raise ValueError("Invalid Istanbul maps")
+        if set(statements) != set(maps) or set(branches) != set(branch_maps):
+            raise ValueError("Istanbul statement maps incomplete")
+        lines = {}
+        for key, count in statements.items():
+            line = maps[key]["start"]["line"]
+            if type(count) is not int or count < 0 or type(line) is not int or not 1 <= line <= line_counts[normal]:
+                raise ValueError("Invalid Istanbul source/count")
+            lines[line] = max(lines.get(line, 0), count)
+        arms = []
+        for key, branch in branches.items():
+            locations = branch_maps[key]["locations"]
+            if not isinstance(branch, list) or not isinstance(locations, list) or len(branch) != len(locations):
+                raise ValueError("Incomplete Istanbul branch arms")
+            for location in locations:
+                for point in ("start", "end"):
+                    line = location[point]["line"]
+                    if type(line) is not int or not 1 <= line <= line_counts[normal]:
+                        raise ValueError("Invalid Istanbul branch source")
+            arms.extend(branch)
+        if any(type(count) is not int or count < 0 for count in arms):
+            raise ValueError("Invalid Istanbul branch counts")
+        covered = sum(count > 0 for count in lines.values())
+        files[normal] = {"summary": {"covered_lines": covered, "num_statements": len(lines),
+            "missing_lines": len(lines) - covered, "num_branches": len(arms),
+            "covered_branches": sum(count > 0 for count in arms)},
+            "executed_lines": sorted(line for line, count in lines.items() if count > 0),
+            "missing_lines": sorted(line for line, count in lines.items() if count == 0)}
+    return {"format": "istanbul-executable-lines-branch-arms", "files": files, "totals": {}}
 
 
 def _admit_source_coverage(data: dict, inventory: dict[str, str], source: str,
@@ -126,8 +181,8 @@ class IsolatedValidator:
             raise _unavailable("Suite evidence must be stored outside producer writable root")
         if coveragepath is not None:
             coveragepath = Path(coveragepath).absolute()
-            if ecosystem != "python" or coveragepath.resolve().is_relative_to(root.resolve()):
-                raise _unavailable("Python coverage evidence must be outside producer root")
+            if ecosystem not in {"python", "node"} or coveragepath.resolve().is_relative_to(root.resolve()):
+                raise _unavailable("Coverage evidence must be outside producer root")
         environment = self.manager.prepare(root, ecosystem, mode)
         with tempfile.TemporaryDirectory(prefix="autospec-suite-") as temporary:
             stage = snapshot_product(root, Path(temporary) / "product")
@@ -143,7 +198,9 @@ class IsolatedValidator:
             source_files = {file.relative_to(stage).as_posix(): hashlib.sha256(file.read_bytes()).hexdigest()
                             for file in sorted(stage.rglob("*")) if file.is_file()}
             source_fingerprint = hashlib.sha256(json.dumps(source_files,sort_keys=True).encode()).hexdigest()
-            coverage_inventory = _coverage_inventory(stage, coverage_source) if coveragepath is not None else None
+            coverage_inventory = _coverage_inventory(stage, coverage_source, ecosystem) if coveragepath is not None else None
+            coverage_line_counts = {path: len((stage / path).read_text(encoding="utf-8").splitlines())
+                                    for path in coverage_inventory} if ecosystem == "node" and coverage_inventory else None
             if ecosystem == "python":
                 command = ["/opt/venv/bin/python", "-m", "pytest", "--json-report", "--json-report-file=suite-report.json", *test_args]
                 command += ["-o", "addopts="]  # no product config can disable/redirect the factory recipe
@@ -156,10 +213,28 @@ class IsolatedValidator:
                 if has_vitest:
                     command = ["node", "/opt/node_modules/vitest/vitest.mjs", "run", "--reporter=json", "--outputFile=suite-report.json", "--maxWorkers=2", "--minWorkers=1", *test_args]
                     parser = vitest_evidence
+                    coverage_directory = None
+                    if coveragepath is not None:
+                        deps = {**package.get("dependencies", {}), **package.get("devDependencies", {})}
+                        locked = json.loads((stage / "package-lock.json").read_text(encoding="utf-8"))["packages"]
+                        version = locked["node_modules/vitest"]["version"]
+                        if ("@vitest/coverage-v8" not in deps or version != "2.1.9" or
+                            locked.get("node_modules/@vitest/coverage-v8", {}).get("version") != version):
+                            raise _unavailable("Node coverage needs locked vitest/@vitest/coverage-v8 2.1.9; request it through the dependency coordinator")
+                        coverage_directory = "/tmp/autospec-coverage-" + uuid.uuid4().hex
+                        include = ("" if coverage_source == "." else coverage_source + "/") + "**/*.{js,jsx,cjs,mjs,ts,tsx,cts,mts}"
+                        command += ["--coverage.enabled", "--coverage.provider=v8", "--coverage.all=true",
+                                    f"--coverage.include={include}", "--coverage.exclude=**/*.{test,spec,config}.*",
+                                    "--coverage.exclude=**/{test,tests,__tests__}/**", "--coverage.exclude=**/*.d.ts",
+                                    "--coverage.exclude=**/{setupTests,testSetup}.*", "--coverage.reporter=json",
+                                    f"--coverage.reportsDirectory={coverage_directory}", "--coverage.clean=true"]
                 else:
+                    if coveragepath is not None:
+                        raise _unavailable("Structured Node coverage requires the qualified locked Vitest provider")
                     command = ["node", "--test", "--test-reporter=tap", *test_args]
                     parser = None
-                command = _node_command(command, report=has_vitest)
+                    coverage_directory = None
+                command = _node_command(command, report=has_vitest, coverage_directory=coverage_directory)
             rc, out, err = run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout)
             output = out + err
             if parser is None:
@@ -185,10 +260,13 @@ class IsolatedValidator:
                     if report.stat().st_size > 20_000_000:
                         raise ValueError("coverage exceeds limit")
                     coverage = json.loads(report.read_text(encoding="utf-8"))
-                    totals = coverage["totals"]
-                    for key in ("covered_lines", "num_statements", "missing_lines", "num_branches", "covered_branches"):
-                        if not isinstance(totals[key], int) or totals[key] < 0:
-                            raise ValueError("invalid coverage counts")
+                    if ecosystem == "node":
+                        coverage = _istanbul_coverage(coverage, coverage_inventory, coverage_line_counts)
+                    else:
+                        totals = coverage["totals"]
+                        for key in ("covered_lines", "num_statements", "missing_lines", "num_branches", "covered_branches"):
+                            if type(totals[key]) is not int or totals[key] < 0:
+                                raise ValueError("invalid coverage counts")
                     if not isinstance(coverage["files"], dict):
                         raise ValueError("invalid coverage files")
                     coverage = _admit_source_coverage(coverage, coverage_inventory, coverage_source,
