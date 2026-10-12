@@ -117,7 +117,8 @@ def test_durable_record_handoff_recovers_exact_same_container_port_and_db(tmp_pa
         status=PublicationRegistry(registry.root).status('project')
         assert status['running'] and not status['ingress_attached']
         restored=PublicationRegistry(registry.root).recover('project')
-        assert restored==first
+        assert first['created_this_call'] and not restored['created_this_call']
+        assert {k:v for k,v in restored.items() if k!='created_this_call'}=={k:v for k,v in first.items() if k!='created_this_call'}
         launches=[a for a in fake.calls if a[1]=='run' and '-d' in a]
         assert len(launches)==1 and '-v' not in launches[0] and '--entrypoint' not in launches[0]
         assert launches[0][-1]==spec.image_id and launches[0][launches[0].index('--network')+1]=='none'
@@ -250,11 +251,172 @@ def test_facade_contract_publishes_real_ids_and_undeploy_preserves_db(tmp_path,m
             publication_internal_port=spec.internal_port,publication_local_cookie_mode=spec.local_cookie_mode,
             publication_database_path=spec.database_path,publication_health_path=spec.health_path)
         assert result.ok and not result.packaged and result.container in fake.containers and result.host_port>0
+        assert result.created_publication_container==result.container
         assert docker_deploy.inspect_deployment('project',publication_root=registry.root).ok
         assert docker_deploy.undeploy('project',publication_root=registry.root).ok
         assert fake.volumes and not fake.containers
+        stopped=docker_deploy.inspect_deployment('project',publication_root=registry.root)
+        assert not stopped.ok and stopped.skipped
         assert docker_deploy.recover_publication('project',registry.root).ok
     finally:cleanup(registry)
+
+
+def test_publication_cached_reuse_has_no_creation_receipt_even_when_state_never_flushed(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    state=SimpleNamespace(id='project',acceptance_contract_hash=spec.contract_hash)
+    try:
+        result=docker_deploy.deploy_and_verify(state,source,network='none',host_port=0,build_timeout=30,deploy_timeout=30,
+            kind='backend',qualified_image_id=spec.image_id,expected_snapshot=spec.snapshot_hash,
+            expected_runtime_command=spec.runtime_command,publication_root=registry.root,
+            publication_contract_hash=spec.contract_hash,publication_internal_port=spec.internal_port,
+            publication_local_cookie_mode=spec.local_cookie_mode,publication_database_path=spec.database_path,
+            publication_health_path=spec.health_path)
+        assert result.ok and result.container==first['container_id'] and not result.created_publication_container
+    finally:cleanup(registry)
+
+
+def test_publication_late_cancel_receipt_never_stops_replacement_cid(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    registry.stop('project');second=registry.publish('project',source,spec)
+    assert second['created_this_call'] and second['container_id']!=first['container_id']
+    try:
+        before=len(fake.calls)
+        refused=docker_deploy.undeploy('project',publication_root=registry.root,expected_publication_container=first['container_id'])
+        assert not refused.ok and 'RECEIPT_IDENTITY_DIFFER' in refused.detail
+        assert second['container_id'] in fake.containers
+        assert not any(a[1:3] in (['container','stop'],['container','rm']) for a in fake.calls[before:])
+        assert docker_deploy.undeploy('project',publication_root=registry.root,expected_publication_container=second['container_id']).ok
+    finally:cleanup(registry)
+
+
+@pytest.mark.parametrize('cold',[False,True])
+def test_publication_source_changes_during_reuse_never_admit_or_stop_old_service(tmp_path,monkeypatch,cold):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    if cold:registry.release_ingress('project')
+    def edit(*args,**kwargs):(source/'main.py').write_text('# concurrent factory-side source edit\n')
+    monkeypatch.setattr(PublicationRegistry,'_healthy',edit)
+    before=len(fake.calls)
+    try:
+        with pytest.raises(PublicationError,match='SOURCE_CHANGED_DURING_REUSE'):registry.publish('project',source,spec)
+        assert first['container_id'] in fake.containers and fake.volumes
+        assert not any(a[1:3] in (['container','stop'],['container','rm']) for a in fake.calls[before:])
+    finally:cleanup(registry)
+
+
+def test_cold_cancel_only_releases_new_ingress_not_existing_daemon_app_or_db(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    registry.release_ingress('project')
+    def cancel(*args,**kwargs):raise PublicationError('PUBLICATION_CANCELLED')
+    monkeypatch.setattr(PublicationRegistry,'_healthy',cancel);before=len(fake.calls)
+    try:
+        with pytest.raises(PublicationError,match='CANCELLED'):registry.publish('project',source,spec)
+        assert first['container_id'] in fake.containers and fake.volumes
+        assert not any(a[1:3] in (['container','stop'],['container','rm'],['volume','rm']) for a in fake.calls[before:])
+        assert not registry.status('project')['ingress_attached']
+    finally:cleanup(registry)
+
+
+def test_recovery_facade_forwards_cancel_event_without_creation_receipt_or_old_resource_cleanup(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    registry.release_ingress('project');event=threading.Event();event.set()
+    def cancel(self,session,spec,timeout,cancel_event=None):
+        assert cancel_event is event
+        raise PublicationError('PUBLICATION_CANCELLED')
+    monkeypatch.setattr(PublicationRegistry,'_healthy',cancel);before=len(fake.calls)
+    try:
+        result=docker_deploy.recover_publication('project',registry.root,cancel_event=event)
+        assert not result.ok and 'CANCELLED' in result.detail and not result.created_publication_container
+        assert first['container_id'] in fake.containers and fake.volumes
+        assert not any(a[1:3] in (['container','stop'],['container','rm'],['volume','rm']) for a in fake.calls[before:])
+    finally:cleanup(registry)
+
+
+def test_publication_intentional_stop_destroy_skip_but_failed_start_is_not_skip(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch)
+    registry.publish('project',source,spec);registry.stop('project')
+    assert docker_deploy.inspect_deployment('project',publication_root=registry.root).skipped
+    registry.destroy_data('project')
+    destroyed=docker_deploy.inspect_deployment('project',publication_root=registry.root)
+    assert destroyed.skipped and not destroyed.ok
+    row=registry._read('project');row['status']='failed';row['volume_identity']=None;registry._write(row)
+    failed=docker_deploy.inspect_deployment('project',publication_root=registry.root)
+    assert not failed.ok and not failed.skipped
+
+
+def test_completed_stop_status_needs_no_daemon_query_or_image_recreation(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch)
+    registry.publish('project',source,spec);registry.stop('project')
+    def unavailable(*args,**kwargs):raise AssertionError('completed stop must not query unavailable Docker')
+    with monkeypatch.context() as scoped:
+        scoped.setattr(publication,'_docker_call',unavailable)
+        status=docker_deploy.inspect_deployment('project',publication_root=registry.root)
+        assert status.skipped and not status.ok
+    cleanup(registry)
+
+
+def test_stop_terminal_flush_failure_keeps_durable_intent_and_never_revives(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    write=registry._write
+    def fail_final(row):
+        if row['status']=='stopped':raise OSError('trusted terminal stop flush failed')
+        write(row)
+    monkeypatch.setattr(registry,'_write',fail_final)
+    try:
+        with pytest.raises(OSError,match='terminal stop flush failed'):registry.stop('project')
+        assert first['container_id'] not in fake.containers and fake.volumes
+        pending=registry._read('project')
+        assert pending['status']=='stopping' and pending['container_id']==first['container_id']
+        before=len(fake.calls)
+        refused=docker_deploy.recover_publication('project',registry.root)
+        assert not refused.ok and 'RECOVERY_BLOCKED' in refused.detail
+        assert not any(a[1]=='run' for a in fake.calls[before:])
+        status=docker_deploy.inspect_deployment('project',publication_root=registry.root)
+        assert not status.ok and not status.skipped
+        monkeypatch.setattr(registry,'_write',write)
+        # An explicit retry can complete its own receipt even though cleanup
+        # succeeded before the first terminal journal flush failed.
+        done=registry.stop('project',expected_container_id=first['container_id'])
+        assert done['status']=='stopped' and fake.volumes
+        assert registry.stop('project')['status']=='stopped'
+    finally:
+        monkeypatch.setattr(registry,'_write',write);cleanup(registry)
+
+
+def test_stop_intent_flush_failure_does_not_touch_daemon_or_owned_ingress(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    write=registry._write
+    def fail_intent(row):
+        if row['status']=='stopping':raise OSError('trusted stop intent flush failed')
+        write(row)
+    monkeypatch.setattr(registry,'_write',fail_intent);before=len(fake.calls)
+    try:
+        with pytest.raises(OSError,match='intent flush failed'):registry.stop('project')
+        assert registry._read('project')['status']=='running'
+        assert first['container_id'] in fake.containers and fake.volumes
+        assert registry.status('project')['ingress_attached']
+        assert not any(a[1:3] in (['container','stop'],['container','rm'],['volume','rm']) for a in fake.calls[before:])
+    finally:
+        monkeypatch.setattr(registry,'_write',write);cleanup(registry)
+
+
+def test_stop_cleanup_failure_blocks_recovery_and_preserves_explicit_retry(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+    cleanup_container=runtime._cleanup_container
+    def fail_cleanup(*args,**kwargs):raise RuntimeError('trusted owned cleanup failed')
+    monkeypatch.setattr(runtime,'_cleanup_container',fail_cleanup)
+    try:
+        with pytest.raises(RuntimeError,match='owned cleanup failed'):registry.stop('project')
+        assert registry._read('project')['status']=='stopping'
+        assert first['container_id'] in fake.containers and fake.volumes
+        before=len(fake.calls)
+        with pytest.raises(PublicationError,match='RECOVERY_BLOCKED'):registry.recover('project')
+        assert not any(a[1]=='run' for a in fake.calls[before:])
+        assert not docker_deploy.inspect_deployment('project',publication_root=registry.root).ok
+        monkeypatch.setattr(runtime,'_cleanup_container',cleanup_container)
+        assert registry.stop('project',expected_container_id=first['container_id'])['status']=='stopped'
+        assert not fake.containers and fake.volumes
+    finally:
+        monkeypatch.setattr(runtime,'_cleanup_container',cleanup_container);cleanup(registry)
 
 
 @pytest.mark.skipif(os.environ.get('AUTOSPEC_REAL_LINUX_VALIDATION')!='1',reason='Opt-in NETNONE image/HTTP/SQLite publication, fixture never executed host')

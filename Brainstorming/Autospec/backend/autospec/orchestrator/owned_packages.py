@@ -117,6 +117,8 @@ class PackageRegistry:
                 if row['status']=='uncertain':raise PackageError('PACKAGE_JOURNAL_UNCERTAIN: explicit disposition required')
                 alias=self._assert_alias(row)
                 if alias is not None:
+                    if source_snapshot(source).digest!=spec.snapshot_hash:
+                        raise PackageError('PACKAGE_SOURCE_CHANGED_DURING_REUSE: previous alias preserved')
                     row['status']='packaged';self._write(row);return {**row,'created_this_call':False}
                 if row['status']=='packaged':raise PackageError('PACKAGE_OWNED_ALIAS_MISSING')
             else:
