@@ -27,7 +27,14 @@ def actual_primitive(primitive, invocation="(32)", *, replace_symbol=False, depe
     script = "import os,json,threading,importlib\n" + ENTROPY_BOOTSTRAP + "\n" + setup + "\n"
     script += "b=" + repr(dict(entropy_module=module, entropy_attribute=attribute, entropy_primitive=primitive)) + "\n"
     script += "guard=threading.RLock();state={'session_entropy':[]}\n" + ENTROPY_INSTALL + "\n"
-    if dependency_replacement: script += "_entropy_secrets._sysrand.getrandbits=lambda n: 0\n"
+    if dependency_replacement is True: script += "_entropy_secrets._sysrand.getrandbits=lambda n: 0\n"
+    elif dependency_replacement:
+        script += {"randbytes_code":"_entropy_secrets._sysrand.randbytes.__func__.__code__=(lambda self,n:b'x'*n).__code__\n",
+            "getrandbits_code":"_entropy_secrets._sysrand.getrandbits.__func__.__code__=(lambda self,n:0).__code__\n",
+            "encoder_code":"_entropy_b64.urlsafe_b64encode.__code__=(lambda raw:b'A'*44).__code__\n",
+            "binascii_source":"_entropy_binascii.b2a_base64=lambda raw,**kw:b'A'*44\n",
+            "random_source":"_entropy_random_globals['_urandom']=lambda n:b'x'*n\n",
+            "translation":"_entropy_encoder_globals['_urlsafe_encode_translation']=bytes([65])*256\n"}[dependency_replacement]
     script += f"value=getattr(importlib.import_module({module!r}),{attribute!r}){invocation}\n"
     script += "print(json.dumps({'journal':state['session_entropy'],'value':value if isinstance(value,str) else value.hex()}))\n"
     return subprocess.run([sys.executable, "-I", "-c", script], capture_output=True, text=True, timeout=10)
@@ -63,6 +70,15 @@ def test_noncanonical_arguments_cannot_attest_entropy(invocation):
 def test_symbol_or_rng_dependency_replacement_is_refused_not_self_attested(dependency):
     result=actual_primitive("secrets.token_urlsafe",replace_symbol=not dependency,dependency_replacement=dependency)
     assert result.returncode!=0 and ("captured stdlib CSPRNG" in result.stderr or "dependency was replaced" in result.stderr)
+
+
+@pytest.mark.parametrize("changed",["randbytes_code","getrandbits_code","encoder_code","binascii_source","random_source","translation"])
+def test_in_place_rng_code_and_real_encoding_dependencies_are_refused_before_crypto_attestation(changed):
+    # Mutations happen only in a disposable constant-supervisor child process;
+    # its finally cleanup is process termination. Host stdlib is never patched.
+    result=actual_primitive("secrets.token_urlsafe",dependency_replacement=changed)
+    assert result.returncode!=0 and "dependency was replaced" in result.stderr
+    assert not result.stdout
 
 
 def test_truncated_cookie_and_duplicate_native_records_are_not_qualifiable():
@@ -146,7 +162,7 @@ def test_entropy_payload_must_match_its_exact_intact_native_artifact(tmp_path):
 
 
 @pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_PRODUCT_HARNESS")!="1",reason="opt-in owned Linux real auth entropy proof")
-@pytest.mark.parametrize("nbytes", [32,16])
+@pytest.mark.parametrize("nbytes", [32,16,"replaced"])
 async def test_real_owned_linux_csprng_argument_and_actual_http_cookie(linux_fixture_source,tmp_path,nbytes):
     from autospec.validation.final_gate import source_snapshot
     import shutil
@@ -155,7 +171,11 @@ async def test_real_owned_linux_csprng_argument_and_actual_http_cookie(linux_fix
     for name in ("main.py","pyproject.toml","uv.lock"):shutil.copyfile(original/name,source/name)
     # Supervisor-owned fixture variant only, never mutate a benchmark snapshot.
     path=source/"main.py"
-    path.write_bytes(path.read_bytes().replace(b"secrets.token_urlsafe(32)",f"secrets.token_urlsafe({nbytes})".encode()))
+    byte_count=32 if nbytes=="replaced" else nbytes
+    data=path.read_bytes().replace(b"secrets.token_urlsafe(32)",f"secrets.token_urlsafe({byte_count})".encode())
+    if nbytes=="replaced":
+        data=data.replace(b"import secrets",b"import secrets\nsecrets._sysrand.randbytes.__func__.__code__=(lambda self,n:b'x'*n).__code__")
+    path.write_bytes(data)
     snapshot=source_snapshot(source).digest
     binding=make_bindings(tmp_path,source,snapshot)
     hook=replace(binding.instrumentation,entropy_module="secrets",entropy_attribute="token_urlsafe",entropy_primitive="secrets.token_urlsafe")
@@ -176,7 +196,21 @@ async def test_real_owned_linux_csprng_argument_and_actual_http_cookie(linux_fix
         snapshot_hash=identity,contract_hash=oracle,proof_provider=source_review,instrumented=True)
     async with owner as h:
         await h.adapter.prepare_case("INSTRUMENTED")
-        login=await h.adapter.login("alice");assert login.status_code==200
+        login=await h.adapter.login("alice")
+        if nbytes=="replaced":
+            assert login.status_code==500
+            assert await h._control("observe",name="session_entropy")==[]
+            with pytest.raises(AdapterUnavailable,match="correlated"):
+                await h.adapter.observe("session_entropy",token_sha256="0"*64)
+            selected=os.environ.get("AUTOSPEC_ENTROPY_EVIDENCE_ROOT")
+            if selected:
+                target=Path(selected).resolve()/"replaced";target.mkdir(parents=True,exist_ok=True)
+                write_json(target/"native-observation.json",dict(scope="owned fixture counterexample, not campaign acceptance",
+                    snapshot_hash=snapshot,contract_hash=CONTRACT,runtime=h.runtime.inspect_configuration(),
+                    actual_login_status=login.status_code,native_entropy_records=[],native_attestation_refused=True,
+                    replacement="SystemRandom.randbytes.__func__.__code__ changed in place",source_unchanged=source_snapshot(source).digest==snapshot))
+            return
+        assert login.status_code==200
         token=login.cookies.get("sid");assert token
         token_hash=hashlib.sha256(token.encode()).hexdigest()
         result=await h.adapter.observe("session_entropy",token_sha256=token_hash)
