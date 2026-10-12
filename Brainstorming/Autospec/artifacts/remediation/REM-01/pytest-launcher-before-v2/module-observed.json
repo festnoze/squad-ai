@@ -1,0 +1,45 @@
+{
+  "actual_argv": [
+    "/opt/venv/bin/python",
+    "-m",
+    "pytest",
+    "--json-report",
+    "--json-report-file=suite-report.json",
+    "-o",
+    "addopts="
+  ],
+  "actual_output": "",
+  "actual_return_code": 0,
+  "environment_fingerprint": "3df6feea066f71568755a20f7cf7e62acea17ab37b1a5a3f7029037bf63d6641",
+  "image_id": "sha256:46e6456ccd6fd2d7c982b42b0c164e6348d3eead2272f948d7d4e21400c5233d",
+  "observed_report": {
+    "autospec_shadow_executed": true,
+    "collectors": [
+      {
+        "result": [
+          {
+            "nodeid": "test_business.py::test_real",
+            "type": "Function"
+          }
+        ]
+      }
+    ],
+    "exitcode": 0,
+    "summary": {
+      "collected": 1,
+      "passed": 1,
+      "total": 1
+    },
+    "tests": [
+      {
+        "call": {
+          "outcome": "passed"
+        },
+        "nodeid": "test_business.py::test_real",
+        "outcome": "passed"
+      }
+    ]
+  },
+  "shadow": "module",
+  "source_fingerprint": "6a101c924a832cd5f67aeefc34e75127ac99f0ff3f379a5e610d090f74c90f6c"
+}

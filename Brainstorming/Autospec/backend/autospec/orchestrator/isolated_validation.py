@@ -57,6 +57,50 @@ def _timed_call(receipt, phase, operation):
                 "scope": "actual elapsed supervisor action, including attestation/cache checks"}
 
 
+_PYTEST_LAUNCHER = r'''import sys,os,importlib
+from pathlib import Path
+if not sys.flags.isolated or not sys.flags.no_site:
+    raise RuntimeError("FACTORY_PYTEST_STARTUP_NOT_ISOLATED")
+reporters=Path("/opt/reporters")
+dependencies=Path("/opt/venv/lib/python%d.%d/site-packages" % sys.version_info[:2])
+# -I -S suppresses cwd, PYTHONPATH and installed .pth/startup hooks. Admit only
+# explicit immutable image directories before loading the test machinery.
+sys.path[:0]=[str(reporters),str(dependencies)]
+def owned(module,root):
+    file=Path(module.__file__).resolve()
+    if not file.is_relative_to(root.resolve()):
+        raise RuntimeError("FACTORY_PYTEST_MODULE_ORIGIN_DIFFER: "+module.__name__)
+    return module
+pytest=owned(importlib.import_module("pytest"),dependencies)
+configuration=owned(importlib.import_module("_pytest.config"),dependencies)
+for name in configuration.default_plugins:
+    owned(importlib.import_module("_pytest."+name),dependencies)
+plugins=[("pytest_jsonreport",owned(importlib.import_module("pytest_jsonreport.plugin"),reporters)),
+         ("pytest_cov",owned(importlib.import_module("pytest_cov.plugin"),reporters))]
+owned(importlib.import_module("coverage"),reporters)
+# Preserve reviewed asynchronous suites when this locked image has asyncio.
+# No implicit install or arbitrary producer entrypoint autoload is allowed.
+if importlib.util.find_spec("pytest_asyncio") is not None:
+    plugins.append(("asyncio",owned(importlib.import_module("pytest_asyncio.plugin"),dependencies)))
+os.environ["PYTEST_DISABLE_PLUGIN_AUTOLOAD"]="1"
+os.environ.pop("PYTEST_PLUGINS",None)
+os.environ.pop("PYTEST_ADDOPTS",None)
+class FactoryPlugins:
+    @pytest.hookimpl
+    def pytest_addhooks(self,pluginmanager):
+        for name,plugin in plugins:
+            pluginmanager.register(plugin,name)
+# Product imports are needed by tests, but may never outrank the image-owned
+# runner/reporters. This is launcher provenance, NOT an in-process Python TEE.
+sys.path.append("/app")
+raise SystemExit(pytest.main(sys.argv[1:],plugins=[FactoryPlugins()]))
+'''
+
+
+def _python_test_command(arguments: list[str]) -> list[str]:
+    return ["/usr/local/bin/python", "-I", "-S", "-c", _PYTEST_LAUNCHER, *arguments]
+
+
 def _node_command(command: list[str], *, report: bool = False, dist: bool = False,
                   coverage_directory: str | None = None) -> list[str]:
     # Native Linux tmpfs source avoids broken cross-filesystem symlinks in
@@ -266,10 +310,11 @@ class IsolatedValidator:
             coverage_line_counts = {path: len((stage / path).read_text(encoding="utf-8").splitlines())
                                     for path in coverage_inventory} if ecosystem == "node" and coverage_inventory else None
             if ecosystem == "python":
-                command = ["/opt/venv/bin/python", "-m", "pytest", "--json-report", "--json-report-file=suite-report.json", *test_args]
-                command += ["-o", "addopts="]  # no product config can disable/redirect the factory recipe
+                arguments = ["--json-report", "--json-report-file=suite-report.json", *test_args]
+                arguments += ["-o", "addopts=", "--import-mode=append"]  # no producer config may replace factory recipe/import precedence
                 if coveragepath is not None:
-                    command += [f"--cov={coverage_source}", "--cov-config=/dev/null", "--cov-branch", "--cov-report=json:suite-coverage.json", "--cov-report="]
+                    arguments += [f"--cov={coverage_source}", "--cov-config=/dev/null", "--cov-branch", "--cov-report=json:suite-coverage.json", "--cov-report="]
+                command = _python_test_command(arguments)
                 parser = pytest_evidence
             else:
                 package = json.loads((stage / "package.json").read_text(encoding="utf-8"))
@@ -357,7 +402,9 @@ class IsolatedValidator:
         identifiers = set()
         for collector in data.get("collectors", []):
             for item in collector.get("result", []):
-                if item.get("type") in {"Function", "TestCaseFunction", "DoctestItem"}:
+                # Coroutine is the exact native pytest-asyncio item observed in
+                # its locked image-owned plugin; unknown/custom types still fail.
+                if item.get("type") in {"Function", "TestCaseFunction", "DoctestItem", "Coroutine"}:
                     identifiers.add(item["nodeid"])
         if result.evidence.exit_code or not result.evidence.report_valid or result.evidence.collection_errors or len(identifiers) != result.evidence.collected or not identifiers:
             raise _unavailable("Incomplete/unsupported pytest collection; no baseline can be claimed")

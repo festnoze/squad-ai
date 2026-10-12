@@ -1,0 +1,155 @@
+{
+  "actual_collection_argv": [
+    "/usr/local/bin/python",
+    "-I",
+    "-S",
+    "-c",
+    "import sys,os,importlib\nfrom pathlib import Path\nif not sys.flags.isolated or not sys.flags.no_site:\n    raise RuntimeError(\"FACTORY_PYTEST_STARTUP_NOT_ISOLATED\")\nreporters=Path(\"/opt/reporters\")\ndependencies=Path(\"/opt/venv/lib/python%d.%d/site-packages\" % sys.version_info[:2])\n# -I -S suppresses cwd, PYTHONPATH and installed .pth/startup hooks. Admit only\n# explicit immutable image directories before loading the test machinery.\nsys.path[:0]=[str(reporters),str(dependencies)]\ndef owned(module,root):\n    file=Path(module.__file__).resolve()\n    if not file.is_relative_to(root.resolve()):\n        raise RuntimeError(\"FACTORY_PYTEST_MODULE_ORIGIN_DIFFER: \"+module.__name__)\n    return module\npytest=owned(importlib.import_module(\"pytest\"),dependencies)\nconfiguration=owned(importlib.import_module(\"_pytest.config\"),dependencies)\nfor name in configuration.default_plugins:\n    owned(importlib.import_module(\"_pytest.\"+name),dependencies)\nplugins=[(\"pytest_jsonreport\",owned(importlib.import_module(\"pytest_jsonreport.plugin\"),reporters)),\n         (\"pytest_cov\",owned(importlib.import_module(\"pytest_cov.plugin\"),reporters))]\nowned(importlib.import_module(\"coverage\"),reporters)\n# Preserve reviewed asynchronous suites when this locked image has asyncio.\n# No implicit install or arbitrary producer entrypoint autoload is allowed.\nif importlib.util.find_spec(\"pytest_asyncio\") is not None:\n    plugins.append((\"asyncio\",owned(importlib.import_module(\"pytest_asyncio.plugin\"),dependencies)))\nos.environ[\"PYTEST_DISABLE_PLUGIN_AUTOLOAD\"]=\"1\"\nos.environ.pop(\"PYTEST_PLUGINS\",None)\nos.environ.pop(\"PYTEST_ADDOPTS\",None)\nclass FactoryPlugins:\n    @pytest.hookimpl\n    def pytest_addhooks(self,pluginmanager):\n        for name,plugin in plugins:\n            pluginmanager.register(plugin,name)\n# Product imports are needed by tests, but may never outrank the image-owned\n# runner/reporters. This is launcher provenance, NOT an in-process Python TEE.\nsys.path.append(\"/app\")\nraise SystemExit(pytest.main(sys.argv[1:],plugins=[FactoryPlugins()]))\n",
+    "--json-report",
+    "--json-report-file=suite-report.json",
+    "--collect-only",
+    "-q",
+    "-o",
+    "addopts=",
+    "--import-mode=append"
+  ],
+  "actual_coverage_argv": [
+    "/usr/local/bin/python",
+    "-I",
+    "-S",
+    "-c",
+    "import sys,os,importlib\nfrom pathlib import Path\nif not sys.flags.isolated or not sys.flags.no_site:\n    raise RuntimeError(\"FACTORY_PYTEST_STARTUP_NOT_ISOLATED\")\nreporters=Path(\"/opt/reporters\")\ndependencies=Path(\"/opt/venv/lib/python%d.%d/site-packages\" % sys.version_info[:2])\n# -I -S suppresses cwd, PYTHONPATH and installed .pth/startup hooks. Admit only\n# explicit immutable image directories before loading the test machinery.\nsys.path[:0]=[str(reporters),str(dependencies)]\ndef owned(module,root):\n    file=Path(module.__file__).resolve()\n    if not file.is_relative_to(root.resolve()):\n        raise RuntimeError(\"FACTORY_PYTEST_MODULE_ORIGIN_DIFFER: \"+module.__name__)\n    return module\npytest=owned(importlib.import_module(\"pytest\"),dependencies)\nconfiguration=owned(importlib.import_module(\"_pytest.config\"),dependencies)\nfor name in configuration.default_plugins:\n    owned(importlib.import_module(\"_pytest.\"+name),dependencies)\nplugins=[(\"pytest_jsonreport\",owned(importlib.import_module(\"pytest_jsonreport.plugin\"),reporters)),\n         (\"pytest_cov\",owned(importlib.import_module(\"pytest_cov.plugin\"),reporters))]\nowned(importlib.import_module(\"coverage\"),reporters)\n# Preserve reviewed asynchronous suites when this locked image has asyncio.\n# No implicit install or arbitrary producer entrypoint autoload is allowed.\nif importlib.util.find_spec(\"pytest_asyncio\") is not None:\n    plugins.append((\"asyncio\",owned(importlib.import_module(\"pytest_asyncio.plugin\"),dependencies)))\nos.environ[\"PYTEST_DISABLE_PLUGIN_AUTOLOAD\"]=\"1\"\nos.environ.pop(\"PYTEST_PLUGINS\",None)\nos.environ.pop(\"PYTEST_ADDOPTS\",None)\nclass FactoryPlugins:\n    @pytest.hookimpl\n    def pytest_addhooks(self,pluginmanager):\n        for name,plugin in plugins:\n            pluginmanager.register(plugin,name)\n# Product imports are needed by tests, but may never outrank the image-owned\n# runner/reporters. This is launcher provenance, NOT an in-process Python TEE.\nsys.path.append(\"/app\")\nraise SystemExit(pytest.main(sys.argv[1:],plugins=[FactoryPlugins()]))\n",
+    "--json-report",
+    "--json-report-file=suite-report.json",
+    "-o",
+    "addopts=",
+    "--import-mode=append",
+    "--cov=business",
+    "--cov-config=/dev/null",
+    "--cov-branch",
+    "--cov-report=json:suite-coverage.json",
+    "--cov-report="
+  ],
+  "collection_ids": [
+    "test_business.py::test_real"
+  ],
+  "collection_return_code": 0,
+  "coverage": {
+    "autospec_inventory": {
+      "environment_fingerprint": "3df6feea066f71568755a20f7cf7e62acea17ab37b1a5a3f7029037bf63d6641",
+      "files": {
+        "business.py": "d68accd3506d793a21869833d62dfa4849ea37459ec26fba506dfcd0a43840ab"
+      },
+      "image": "sha256:46e6456ccd6fd2d7c982b42b0c164e6348d3eead2272f948d7d4e21400c5233d",
+      "source": "business",
+      "source_fingerprint": "bf2f9e3862e061be5ad65a3e72712a6189c809b0e42a609423541a6f3f1ece30",
+      "version": 1
+    },
+    "files": {
+      "business.py": {
+        "classes": {
+          "": {
+            "excluded_lines": [],
+            "executed_branches": [],
+            "executed_lines": [
+              1
+            ],
+            "missing_branches": [],
+            "missing_lines": [],
+            "summary": {
+              "covered_branches": 0,
+              "covered_lines": 1,
+              "excluded_lines": 0,
+              "missing_branches": 0,
+              "missing_lines": 0,
+              "num_branches": 0,
+              "num_partial_branches": 0,
+              "num_statements": 1,
+              "percent_covered": 100.0,
+              "percent_covered_display": "100"
+            }
+          }
+        },
+        "excluded_lines": [],
+        "executed_branches": [],
+        "executed_lines": [
+          1
+        ],
+        "functions": {
+          "": {
+            "excluded_lines": [],
+            "executed_branches": [],
+            "executed_lines": [],
+            "missing_branches": [],
+            "missing_lines": [],
+            "summary": {
+              "covered_branches": 0,
+              "covered_lines": 0,
+              "excluded_lines": 0,
+              "missing_branches": 0,
+              "missing_lines": 0,
+              "num_branches": 0,
+              "num_partial_branches": 0,
+              "num_statements": 0,
+              "percent_covered": 100.0,
+              "percent_covered_display": "100"
+            }
+          },
+          "answer": {
+            "excluded_lines": [],
+            "executed_branches": [],
+            "executed_lines": [
+              1
+            ],
+            "missing_branches": [],
+            "missing_lines": [],
+            "summary": {
+              "covered_branches": 0,
+              "covered_lines": 1,
+              "excluded_lines": 0,
+              "missing_branches": 0,
+              "missing_lines": 0,
+              "num_branches": 0,
+              "num_partial_branches": 0,
+              "num_statements": 1,
+              "percent_covered": 100.0,
+              "percent_covered_display": "100"
+            }
+          }
+        },
+        "missing_branches": [],
+        "missing_lines": [],
+        "summary": {
+          "covered_branches": 0,
+          "covered_lines": 1,
+          "excluded_lines": 0,
+          "missing_branches": 0,
+          "missing_lines": 0,
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "num_statements": 1,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100"
+        }
+      }
+    },
+    "meta": {
+      "branch_coverage": true,
+      "format": 3,
+      "show_contexts": false,
+      "timestamp": "2026-10-12T12:56:13.864980",
+      "version": "7.10.6"
+    },
+    "totals": {
+      "covered_branches": 0,
+      "covered_lines": 1,
+      "missing_lines": 0,
+      "num_branches": 0,
+      "num_statements": 1,
+      "percent_covered": 100.0
+    }
+  },
+  "coverage_return_code": 1,
+  "image_id": "sha256:46e6456ccd6fd2d7c982b42b0c164e6348d3eead2272f948d7d4e21400c5233d",
+  "source_fingerprint": "bf2f9e3862e061be5ad65a3e72712a6189c809b0e42a609423541a6f3f1ece30"
+}

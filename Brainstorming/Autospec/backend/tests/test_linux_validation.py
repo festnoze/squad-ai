@@ -80,7 +80,8 @@ def test_suite_cannot_admit_missing_or_malformed_report(tmp_path,monkeypatch,rep
     assert result.evidence.exit_code==0 and not result.evidence.report_valid
     executed=json.loads((tmp_path/'evidence.execution.json').read_bytes())
     assert executed==result.execution_receipt
-    assert executed['return_code']==0 and executed['argv'][:3]==['/opt/venv/bin/python','-m','pytest']
+    assert executed['return_code']==0 and executed['argv'][:4]==['/usr/local/bin/python','-I','-S','-c']
+    assert '--import-mode=append' in executed['argv']
     assert executed['timing']['phase']=='tests' and executed['timing']['seconds']>=0
     assert executed['environment_preparation']['phase']=='install'
     assert executed['image_id']=='attested' and executed['source_fingerprint']==result.source_fingerprint

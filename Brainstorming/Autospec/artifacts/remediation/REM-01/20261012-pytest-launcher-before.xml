@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="13.820" timestamp="2026-10-12T14:46:33.555831+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_pytest_launcher_boundary" name="test_real_product_cannot_replace_pytest_launcher_and_forge_green_report[module]" time="12.486"><failure message="AssertionError: &#10;assert 0 == 1&#10; +  where 0 = SuiteEvidence(outcomes={'test_business.py::test_real': 'passed'}, collected=1, exit_code=0, collection_errors=(), collection_skips=(), reasons={'test_business.py::test_real': ''}, report_valid=True, executed=0).exit_code&#10; +    where SuiteEvidence(outcomes={'test_business.py::test_real': 'passed'}, collected=1, exit_code=0, collection_errors=(), collection_skips=(), reasons={'test_business.py::test_real': ''}, report_valid=True, executed=0) = IsolatedSuiteResult(evidence=SuiteEvidence(outcomes={'test_business.py::test_real': 'passed'}, collected=1, exit_code=...ce7ea8397df65d11db22a0bc3416eed1033cb4c27ec3dddc8d6', 'scope': 'actual container inner argv and observed return code'}).evidence">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3375/test_real_product_cannot_repla0')
+shadow = 'module'
+
+    @pytest.mark.skipif(os.environ.get('AUTOSPEC_REAL_LINUX_VALIDATION')!='1',
+        reason='Opt-in Docker-only product module substitution counterproof')
+    @pytest.mark.parametrize('shadow',['module','package'])
+    def test_real_product_cannot_replace_pytest_launcher_and_forge_green_report(tmp_path,shadow):
+        root=tmp_path/'product';root.mkdir()
+        (root/'pyproject.toml').write_text('[project]\nname="pytest-launcher-proof"\nversion="0.1.0"\nrequires-python="&gt;=3.12"\ndependencies=["pytest==9.0.3"]\n')
+        (root/'business.py').write_text('def answer():return 0\n')
+        (root/'test_business.py').write_text('from business import answer\ndef test_real():\n assert answer()==1\n')
+        if shadow=='module':(root/'pytest.py').write_text(_FORGED_PYTEST)
+        else:
+            (root/'pytest').mkdir()
+            (root/'pytest/__init__.py').write_text('# product shadow must not replace installed pytest\n')
+            (root/'pytest/__main__.py').write_text(_FORGED_PYTEST)
+        validator=IsolatedValidator(tmp_path/'cache',timeout=180)
+        validator.manager.ensure_lock(root,'python')
+        result=validator.run_suite(root,'python','test',tmp_path/'suite.json')
+        data=json.loads((tmp_path/'suite.json').read_bytes())
+        if os.environ.get('AUTOSPEC_PYTEST_LAUNCHER_PROOF_ROOT'):
+            from pathlib import Path
+            from autospec.orchestrator.dependencies import atomic_json
+            atomic_json(Path(os.environ['AUTOSPEC_PYTEST_LAUNCHER_PROOF_ROOT'])/(shadow+'-observed.json'),
+                {'shadow':shadow,'actual_argv':result.execution_receipt['argv'],
+                 'actual_return_code':result.evidence.exit_code,'image_id':result.image,
+                 'environment_fingerprint':result.fingerprint,'source_fingerprint':result.source_fingerprint,
+                 'observed_report':data,'actual_output':result.output})
+&gt;       assert result.evidence.exit_code==1,result.output
+E       AssertionError: 
+E       assert 0 == 1
+E        +  where 0 = SuiteEvidence(outcomes={'test_business.py::test_real': 'passed'}, collected=1, exit_code=0, collection_errors=(), collection_skips=(), reasons={'test_business.py::test_real': ''}, report_valid=True, executed=0).exit_code
+E        +    where SuiteEvidence(outcomes={'test_business.py::test_real': 'passed'}, collected=1, exit_code=0, collection_errors=(), collection_skips=(), reasons={'test_business.py::test_real': ''}, report_valid=True, executed=0) = IsolatedSuiteResult(evidence=SuiteEvidence(outcomes={'test_business.py::test_real': 'passed'}, collected=1, exit_code=...ce7ea8397df65d11db22a0bc3416eed1033cb4c27ec3dddc8d6', 'scope': 'actual container inner argv and observed return code'}).evidence
+
+tests\test_pytest_launcher_boundary.py:45: AssertionError</failure></testcase></testsuite></testsuites>
