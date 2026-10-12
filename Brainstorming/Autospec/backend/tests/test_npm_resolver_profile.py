@@ -43,6 +43,7 @@ def test_node_recipe_provisions_trusted_tool_before_product_manifest(tmp_path, m
     assert "RUN npm ci --ignore-scripts --no-audit --no-fund --userconfig=/dev/null" in recipe
     assert "--force" not in recipe and "--legacy-peer-deps" not in recipe
     assert "COPY ." not in recipe and "USER 65532:65532" in recipe
+    assert "RUN ln -s /tmp/vite-config-cache /opt/node_modules/.vite-temp" in recipe
     first_run = next(line[4:] for line in recipe.splitlines() if line.startswith("RUN ["))
     assert json.loads(first_run)[-2:] == ["--", "__autospec_provision_only__"]
     assert "--omit=dev" in recipe if mode == "runtime" else "--include=dev" in recipe

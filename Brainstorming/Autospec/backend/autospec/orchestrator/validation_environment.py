@@ -433,4 +433,5 @@ class LinuxEnvironmentManager:
             common += "COPY package.json package-lock.json ./\nRUN npm ci --ignore-scripts --no-audit --no-fund --userconfig=/dev/null --globalconfig=/tmp/autospec-empty-global-npmrc" + (" --omit=dev" if mode == "runtime" else " --include=dev") + "\n"
             common += "RUN mv node_modules /opt/node_modules\n"
             common += "RUN ln -s /tmp/vite-cache /opt/node_modules/.vite\n"
+            common += "RUN ln -s /tmp/vite-config-cache /opt/node_modules/.vite-temp\n"
         return common + f"LABEL autospec.environment={fingerprint}\nWORKDIR /app\nUSER 65532:65532\n"
