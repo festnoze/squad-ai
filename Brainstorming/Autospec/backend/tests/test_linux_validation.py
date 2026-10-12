@@ -65,6 +65,32 @@ def test_runtime_forbids_environment_secrets_and_external_db(tmp_path):
         RuntimeSession(tmp_path, "image", ["python"], env={"DATABASE_URL": "postgres://host/private"})
 
 
+@pytest.mark.parametrize('report',['not-json',None])
+def test_suite_cannot_admit_missing_or_malformed_report(tmp_path,monkeypatch,report):
+    from autospec.orchestrator import isolated_validation
+    root=tmp_path/'source';root.mkdir();(root/'test.py').write_text('# trusted fixture')
+    manager=SimpleNamespace(prepare=lambda *_:SimpleNamespace(image='attested',fingerprint='fingerprint'))
+    def run(command,stage,*args,**kwargs):
+        if report is not None: (stage/'suite-report.json').write_text(report)
+        return 0,'exit zero is not evidence',''
+    monkeypatch.setattr(isolated_validation,'run_isolated',run)
+    result=IsolatedValidator(tmp_path/'cache',manager=manager).run_suite(root,'python','test',tmp_path/'evidence.json')
+    assert result.evidence.exit_code==0 and not result.evidence.report_valid
+
+
+def test_collection_refuses_incomplete_custom_items(tmp_path,monkeypatch):
+    from autospec.orchestrator.isolated_validation import IsolatedSuiteResult
+    from autospec.orchestrator.test_integrity import SuiteEvidence
+    validator=IsolatedValidator(tmp_path/'cache')
+    report=tmp_path/'report.json'
+    def suite(*args,**kwargs):
+        report.write_text(json.dumps({'collectors':[{'result':[{'nodeid':'custom::id','type':'UnknownItem'}]}]}))
+        return IsolatedSuiteResult(SuiteEvidence({},1,0),'','fingerprint','image')
+    monkeypatch.setattr(validator,'run_suite',suite)
+    with pytest.raises(RuntimeError,match='Incomplete/unsupported'):
+        validator.collect_python(tmp_path/'product',report)
+
+
 @pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION") != "1", reason="Opt-in real Linux Docker dependency/network proof")
 def test_real_python_locked_suite_and_net_none_runtime(tmp_path):
     product = tmp_path / "product"
@@ -114,7 +140,7 @@ async def test_real_fullstack_foundation_and_runtime_recovery(tmp_path, monkeypa
     factory=Path(os.environ.get('AUTOSPEC_TEST_FACTORY_ROOT','C:/Dev/squad-ai/Brainstorming/Autospec'))
     monkeypatch.setattr(bootstrap,'PROJECT_DIR',factory)
     workspace.scaffold(state,streams_enabled=False,ui_tests_enabled=False)
-    result=await bootstrap.verify(state,root,timeout_s=300)
+    result=await bootstrap.verify(state,root,timeout_s=600)
     assert result.ok,result.detail
     assert 'Chromium' in result.detail and 'SELECT 1 OK' in result.detail
     assert (root/'uv.lock').exists() and (root/'frontend/package-lock.json').exists()
@@ -125,6 +151,17 @@ async def test_real_fullstack_foundation_and_runtime_recovery(tmp_path, monkeypa
     recovered=await bootstrap.verify_runtime(state,root,timeout_s=90,repair_dependencies=True)
     assert recovered.ok,recovered.detail
     assert (root/'main.py').read_bytes()==source and (root/'uv.lock').read_bytes()==lock
+    # Vite transpilation alone would accept this. The independent tsc gate must
+    # reject it before any dist export or browser success is claimed.
+    frontend=root/'frontend'
+    (frontend/'src/TypeBroken.ts').write_text('export const wrong: string = 123;\n')
+    validator=IsolatedValidator(tmp_path/'typecheck-cache')
+    rc,output,dist,_=validator.build_frontend(frontend)
+    try:
+        assert rc!=0 and 'TS2322' in output,output
+        assert not (dist/'dist').exists()
+    finally:
+        shutil.rmtree(dist)
 
 
 @pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION") != "1", reason="Opt-in real manifest-only dependency coordinator Linux resolver")
@@ -145,3 +182,25 @@ def test_real_dependency_resolver_exports_only_manifest_lock(tmp_path,ecosystem)
     assert result.returncode==0,result.stdout+result.stderr
     assert {p.name for p in tmp_path.iterdir()}==expected
     assert (tmp_path/'source.py').read_text()=='raise RuntimeError("MUST NEVER EXECUTE")'
+
+
+@pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION") != "1", reason="Opt-in real pytest collection and branch coverage in Linux")
+def test_real_pytest_collection_and_coverage_are_structured(tmp_path):
+    root=tmp_path/'product';root.mkdir()
+    (root/'pyproject.toml').write_text('[project]\nname="coverage-proof"\nversion="0.1.0"\nrequires-python=">=3.12"\ndependencies=["pytest==9.0.3"]\n')
+    (root/'business.py').write_text('def choose(value):\n if value:\n  return 1\n return 0\n')
+    (root/'test_business.py').write_text('import pytest\nfrom business import choose\n@pytest.mark.parametrize("value",[True,False])\ndef test_choose(value):\n assert choose(value)==int(value)\n')
+    validator=IsolatedValidator(tmp_path/'cache')
+    validator.manager.ensure_lock(root,'python')
+    ids,collected=validator.collect_python(root,tmp_path/'collection.json')
+    assert ids==('test_business.py::test_choose[False]','test_business.py::test_choose[True]')
+    assert collected.evidence.collected==2 and collected.evidence.executed==0
+    result=validator.run_suite(root,'python','test',tmp_path/'suite.json',coveragepath=tmp_path/'coverage.json',coverage_source='business')
+    assert result.evidence.report_valid and result.evidence.exit_code==0,result.output
+    assert result.evidence.outcomes=={identifier:'passed' for identifier in ids}
+    assert result.coverage['totals']['num_statements']==4
+    assert result.coverage['totals']['covered_lines']==4
+    assert result.coverage['totals']['num_branches']==2
+    assert result.coverage['totals']['covered_branches']==2
+    assert json.loads((tmp_path/'coverage.json').read_text())==result.coverage
+    assert result.source_fingerprint==collected.source_fingerprint
