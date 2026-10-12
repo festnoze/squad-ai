@@ -60,7 +60,7 @@ async def test_approve_endpoint(green_pytest, monkeypatch):
     server.pipelines.clear()
     server.set_runner(FakeRunner([PM, PO, QA, DEV]))
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         pid = (
             await client.post("/api/projects", json={"goal": "g", "name": "todo"})
         ).json()["id"]

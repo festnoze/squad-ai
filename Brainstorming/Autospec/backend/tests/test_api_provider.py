@@ -19,7 +19,7 @@ def make_client(replies: list[str]) -> httpx.AsyncClient:
     server.pipelines.clear()
     server.set_runner(FakeRunner(replies))
     transport = httpx.ASGITransport(app=server.app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1")
 
 
 async def test_get_provider_defaults(monkeypatch):

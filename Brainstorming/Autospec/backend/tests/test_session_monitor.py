@@ -167,7 +167,7 @@ async def test_cancel_resume_endpoint(green_pytest):
     server.pipelines[state.id] = pipeline
     pipeline.schedule_resume(time.time() + 3600)
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         resp = await client.post(f"/api/projects/{state.id}/cancel-resume")
         assert resp.status_code == 200
         assert state.resume_at == 0.0

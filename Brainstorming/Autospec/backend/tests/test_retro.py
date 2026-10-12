@@ -157,7 +157,7 @@ async def test_retro_endpoint_and_unknown_404(green_pytest):
     server.pipelines.clear()
     server.set_runner(FakeRunner([RETRO]))
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         assert (await client.post("/api/projects/nope/retro")).status_code == 404
         state = ProjectState(id="proj-retro5", name="todo", goal="g", phase=PipelinePhase.DONE)
         server.pipelines["proj-retro5"] = Pipeline(state, FakeRunner([RETRO]))

@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -35,6 +34,7 @@ from ..agents.providers import (
 from ..agents.runner import AgentRunner
 from ..agents.scripted import ScriptedRunner
 from ..config import PROJECT_DIR, _env_int, settings
+from .control_boundary import FactoryControlBoundary
 from ..models import (
     BuildStage,
     ChatMessage,
@@ -278,19 +278,7 @@ async def _lifespan(app):
 
 
 app = FastAPI(title="Autospec", version="0.1.0", lifespan=_lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5183",
-        "http://127.0.0.1:5183",
-        "http://localhost:8100",
-        "http://127.0.0.1:8100",
-        "http://localhost:8123",
-        "http://127.0.0.1:8123",
-    ],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(FactoryControlBoundary)
 
 pipelines: dict[str, Pipeline] = {}
 _runner: AgentRunner = (

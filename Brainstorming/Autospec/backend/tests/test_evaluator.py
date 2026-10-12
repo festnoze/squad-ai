@@ -147,7 +147,7 @@ async def test_evaluate_endpoint_triggers_findings(green_pytest, no_real_run):
         FakeRunner([pm_brief, po_plan, qa_trivial, dev_green, EVAL_FINDINGS, IMPACT_UPDATE])
     )
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         project_id = (
             await client.post("/api/projects", json={"goal": "Une todo-list", "name": "todo"})
         ).json()["id"]
@@ -182,5 +182,5 @@ async def test_evaluate_endpoint_triggers_findings(green_pytest, no_real_run):
 async def test_evaluate_unknown_project_404():
     server.pipelines.clear()
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         assert (await client.post("/api/projects/nope/evaluate")).status_code == 404

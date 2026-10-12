@@ -85,7 +85,7 @@ async def test_create_endpoint_with_imported_brief(green_pytest):
     server.pipelines.clear()
     server.set_runner(FakeRunner([PO, QA, DEV]))
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         r = await client.post(
             "/api/projects", json={"goal": "g", "name": "imp", "brief": "# Spec doc"}
         )

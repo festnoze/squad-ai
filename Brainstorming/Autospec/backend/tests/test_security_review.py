@@ -143,7 +143,7 @@ async def test_security_endpoint_triggers_findings(green_pytest, no_real_audit):
         FakeRunner([pm_brief, po_plan, qa_trivial, dev_green, SEC_FINDINGS, IMPACT_UPDATE])
     )
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         project_id = (
             await client.post("/api/projects", json={"goal": "Une todo-list", "name": "todo"})
         ).json()["id"]
@@ -179,5 +179,5 @@ async def test_security_endpoint_triggers_findings(green_pytest, no_real_audit):
 async def test_security_unknown_project_404():
     server.pipelines.clear()
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         assert (await client.post("/api/projects/nope/security-review")).status_code == 404
