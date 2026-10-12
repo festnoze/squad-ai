@@ -1,0 +1,374 @@
+{
+  "requirement_id": "ARC-02",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "foreign_keys",
+      "passed": true,
+      "observed": {
+        "enabled": 1
+      },
+      "reproduction": "each distinct app SQLite connection enables FK",
+      "evidence": "X"
+    },
+    {
+      "check": "foreign_keys",
+      "passed": true,
+      "observed": {
+        "enabled": 1
+      },
+      "reproduction": "each distinct app SQLite connection enables FK",
+      "evidence": "X"
+    },
+    {
+      "check": "null_ids",
+      "passed": true,
+      "observed": {
+        "table": "users",
+        "mutated_fields": {
+          "id": null,
+          "email": "null-0f24b383-7417-46a3-9190-124a12d17268@example.test",
+          "email_normalized": "null-0f24b383-7417-46a3-9190-124a12d17268@example.test"
+        },
+        "integrity_error": "NOT NULL constraint failed: users.id"
+      },
+      "reproduction": "direct INSERT users, fixed mutation {'id': None, 'email': 'null-0f24b383-7417-46a3-9190-124a12d17268@example.test', 'email_normalized': 'null-0f24b383-7417-46a3-9190-124a12d17268@example.test'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "null_ids",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.id"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "integer_versions",
+      "passed": false,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "a48eb8e4-20ca-4cf7-a537-0ec7393ac879",
+          "version": 1.5
+        },
+        "integrity_error": ""
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': 'a48eb8e4-20ca-4cf7-a537-0ec7393ac879', 'version': 1.5}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "integer_versions",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "e61e68c4-02df-4280-9a2e-f62e49306f52",
+          "version": 0
+        },
+        "integrity_error": "CHECK constraint failed: version>=1"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': 'e61e68c4-02df-4280-9a2e-f62e49306f52', 'version': 0}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "99305331-f59e-4668-83c2-24466acae377",
+          "owner_id": "e44410cb-e9ae-4818-a090-ee4ef1bbc57d"
+        },
+        "integrity_error": "FOREIGN KEY constraint failed"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '99305331-f59e-4668-83c2-24466acae377', 'owner_id': 'e44410cb-e9ae-4818-a090-ee4ef1bbc57d'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "3f597a95-59e7-485a-9465-5be2ba7f306c",
+          "status": "invalid"
+        },
+        "integrity_error": "CHECK constraint failed: status IN('open','in_progress','resolved','closed')"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '3f597a95-59e7-485a-9465-5be2ba7f306c', 'status': 'invalid'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "14237351-8bf6-4d9c-a988-fb9c673357a4",
+          "priority": "urgent"
+        },
+        "integrity_error": "CHECK constraint failed: priority IN('low','normal','high')"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '14237351-8bf6-4d9c-a988-fb9c673357a4', 'priority': 'urgent'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "256fe0d1-ad2e-4b95-b350-14175689578c",
+          "owner_id": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.owner_id"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '256fe0d1-ad2e-4b95-b350-14175689578c', 'owner_id': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "users",
+        "mutated_fields": {
+          "id": "c3672083-b734-4c50-ba82-f6bac4874f9c"
+        },
+        "integrity_error": "UNIQUE constraint failed: users.email_normalized"
+      },
+      "reproduction": "direct INSERT users, fixed mutation {'id': 'c3672083-b734-4c50-ba82-f6bac4874f9c'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "idempotency_keys",
+        "mutated_fields": {},
+        "integrity_error": "UNIQUE constraint failed: idempotency_keys.user_id, idempotency_keys.kind, idempotency_keys.key"
+      },
+      "reproduction": "direct INSERT idempotency_keys, fixed mutation {}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "users",
+        "mutated_fields": {
+          "id": "42a5332e-8750-430c-a8ad-d99a679d2185",
+          "email": "role-0f24b383-7417-46a3-9190-124a12d17268@example.test",
+          "email_normalized": "role-0f24b383-7417-46a3-9190-124a12d17268@example.test",
+          "role": "superadmin"
+        },
+        "integrity_error": "CHECK constraint failed: role IN ('client','agent','admin')"
+      },
+      "reproduction": "direct INSERT users, fixed mutation {'id': '42a5332e-8750-430c-a8ad-d99a679d2185', 'email': 'role-0f24b383-7417-46a3-9190-124a12d17268@example.test', 'email_normalized': 'role-0f24b383-7417-46a3-9190-124a12d17268@example.test', 'role': 'superadmin'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "29d698c2-8094-433e-8fbf-61fd732b239f",
+          "title": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.title"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '29d698c2-8094-433e-8fbf-61fd732b239f', 'title': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "453c8358-40be-4539-9291-305d92eb6388",
+          "description": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.description"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '453c8358-40be-4539-9291-305d92eb6388', 'description': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "386c1ee4-57d0-446b-989f-33cf7bc12ebd",
+          "status": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.status"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '386c1ee4-57d0-446b-989f-33cf7bc12ebd', 'status': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "db2d8431-d3ca-4b58-854c-e605175acdab",
+          "priority": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.priority"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': 'db2d8431-d3ca-4b58-854c-e605175acdab', 'priority': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "d1276414-d294-485b-9e9f-788d779e01ac",
+          "version": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.version"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': 'd1276414-d294-485b-9e9f-788d779e01ac', 'version': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "f2f33def-6e2c-44b9-be64-d46df1213172",
+          "created_at": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.created_at"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': 'f2f33def-6e2c-44b9-be64-d46df1213172', 'created_at': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "tickets",
+        "mutated_fields": {
+          "id": "429cc89c-90b8-4566-b941-609d6be7091c",
+          "updated_at": null
+        },
+        "integrity_error": "NOT NULL constraint failed: tickets.updated_at"
+      },
+      "reproduction": "direct INSERT tickets, fixed mutation {'id': '429cc89c-90b8-4566-b941-609d6be7091c', 'updated_at': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "messages",
+        "mutated_fields": {
+          "id": "08453802-6b84-4804-9b51-b37c206ac208",
+          "ticket_id": "e8d6c1ff-d70a-4153-82de-fd61d247e50b"
+        },
+        "integrity_error": "FOREIGN KEY constraint failed"
+      },
+      "reproduction": "direct INSERT messages, fixed mutation {'id': '08453802-6b84-4804-9b51-b37c206ac208', 'ticket_id': 'e8d6c1ff-d70a-4153-82de-fd61d247e50b'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "messages",
+        "mutated_fields": {
+          "id": "79effe99-6450-42f3-94bd-4de5a65e9483",
+          "visibility": "private"
+        },
+        "integrity_error": "CHECK constraint failed: visibility IN('public','internal')"
+      },
+      "reproduction": "direct INSERT messages, fixed mutation {'id': '79effe99-6450-42f3-94bd-4de5a65e9483', 'visibility': 'private'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "messages",
+        "mutated_fields": {
+          "id": "c03db015-ab49-45b3-9d0f-2272a56e1ce9",
+          "author_id": null
+        },
+        "integrity_error": "NOT NULL constraint failed: messages.author_id"
+      },
+      "reproduction": "direct INSERT messages, fixed mutation {'id': 'c03db015-ab49-45b3-9d0f-2272a56e1ce9', 'author_id': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "table": "sessions",
+        "mutated_fields": {
+          "token_hash": "10edcd86-7b24-4800-b510-d0488c638e92",
+          "user_id": "dfaaab82-c8ef-4f57-8082-121f8a701493"
+        },
+        "integrity_error": "FOREIGN KEY constraint failed"
+      },
+      "reproduction": "direct INSERT sessions, fixed mutation {'token_hash': '10edcd86-7b24-4800-b510-d0488c638e92', 'user_id': 'dfaaab82-c8ef-4f57-8082-121f8a701493'}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "null_ids",
+      "passed": true,
+      "observed": {
+        "table": "messages",
+        "mutated_fields": {
+          "id": null
+        },
+        "integrity_error": "NOT NULL constraint failed: messages.id"
+      },
+      "reproduction": "direct INSERT messages, fixed mutation {'id': None}; required DB constraint must reject",
+      "evidence": "X"
+    },
+    {
+      "check": "foreign_keys",
+      "passed": true,
+      "observed": {
+        "actual_app_connections": [
+          {
+            "connection_id": 11,
+            "foreign_keys": 1,
+            "busy_timeout_ms": 80
+          },
+          {
+            "connection_id": 12,
+            "foreign_keys": 1,
+            "busy_timeout_ms": 80
+          }
+        ]
+      },
+      "reproduction": "independent instrumentation verifies FK on actual HTTP handler connections, not only direct harness connections",
+      "evidence": "X"
+    },
+    {
+      "check": "constraints",
+      "passed": true,
+      "observed": {
+        "before_digest": "e4612035d32f99c08f86dc9a20e1b2dad13e5d082aa374da7d07ce0628a183e9",
+        "after_digest": "e4612035d32f99c08f86dc9a20e1b2dad13e5d082aa374da7d07ce0628a183e9"
+      },
+      "reproduction": "all direct constraint probes roll back; full business DB preserved",
+      "evidence": "X"
+    }
+  ]
+}

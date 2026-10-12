@@ -1,0 +1,125 @@
+{
+  "requirement_id": "ARC-06",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "openapi",
+      "passed": false,
+      "observed": {
+        "status": 200,
+        "missing": {
+          "/api/auth/me": [
+            "get"
+          ],
+          "/api/users": [
+            "get",
+            "post"
+          ],
+          "/api/users/{id}": [
+            "patch"
+          ],
+          "/api/assignees": [
+            "get"
+          ],
+          "/api/tickets": [
+            "get",
+            "post"
+          ],
+          "/api/tickets/{id}": [
+            "get",
+            "patch"
+          ],
+          "/api/tickets/{id}/messages": [
+            "get",
+            "post"
+          ],
+          "/api/tickets/{id}/history": [
+            "get"
+          ],
+          "/api/dashboard": [
+            "get"
+          ]
+        },
+        "schema_names": [
+          "HTTPValidationError",
+          "ValidationError"
+        ]
+      },
+      "reproduction": "actual OpenAPI GET; required routes/methods and concrete schemas",
+      "evidence": "X"
+    },
+    {
+      "check": "validation",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "fields": [
+          "owner_id"
+        ]
+      },
+      "reproduction": "strict creation schema rejects unknown/server fields",
+      "evidence": "X"
+    },
+    {
+      "check": "error_dto",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "errors shaped {error:{code,message,fields?}}",
+      "evidence": "X"
+    },
+    {
+      "check": "validation",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "fields": [
+          "unexpected"
+        ]
+      },
+      "reproduction": "strict creation schema rejects unknown/server fields",
+      "evidence": "X"
+    },
+    {
+      "check": "error_dto",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "errors shaped {error:{code,message,fields?}}",
+      "evidence": "X"
+    },
+    {
+      "check": "validation",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "fields": [
+          "version"
+        ]
+      },
+      "reproduction": "strict creation schema rejects unknown/server fields",
+      "evidence": "X"
+    },
+    {
+      "check": "error_dto",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "errors shaped {error:{code,message,fields?}}",
+      "evidence": "X"
+    }
+  ]
+}

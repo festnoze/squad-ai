@@ -1,0 +1,43 @@
+{
+  "requirement_id": "ARC-03",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "distinct_connections",
+      "passed": true,
+      "observed": {
+        "different_objects": true
+      },
+      "reproduction": "two actual SQLite connections, not an asyncio lock",
+      "evidence": "X"
+    },
+    {
+      "check": "busy",
+      "passed": true,
+      "observed": {
+        "status": 503,
+        "body": {
+          "error": {
+            "code": "DB_BUSY",
+            "message": "Requête refusée"
+          }
+        },
+        "elapsed_seconds": 0.16410819999873638,
+        "configured_timeout_ms": 80
+      },
+      "reproduction": "hold BEGIN IMMEDIATE on independent connection; real PATCH bounded wait <=5s (+0.5s measured HTTP overhead), 503 DB_BUSY",
+      "evidence": "X"
+    },
+    {
+      "check": "rollback",
+      "passed": true,
+      "observed": {
+        "before_digest": "1e1b5c5869ab2c0295158c34a68e5f7a7179482ffd96c60db459ee94efc2f2bf",
+        "after_digest": "1e1b5c5869ab2c0295158c34a68e5f7a7179482ffd96c60db459ee94efc2f2bf"
+      },
+      "reproduction": "busy refusal leaves ticket/audit/idempotency full DB unchanged",
+      "evidence": "X"
+    }
+  ]
+}

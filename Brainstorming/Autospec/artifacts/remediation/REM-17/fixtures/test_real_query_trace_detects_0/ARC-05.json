@@ -1,0 +1,117 @@
+{
+  "requirement_id": "ARC-05",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "query_counts",
+      "passed": true,
+      "observed": {
+        "ticket_count": 1,
+        "select_count": 3,
+        "queries": [
+          "SELECT users.*,sessions.csrf,sessions.expires,sessions.revoked FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash='[bound]'",
+          "SELECT * FROM tickets ORDER BY updated_at DESC,id DESC",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'"
+        ]
+      },
+      "reproduction": "compare actual SQL requests for one vs fifty fixture tickets (bound literals redacted)",
+      "evidence": "X"
+    },
+    {
+      "check": "query_counts",
+      "passed": true,
+      "observed": {
+        "ticket_count": 50,
+        "select_count": 52,
+        "queries": [
+          "SELECT users.*,sessions.csrf,sessions.expires,sessions.revoked FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash='[bound]'",
+          "SELECT * FROM tickets ORDER BY updated_at DESC,id DESC",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'",
+          "SELECT id FROM messages WHERE ticket_id='[bound]'"
+        ]
+      },
+      "reproduction": "compare actual SQL requests for one vs fifty fixture tickets (bound literals redacted)",
+      "evidence": "X"
+    },
+    {
+      "check": "query_counts",
+      "passed": false,
+      "observed": {
+        "counts_1_50": [
+          3,
+          52
+        ],
+        "scaled_related_queries": [
+          "select id from messages where ticket_id='[bound]'"
+        ]
+      },
+      "reproduction": "same related-ticket SELECT shape executed once for one row and >=50 times for fifty rows: concrete N+1, no arbitrary total-query/time threshold",
+      "evidence": "X"
+    },
+    {
+      "check": "query_plan",
+      "passed": true,
+      "observed": {
+        "query_plan": [
+          [
+            5,
+            0,
+            224,
+            "SCAN tickets USING INDEX ticket_list"
+          ]
+        ]
+      },
+      "reproduction": "real EXPLAIN QUERY PLAN for list/messages, reviewed query symbols",
+      "evidence": "X"
+    }
+  ]
+}
