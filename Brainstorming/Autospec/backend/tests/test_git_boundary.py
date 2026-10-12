@@ -73,5 +73,34 @@ def test_native_owned_git_repo_worktree_merge_and_no_parent_adoption(tmp_path):
     assert run_git(owned,["add","-A"])[0]==0
     assert run_git(owned,["commit","-m","linked fixture"])[0]==0
     assert run_git(product,["merge","--no-ff","-m","merge fixture","fixture-branch"])[0]==0
+    code,base=run_git(product,["merge-base","HEAD","fixture-branch"])
+    assert code==0 and len(base.strip())==40
+    assert run_git(product,["revert","-m","1","--no-edit","HEAD"])[0]==0
+    assert (product/"main.py").read_text()=="# data, not executed\n"
     assert run_git(product,["status","--porcelain"])[1].strip()==""
     assert run_git(parent,["rev-parse","HEAD"])[0]!=0  # parent HEAD still unborn
+
+
+@pytest.mark.parametrize("args",[
+    ["merge-base","--octopus","HEAD","branch"],["merge-base","--all","HEAD"],
+    ["merge-base","HEAD","../../foreign"],["merge-base","HEAD","HEAD^{tree}"],
+    ["merge-base","HEAD","branch","extra"],
+    ["revert","--no-edit","HEAD"],["revert","-m","2","--no-edit","HEAD"],
+    ["revert","-m","1","--no-edit","branch"],["revert","-m","1","--no-edit","HEAD~1"],
+    ["revert","-m","1","--no-edit","--all"],["revert","--continue"],
+    ["revert","--abort","extra"]])
+def test_new_local_commands_cannot_expand_factory_shapes(tmp_path,monkeypatch,args):
+    from autospec.agents import runner
+    monkeypatch.setattr(runner,"_run_tracked",lambda *a:pytest.fail("invalid argv must never dispatch"))
+    with pytest.raises(GitConfigurationRefused):run_git(tmp_path,args)
+
+
+def test_symbolic_revert_is_pinned_to_observed_commit_before_mutation(tmp_path,monkeypatch):
+    from autospec.agents import runner
+    calls=[];commit="a"*40
+    def tracked(argv,*args):
+        calls.append(argv)
+        return (0,commit+"\n","") if argv[-3:]==["rev-parse","--verify","HEAD^{commit}"] else (0,"","")
+    monkeypatch.setattr(runner,"_run_tracked",tracked)
+    assert run_git(tmp_path,["revert","-m","1","--no-edit","HEAD"])[0]==0
+    assert calls[-1][-5:]==["revert","-m","1","--no-edit",commit]
