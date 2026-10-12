@@ -20,6 +20,12 @@ from .support_adapter import AdapterUnavailable, Proof
 from .quality_contracts import source_e2e_scenarios
 
 BROWSER_IDS = tuple(f"UX-{i:02d}" for i in range(1, 9)) + ("SEC-10", "SEC-12", "FUN-02", "FUN-06", "FUN-12")
+BROWSER_PROFILE_FIELDS = frozenset({"timeout_ms", "desktop_width", "mobile_width", "client_ticket_count", "staff_ticket_count"})
+
+
+def _source_browser_profile(profile):
+    return (isinstance(profile,dict) and set(profile)==BROWSER_PROFILE_FIELDS and
+        all(type(value) is int and value>0 for value in profile.values()))
 BROWSER_NETWORK_LIMITS = ["HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
     "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."]
 
@@ -85,7 +91,7 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
 def browser_generation_requirements(contract):
     profiles = [f for f in contract.facts if f.kind == "browser_profile"]
     requirements = {r.id: r for r in contract.requirements}
-    if len(profiles) != 1 or not set(BROWSER_IDS) <= set(profiles[0].requirement_ids):
+    if len(profiles) != 1 or not set(BROWSER_IDS) <= set(profiles[0].requirement_ids) or not _source_browser_profile(profiles[0].expected):
         raise AdapterUnavailable("reviewed browser profile missing")
     return {"contract_hash": contract.contract_hash, "brief_hash": contract.brief_hash,
             "reference_hash": contract.reference_hash, "formal_profile": profiles[0].expected,
@@ -114,6 +120,8 @@ class PlaywrightHarness:
         self.docker_browser=None
         self.browser_environment={"qualified":False}
         self.contexts = []
+        self._runtime_invalidated=False
+        self._bound_runtime_parent=None
 
     @property
     def environment_limits(self):
@@ -125,6 +133,8 @@ class PlaywrightHarness:
     async def start(self):
         try:
             self.browser_environment={"qualified":False}
+            if self._runtime_invalidated:
+                raise AdapterUnavailable("browser harness cannot adopt a changed runtime; create a new explicit harness")
             runtime=getattr(self.adapter,"supervised_runtime",None)
             if runtime is None and (getattr(self.adapter,"live_sqlite",False) or not self.trusted_fixture_local_browser):
                 raise AdapterUnavailable("product browser requires an exact supervised NETNONE runtime; no host fallback")
@@ -133,6 +143,11 @@ class PlaywrightHarness:
                     raise AdapterUnavailable("host Chromium override forbidden for supervised product browser")
                 from .docker_browser import DockerBrowserSession
                 self.docker_browser=DockerBrowserSession(runtime,origin=self.adapter.base_url)
+                parent=getattr(self.docker_browser,"parent_id",None)
+                if self._bound_runtime_parent is not None and parent!=self._bound_runtime_parent:
+                    self._runtime_invalidated=True
+                    raise AdapterUnavailable("browser harness cannot adopt a restarted runtime namespace")
+                self._bound_runtime_parent=parent
                 await asyncio.to_thread(self.docker_browser.start)
             from playwright.async_api import async_playwright
             self.playwright = await async_playwright().start()
@@ -178,6 +193,17 @@ class PlaywrightHarness:
     async def page(self, case, viewport, *, auto_navigate=True):
         if type(auto_navigate) is not bool: raise ValueError("explicit browser navigation flag required")
         if self.browser is None: await self.start()
+        if self.docker_browser is not None:
+            try:
+                # The endpoint getter freshly attests both immutable container
+                # IDs and NETNONE; never publish its private control token.
+                await asyncio.to_thread(lambda:self.docker_browser.endpoint)
+            except Exception:
+                self._runtime_invalidated=True
+                self.browser_environment={"qualified":False,"runtime_changed":True}
+                try: await self.close()
+                except Exception: pass
+                raise AdapterUnavailable("browser runtime changed/unavailable before page creation; no namespace adoption") from None
         context = await self.browser.new_context(viewport={"width": viewport, "height": 900},service_workers="block")
         self.contexts.append(context)
         origin = urlsplit(self.adapter.base_url)
@@ -286,8 +312,7 @@ class BrowserVerifier:
             for rid in ids or BROWSER_IDS:
                 if rid not in BROWSER_IDS: raise ValueError("unsupported browser requirement")
                 case, limits = _BrowserCase(self, rid), []
-                if (not isinstance(self.profile, dict) or not {"timeout_ms","desktop_width","mobile_width","client_ticket_count",
-                        "staff_ticket_count"} <= set(self.profile) or rid not in requirements):
+                if not _source_browser_profile(self.profile) or rid not in requirements:
                     limits.append("reviewed browser source profile missing")
                 else:
                     try:

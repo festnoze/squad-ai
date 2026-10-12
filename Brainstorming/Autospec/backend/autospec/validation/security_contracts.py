@@ -24,6 +24,13 @@ from .entropy_protocol import validate_entropy_evidence
 SECURITY_IDS = tuple(f"SEC-{i:02d}" for i in range(1, 16))
 
 
+def _source_security_profile(profile):
+    return (isinstance(profile,dict) and
+        all(isinstance(profile.get(k),dict) for k in ["api","statuses","password","rate","session"]) and
+        "min_token_chars" not in profile["session"] and "db_fault" not in profile["statuses"] and
+        type(profile["session"].get("min_entropy_bits")) is int and profile["session"]["min_entropy_bits"]>0)
+
+
 class SecurityIdentityError(ValueError):
     pass
 
@@ -37,7 +44,7 @@ def security_generation_requirements(contract: AcceptanceContract) -> dict:
     profiles = [f for f in contract.facts if f.kind == "security_profile"]
     requirements = {r.id: r for r in contract.requirements}
     if (len(profiles) != 1 or not set(SECURITY_IDS) <= set(profiles[0].requirement_ids) or
-            not set(SECURITY_IDS) <= set(requirements)):
+            not set(SECURITY_IDS) <= set(requirements) or not _source_security_profile(profiles[0].expected)):
         raise AdapterUnavailable("reviewed security source profile incomplete")
     return {"contract_hash": contract.contract_hash, "brief_hash": contract.brief_hash,
             "reference_hash": contract.reference_hash, "reviewed_by": contract.reviewed_by,
@@ -178,8 +185,7 @@ class SecurityVerifier:
         await self._identity()
         requirements = {r.id: r for r in self.contract.requirements}
         results = []
-        valid_profile = (isinstance(self.profile, dict) and
-                         all(isinstance(self.profile.get(k), dict) for k in ["api", "statuses", "password", "rate", "session"]))
+        valid_profile = _source_security_profile(self.profile)
         for rid in SECURITY_IDS:
             requirement = requirements.get(rid)
             c = _Case(self, rid)
@@ -376,14 +382,14 @@ class SecurityVerifier:
         await self.adapter.advance_clock(1)
         r = await c.request("alice", "GET", self.route("me"))
         c.expect("absolute_expiry_not_sliding", r.status_code, self.status("unauthorized"))
-        for mode in await c.observe("cookie_modes"):
-            c.expect("secure_mode_" + mode["mode"], mode["secure"], self.profile["session"]["modes"][mode["mode"]])
         token_sha256 = hashlib.sha256(cookie.value.encode("utf-8")).hexdigest()
         entropy = await c.observe("session_entropy", token_sha256=token_sha256)
         c.proofs.extend(validate_entropy_evidence(entropy, token_sha256=token_sha256,
             snapshot=self.snapshot, contract=self.pinned_contract_hash))
         c.expect("cryptographic_session_entropy", entropy["cryptographic"], True)
         c.expect("session_minimum_entropy_bits", entropy["entropy_bits"] >= self.profile["session"]["min_entropy_bits"], True)
+        for mode in await c.observe("cookie_modes"):
+            c.expect("secure_mode_" + mode["mode"], mode["secure"], self.profile["session"]["modes"][mode["mode"]])
 
     async def _sec06(self, c):
         response = await self._login("alice")
