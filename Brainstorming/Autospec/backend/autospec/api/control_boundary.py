@@ -145,7 +145,8 @@ class ControlPolicy:
             if not (local_authority or configured):
                 return False
             client = scope.get("client")
-            if not configured and (not client or not _loopback(client[0]) or client[0] == "localhost"):
+            local_peer = bool(client and client[0] != "localhost" and _loopback(client[0]))
+            if not local_peer and not (configured and not _loopback(host)):
                 return False
             if not origins:
                 return True  # Local CLI; not a browser authentication bypass.

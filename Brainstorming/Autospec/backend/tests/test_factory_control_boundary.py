@@ -137,6 +137,14 @@ async def test_configured_hostname_without_port_still_requires_actual_server_por
     assert approved.status_code == 200 and effects == ["route reached"]
 
 
+async def test_configured_loopback_name_does_not_authorize_a_remote_peer():
+    app, effects = guarded(ControlPolicy((), ("127.0.0.1:8100", "localhost")))
+    response = await request(app, client=("192.0.2.1",1))
+    assert response.status_code == 403 and not effects
+    response = await request(app, headers={"Host":"localhost:8100"}, client=("192.0.2.1",1))
+    assert response.status_code == 403 and not effects
+
+
 @pytest.mark.parametrize("name,value", [
     ("AUTOSPEC_CONTROL_ORIGINS", "*"), ("AUTOSPEC_CONTROL_ORIGINS", '["*"]'),
     ("AUTOSPEC_CONTROL_ORIGINS", '["null"]'), ("AUTOSPEC_CONTROL_ORIGINS", '["http://localhost:5183/"]'),
