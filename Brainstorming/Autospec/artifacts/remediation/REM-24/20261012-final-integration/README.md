@@ -69,6 +69,40 @@ NETNONE resources. XML and JSON are raw copies, not reconstructed summaries.
   a fresh-call alias receipt; a previously existing package is preserved.
   This unit replay does not replace the teammate's native package proof.
 
+## Independent late counterexamples and corrected parent replay
+
+- `owned-publication-parent-v2.xml`: **37 PASS**, 184.27 s. Actual Docker
+  publication/migration/persistence and actual Windows file-handle contention;
+  this resolves the retained atomic-replace failure, not the whole regression.
+- `owned-lifecycle-independent-before.xml`: **9 FAIL**, 2.04 s. Independent
+  offline ASGI/inert-thread counterexamples exposed contract DELETE entering
+  legacy cleanup or ignoring a pre-flush journal, and publication cancellation
+  releasing a still-live worker. No generated application ran on the host.
+- `budget-cache-root-v1.xml`: **101 PASS / 2 FAIL**, 31.24 s. The remaining
+  failures were a reviewed E2E mode not forwarded into its seal hash and an
+  obsolete budget-message assertion. The E2E mode was fixed in coordinator;
+  the budget message now explicitly requires attested reconciliation.
+- v2: **113 PASS / 1 FAIL**, 15.18 s; an old recovery mock did not yet accept
+  the newly forwarded cancellation event. It was corrected with an exact event
+  identity assertion, not a permissive fallback in production.
+- `owned-budget-cache-root-v3.xml`: **146 PASS**, 18.70 s. Final factory-only
+  replay includes repeated cancellation with a blocked worker, fresh-call CID
+  cleanup versus preserved reuse, startup recovery drainage, both journal types
+  before project deletion, absent/claimed/corrupt/outage cases, unknown historic
+  costs even with caps removed, exact reviewed E2E mode, and final-report cache
+  invalidation for absent context, changed seals/engine/report bytes.
+- Superseded reports are retained. Report reuse requires current source-review
+  admission FIRST, exact factory `.py`/browser `.cjs` hashes, reviewed external
+  configuration/seals and the exact serialized report SHA. A cache identity is
+  not an X/R/V acceptance proof. Cost counters and known amounts are preserved;
+  resume, feedback or a different cap cannot silently reconcile missing usage.
+- Withdrawal intent is durable (`stopping`) before Docker mutation. A failed
+  terminal flush cannot make startup recreate an intentionally withdrawn app.
+  Native peer evidence and its failed fixture callback are kept under REM-01.
+
+These are scoped mechanics and counterexample replays, not 57 product PASSes.
+The corrected full regression and fresh REM-25 campaign are still required.
+
 ## Factory frontend
 
 - `frontend-root-v4.xml`: actual locked Vitest **4.1.11**, **308 PASS**, 7.9475 s,

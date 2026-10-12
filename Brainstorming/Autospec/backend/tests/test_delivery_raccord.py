@@ -115,7 +115,8 @@ async def test_build_clock_gap_preserves_actual_x_but_not_provenance_or_cancella
     assert source_snapshot(source).digest==snapshot
 
 
-async def test_pipeline_calls_native_collection_before_independent_final_gate(tmp_path,monkeypatch):
+@pytest.mark.parametrize("cache_change", [None,"missing_context","seal","engine","report_bytes"])
+async def test_pipeline_calls_native_collection_before_independent_final_gate(tmp_path,monkeypatch,cache_change):
     from autospec.agents.runner import FakeRunner
     from autospec.config import settings
     from autospec.orchestrator.pipeline import Pipeline
@@ -145,8 +146,20 @@ async def test_pipeline_calls_native_collection_before_independent_final_gate(tm
     monkeypatch.setattr(coordinator,"verify_project",verify)
     assert await pipeline._aindependent_acceptance_phase()
     assert order==["review","build","native","judge"] and not pipeline.runner.calls
-    # Cached intact independent evidence is readmitted without executing again.
-    assert await pipeline._aindependent_acceptance_phase() and len(order)==4
+    supervisor=acceptance.supervisor_root(state.id)
+    digest=source_snapshot(source).digest
+    reports_path=supervisor/"reports"/digest/"verification-reports.json"
+    if cache_change=="missing_context":reports_path.with_name("verification-context.json").unlink()
+    elif cache_change=="seal":atomic_json(supervisor/"reviewed-fixtures.json",{"scope":"inert metatest seal changed"})
+    elif cache_change=="engine":
+        from autospec.validation import final_gate
+        context=final_gate.verification_cache_context
+        monkeypatch.setattr(final_gate,"verification_cache_context",lambda *args:{**context(*args),"metatest_engine_revision":2})
+    elif cache_change=="report_bytes":reports_path.write_bytes(reports_path.read_bytes()+b"\n")
+    # Revalidate source-review engine/seals FIRST, even for an intact cache.
+    assert await pipeline._aindependent_acceptance_phase()
+    assert order==["review","build","native","judge"]+(["review","build","native","judge"] if cache_change else ["review"])
+    assert len(list(reports_path.parent.glob("verification-reports-prior-*.json")))==int(bool(cache_change))
 
 
 @pytest.mark.parametrize("qualifies,publish_enabled",[(True,True),(True,False),(False,True)])
@@ -250,8 +263,9 @@ async def test_contract_stop_and_factory_start_recovery_use_owned_registry_only(
     def status(project_id,*,publication_root):
         calls.append(("status",project_id,publication_root))
         return docker_deploy.DockerDeployResult(False,"synthetic absent ingress",container=state.deployed_container)
-    def recover(project_id,publication_root,*,timeout,intended_active_only):
+    def recover(project_id,publication_root,*,timeout,intended_active_only,cancel_event):
         assert intended_active_only is True
+        assert cancel_event is pipeline._docker_cancel
         calls.append(("recover",project_id,publication_root))
         if not state.deployed_container:
             return docker_deploy.DockerDeployResult(False,"synthetic intentionally stopped journal",skipped=True)

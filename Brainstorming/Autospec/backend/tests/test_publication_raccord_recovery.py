@@ -53,7 +53,8 @@ async def test_failed_update_preserves_previous_service_but_cancel_removes_new_o
     def publish(*args,**kwargs):
         if cancel_after_return:pipeline._stop_requested=True
         return docker_deploy.DockerDeployResult(cancel_after_return,"synthetic refused update or late cancel",
-            image=qualified["image_id"],container="b"*64 if cancel_after_return else "",host_port=19300)
+            image=qualified["image_id"],container="b"*64 if cancel_after_return else "",host_port=19300,
+            created_publication_container="b"*64 if cancel_after_return else "")
     def stop(*args,**kwargs):calls.append((args,kwargs));return docker_deploy.DockerDeployResult(True,"owned DB retained")
     monkeypatch.setattr(docker_deploy,"deploy_and_verify",publish)
     monkeypatch.setattr(docker_deploy,"undeploy",stop)
@@ -61,6 +62,8 @@ async def test_failed_update_preserves_previous_service_but_cancel_removes_new_o
     assert state.deployed_container==previous and state.deploy_status=="failed" and not state.delivery_ready
     assert state.deployed_image==("sha256:"+"d"*64 if previous else "")
     assert state.deploy_host_port==(19232 if previous else 0) and len(calls)==int(cancel_after_return)
+    if calls:
+        assert calls[0][1]["expected_publication_container"]=="b"*64
 
 
 @pytest.mark.parametrize("kind", ["cli", "library"])
@@ -102,6 +105,28 @@ async def test_contract_web_with_empty_cid_never_uses_legacy_removal(tmp_path, m
     monkeypatch.setattr(docker_deploy,"undeploy",stop)
     await pipeline.aundeploy()
     assert not state.deploy_status and not pipeline.runner.calls
+
+
+@pytest.mark.parametrize("state_was_flushed", [True, False])
+async def test_late_web_cancel_preserves_a_reused_service_even_with_missing_state_cid(tmp_path, monkeypatch, state_was_flushed):
+    state = ProjectState(id="web-late-reuse", name="meta", goal="meta", acceptance_contract_hash="a"*64,
+        technical_stack={"kind":"fullstack"}, deployed_container="b"*64 if state_was_flushed else "")
+    pipeline = Pipeline(state, FakeRunner())
+    qualified=dict(image_id="sha256:"+"c"*64,snapshot_hash="d"*64,runtime_command=["/opt/venv/bin/python","main.py"],
+        internal_port=8000,local_cookie_mode=True,database_path="/var/lib/autospec-validation/support.sqlite",
+        health_path="/api/health",migration_command=None)
+    async def load(*args):return qualified
+    def reused(*args,**kwargs):
+        pipeline._stop_requested=True
+        return docker_deploy.DockerDeployResult(True,"old owned service reattached, not created",
+            image=qualified["image_id"],container="b"*64,host_port=19300)
+    monkeypatch.setattr(delivery_raccord,"load_qualified_delivery_image",load)
+    monkeypatch.setattr(pipeline,"_acceptance_contract",lambda:object())
+    monkeypatch.setattr(docker_deploy,"deploy_and_verify",reused)
+    monkeypatch.setattr(docker_deploy,"undeploy",lambda *a,**k:pytest.fail("old service stopped on an empty state guess"))
+    assert not await pipeline._adocker_qualified_delivery(tmp_path,kind="fullstack")
+    assert state.deployed_container==("b"*64 if state_was_flushed else "")
+    assert state.deploy_status=="failed" and not state.delivery_ready and not pipeline.runner.calls
 
 
 @pytest.mark.parametrize("new_alias", [True, False])

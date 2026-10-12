@@ -10,7 +10,7 @@ from autospec.orchestrator import acceptance, milestones
 from autospec.orchestrator.dependencies import atomic_json
 from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
-from autospec.validation.final_gate import source_snapshot
+from autospec.validation.final_gate import source_snapshot, verification_cache_context
 
 
 def setup(auth=False):
@@ -114,7 +114,7 @@ async def test_missing_vertical_harness_never_spends_repair_calls(monkeypatch):
     assert pipeline._delivery_blocked and not state.delivery_ready and not pipeline.runner.calls
 
 
-async def test_final_gate_cached_reports_rechecked_against_current_source_and_proofs():
+async def test_final_gate_cached_reports_rechecked_against_current_source_and_proofs(monkeypatch):
     state, contract = setup()
     for task in state.stories[0].tasks: task.status = StoryStatus.DONE
     state.stories[0].status = StoryStatus.DONE
@@ -131,6 +131,12 @@ async def test_final_gate_cached_reports_rechecked_against_current_source_and_pr
            "proofs": [proof(supervisor, kind, "BOOK-01:create", snapshot, contract) for kind in ("X", "V")]}
     atomic_json(supervisor / "reports" / snapshot / "verification-reports.json",
                 [{"contract_hash": contract.contract_hash, "snapshot_hash": snapshot, "requirements": [row]}])
+    reports_path=supervisor/"reports"/snapshot/"verification-reports.json"
+    atomic_json(reports_path.with_name("verification-context.json"),
+        {"context":verification_cache_context(contract.contract_hash,snapshot,supervisor),
+         "reports_sha256":hashlib.sha256(reports_path.read_bytes()).hexdigest()})
+    async def review(*args,**kwargs):return {"status":"REVIEWED"}  # inert admission metatest only
+    monkeypatch.setattr(pipeline,"_await_reviewed_configuration",review)
     assert await pipeline._aindependent_acceptance_phase() and state.delivery_ready
     (root / "main.py").write_text("changed")
     assert not await pipeline._aindependent_acceptance_phase() and not state.delivery_ready
