@@ -1,0 +1,17 @@
+{
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "snapshot_hash": "ad6fda1124e69c5b7149abf402be888f7cc69c003a0a8b1b81b80e91ab32a2f6",
+  "value": {
+    "argv": [
+      "/opt/venv/bin/python",
+      "main.py"
+    ],
+    "container_id": "0e9284da68518915ff0802bf70906c0761fe93104bd5320d8c78e2151e25597e",
+    "documented_text": "/opt/venv/bin/python main.py",
+    "execution": "observed-runtime",
+    "image_id": "sha256:2d5abfb99d303d01f22647f090678ee1767415d4d77648d0904c75211d3d7b86",
+    "label": "launch",
+    "passed": true,
+    "return_code": null
+  }
+}

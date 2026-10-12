@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -12,6 +13,21 @@ from autospec.validation.final_gate import source_snapshot
 from autospec.validation.support_adapter import AdapterUnavailable
 from autospec.orchestrator.validation_environment import LinuxEnvironmentManager, RECIPE_VERSION
 from autospec.orchestrator.isolated_validation import _node_command, build_delivery_image
+
+
+def _export_native(case,value,*directories):
+    """Optional test-proof export; never copy DB, passwords or fixture inputs."""
+    destination=os.environ.get("AUTOSPEC_DELIVERY_EVIDENCE_ROOT")
+    if not destination:return
+    import shutil
+    target=Path(destination).resolve()/case;target.mkdir(parents=True,exist_ok=True)
+    (target/"result.json").write_bytes(json.dumps(value,sort_keys=True,ensure_ascii=True).encode())
+    for directory in directories:
+        for path in Path(directory).rglob("*.json"):
+            relative=path.relative_to(directory)
+            if relative.parts[0] not in {"delivery-evidence","native-observations"} and path.name not in {"delivery-build.json","observations.json"}:
+                continue
+            file=target/relative;file.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(path,file)
 
 
 @pytest.fixture
@@ -120,6 +136,8 @@ def test_real_build_and_current_image_attestations_admitted(tmp_path):
         receipt=json.loads((tmp_path/"evidence/delivery-build.json").read_text())
         rows=delivery_build_checks(receipt,root,snapshot)
         assert all(r["passed"] for r in rows),rows
+        _export_native("build",dict(snapshot_hash=snapshot,contract_hash="c"*64,receipt=receipt,verification=rows,
+            scope="actual tsc/Vite/baked image/cache metatest; not support-client acceptance"),tmp_path/"evidence")
         assert not (root/".venv").exists() and not (root/"frontend/node_modules").exists()
     finally:
         _docker_call(["docker","image","rm",tag],capture_output=True,text=True,timeout=10)
@@ -242,6 +260,29 @@ async def test_real_manifest_only_python_audit_never_imports_product(tmp_path,mo
         assert set(observed["context_files"])=={"requirements.txt","runner.py","Dockerfile"}
         assert observed["run"]["tool"]=="pip-audit==2.10.1"
     assert source_snapshot(source).digest==snapshot
+    _export_native("python-audit",dict(snapshot_hash=snapshot,contract_hash="c"*64,audit=raw,scope="actual public lock advisory query, not source exploitability review"),tmp_path/"evidence")
+
+
+@pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION")!="1",reason="Explicit opt-in actual npm public lock audit, no application source networking")
+@pytest.mark.asyncio
+@pytest.mark.parametrize("vulnerable",[False,True])
+async def test_real_node_manifest_audit_good_and_known_vulnerable_lock(tmp_path,vulnerable):
+    from autospec.validation.delivery_evidence import collect_manifest_audit
+    source=tmp_path/"source";source.mkdir()
+    (source/"package.json").write_text(json.dumps(dict(name="native-audit-fixture",version="1",dependencies={"lodash":"4.17.11"} if vulnerable else {})))
+    (source/"main.js").write_bytes(b'throw Error("MUST NOT execute application in advisory networking phase");')
+    manager=LinuxEnvironmentManager(tmp_path/"cache",timeout=600);manager.ensure_lock(source,"node")
+    snapshot=source_snapshot(source).digest
+    raw=await collect_manifest_audit(source,snapshot,"c"*64,tmp_path/"evidence",timeout=600)
+    assert raw["status"]=="AVAILABLE" and raw["report_valid"],raw
+    assert bool(raw["findings"]) is vulnerable
+    assert raw["return_code"]==(1 if vulnerable else 0)
+    assert all(f["exploitable"] is None for f in raw["findings"])
+    for proof in raw["artifacts"]:
+        value=json.loads(Path(proof["path"]).read_bytes())["value"]
+        assert set(value["context_files"])=={"package.json","package-lock.json","runner.cjs","Dockerfile"}
+        assert value["run"]["argv"][:2]==["npm","audit"]
+    _export_native("node-audit-bad" if vulnerable else "node-audit-good",dict(snapshot_hash=snapshot,contract_hash="c"*64,audit=raw),tmp_path/"evidence")
 
 
 @pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_PRODUCT_HARNESS")!="1",reason="Explicit opt-in real Linux README CLI+SQLite fixture and negative rc")
@@ -287,3 +328,5 @@ async def test_real_readme_collects_isolated_cli_defaults_and_negative_rc(tmp_pa
     assert any(c.get("return_code")==9 for c in value["documented_commands"]) is negative
     # Unavailable audit remains unavailable despite real README success.
     assert value["audit"]["status"]=="UNAVAILABLE"
+    _export_native("readme-bad" if negative else "readme-good",dict(snapshot_hash=snapshot,contract_hash="c"*64,docs_audit=value,
+        scope="narrow real README commands, not complete production OPS-05"),root)
