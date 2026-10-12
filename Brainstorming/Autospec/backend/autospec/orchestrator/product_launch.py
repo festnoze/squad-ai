@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+import re
 import tempfile
 import time
 from dataclasses import dataclass
@@ -36,7 +37,13 @@ class ProductPreview:
 
 
 def open_preview(state: ProjectState, root: Path, *, docker: str, timeout: float,
-                 arguments: tuple[str, ...] = ()) -> ProductPreview:
+                 arguments: tuple[str, ...] = (), readiness_path: str = "/") -> ProductPreview:
+    # Factory-selected same-origin HTTP target, not a producer URL. A 403/404
+    # merely proves a listener exists, not that this preview target is ready.
+    if (not isinstance(readiness_path, str) or len(readiness_path) > 2000 or
+        not re.fullmatch(r"/[A-Za-z0-9_./~-]*", readiness_path) or
+        readiness_path.startswith("//") or any(part in {".", ".."} for part in readiness_path.split("/"))):
+        raise AgentError("Invalid factory preview readiness path", code="ISOLATION_UNAVAILABLE")
     kind = state.technical_stack.get("kind", "api")
     frontend_only = kind == "frontend"
     if kind not in {"api", "fullstack", "frontend"}:
@@ -72,7 +79,8 @@ def open_preview(state: ProjectState, root: Path, *, docker: str, timeout: float
                    if frontend_only else ["/opt/venv/bin/python", "main.py", *arguments]
                    if ecosystem == "python" else ["node", "main.js", *arguments])
         session = RuntimeSession(stage, environment.image, command, port=8000, ecosystem=ecosystem,
-            docker=docker, env={"PORT": "8000", "HOST": "127.0.0.1", **({"DATABASE_URL": "sqlite:////tmp/preview.sqlite"} if ecosystem == "python" else {})})
+            docker=docker, application_origin=True, local_cookie_mode=True,
+            env={"PORT": "8000", "HOST": "127.0.0.1", **({"DATABASE_URL": "sqlite:////tmp/preview.sqlite"} if ecosystem == "python" else {})})
         session.__enter__()
         deadline = time.monotonic() + min(timeout, 60)
         ready = False
@@ -81,8 +89,8 @@ def open_preview(state: ProjectState, root: Path, *, docker: str, timeout: float
                 if not session.is_running():
                     raise AgentError("Preview container exited before HTTP readiness")
                 try:
-                    response = client.get(session.origin + "/", timeout=min(5, max(.1, deadline-time.monotonic())))
-                    ready = 200 <= response.status_code < 500
+                    response = client.get(session.origin + readiness_path, timeout=min(5, max(.1, deadline-time.monotonic())))
+                    ready = 200 <= response.status_code < 300
                 except httpx.HTTPError:
                     pass
                 if ready:
