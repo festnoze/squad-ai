@@ -6,6 +6,8 @@ port publishing. The product keeps network=none: no host/LAN/registry egress.
 from __future__ import annotations
 
 import json
+import math
+import re
 import shutil
 import socket
 import socketserver
@@ -263,61 +265,247 @@ def build_delivery_image(root: Path, image: str, *, docker: str = "docker", time
 
 
 class RuntimeSession:
-    """An exact owned net-none container plus trusted localhost ingress proxy."""
+    """Exact owned net-none runtime, stable ingress and optional disposable DB.
+
+    Constructing reserves a loopback socket, so origin is known BEFORE launch.
+    A caller must close a constructed session even if it never enters it.
+    Product code sees neither a host bind for DB nor the Docker socket. exec is
+    a trusted supervisor API, not a mediated agent/model tool.
+    """
+    DATABASE_DIRECTORY = "/var/lib/autospec-validation"
+    DATABASE_URL = "sqlite:////var/lib/autospec-validation/support.sqlite"
+
     def __init__(self, stage: Path, image: str, command: list[str], *, port: int = 8000,
                  ecosystem: str = "python", docker: str = "docker", env: dict[str, str] | None = None,
-                 connection_timeout: float = 15):
+                 connection_timeout: float = 15, application_origin: bool = False,
+                 local_cookie_mode: bool = False, persistent_database: bool = False):
         if not 1 <= port <= 65535 or ecosystem not in {"python", "node"}:
             raise _unavailable("Invalid runtime port/ecosystem")
+        if not math.isfinite(connection_timeout) or connection_timeout <= 0:
+            raise _unavailable("Invalid runtime connection timeout")
+        if not command or any(not isinstance(value, str) or "\x00" in value for value in command):
+            raise _unavailable("Invalid runtime command")
+        if local_cookie_mode and not application_origin:
+            raise _unavailable("Local cookie mode requires the controlled application origin")
         self.stage, self.image, self.command = Path(stage), image, command
         self.port, self.ecosystem, self.docker = port, ecosystem, docker
         self.env = dict(env or {})
         allowed = {"PORT", "DATABASE_URL", "AUTOSPEC_STATIC_DIR", "AUTOSPEC_BOOTSTRAP_TOKEN", "HOST", "PYTHONPATH"}
-        if set(self.env) - allowed or any("\x00" in value for value in self.env.values()):
+        if set(self.env) - allowed or any(not isinstance(value, str) or "\x00" in value for value in self.env.values()):
             raise _unavailable("Runtime environment is factory-owned and allowlisted")
-        if "DATABASE_URL" in self.env and not self.env["DATABASE_URL"].startswith("sqlite:////tmp/"):
+        if "DATABASE_URL" in self.env and not re.fullmatch(r"sqlite:////tmp/[A-Za-z0-9_.-]+\.(?:db|sqlite|sqlite3)", self.env["DATABASE_URL"]):
             raise _unavailable("Runtime validation DB must be disposable SQLite under /tmp")
+        if persistent_database and "DATABASE_URL" in self.env:
+            raise _unavailable("Persistent validation DB has a fixed factory URL, not an env override")
+        for key, expected in (("PORT", str(port)), ("PYTHONPATH", "/app")):
+            if key in self.env and self.env[key] != expected:
+                raise _unavailable(f"Runtime {key} must use its fixed factory value")
+        if "HOST" in self.env and self.env["HOST"] not in {"0.0.0.0", "127.0.0.1"}:
+            raise _unavailable("Runtime HOST must be a container-local listener")
+        if "AUTOSPEC_STATIC_DIR" in self.env and self.env["AUTOSPEC_STATIC_DIR"] not in {"/app/dist", "/app/frontend/dist"}:
+            raise _unavailable("Runtime static directory must be a staged dist")
         self.timeout = connection_timeout
         self.owner, self.name = uuid.uuid4().hex, "autospec-sandbox-" + uuid.uuid4().hex
         self.identifier = None
-        self.server = None
         self.thread = None
         self.lock = threading.Lock()
+        self.operation_lock = threading.RLock()
         self.clients: set[subprocess.Popen] = set()
         self.sockets: set[socket.socket] = set()
         self.capacity = threading.BoundedSemaphore(64)
+        self.closed = False
+        self.transition = True
+        self.persistent_database = persistent_database
+        self.volume_name = "autospec-validation-" + uuid.uuid4().hex if persistent_database else None
+        self.volume_identity = None
+        self.volume_requested = False
+        self.database_url = self.DATABASE_URL if persistent_database else self.env.get("DATABASE_URL")
+        self.database_path = "/var/lib/autospec-validation/support.sqlite" if persistent_database else None
+        session = self
+        class Handler(socketserver.BaseRequestHandler):
+            def handle(self):
+                session._forward(self.request)
+        class Server(socketserver.ThreadingTCPServer):
+            daemon_threads = True
+            allow_reuse_address = False
+        self.server = Server(("127.0.0.1", 0), Handler)
+        self.host_port = self.server.server_address[1]
+        self.origin = f"http://127.0.0.1:{self.host_port}"
+        if application_origin:
+            self.env["APP_ORIGIN"] = self.origin
+        if local_cookie_mode:
+            self.env["SESSION_COOKIE_SECURE"] = "false"
+        if persistent_database:
+            self.env["DATABASE_URL"] = self.DATABASE_URL
 
     def __enter__(self):
-        require_sandbox(self.stage, self.image, docker=self.docker)
-        command = _node_command(self.command) if self.ecosystem == "node" else self.command
-        argv = docker_run_cmd(command, str(self.stage), self.image, self.docker, run_id=self.owner, container_name=self.name)
-        argv.remove("--rm")  # retain exit/log evidence until owned explicit cleanup
-        argv.insert(2, "-d")
-        at = argv.index("--entrypoint")
-        argv[at:at] = [piece for key, value in self.env.items() for piece in ("--env", f"{key}={value}")]
+        if self.closed or self.thread is not None:
+            raise _unavailable("RuntimeSession is closed or already started")
         try:
-            rc, out, err = _run_tracked(argv, "", str(self.stage), 15)
-            if rc:
-                raise _unavailable(f"Runtime container failed: {out} {err}")
-            self.identifier = _container_identity(self.docker, self.name, self.owner)
-            if self.identifier is None:
-                raise _unavailable("Runtime container identity absent")
-            session = self
-            class Handler(socketserver.BaseRequestHandler):
-                def handle(self):
-                    session._forward(self.request)
-            class Server(socketserver.ThreadingTCPServer):
-                daemon_threads = True
-                allow_reuse_address = False
-            self.server = Server(("127.0.0.1", 0), Handler)
+            require_sandbox(self.stage, self.image, docker=self.docker)
+            if self.persistent_database:
+                self._create_volume()
+            self._launch()
             self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
             self.thread.start()
-            self.host_port = self.server.server_address[1]
-            self.origin = f"http://127.0.0.1:{self.host_port}"
             return self
         except BaseException:
             self.close()
             raise
+
+    def _volume_attestation(self) -> dict | None:
+        result = _docker_call([self.docker, "volume", "inspect", self.volume_name, "--format", "{{json .}}"],
+                              capture_output=True, text=True, timeout=3, check=False)
+        if result.returncode:
+            if "no such volume" in result.stderr.lower():
+                return None
+            raise _unavailable("Cannot attest whether the owned validation volume is absent")
+        try:
+            data = json.loads(result.stdout)
+            labels = data["Labels"]
+            if data["Name"] != self.volume_name or data["Driver"] != "local" or labels.get("autospec.run_id") != self.owner or labels.get("autospec.kind") != "validation-state":
+                raise ValueError("Volume ownership mismatch")
+            return {key: data[key] for key in ("Name", "Driver", "CreatedAt", "Labels")}
+        except (KeyError, TypeError, ValueError) as exc:
+            raise _unavailable("Validation volume identity cannot be verified") from exc
+
+    def _assert_volume(self) -> None:
+        if self.volume_identity is None or self._volume_attestation() != self.volume_identity:
+            raise _unavailable("Validation volume identity changed; refusing access or removal")
+
+    def _create_volume(self) -> None:
+        # docker volume create adopts existing names: preflight + random name +
+        # labels/CreatedAt attestation reject foreign volumes rather than adopt.
+        if self._volume_attestation() is not None:
+            raise _unavailable("Validation volume name is already occupied")
+        self.volume_requested = True
+        rc, out, err = _run_tracked([self.docker, "volume", "create", "--driver", "local",
+                                     "--label", f"autospec.run_id={self.owner}", "--label", "autospec.kind=validation-state",
+                                     self.volume_name], "", None, 10)
+        if rc or out.strip() != self.volume_name:
+            raise _unavailable(f"Validation volume creation failed: {out} {err}")
+        self.volume_identity = self._volume_attestation()
+        if self.volume_identity is None:
+            raise _unavailable("Validation volume creation could not be attested")
+        # A single trusted chown/chmod initializes a NEW empty volume. No source
+        # mount, network, credentials, recursive chown, hooks or package tools.
+        init_name = "autospec-sandbox-" + uuid.uuid4().hex
+        argv = docker_run_cmd(["/bin/sh", "-c", "chmod 700 /var/lib/autospec-validation && chown 65532:65532 /var/lib/autospec-validation"],
+                              str(self.stage), self.image, self.docker, run_id=self.owner, container_name=init_name)
+        index = argv.index("-v")
+        del argv[index:index + 2]
+        index = argv.index("-w")
+        del argv[index:index + 2]
+        argv[argv.index("--user") + 1] = "0:0"
+        index = argv.index("--entrypoint")
+        argv[index:index] = ["--cap-add", "CHOWN", "--mount", self._volume_mount()]
+        try:
+            rc, out, err = _run_tracked(argv, "", None, 15)
+            if rc:
+                raise _unavailable(f"Validation volume initialization failed: {out} {err}")
+        finally:
+            _cleanup_container(self.docker, init_name, self.owner)
+
+    def _volume_mount(self) -> str:
+        self._assert_volume()
+        return f"type=volume,source={self.volume_name},target={self.DATABASE_DIRECTORY},volume-nocopy"
+
+    def _launch(self) -> None:
+        command = _node_command(self.command) if self.ecosystem == "node" else self.command
+        argv = docker_run_cmd(command, str(self.stage), self.image, self.docker, run_id=self.owner, container_name=self.name)
+        argv.remove("--rm")  # retain exit/log evidence until owned explicit cleanup
+        argv.insert(2, "-d")
+        index = argv.index("-v") + 1
+        argv[index] = argv[index].removesuffix(":rw") + ":ro"
+        at = argv.index("--entrypoint")
+        argv[at:at] = [piece for key, value in self.env.items() for piece in ("--env", f"{key}={value}")]
+        if self.persistent_database:
+            at = argv.index("--entrypoint")
+            argv[at:at] = ["--mount", self._volume_mount()]
+        rc, out, err = _run_tracked(argv, "", None, 15)
+        if rc:
+            raise _unavailable(f"Runtime container failed: {out} {err}")
+        self.identifier = _container_identity(self.docker, self.name, self.owner)
+        if self.identifier is None or out.strip() != self.identifier:
+            raise _unavailable("Runtime container launch identity absent or mismatched")
+        self.transition = False
+
+    def _assert_owned(self) -> str:
+        if self.closed or self.transition or self.identifier is None:
+            raise _unavailable("Runtime is not active")
+        if _container_identity(self.docker, self.identifier, self.owner) != self.identifier:
+            raise _unavailable("Runtime immutable container identity is no longer owned")
+        return self.identifier
+
+    def exec(self, argv: list[str], *, stdin: str = "", timeout: float = 30) -> tuple[int, str, str]:
+        """Execute source-reviewed supervisor argv, only in the owned container.
+
+        Never forwards env, host cwd or copy-back. Not available to model tools.
+        The caller owns migration/seed authorization and interprets outputs.
+        """
+        if not argv or any(not isinstance(value, str) or "\x00" in value for value in argv) or argv[0].startswith("-"):
+            raise _unavailable("Invalid supervisor exec argv")
+        if not isinstance(stdin, str) or not math.isfinite(timeout) or timeout <= 0:
+            raise _unavailable("Invalid supervisor exec input/timeout")
+        with self.operation_lock:
+            identifier = self._assert_owned()
+            if self.persistent_database:
+                self._assert_volume()
+            try:
+                result = _run_tracked([self.docker, "exec", "-i", identifier, *argv], stdin, None, timeout)
+                if result[0] == -1:
+                    self.close()
+                return result
+            except BaseException:
+                # Killing only the host docker-exec client does NOT terminate
+                # a daemon-side exec or its descendants. End the exact owned
+                # container on timeout/cancellation before propagating failure.
+                self.close()
+                raise
+
+    def is_running(self) -> bool:
+        """Fresh exact-ID liveness; never infer running from docker run exit0."""
+        with self.operation_lock:
+            if self.closed or self.transition or self.identifier is None:
+                return False
+            if _container_identity(self.docker, self.identifier, self.owner) is None:
+                return False
+            result = _docker_call([self.docker, "container", "inspect", self.identifier, "--format", "{{json .State}}"],
+                                  capture_output=True, text=True, timeout=3, check=False)
+            try:
+                return result.returncode == 0 and json.loads(result.stdout).get("Running") is True
+            except (ValueError, TypeError, AttributeError) as exc:
+                raise _unavailable("Runtime liveness could not be attested") from exc
+
+    def _disconnect(self) -> None:
+        with self.lock:
+            clients, sockets = list(self.clients), list(self.sockets)
+        for connection in sockets:
+            try:
+                connection.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+        for process in clients:
+            close_owned_process(process)
+
+    def restart(self) -> "RuntimeSession":
+        """Same origin/owned DB, new independently attested container identity."""
+        with self.operation_lock:
+            identifier = self._assert_owned()
+            if self.persistent_database:
+                self._assert_volume()
+            self.transition = True
+            self._disconnect()
+            _cleanup_container(self.docker, identifier, self.owner)
+            self.identifier = None
+            self.name = "autospec-sandbox-" + uuid.uuid4().hex
+            try:
+                require_sandbox(self.stage, self.image, docker=self.docker)
+                self._launch()
+            except BaseException:
+                self.close()
+                raise
+            return self
 
     def _forward(self, connection: socket.socket) -> None:
         if not self.capacity.acquire(blocking=False):
@@ -337,10 +525,12 @@ class RuntimeSession:
                 bridge = ["/opt/venv/bin/python", "-u", "-c", code]
             else:
                 bridge = ["node", "-e", f"const s=require('net').connect({self.port},'127.0.0.1');s.on('connect',()=>{{process.stdin.pipe(s);s.pipe(process.stdout);}});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit());"]
-            process = spawn_owned_process([self.docker, "exec", "-i", self.identifier, *bridge],
-                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-            with self.lock:
-                self.clients.add(process)
+            with self.operation_lock:
+                identifier = self._assert_owned()
+                process = spawn_owned_process([self.docker, "exec", "-i", identifier, *bridge],
+                                              stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                with self.lock:
+                    self.clients.add(process)
             timer = threading.Timer(self.timeout, close_owned_process, args=(process,))
             timer.start()
             def upload():
@@ -364,7 +554,7 @@ class RuntimeSession:
                 timer.cancel()
                 connection.shutdown(socket.SHUT_RDWR)
                 uploader.join(timeout=1)
-        except (OSError, ValueError):
+        except (OSError, ValueError, RuntimeError):
             pass
         finally:
             if process is not None:
@@ -379,26 +569,41 @@ class RuntimeSession:
             self.capacity.release()
 
     def logs(self) -> str:
-        if self.identifier is None:
+        if self.closed or self.identifier is None:
             return ""
-        result = _docker_call([self.docker, "logs", "--tail", "100", self.identifier], capture_output=True, text=True, timeout=3, check=False)
-        return (result.stdout + result.stderr)[-12000:]
+        with self.operation_lock:
+            identifier = self._assert_owned()
+            result = _docker_call([self.docker, "logs", "--tail", "100", identifier], capture_output=True, text=True, timeout=3, check=False)
+            return (result.stdout + result.stderr)[-12000:]
 
     def close(self):
-        if self.server is not None:
+        if self.thread is not None and self.server is not None:
             self.server.shutdown()
+            self.thread.join(timeout=2)
+            self.thread = None
+        if self.server is not None:
             self.server.server_close()
             self.server = None
-        with self.lock:
-            clients, sockets = list(self.clients), list(self.sockets)
-        for connection in sockets:
-            try:
-                connection.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-        for process in clients:
-            close_owned_process(process)
-        _cleanup_container(self.docker, self.name, self.owner)
+        with self.operation_lock:
+            if self.closed:
+                return
+            self.transition = True
+            self._disconnect()
+            _cleanup_container(self.docker, self.identifier or self.name, self.owner)
+            if self.volume_requested:
+                current = self._volume_attestation()
+                if current is not None:
+                    # Creation may have reached the daemon before cancellation
+                    # or a client timeout. Only our requested UUID/labels may
+                    # be recovered; a replaced attested volume is never adopted.
+                    if self.volume_identity is not None and current != self.volume_identity:
+                        raise _unavailable("Validation volume identity changed; refusing removal")
+                    result = _docker_call([self.docker, "volume", "rm", self.volume_name], capture_output=True, text=True, timeout=5, check=False)
+                    if result.returncode:
+                        raise _unavailable("Owned validation volume cleanup failed")
+                self.volume_identity = None
+                self.volume_requested = False
+            self.closed = True
 
     def __exit__(self, *_):
         self.close()
