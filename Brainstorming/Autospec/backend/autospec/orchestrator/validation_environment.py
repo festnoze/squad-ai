@@ -28,7 +28,7 @@ from .sandbox import _docker_call, _unavailable
 
 BASE_IMAGES = {"python": "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
                "node": "node:22-bookworm-slim"}
-RECIPE_VERSION = 2
+RECIPE_VERSION = 3
 FACTORY_FILES = {".autospec-bootstrap.json", ".autospec-environment.json", ".mcp.json",
                  "claude.md", "agents.md", "gemini.md"}
 
@@ -274,7 +274,7 @@ class LinuxEnvironmentManager:
                     "manifest": hashlib.sha256(manifest.read_bytes()).hexdigest(),
                     "lock": hashlib.sha256(lock.read_bytes()).hexdigest(),
                     "toolchain_image": base["Id"], "platform": "linux/" + base["Architecture"],
-                    "supervisor_reporter": "pytest-json-report==1.5.0" if ecosystem == "python" and mode == "test" else "native"}
+                    "supervisor_reporter": "pytest-json-report==1.5.0 pytest-cov==7.0.0 coverage==7.10.6" if ecosystem == "python" and mode == "test" else "native"}
         digests = base.get("RepoDigests", [])
         if not digests or not re.fullmatch(r"[a-z0-9./:_-]+@sha256:[a-f0-9]{64}", digests[0]):
             raise _unavailable("Trusted base requires its immutable registry digest")
@@ -311,17 +311,17 @@ class LinuxEnvironmentManager:
 
     @staticmethod
     def _recipe(base: str, ecosystem: str, mode: str, fingerprint: str, manifest: Path) -> str:
-        common = f"FROM {base}\nLABEL autospec.environment={fingerprint}\nWORKDIR /opt/dependencies\n"
+        common = f"FROM {base}\nWORKDIR /opt/dependencies\n"
         if ecosystem == "python":
             project = tomllib.loads(manifest.read_text(encoding="utf-8"))
             dev = " --extra dev" if "dev" in project.get("project", {}).get("optional-dependencies", {}) and mode == "test" else ""
             common += "COPY pyproject.toml uv.lock ./\nENV UV_PROJECT_ENVIRONMENT=/opt/venv UV_PYTHON_DOWNLOADS=never UV_LINK_MODE=copy\n"
             common += "RUN uv sync --locked --no-build --no-install-project --no-config" + dev + (" --no-dev" if mode == "runtime" else "") + "\n"
             if mode == "test":
-                common += "RUN uv pip install --python /opt/venv/bin/python --no-build pytest-json-report==1.5.0\n"
+                common += "RUN uv pip install --python /opt/venv/bin/python --no-build pytest-json-report==1.5.0 pytest-cov==7.0.0 coverage==7.10.6\n"
             common += 'ENV PATH="/opt/venv/bin:$PATH"\n'
         else:
             common += "COPY package.json package-lock.json ./\nRUN npm ci --ignore-scripts --no-audit --no-fund --userconfig=/dev/null --globalconfig=/tmp/autospec-empty-global-npmrc" + (" --omit=dev" if mode == "runtime" else " --include=dev") + "\n"
             common += "RUN mv node_modules /opt/node_modules\n"
             common += "RUN ln -s /tmp/vite-cache /opt/node_modules/.vite\n"
-        return common + "WORKDIR /app\nUSER 65532:65532\n"
+        return common + f"LABEL autospec.environment={fingerprint}\nWORKDIR /app\nUSER 65532:65532\n"
