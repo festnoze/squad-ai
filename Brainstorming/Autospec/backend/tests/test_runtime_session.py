@@ -40,6 +40,8 @@ class FakeDocker:
 
     def call(self, argv, **kwargs):
         self.calls.append((argv, None, None, None))
+        if argv[1:3] == ['image', 'inspect']:
+            return SimpleNamespace(returncode=0, stdout=argv[3]+' /app', stderr='')
         if argv[1:3] == ['volume', 'inspect']:
             return SimpleNamespace(returncode=0 if self.volume else 1,
                 stdout=json.dumps(self.volume) if self.volume else '', stderr='' if self.volume else 'no such volume')
@@ -169,6 +171,18 @@ def test_ingress_bridge_uses_isolated_base_python_not_product_import_path(tmp_pa
             assert argv[7:10] == ['-I', '-u', '-c']
     finally:
         left.close(); right.close()
+
+
+def test_baked_runtime_refuses_mutable_tag_and_mounts_no_host_source(tmp_path, docker_fake):
+    with pytest.raises(RuntimeError, match='immutable local image ID'):
+        RuntimeSession(tmp_path, 'mutable:tag', ['python'], mount_stage=False)
+    identifier = 'sha256:' + 'a'*64
+    with RuntimeSession(tmp_path, identifier, ['python', 'main.py'], mount_stage=False) as session:
+        session.restart()
+        launches = [call[0] for call in docker_fake.calls if call[0][1]=='run' and '-d' in call[0]]
+        assert len(launches)==2 and all('-v' not in command and '--mount' not in command for command in launches)
+        assert all(command[command.index('-w')+1]=='/app' for command in launches)
+        assert all(identifier in command for command in launches)
 
 
 @pytest.mark.parametrize('options', [

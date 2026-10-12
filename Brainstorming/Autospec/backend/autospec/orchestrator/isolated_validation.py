@@ -186,6 +186,19 @@ class IsolatedValidator:
                     file.write_bytes(data)
             return rc, out + err, environment
 
+    def run_captured(self, root: Path, ecosystem: str, command: list[str], *, mode: str = "runtime") -> tuple[int, str, str, LinuxEnvironment]:
+        """Filtered isolated execution, separate stdout/stderr, no exports.
+
+        A help probe must not treat stderr-only diagnostics as a valid stdout
+        response. Timeout/cancellation remains daemon-side container cleanup.
+        """
+        environment = self.manager.prepare(Path(root), ecosystem, mode)
+        with tempfile.TemporaryDirectory(prefix="autospec-captured-") as temporary:
+            stage = snapshot_product(Path(root), Path(temporary) / "product")
+            rc, out, err = run_isolated(_node_command(command) if ecosystem == "node" else command,
+                                       stage, environment.image, docker=self.docker, timeout=self.timeout)
+            return rc, out, err, environment
+
     def build_frontend(self, root: Path) -> tuple[int, str, Path, LinuxEnvironment]:
         """Vite builds inside Docker; returns a supervisor-owned temporary dist.
 
@@ -278,7 +291,8 @@ class RuntimeSession:
     def __init__(self, stage: Path, image: str, command: list[str], *, port: int = 8000,
                  ecosystem: str = "python", docker: str = "docker", env: dict[str, str] | None = None,
                  connection_timeout: float = 15, application_origin: bool = False,
-                 local_cookie_mode: bool = False, persistent_database: bool = False):
+                 local_cookie_mode: bool = False, persistent_database: bool = False,
+                 mount_stage: bool = True):
         if not 1 <= port <= 65535 or ecosystem not in {"python", "node"}:
             raise _unavailable("Invalid runtime port/ecosystem")
         if not math.isfinite(connection_timeout) or connection_timeout <= 0:
@@ -287,6 +301,8 @@ class RuntimeSession:
             raise _unavailable("Invalid runtime command")
         if local_cookie_mode and not application_origin:
             raise _unavailable("Local cookie mode requires the controlled application origin")
+        if type(mount_stage) is not bool or not mount_stage and not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
+            raise _unavailable("Baked runtime requires an immutable local image ID")
         self.stage, self.image, self.command = Path(stage), image, command
         self.port, self.ecosystem, self.docker = port, ecosystem, docker
         self.env = dict(env or {})
@@ -316,6 +332,7 @@ class RuntimeSession:
         self.closed = False
         self.transition = True
         self.persistent_database = persistent_database
+        self.mount_stage = mount_stage
         self.volume_name = "autospec-validation-" + uuid.uuid4().hex if persistent_database else None
         self.volume_identity = None
         self.volume_requested = False
@@ -411,12 +428,20 @@ class RuntimeSession:
         return f"type=volume,source={self.volume_name},target={self.DATABASE_DIRECTORY},volume-nocopy"
 
     def _launch(self) -> None:
+        if not self.mount_stage:
+            result = _docker_call([self.docker, "image", "inspect", self.image, "--format", "{{.Id}} {{.Config.WorkingDir}}"],
+                                  capture_output=True, text=True, timeout=3, check=False)
+            if result.returncode or result.stdout.strip() != self.image + " /app":
+                raise _unavailable("Baked runtime image identity/working directory differs")
         command = _node_command(self.command) if self.ecosystem == "node" else self.command
         argv = docker_run_cmd(command, str(self.stage), self.image, self.docker, run_id=self.owner, container_name=self.name)
         argv.remove("--rm")  # retain exit/log evidence until owned explicit cleanup
         argv.insert(2, "-d")
-        index = argv.index("-v") + 1
-        argv[index] = argv[index].removesuffix(":rw") + ":ro"
+        index = argv.index("-v")
+        if self.mount_stage:
+            argv[index + 1] = argv[index + 1].removesuffix(":rw") + ":ro"
+        else:
+            del argv[index:index + 2]  # execute baked /app, not host source/config
         at = argv.index("--entrypoint")
         argv[at:at] = [piece for key, value in self.env.items() for piece in ("--env", f"{key}={value}")]
         if self.persistent_database:
