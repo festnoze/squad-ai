@@ -1,0 +1,205 @@
+{
+  "pack": "browser_e2e",
+  "status": "PASS",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "scenarios": [
+    {
+      "id": "E2E-03",
+      "expected": "**Refus et isolation** : Bob tente les URLs/API du ticket Alice ; client ouvre route admin ; connexion d'un compte désactivé. Réponses correctes, zéro fuite. Liens : SEC-08/09/14, UX-05.",
+      "mode": "alone",
+      "status": "PASS",
+      "observed": [
+        {
+          "check": "TST-05:E2E-03:real_login_http_bob",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:real_login_bob",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:foreign_ticket_404",
+          "observed": 404,
+          "expected": 404,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:foreign_detail_cleared",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:admin_route_denied",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:admin_client_no_private",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:denied_reads_no_business_db_effect",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:inactive_login_401",
+          "observed": 401,
+          "expected": 401,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-03:console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "limits": [],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in2\\browser_e2e-\\TST-05-E2E-03-scenario-final-294e34ade9094995bc82e9be56b60811.png",
+          "sha256": "55b8f1b409971152cf4d97efea1bc919f2f9b22a93c49877b31e62fc808b4347",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in2\\browser_e2e-\\TST-05-E2E-03-scenario-final-678648943a8a4c6aa8352366c5a0f61f.png",
+          "sha256": "1442ad1e3757de6def38bd9e781c24a7a21c641c7a3a18d9fdb5c41cd195c7de",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in2\\browser_e2e-\\E2E-03-alone-d9672d535d724810bdc255c53cf54671.json",
+          "sha256": "aff5217488fd82686b51a9b3eda8875a1eabae2e51ba7cf850729679021fc6a7",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:real_login_http_bob",
+            "TST-05:E2E-03:real_login_bob",
+            "TST-05:E2E-03:foreign_ticket_404",
+            "TST-05:E2E-03:foreign_detail_cleared",
+            "TST-05:E2E-03:admin_route_denied",
+            "TST-05:E2E-03:admin_client_no_private",
+            "TST-05:E2E-03:denied_reads_no_business_db_effect",
+            "TST-05:E2E-03:inactive_login_401",
+            "TST-05:E2E-03:console"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "fixture_reset_before": true,
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/users",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        }
+      ],
+      "impact": "",
+      "real_ui_api_db": true,
+      "nominal_mocks": false,
+      "unhandled_console_errors": [],
+      "nonblank": true,
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}

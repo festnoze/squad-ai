@@ -1,0 +1,217 @@
+{
+  "pack": "browser",
+  "status": "FAIL",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "da7336b9586c4bf6f731bd5d7a783b19c59c5a01d1fb726f6c784e3b2aabdea7",
+  "requirements": [
+    {
+      "id": "UX-04",
+      "gate": "M",
+      "status": "FAIL",
+      "expected": "Captures à 1280 et 390 px : actions accessibles, aucun débordement global, textes/statuts lisibles, couleurs non exclusives. Tester textes et mots longs.",
+      "observed": [
+        {
+          "check": "UX-04:real_login_http_alice",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-04:real_login_alice",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:no_global_overflow_1280",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:actions_visible_1280",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:actions_not_clipped_1280",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:status_not_color_only_1280",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:no_global_overflow_390",
+          "observed": false,
+          "expected": true,
+          "passed": false
+        },
+        {
+          "check": "UX-04:actions_visible_390",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:actions_not_clipped_390",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:status_not_color_only_390",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-04:unhandled_page_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_6\\browser-mobile_overflow\\UX-04-viewport-1280-3ee8bcbb326c44a7be490cdfb01b8c21.png",
+          "sha256": "165247b2ceef074cf62f4f103aaeb09eb42dd5555ca3dae27eeb66cae830a9db",
+          "snapshot_hash": "da7336b9586c4bf6f731bd5d7a783b19c59c5a01d1fb726f6c784e3b2aabdea7",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-04:viewport-1280"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_6\\browser-mobile_overflow\\UX-04-viewport-390-9a9976406c4d4993b7d576c4d0efc74f.png",
+          "sha256": "edf2608b628cc30b37701825ff5d40a59e673c474df478d5949f38058a6a099a",
+          "snapshot_hash": "da7336b9586c4bf6f731bd5d7a783b19c59c5a01d1fb726f6c784e3b2aabdea7",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-04:viewport-390"
+          ],
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_6\\browser-mobile_overflow\\UX-04-final-c6a4a26ca6a94939b976d0a950c3a668.png",
+          "sha256": "edf2608b628cc30b37701825ff5d40a59e673c474df478d5949f38058a6a099a",
+          "snapshot_hash": "da7336b9586c4bf6f731bd5d7a783b19c59c5a01d1fb726f6c784e3b2aabdea7",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-04:final"
+          ],
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_6\\browser-mobile_overflow\\UX-04-17a03f0f956246c38d278ea75f437e4c.json",
+          "sha256": "1b0594c0834635cb5e01cc4ef0c208fc42660a7def2f7d28c1bfa0644e826217",
+          "snapshot_hash": "da7336b9586c4bf6f731bd5d7a783b19c59c5a01d1fb726f6c784e3b2aabdea7",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-04:real_login_http_alice",
+            "UX-04:real_login_alice",
+            "UX-04:no_global_overflow_1280",
+            "UX-04:actions_visible_1280",
+            "UX-04:actions_not_clipped_1280",
+            "UX-04:status_not_color_only_1280",
+            "UX-04:no_global_overflow_390",
+            "UX-04:actions_visible_390",
+            "UX-04:actions_not_clipped_390",
+            "UX-04:status_not_color_only_390",
+            "UX-04:unhandled_page_errors"
+          ],
+          "passed": false,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets",
+          "payload": {
+            "title": "MOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONGMOTLONG",
+            "description": "Independent browser probe description long enough",
+            "client_request_id": "a742df3c-0482-4df3-a5e9-f3a007d1e939"
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/eaf6ea48-11ea-4bd7-a15d-7b758d851583",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/eaf6ea48-11ea-4bd7-a15d-7b758d851583/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        }
+      ],
+      "impact": "UI source invariant violated",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "da7336b9586c4bf6f731bd5d7a783b19c59c5a01d1fb726f6c784e3b2aabdea7",
+      "layer": "browser"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": "mobile_overflow"
+}

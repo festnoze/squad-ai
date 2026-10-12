@@ -1,0 +1,117 @@
+{
+  "id": "FUN-02",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "checks": [
+    {
+      "check": "FUN-02:real_login_http_alice",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "FUN-02:real_login_alice",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "FUN-02:client_count",
+      "observed": "6",
+      "expected": "6",
+      "passed": true
+    },
+    {
+      "check": "FUN-02:known_detail",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "FUN-02:missing_clears_previous_detail",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "FUN-02:missing_error",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "FUN-02:unhandled_page_errors",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/32164122-c694-4de3-bc67-ea8c2a21da08",
+      "payload": null,
+      "query": {}
+    }
+  ],
+  "console_errors": []
+}

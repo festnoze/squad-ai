@@ -1,0 +1,175 @@
+{
+  "id": "TST-01",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "checks": [
+    {
+      "check": "TST-01:backend_exit",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_no_failures",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_collected",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_accounted",
+      "observed": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_critical_skip",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_nominal_mocks",
+      "observed": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_assertions_reviewed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_report_valid",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:backend_collection_errors",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_exit",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_no_failures",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_collected",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_accounted",
+      "observed": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_critical_skip",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_nominal_mocks",
+      "observed": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_assertions_reviewed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_report_valid",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:frontend_collection_errors",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_exit",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_no_failures",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_collected",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_accounted",
+      "observed": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_critical_skip",
+      "observed": 0,
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_nominal_mocks",
+      "observed": false,
+      "expected": false,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_assertions_reviewed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_report_valid",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-01:e2e_collection_errors",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-01:required_suites",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+*.json -text
+*.xml -text
+*.png -text
+*.log -text

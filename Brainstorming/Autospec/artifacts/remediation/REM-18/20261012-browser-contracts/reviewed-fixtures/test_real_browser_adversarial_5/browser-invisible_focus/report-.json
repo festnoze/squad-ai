@@ -1,0 +1,262 @@
+{
+  "pack": "browser",
+  "status": "FAIL",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "23b6a6bed88e6a0a1a5c0306532e3b2cbb5430b984263f1677aea83866adcfb3",
+  "requirements": [
+    {
+      "id": "UX-03",
+      "gate": "M",
+      "status": "FAIL",
+      "expected": "Actions au clavier, focus visible, labels accessibles, erreurs associées aux champs ; modale avec focus confiné, Échap et retour au déclencheur. Contrôle interactif requis.",
+      "observed": [
+        {
+          "check": "UX-03:real_login_http_alice",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-03:real_login_alice",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_visible",
+          "observed": false,
+          "expected": true,
+          "passed": false
+        },
+        {
+          "check": "UX-03:modal_keyboard_open",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_confined",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:escape_closes",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:focus_return",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:field_error_associated",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:accessible_label_title",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:accessible_label_description",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:accessible_label_email",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:accessible_label_password",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:login_logical_tab",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-03:unhandled_page_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_5\\browser-invisible_focus\\UX-03-keyboard-focus-029729f898b549d183e1c6d23f27ea85.png",
+          "sha256": "f14dcb2016f8c5bf9ff0dd701a8ff2845e1516628489b1a4fc8463808a223ca3",
+          "snapshot_hash": "23b6a6bed88e6a0a1a5c0306532e3b2cbb5430b984263f1677aea83866adcfb3",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-03:keyboard-focus"
+          ],
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_5\\browser-invisible_focus\\UX-03-final-39084d7ba2264779a26599d9d4c12a52.png",
+          "sha256": "71151f231e2cd8bcf274ad074ed95f3fb254e2c31c0ad8974efa389432a1ad49",
+          "snapshot_hash": "23b6a6bed88e6a0a1a5c0306532e3b2cbb5430b984263f1677aea83866adcfb3",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-03:final"
+          ],
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_5\\browser-invisible_focus\\UX-03-69fbdd58fe1142a8a19621ed5ec18c65.json",
+          "sha256": "0542126b1a65aad32c72e9bda0ccc1714e9399492feb8d53d871945ffc40e7cf",
+          "snapshot_hash": "23b6a6bed88e6a0a1a5c0306532e3b2cbb5430b984263f1677aea83866adcfb3",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-03:real_login_http_alice",
+            "UX-03:real_login_alice",
+            "UX-03:focus_visible",
+            "UX-03:modal_keyboard_open",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:focus_confined",
+            "UX-03:escape_closes",
+            "UX-03:focus_return",
+            "UX-03:field_error_associated",
+            "UX-03:accessible_label_title",
+            "UX-03:accessible_label_description",
+            "UX-03:accessible_label_email",
+            "UX-03:accessible_label_password",
+            "UX-03:login_logical_tab",
+            "UX-03:unhandled_page_errors"
+          ],
+          "passed": false,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/logout",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        }
+      ],
+      "impact": "UI source invariant violated",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "23b6a6bed88e6a0a1a5c0306532e3b2cbb5430b984263f1677aea83866adcfb3",
+      "layer": "browser"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": "invisible_focus"
+}

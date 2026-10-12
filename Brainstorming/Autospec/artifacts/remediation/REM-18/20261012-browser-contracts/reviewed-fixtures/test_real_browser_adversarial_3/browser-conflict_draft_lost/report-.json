@@ -1,0 +1,335 @@
+{
+  "pack": "browser",
+  "status": "FAIL",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "33afaa56c71f76dc68c666bba51fc46a2d6115f953d2324083cc3fde9a6cc737",
+  "requirements": [
+    {
+      "id": "UX-07",
+      "gate": "M",
+      "status": "FAIL",
+      "expected": "Doubles clics/retries sans doublon ; 409 propose un rechargement sans écrasement automatique ni perte de texte. Formulaire réutilisable après échec.",
+      "observed": [
+        {
+          "check": "UX-07:real_login_http_camille",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-07:real_login_camille",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-07:real_login_http_dylan",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-07:real_login_dylan",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-07:first_patch_success",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-07:conflict_is_explicit",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-07:draft_conserved",
+          "observed": "CONFLICT_DRAFT_04059aadf2c74f5eb7a0c9ed17e07879",
+          "expected": "CONFLICT_DRAFT_04059aadf2c74f5eb7a0c9ed17e07879",
+          "passed": true
+        },
+        {
+          "check": "UX-07:reload_conserves_draft",
+          "observed": "",
+          "expected": "CONFLICT_DRAFT_04059aadf2c74f5eb7a0c9ed17e07879",
+          "passed": false
+        },
+        {
+          "check": "UX-07:no_automatic_reapplication",
+          "observed": "high",
+          "expected": "high",
+          "passed": true
+        },
+        {
+          "check": "UX-07:interaction_failed",
+          "observed": "TimeoutError",
+          "expected": "completed",
+          "passed": false
+        }
+      ],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_3\\browser-conflict_draft_lost\\UX-07-final-11d18e321a98457c854c6e87b875067e.png",
+          "sha256": "f6aca57d5cc0622600bd80aa499bf81da7eb257d32e7555b73932549afa59e5d",
+          "snapshot_hash": "33afaa56c71f76dc68c666bba51fc46a2d6115f953d2324083cc3fde9a6cc737",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-07:final"
+          ],
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_3\\browser-conflict_draft_lost\\UX-07-final-248025b67e644511b99a7a3fd16eb375.png",
+          "sha256": "8d830543850f4e3e371d72186a459180b85bf47152bdda59e05e7617304b6260",
+          "snapshot_hash": "33afaa56c71f76dc68c666bba51fc46a2d6115f953d2324083cc3fde9a6cc737",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-07:final"
+          ],
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_adversarial_3\\browser-conflict_draft_lost\\UX-07-56a694df0de14d1b99e9b5725d32b2f8.json",
+          "sha256": "b27ca27cd2f68bd75f72d953958a6db5971dbd3a0c4197cffb1ae3fee548c189",
+          "snapshot_hash": "33afaa56c71f76dc68c666bba51fc46a2d6115f953d2324083cc3fde9a6cc737",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-07:real_login_http_camille",
+            "UX-07:real_login_camille",
+            "UX-07:real_login_http_dylan",
+            "UX-07:real_login_dylan",
+            "UX-07:first_patch_success",
+            "UX-07:conflict_is_explicit",
+            "UX-07:draft_conserved",
+            "UX-07:reload_conserves_draft",
+            "UX-07:no_automatic_reapplication",
+            "UX-07:interaction_failed"
+          ],
+          "passed": false,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": {
+            "expected_version": 1,
+            "priority": "high",
+            "status": "open",
+            "assignee_id": null
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": {
+            "expected_version": 1,
+            "priority": "low",
+            "status": "open",
+            "assignee_id": null
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": {
+            "content": "",
+            "visibility": "public",
+            "client_request_id": "44c617ff-c921-48b5-a0ff-dc3ccf04034d"
+          },
+          "query": {}
+        }
+      ],
+      "impact": "UI source invariant violated",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "33afaa56c71f76dc68c666bba51fc46a2d6115f953d2324083cc3fde9a6cc737",
+      "layer": "browser"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": "conflict_draft_lost"
+}

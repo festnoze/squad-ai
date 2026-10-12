@@ -1,0 +1,562 @@
+{
+  "pack": "browser",
+  "status": "PASS",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "requirements": [
+    {
+      "id": "UX-06",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Recherches A puis B, réponses inversées : B reste affichée. URL/rechargement conservent filtres/page ; nouveau filtre => page 1. Mécanisme anti-réponse obsolète démontré.",
+      "observed": [
+        {
+          "check": "UX-06:real_login_http_alice",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-06:real_login_alice",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-06:late_a_cannot_replace_b",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-06:search_in_url",
+          "observed": [
+            "Unicode"
+          ],
+          "expected": [
+            "Unicode"
+          ],
+          "passed": true
+        },
+        {
+          "check": "UX-06:search_survives_reload",
+          "observed": "Unicode",
+          "expected": "Unicode",
+          "passed": true
+        },
+        {
+          "check": "UX-06:page_survives_reload",
+          "observed": [
+            "2"
+          ],
+          "expected": [
+            "2"
+          ],
+          "passed": true
+        },
+        {
+          "check": "UX-06:filter_resets_page1",
+          "observed": [
+            "1"
+          ],
+          "expected": [
+            "1"
+          ],
+          "passed": true
+        },
+        {
+          "check": "UX-06:filter_survives_reload",
+          "observed": "high",
+          "expected": "high",
+          "passed": true
+        },
+        {
+          "check": "UX-06:status_resets_page1",
+          "observed": [
+            "1"
+          ],
+          "expected": [
+            "1"
+          ],
+          "passed": true
+        },
+        {
+          "check": "UX-06:status_survives_reload",
+          "observed": "closed",
+          "expected": "closed",
+          "passed": true
+        },
+        {
+          "check": "UX-06:real_login_http_camille",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "UX-06:real_login_camille",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "UX-06:assignment_resets_page1_mine",
+          "observed": [
+            "1"
+          ],
+          "expected": [
+            "1"
+          ],
+          "passed": true
+        },
+        {
+          "check": "UX-06:assignment_survives_reload_mine",
+          "observed": "mine",
+          "expected": "mine",
+          "passed": true
+        },
+        {
+          "check": "UX-06:assignment_resets_page1_unassigned",
+          "observed": [
+            "1"
+          ],
+          "expected": [
+            "1"
+          ],
+          "passed": true
+        },
+        {
+          "check": "UX-06:assignment_survives_reload_unassigned",
+          "observed": "unassigned",
+          "expected": "unassigned",
+          "passed": true
+        },
+        {
+          "check": "UX-06:unhandled_page_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_good_ux_fixt5\\browser-\\UX-06-final-4b9c876b7c504dfab59f0e368e44f458.png",
+          "sha256": "6cd47afbbaab1072df6695b6764222ff33a74edbab489052d5dbe54023c30cc3",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-06:final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_good_ux_fixt5\\browser-\\UX-06-final-0e1600b8b98840b89e0c3533b8910e4e.png",
+          "sha256": "68b46c3136c842a95d8ebf69f9e0d22d41d68e83f0111d28fa32be75d36ce1fe",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-06:final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_real_browser_good_ux_fixt5\\browser-\\UX-06-56e8d68846104c209ec235fbc226106a.json",
+          "sha256": "0d70f97cc9f7efdba86d2fd55116e9426c721e3aff3ed34cab8b9fe937c772e8",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "UX-06:real_login_http_alice",
+            "UX-06:real_login_alice",
+            "UX-06:late_a_cannot_replace_b",
+            "UX-06:search_in_url",
+            "UX-06:search_survives_reload",
+            "UX-06:page_survives_reload",
+            "UX-06:filter_resets_page1",
+            "UX-06:filter_survives_reload",
+            "UX-06:status_resets_page1",
+            "UX-06:status_survives_reload",
+            "UX-06:real_login_http_camille",
+            "UX-06:real_login_camille",
+            "UX-06:assignment_resets_page1_mine",
+            "UX-06:assignment_survives_reload_mine",
+            "UX-06:assignment_resets_page1_unassigned",
+            "UX-06:assignment_survives_reload_unassigned",
+            "UX-06:unhandled_page_errors"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "ASCII"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "Unicode"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "Unicode"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "2"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "2"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "priority": [
+              "high"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "priority": [
+              "high"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "priority": [
+              "high"
+            ],
+            "status": [
+              "closed"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "priority": [
+              "high"
+            ],
+            "status": [
+              "closed"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "2"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "assigned_to_me": [
+              "true"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "assigned_to_me": [
+              "true"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "2"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "assigned_to_me": [
+              "true"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "unassigned": [
+              "true"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ],
+            "unassigned": [
+              "true"
+            ]
+          }
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+      "layer": "browser"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}

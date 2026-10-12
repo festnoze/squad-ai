@@ -1,0 +1,191 @@
+{
+  "source_expected": "**Client nominal** : Alice se connecte, crée un ticket, le retrouve par recherche, consulte son détail et répond ; rechargement conserve les données. Liens : FUN-01/02/05/10, UX-01.",
+  "mode": "together",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "checks": [
+    {
+      "check": "TST-05:E2E-01:real_login_http_alice",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-01:real_login_alice",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-01:reload_public_response",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-01:one_db_ticket",
+      "observed": 1,
+      "expected": 1,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-01:console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/tickets",
+      "payload": {
+        "title": "E2E client eb244a84d98e4adca13973380311a57a",
+        "description": "Independent browser probe description long enough",
+        "client_request_id": "6e529576-2200-4189-ba25-36c887b07d57"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489/messages",
+      "payload": {
+        "content": "E2E public response 2aa9e63492984217934c1b2c50092209",
+        "visibility": "public",
+        "client_request_id": "1760dec8-5c14-494d-9461-d9c3d2b5daae"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "q": [
+          "E2E client eb244a84d98e4adca13973380311a57a"
+        ],
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/ac5a581d-bade-4ea2-8d0c-4f23ec976489/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    }
+  ],
+  "limits": []
+}
