@@ -25,13 +25,13 @@ async def test_coverage_score_parsed(monkeypatch):
     monkeypatch.setattr(cfg, "fake_agents", False)
     pipeline, ws, pkg = _pipeline("p-cov1")
 
-    def _fake_run(cmd, cwd, env):
-        Path(cwd, ".autospec-cov.json").write_text(
-            json.dumps({"totals": {"percent_covered": 87.0}}), encoding="utf-8"
-        )
-        return subprocess.CompletedProcess(cmd, 0, "", "")
+    from autospec.orchestrator import pipeline_validation
+    def _fake_run(root, supervisor, **kwargs):
+        assert root == ws and not supervisor.is_relative_to(ws)
+        assert kwargs["source"] == pkg
+        return 87.0, "admitted isolated coverage"
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", _fake_run)
+    monkeypatch.setattr(pipeline_validation, "run_coverage", _fake_run)
     story = UserStory(id="US-1", epic_id="E1", title="t")
     score = await pipeline._arun_coverage(story, pkg, ws)
     assert score == 87
@@ -46,7 +46,8 @@ async def test_coverage_unavailable_returns_minus1(monkeypatch):
     def _boom(*a, **k):
         raise OSError("pytest-cov absent")
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", _boom)
+    from autospec.orchestrator import pipeline_validation
+    monkeypatch.setattr(pipeline_validation, "run_coverage", _boom)
     story = UserStory(id="US-1", epic_id="E1", title="t")
     assert await pipeline._arun_coverage(story, pkg, ws) == -1
     assert story.coverage_score == -1

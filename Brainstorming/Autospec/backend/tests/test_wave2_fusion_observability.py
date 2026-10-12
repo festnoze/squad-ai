@@ -192,7 +192,8 @@ async def test_the_real_runner_counts_one_execution_and_demo_mode_counts_none(
         stdout = "1 passed"
 
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Proc())
-    monkeypatch.setattr(pipeline, "_run_suite_process", lambda *a, **k: _Proc())
+    from autospec.orchestrator import pipeline_validation
+    monkeypatch.setattr(pipeline_validation, "run_native", lambda *a, **k: (True, "1 passed", {"native": "passed"}))
 
     ok, _out, _res = await pipeline._arun_pytest(ws=worktree)
 

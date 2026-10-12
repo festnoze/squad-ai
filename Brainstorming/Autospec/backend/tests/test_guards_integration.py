@@ -122,7 +122,7 @@ async def test_import_guard_flags_hallucinated(monkeypatch):
 # T08 — flaky-check quarantine                                                 #
 # --------------------------------------------------------------------------- #
 
-async def test_flaky_rerun_flips_red_to_green(monkeypatch, tmp_path):
+async def test_red_is_not_silently_promoted_by_an_automatic_flaky_rerun(monkeypatch, tmp_path):
     import autospec.orchestrator.pipeline as pipe_mod
 
     monkeypatch.setattr(cfg, "fake_agents", False)
@@ -139,9 +139,9 @@ async def test_flaky_rerun_flips_red_to_green(monkeypatch, tmp_path):
 
     monkeypatch.setattr(pipe_mod.asyncio, "to_thread", fake_to_thread)
     ok, output, real = await pipeline._arun_pytest(ws=iso)
-    assert ok is True                # red suite flipped green on rerun
-    assert results == []             # both runs consumed
-    assert real == {"t::a": "passed"}
+    assert ok is False
+    assert results == [(True, "green output", {"t::a": "passed"})]
+    assert real == {}  # a second nominal run cannot erase the first failure
 
 
 async def test_flaky_rerun_disabled_keeps_red(monkeypatch, tmp_path):

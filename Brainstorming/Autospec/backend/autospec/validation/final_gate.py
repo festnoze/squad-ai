@@ -17,7 +17,9 @@ from ..orchestrator.dependencies import atomic_json
 _EXCLUDED_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".ruff_cache",
                   ".mypy_cache", ".autospec", ".agents", ".claude", ".codex", ".aws", ".ssh",
                   "dist", "build", "coverage", ".vite", "test-results"}
-_EXCLUDED_FILES = {"autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl"}
+_EXCLUDED_FILES = {"autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl",
+                   ".autospec-bootstrap.json", ".autospec-environment.json", "acceptance-contract.json",
+                   "contract-baseline.json", ".mcp.json", "claude.md", "agents.md", "gemini.md"}
 _HASH = re.compile(r"[0-9a-f]{64}")
 
 
@@ -39,7 +41,7 @@ def source_snapshot(root: Path) -> Snapshot:
         dirs[:] = sorted(name for name in dirs if name not in _EXCLUDED_DIRS)
         for name in sorted(names):
             rel = (Path(directory) / name).relative_to(root).as_posix()
-            if name in _EXCLUDED_FILES or name.endswith((".sqlite", ".sqlite3", ".db", ".db-wal", ".db-shm")):
+            if name.casefold() in _EXCLUDED_FILES or name.endswith((".sqlite", ".sqlite3", ".db", ".db-wal", ".db-shm")):
                 continue
             try:
                 path = broker.path(rel)

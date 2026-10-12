@@ -35,6 +35,8 @@ from ..agents.runner import (
     active_processes,
     active_skills_enabled,
     extract_json,
+    spawn_owned_process,
+    close_owned_process,
 )
 from ..agents.personas import FALLBACK_PERSONAS, persona
 from ..agents.file_broker import (ExecutionContext, ClaimViolation, IsolationViolation,
@@ -78,7 +80,7 @@ from ..models import (
 from ..language_selector import recommend_language
 from ..storage import append_interaction, force_delete_workspace, load_interactions, save_state_checkpoint, save_state_payload, workspace_dir
 from .interactions import InteractionStore
-from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
+from . import delivery_state, independence, milestones as milestone_gates, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
 from . import knowledge as knowledge_lib  # V3-F4 software knowledge base
 from . import observations as observations_lib  # V3-F2 observation critic & router
@@ -223,7 +225,7 @@ def _run_capped_process(
         # POSIX: own session so the whole group can be signalled at the timeout.
         popen_kwargs["start_new_session"] = True
     try:
-        proc = subprocess.Popen(
+        proc = spawn_owned_process(
             cmd, cwd=str(cwd),
             stdout=subprocess.PIPE, stderr=stderr,
             env=env, text=True, encoding="utf-8", errors="replace",
@@ -278,14 +280,6 @@ def _run_capped_process(
             killed = bool(kill_tree(proc))
         except Exception:  # noqa: BLE001 - the kill is best-effort, never fatal
             killed = False
-        if os.name != "nt":
-            # ``kill_tree`` only signals the DIRECT child on POSIX, which would
-            # leave the grandchild (the actual server) alive; the session opened
-            # above makes this group exactly our own descendants.
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except (OSError, AttributeError):
-                pass
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
@@ -296,6 +290,7 @@ def _run_capped_process(
             except Exception:  # noqa: BLE001 - cleanup is best-effort
                 pass
 
+    close_owned_process(proc)
     # The process is gone: whatever it buffered is already in the pipe, so a
     # short join is enough. A reader STILL blocked here means a detached
     # grandchild inherited the pipe and keeps it open - we leave it to the
@@ -1029,6 +1024,10 @@ class Pipeline:
         self._retro_task: asyncio.Task | None = None  # E7 on-demand retrospective
         self._resume_timer: asyncio.Task | None = None  # M2 scheduled auto-resume
         self._run_proc: subprocess.Popen | None = None
+        self._isolated_preview = None
+        self._preview_watch_task = None
+        self._preview_pending = None
+        self._preview_epoch = 0
         # ST-8: frontend `vite preview` processes launched alongside the backend.
         self._frontend_procs: list[subprocess.Popen] = []
         # Strong ref to the app-output streaming task (asyncio keeps only weak
@@ -1614,6 +1613,7 @@ class Pipeline:
         # Kill any in-flight agent CLI call (claude/codex) and its sub-tree, so it
         # never survives the process as an orphan (cost/resource leak).
         self._agent_procs.terminate_all()
+        await self.astop_app()
         self._kill_tree(self._run_proc)  # tree-kill so node/esbuild orphans die too
         for proc in self._frontend_procs:  # ST-8
             self._kill_tree(proc)
@@ -2339,7 +2339,8 @@ class Pipeline:
                     iteration=self.state.iteration,
                 )
             )
-        scheduler.sanitize_dependencies(self.state.stories + new_stories)
+        if not self.state.acceptance_contract_hash:
+            scheduler.sanitize_dependencies(self.state.stories + new_stories)
         self.state.stories.extend(new_stories)
         workspace.write_feature_files(self.state, new_stories)
         if streams_on:
@@ -2575,11 +2576,23 @@ class Pipeline:
             self.state.bootstrap_detail = result.detail[-4000:]
             self.state.bootstrap_fingerprint = result.fingerprint or self.state.bootstrap_fingerprint
             self.state.bootstrap_status = "skipped" if result.skipped else ("ready" if result.ok else "failed")
-            if result.ok and not result.skipped:
-                self.state.bootstrap_verified_once = True
             if not result.ok:
                 self._block_delivery(f"Socle technique non opérationnel : {result.detail}", source="bootstrap")
                 return False
+            if not result.skipped and self.state.backend_language == BackendLanguage.PYTHON:
+                ok, native, _ = await self._arun_pytest(ws=ws)
+                if not ok:
+                    self.state.bootstrap_status = "failed"
+                    self._block_delivery(f"Tests critiques du socle non admissibles : {native[-2000:]}", source="bootstrap-tests")
+                    return False
+            if not result.skipped and self._has_frontend():
+                ok, native, _ = await self._arun_frontend_tests(ws=ws)
+                if not ok:
+                    self.state.bootstrap_status = "failed"
+                    self._block_delivery(f"Tests critiques frontend du socle non admissibles : {native[-2000:]}", source="bootstrap-tests")
+                    return False
+            if result.ok and not result.skipped:
+                self.state.bootstrap_verified_once = True
             self._chat(ChatRole.SYSTEM, f"🔧 Socle technique vérifié : {result.detail}")
             return True
         except asyncio.CancelledError:
@@ -2771,7 +2784,14 @@ class Pipeline:
 
     async def _adeploy_task(self) -> None:
         try:
-            await self._adocker_delivery_phase(force=True)
+            if self.state.acceptance_contract_hash:
+                # A manual redeploy cannot attach an old ready verdict to
+                # modified source or bypass its independent acceptance gate.
+                self.state.delivery_ready = False
+                self._sync()
+                await self._adelivery_gates()
+            else:
+                await self._adocker_delivery_phase(force=True)
         except Exception as exc:  # background task: surface, never crash silently
             delivery_state.set_deploy(self.state, status="failed", detail=str(exc))
             self._chat(ChatRole.SYSTEM, f"Erreur de la livraison Docker : {exc}")
@@ -3127,11 +3147,8 @@ class Pipeline:
     def _maybe_sandbox(self, cmd: list, ws) -> list:
         """R1: wrap a command to run inside a no-network Docker sandbox when
         enabled, else return it unchanged."""
-        if not settings.sandbox_enabled:
-            return cmd
-        return sandbox.docker_run_cmd(
-            list(cmd), str(ws), settings.sandbox_image, docker=settings.docker_cmd
-        )
+        raise AgentError("ISOLATION_UNAVAILABLE: legacy optional sandbox path disabled; use attested product validation",
+                         code="ISOLATION_UNAVAILABLE")
 
     async def _aexercise_product(self) -> str:
         """Actually launch the generated app (`main.py`) and capture its output.
@@ -3155,6 +3172,11 @@ class Pipeline:
         """
         if settings.fake_agents:
             return "mode démo : exécution réelle du produit court-circuitée"
+        from .bootstrap import verify_runtime
+        probe = await verify_runtime(self.state, workspace_dir(self.state.id),
+                                     timeout_s=settings.evaluator_run_timeout_s)
+        self.monitor.event("evaluator_run", ok=probe.ok, isolated=True)
+        return probe.detail
         ws = workspace_dir(self.state.id)
         env = _minimal_env()
         timeout = settings.evaluator_run_timeout_s
@@ -3309,31 +3331,10 @@ class Pipeline:
         with a minimal env + wall-clock cap. Demo mode short-circuits."""
         if settings.fake_agents:
             return "mode démo : audit des dépendances court-circuité"
-        ws = workspace_dir(self.state.id)
-        env = _minimal_env()
-        timeout = settings.security_audit_timeout_s
-
-        def _run() -> str:
-            parts: list[str] = []
-            cmds = [("pip-audit", [settings.uv_cmd, "run", "pip-audit"])]
-            if (ws / "package.json").exists():
-                cmds.append(("npm audit", [settings.npm_cmd, "audit"]))
-            for label, cmd in cmds:
-                try:
-                    proc = subprocess.run(
-                        cmd, cwd=str(ws),
-                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                        env=env, text=True, encoding="utf-8", errors="replace",
-                        timeout=timeout,
-                    )
-                    parts.append(f"$ {label} (code {proc.returncode})\n{proc.stdout[-2000:]}")
-                except subprocess.TimeoutExpired:
-                    parts.append(f"$ {label} : timeout après {timeout:g}s")
-                except OSError as exc:
-                    parts.append(f"$ {label} : indisponible ({exc})")
-            return "\n\n".join(parts) or "(aucun audit de dépendances exécuté)"
-
-        return await asyncio.to_thread(_run)
+        # uv run/npm audit can evaluate generated project configuration and
+        # must not run on the host. An unavailable advisory is not a clean
+        # supply-chain verdict. Runtime security packs remain independent.
+        return "NOT_VERIFIED: audit supply-chain isolé non provisionné ; aucun audit hôte ni verdict de sécurité implicite."
 
     async def _asecurity_phase(self, force: bool = False) -> None:
         """Audit the delivered code + dependencies for security weaknesses and
@@ -3772,7 +3773,8 @@ class Pipeline:
         declared done: every planned story/task must be effectively shipped, and
         user-facing acceptance evidence must be present enough to trust.
         """
-        if not self._setting("definition_of_done_enabled"):
+        contracted = bool(self.state.acceptance_contract_hash)
+        if not contracted and not self._setting("definition_of_done_enabled"):
             delivery_state.mark_ready(self.state)
             return True
         result = evaluate_definition_of_done(
@@ -3780,9 +3782,13 @@ class Pipeline:
             iteration=None if all_iterations else self.state.iteration,
             require_ui_evidence=self._setting("ui_tests_enabled"),
             strict_criteria=self._setting("definition_of_done_strict_criteria"),
-            partial=self._setting("partial_delivery_enabled"),
+            partial=False if contracted else self._setting("partial_delivery_enabled"),
         )
         delivery_state.apply_definition_result(self.state, result)
+        if contracted:
+            # Structural completeness is provisional. No transient green is
+            # broadcast before image + immutable independent proofs pass.
+            self.state.delivery_ready = False
         self._report_traceability(all_iterations)
         self._log_cost_counterfactual()
         if result.blockers:
@@ -3847,8 +3853,15 @@ class Pipeline:
                     "⏸️ Déploiement Docker non lancé — la politique d'autonomie "
                     "requiert une validation humaine (bouton « Déployer »).",
                 )
+            if self.state.acceptance_contract_hash:
+                self._block_delivery("Image finale non vérifiée : validation humaine requise.", source="acceptance")
+                return False
             return True
-        return await self._adocker_delivery_phase()
+        if not await self._adocker_delivery_phase():
+            return False
+        if self.state.acceptance_contract_hash:
+            return await self._aindependent_acceptance_phase()
+        return True
 
     async def _alifecycle(self) -> None:
         try:
@@ -4228,6 +4241,98 @@ class Pipeline:
             self._block_delivery(f"Oracle d'acceptation indisponible ou altéré ({type(exc).__name__}).", source="contract")
             raise DeliveryBlocked() from exc
 
+    async def _avertical_probe(self, contract, snapshot_root, snapshot_hash):
+        from ..validation.coordinator import verify_vertical
+        return await verify_vertical(self.state, contract, snapshot_root, snapshot_hash,
+                                     acceptance.supervisor_root(self.state.id))
+
+    async def _avertical_milestone(self) -> bool:
+        from ..validation.final_gate import freeze_snapshot
+        contract = self._acceptance_contract()
+        supervisor = acceptance.supervisor_root(self.state.id)
+        async def verify():
+            try:
+                snapshot, source = await asyncio.to_thread(freeze_snapshot, workspace_dir(self.state.id), supervisor / "snapshots")
+                result = await self._avertical_probe(contract, source, snapshot.digest)
+                admitted = milestone_gates.admit_vertical(contract, result, snapshot_hash=snapshot.digest, evidence_root=supervisor)
+                if admitted["status"] != "PASS":
+                    return False, "VERTICAL_CONTRACT_FAILED: " + "; ".join(admitted["findings"])
+                digest = milestone_gates.save_receipt(admitted, supervisor)
+                self.state.plan_admission["vertical_receipt_hash"] = digest
+                self.monitor.event("vertical_milestone", ok=True, snapshot_hash=snapshot.digest,
+                                   contract_hash=contract.contract_hash, receipt_hash=digest)
+                self._sync()
+                return True, "chaîne navigateur → API → DB prouvée sur snapshot identifié"
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                # Missing supervisor ports/profiles/provider are not a product
+                # defect and must never trigger a charged repair by default.
+                return False, f"ISOLATION_UNAVAILABLE: vertical harness {type(exc).__name__}: {exc}"
+        self.state.agent_activity["vertical"] = self._activity("tests")
+        self._sync()
+        try:
+            ok, detail = await verify()
+            if not ok:
+                ok, detail = await self._arepair_delivery("vertical", detail, verify)
+            if not ok:
+                self._block_delivery("Première tranche métier non validée : " + detail, source="vertical")
+            return ok
+        finally:
+            self.state.agent_activity.pop("vertical", None)
+            self._sync()
+
+    async def _aindependent_acceptance_phase(self) -> bool:
+        from ..validation.final_gate import admit_reports, freeze_snapshot
+        from .dependencies import atomic_json
+        contract = self._acceptance_contract()
+        supervisor = acceptance.supervisor_root(self.state.id)
+        self.state.delivery_ready = False
+        self.state.agent_activity["independent-acceptance"] = self._activity("tests")
+        self._sync()
+        try:
+            snapshot, source = await asyncio.to_thread(freeze_snapshot, workspace_dir(self.state.id), supervisor / "snapshots")
+            # Re-admit cached reports: proof files and code identities may have
+            # changed since the previous run. State/model narration is ignored.
+            reports_path = supervisor / "reports" / snapshot.digest / "verification-reports.json"
+            if reports_path.is_file():
+                reports = json.loads(reports_path.read_text(encoding="utf-8"))
+                cached = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
+            else:
+                cached = None
+            if cached is None or not cached.ready:
+                from ..validation.coordinator import verify_project
+                reports = await verify_project(self.state, contract, source, snapshot.digest, supervisor)
+                atomic_json(reports_path, reports)
+            admission = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
+            atomic_json(supervisor / "reports" / snapshot.digest / "final-admission.json", admission.payload())
+            self.state.acceptance_result = {"status": admission.status, "contract_hash": contract.contract_hash,
+                "snapshot_hash": snapshot.digest, "report": str(reports_path),
+                "counts": {status: sum(row["status"] == status for row in admission.requirements)
+                           for status in ("PASS", "FAIL", "NOT_VERIFIED")}}
+            self.monitor.event("independent_acceptance", **self.state.acceptance_result)
+            if not admission.ready:
+                mandatory = [row["id"] for row in admission.requirements if row["gate"] in {"B", "M"} and row["status"] != "PASS"]
+                self._block_delivery("Acceptation indépendante bloquée : " + ", ".join(mandatory), source="acceptance")
+                return False
+            # A result gathered while somebody modified source is stale, even
+            # if all individual probes returned green on their frozen copy.
+            from ..validation.final_gate import source_snapshot
+            if (await asyncio.to_thread(source_snapshot, workspace_dir(self.state.id))).digest != snapshot.digest:
+                self._block_delivery("Code modifié pendant la vérification indépendante.", source="acceptance")
+                return False
+            delivery_state.mark_ready(self.state)
+            return True
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self.state.acceptance_result = {"status": "NOT_VERIFIED", "detail": f"{type(exc).__name__}: {exc}"}
+            self._block_delivery("Acceptation indépendante non vérifiée : " + str(exc), source="acceptance")
+            return False
+        finally:
+            self.state.agent_activity.pop("independent-acceptance", None)
+            self._sync()
+
     _FILE_WRITERS = frozenset({"dev", "dev-frontend", "qa", "tech-writer"})
     _MANIFEST_NAMES = frozenset({"pyproject.toml", "uv.lock", "package.json", "package-lock.json",
                                  "go.mod", "go.sum", "Cargo.toml", "Cargo.lock"})
@@ -4267,7 +4372,7 @@ class Pipeline:
                 transient = True
         run_id = self.state.generation_checkpoint.get("run_id") or f"project-{self.state.id}"
         return ExecutionContext(run_id=run_id, project_root=root, task_id=owner,
-                                protected_paths=self._protected_tool_paths(root)), transient
+                                readonly_paths=self._protected_tool_paths(root)), transient
 
     async def _aauthorize_agent_write(self, owner: str, paths: tuple[str, ...], role: str):
         if role not in self._FILE_WRITERS:
@@ -4533,7 +4638,8 @@ class Pipeline:
             for epic_id, story_id, story_data in planned
         ]
         # Deps may point to already-done stories from previous iterations.
-        scheduler.sanitize_dependencies(self.state.stories + new_stories)
+        if contract is None:
+            scheduler.sanitize_dependencies(self.state.stories + new_stories)
         self.state.stories.extend(new_stories)
         if contract is not None:
             remap = lambda value: task_id_map.get(value, id_map.get(value, value))
@@ -4547,6 +4653,11 @@ class Pipeline:
                     consumers=[remap(v) for v in shared.get("consumers", [])])
                     for shared in plan.get("shared_contracts", [])],
             )
+            try:
+                milestone_gates.milestone_owners(self.state, milestone_gates.strict_graph(self.state))
+            except milestone_gates.MilestoneError as exc:
+                self._block_delivery(str(exc), source="plan")
+                raise DeliveryBlocked() from exc
         workspace.write_feature_files(self.state, new_stories)
         # ST-5: sanity-check the produced work graph (dangling deps / cycle).
         if self._setting("streams_enabled"):
@@ -4774,30 +4885,17 @@ class Pipeline:
             return -1
         if toolchain.normalize(self.state.backend_language.value) != "python":
             return -1  # pytest-cov is Python-only (L2g)
-        # The report is written under cwd=ws (via report.name) and read back from
-        # the same dir — ``ws`` may be a per-item worktree on the streams path.
-        report = Path(ws) / ".autospec-cov.json"
-        env = _minimal_env()
-        cmd = [
-            settings.uv_cmd, "run", "pytest",
-            f"--cov={pkg}", "--cov-report", f"json:{report.name}", "-q",
-        ]
-
-        def _run():
-            try:
-                report.unlink(missing_ok=True)
-                proc = self._run_suite_process(cmd, ws, env)
-                if proc.returncode != 0:
-                    return None
-            except (OSError, subprocess.TimeoutExpired):
-                return None
-            try:
-                data = json.loads(report.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                return None
-            return (data.get("totals") or {}).get("percent_covered")
-
-        pct = await asyncio.to_thread(_run)
+        from .pipeline_validation import run_coverage
+        owner = _BUILD_ITEM.get() or f"phase:{self.state.phase.value}"
+        self._count_suite_run()
+        try:
+            pct, output = await asyncio.to_thread(run_coverage, Path(ws), acceptance.supervisor_root(self.state.id),
+                owner=owner, source=pkg, docker=settings.docker_cmd, timeout=settings.test_suite_timeout_s)
+            self.monitor.event("native_coverage", item=owner, admitted=pct is not None,
+                               summary=output[-500:], percent=pct)
+        except (AgentError, IsolationViolation, OSError, ValueError, KeyError) as exc:
+            self._log("coverage", f"Couverture non vérifiée : {exc}")
+            pct = None
         if pct is None:
             return -1
         story.coverage_score = round(pct)
@@ -5205,11 +5303,11 @@ class Pipeline:
                 self._chat(ChatRole.SYSTEM, f"⛔ {msg}")
                 self._notify("error", "Validation des skills échouée", msg[:200])
                 return
-        if self._setting("decompose_enabled"):
+        if self._setting("decompose_enabled") and not self.state.acceptance_contract_hash:
             # SK-2: split eligible backend stories into layered sub-tasks, then
             # let the parallel worktree engine build + aggregate them.
             await self._adecompose_pending(all_iterations=all_iterations)
-        if self._setting("streams_enabled") or self._setting("decompose_enabled"):
+        if self.state.acceptance_contract_hash or self._setting("streams_enabled") or self._setting("decompose_enabled"):
             # P4d: optional LLM judge completes file claims + sharpens
             # serialization before the parallel scheduler (floor already safe).
             await self._ajudge_independence()
@@ -5219,7 +5317,8 @@ class Pipeline:
             # Wave 5: nobody in the plan boots the server (the auto-discovery
             # convention only wires ROUTES). Add the web bootstrap task BEFORE
             # the floor so its shared-file claim is serialized like any other.
-            self._ensure_web_wiring_task(all_iterations=all_iterations)
+            if not self.state.acceptance_contract_hash:
+                self._ensure_web_wiring_task(all_iterations=all_iterations)
             self._enforce_global_independence()
             await self._abuild_phase_streams(all_iterations=all_iterations)
             return
@@ -5431,7 +5530,7 @@ class Pipeline:
                             self._log(f"dev:{story.id}", "❌ Tests d'acceptance UI rouges.")
                 if ok and settings.coverage_enabled and not is_frontend:
                     cov = await self._arun_coverage(story, pkg, ws)
-                    if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
+                    if settings.coverage_gate_threshold > 0 and cov < settings.coverage_gate_threshold:
                         ok = False
                         tail = (
                             f"Couverture insuffisante : {cov}% < seuil "
@@ -5440,11 +5539,6 @@ class Pipeline:
                         self._log(f"dev:{story.id}", "❌ " + tail)
                 if ok:
                     story.status = StoryStatus.DONE
-                    # Suite green: any planned test we couldn't map to a real
-                    # node is assumed green (the whole suite passed).
-                    for test in story.test_plan:
-                        if test.status == TestState.NONEXISTENT:
-                            test.status = TestState.GREEN
                     self._log(f"dev:{story.id}", f"✅ Suite de tests verte — {story.id} terminé.")
                     # Commit the workspace as this story's green state so its diff
                     # can be exposed (git show of the "story <id> done" commit).
@@ -5624,7 +5718,23 @@ class Pipeline:
                         else self.state.stories_of_iteration(self.state.iteration)
                     )
                 }
-                graph = work_streams.build_work_graph(self.state)
+                try:
+                    graph = (milestone_gates.strict_graph(self.state) if self.state.acceptance_contract_hash
+                             else work_streams.build_work_graph(self.state))
+                    allowed = None
+                    if self.state.acceptance_contract_hash:
+                        foundation, vertical = milestone_gates.milestone_owners(self.state, graph)
+                        contract = self._acceptance_contract()
+                        receipt = milestone_gates.load_receipt(self.state, contract, acceptance.supervisor_root(self.state.id))
+                        if receipt is None:
+                            allowed = foundation | {vertical}
+                            if milestone_gates.vertical_complete(graph, foundation, vertical) and not running:
+                                if not await self._avertical_milestone():
+                                    raise DeliveryBlocked()
+                                allowed = None
+                except (milestone_gates.MilestoneError, OSError, ValueError, TypeError, KeyError) as exc:
+                    self._block_delivery(f"Jalon/plan non admis : {exc}", source="vertical")
+                    raise DeliveryBlocked() from exc
                 # Surface graph sanitation loudly (unknown deps dropped, cycles
                 # broken at ingestion): silent repairs hide plan defects.
                 for warning in graph.warnings:
@@ -5684,6 +5794,8 @@ class Pipeline:
                 # conflict any more. The hold is released by _reap_done.
                 solo_inflight = bool(self._solo_running & running.keys())
                 for it in picks:
+                    if allowed is not None and it.id not in allowed:
+                        continue
                     if solo_inflight:
                         break  # P2-A: the solo rebuild has the HEAD to itself
                     if it.id in self._solo_ids and running:
@@ -6479,9 +6591,6 @@ class Pipeline:
         if real:
             self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
         story.status = StoryStatus.DONE
-        for test in story.test_plan:
-            if test.status == TestState.NONEXISTENT:
-                test.status = TestState.GREEN
         if not self._story_rollup_incomplete(story):  # D11: never a partial rollup
             await self._acommit_story(ws, story.id)
         self._set_recovery(story, "", sync=False)
@@ -6506,6 +6615,9 @@ class Pipeline:
         FAILED — the new sub-tasks will build); False to fall through to FAILED.
         Bounded by ``split_max_depth`` (bypassed when ``force`` — a manual user
         action); non-fatal (any error → False)."""
+        if self.state.acceptance_contract_hash:
+            self._log(f"split:{item.id}", "Découpage refusé : le plan à contrat doit être réadmis avec ses lots et jalons.")
+            return False
         if not force and not settings.split_on_failure_enabled:
             return False
         if not force and getattr(target, "split_depth", 0) >= settings.split_max_depth:
@@ -7109,6 +7221,14 @@ class Pipeline:
         """
         if not settings.empty_red_is_infra or not empty_red:
             return False, output, None, False
+        if not settings.fake_agents:
+            failure = repair_policy.classify_failure(output)
+            self.monitor.event("empty_red", item=wid, phase="isolated_not_verified",
+                               category=failure.category, fingerprint=failure.fingerprint)
+            # A pristine isolated runner has no host venv to purge. Registry,
+            # daemon or missing oracle failures need supervisor remediation,
+            # not another paid generation with identical inputs.
+            return False, output, None, not failure.repairable
         self.monitor.event("empty_red", item=wid, phase="replay")
         self._log(
             f"dev:{wid}",
@@ -7368,12 +7488,18 @@ class Pipeline:
                             self.state.sizing_lessons.append(lesson)
                         self.state.sizing_lessons = self.state.sizing_lessons[-12:]
                     elif canary_kind == "semantic":
-                        # Revert impossible : on ne peut pas mieux faire que
-                        # livrer l'item en signalant BRUYAMMENT le HEAD rouge.
+                        # A failed revert is not a successful delivery. Keep
+                        # recovery evidence and block dependents on red HEAD.
+                        keep_branch = True
+                        target.status = subject.status = StoryStatus.FAILED
+                        target.last_error = "CANARY_REVERT_FAILED: " + canary_tail
+                        self._set_stage(target, BuildStage.FAILED, "")
+                        self._block_delivery(target.last_error, source="post-merge-canary")
                         self._notify(
                             "warning", "Canari post-merge rouge",
                             f"{item.id} mergé mais la suite combinée est rouge et le revert a échoué.",
                         )
+                        return
                     elif not canary_ok:  # canary_kind == "infra"
                         # Rouge d'infra persistant : le merge est conservé (le
                         # code est bon), mais l'environnement partagé est cassé —
@@ -7383,6 +7509,13 @@ class Pipeline:
                             f"{item.id} mergé mais l'outillage partagé est indisponible "
                             "(venv/toolchain), pas un conflit de code.",
                         )
+                        if not settings.fake_agents:
+                            keep_branch = True
+                            target.status = subject.status = StoryStatus.FAILED
+                            target.last_error = "CANARY_NOT_VERIFIED: " + canary_tail
+                            self._set_stage(target, BuildStage.FAILED, sync=False)
+                            self._block_delivery(target.last_error, source="canary")
+                            return
                 if merged:
                     keep_branch = False  # P2b: merged into HEAD — branch is useless now
                     if not dev_ran:
@@ -7392,9 +7525,6 @@ class Pipeline:
                     # P3: an item is "delivered" only here - green AND merged on
                     # the shared HEAD. This is the denominator of suites_per_item.
                     self.state.calibration_for().items_delivered += 1
-                    for test in subject.test_plan:
-                        if test.status == TestState.NONEXISTENT:
-                            test.status = TestState.GREEN
                     if item.kind == "story":
                         self.state.story(item.story_id).test_plan = subject.test_plan
                     self._set_recovery(target, "", sync=False)  # B1: clear
@@ -7718,7 +7848,7 @@ class Pipeline:
                     self._log(f"dev:{subject.id}", "❌ Tests d'acceptance UI rouges.")
         if ok and settings.coverage_enabled and not is_frontend:
             cov = await self._arun_coverage(subject, pkg, worktree)
-            if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
+            if settings.coverage_gate_threshold > 0 and cov < settings.coverage_gate_threshold:
                 ok = False
                 tail = (
                     f"Couverture insuffisante : {cov}% < seuil "
@@ -7895,6 +8025,15 @@ class Pipeline:
         if ok:
             self._count_canary("green")  # P3
             return True, "green", ""
+        if not settings.fake_agents:
+            failure = repair_policy.classify_failure(output)
+            code_collection_error = failure.category == "dependency" or "SyntaxError" in output
+            infra = not results and not code_collection_error
+            verdict = "infra_persistent" if infra else "semantic"
+            self._count_canary(verdict)
+            self.monitor.event("canary", item=item.id, verdict=verdict,
+                               category=failure.category, fingerprint=failure.fingerprint)
+            return False, "infra" if infra else "semantic", output[-1500:]
         # Rouge. Est-ce l'environnement plutôt que le code ?
         if not is_frontend and self._looks_like_infra_failure(output, results):
             self._log(
@@ -8293,6 +8432,16 @@ class Pipeline:
         handling resumes."""
         if not manifests.is_manifest_conflict(conflict_files):
             return False
+        from ..agents.file_broker import FileBroker
+        try:
+            broker = FileBroker(ExecutionContext("manifest-merge", Path(repo)))
+            # Validate the entire batch BEFORE git checkout or any write; a
+            # tracked prefix may have been replaced with an NTFS junction.
+            targets = {path: broker.path(path.strip().replace("\\", "/"), writing=True)
+                       for path in conflict_files}
+        except (IsolationViolation, OSError, ValueError):
+            return False
+        resolution_roots = set()
         for path in conflict_files:
             rel = path.strip().replace("\\", "/")
             name = rel.rsplit("/", 1)[-1]
@@ -8300,6 +8449,7 @@ class Pipeline:
                 code, _ = await self._agit(repo, "checkout", "--ours", "--", rel)
                 if code != 0:
                     return False
+                resolution_roots.add((str(Path(rel).parent), "python" if name == "uv.lock" else "node"))
             else:
                 ours_code, ours = await self._agit(repo, "show", f":2:{rel}")
                 theirs_code, theirs = await self._agit(repo, "show", f":3:{rel}")
@@ -8313,12 +8463,28 @@ class Pipeline:
                 if merged is None:
                     return False
                 try:
-                    (Path(repo) / rel).write_text(merged, encoding="utf-8")
-                except OSError:
+                    broker.path(rel, writing=True).write_text(merged, encoding="utf-8")
+                except (OSError, IsolationViolation):
                     return False
+                resolution_roots.add((str(Path(rel).parent), "python" if name == "pyproject.toml" else "node"))
             code, _ = await self._agit(repo, "add", "--", rel)
             if code != 0:
                 return False
+        if resolution_roots and not settings.fake_agents:
+            from .validation_environment import LinuxEnvironmentManager
+            async with self._dependency_lock:
+                manager = LinuxEnvironmentManager(acceptance.supervisor_root(self.state.id) / "environments",
+                    docker=settings.docker_cmd, timeout=settings.bootstrap_timeout_s)
+                try:
+                    for directory, ecosystem in sorted(resolution_roots):
+                        root = Path(repo) / directory
+                        lock = await asyncio.to_thread(manager.regenerate_lock, root, ecosystem)
+                        code, _ = await self._agit(repo, "add", "--", lock.relative_to(repo).as_posix())
+                        if code:
+                            return False
+                except (AgentError, IsolationViolation, OSError, ValueError) as exc:
+                    self._log("dependencies", f"Fusion manifests refusée : lock neuf non admis ({exc}).")
+                    return False
         return True
 
     async def _abranch_files(self, repo, branch: str) -> list[str]:
@@ -9081,7 +9247,7 @@ class Pipeline:
                 await self._acommit_story(ws, f"feature {task_id}")
             await self._abuild_work_item(item)
             if not self._delivery_blocked:
-                self._apply_definition_of_done()
+                await self._adelivery_gates()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {task_id} : {exc}")
         finally:
@@ -9388,7 +9554,7 @@ class Pipeline:
                     else TestState.RED
                 )
             elif item.get("status") == "green":
-                test.status = TestState.GREEN
+                test.status = TestState.NONEXISTENT  # model narration is not execution evidence
             elif item.get("status") == "red":
                 test.status = TestState.RED
 
@@ -9522,20 +9688,22 @@ class Pipeline:
         In particular, killing only npm/uv on Windows leaves its child holding
         stdout open forever. The shared capped launcher kills the whole tree.
         """
-        run = _run_capped_process(
-            self._resolve_cmd(cmd), cwd=cwd, env=env,
-            timeout=settings.test_suite_timeout_s, output_cap=256_000,
-            kill_tree=self._kill_tree, name="test-suite",
-        )
-        output = run.output
-        if run.launch_error:
-            output += f"\nLancement impossible : {run.launch_error}"
-        if run.timed_out:
-            output += f"\nSuite interrompue après {settings.test_suite_timeout_s:g}s (timeout)."
-        if run.pipe_leaked:
-            output += "\nProcessus enfant détaché : sortie incomplète, suite non validée."
-        failed = run.launch_error or run.timed_out or run.pipe_leaked
-        return subprocess.CompletedProcess(cmd, 1 if failed else (run.returncode or 0), stdout=output)
+        # Compatibility callers must never reintroduce host execution. Native
+        # tests use run_native; arbitrary generated script commands stay in a
+        # filtered, network-none Linux copy, with no host environment inherited.
+        from .isolated_validation import IsolatedValidator
+        ecosystem = "python" if (Path(cwd) / "pyproject.toml").is_file() else "node"
+        command = list(cmd)
+        if ecosystem == "python" and len(command) >= 3 and command[1] == "run":
+            target = command[2]
+            if target in {"pytest", "python"}:
+                command = ["/opt/venv/bin/python", *( ["-m", "pytest"] if target == "pytest" else []), *command[3:]]
+            else:
+                command = [f"/opt/venv/bin/{target}", *command[3:]]
+        validator = IsolatedValidator(acceptance.supervisor_root(self.state.id) / "environments",
+                                      docker=settings.docker_cmd, timeout=settings.test_suite_timeout_s)
+        code, output, _ = validator.run_command(Path(cwd), ecosystem, command)
+        return subprocess.CompletedProcess(cmd, code, stdout=output)
 
     async def _arun_pytest(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the test suite for the project's backend language (L2g).
@@ -9554,6 +9722,11 @@ class Pipeline:
             return True, "mode démo : vérification des tests court-circuitée", {}
         if self.state.technical_stack.get("kind") == "frontend":
             return True, "frontend seul : pas de suite backend", {}
+        return await self._arun_isolated_native(
+            workspace_dir(self.state.id) if ws is None else Path(ws), "python",
+        ) if self.state.backend_language == BackendLanguage.PYTHON else (
+            False, "ISOLATION_UNAVAILABLE: this language has no attested Linux validation profile", {}
+        )
         self._count_suite_run()  # P3: one REAL suite execution, whoever asked for it
         # Run in a worker thread via subprocess: asyncio's subprocess support is
         # unavailable on Windows' SelectorEventLoop (used by uvicorn), so we stay
@@ -10253,22 +10426,7 @@ class Pipeline:
     def _terminate_tree(proc) -> None:
         """Terminate a launched process and its children (the app may spawn a
         server child). Windows needs a tree-kill; POSIX gets terminate→kill."""
-        if proc.poll() is not None:
-            return
-        try:
-            if os.name == "nt":
-                subprocess.run(
-                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-                )
-            else:
-                proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-        except OSError:
-            pass
+        Pipeline._kill_tree(proc)
 
     def _expects_web_app(self) -> bool:
         """Should the delivered product LISTEN on a port, by INTENT (product
@@ -10315,6 +10473,20 @@ class Pipeline:
         exit 0 within the timeout AND, with ``SMOKE_CLI_HELP`` on, answer
         ``--help`` with a non-empty stdout (see :meth:`_smoke_cli_help_run`).
         Returns (ok, human-readable detail)."""
+        # Web probes are performed by bootstrap/runtime acceptance, including
+        # actual HTTP+DB, rather than finding a possibly unrelated host port.
+        from .isolated_validation import IsolatedValidator
+        if self._expects_web_app():
+            return False, "ISOLATION_UNAVAILABLE: web smoke requires the asynchronous isolated runtime gate"
+        validator = IsolatedValidator(acceptance.supervisor_root(self.state.id) / "environments",
+                                      docker=settings.docker_cmd, timeout=settings.smoke_run_timeout_s)
+        code, output, _ = validator.run_command(ws, "python", ["/opt/venv/bin/python", "main.py"], mode="runtime")
+        if code:
+            return False, f"CLI isolé en échec ({code}): {output[-2000:]}"
+        if self._setting("smoke_cli_help"):
+            code, help_output, _ = validator.run_command(ws, "python", ["/opt/venv/bin/python", "main.py", "--help"], mode="runtime")
+            return code == 0 and bool(help_output.strip()), help_output[-2000:]
+        return True, output[-2000:]
         import socket
 
         pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
@@ -10335,7 +10507,7 @@ class Pipeline:
         if is_web:
             port = self._resolve_web_port(ws)
             try:
-                proc = subprocess.Popen(
+                proc = spawn_owned_process(
                     cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     env=env, text=True, encoding="utf-8", errors="replace",
                 )
@@ -10565,6 +10737,9 @@ class Pipeline:
         sibling suite then died mid-run on "Cannot find package 'vite'" (the
         messagerie2 churn: 6 reinstalls of the shared install in one build).
         The npm cache keeps the per-worktree install fast (~20-40 s)."""
+        # Dependencies are image-owned. A dev call only reads/writes through
+        # mediation; installing a product tree on the host is never necessary.
+        return
         if settings.fake_agents or self._node_modules_usable(root):
             return
         stream = next(iter(workspace.frontend_streams(self.state)), None)
@@ -10603,12 +10778,12 @@ class Pipeline:
         stream = next(iter(workspace.frontend_streams(self.state)), None)
         if stream is None:
             return True, "aucun stream frontend", {}
-        self._count_suite_run()  # P3: one REAL suite execution (Vitest + build)
         root = workspace.stream_root(self.state, stream)
         if ws is not None:
             # Re-root the frontend zone onto the worktree copy of the repo.
             rel = root.relative_to(workspace_dir(self.state.id))
             root = ws / rel
+        return await self._arun_isolated_native(root, "node", build=True, logical_prefix=stream.file_root or "")
         # Safety net: the verify step also needs node_modules (idempotent — the
         # dev step usually installed/linked it already).
         await self._aensure_frontend_node_modules(root)
@@ -10692,6 +10867,29 @@ class Pipeline:
             ok=ok, summary=(output or "")[-500:],
         )
         return ok, output, results
+
+    async def _arun_isolated_native(self, root: Path, ecosystem: str, *, build: bool = False, logical_prefix: str = ""):
+        from .pipeline_validation import run_native
+        owner = _BUILD_ITEM.get() or f"phase:{self.state.phase.value}"
+        activity = f"native:{owner}:{ecosystem}"
+        self.state.agent_activity[activity] = self._activity("tests")
+        self._sync()
+        self._count_suite_run()
+        try:
+            result = await asyncio.to_thread(
+                run_native, root, ecosystem, acceptance.supervisor_root(self.state.id),
+                owner=owner, project_root=workspace_dir(self.state.id),
+                docker=settings.docker_cmd, timeout=settings.test_suite_timeout_s,
+                build=build, logical_prefix=logical_prefix,
+            )
+            self.monitor.pytest(item_id=owner, ok=result[0], summary=result[1][-500:])
+            return result
+        except (AgentError, IsolationViolation, OSError, ValueError) as exc:
+            self.monitor.pytest(item_id=owner, ok=False, summary=str(exc)[-500:])
+            return False, f"ISOLATED_VALIDATION_FAILED: {exc}", {}
+        finally:
+            self.state.agent_activity.pop(activity, None)
+            self._sync()
 
     @staticmethod
     def _looks_like_frontend_infra_failure(output: str, results: dict[str, str]) -> bool:
@@ -10808,6 +11006,42 @@ class Pipeline:
     # ------------------------------------------------------------ RUN app
 
     async def arun_app(self, args: str = "") -> None:
+        if not settings.fake_agents:
+            if self._preview_pending is not None:
+                self._log("run", "Lancement isolé déjà en cours.")
+                return
+            if self._isolated_preview is not None:
+                self._log("run", f"Application isolée déjà active : {self._isolated_preview.origin}")
+                return
+            from .product_launch import open_preview
+            epoch = self._preview_epoch
+            pending = asyncio.create_task(asyncio.to_thread(
+                open_preview, self.state, workspace_dir(self.state.id),
+                docker=settings.docker_cmd, timeout=settings.bootstrap_timeout_s,
+                arguments=tuple(shlex.split(args)),
+            ))
+            self._preview_pending = pending
+            try:
+                self._isolated_preview = await asyncio.shield(pending)
+            except asyncio.CancelledError:
+                # A cancelled to_thread launch still owns resources. Wait for
+                # precisely this result and dispose it before returning.
+                try:
+                    preview = await asyncio.shield(pending)
+                    await self._aclose_isolated_preview(preview)
+                except Exception:
+                    pass
+                raise
+            finally:
+                self._preview_pending = None
+            if epoch != self._preview_epoch:
+                await self._aclose_isolated_preview(self._isolated_preview)
+                return
+            self.state.running = True
+            self._sync()
+            self._log("run", f"▶ Application isolée : {self._isolated_preview.origin} (base jetable de preview)")
+            self._preview_watch_task = asyncio.create_task(self._awatch_isolated_preview(self._isolated_preview))
+            return
         if self._run_proc and self._run_proc.poll() is None:
             self._log("run", "L'application tourne déjà.")
             return
@@ -10870,7 +11104,7 @@ class Pipeline:
         (ST-8). Mirrors ``_stream_run_output`` but for a frontend stream."""
         cmd = self._resolve_cmd(toolchain.frontend_run_command())
         try:
-            proc = subprocess.Popen(
+            proc = spawn_owned_process(
                 cmd, cwd=str(root),
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 env=env, text=True, encoding="utf-8", errors="replace",
@@ -10907,7 +11141,7 @@ class Pipeline:
         else:
             cmd = toolchain.run_command(lang, run_args)
         try:
-            proc = subprocess.Popen(
+            proc = spawn_owned_process(
                 cmd,
                 cwd=str(ws),
                 stdout=subprocess.PIPE,
@@ -10937,18 +11171,44 @@ class Pipeline:
         (restart / delete) fail with « partiellement verrouillé ». ``taskkill
         /T`` (Windows) / ``terminate`` (POSIX) takes the children down too.
         Best-effort; returns True if a live process was signalled."""
-        if proc is None or proc.poll() is not None:
+        if proc is None:
             return False
+        if not hasattr(proc, "_autospec_cleanup_lock"):
+            # PID-only migration state is not authority to terminate anything.
+            logger.warning("Refus d'arrêt d'un processus non possédé par Autospec")
+            return False
+        alive = proc.poll() is None
+        close_owned_process(proc)
+        return alive
+
+    async def _awatch_isolated_preview(self, preview):
         try:
-            if os.name == "nt":
-                subprocess.run(
-                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-                )
-            else:
-                proc.terminate()
-        except OSError:
-            pass
+            while self._isolated_preview is preview:
+                if not await asyncio.to_thread(preview.is_running):
+                    self._log("run", "Application isolée terminée ; le statut running est retiré.")
+                    break
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._log("run", f"Application isolée non attestée : {type(exc).__name__}.")
+        finally:
+            if self._isolated_preview is preview:
+                await self._aclose_isolated_preview(preview)
+
+    async def _aclose_isolated_preview(self, preview) -> bool:
+        self.state.running = False
+        self._sync()
+        try:
+            await asyncio.to_thread(preview.close)
+        except Exception as exc:
+            # Keep authority to retry exact cleanup; never lose the handle or
+            # leave running=True merely because Docker cleanup is unavailable.
+            self._isolated_preview = preview
+            self._log("run", f"Nettoyage isolé incomplet, handle conservé : {type(exc).__name__}.")
+            return False
+        if self._isolated_preview is preview:
+            self._isolated_preview = None
         return True
 
     async def astop_app(self) -> None:
@@ -10958,6 +11218,21 @@ class Pipeline:
         sees it exit and calls ``_on_run_finished``, which resets ``running=False``.
         Safe to call when no app is running (logged no-op, never raises).
         """
+        self._preview_epoch += 1
+        if self._preview_watch_task is not None:
+            watch, self._preview_watch_task = self._preview_watch_task, None
+            if not watch.done():
+                watch.cancel()
+            await asyncio.gather(watch, return_exceptions=True)
+        if self._preview_pending is not None:
+            try:
+                pending_preview = await asyncio.shield(self._preview_pending)
+                await self._aclose_isolated_preview(pending_preview)
+            except Exception:
+                pass
+        if self._isolated_preview is not None:
+            if await self._aclose_isolated_preview(self._isolated_preview):
+                self._log("run", "■ Conteneur et proxy possédés arrêtés ; aucun processus tiers touché.")
         stopped = False
         if self._kill_tree(self._run_proc):
             stopped = True
