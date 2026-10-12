@@ -5,6 +5,28 @@ qualified: the first two native probes failed at npm lock resolution, before
 tests/build/browser, as retained in `bootstrap-browser.xml` / `.log`. This is
 not production security acceptance or an audit-risk waiver.
 
+Follow-up npm profile: `22c5ca78`, with strict tool provisioning instead of a
+peer bypass. Node22 remains immutable. A fixed npm11.6.4 tarball from the public
+registry is checked against the saved primary SHA512 before extraction or tool
+execution. Resolver networking receives only manifests, not `.env`, `.npmrc`,
+producer source or scripts. The Node dependency recipe provisions the same
+tool before the manifest COPY, and exposes its fixed path. Recipe version5 and
+template hash invalidate old environment attestations; the schema's ten input
+keys stay unchanged. Its native eight-case run passed in 82.27s: six metatests,
+real Vitest4/Vite6 resolution/build and non-root NETNONE npm version observation,
+and an actually wrong SRI refusing export while preserving the prior lock.
+The exact lock of that native supervisor profile was audited separately:
+rc0 / zero vulnerabilities across 92 dependencies, `npm-native/audit-native-profile.json`.
+
+Vite6 follow-up `370e4e0a` keeps `.vite-temp` on `/tmp/vite-config-cache`, without
+making dependencies writable. Its recipe hash changes the cache identity.
+The isolated-runner owner supplies the corresponding tmpfs directory and
+Vitest4 CLI/provider qualification. The first native npm receipt predates this
+link and is explicitly a checkpoint for npm provisioning, not a new-template
+delivery attestation. Unit profile/cache/lock/checker replay: 105 PASS / 16
+explicit native SKIP / 3.81s; link follow-up: 90 PASS / 15 SKIP / 1.07s.
+Complete React bootstrap nominal probes remain pending the coherent runner.
+
 Chosen direct versions, verified on the public npm registry: Vite 6.4.4,
 Vitest 4.1.11, React plugin 4.7.0. The combination fits their real peer ranges.
 No `--force`, dependency override, application source change, or paid generation
