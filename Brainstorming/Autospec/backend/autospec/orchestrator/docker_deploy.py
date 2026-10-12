@@ -9,11 +9,18 @@ docker-absent condition, classified as *infra* (park, don't burn repair attempts
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import signal
 import socket
 import subprocess
+import threading
+import time
 import urllib.error
 import urllib.request
+import uuid
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,16 +42,113 @@ class DockerDeployResult:
     image: str = ""
     container: str = ""
     host_port: int = 0
+    cancelled: bool = False
+    packaged: bool = False
+
+
+class DockerRuntimeError(RuntimeError):
+    """A Docker query failed; an empty registry must never mean daemon failure."""
+
+
+_operation = threading.local()
+_port_lock = threading.RLock()
+_port_reservations: dict[str, tuple[int, socket.socket | None]] = {}
+
+
+def _cancelled() -> bool:
+    event = getattr(_operation, "cancel_event", None)
+    return event is not None and event.is_set()
+
+
+def _pause(seconds: float) -> None:
+    event = getattr(_operation, "cancel_event", None)
+    if event is not None:
+        event.wait(seconds)
+    else:
+        time.sleep(seconds)
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the CLI and children even when stdout is still open."""
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                           capture_output=True, timeout=5)
+        else:
+            os.killpg(proc.pid, signal.SIGKILL)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    if proc.poll() is None:
+        proc.kill()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def _run_process(args: list[str], *, timeout: float, cwd=None, on_line=None) -> tuple[int, str]:
+    """Stream bounded output while an independent deadline supervises the CLI."""
+    if _cancelled():
+        return -2, "Docker operation cancelled"
+    kwargs = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+    try:
+        proc = subprocess.Popen(args, cwd=str(cwd) if cwd is not None else None,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                **kwargs)
+    except OSError as exc:
+        return -1, f"Docker CLI unavailable: {exc}"
+    chunks: deque[str] = deque(maxlen=64)
+    done = threading.Event()
+
+    def read_output() -> None:
+        try:
+            assert proc.stdout is not None
+            while chunk := proc.stdout.read1(4096):
+                decoded = chunk.decode("utf-8", errors="replace")
+                chunks.append(decoded)
+                if on_line:
+                    for line in decoded.splitlines():
+                        try:
+                            on_line(line)
+                        except Exception:  # logging must not stop process supervision
+                            pass
+        finally:
+            done.set()
+
+    reader = threading.Thread(target=read_output, daemon=True)
+    reader.start()
+    deadline = time.monotonic() + max(timeout, 0.01)
+    failure = ""
+    while proc.poll() is None or not done.is_set():
+        if _cancelled():
+            failure = "Docker operation cancelled"
+            break
+        if time.monotonic() >= deadline:
+            failure = f"Docker operation timeout after {timeout:g}s"
+            break
+        done.wait(min(0.05, max(0.001, deadline - time.monotonic())))
+        if done.is_set() and proc.poll() is None:
+            _pause(0.01)
+    if failure:
+        _kill_tree(proc)
+    reader.join(timeout=1)
+    if done.is_set() and proc.stdout is not None:
+        proc.stdout.close()
+    output = "".join(chunks)[-16000:]
+    if failure:
+        return (-2 if "cancelled" in failure else -1), output + "\n" + failure
+    return proc.returncode, output
 
 
 LABEL_PROJECT = "autospec.project"
 LABEL_PORT = "autospec.port"
+LABEL_ACTIVE = "autospec.delivery.active"
 
 # Substrings that mark a "the daemon is not reachable / docker is not installed"
 # condition — an infra problem, never a repairable wiring bug. The public tuple
 # is shared with ``Pipeline._smoke_looks_like_infra`` (single source of truth);
-# "no such file or directory" stays PRIVATE to this module: inside a smoke/pytest
-# report it would misclassify an app-level FileNotFoundError as infra.
+# Missing application files are deliberately excluded: a failed Docker COPY is
+# a repairable source problem, unlike a missing Docker executable or socket.
 DOCKER_INFRA_MARKERS = (
     "error during connect",
     "cannot connect to the docker daemon",
@@ -55,15 +159,10 @@ DOCKER_INFRA_MARKERS = (
     # l'ACL du named pipe refuse notre process (vu en run supervisé 2026-07-20).
     "permission denied while trying to connect",
 )
-_DAEMON_DOWN_MARKERS = DOCKER_INFRA_MARKERS + (
-    "no such file or directory",  # docker binary invoked but engine socket missing
-)
+_DAEMON_DOWN_MARKERS = DOCKER_INFRA_MARKERS + ("dial unix /var/run/docker.sock",)
 
-# Cross-reachability tuning: one retry for pairs involving our own container
-# (a slow cold-start must not burn a repair attempt), and a probe budget for
-# foreign pairs so the matrix stays bounded on big fleets.
+# Retry once for a peer's slow cold-start; unrelated peer pairs are not tested.
 _PROBE_RETRY_DELAY_S = 2.0
-_MAX_FOREIGN_PROBES = 20
 
 
 def slug(project_id: str) -> str:
@@ -81,32 +180,56 @@ def container_name(project_id: str) -> str:
     return f"autospec-{slug(project_id)}"
 
 
+def data_volume_name(project_id: str) -> str:
+    return f"{container_name(project_id)}-data"
+
+
+def ensure_data_volume(project_id: str, name: str | None = None) -> str:
+    """Create or reuse owned storage; never adopt another project's volume."""
+    name = name or data_volume_name(project_id)
+    rc, out = _docker(["volume", "inspect", name], timeout=15)
+    if rc != 0:
+        if "no such volume" not in out.lower():
+            raise DockerRuntimeError(out)
+        rc, out = _docker(["volume", "create", "--label", f"{LABEL_PROJECT}={project_id}", name], timeout=15)
+        if rc != 0:
+            raise DockerRuntimeError(out)
+        rc, out = _docker(["volume", "inspect", name], timeout=15)
+        if rc != 0:
+            raise DockerRuntimeError(out)
+    try:
+        if (json.loads(out)[0].get("Labels") or {}).get(LABEL_PROJECT) != project_id:
+            raise DockerRuntimeError(f"Le volume {name} appartient à un autre projet")
+    except (ValueError, IndexError, TypeError, KeyError) as exc:
+        raise DockerRuntimeError(f"volume inspect invalide : {out[:500]}") from exc
+    return name
+
+
 def _docker(args: list[str], *, timeout: float, cwd: str | Path | None = None) -> tuple[int, str]:
     """Run ``docker <args>`` synchronously; return ``(returncode, output)``.
 
     stdout+stderr are merged. A launch failure (docker absent) or a timeout is
     reported as ``(-1, str(exc))`` so callers can classify it via
     :func:`looks_like_daemon_down`."""
-    try:
-        proc = subprocess.run(
-            [settings.docker_cmd, *args],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            cwd=str(cwd) if cwd is not None else None,
-            timeout=timeout,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        return -1, str(exc)
-    return proc.returncode, (proc.stdout or "")
+    return _run_process([settings.docker_cmd, *args], timeout=timeout, cwd=cwd)
 
 
 def looks_like_daemon_down(output: str) -> bool:
     """Does ``output`` look like the Docker engine is unreachable / absent?"""
     low = (output or "").lower()
-    return any(marker in low for marker in _DAEMON_DOWN_MARKERS)
+    return any(marker in low for marker in _DAEMON_DOWN_MARKERS) or "docker cli unavailable" in low
+
+
+def looks_like_infra(output: str) -> bool:
+    """Daemon, registry/network, and host resource errors are not app repairs."""
+    low = (output or "").lower()
+    return looks_like_daemon_down(output) or any(marker in low for marker in (
+        "toomanyrequests", "pull rate limit", "failed to authorize", "unauthorized:",
+        "failed to fetch oauth token", "proxyconnect", "tls handshake timeout",
+        "no space left on device", "cannot assign requested address",
+        "port is already allocated", "address already in use",
+        "appartient à un autre projet",
+    ))
 
 
 def docker_available() -> tuple[bool, str]:
@@ -140,49 +263,21 @@ def build_image(
     *,
     timeout: float,
     on_line=None,
+    cancel_event: threading.Event | None = None,
 ) -> tuple[bool, str]:
     """Build ``image`` from ``ws`` (the workspace holds the managed Dockerfile).
 
     Streams each build line to ``on_line`` (if given) and returns
     ``(succeeded, tail)`` where ``tail`` is the last ~4000 chars of output."""
-    lines: list[str] = []
+    previous = getattr(_operation, "cancel_event", None)
+    if cancel_event is not None:
+        _operation.cancel_event = cancel_event
     try:
-        proc = subprocess.Popen(
-            [settings.docker_cmd, "build", "-t", image, "."],
-            cwd=str(ws),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-    except OSError as exc:
-        return False, str(exc)
-
-    assert proc.stdout is not None
-    try:
-        for raw in proc.stdout:
-            line = raw.rstrip("\n")
-            lines.append(line)
-            if on_line is not None:
-                try:
-                    on_line(line)
-                except Exception:  # noqa: BLE001 — a logging hook must never break the build
-                    pass
-        try:
-            proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            lines.append(f"[build timeout after {timeout:.0f}s]")
-            return False, "\n".join(lines)[-4000:]
+        rc, out = _run_process([settings.docker_cmd, "build", "-t", image, "."],
+                               cwd=ws, timeout=timeout, on_line=on_line)
+        return rc == 0, out[-4000:]
     finally:
-        try:
-            proc.stdout.close()
-        except Exception:  # noqa: BLE001
-            pass
-
-    tail = "\n".join(lines)[-4000:]
-    return proc.returncode == 0, tail
+        _operation.cancel_event = previous
 
 
 def replace_container(
@@ -192,10 +287,9 @@ def replace_container(
     host_port: int,
     container_port: int,
     project_id: str,
+    *, data_volume: str | None = None,
 ) -> tuple[bool, str]:
-    """Remove any old container of this name, then run the fresh image detached."""
-    # rm -f old — ignore rc (it may simply not exist yet).
-    _docker(["rm", "-f", name], timeout=30.0)
+    """Start a fresh name; replacement/rollback is owned by deploy_and_verify."""
     rc, out = _docker(
         [
             "run",
@@ -205,13 +299,20 @@ def replace_container(
             "--network",
             network,
             "-p",
-            f"{host_port}:{container_port}",
+            f"127.0.0.1:{host_port or ''}:{container_port}",
             "--label",
             f"{LABEL_PROJECT}={project_id}",
             "--label",
             f"{LABEL_PORT}={container_port}",
+            "--label",
+            f"{LABEL_ACTIVE}={int(name == container_name(project_id))}",
             "--restart",
-            "unless-stopped",
+            "on-failure:3",
+            "--cap-drop", "ALL",
+            "--security-opt", "no-new-privileges",
+            "--memory", "512m", "--cpus", "1", "--pids-limit", "256",
+            *(["--mount", f"type=volume,source={data_volume},target=/app/data",
+               "--env", "DATABASE_URL=sqlite:////app/data/app.db"] if data_volume else []),
             image,
         ],
         timeout=60.0,
@@ -224,41 +325,60 @@ def _container_logs(name: str, *, tail: int = 80) -> str:
     return out.strip()
 
 
-def wait_healthy(name: str, host_port: int, *, timeout: float) -> tuple[bool, str]:
+def wait_healthy(
+    name: str, host_port: int, *, timeout: float,
+    health_path: str = "/", expected: dict[str, str] | None = None,
+    strict_http: bool = False,
+) -> tuple[bool, str]:
     """Poll until the container is listening on ``127.0.0.1:host_port``.
 
     - ``docker inspect`` state ``exited``/``dead`` → fail fast with the logs.
-    - Any HTTP status (incl. 404/500) on ``GET /`` proves the port is open =
-      healthy.
+    - Managed APIs must satisfy their JSON health contract inside the image.
+    - Frontends must return HTTP 2xx; legacy products without a contract retain
+      the historical connectivity-only check (any HTTP status).
     - Timeout → fail with the logs (repairable: localhost binding, boot crash,
       wrong internal port)."""
     import time
 
-    deadline = time.monotonic() + max(timeout, 1.0)
-    url = f"http://127.0.0.1:{host_port}/"
+    deadline = time.monotonic() + max(timeout, 0.01)
+    url = f"http://127.0.0.1:{host_port}{health_path}"
     last = ""
     while time.monotonic() < deadline:
+        if _cancelled():
+            return False, "Docker operation cancelled"
         rc, state = _docker(
             ["inspect", "-f", "{{.State.Status}}", name],
-            timeout=15.0,
+            timeout=min(15.0, max(0.01, deadline - time.monotonic())),
         )
         status = state.strip().lower()
         if rc != 0:
             last = state.strip()
-            if looks_like_daemon_down(state):
-                return False, last
+            return False, last
         if status in ("exited", "dead"):
             logs = _container_logs(name)
             return False, f"container {status}\n{logs}"
         try:
-            with urllib.request.urlopen(url, timeout=5):
+            with urllib.request.urlopen(url, timeout=min(5, max(0.01, deadline - time.monotonic()))) as response:
+                if expected is not None:
+                    payload = json.loads(response.read(16384).decode("utf-8"))
+                    if response.status == 200 and isinstance(payload, dict) and all(
+                        payload.get(key) == value for key, value in expected.items()
+                    ):
+                        return True, ""
+                    last = f"contrat santé {health_path} invalide (HTTP {response.status}, attendu {expected}, reçu {str(payload)[:500]})"
+                elif not strict_http or 200 <= response.status < 300:
+                    return True, ""
+                else:
+                    last = f"HTTP {response.status} sur {health_path}"
+        except urllib.error.HTTPError as exc:
+            if not strict_http and expected is None:
                 return True, ""
-        except urllib.error.HTTPError:
-            # Reached the server; any HTTP status means it is listening.
-            return True, ""
+            last = f"HTTP {exc.code} sur {health_path}"
+        except (ValueError, UnicodeError) as exc:
+            last = f"réponse santé JSON invalide sur {health_path}: {exc}"
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last = str(exc)
-        time.sleep(1.0)
+        _pause(min(1.0, max(0.01, deadline - time.monotonic())))
 
     logs = _container_logs(name)
     return False, f"health-wait timeout après {timeout:.0f}s ({last})\n{logs}"
@@ -274,7 +394,7 @@ def _parse_host_ports(ports_field: str) -> list[int]:
     return sorted({int(m) for m in _HOST_PORT_RE.findall(ports_field or "")})
 
 
-def list_deployed() -> list[dict]:
+def list_deployed(*, network: str | None = None) -> list[dict]:
     """Every currently-running Autospec container, from its labels.
 
     Label-based registry: containers of deleted/dead projects self-clean (they
@@ -284,20 +404,23 @@ def list_deployed() -> list[dict]:
     used by the port allocator)."""
     fmt = (
         "{{.Names}}\t{{.Label \"" + LABEL_PROJECT + "\"}}\t{{.Label \""
-        + LABEL_PORT + "\"}}\t{{.Ports}}"
+        + LABEL_PORT + "\"}}\t{{.Ports}}\t{{.Label \"" + LABEL_ACTIVE + "\"}}"
     )
     rc, out = _docker(
-        ["ps", "--filter", f"label={LABEL_PROJECT}", "--format", fmt],
+        ["ps", "--filter", f"label={LABEL_PROJECT}",
+         *(["--filter", f"network={network}"] if network else []), "--format", fmt],
         timeout=15.0,
     )
     if rc != 0:
-        return []
+        raise DockerRuntimeError(out.strip() or "docker ps failed without diagnostic")
     deployed: list[dict] = []
     for line in out.splitlines():
         line = line.strip()
         if not line:
             continue
         parts = line.split("\t")
+        if len(parts) > 4 and parts[4] == "0":
+            continue  # transactional candidate, not an independently delivered peer
         name = parts[0] if len(parts) > 0 else ""
         project = parts[1] if len(parts) > 1 else ""
         port_raw = parts[2] if len(parts) > 2 else ""
@@ -334,48 +457,37 @@ def probe(src: str, dst: str, dst_port: int) -> tuple[bool, str]:
     combined = out.lower()
     if "executable file not found" in combined or "no such file" in combined or "not found" in combined:
         rc2, out2 = _docker(
-            ["exec", src, "wget", "-q", "-O-", "-T", "5", url],
+            ["exec", src, "wget", "-S", "-O", "/dev/null", "-T", "5", url],
             timeout=20.0,
         )
-        if rc2 == 0:
+        if rc2 == 0 or re.search(r"HTTP/\d(?:\.\d)?\s+[1-5]\d\d|server returned error: HTTP/\d(?:\.\d)?\s+[1-5]\d\d", out2, re.I):
             return True, ""
+        if "not found" in out2.lower() or "no such file" in out2.lower():
+            rc3, out3 = _docker(["exec", src, "curl", "--silent", "--show-error", "--output", "/dev/null", "--max-time", "5", url], timeout=10.0)
+            return rc3 == 0, out3.strip()
         return False, (out2 or out).strip()
     return False, out.strip()
 
 
 def check_cross_reachability(own_container: str, deployed: list[dict]) -> tuple[bool, str]:
-    """Probe reachability between the deployed containers.
-
-    A failing pair *involving* ``own_container`` fails this project's gate
-    (attributable, repairable) — those pairs are probed FIRST and get ONE retry
-    after ``_PROBE_RETRY_DELAY_S`` so a slow cold-start never burns a repair
-    attempt. A failing pair between two *foreign* containers is a warning only
-    (never our bug to fix); foreign pairs have no retry and stop after
-    ``_MAX_FOREIGN_PROBES`` probes so the matrix stays bounded on big fleets.
-    Returns ``(ok_for_own, detail)``."""
-    import time
-
+    """Verify only the 2(N-1) directions involving this delivery."""
     ok = True
     lines: list[str] = []
-    warnings: list[str] = []
-
-    own_pairs: list[tuple[dict, dict]] = []
-    foreign_pairs: list[tuple[dict, dict]] = []
-    for src in deployed:
-        for dst in deployed:
-            if src["name"] == dst["name"] or not (dst.get("port") or 0):
-                continue
-            if own_container in (src["name"], dst["name"]):
-                own_pairs.append((src, dst))
-            else:
-                foreign_pairs.append((src, dst))
-
+    own = next((entry for entry in deployed if entry["name"] == own_container), None)
+    if own is None:
+        return False, f"container {own_container} absent du registre Docker"
+    peers = [entry for entry in deployed if entry["name"] != own_container and entry.get("project") != own.get("project")]
+    own_pairs = [(src, dst) for peer in peers for src, dst in ((own, peer), (peer, own)) if dst.get("port")]
     for src, dst in own_pairs:
+        if _cancelled():
+            return False, "Docker operation cancelled"
         dst_port = dst["port"]
         reachable, err = probe(src["name"], dst["name"], dst_port)
-        if not reachable:
+        if not reachable and not looks_like_infra(err):
             # One retry: a peer that just booted may need a moment.
-            time.sleep(_PROBE_RETRY_DELAY_S)
+            _pause(_PROBE_RETRY_DELAY_S)
+            if _cancelled():
+                return False, "Docker operation cancelled"
             reachable, err = probe(src["name"], dst["name"], dst_port)
         if reachable:
             lines.append(f"OK   {src['name']} -> {dst['name']}:{dst_port}")
@@ -383,74 +495,97 @@ def check_cross_reachability(own_container: str, deployed: list[dict]) -> tuple[
             ok = False
             lines.append(f"FAIL {src['name']} -> {dst['name']}:{dst_port} ({err})")
 
-    probed = 0
-    for src, dst in foreign_pairs:
-        if probed >= _MAX_FOREIGN_PROBES:
-            warnings.append(
-                f"(budget de sondes atteint : {len(foreign_pairs) - probed} "
-                f"paire(s) tierce(s) non sondée(s))"
-            )
-            break
-        probed += 1
-        dst_port = dst["port"]
-        reachable, err = probe(src["name"], dst["name"], dst_port)
-        if reachable:
-            lines.append(f"OK   {src['name']} -> {dst['name']}:{dst_port}")
-        else:
-            warnings.append(f"FAIL {src['name']} -> {dst['name']}:{dst_port} ({err})")
-
-    if warnings:
-        lines.append("--- avertissements (paires tierces) ---")
-        lines.extend(warnings)
     return ok, "\n".join(lines)
 
 
-def undeploy(project_id: str) -> None:
-    """Best-effort teardown: force-remove the container, then remove the image."""
+def undeploy(project_id: str) -> DockerDeployResult:
+    """Remove owned resources, reporting every actual failure to the caller."""
     name = container_name(project_id)
     image = image_name(project_id)
-    _docker(["rm", "-f", name], timeout=30.0)
-    _docker(["rmi", "-f", image], timeout=60.0)
+    try:
+        info = _inspect_container(name)
+    except DockerRuntimeError as exc:
+        return DockerDeployResult(False, str(exc), infra=True, container=name, image=image)
+    if info and info.get("Config", {}).get("Labels", {}).get(LABEL_PROJECT) != project_id:
+        return DockerDeployResult(False, "Refus de supprimer un conteneur appartenant à un autre projet", infra=True)
+    rc, out = _docker(["rm", "-f", name], timeout=30.0)
+    if rc != 0 and "no such container" not in out.lower():
+        return DockerDeployResult(False, out, infra=looks_like_infra(out), container=name, image=image)
+    rc, out = _docker(["rmi", image], timeout=60.0)
+    if rc != 0 and "no such image" not in out.lower():
+        return DockerDeployResult(False, out, infra=looks_like_infra(out), image=image)
+    release_host_port(project_id)
+    return DockerDeployResult(True, "Livraison Docker supprimée")
 
 
 def host_port_is_free(port: int) -> bool:
-    """Is nothing already listening on ``127.0.0.1:<port>`` ? (connect-test).
-
-    Single shared implementation — ``Pipeline._port_is_free`` delegates here."""
+    """Bind-test: also catches bound-but-not-listening sockets."""
     with socket.socket() as s:
-        s.settimeout(1.0)
-        return s.connect_ex(("127.0.0.1", port)) != 0
+        try:
+            if os.name == "nt":
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            s.bind(("127.0.0.1", port))
+            return True
+        except OSError:
+            return False
+
+
+def release_host_port(project_id: str, port: int | None = None) -> None:
+    with _port_lock:
+        reservation = _port_reservations.get(project_id)
+        if reservation is not None and (port is None or reservation[0] == port):
+            _port_reservations.pop(project_id)
+            if reservation[1] is not None:
+                reservation[1].close()
+
+
+def _release_port_socket(project_id: str) -> None:
+    """Keep the logical claim while Docker takes over the socket."""
+    with _port_lock:
+        reservation = _port_reservations.get(project_id)
+        if reservation and reservation[1] is not None:
+            reservation[1].close()
+            _port_reservations[project_id] = (reservation[0], None)
 
 
 def allocate_host_port(state: ProjectState) -> int:
-    """Return a stable host port for ``state``.
+    """Reserve a free socket, preferring a port still owned by this project.
 
-    Reuse ``state.deploy_host_port`` if already assigned. Otherwise scan upward
-    from ``settings.docker_host_port_base`` skipping the HOST ports actually
-    published by running autospec containers (authoritative even when a project
-    state file is gone), the ports claimed by other persisted project states,
-    and any host-busy port."""
-    if state.deploy_host_port:
-        return state.deploy_host_port
-
-    claimed: set[int] = set()
-    for entry in list_deployed():
-        claimed.update(entry.get("host_ports") or [])
+    The socket protects against concurrent allocators/processes until Docker
+    binds it. The in-process claim remains until deployment cleanup completes.
+    Persisted ports are rechecked, never blindly reused.
+    """
     from .. import storage
-
-    for other in storage.list_states():
-        if other.id == state.id:
-            continue
-        if other.deploy_host_port:
-            claimed.add(other.deploy_host_port)
-
-    port = int(settings.docker_host_port_base)
-    while port < 65536:
-        if port not in claimed and host_port_is_free(port):
+    with _port_lock:
+        if state.id in _port_reservations:
+            return _port_reservations[state.id][0]
+        claimed = {value[0] for value in _port_reservations.values()}
+        own_ports: set[int] = set()
+        for entry in list_deployed():
+            (own_ports if entry.get("project") == state.id else claimed).update(entry.get("host_ports") or [])
+        for other in storage.list_states():
+            if other.id != state.id and other.deploy_host_port:
+                claimed.add(other.deploy_host_port)
+        preferred = [state.deploy_host_port] if state.deploy_host_port else []
+        for port in [*preferred, *range(int(settings.docker_host_port_base), 65536)]:
+            if not 0 < port < 65536 or port in claimed:
+                continue
+            if port in own_ports:
+                _port_reservations[state.id] = (port, None)
+                return port
+            if not host_port_is_free(port):
+                continue
+            sock = socket.socket()
+            try:
+                if os.name == "nt":
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                sock.bind(("127.0.0.1", port))
+            except OSError:
+                sock.close()
+                continue
+            _port_reservations[state.id] = (port, sock)
             return port
-        port += 1
-    # Extremely unlikely fallback.
-    return int(settings.docker_host_port_base)
+        raise DockerRuntimeError("Aucun port hôte disponible pour la livraison Docker")
 
 
 def should_run(
@@ -459,19 +594,11 @@ def should_run(
     *,
     enabled: bool,
 ) -> tuple[bool, str, str]:
-    """Should Docker delivery run for this project, and as which ``kind`` ?
+    """Resolve delivery from the selected technical stack, then legacy artifacts.
 
-    Returns ``(run, reason, kind)`` where ``kind`` ∈ ``{"backend", "fullstack",
-    "frontend", ""}``:
-
-    - a python web backend without a frontend → ``"backend"``;
-    - a python web backend *with* a frontend root → ``"fullstack"`` (one image);
-    - a frontend-only SPA (no python web backend) → ``"frontend"`` (nginx image,
-      container port 80);
-
-    Skip (``run=False``) when: the gate is off | demo mode (``fake_agents``) |
-    no DONE story | a web backend written in a non-python language | neither a
-    web backend nor a frontend was detected."""
+    Web projects are served; CLI and library projects receive a packaged image.
+    Disabled, demo, unfinished, and unrecognised projects are skipped.
+    """
     from ..models import StoryStatus
 
     if not enabled:
@@ -481,26 +608,77 @@ def should_run(
     if not any(s.effective_status() == StoryStatus.DONE for s in state.stories):
         return False, "aucune story livrée", ""
 
+    stack = getattr(state, "technical_stack", None)
+    stack_kind = stack.get("kind", "") if isinstance(stack, dict) else getattr(stack, "kind", "")
+    if stack_kind in {"backend", "api", "fullstack", "frontend", "cli", "library"}:
+        return True, "", "backend" if stack_kind == "api" else stack_kind
+    profile = state.product_profile
+    if profile in {"cli", "library-fast"}:
+        return True, "", "cli" if profile == "cli" else "library"
     backend_web = _backend_web_candidate(ws)
     frontend = _frontend_root(state, ws)
-
-    if backend_web:
-        from . import toolchain
-
-        lang = toolchain.normalize(state.backend_language.value)
-        if lang != "python":
-            return (
-                False,
-                f"backend web {lang} non-python : livraison Docker non applicable",
-                "",
-            )
+    non_python = state.backend_language.value in {"go", "rust", "node", "typescript"}
+    if backend_web or profile in {"api", "web-ssr", "fullstack"} or (non_python and ((ws / "go.mod").exists() or (ws / "Cargo.toml").exists())):
         kind = "fullstack" if frontend is not None else "backend"
         return True, "", kind
 
     if frontend is not None:
         return True, "", "frontend"
 
-    return False, "produit non-web : livraison Docker non applicable", ""
+    if (ws / "main.py").exists() or (ws / "package.json").exists():
+        return True, "", "cli"
+    if (ws / "pyproject.toml").exists():
+        return True, "", "library"
+    return False, "aucun projet exécutable ou bibliothèque détecté", ""
+
+
+def _inspect_container(name: str) -> dict | None:
+    rc, out = _docker(["inspect", name], timeout=15.0)
+    if rc != 0:
+        if "no such object" in out.lower() or "no such container" in out.lower():
+            return None
+        raise DockerRuntimeError(out or f"docker inspect {name} failed")
+    try:
+        return json.loads(out)[0]
+    except (ValueError, IndexError, KeyError, TypeError) as exc:
+        raise DockerRuntimeError(f"docker inspect {name}: invalid JSON: {out[:500]}") from exc
+
+
+def _published_port(info: dict, container_port: int) -> int:
+    ports = info.get("NetworkSettings", {}).get("Ports", {})
+    for binding in ports.get(f"{container_port}/tcp") or []:
+        if binding.get("HostIp") == "127.0.0.1":
+            return int(binding["HostPort"])
+    raise DockerRuntimeError("Aucune publication loopback retournée par Docker")
+
+
+def inspect_deployment(project_id: str) -> DockerDeployResult:
+    """Reconcile persisted deployment against Docker without changing resources."""
+    name = container_name(project_id)
+    try:
+        info = _inspect_container(name)
+        if info is None:
+            return DockerDeployResult(False, "Conteneur Docker absent", skipped=True)
+        if info.get("Config", {}).get("Labels", {}).get(LABEL_PROJECT) != project_id:
+            return DockerDeployResult(False, "Nom de conteneur occupé par une ressource étrangère", infra=True)
+        running = info.get("State", {}).get("Running", False)
+        port = int(info.get("Config", {}).get("Labels", {}).get(LABEL_PORT, 0))
+        host = _published_port(info, port) if running else 0
+        return DockerDeployResult(bool(running), "Conteneur actif" if running else "Conteneur arrêté",
+                                  image=image_name(project_id), container=name, host_port=host)
+    except (DockerRuntimeError, ValueError) as exc:
+        return DockerDeployResult(False, str(exc), infra=True)
+
+
+def inspect_packaged_image(project_id: str) -> DockerDeployResult:
+    """A packaged CLI/library owns an image, not a long-running container."""
+    image = image_name(project_id)
+    rc, out = _docker(["image", "inspect", image], timeout=15.0)
+    if rc != 0:
+        absent = "no such image" in out.lower() or "no such object" in out.lower()
+        return DockerDeployResult(False, out.strip(), skipped=absent,
+                                  infra=not absent, packaged=True)
+    return DockerDeployResult(True, "Image Docker disponible", image=image, packaged=True)
 
 
 def deploy_and_verify(
@@ -514,28 +692,50 @@ def deploy_and_verify(
     kind: str = "",
     on_line=None,
     on_stage=None,
+    cancel_event: threading.Event | None = None,
 ) -> DockerDeployResult:
-    """Single entry point: build → deploy → health → cross-reachability.
+    """Build and verify a candidate before replacing the last working delivery.
 
-    Also reused as the repair ``averify`` (a full rebuild + redeploy + reverify).
-    ``kind`` is the deploy kind already resolved by the caller (re-derived via
-    :func:`should_run` only when empty). ``on_stage`` (if given) receives
-    ``"building"`` / ``"deploying"`` / ``"verifying"`` as each stage starts so
-    the UI can track progress — including during repair re-verifies.
-    Classification contract:
-
-    - ``docker_available`` / ``ensure_network`` failures → ``infra`` (park);
-    - build / replace_container / wait_healthy / own-pair reachability failures →
-      repairable (``ok=False`` without ``infra``).
-
-    ``detail`` concatenates the build tail, the docker logs and the network
-    sections."""
+    Docker cannot change an existing container's host-port mapping. A candidate
+    is checked on an ephemeral loopback port first; the fixed-port cutover then
+    retains a stopped backup until health AND network checks pass. Any failure
+    restores it. Cancellation cooperatively stops CLI processes and performs the
+    same rollback, so callers must await thread completion before teardown.
+    """
     if not kind:
         _, _, kind = should_run(state, ws, enabled=True)
-    container_port = 80 if kind == "frontend" else resolve_web_port(ws)
-
+    container_port = 8080 if kind == "frontend" else resolve_web_port(ws)
     image = image_name(state.id)
     name = container_name(state.id)
+    token = uuid.uuid4().hex[:12]
+    candidate_image = image.removesuffix(":latest") + f":candidate-{token}"
+    candidate = name + f"-candidate-{token}"
+    backup = name + f"-backup-{token}"
+    package = kind in {"cli", "library"}
+    stack = state.technical_stack or {}
+    persistent_volume = ""
+    candidate_volume = ""
+    candidate_volume_owned = False
+    health_options: dict = {}
+    if stack.get("kind") in {"api", "fullstack"}:
+        health_options = {
+            "health_path": "/api/health", "strict_http": True,
+            "expected": {"status": "ok", "service": "autospec-bootstrap",
+                         "database": "ok" if stack.get("database", "none") != "none" else "none"},
+        }
+    elif kind == "frontend":
+        health_options = {"strict_http": True}
+    previous_event = getattr(_operation, "cancel_event", None)
+    _operation.cancel_event = cancel_event
+    candidate_started = False
+    final_started = False
+    backup_created = False
+    old_was_running = False
+    old_stopped = False
+    committed = False
+    cleanup_errors: list[str] = []
+    build_tail = ""
+    result: DockerDeployResult | None = None
 
     def _stage(stage: str) -> None:
         if on_stage is not None:
@@ -548,79 +748,157 @@ def deploy_and_verify(
         return DockerDeployResult(
             ok=False,
             detail=detail,
-            infra=infra,
+            infra=infra or looks_like_infra(detail),
             image=image,
             container=name,
             host_port=host_port,
+            cancelled=_cancelled(),
         )
 
-    # --- infra pre-checks -------------------------------------------------
-    ok, out = docker_available()
-    if not ok:
-        detail = f"docker indisponible — {out}"
-        # PRE-1 (run supervisé 2026-07-20) : « permission denied » sur le named
-        # pipe = Docker Desktop tourne presque toujours dans la session Windows
-        # d'un AUTRE utilisateur - l'utilisateur peut agir, dis-lui comment.
-        if "permission denied while trying to connect" in (out or "").lower():
-            detail += (
-                "\nCause probable : Docker Desktop est lancé dans la session "
-                "Windows d'un autre utilisateur (l'ACL du pipe refuse ce "
-                "process). Relancez Docker Desktop dans VOTRE session, puis "
-                "relancez le déploiement."
-            )
-        return _fail(detail, infra=True)
-    ok, out = ensure_network(network)
-    if not ok:
-        return _fail(f"réseau {network} indisponible — {out}", infra=True)
+    def command(args: list[str], timeout: float = 30.0) -> str:
+        if _cancelled():
+            raise DockerRuntimeError("Docker operation cancelled")
+        rc, out = _docker(args, timeout=timeout)
+        if rc != 0:
+            raise DockerRuntimeError(out or f"docker {args[0]} failed")
+        return out
 
-    # --- build (repairable) ----------------------------------------------
-    _stage("building")
-    built, build_tail = build_image(ws, image, timeout=build_timeout, on_line=on_line)
-    if not built:
-        return _fail("=== docker build (tail) ===\n" + build_tail)
+    def cleanup(args: list[str]) -> bool:
+        rc, out = _docker(args, timeout=30.0)
+        if rc and not any(x in out.lower() for x in ("no such container", "no such image", "no such volume")):
+            cleanup_errors.append(f"docker {' '.join(args)}: {out}")
+            return False
+        return True
 
-    # --- deploy (repairable) ---------------------------------------------
-    _stage("deploying")
-    started, run_out = replace_container(
-        image, name, network, host_port, container_port, state.id
-    )
-    if not started:
-        return _fail(
-            "=== docker build (tail) ===\n"
-            + build_tail
-            + "\n\n=== docker run ===\n"
-            + run_out
-        )
-
-    # --- health (repairable) ---------------------------------------------
-    _stage("verifying")
-    healthy, health_out = wait_healthy(name, host_port, timeout=deploy_timeout)
-    if not healthy:
-        return _fail(
-            "=== docker build (tail) ===\n"
-            + build_tail[-1500:]
-            + "\n\n=== docker logs ===\n"
-            + health_out
-        )
-
-    # --- cross-container reachability (repairable for own pairs) ----------
-    deployed = list_deployed()
-    net_ok, net_detail = check_cross_reachability(name, deployed)
-    if not net_ok:
-        return _fail(
-            "=== docker logs ===\n"
-            + _container_logs(name)
-            + "\n\n=== réseau ===\n"
-            + net_detail
-        )
-
-    detail = f"déployé {name} sur http://localhost:{host_port} (réseau {network})"
-    if net_detail:
-        detail += "\n\n=== réseau ===\n" + net_detail
-    return DockerDeployResult(
-        ok=True,
-        detail=detail,
-        image=image,
-        container=name,
-        host_port=host_port,
-    )
+    try:
+        if _cancelled():
+            raise DockerRuntimeError("Docker operation cancelled")
+        ok, out = docker_available()
+        if not ok:
+            result = _fail(f"docker indisponible — {out}", infra=True)
+        if result is None and not package:
+            ok, out = ensure_network(network)
+            if not ok:
+                result = _fail(f"réseau {network} indisponible — {out}", infra=True)
+        if result is None:
+            _stage("building")
+            built, build_tail = build_image(ws, candidate_image, timeout=build_timeout, on_line=on_line)
+            if not built:
+                result = _fail("=== docker build (tail) ===\n" + build_tail)
+        if result is None and package:
+            _stage("verifying")
+            # --rm alone cannot clean a daemon-side container when the attached
+            # CLI is killed. A known name allows the finally block to remove it.
+            if kind == "cli":
+                candidate_started = True
+                command(["run", "--rm", "--name", candidate, "--network", "none",
+                         "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+                         "--memory", "512m", "--cpus", "1", "--pids-limit", "256",
+                         candidate_image, "--help"], deploy_timeout)
+            command(["tag", candidate_image, image])
+            committed = True
+            result = DockerDeployResult(True, f"Image {image} construite et {'commande --help vérifiée' if kind == 'cli' else 'paquet compilé/installé'} ({kind})",
+                                        image=image, packaged=True)
+        if result is None:
+            if _cancelled():
+                raise DockerRuntimeError("Docker operation cancelled")
+            if stack.get("database") == "sqlite":
+                persistent_volume = ensure_data_volume(state.id)
+                candidate_volume = data_volume_name(state.id) + f"-candidate-{token}"
+                ensure_data_volume(state.id, candidate_volume)
+                candidate_volume_owned = True
+            old = _inspect_container(name)
+            if old and old.get("Config", {}).get("Labels", {}).get(LABEL_PROJECT) != state.id:
+                raise DockerRuntimeError("Nom de conteneur occupé par une ressource étrangère")
+            old_was_running = bool(old and old.get("State", {}).get("Running"))
+            _stage("deploying")
+            candidate_started = True  # run can create a container before reporting an error
+            started, out = replace_container(candidate_image, candidate, network, 0, container_port, state.id,
+                                              data_volume=candidate_volume or None)
+            if not started:
+                raise DockerRuntimeError(out)
+            candidate_info = _inspect_container(candidate)
+            if candidate_info is None:
+                raise DockerRuntimeError("Conteneur candidat absent après docker run")
+            try:
+                temp_port = _published_port(candidate_info, container_port)
+            except DockerRuntimeError as exc:
+                # A fast boot crash can remove the binding before our first
+                # inspect. Keep its real traceback for the repair agent.
+                raise DockerRuntimeError(f"{exc}\n{_container_logs(candidate)}") from exc
+            _stage("verifying")
+            healthy, out = wait_healthy(candidate, temp_port, timeout=deploy_timeout, **health_options)
+            if not healthy:
+                raise DockerRuntimeError(out)
+            if _cancelled():
+                raise DockerRuntimeError("Docker operation cancelled")
+            if old:
+                if old_was_running:
+                    old_stopped = True
+                    command(["stop", "--time", "5", name], 15.0)
+                backup_created = True
+                command(["rename", name, backup])
+            _release_port_socket(state.id)
+            final_started = True
+            started, out = replace_container(candidate_image, name, network, host_port, container_port, state.id,
+                                              data_volume=persistent_volume or None)
+            if not started:
+                raise DockerRuntimeError(out)
+            healthy, out = wait_healthy(name, host_port, timeout=deploy_timeout, **health_options)
+            if not healthy:
+                raise DockerRuntimeError(out)
+            net_ok, net_detail = check_cross_reachability(name, list_deployed(network=network))
+            if not net_ok:
+                raise DockerRuntimeError(net_detail)
+            command(["tag", candidate_image, image])
+            if _cancelled():
+                raise DockerRuntimeError("Docker operation cancelled")
+            committed = True
+            result = DockerDeployResult(True,
+                f"déployé {name} sur http://127.0.0.1:{host_port} (réseau {network})\n{net_detail}".strip(),
+                image=image, container=name, host_port=host_port)
+    except DockerRuntimeError as exc:
+        result = _fail(f"{exc}\n\n=== docker build (tail) ===\n{build_tail[-1500:]}")
+    finally:
+        # Rollback/cleanup must be allowed to run after a cancellation request.
+        _operation.cancel_event = None
+        try:
+            if not committed:
+                removed = not final_started or cleanup(["rm", "-f", name])
+                # A cancelled rename CLI may have completed on the daemon.
+                # Inspect the actual result before choosing how to restore.
+                actual_backup = False
+                if backup_created:
+                    try:
+                        actual_backup = _inspect_container(backup) is not None
+                    except DockerRuntimeError as exc:
+                        cleanup_errors.append(str(exc))
+                restored = not actual_backup or (removed and cleanup(["rename", backup, name]))
+                if restored and old_was_running and (backup_created or old_stopped):
+                    cleanup(["start", name])
+            elif backup_created:
+                cleanup(["rm", "-f", backup])
+            if candidate_started:
+                cleanup(["rm", "-f", candidate])
+            if candidate_volume:
+                if not candidate_volume_owned:
+                    # Creation may have reached the daemon before cancellation.
+                    # Never delete a volume whose ownership validation failed.
+                    rc, volume_info = _docker(["volume", "inspect", candidate_volume], timeout=15)
+                    if rc == 0:
+                        try:
+                            candidate_volume_owned = (json.loads(volume_info)[0].get("Labels") or {}).get(LABEL_PROJECT) == state.id
+                        except (ValueError, IndexError, TypeError, KeyError):
+                            pass
+                if candidate_volume_owned:
+                    cleanup(["volume", "rm", candidate_volume])
+            cleanup(["rmi", candidate_image])
+        finally:
+            release_host_port(state.id)
+            _operation.cancel_event = previous_event
+    assert result is not None
+    if cleanup_errors:
+        from dataclasses import replace
+        result = replace(result, ok=False, infra=True,
+                         detail=result.detail + "\n=== nettoyage / rollback incomplet ===\n" + "\n".join(cleanup_errors))
+    return result

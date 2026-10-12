@@ -80,6 +80,22 @@ function renderBar(projects: ProjectState[], handlers: Partial<Record<string, an
 }
 
 describe("ProjectBar — surveillance multi-projets (U1)", () => {
+  it("bootstrap échoué sans story : reprise explicite disponible depuis la barre", () => {
+    const project = makeProject({ phase: "needs_attention", bootstrap_status: "failed", stories: [] });
+    const { onPlay } = renderBar([project], { selectedId: "p1" });
+    fireEvent.click(screen.getByRole("button", { name: "Check the project foundation again, then continue planning and building" }));
+    expect(onPlay).toHaveBeenCalledWith(project);
+  });
+
+  it.each(["preparing", "verifying"] as const)("bootstrap %s : visible et stoppable même sans sélection", (bootstrap_status) => {
+    const project = makeProject({ phase: "needs_attention", bootstrap_status, stories: [makeStory("todo")] });
+    const { onStop } = renderBar([project]);
+    expect(document.body.querySelector(".dot.pulse")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Resume building the remaining stories" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Stop this project's pipeline" }));
+    expect(onStop).toHaveBeenCalledWith(project);
+  });
+
   it("projet en build : indicateur pulsant + bouton ⏹ qui stoppe", () => {
     const { onStop, onPlay } = renderBar([makeProject({ phase: "build" })]);
     const { container } = { container: document.body };

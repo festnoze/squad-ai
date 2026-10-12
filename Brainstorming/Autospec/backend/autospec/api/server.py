@@ -21,6 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from pydantic import Field
 
 from ..agents.discovery import adiscover_models
 from ..agents.providers import (
@@ -144,6 +145,11 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
         if state.phase in _INTERRUPTED_PHASES:
             state.phase = PipelinePhase.STOPPED
             changed = True
+        if state.bootstrap_status in ("preparing", "verifying"):
+            state.bootstrap_status = "failed"
+            state.bootstrap_detail = "Initialisation interrompue par le redémarrage ; reprendre pour la vérifier."
+            state.delivery_ready = False
+            changed = True
         # An interrupted build (crash/reload/cancel) can leave a work item in a
         # transient in-flight status with no worker behind it. Nothing is running
         # at recovery time, so revert any such orphan to TODO and clear its live
@@ -222,6 +228,14 @@ async def _arecover_projects() -> None:
     states = await asyncio.to_thread(list_states)
     await _asweep_workspace_orphans()
     recover_projects(states)
+    for pipeline in list(pipelines.values()):
+        if pipeline.state.deployed_container or pipeline.state.deploy_status:
+            try:
+                await pipeline.areconcile_deploy()
+            except Exception as exc:
+                pipeline.state.deploy_status = "failed"
+                pipeline.state.deploy_detail = f"État Docker non confirmé : {exc}"
+                pipeline._sync()
 
 
 @asynccontextmanager
@@ -273,10 +287,11 @@ class CreateProjectRequest(BaseModel):
     name: str = ""
     auto_spec: bool = False
     product_profile: str = ""  # auto | library-fast | cli | api | web-ssr | fullstack | brownfield
-    budget_usd: float = 0.0
+    budget_usd: float = Field(default=0.0, allow_inf_nan=False)
     budget_tokens: int = 0
     brief: str = ""  # I3: optional imported spec — seeds the brief, skips the interview
     brownfield_path: str = ""  # B1: existing repo to extend
+    technical_stack: dict[str, str] = Field(default_factory=dict)
 
 
 class MessageRequest(BaseModel):
@@ -296,7 +311,7 @@ class RollbackRequest(BaseModel):
 
 
 class BudgetRequest(BaseModel):
-    budget_usd: float | None = None
+    budget_usd: float | None = Field(default=None, allow_inf_nan=False)
     budget_tokens: int | None = None
 
 
@@ -536,6 +551,7 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
         budget_tokens=max(0, req.budget_tokens),
         brief=parse_spec_import(req.brief),
         brownfield_path=(req.brownfield_path or "").strip(),
+        technical_stack=req.technical_stack,
     )
     state.chat.append(ChatMessage(role=ChatRole.USER, content=req.goal))
     pipeline = Pipeline(state, _runner)
@@ -658,12 +674,14 @@ async def adelete_project(project_id: str) -> dict:
     pipeline = pipelines.pop(project_id, None)
     if pipeline:
         await pipeline.adispose()
-    # Best-effort: tear down any Docker container/image before wiping the
-    # workspace, so a deleted project leaves no zombie container on the network.
-    try:
-        await asyncio.to_thread(docker_deploy.undeploy, project_id)
-    except Exception:  # noqa: BLE001 — deletion must not fail on docker hiccups
-        pass
+    # Preserve the state needed to retry cleanup if the daemon is unavailable.
+    stored = pipeline.state if pipeline else load_state(project_id)
+    if stored and (stored.deployed_image or stored.deployed_container or stored.deploy_status in ("deployed", "packaged")):
+        result = await asyncio.to_thread(docker_deploy.undeploy, project_id)
+        if not result.ok:
+            if pipeline:
+                pipelines[project_id] = pipeline
+            raise HTTPException(409, f"Retrait Docker non confirmé : {result.detail}")
     try:
         # rmtree of a git workspace (read-only packs + chmod retries on Windows)
         # is slow; off the event loop so uvicorn keeps accepting connections
@@ -1295,6 +1313,13 @@ async def aundeploy_project(project_id: str) -> dict:
     pipeline = _pipeline(project_id)
     await _acall_pipeline(pipeline.aundeploy(), f"Projet inconnu : {project_id}")
     return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/deployment/refresh")
+async def arefresh_deployment(project_id: str) -> dict:
+    pipeline = _pipeline(project_id)
+    await pipeline.areconcile_deploy()
+    return {"state": pipeline.state.model_dump(mode="json")}
 
 
 @app.post("/api/projects/{project_id}/verify")

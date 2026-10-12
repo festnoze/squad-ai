@@ -27,6 +27,13 @@ from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
 
 
+@pytest.fixture(autouse=True)
+def release_port_reservations():
+    yield
+    for project_id in list(docker_deploy._port_reservations):
+        docker_deploy.release_host_port(project_id)
+
+
 # =========================================================================
 # Module layer — fake subprocess/Popen inside docker_deploy
 # =========================================================================
@@ -50,7 +57,7 @@ def test_docker_available_false_on_file_not_found(monkeypatch):
     def _boom(cmd, **kwargs):
         raise FileNotFoundError("docker introuvable")
 
-    monkeypatch.setattr(subprocess, "run", _boom)
+    monkeypatch.setattr(subprocess, "Popen", _boom)
     ok, out = docker_deploy.docker_available()
     assert ok is False
     # The launch error string is surfaced (the pipeline classifies it as infra).
@@ -66,9 +73,9 @@ def test_docker_available_false_on_named_pipe_daemon_down(monkeypatch):
     )
 
     def _fake_run(cmd, **kwargs):
-        return subprocess.CompletedProcess(cmd, 1, stdout=pipe_err)
+        return 1, pipe_err
 
-    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setattr(docker_deploy, "_run_process", _fake_run)
     ok, out = docker_deploy.docker_available()
     assert ok is False
     assert docker_deploy.looks_like_daemon_down(out) is True
@@ -264,12 +271,10 @@ def test_cross_reachability_foreign_probe_budget(monkeypatch):
         return True, ""
 
     monkeypatch.setattr(docker_deploy, "probe", _probe)
-    monkeypatch.setattr(docker_deploy, "_MAX_FOREIGN_PROBES", 5)
     ok, detail = docker_deploy.check_cross_reachability("autospec-0", deployed)
     assert ok is True
-    # 12 own pairs (0↔each of 6 others, both directions) + 5 foreign (budget).
-    assert calls["n"] == 12 + 5
-    assert "non sondée" in detail
+    # Only 12 own directions; no foreign cross-product is constructed/probed.
+    assert calls["n"] == 12
 
 
 def test_cross_reachability_foreign_pair_is_warning_only(monkeypatch):
@@ -290,8 +295,7 @@ def test_cross_reachability_foreign_pair_is_warning_only(monkeypatch):
     monkeypatch.setattr(docker_deploy, "probe", _probe)
     ok, detail = docker_deploy.check_cross_reachability("autospec-me", deployed)
     assert ok is True  # own pairs all green → gate passes
-    assert "avertissements (paires tierces)" in detail
-    assert "FAIL autospec-b -> autospec-c" in detail
+    assert "autospec-b -> autospec-c" not in detail
 
 
 # ------------------------------------------------------- allocate_host_port
@@ -300,8 +304,9 @@ def test_allocate_host_port_reuses_persisted(monkeypatch):
     """A state that already owns a port keeps it (stable across redeploys)."""
     state = ProjectState(id="alloc-reuse", name="a", goal="g")
     state.deploy_host_port = 18042
-    # No docker / storage scan should be needed on the reuse path.
-    monkeypatch.setattr(docker_deploy, "list_deployed", lambda: (_ for _ in ()).throw(AssertionError("no scan on reuse")))
+    monkeypatch.setattr(docker_deploy, "list_deployed", lambda: [{"name": "autospec-alloc-reuse", "project": state.id, "host_ports": [18042]}])
+    from autospec import storage
+    monkeypatch.setattr(storage, "list_states", lambda: [])
     assert docker_deploy.allocate_host_port(state) == 18042
 
 
@@ -473,17 +478,16 @@ def test_should_run_frontend_only_is_nginx_port80(monkeypatch):
     assert kind == "frontend"
 
 
-def test_should_run_skips_non_web(monkeypatch):
-    """CLI/library (no web backend, no frontend) → skip with an explicit reason."""
+def test_should_run_packages_cli(monkeypatch):
+    """Non-web projects receive a verified image without an HTTP health gate."""
     monkeypatch.setattr(settings, "fake_agents", False)
     state = _done_state("sr-cli")
     ws = workspace_dir(state.id)
     ws.mkdir(parents=True, exist_ok=True)
     (ws / "main.py").write_text("print('hello cli')\n", encoding="utf-8")
     run, reason, kind = docker_deploy.should_run(state, ws, enabled=True)
-    assert run is False
-    assert kind == ""
-    assert "non applicable" in reason
+    assert run is True
+    assert kind == "cli"
 
 
 def test_should_run_skips_when_disabled_or_demo(monkeypatch):
@@ -498,15 +502,14 @@ def test_should_run_skips_when_disabled_or_demo(monkeypatch):
     assert "démo" in reason
 
 
-def test_should_run_non_python_backend_skips(monkeypatch):
+def test_should_run_non_python_backend_supported(monkeypatch):
     monkeypatch.setattr(settings, "fake_agents", False)
     state = _done_state("sr-go", language=BackendLanguage.GO)
     ws = workspace_dir(state.id)
     _write_backend_main(ws)
     run, reason, kind = docker_deploy.should_run(state, ws, enabled=True)
-    assert run is False
-    assert kind == ""
-    assert "non-python" in reason
+    assert run is True
+    assert kind == "backend"
 
 
 # ------------------------------------------------------------ probe fallback
@@ -641,10 +644,9 @@ async def test_phase_skips_in_fake_agents_demo(monkeypatch, deploy_env):
     assert calls["n"] == 0
 
 
-async def test_phase_skips_cli_project_with_warning(monkeypatch, deploy_env):
-    """Enabled-but-non-web: skipped, zero docker work, an explicit warning chat +
-    ``deploy_status == 'skipped'``."""
-    calls = _fake_deploy(monkeypatch, [DockerDeployResult(ok=True, detail="x")])
+async def test_phase_packages_cli_project(monkeypatch, deploy_env):
+    """A CLI is packaged without pretending to be a running web server."""
+    calls = _fake_deploy(monkeypatch, [DockerDeployResult(ok=True, detail="x", packaged=True)])
     chats: list[str] = []
     monkeypatch.setattr(Pipeline, "_chat", lambda self, role, content: chats.append(content))
     state = _phase_state("dk-cli")
@@ -654,9 +656,9 @@ async def test_phase_skips_cli_project_with_warning(monkeypatch, deploy_env):
     pipeline = Pipeline(state, FakeRunner([]))
 
     assert await pipeline._adocker_delivery_phase() is True
-    assert calls["n"] == 0
-    assert state.deploy_status == "skipped"
-    assert any("non applicable" in c and "PAS empaquetée" in c for c in chats)
+    assert calls["n"] == 1
+    assert state.deploy_status == "packaged"
+    assert state.deploy_host_port == 0
 
 
 # ------------------------------------------------------------- daemon down

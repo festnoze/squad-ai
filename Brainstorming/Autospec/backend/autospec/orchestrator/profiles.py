@@ -42,7 +42,7 @@ PROFILES: dict[str, ProductProfile] = {
             "smoke_run": False,
             "runtime_acceptance_enabled": False,
             "ui_tests_enabled": False,
-            "docker_delivery": False,
+            "docker_delivery": True,
         },
     ),
     "cli": ProductProfile(
@@ -57,7 +57,7 @@ PROFILES: dict[str, ProductProfile] = {
             "smoke_run": True,
             "runtime_acceptance_enabled": False,
             "ui_tests_enabled": False,
-            "docker_delivery": False,
+            "docker_delivery": True,
         },
     ),
     "api": ProductProfile(

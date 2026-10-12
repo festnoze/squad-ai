@@ -1,6 +1,17 @@
 import type { Namespace } from "./index";
 
 export const runPanel: Namespace = {
+  bootstrap_preparing: { en: "Preparing project foundation", fr: "Préparation du socle technique" },
+  bootstrap_verifying: { en: "Checking project foundation", fr: "Vérification du socle technique" },
+  bootstrap_ready: { en: "Project foundation verified", fr: "Socle technique vérifié" },
+  bootstrap_failed: { en: "Project initialization needs attention", fr: "Initialisation technique à reprendre" },
+  retryBootstrap: { en: "▶ Retry initialization", fr: "▶ Reprendre l'initialisation" },
+  retryBootstrapTitle: {
+    en: "Check the project foundation again, then continue planning and building",
+    fr: "Revérifier le socle technique, puis continuer la planification et le build",
+  },
+  dockerPackaged: { en: "Docker image verified", fr: "Image Docker vérifiée" },
+  dockerRemoveImageTitle: { en: "Remove the packaged Docker image", fr: "Supprimer l'image Docker produite" },
   // Header
   title: { en: "Execution", fr: "Exécution" },
   iteration: { en: "iteration {n}", fr: "itération {n}" },
@@ -46,11 +57,12 @@ export const runPanel: Namespace = {
   // Usage / forecast meters
   usageTokens: { en: "tokens", fr: "tokens" },
   usageCalls: { en: "calls", fr: "appels" },
+  estimatedBudget: { en: "guardrail: ${budget}", fr: "garde-fou : ${budget}" },
   forecastTitle: {
-    en: "Estimated remaining cost (project cost/story history)",
-    fr: "Estimation du coût restant (historique coût/story du projet)",
+    en: "Rough remaining usage estimate from recorded cost/story history, not a quote or a billing prediction. Incomplete usage makes this less reliable.",
+    fr: "Estimation indicative de l'usage restant d'après l'historique coût/story enregistré, pas un devis ni une prévision de facture. Un usage incomplet la rend moins fiable.",
   },
-  forecast: { en: "📈 ~${cost} / {n} story(ies)", fr: "📈 ~${cost} / {n} story(ies)" },
+  forecast: { en: "📈 Estimated remaining: ~${cost} / {n} story(ies)", fr: "📈 Reste estimé : ~${cost} / {n} story(ies)" },
 
   // Run controls
   argsPlaceholder: { en: "arguments (e.g. auth-screen)…", fr: "arguments (ex. auth-screen)…" },

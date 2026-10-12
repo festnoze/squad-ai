@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -26,6 +27,25 @@ namespace Viewpoint
     /// a collider, a counter, a held id or an event, and the raised picture in
     /// particular puts the roll on the anchor rect AT ONCE and lets only the
     /// picture under it lag (see <see cref="SetPhotoView"/>).
+    ///
+    /// PRD_VISUAL tier 5 gave the overlay its surfaces (V-HUD-02 to 05 and
+    /// V-HUD-07): the counters, the prompt and the held hints now sit on drawn
+    /// panels instead of floating on the world. Two rules govern that work and
+    /// are worth stating once too:
+    ///
+    /// EVERY PANEL, CAP AND GLYPH IS PAINTED IN THIS FILE. Section 3.2 as
+    /// amended (Appendix C.11) allows the font and the CC0 texture sets and
+    /// nothing else, so there is no sprite atlas to import and nothing to
+    /// strip out of the player. The painters live at the bottom of the file
+    /// and everything they produce is cached on the instance, so a frame of
+    /// HUD costs no texture work at all.
+    ///
+    /// A PANEL CHANGES WHAT A LABEL NEEDS. A label on bare sky is carried
+    /// entirely by its dark contour (white on this sky is about 1.24:1, see
+    /// Fonts.Apply); a label on one of these panels has its contrast from the
+    /// panel and takes the lighter TextEdge.Shadow. Which label gets which is
+    /// therefore a consequence of where it sits, not a taste, and it is noted
+    /// at each Build below.
     /// </summary>
     public sealed class Hud : MonoBehaviour
     {
@@ -36,25 +56,79 @@ namespace Viewpoint
 
         // ---- PRD 12.1 -------------------------------------------------------
 
-        const float CrosshairPx = 5f;
+        /// <summary>
+        /// PRD 12.1's white at 85 percent. The 5 x 5 px square it used to fill
+        /// is gone: V-HUD-05 replaces it with a ring, a dot and a reticle, all
+        /// sized in the tier 5 block below. The ALPHA is the part of the pinned
+        /// look that survives, and it is shared by all three.
+        /// </summary>
         static readonly Color CrosshairColor = new Color(1f, 1f, 1f, 0.85f);
 
         const float BatterySizePx = 22f;
         static readonly Vector2 BatteryOffset = new Vector2(24f, 20f);
 
         const float FilmSizePx = 20f;
-        static readonly Vector2 FilmOffset = new Vector2(24f, 52f);
+
+        /// <summary>
+        /// PRD 12.1 also gives the film line its own offset, (24, 52). It has
+        /// no constant any more because nothing positions that line: V-HUD-02
+        /// makes it the second row of a panel, and the row lands where the
+        /// first row's height and the panel's spacing put it, which is 54.
+        /// See BuildCounters.
+        /// </summary>
         static readonly Color FilmColor = new Color(0.75f, 0.95f, 0.93f);
 
         const float PromptSizePx = 22f;
         const float PromptBottomPx = 120f;
 
         const float HeldMarginPx = 24f;
-        const float HeldPanelWidthPx = 520f;
+
+        /// <summary>
+        /// Not a PRD number: 12.1 pins the 24 px margins and 12.3 pins the
+        /// 86 x 78 minimum, and the width was free. It was 520 while the hints
+        /// were one line of text. V-HUD-04 turns that line into four key-cap
+        /// pairs, and measured on Manrope's own advance widths those cost about
+        /// 341 px of type (the four keys at 13 px and the four actions at 15)
+        /// plus 101 px of chip padding and gaps. 580 leaves the row 556 px
+        /// inside the panel's padding, which clears 442 with enough room for
+        /// the synthesised weight (see Fonts.StyleFor) to run wider than the
+        /// metrics say, since a row that overflows this panel overflows it to
+        /// the LEFT, off the edge of the panel entirely.
+        /// </summary>
+        const float HeldPanelWidthPx = 580f;
+
+        const float HeldPanelHeightPx = 158f;
         const float HeldTitleSizePx = 22f;
         const float HeldHintSizePx = 15f;
+
         static readonly Vector2 HeldPanelMinSize = new Vector2(86f, 78f);
         static readonly Color HeldHintColor = new Color(1f, 1f, 1f, 0.75f);
+
+        /// <summary>
+        /// The hint line of PRD 12.1, VERBATIM, and the only copy of it.
+        ///
+        /// V-HUD-04 asks for "the four control hints as key-cap glyph pairs in
+        /// a row" while its acceptance asks that "the hint string's four
+        /// commands stay in the same order and words". Both hold here because
+        /// the row is BUILT BY SPLITTING THIS CONSTANT and never by retyping
+        /// its pieces: the four commands are what Split hands back, in the
+        /// order it hands them back, and each command's key and action are the
+        /// two halves of its first " : ". BuildHintRow rejoins them and logs an
+        /// error if the result is not this string byte for byte, so an edit
+        /// that breaks the identity says so instead of shipping.
+        /// </summary>
+        const string HeldHintText =
+            "Clic gauche : poser   Clic droit : lever   Molette : pivoter   F : reposer";
+
+        /// <summary>The three spaces PRD 12.1 puts between two commands.</summary>
+        const string HintSeparator = "   ";
+
+        /// <summary>
+        /// What sits between a key and what it does, in every prompt and in
+        /// every hint the game writes. Used to lift the key out of a string
+        /// without editing the string (see <see cref="SplitPromptKey"/>).
+        /// </summary>
+        const string KeySeparator = " : ";
 
         const float BannerTopPx = 70f;
         const float BannerTitleSizePx = 44f;
@@ -213,6 +287,148 @@ namespace Viewpoint
         /// </summary>
         static readonly Color RewindAmber = Palette.Get("battery");
 
+        // ---- PRD_VISUAL 4.11: the panels, the caps and the drawn glyphs -----
+        //
+        // Tier 5's whole design, in one block: one ink, three alphas, one
+        // corner radius family and the sizes the glyphs are painted at.
+
+        /// <summary>
+        /// The one dark this interface is made of. It is the menu's dim of PRD
+        /// 12.4 (0.08, 0.10, 0.14) rather than a new colour, so a HUD panel and
+        /// the menu that can open over it read as the same material. Only the
+        /// alpha changes from panel to panel, and every alpha below is the one
+        /// its own item names.
+        /// </summary>
+        static readonly Color PanelInk = new Color(0.08f, 0.10f, 0.14f);
+
+        /// <summary>V-HUD-02: "a single rounded panel at 60 percent dark".</summary>
+        const float CounterPanelAlpha = 0.60f;
+
+        /// <summary>V-HUD-03: "a pill (generated rounded rect, 55 percent dark)".</summary>
+        const float PromptPillAlpha = 0.55f;
+
+        /// <summary>V-HUD-04: "a simple 65 percent dark", see BuildHeldPanel.</summary>
+        const float HeldPanelAlpha = 0.65f;
+
+        /// <summary>
+        /// Corner radius of the counter and held panels, in reference pixels.
+        /// Ten is a fifth of the counter panel's height: enough to read as
+        /// drawn rather than as a default rectangle, and short of the "pill"
+        /// V-HUD-03 reserves for the prompt.
+        /// </summary>
+        const int PanelRadiusPx = 10;
+
+        /// <summary>Corner radius of a key cap. A chip, not a pill.</summary>
+        const int KeyCapRadiusPx = 4;
+
+        const float CounterPadXPx = 10f;
+        const float CounterPadYPx = 8f;
+        const float CounterRowGapPx = 8f;
+        const float CounterRowSpacingPx = 4f;
+
+        /// <summary>PRD_VISUAL names the size: "a generated 16 x 24 icon".</summary>
+        static readonly Vector2 BatteryGlyphPx = new Vector2(16f, 24f);
+
+        static readonly Vector2 FilmGlyphPx = new Vector2(20f, 20f);
+
+        /// <summary>
+        /// The battery glyph is amber and the film glyph is the film counter's
+        /// own teal, both READ rather than copied: amber means stored energy in
+        /// this game and the numbers beside the glyph are exactly that count
+        /// (PRD 5.1), so a glyph that spelt out a triple would drift the day
+        /// the palette moves.
+        /// </summary>
+        static readonly Color BatteryGlyphColor = Palette.Get("battery");
+
+        /// <summary>
+        /// Forty and not more: PRD 12.1 puts the prompt's bottom edge at 120 px
+        /// and the toast's at 160, and those two used to be a bare line of text
+        /// each. Now that the prompt has a box around it, anything taller than
+        /// the 40 px between them would slide under the toast, which is the one
+        /// other thing that speaks from the bottom of this screen.
+        /// </summary>
+        const float PromptPillHeightPx = 40f;
+        const float PromptPillPadXPx = 18f;
+        const float PromptCapGapPx = 10f;
+
+        /// <summary>
+        /// A key cap's letter. Smaller than the line it prefixes, because a cap
+        /// is a label on a key and not a word in the sentence.
+        /// </summary>
+        const float PromptCapSizePx = 16f;
+
+        const float HintCapSizePx = 13f;
+        const float KeyCapPadXPx = 6f;
+        const float KeyCapPadYPx = 3f;
+        const float HintPairGapPx = 5f;
+        const float HintCommandGapPx = 11f;
+        const float HintRowHeightPx = 26f;
+
+        /// <summary>
+        /// A cap is a light chip with dark type on it, the one place in this
+        /// interface where that polarity is inverted. That is the point: a key
+        /// cap has to read as a physical thing the player presses, and on a
+        /// dark panel the only way to say "object" rather than "word" is to
+        /// make it the brightest thing in the line.
+        /// </summary>
+        static readonly Color KeyCapFace = new Color(0.93f, 0.95f, 0.97f, 0.92f);
+        static readonly Color KeyCapInk = new Color(0.07f, 0.09f, 0.13f);
+
+        /// <summary>
+        /// The longest key a cap will hold. Long enough for "F11", short enough
+        /// that a sentence opening on a colon ("Mains pleines : ...") can never
+        /// be mistaken for a key. See <see cref="SplitPromptKey"/>.
+        /// </summary>
+        const int KeyCapMaxChars = 3;
+
+        // ---- V-HUD-05: the crosshair ----------------------------------------
+
+        /// <summary>Outer diameter of the ring. The item's "6 px ring".</summary>
+        const float CrosshairRingPx = 6f;
+
+        const float CrosshairRingStrokePx = 1.3f;
+
+        /// <summary>The item's "2 px dot", which is all that is left while a
+        /// picture is raised.</summary>
+        const float CrosshairDotPx = 2f;
+
+        /// <summary>The viewfinder's reticle: a circle with four tick marks.</summary>
+        const float CrosshairReticlePx = 24f;
+
+        /// <summary>
+        /// What the ring shrinks TO when a picture is raised: the dot's own
+        /// size, so the ring does not fade out beside the dot, it collapses
+        /// into it.
+        /// </summary>
+        const float CrosshairShrink = CrosshairDotPx / CrosshairRingPx;
+
+        const float CrosshairFadeSeconds = 0.12f;
+
+        // ---- V-HUD-07: the banner's rule and its delayed subtitle -----------
+
+        /// <summary>
+        /// How long the rule takes to grow out from under the title. Inside the
+        /// 0.667 s the pinned alpha curve takes to reach full, so the line is
+        /// done arriving by the time the words are fully there.
+        /// </summary>
+        const float BannerRuleSeconds = 0.35f;
+
+        const float BannerRuleHeightPx = 2f;
+
+        /// <summary>
+        /// Slack either side of the title, so the rule reads as belonging to
+        /// the words rather than as underlining them.
+        /// </summary>
+        const float BannerRuleMarginPx = 48f;
+
+        const float BannerRuleMinPx = 160f;
+        const float BannerRuleMaxPx = 900f;
+        static readonly Color BannerRuleColor = new Color(1f, 1f, 1f, 0.55f);
+
+        /// <summary>V-HUD-07: "the subtitle fades in 0.15 s after the title".</summary>
+        const float BannerSubtitleDelay = 0.15f;
+        const float BannerSubtitleFade = 0.15f;
+
         // ---- V-POST-06: the two transition colours --------------------------
 
         /// <summary>
@@ -237,13 +453,17 @@ namespace Viewpoint
         RectTransform _canvasRect;
         Text _batteryLabel;
         Text _filmLabel;
+        RectTransform _batteryGlyph;
+        RectTransform _filmGlyph;
         Text _promptLabel;
+        Text _promptCapLabel;
+        RectTransform _promptCap;
+        string _promptText = string.Empty;
         Text _toastLabel;
         Text _rewindLabel;
         Text _bannerTitle;
         Text _bannerSubtitle;
         Text _heldTitle;
-        Text _heldHint;
 
         RawImage _photoView;
         RectTransform _photoViewRect;
@@ -264,6 +484,13 @@ namespace Viewpoint
         float _heldCardToA = 1f;
         Texture2D _heldCardTexture;
         CanvasGroup _bannerGroup;
+        CanvasGroup _bannerSubtitleGroup;
+        RectTransform _bannerRule;
+        float _bannerRuleWidth;
+        RectTransform _crosshairRing;
+        CanvasGroup _crosshairRingGroup;
+        Fader _crosshairRingFader;
+        Fader _crosshairReticleFader;
         Image _fade;
         CanvasGroup _rewindPulse;
         RectTransform _rewindBarFill;
@@ -277,6 +504,22 @@ namespace Viewpoint
         Fader _filmFader;
         Fader _viewfinderFader;
         Fader _rewindFader;
+
+        // ---- The drawn art --------------------------------------------------
+        //
+        // Cached on the INSTANCE and not statically. A static cache would
+        // survive a domain reload in the editor holding references to textures
+        // play mode has already destroyed, which read as null and rebuild
+        // anyway; on the instance there is exactly one cache per HUD, it is
+        // filled once during Build, and OnDestroy can give it all back.
+
+        readonly Dictionary<int, Sprite> _roundedSprites = new Dictionary<int, Sprite>();
+        readonly List<UnityEngine.Object> _drawn = new List<UnityEngine.Object>();
+        Sprite _batteryGlyphSprite;
+        Sprite _filmGlyphSprite;
+        Sprite _ringSprite;
+        Sprite _dotSprite;
+        Sprite _reticleSprite;
 
         float _bannerTimer;
         float _toastTimer;
@@ -379,9 +622,15 @@ namespace Viewpoint
                 _bannerTimer -= dt;
                 // Fades in over the first two thirds of a second and out over the
                 // last, exactly the curve of the original. V-ANIM-03 says the
-                // banner keeps this curve, so nothing here changed.
+                // banner keeps this curve, and V-HUD-07 says the same of the
+                // 4.5 s, so this line is untouched by tier 5: everything the
+                // item adds is written on CHILDREN of the group this alpha
+                // drives, and a nested CanvasGroup multiplies. The rule and the
+                // subtitle therefore arrive inside the pinned fade rather than
+                // beside it, and when the banner leaves, it leaves as one.
                 float alpha = Mathf.Clamp01(Mathf.Min(_bannerTimer, BannerSeconds - _bannerTimer) * 1.5f);
                 _bannerGroup.alpha = alpha;
+                StepBanner(BannerSeconds - _bannerTimer);
             }
             else if (_bannerGroup.alpha != 0f)
             {
@@ -389,11 +638,22 @@ namespace Viewpoint
             }
 
             StepToast(dt);
-            StepPop(_batteryPop, _batteryLabel.rectTransform, dt);
-            StepPop(_filmPop, _filmLabel.rectTransform, dt);
+            // V-VFX-04's pop is written on the GLYPH of each counter and no
+            // longer on its line of text, and the reason is the panel V-HUD-02
+            // puts under both. A line that swells by a quarter inside a panel
+            // sized to hold it is a line that leaves the panel for a fifth of a
+            // second, which reads as the frame breaking rather than as the
+            // number changing; the tween, its 0.2 s and its amplitude are
+            // untouched, only what they are applied to moved. A 16 x 24 glyph
+            // at 1.25 still sits inside the panel's own padding, and a number
+            // that stays still at the instant it changes is a number that can
+            // be read at the instant it changes.
+            StepPop(_batteryPop, _batteryGlyph, dt);
+            StepPop(_filmPop, _filmGlyph, dt);
             _promptFader.Step(dt);
             _filmFader.Step(dt);
             StepPrompt();
+            StepCrosshair(dt);
             StepHeld(dt);
             StepHeldCard(dt);
             StepPicture(dt);
@@ -520,6 +780,23 @@ namespace Viewpoint
         /// The interaction prompt. V-ANIM-03 fades it in over 0.12 s and out
         /// over 0.2 s, so an empty string starts the fade instead of blanking
         /// the label: the words have to stay readable while they leave.
+        ///
+        /// V-HUD-03 asks that the key be "prefixed with a key-cap glyph" while
+        /// "the French string after the key-cap is unchanged", and the callers
+        /// hand this method ONE string that already contains the key
+        /// ("E : ramasser la pile"). The split is therefore made HERE, on the
+        /// string, and never in the callers: PlayerController and every
+        /// IInteractable keep writing exactly the prompt they always wrote, the
+        /// smoke probe keeps reading that same string off PlayerController, and
+        /// only the DRAWING of it is in two pieces. <see cref="SplitPromptKey"/>
+        /// takes the key, the cap draws it, and the label draws the remainder
+        /// character for character.
+        ///
+        /// What the screen loses is the " : " between the two, which is what a
+        /// cap is FOR: the item pins "the French string after the key-cap" and
+        /// that is what survives. A prompt with no key ("Il manque 2 piles") or
+        /// whose head is a sentence and not a key ("Mains pleines : posez...")
+        /// keeps every character and shows no cap.
         /// </summary>
         public void SetPrompt(string text)
         {
@@ -529,11 +806,52 @@ namespace Viewpoint
                 _promptFader.Hide(PromptOutSeconds);
                 return;
             }
-            if (_promptLabel.text != wanted)
+            if (_promptText != wanted)
             {
-                _promptLabel.text = wanted;
+                _promptText = wanted;
+                string key;
+                string rest;
+                bool capped = SplitPromptKey(wanted, out key, out rest);
+                _promptLabel.text = rest;
+                _promptCapLabel.text = capped ? key : string.Empty;
+                if (_promptCap.gameObject.activeSelf != capped)
+                {
+                    _promptCap.gameObject.SetActive(capped);
+                }
             }
             _promptFader.Show(PromptInSeconds);
+        }
+
+        /// <summary>
+        /// Lifts the key off the front of a prompt WITHOUT editing the prompt.
+        /// True when the text opens on a key and a colon, in which case the key
+        /// and the rest of the sentence come back separately and
+        /// <c>key + " : " + rest</c> is the argument byte for byte.
+        ///
+        /// The two guards are what keep a sentence from being mistaken for a
+        /// key. A head longer than three characters is not a key ("F11" is the
+        /// longest this game has), and a head containing a space is a phrase:
+        /// "Mains pleines : posez (clic gauche) ou reposez (F) votre photo"
+        /// fails both and is drawn whole, which is right, because there is no
+        /// key to press in it.
+        /// </summary>
+        static bool SplitPromptKey(string text, out string key, out string rest)
+        {
+            key = string.Empty;
+            rest = text;
+            int at = text.IndexOf(KeySeparator, System.StringComparison.Ordinal);
+            if (at <= 0 || at > KeyCapMaxChars)
+            {
+                return false;
+            }
+            string head = text.Substring(0, at);
+            if (head.IndexOf(' ') >= 0)
+            {
+                return false;
+            }
+            key = head;
+            rest = text.Substring(at + KeySeparator.Length);
+            return true;
         }
 
         /// <summary>
@@ -564,6 +882,8 @@ namespace Viewpoint
                 if (_photoShown)
                 {
                     _photoShown = false;
+                    // V-HUD-05: the ring comes back with the frame it left.
+                    ApplyCrosshair();
                     // The reverse of the raise (V-ANIM-04) is played by a GHOST
                     // copy, never by this rect: the probe requires the picture
                     // to be gone from the HUD three frames after a placement,
@@ -591,6 +911,9 @@ namespace Viewpoint
             if (!_photoShown)
             {
                 _photoShown = true;
+                // V-HUD-05: the square in front of the eye is the frame now, so
+                // the ring collapses into the dot.
+                ApplyCrosshair();
                 StartRise();
             }
             else if (rollSteps != previous)
@@ -606,6 +929,8 @@ namespace Viewpoint
                 return;
             }
             _viewfinderOn = active;
+            // V-HUD-05: the reticle is the viewfinder's crosshair.
+            ApplyCrosshair();
             if (active)
             {
                 // Frame one already has the brackets out at the corners, so the
@@ -742,11 +1067,29 @@ namespace Viewpoint
             }
         }
 
+        /// <summary>
+        /// The level banner. The 4.5 s and the alpha curve are pinned by PRD
+        /// 12.1 and V-HUD-07 repeats it, so neither is touched here.
+        ///
+        /// The rule line is measured against the TITLE that was just set rather
+        /// than given a width of its own, because a rule that is wider than the
+        /// words it belongs to reads as a divider between two things. Asking
+        /// the Text for its preferred width is what makes "Niveau 3 : L'arche"
+        /// and "Niveau 19 : Le grand escalier suspendu" both come out looking
+        /// deliberate; the clamp covers the headless case, where there is no
+        /// font and the answer is zero.
+        /// </summary>
         public void ShowBanner(string title, string subtitle)
         {
             _bannerTitle.text = title ?? string.Empty;
             _bannerSubtitle.text = subtitle ?? string.Empty;
+            _bannerRuleWidth = Mathf.Clamp(
+                _bannerTitle.preferredWidth + BannerRuleMarginPx * 2f,
+                BannerRuleMinPx, BannerRuleMaxPx);
             _bannerTimer = BannerSeconds;
+            // Nothing on this HUD appears in one frame (V-ANIM-03), so the rule
+            // and the subtitle start at nothing and are stepped from here on.
+            StepBanner(0f);
         }
 
         public void ShowToast(string text)
@@ -916,9 +1259,11 @@ namespace Viewpoint
         }
 
         /// <summary>
-        /// The counter pop. Applied to the label's own rect, whose pivot is its
-        /// top left ANCHOR, so the line swells towards the middle of the screen
-        /// and its PRD 12.1 offset from the corner never moves.
+        /// The counter pop (V-VFX-04). Applied to the counter's GLYPH since
+        /// V-HUD-02 put a panel under both lines: a rect inside a layout group
+        /// has a centred pivot, so the glyph swells about its own middle, the
+        /// layout ignores scale and nothing around it moves. See the call in
+        /// Update for why the line of text is no longer what pops.
         /// </summary>
         static void StepPop(Tween pop, RectTransform rect, float dt)
         {
@@ -932,11 +1277,84 @@ namespace Viewpoint
 
         void StepPrompt()
         {
-            // Cleared only once the words have actually finished leaving.
-            if (_promptFader.Hidden && _promptLabel.text.Length > 0)
+            // Cleared only once the words have actually finished leaving. The
+            // cached string goes with them, so the next prompt is split again
+            // rather than compared against a line that is no longer drawn.
+            if (_promptFader.Hidden && _promptText.Length > 0)
             {
+                _promptText = string.Empty;
                 _promptLabel.text = string.Empty;
+                _promptCapLabel.text = string.Empty;
+                if (_promptCap.gameObject.activeSelf)
+                {
+                    _promptCap.gameObject.SetActive(false);
+                }
             }
+        }
+
+        /// <summary>
+        /// V-HUD-05's three states, which are not three widgets but one dot and
+        /// two things that come and go around it.
+        ///
+        /// The dot is the aim point and never moves: it is what the placement
+        /// ray actually reads, so it is the one part of the crosshair that may
+        /// not be animated away. The ring collapses INTO it while a picture is
+        /// raised (the raised square is the frame then, and a ring inside a
+        /// frame is two frames), and the reticle takes its place while the
+        /// viewfinder is up. The ring's scale is driven off its own group alpha
+        /// rather than off a second tween, so the shrink and the fade cannot
+        /// come apart.
+        /// </summary>
+        void StepCrosshair(float dt)
+        {
+            _crosshairRingFader.Step(dt);
+            _crosshairReticleFader.Step(dt);
+            float k = Mathf.Lerp(CrosshairShrink, 1f, _crosshairRingGroup.alpha);
+            _crosshairRing.localScale = new Vector3(k, k, 1f);
+        }
+
+        /// <summary>
+        /// Picks the crosshair's state from the two facts that decide it. Called
+        /// from both of the places that can change one of them, never from
+        /// Update: the state is instant truth, and only the travel between
+        /// states is animated.
+        /// </summary>
+        void ApplyCrosshair()
+        {
+            if (_crosshairRingFader == null)
+            {
+                return;
+            }
+            if (_viewfinderOn)
+            {
+                _crosshairReticleFader.Show(CrosshairFadeSeconds);
+                _crosshairRingFader.Hide(CrosshairFadeSeconds);
+                return;
+            }
+            _crosshairReticleFader.Hide(CrosshairFadeSeconds);
+            if (_photoShown)
+            {
+                _crosshairRingFader.Hide(CrosshairFadeSeconds);
+            }
+            else
+            {
+                _crosshairRingFader.Show(CrosshairFadeSeconds);
+            }
+        }
+
+        /// <summary>
+        /// V-HUD-07's rule and delayed subtitle, both written as functions of
+        /// the banner's OWN age so that neither can drift from the 4.5 s the
+        /// PRD pins. The rule grows outward from the centre because its rect is
+        /// centred and only its width changes; the subtitle's ramp multiplies
+        /// with the banner's pinned curve rather than replacing it.
+        /// </summary>
+        void StepBanner(float age)
+        {
+            float grow = EaseOut(Mathf.Clamp01(age / BannerRuleSeconds));
+            _bannerRule.sizeDelta = new Vector2(_bannerRuleWidth * grow, BannerRuleHeightPx);
+            _bannerSubtitleGroup.alpha =
+                Mathf.Clamp01((age - BannerSubtitleDelay) / BannerSubtitleFade);
         }
 
         /// <summary>
@@ -1231,6 +1649,14 @@ namespace Viewpoint
             _canvasRect = canvasObject.GetComponent<RectTransform>();
             Transform root = canvasObject.transform;
 
+            // Every glyph the widgets below hang on an Image is painted first
+            // and then never again (PRD_VISUAL 3.2 as amended allows the font
+            // and the CC0 texture sets and nothing else, so all of this is
+            // code). Five small textures here and three rounded corners on
+            // demand, under 150 KB together, and nothing in Update ever touches
+            // a pixel of any of them.
+            PaintArt();
+
             BuildCrosshair(root);
             BuildCounters(root);
             BuildPhotoView(root);
@@ -1246,23 +1672,150 @@ namespace Viewpoint
             LayoutSquare(SquareSide());
         }
 
+        /// <summary>
+        /// V-HUD-05's crosshair: a ring, a dot and a reticle, all three painted
+        /// here (rule 4) and none of them ever rebuilt.
+        ///
+        /// The three rects are siblings and the dot is drawn LAST, so it stays
+        /// on top of whichever of the other two is up. PRD 12.1's 5 x 5 square
+        /// is gone, which is the item; its white at 85 percent is not, and all
+        /// three share it.
+        /// </summary>
         void BuildCrosshair(Transform root)
         {
-            RectTransform rect = NewRect("Crosshair", root);
-            SetCentered(rect, Vector2.zero, new Vector2(CrosshairPx, CrosshairPx));
-            NewImage(rect, CrosshairColor);
+            RectTransform group = NewRect("Crosshair", root);
+            SetCentered(group, Vector2.zero, new Vector2(CrosshairReticlePx, CrosshairReticlePx));
+
+            _crosshairRing = NewRect("Ring", group);
+            SetCentered(_crosshairRing, Vector2.zero, RingSpriteSizePx());
+            NewGlyph(_crosshairRing, _ringSprite, CrosshairColor);
+            _crosshairRingGroup = NewGroup(_crosshairRing.gameObject);
+            // The ring is the resting state, so it is the one thing on this HUD
+            // that starts shown. Everything else a Fader owns starts parked.
+            _crosshairRingGroup.alpha = 1f;
+            _crosshairRingFader = new Fader(_crosshairRingGroup);
+
+            RectTransform reticle = NewRect("Reticle", group);
+            SetCentered(reticle, Vector2.zero,
+                new Vector2(CrosshairReticlePx, CrosshairReticlePx));
+            NewGlyph(reticle, _reticleSprite, CrosshairColor);
+            // No field for this group: only the ring's alpha is read back
+            // (StepCrosshair drives the shrink off it), and the reticle's is
+            // the Fader's business alone.
+            _crosshairReticleFader = new Fader(NewGroup(reticle.gameObject));
+            reticle.gameObject.SetActive(false);
+
+            RectTransform dot = NewRect("Dot", group);
+            SetCentered(dot, Vector2.zero,
+                new Vector2(CrosshairDotPx * 2f, CrosshairDotPx * 2f));
+            NewGlyph(dot, _dotSprite, CrosshairColor);
         }
 
+        /// <summary>
+        /// V-HUD-02: the two counters, their glyphs and the panel they now lie
+        /// on. Three decisions are worth writing down.
+        ///
+        /// WHERE THE PANEL SITS. PRD 12.1 puts the battery line's top left at
+        /// (24, 20) and the film line's at (24, 52). Those offsets belong to
+        /// LABELS, and this item replaces the labels with a panel, so the panel
+        /// is placed by its padding instead: its corner goes at (24 - padX,
+        /// 20 - padY), which lands the first row's glyph exactly on the pinned
+        /// (24, 20) and the second row's within 2 px of the pinned (24, 52).
+        /// The numbers of 12.1 are therefore still describing what is on
+        /// screen, with the glyph occupying the position the line used to and
+        /// the words following it.
+        ///
+        /// WHY IT IS FITTED AND NOT SIZED. The film row only exists while the
+        /// player carries film, and a panel left at its two-row height would
+        /// have an empty half on most levels. A ContentSizeFitter over a
+        /// vertical layout costs one rebuild on the frame the row appears or
+        /// leaves, and the Fader already deactivates that row, which is exactly
+        /// what a layout group ignores.
+        ///
+        /// WHAT THE PANEL BUYS THE LABELS. Both lines lose the four-sided
+        /// contour they needed over bare sky and take the lighter
+        /// TextEdge.Shadow, which is the "cleaner look" V-HUD-01 asked for and
+        /// could not have while these two floated on the world.
+        ///
+        /// TWO CLAUSES OF V-HUD-02 ARE NOT HONOURED, AND BOTH CONTRADICT
+        /// SOMETHING THE ITEM ITSELF SAYS. They are recorded here rather than
+        /// silently diverged from, which is what Appendix C asks of an item
+        /// that turns out to be impossible as written.
+        ///
+        /// 1. "The pipe separator replaced by spacing. Text unchanged." The
+        ///    pipe is INSIDE the pinned string
+        ///    ("Piles : {0} portee{1}   |   Teleporteur : {2} / {3}", PRD 12.1),
+        ///    so the two sentences ask for opposite things and the acceptance
+        ///    below them ("the strings of gameplay PRD 12.1 are present
+        ///    verbatim") settles which one wins. The line is therefore ONE
+        ///    label holding the whole format string, pipe and all. Splitting
+        ///    the draw across two labels was considered and rejected: whichever
+        ///    of the two halves the pipe is given it is still drawn, so the
+        ///    split buys nothing on screen and costs an invariant (two halves
+        ///    that must concatenate byte for byte) with no test to hold it.
+        ///    What the item actually wanted - a line that reads as a counter
+        ///    rather than as a debug print - is bought by the panel, the glyph
+        ///    and the three spaces the pinned string already puts either side
+        ///    of that pipe.
+        ///
+        /// 2. "The panel occupies no more than 420 x 64 px at reference." The
+        ///    strings do not fit in it. Measured against Manrope's own advance
+        ///    widths, the battery line is 357 px at its pinned 22 px (382 at
+        ///    "12 portees ... 10 / 12"), and the film line is 483 px at its
+        ///    pinned 20 px, before the synthesised weight and before the glyph,
+        ///    the gap and the padding. One row lands near 400 to 430 px wide
+        ///    and 46 px high, which meets the cap in the common case; the
+        ///    second row cannot be brought under it at all without shrinking a
+        ///    pinned size or cutting a pinned string. The panel is fitted to
+        ///    its content instead of clamped, because a clamp would only move
+        ///    the failure from a wide panel to text hanging out of a narrow one.
+        /// </summary>
         void BuildCounters(Transform root)
         {
-            _batteryLabel = NewLabel("Batteries", root, BatterySizePx, Color.white,
-                TextAnchor.UpperLeft, OutlineStrong);
-            AnchorTopLeft(_batteryLabel.rectTransform, BatteryOffset, new Vector2(900f, 34f));
+            RectTransform panel = NewRect("Counters", root);
+            // ZERO, AND NOT THE ITEM'S 420 x 64. The ContentSizeFitter below
+            // overwrites both axes on the first layout pass, so ANY size
+            // written here is discarded; writing the cap would only read as a
+            // cap that is being honoured, and it is not (see point 2 of the
+            // summary above for what the pinned strings actually measure). The
+            // anchor, the pivot and the corner offset are what this call is
+            // really for.
+            AnchorTopLeft(panel,
+                new Vector2(BatteryOffset.x - CounterPadXPx, BatteryOffset.y - CounterPadYPx),
+                Vector2.zero);
+            NewPanel(panel, Alpha(PanelInk, CounterPanelAlpha), PanelRadiusPx);
 
-            _filmLabel = NewLabel("Films", root, FilmSizePx, FilmColor,
-                TextAnchor.UpperLeft, OutlineStrong);
-            AnchorTopLeft(_filmLabel.rectTransform, FilmOffset, new Vector2(900f, 30f));
-            _filmFader = NewFader(_filmLabel.gameObject);
+            var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.childAlignment = TextAnchor.UpperLeft;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(
+                Mathf.RoundToInt(CounterPadXPx), Mathf.RoundToInt(CounterPadXPx),
+                Mathf.RoundToInt(CounterPadYPx), Mathf.RoundToInt(CounterPadYPx));
+            layout.spacing = CounterRowSpacingPx;
+
+            var fitter = panel.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            RectTransform batteryRow = NewRow("BatteryRow", panel, CounterRowGapPx);
+            _batteryGlyph = NewRect("BatteryGlyph", batteryRow);
+            NewGlyph(_batteryGlyph, _batteryGlyphSprite, BatteryGlyphColor);
+            SetLayoutSize(_batteryGlyph, BatteryGlyphPx);
+            _batteryLabel = NewLabel("Batteries", batteryRow, BatterySizePx, Color.white,
+                TextAnchor.MiddleLeft, TextEdge.Shadow, OutlineSoft, TextWeight.Regular);
+
+            RectTransform filmRow = NewRow("FilmRow", panel, CounterRowGapPx);
+            _filmGlyph = NewRect("FilmGlyph", filmRow);
+            NewGlyph(_filmGlyph, _filmGlyphSprite, FilmColor);
+            SetLayoutSize(_filmGlyph, FilmGlyphPx);
+            _filmLabel = NewLabel("Films", filmRow, FilmSizePx, FilmColor,
+                TextAnchor.MiddleLeft, TextEdge.Shadow, OutlineSoft, TextWeight.Regular);
+            // The FADER MOVED FROM THE LABEL TO THE ROW, so the film glyph
+            // leaves with the number it counts. It is also what lets the panel
+            // shrink back to one row: a layout group skips inactive children,
+            // and a Fader deactivates what it has finished hiding.
+            _filmFader = NewFader(filmRow.gameObject);
         }
 
         /// <summary>
@@ -1358,19 +1911,91 @@ namespace Viewpoint
             _viewfinderFader = NewFader(rect.gameObject);
         }
 
+        /// <summary>
+        /// V-HUD-03's pill. A rounded rect at 55 percent dark, holding a key
+        /// cap and the rest of the sentence, fitted to whatever it is given.
+        ///
+        /// The pill is a CAPSULE and not a rounded box: its corner radius is
+        /// half its height, which is what the item's word "pill" means and what
+        /// tells it apart at a glance from the counter panel above it. One
+        /// sprite serves both, because a 9-slice of radius r draws any box at
+        /// least 2r across.
+        ///
+        /// It is fitted on BOTH axes and centred on the pinned 120 px, so the
+        /// pinned position is the pill's and the words inside it are what
+        /// decide its width. The acceptance ("the prompt reads against both a
+        /// bright sky and the dark cage bars") is carried by the pill itself:
+        /// over the bars it is a slightly darker dark, over the sky it is the
+        /// only dark there is, and in both cases the white sits on the SAME
+        /// background instead of on whatever the player happens to face.
+        ///
+        /// THE FADER MOVED FROM THE LABEL TO THE PILL. V-ANIM-03's 0.12 s in
+        /// and 0.2 s out are unchanged, but they now carry the pill, the cap
+        /// and the words together; a pill that stayed while its text faded
+        /// would be an empty capsule sitting on screen.
+        /// </summary>
         void BuildPrompt(Transform root)
         {
-            _promptLabel = NewLabel("Prompt", root, PromptSizePx, Color.white,
-                TextAnchor.MiddleCenter, OutlineStrong);
-            RectTransform rect = _promptLabel.rectTransform;
-            rect.anchorMin = new Vector2(0.5f, 0f);
-            rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = new Vector2(0.5f, 0f);
-            rect.anchoredPosition = new Vector2(0f, PromptBottomPx);
-            rect.sizeDelta = new Vector2(1200f, 34f);
-            _promptFader = NewFader(_promptLabel.gameObject);
+            RectTransform pill = NewRect("Prompt", root);
+            pill.anchorMin = new Vector2(0.5f, 0f);
+            pill.anchorMax = new Vector2(0.5f, 0f);
+            pill.pivot = new Vector2(0.5f, 0f);
+            pill.anchoredPosition = new Vector2(0f, PromptBottomPx);
+            pill.sizeDelta = new Vector2(400f, PromptPillHeightPx);
+            NewPanel(pill, Alpha(PanelInk, PromptPillAlpha),
+                Mathf.RoundToInt(PromptPillHeightPx * 0.5f));
+
+            var layout = pill.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(
+                Mathf.RoundToInt(PromptPillPadXPx), Mathf.RoundToInt(PromptPillPadXPx), 0, 0);
+            layout.spacing = PromptCapGapPx;
+
+            var fitter = pill.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+            _promptCap = NewKeyCap("PromptKey", pill, PromptCapSizePx, out _promptCapLabel);
+            _promptCap.gameObject.SetActive(false);
+
+            _promptLabel = NewLabel("PromptText", pill, PromptSizePx, Color.white,
+                TextAnchor.MiddleLeft, TextEdge.Shadow, OutlineSoft, TextWeight.Regular);
+
+            _promptFader = NewFader(pill.gameObject);
         }
 
+        /// <summary>
+        /// V-HUD-04's held panel: the polaroid card, the title and the four
+        /// control hints as key-cap pairs, on a rounded panel at 65 percent.
+        ///
+        /// THE ITEM OFFERS A BLUR AND IT IS DECLINED, for a reason that is not
+        /// about cost. "A blurred copy of the frame behind it via the opaque
+        /// texture, or a simple 65 percent dark if the blur costs too much."
+        /// The RP asset does set m_RequireOpaqueTexture, so _CameraOpaqueTexture
+        /// exists; a UI Image cannot sample it without a shader, and a new
+        /// .shader is allowed where a new binary asset is not. What settles it
+        /// is the README's oldest trap: A SHADER REACHED ONLY BY Shader.Find IS
+        /// STRIPPED FROM THE PLAYER. Every shader this game creates in code had
+        /// to be added to Always Included Shaders in
+        /// ProjectSettings/GraphicsSettings.asset to survive a build, and that
+        /// file is not this agent's to edit. A blur shader added here would
+        /// look perfect in the editor and come back null in the player, which
+        /// is a panel drawing with a null material: invisible, silent, and
+        /// exactly the failure mode that once read as "the levels are empty".
+        ///
+        /// Two smaller reasons point the same way. A ScreenSpaceOverlay canvas
+        /// draws after everything, so the opaque texture it would sample is the
+        /// frame BEFORE transparents, and the blur would miss the very things
+        /// (the teleporter's light, the motes) that make the frame worth
+        /// blurring. And the panel sits over the abyss more often than not,
+        /// where there is nothing behind it to blur.
+        ///
+        /// So: 65 percent dark, the branch the item itself sanctions. It is
+        /// darker than the 55 it replaces, which is what the hints need now
+        /// that they are dark type on light caps.
+        /// </summary>
         void BuildHeldPanel(Transform root)
         {
             RectTransform panel = NewRect("HeldPanel", root);
@@ -1382,8 +2007,8 @@ namespace Viewpoint
             // slides it in: the pinned -24 is the value every show tween lands
             // on, and the panel is never on screen anywhere else.
             panel.anchoredPosition = new Vector2(HeldHiddenX, HeldMarginPx);
-            panel.sizeDelta = new Vector2(HeldPanelWidthPx, 150f);
-            NewImage(panel, new Color(0.08f, 0.10f, 0.14f, 0.55f));
+            panel.sizeDelta = new Vector2(HeldPanelWidthPx, HeldPanelHeightPx);
+            NewPanel(panel, Alpha(PanelInk, HeldPanelAlpha), PanelRadiusPx);
             _heldPanel = panel;
 
             var layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -1413,12 +2038,76 @@ namespace Viewpoint
             _heldCard.raycastTarget = false;
 
             _heldTitle = NewLabel("HeldTitle", panel, HeldTitleSizePx, Color.white,
-                TextAnchor.MiddleRight, OutlineSoft);
-            _heldHint = NewLabel("HeldHint", panel, HeldHintSizePx, HeldHintColor,
-                TextAnchor.MiddleRight, OutlineSoft);
-            _heldHint.text = "Clic gauche : poser   Clic droit : lever   Molette : pivoter   F : reposer";
+                TextAnchor.MiddleRight, TextEdge.Shadow, OutlineSoft, TextWeight.Regular);
+
+            BuildHintRow(panel);
 
             panel.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// V-HUD-04's four control hints, as key-cap pairs in a row.
+        ///
+        /// The row is built by SPLITTING <see cref="HeldHintText"/> and never by
+        /// retyping its pieces, which is what makes the acceptance ("the hint
+        /// string's four commands stay in the same order and words") true by
+        /// construction rather than by review: Split hands back the four
+        /// commands in order, each command's first " : " separates its key from
+        /// what the key does, and rejoining all of it reproduces the constant.
+        /// The guard at the end says so out loud if a later edit breaks it,
+        /// because a hint row that quietly drops a word looks exactly like a
+        /// hint row that does not.
+        ///
+        /// The row carries no state and is written exactly once, which is why
+        /// nothing here is kept in a field: there is no later frame in which
+        /// any of it changes.
+        /// </summary>
+        void BuildHintRow(RectTransform panel)
+        {
+            RectTransform row = NewRect("HeldHints", panel);
+            var layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleRight;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.spacing = HintCommandGapPx;
+            SetLayoutHeight(row, HintRowHeightPx);
+
+            string[] commands = HeldHintText.Split(
+                new string[] { HintSeparator }, System.StringSplitOptions.None);
+            var rebuilt = new System.Text.StringBuilder();
+            for (var i = 0; i < commands.Length; i++)
+            {
+                if (i > 0)
+                {
+                    rebuilt.Append(HintSeparator);
+                }
+                string command = commands[i];
+                int at = command.IndexOf(KeySeparator, System.StringComparison.Ordinal);
+                RectTransform pair = NewRow("Hint" + i, row, HintPairGapPx);
+                if (at > 0)
+                {
+                    Text cap;
+                    NewKeyCap("Key" + i, pair, HintCapSizePx, out cap);
+                    cap.text = command.Substring(0, at);
+                    Text action = NewLabel("Action" + i, pair, HeldHintSizePx, HeldHintColor,
+                        TextAnchor.MiddleLeft, TextEdge.Shadow, OutlineSoft, TextWeight.Regular);
+                    action.text = command.Substring(at + KeySeparator.Length);
+                    rebuilt.Append(cap.text).Append(KeySeparator).Append(action.text);
+                    continue;
+                }
+                // No key in this command: it is drawn whole, for the same
+                // reason a keyless prompt is (see SplitPromptKey).
+                Text whole = NewLabel("Action" + i, pair, HeldHintSizePx, HeldHintColor,
+                    TextAnchor.MiddleLeft, TextEdge.Shadow, OutlineSoft, TextWeight.Regular);
+                whole.text = command;
+                rebuilt.Append(command);
+            }
+
+            if (rebuilt.ToString() != HeldHintText)
+            {
+                Debug.LogError("[Hud] The hint row no longer spells PRD 12.1's hint: \""
+                    + rebuilt + "\"");
+            }
         }
 
         void BuildBanner(Transform root)
@@ -1439,10 +2128,33 @@ namespace Viewpoint
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
+            // The banner is the one thing on this HUD that lands on BARE SKY
+            // every time (it arrives on the frame a level opens, over whatever
+            // the spawn happens to face), so both its labels keep the
+            // four-sided contour and only the title takes the heavier weight.
+            // Under Manrope, Title and Regular render the same and the
+            // hierarchy is the 44 against 20 px; under the fallback font the
+            // distinction is real. See Fonts.StyleFor.
             _bannerTitle = NewLabel("BannerTitle", banner, BannerTitleSizePx, Color.white,
-                TextAnchor.MiddleCenter, OutlineSoft);
+                TextAnchor.MiddleCenter, TextEdge.Contour, OutlineSoft, TextWeight.Title);
+
+            // V-HUD-07's rule, in two rects: a full-width holder the layout can
+            // measure, and the line itself centred inside it. Centred is what
+            // makes the growth read as "outward" without animating a position,
+            // and it is why the line may not be a layout child of its own.
+            RectTransform ruleHolder = NewRect("BannerRuleRow", banner);
+            SetLayoutHeight(ruleHolder, BannerRuleHeightPx + 10f);
+            _bannerRule = NewRect("BannerRule", ruleHolder);
+            SetCentered(_bannerRule, Vector2.zero, new Vector2(0f, BannerRuleHeightPx));
+            NewImage(_bannerRule, BannerRuleColor);
+
             _bannerSubtitle = NewLabel("BannerSubtitle", banner, BannerSubtitleSizePx,
-                BannerSubtitleColor, TextAnchor.MiddleCenter, OutlineSoft);
+                BannerSubtitleColor, TextAnchor.MiddleCenter, TextEdge.Contour, OutlineSoft,
+                TextWeight.Regular);
+            // A group of its own for the 0.15 s delay. Nested groups multiply,
+            // so this one only ever subtracts from the pinned banner curve and
+            // can never make the subtitle outlive it.
+            _bannerSubtitleGroup = NewGroup(_bannerSubtitle.gameObject);
         }
 
         void BuildToast(Transform root)
@@ -1807,10 +2519,12 @@ namespace Viewpoint
         }
 
         /// <summary>
-        /// A label on the engine's builtin font. Everything about the font and
-        /// the outline lives in Fonts, which also records why this is uGUI Text
-        /// and not TextMeshPro: TMP cannot start in a player without an asset
-        /// this project deliberately does not ship.
+        /// A label over the WORLD. Everything about the font and the edge lives
+        /// in Fonts, which also records why this is uGUI Text and not
+        /// TextMeshPro: TMP cannot start in a player without an asset this
+        /// project deliberately does not ship. This short form means "there is
+        /// nothing behind this label", so it takes the four-sided contour that
+        /// is the only thing keeping white readable over a pale sky.
         /// </summary>
         static Text NewLabel(string name, Transform parent, float sizePx,
             Color color, TextAnchor alignment, Color outlineColor)
@@ -1819,6 +2533,486 @@ namespace Viewpoint
             var label = rect.gameObject.AddComponent<Text>();
             Fonts.Apply(label, Mathf.RoundToInt(sizePx), color, alignment, true, outlineColor);
             return label;
+        }
+
+        /// <summary>
+        /// A label whose edge and weight are chosen, for the labels tier 5 puts
+        /// ON something: a panel already carries their contrast, so they take
+        /// the one-sided TextEdge.Shadow and lose the letterpress ring.
+        /// </summary>
+        static Text NewLabel(string name, Transform parent, float sizePx,
+            Color color, TextAnchor alignment, TextEdge edge, Color edgeColor, TextWeight weight)
+        {
+            RectTransform rect = NewRect(name, parent);
+            var label = rect.gameObject.AddComponent<Text>();
+            Fonts.Apply(label, Mathf.RoundToInt(sizePx), color, alignment, edge, edgeColor, weight);
+            return label;
+        }
+
+        /// <summary>The same colour at a chosen alpha. Reads as the design does.</summary>
+        static Color Alpha(Color color, float alpha)
+        {
+            return new Color(color.r, color.g, color.b, alpha);
+        }
+
+        /// <summary>
+        /// A rounded panel: one 9-sliced sprite of the given corner radius,
+        /// tinted by the Image. Sliced rather than stretched, so one painted
+        /// corner serves the counter panel, the prompt pill, the held card and
+        /// every key cap at any size at least twice its radius.
+        /// </summary>
+        Image NewPanel(RectTransform rect, Color color, int radiusPx)
+        {
+            Image image = NewImage(rect, color);
+            image.sprite = RoundedSprite(radiusPx);
+            image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = 1f;
+            return image;
+        }
+
+        /// <summary>A painted glyph, drawn at whatever size its rect is given.</summary>
+        static Image NewGlyph(RectTransform rect, Sprite sprite, Color color)
+        {
+            Image image = NewImage(rect, color);
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            return image;
+        }
+
+        /// <summary>
+        /// A horizontal strip whose children keep their own sizes and sit on
+        /// one middle line. Used for a counter's glyph and numbers, and for a
+        /// hint's cap and words.
+        /// </summary>
+        static RectTransform NewRow(string name, RectTransform parent, float spacing)
+        {
+            RectTransform rect = NewRect(name, parent);
+            var layout = rect.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.spacing = spacing;
+            return rect;
+        }
+
+        /// <summary>
+        /// Fixes what a layout group should give a child that has no opinion of
+        /// its own. An Image has no preferred size, so without this a glyph
+        /// inside a row would be measured as nothing.
+        /// </summary>
+        static void SetLayoutSize(RectTransform rect, Vector2 size)
+        {
+            var element = rect.gameObject.AddComponent<LayoutElement>();
+            element.minWidth = size.x;
+            element.minHeight = size.y;
+            element.preferredWidth = size.x;
+            element.preferredHeight = size.y;
+        }
+
+        /// <summary>The same for a row whose width its parent decides.</summary>
+        static void SetLayoutHeight(RectTransform rect, float height)
+        {
+            var element = rect.gameObject.AddComponent<LayoutElement>();
+            element.minHeight = height;
+            element.preferredHeight = height;
+        }
+
+        /// <summary>
+        /// A key cap: V-HUD-03's "small square with E in it, drawn as a nested
+        /// Text on a rounded rect".
+        ///
+        /// It is a layout group and not a fixed square, which is what lets the
+        /// same cap hold "E", "F", "Molette" and "Clic gauche": the chip grows
+        /// with its letter and a one-character cap still comes out square,
+        /// because the padding is symmetric and the cap's height is the
+        /// letter's line box. Its width reaches its parent as the layout
+        /// group's own preferred width, so no ContentSizeFitter is needed and
+        /// nothing here fights the row it sits in.
+        ///
+        /// The letter takes NO edge: it is dark type on a light chip, which is
+        /// contrast the other way round, and a shadow under it would only
+        /// muddy a 13 px glyph.
+        /// </summary>
+        RectTransform NewKeyCap(string name, RectTransform parent, float sizePx, out Text label)
+        {
+            RectTransform cap = NewRect(name, parent);
+            NewPanel(cap, KeyCapFace, KeyCapRadiusPx);
+            var layout = cap.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.padding = new RectOffset(
+                Mathf.RoundToInt(KeyCapPadXPx), Mathf.RoundToInt(KeyCapPadXPx),
+                Mathf.RoundToInt(KeyCapPadYPx), Mathf.RoundToInt(KeyCapPadYPx));
+            label = NewLabel("Cap", cap, sizePx, KeyCapInk,
+                TextAnchor.MiddleCenter, TextEdge.None, KeyCapInk, TextWeight.Title);
+            return cap;
+        }
+
+        // ---- Painting the art (PRD_VISUAL 3.2 as amended: no new asset) -----
+
+        /// <summary>
+        /// How many texels each reference pixel of a painted glyph is drawn
+        /// with. The HUD is authored at 1600 x 900 and scales up with the
+        /// window, so a glyph painted 1:1 would soften on any larger screen;
+        /// four covers 4K on the crosshair, which is the smallest and therefore
+        /// the most exposed of them. It costs nothing: the largest texture in
+        /// this file is 96 x 96.
+        /// </summary>
+        const int ArtScale = 4;
+
+        /// <summary>
+        /// The same for a rounded panel's corner, at half the resolution. A
+        /// panel corner is ten to twenty pixels of arc rather than one or two,
+        /// so it is already smooth at two texels per pixel, and the prompt
+        /// pill's radius of 22 would otherwise cost a 180 px square texture to
+        /// draw a shape the eye reads as "not sharp".
+        /// </summary>
+        const int PanelArtScale = 2;
+
+        /// <summary>
+        /// Paints everything the widgets hang on an Image, once, at build.
+        ///
+        /// Order matters only in that BuildCrosshair and the rest run after it.
+        /// The rounded panels are painted lazily instead (see RoundedSprite),
+        /// because their radius is what identifies them and the callers are the
+        /// ones that know it.
+        /// </summary>
+        void PaintArt()
+        {
+            _batteryGlyphSprite = PaintBattery();
+            _filmGlyphSprite = PaintFilmCan();
+            _ringSprite = PaintRing();
+            _dotSprite = PaintDot();
+            _reticleSprite = PaintReticle();
+        }
+
+        /// <summary>
+        /// The 9-slice for a rounded box of the given corner radius, painted on
+        /// first use and kept.
+        ///
+        /// The texture is only 2r + 1 reference pixels square: four corners and
+        /// a single pixel of middle, which is all a 9-slice ever samples. The
+        /// sprite is created at PanelArtScale times the canvas's own 100 pixels
+        /// per unit, so its border of r * PanelArtScale texels comes back out as
+        /// exactly r canvas units however finely it was painted. Get that pair
+        /// out of step and the corners arrive at the wrong size with nothing to
+        /// say so.
+        /// </summary>
+        Sprite RoundedSprite(int radiusPx)
+        {
+            Sprite cached;
+            if (_roundedSprites.TryGetValue(radiusPx, out cached) && cached != null)
+            {
+                return cached;
+            }
+
+            int side = radiusPx * 2 + 1;
+            var painter = new Painter(side, side, PanelArtScale);
+            painter.RoundedRect(side * 0.5f, side * 0.5f,
+                side * 0.5f - radiusPx, side * 0.5f - radiusPx, radiusPx, 0f);
+            Texture2D texture = Bake(painter);
+            texture.name = "Rounded" + radiusPx;
+            float border = radiusPx * PanelArtScale;
+            Sprite sprite = Sprite.Create(
+                texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f * PanelArtScale, 0, SpriteMeshType.FullRect,
+                new Vector4(border, border, border, border));
+            sprite.name = "Rounded" + radiusPx;
+            _drawn.Add(sprite);
+            _roundedSprites[radiusPx] = sprite;
+            return sprite;
+        }
+
+        /// <summary>
+        /// V-HUD-02's battery: "a generated 16 x 24 icon: a rounded rect with a
+        /// nub". Drawn upright, with the nub on top and a charge bar inside,
+        /// because the thing it labels is a count of batteries carried and a
+        /// battery standing up is the shape a player reads without looking.
+        /// </summary>
+        Sprite PaintBattery()
+        {
+            float w = BatteryGlyphPx.x;
+            float h = BatteryGlyphPx.y;
+            float cx = w * 0.5f;
+            var painter = new Painter(w, h, ArtScale);
+
+            // Every extent below is inset from the edge of the box by at least
+            // the stroke's own half width. A shape painted flush with the edge
+            // loses its antialiasing to the clamp, and on a 16 px glyph that
+            // reads as a chipped corner.
+            const float nubHalfW = 3f;
+            const float nubHalfH = 1.5f;
+            const float nubRadius = 1f;
+            const float shellInset = 1f;
+            const float shellRadius = 3f;
+            const float shellStroke = 1.6f;
+
+            // The nub, first and on its own, so the shell's stroke can overlap
+            // its base and the two read as one piece of metal.
+            painter.RoundedRect(cx, h - nubHalfH - 0.5f,
+                nubHalfW - nubRadius, nubHalfH - nubRadius, nubRadius, 0f);
+
+            // The shell: an outline, so the glyph reads as a container.
+            float shellTop = h - nubHalfH * 2f - 0.5f;
+            float shellCy = (shellTop + shellInset) * 0.5f;
+            float shellHalfH = (shellTop - shellInset) * 0.5f;
+            float shellHalfW = cx - shellInset;
+            painter.RoundedRect(cx, shellCy, shellHalfW - shellRadius,
+                shellHalfH - shellRadius, shellRadius, shellStroke);
+
+            // The charge, filling the bottom half of the cell. Not the whole
+            // of it: a battery drawn full is a battery that looks like a
+            // percentage, and this glyph labels a count.
+            painter.RoundedRect(cx, 7.5f, 4f, 3.5f, 1f, 0f);
+            return Bake(painter, "BatteryGlyph");
+        }
+
+        /// <summary>
+        /// The film can of V-HUD-02: a reel seen face on, which is a ring, a
+        /// hub and the three windows between the spokes. Three and not four,
+        /// so the glyph cannot be mistaken for a wheel.
+        /// </summary>
+        Sprite PaintFilmCan()
+        {
+            float w = FilmGlyphPx.x;
+            float h = FilmGlyphPx.y;
+            float cx = w * 0.5f;
+            float cy = h * 0.5f;
+            var painter = new Painter(w, h, ArtScale);
+            painter.Circle(cx, cy, w * 0.5f - 1.4f, 1.6f);
+            painter.Disc(cx, cy, 2.2f);
+            for (var i = 0; i < 3; i++)
+            {
+                float angle = (90f + i * 120f) * Mathf.Deg2Rad;
+                painter.Disc(cx + Mathf.Cos(angle) * 5.2f, cy + Mathf.Sin(angle) * 5.2f, 1.7f);
+            }
+            return Bake(painter, "FilmGlyph");
+        }
+
+        /// <summary>
+        /// The box the ring is painted in. Two pixels wider than the ring on
+        /// each side, so the stroke's own antialiasing is never clipped by the
+        /// edge of the texture.
+        /// </summary>
+        static Vector2 RingSpriteSizePx()
+        {
+            return new Vector2(CrosshairRingPx + 4f, CrosshairRingPx + 4f);
+        }
+
+        /// <summary>V-HUD-05's "6 px ring".</summary>
+        Sprite PaintRing()
+        {
+            Vector2 box = RingSpriteSizePx();
+            var painter = new Painter(box.x, box.y, ArtScale);
+            painter.Circle(box.x * 0.5f, box.y * 0.5f,
+                CrosshairRingPx * 0.5f - CrosshairRingStrokePx * 0.5f, CrosshairRingStrokePx);
+            return Bake(painter, "CrosshairRing");
+        }
+
+        /// <summary>V-HUD-05's "2 px dot", the one part that never leaves.</summary>
+        Sprite PaintDot()
+        {
+            float box = CrosshairDotPx * 2f;
+            // Painted at twice the scale of everything else: it is two pixels
+            // across, so a texel is a quarter of the whole shape at ArtScale
+            // and the disc would come out as a cross.
+            var painter = new Painter(box, box, ArtScale * 2);
+            painter.Disc(box * 0.5f, box * 0.5f, CrosshairDotPx * 0.5f);
+            return Bake(painter, "CrosshairDot");
+        }
+
+        /// <summary>
+        /// V-HUD-05's viewfinder reticle: "a circle with tick marks". The ticks
+        /// sit OUTSIDE the circle and point inward at it, which is what a
+        /// camera reticle does and what tells this state apart from the ring at
+        /// a glance even though both are circles.
+        /// </summary>
+        Sprite PaintReticle()
+        {
+            float box = CrosshairReticlePx;
+            float c = box * 0.5f;
+            const float circleRadius = 7f;
+            const float tickInner = 8.6f;
+            const float tickOuter = 11f;
+            const float tickHalfWide = 0.6f;
+            float tickHalfLong = (tickOuter - tickInner) * 0.5f;
+            float tickMid = tickInner + tickHalfLong;
+
+            var painter = new Painter(box, box, ArtScale);
+            painter.Circle(c, c, circleRadius, 1.2f);
+            // Square ticks and not rounded ones: at 1.2 x 3 px a corner radius
+            // would round the whole mark into a blob.
+            painter.RoundedRect(c, c + tickMid, tickHalfWide, tickHalfLong, 0f, 0f);
+            painter.RoundedRect(c, c - tickMid, tickHalfWide, tickHalfLong, 0f, 0f);
+            painter.RoundedRect(c + tickMid, c, tickHalfLong, tickHalfWide, 0f, 0f);
+            painter.RoundedRect(c - tickMid, c, tickHalfLong, tickHalfWide, 0f, 0f);
+            return Bake(painter, "CrosshairReticle");
+        }
+
+        Sprite Bake(Painter painter, string name)
+        {
+            Texture2D texture = Bake(painter);
+            texture.name = name;
+            // FullRect and not the default Tight: a tight mesh is traced from
+            // the texture's own alpha, which means READING the pixels back,
+            // and Bake has already released the CPU copy. A tight mesh would
+            // also save nothing here - every one of these glyphs fills most of
+            // its box.
+            Sprite sprite = Sprite.Create(
+                texture, new Rect(0f, 0f, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f), 100f * painter.Scale, 0,
+                SpriteMeshType.FullRect, Vector4.zero);
+            sprite.name = name;
+            _drawn.Add(sprite);
+            return sprite;
+        }
+
+        Texture2D Bake(Painter painter)
+        {
+            Texture2D texture = painter.Bake();
+            _drawn.Add(texture);
+            return texture;
+        }
+
+        /// <summary>
+        /// Gives back every texture and sprite this HUD painted.
+        ///
+        /// They are runtime objects with no owner in the scene, so nothing else
+        /// would: a play mode run that builds and tears down a HUD per test
+        /// would leave one set behind each time. Destroy and not
+        /// DestroyImmediate, and only while playing, because this class is
+        /// reachable from edit-mode tooling and DestroyImmediate on an asset is
+        /// how a checkout loses a file.
+        /// </summary>
+        void OnDestroy()
+        {
+            if (!Application.isPlaying)
+            {
+                return;
+            }
+            for (var i = 0; i < _drawn.Count; i++)
+            {
+                if (_drawn[i] != null)
+                {
+                    Destroy(_drawn[i]);
+                }
+            }
+            _drawn.Clear();
+            _roundedSprites.Clear();
+        }
+
+        /// <summary>
+        /// A tiny software rasteriser: the whole of this tier's art, in one
+        /// primitive.
+        ///
+        /// Every glyph here is a rounded rectangle, filled or stroked, and a
+        /// circle is the case where both half-extents are zero. Written as a
+        /// signed distance rather than as pixels because the distance is what
+        /// gives antialiasing for free: coverage is how far inside the shape a
+        /// texel's centre falls, measured in texels, which is exactly the
+        /// fraction of that texel the shape covers along a straight edge and a
+        /// close enough approximation on a curve.
+        ///
+        /// Shapes ACCUMULATE by taking the larger coverage, so drawing a nub
+        /// under a shell leaves no seam between them: a pixel that belongs to
+        /// both is fully covered once, not twice. That is also why nothing here
+        /// writes colour. A glyph is a single-colour mask and the Image tints
+        /// it, which keeps the palette in one place (the constants at the top)
+        /// instead of baked into a texture nobody can read.
+        /// </summary>
+        sealed class Painter
+        {
+            readonly float[] _cover;
+            readonly int _width;
+            readonly int _height;
+            readonly int _scale;
+
+            public Painter(float widthPx, float heightPx, int scale)
+            {
+                _scale = scale;
+                _width = Mathf.Max(1, Mathf.RoundToInt(widthPx * scale));
+                _height = Mathf.Max(1, Mathf.RoundToInt(heightPx * scale));
+                _cover = new float[_width * _height];
+            }
+
+            public int Scale
+            {
+                get { return _scale; }
+            }
+
+            /// <summary>
+            /// A rounded rectangle centred on (cx, cy) with the given
+            /// half-extents OUTSIDE the corner radius, so the shape's real
+            /// half-size is half + radius. A stroke of zero fills it; anything
+            /// else draws a band of that width centred on the outline.
+            /// </summary>
+            public void RoundedRect(float cx, float cy, float halfW, float halfH,
+                float radius, float stroke)
+            {
+                // Everything is measured in reference pixels and only turned
+                // into texels at the end, so the ramp is one texel wide
+                // whatever the supersampling is.
+                float ramp = _scale;
+                float half = stroke * 0.5f;
+                for (var y = 0; y < _height; y++)
+                {
+                    float py = (y + 0.5f) / _scale;
+                    for (var x = 0; x < _width; x++)
+                    {
+                        float px = (x + 0.5f) / _scale;
+                        float dx = Mathf.Abs(px - cx) - halfW;
+                        float dy = Mathf.Abs(py - cy) - halfH;
+                        float ax = Mathf.Max(dx, 0f);
+                        float ay = Mathf.Max(dy, 0f);
+                        float d = Mathf.Sqrt(ax * ax + ay * ay)
+                            + Mathf.Min(Mathf.Max(dx, dy), 0f) - radius;
+                        if (stroke > 0f)
+                        {
+                            d = Mathf.Abs(d) - half;
+                        }
+                        float cover = Mathf.Clamp01(0.5f - d * ramp);
+                        int at = y * _width + x;
+                        if (cover > _cover[at])
+                        {
+                            _cover[at] = cover;
+                        }
+                    }
+                }
+            }
+
+            public void Disc(float cx, float cy, float radius)
+            {
+                RoundedRect(cx, cy, 0f, 0f, radius, 0f);
+            }
+
+            public void Circle(float cx, float cy, float radius, float stroke)
+            {
+                RoundedRect(cx, cy, 0f, 0f, radius, stroke);
+            }
+
+            /// <summary>
+            /// White everywhere, with the coverage in the alpha. Bilinear so a
+            /// glyph drawn between two sizes stays smooth, clamped so the edge
+            /// texel cannot wrap to the far side, and handed back with its CPU
+            /// copy released: nothing reads these pixels again.
+            /// </summary>
+            public Texture2D Bake()
+            {
+                var texture = new Texture2D(_width, _height, TextureFormat.RGBA32, false, true);
+                texture.filterMode = FilterMode.Bilinear;
+                texture.wrapMode = TextureWrapMode.Clamp;
+                texture.anisoLevel = 0;
+                var pixels = new Color32[_cover.Length];
+                for (var i = 0; i < _cover.Length; i++)
+                {
+                    pixels[i] = new Color32(255, 255, 255,
+                        (byte)Mathf.RoundToInt(Mathf.Clamp01(_cover[i]) * 255f));
+                }
+                texture.SetPixels32(pixels);
+                texture.Apply(false, true);
+                return texture;
+            }
         }
     }
 }

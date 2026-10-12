@@ -1,0 +1,481 @@
+flowchart TB
+%% Architecture conceptuelle. Services distants regroupés dans le périmètre infrastructure.
+  subgraph section_clients["Clients"]
+    direction LR
+    subgraph group_interfaces["Interfaces"]
+      web["Frontend web"]
+      mobile["Client mobile"]
+      admin["Back-office"]
+    end
+  end
+  subgraph section_edge["Accès et sécurité"]
+    direction LR
+    subgraph group_protection["Protection"]
+      cdn["DNS / CDN"]
+      waf["WAF / TLS"]
+      proxy["Reverse proxy"]
+    end
+    subgraph group_routing["Routage"]
+      gateway["API Gateway"]
+      limits["Quotas / rate limit"]
+      balance["Load balancer"]
+    end
+  end
+  subgraph section_api["Tier 1 — Présentation / API"]
+    direction LR
+    subgraph group_endpoints["Endpoints"]
+      router["Routeur / versioning"]
+      controller["Contrôleurs REST"]
+      pagination["Pagination / filtres"]
+    end
+    subgraph group_contracts["Façade et contrats"]
+      facade["Façade API"]
+      dto["DTO entrée / sortie"]
+      api_mapper["Mapping des DTO"]
+    end
+    subgraph group_guards["Filtres d’entrée"]
+      auth["Auth / autorisations"]
+      validation["Validation des entrées"]
+      errors["Gestion des erreurs"]
+      correlation["Contexte de requête"]
+    end
+  end
+  subgraph section_app["Tier 2 — Application et agents"]
+    direction LR
+    subgraph group_usecases["Cas d’usage"]
+      create["Créer une ressource"]
+      read["Lire une ressource"]
+      workflow["Orchestrer un workflow"]
+    end
+    subgraph group_coordination["Coordination"]
+      command_bus["Bus de commandes"]
+      query_bus["Bus de requêtes"]
+      uow_port["Port transaction"]
+      schedule["Tâches planifiées"]
+    end
+    subgraph group_ports["Ports / interfaces"]
+      repo_port["Port repository"]
+      read_port["Port de lecture"]
+      event_port["Port d’événements"]
+      external_port["Ports externes"]
+    end
+    subgraph group_agent_graph["Workflow agentique"]
+      agent_run["Service de workflow"]
+      graph_state["État partagé / messages"]
+      supervisor["Agent superviseur"]
+      route_decision{"Quel agent appeler ?"}
+      research_agent["Agent recherche"]
+      analyst_agent["Agent analyse"]
+      writer_agent["Agent synthèse"]
+      review_agent["Agent relecteur"]
+      quality_gate{"Révision nécessaire ?"}
+      run_output["Résultat structuré"]
+      run_failed["Arrêt contrôlé"]
+      run_budget["Budget / nombre d’itérations"]
+    end
+    subgraph group_agent_capabilities["Anatomie d’un agent"]
+      agent_profile["Rôle / objectifs / contexte"]
+      skills["Catalogue de skills"]
+      skill_loader["Chargement des instructions"]
+      tool_decision{"Outil nécessaire ?"}
+      tool_catalog["Tools disponibles"]
+      tool_dispatch["Exécuteur de tools"]
+      agent_messages["Messages / handoffs"]
+      agent_response["Réponse modèle structurée"]
+    end
+    subgraph group_ai_ports["Ports IA / mémoire"]
+      llm_port["Port génération LLM"]
+      prompt_port["Port de prompts"]
+      tool_port["Port d’exécution tools"]
+      memory_port["Port mémoire / retrieval"]
+      checkpoint_port["Port checkpoint"]
+      trace_port["Port de traçage"]
+      graph_port["Port d’orchestration"]
+    end
+  end
+  subgraph section_domain["Tier 3 — Domaine"]
+    direction LR
+    subgraph group_models["Modèles métier"]
+      aggregate["Agrégats"]
+      entity["Entités"]
+      value["Objets valeur"]
+      factory["Fabriques métier"]
+    end
+    subgraph group_rules["Règles métier"]
+      policy["Politiques métier"]
+      invariants["Invariants"]
+      domain_service["Services de domaine"]
+    end
+    subgraph group_events["Événements métier"]
+      domain_event["Événements de domaine"]
+      event_payload["Contrats d’événements"]
+    end
+  end
+  subgraph section_infra["Tier 4 — Infrastructure : adaptateurs et services externes"]
+    direction LR
+    subgraph group_persistence["Persistance"]
+      repository["Repositories concrets"]
+      orm["ORM / modèles de table"]
+      db_mapper["Mapping métier / table"]
+      transaction["Unité de travail"]
+      driver["Pilote de base"]
+      migrations["Migrations"]
+    end
+    subgraph group_integrations["Intégrations"]
+      http["Adaptateurs HTTP"]
+      resilience["Timeout / retry / circuit breaker"]
+      serialization["Sérialisation"]
+      search_adapter["Adaptateur recherche"]
+      blob_adapter["Adaptateur fichiers"]
+    end
+    subgraph group_messaging["Asynchronisme"]
+      outbox["Outbox transactionnelle"]
+      relay["Relais outbox"]
+      consumer["Consommateurs / workers"]
+      idempotency["Idempotence / dédoublon"]
+    end
+    subgraph group_technical["Services techniques"]
+      cache_adapter["Adaptateur cache"]
+      config["Configuration"]
+      secrets["Accès aux secrets"]
+      health["Health / readiness"]
+    end
+    subgraph group_data["Stockage · service externe"]
+      database["Base relationnelle"]
+      cache["Cache partagé"]
+      search["Moteur de recherche"]
+      blob["Stockage de fichiers"]
+    end
+    subgraph group_queues["Messagerie · service externe"]
+      broker["Broker / files"]
+      dlq["File de rejet (DLQ)"]
+    end
+    subgraph group_partners["Services externes · service externe"]
+      idp["Identité OIDC"]
+      payment["Paiement"]
+      email["E-mail / notification"]
+    end
+    subgraph group_collect["Collecter"]
+      instrument["Instrumentation"]
+      collector["Collecteur de télémétrie"]
+    end
+    subgraph group_signals["Observer · service externe"]
+      traces["Traces distribuées"]
+      metrics["Métriques"]
+      logs["Journaux"]
+    end
+    subgraph group_react["Réagir · service externe"]
+      dashboard["Tableaux de bord"]
+      alerts["Alertes / SLO"]
+    end
+    subgraph group_ai_adapters["Adaptateurs IA / tools"]
+      llm_adapter["Adaptateur LLM"]
+      prompt_adapter["Adaptateur prompts"]
+      tool_adapter["Adaptateurs de tools"]
+      memory_adapter["Adaptateur retrieval"]
+      checkpoint_adapter["Checkpointer"]
+      langgraph_runtime["Exécuteur LangGraph"]
+      trace_adapter["Adaptateur traces Langfuse"]
+      llm_client["Client fournisseur LLM"]
+      prompt_render["Compilation du prompt"]
+    end
+    subgraph group_cache_layer["Couche de cache"]
+      cache_key["Clé contexte / prompt / modèle"]
+      cache_lookup["Lecture cache de réponse"]
+      cache_decision{"Cache hit ou miss ?"}
+      cache_write["Écriture / TTL"]
+      cached_output["Réponse LLM en cache"]
+      prompt_local_cache["Cache local des prompts"]
+      cache_invalidate["Invalidation / versions"]
+    end
+    subgraph group_llm_services["Services de modèles · service externe"]
+      llm_provider["Service LLM distant"]
+      embedding_provider["Service embeddings"]
+      judge_provider["Service LLM évaluateur"]
+    end
+    subgraph group_memory_services["Mémoire et cache distants · service externe"]
+      response_cache["Cache de réponses LLM"]
+      checkpoint_db["Stockage des checkpoints"]
+      vector_db["Base vectorielle"]
+    end
+    subgraph group_lf_prompts["Langfuse · prompts · service externe"]
+      lf_prompts["Registre de prompts"]
+      prompt_version["Version / label du prompt"]
+      prompt_variables["Variables et schéma"]
+    end
+    subgraph group_lf_traces["Langfuse · traces · service externe"]
+      lf_traces["Traces / sessions / spans"]
+      lf_generation["Générations / tokens / coût"]
+      lf_scores["Scores / annotations"]
+    end
+    subgraph group_lf_evals["Langfuse · évaluations · service externe"]
+      lf_datasets["Datasets / références"]
+      lf_experiments["Expériences / régressions"]
+      lf_eval["Évaluateur LLM-as-judge"]
+      lf_code_eval["Évaluations déterministes"]
+      lf_feedback["Feedback humain"]
+    end
+    subgraph group_evaluation_jobs["Adaptateurs d’évaluation"]
+      eval_job["Job d’évaluation asynchrone"]
+      eval_adapter["Adaptateur LLM évaluateur"]
+    end
+  end
+  subgraph section_delivery["CI/CD et orchestration"]
+    direction LR
+    subgraph group_buildchain["Construire"]
+      git["Git / revue de code"]
+      quality["Lint / tests / sécurité"]
+      build["Build / image / SBOM"]
+    end
+    subgraph group_release["Livrer"]
+      registry["Registre d’artefacts"]
+      staging["Staging / vérifications"]
+      rollout["Déploiement progressif"]
+    end
+    subgraph group_platform["Orchestrer"]
+      iac["Infrastructure as Code"]
+      cluster["Orchestrateur de conteneurs"]
+      replicas["Réplicas API"]
+      workers["Workers / jobs"]
+      vault["Coffre de secrets"]
+    end
+  end
+  web -->|"execution"| cdn
+  cdn -->|"execution"| waf
+  waf -->|"execution"| proxy
+  proxy -->|"execution"| gateway
+  gateway -->|"execution"| limits
+  limits -->|"execution"| balance
+  balance -->|"execution"| router
+  router -->|"execution"| auth
+  auth -->|"execution"| validation
+  validation -->|"execution"| controller
+  controller -->|"execution"| dto
+  dto -->|"execution"| api_mapper
+  api_mapper -->|"execution"| facade
+  facade -->|"execution"| command_bus
+  command_bus -->|"execution"| create
+  create -->|"execution"| aggregate
+  aggregate -->|"execution"| policy
+  policy -->|"execution"| invariants
+  create -->|"execution"| repo_port
+  repo_port -->|"execution"| repository
+  repository -->|"execution"| db_mapper
+  db_mapper -->|"execution"| orm
+  orm -->|"execution"| driver
+  driver -->|"execution"| database
+  create -->|"execution"| uow_port
+  uow_port -->|"execution"| transaction
+  transaction -->|"execution"| orm
+  auth -->|"Clés OIDC"| idp
+  auth -->|"execution"| controller
+  controller -->|"execution"| pagination
+  pagination -->|"execution"| facade
+  facade -->|"execution"| query_bus
+  query_bus -->|"execution"| read
+  read -->|"execution"| read_port
+  read_port -->|"execution"| cache_adapter
+  cache_adapter -->|"execution"| cache
+  read_port -->|"execution"| repository
+  repository -->|"execution"| orm
+  read -->|"execution"| dto
+  dto -->|"execution"| controller
+  aggregate -->|"event"| domain_event
+  domain_event -->|"event"| event_payload
+  create -->|"event"| event_port
+  event_port -->|"event"| outbox
+  outbox -->|"event"| database
+  database -->|"event"| relay
+  relay -->|"event"| broker
+  broker -->|"event"| consumer
+  consumer -->|"event"| idempotency
+  idempotency -->|"event"| workflow
+  workflow -->|"event"| external_port
+  external_port -->|"event"| http
+  http -->|"event"| resilience
+  resilience -->|"event"| email
+  consumer -->|"Après échecs"| dlq
+  outbox -->|"Même transaction que la modification métier"| database
+  git -->|"delivery"| quality
+  quality -->|"delivery"| build
+  build -->|"delivery"| registry
+  registry -->|"delivery"| staging
+  staging -->|"delivery"| rollout
+  rollout -->|"delivery"| cluster
+  cluster -->|"delivery"| replicas
+  replicas -->|"delivery"| router
+  cluster -->|"delivery"| workers
+  workers -->|"delivery"| consumer
+  iac -->|"delivery"| cluster
+  vault -->|"delivery"| secrets
+  config -->|"delivery"| replicas
+  migrations -->|"delivery"| database
+  correlation -->|"telemetry"| instrument
+  instrument -->|"telemetry"| collector
+  controller -->|"telemetry"| instrument
+  workflow -->|"telemetry"| instrument
+  repository -->|"telemetry"| instrument
+  consumer -->|"telemetry"| instrument
+  collector -->|"telemetry"| traces
+  traces -->|"telemetry"| dashboard
+  collector -->|"telemetry"| metrics
+  metrics -->|"telemetry"| dashboard
+  collector -->|"telemetry"| logs
+  logs -->|"telemetry"| dashboard
+  metrics -->|"telemetry"| alerts
+  health -->|"telemetry"| cluster
+  http -->|"execution"| serialization
+  serialization -->|"execution"| payment
+  search_adapter -->|"execution"| search
+  blob_adapter -->|"execution"| blob
+  secrets -->|"execution"| vault
+  domain_service -->|"execution"| policy
+  factory -->|"execution"| aggregate
+  aggregate -->|"execution"| entity
+  entity -->|"execution"| value
+  schedule -->|"execution"| workflow
+  web -->|"execution"| proxy
+  gateway -->|"execution"| controller
+  controller -->|"execution"| facade
+  facade -->|"execution"| agent_run
+  agent_run -->|"execution"| graph_port
+  graph_port -->|"execution"| langgraph_runtime
+  agent_run -->|"execution"| graph_state
+  graph_state -->|"execution"| supervisor
+  supervisor -->|"execution"| run_budget
+  run_budget -->|"execution"| route_decision
+  research_agent -->|"execution"| analyst_agent
+  analyst_agent -->|"execution"| writer_agent
+  writer_agent -->|"execution"| review_agent
+  review_agent -->|"execution"| quality_gate
+  research_agent -->|"execution"| tool_decision
+  tool_decision -->|"execution"| tool_dispatch
+  tool_dispatch -->|"execution"| tool_port
+  tool_port -->|"execution"| tool_adapter
+  tool_adapter -->|"execution"| search
+  research_agent -->|"execution"| agent_messages
+  agent_messages -->|"execution"| graph_state
+  analyst_agent -->|"execution"| agent_messages
+  graph_state -->|"execution"| checkpoint_port
+  checkpoint_port -->|"execution"| checkpoint_adapter
+  checkpoint_adapter -->|"execution"| checkpoint_db
+  research_agent -->|"execution"| llm_port
+  llm_port -->|"execution"| llm_adapter
+  llm_adapter -->|"execution"| llm_client
+  llm_client -->|"execution"| llm_provider
+  langgraph_runtime -->|"Exécute la définition applicative"| supervisor
+  route_decision -->|"Si recherche nécessaire"| research_agent
+  route_decision -->|"Si analyse nécessaire"| analyst_agent
+  route_decision -->|"Si contexte suffisant"| writer_agent
+  analyst_agent -->|"Demande de complément"| research_agent
+  tool_adapter -->|"Résultat du tool"| tool_dispatch
+  tool_dispatch -->|"Observation"| research_agent
+  tool_decision -->|"Sans outil"| analyst_agent
+  quality_gate -->|"À réviser et budget disponible"| writer_agent
+  quality_gate -->|"Validé"| run_output
+  quality_gate -->|"Budget atteint / échec"| run_failed
+  run_output -->|"Réponse API"| dto
+  research_agent -->|"execution"| agent_profile
+  agent_profile -->|"execution"| skills
+  skills -->|"execution"| skill_loader
+  tool_decision -->|"execution"| tool_catalog
+  tool_catalog -->|"execution"| tool_dispatch
+  agent_messages -->|"execution"| analyst_agent
+  research_agent -->|"execution"| memory_port
+  memory_port -->|"execution"| memory_adapter
+  memory_adapter -->|"execution"| vector_db
+  memory_adapter -->|"execution"| embedding_provider
+  skill_loader -->|"Instructions chargées"| research_agent
+  tool_adapter -->|"Résultat de l’action"| research_agent
+  analyst_agent -->|"Message de retour"| agent_messages
+  agent_messages -->|"État partagé"| graph_state
+  supervisor -->|"Skills propres à cet agent"| skills
+  supervisor -->|"Tools autorisés"| tool_catalog
+  supervisor -->|"Génération"| llm_port
+  supervisor -->|"Échange explicite"| agent_messages
+  research_agent -->|"Skills propres à cet agent"| skills
+  research_agent -->|"Tools autorisés"| tool_catalog
+  research_agent -->|"Génération"| llm_port
+  research_agent -->|"Échange explicite"| agent_messages
+  analyst_agent -->|"Skills propres à cet agent"| skills
+  analyst_agent -->|"Tools autorisés"| tool_catalog
+  analyst_agent -->|"Génération"| llm_port
+  analyst_agent -->|"Échange explicite"| agent_messages
+  writer_agent -->|"Skills propres à cet agent"| skills
+  writer_agent -->|"Tools autorisés"| tool_catalog
+  writer_agent -->|"Génération"| llm_port
+  writer_agent -->|"Échange explicite"| agent_messages
+  review_agent -->|"Skills propres à cet agent"| skills
+  review_agent -->|"Tools autorisés"| tool_catalog
+  review_agent -->|"Génération"| llm_port
+  review_agent -->|"Échange explicite"| agent_messages
+  llm_adapter -->|"execution"| prompt_port
+  prompt_port -->|"execution"| prompt_adapter
+  prompt_adapter -->|"execution"| prompt_local_cache
+  prompt_local_cache -->|"execution"| prompt_version
+  prompt_version -->|"execution"| prompt_render
+  prompt_render -->|"execution"| cache_key
+  cache_key -->|"execution"| cache_lookup
+  cache_lookup -->|"execution"| cache_decision
+  llm_provider -->|"execution"| agent_response
+  agent_response -->|"execution"| cache_write
+  cache_write -->|"execution"| response_cache
+  agent_response -->|"execution"| research_agent
+  cache_lookup -->|"Lire"| response_cache
+  cache_decision -->|"Miss"| llm_client
+  cache_write -->|"Réponse versionnée"| cached_output
+  llm_adapter -->|"Trace de génération"| trace_port
+  cached_output -->|"execution"| agent_response
+  cache_decision -->|"Hit : pas d’appel fournisseur"| cached_output
+  llm_adapter -->|"Trace du cache hit"| trace_port
+  lf_prompts -->|"execution"| prompt_version
+  prompt_version -->|"execution"| prompt_variables
+  prompt_variables -->|"execution"| prompt_render
+  prompt_version -->|"execution"| cache_invalidate
+  cache_invalidate -->|"execution"| cache_key
+  prompt_local_cache -->|"Actualisation / version absente"| lf_prompts
+  prompt_version -->|"Mettre en cache la version"| prompt_local_cache
+  supervisor -->|"telemetry"| trace_port
+  trace_port -->|"telemetry"| trace_adapter
+  trace_adapter -->|"telemetry"| lf_traces
+  lf_traces -->|"telemetry"| lf_generation
+  research_agent -->|"telemetry"| trace_port
+  tool_dispatch -->|"telemetry"| trace_port
+  lf_traces -->|"telemetry"| eval_job
+  eval_job -->|"telemetry"| eval_adapter
+  eval_adapter -->|"telemetry"| judge_provider
+  judge_provider -->|"telemetry"| lf_scores
+  lf_feedback -->|"telemetry"| lf_scores
+  lf_datasets -->|"telemetry"| lf_experiments
+  lf_experiments -->|"telemetry"| lf_eval
+  lf_eval -->|"telemetry"| judge_provider
+  lf_experiments -->|"telemetry"| lf_code_eval
+  lf_code_eval -->|"telemetry"| lf_scores
+  eval_job -->|"Configuration de l’évaluateur"| lf_eval
+  prompt_version -->|"Lien à la version utilisée"| lf_generation
+  lf_scores -->|"Régressions contrôlées en CI"| quality
+  checkpoint_db -->|"Reprendre une exécution"| graph_state
+  graph_state -->|"Messages conservés"| agent_messages
+  controller -. "appelle" .-> facade
+  facade -. "appelle" .-> create
+  create -. "utilise le domaine" .-> aggregate
+  create -. "dépend du contrat" .-> repo_port
+  create -. "dépend du contrat" .-> uow_port
+  read -. "dépend du contrat" .-> read_port
+  workflow -. "dépend du contrat" .-> external_port
+  repository -. "implémente" .-> repo_port
+  repository -. "implémente" .-> read_port
+  transaction -. "implémente" .-> uow_port
+  http -. "implémente" .-> external_port
+  outbox -. "implémente" .-> event_port
+  cache_adapter -. "implémente" .-> read_port
+  repository -. "reconstitue le modèle" .-> aggregate
+  agent_run -. "dépend du contrat" .-> graph_port
+  langgraph_runtime -. "implémente" .-> graph_port
+  research_agent -. "dépend du contrat" .-> llm_port
+  llm_adapter -. "implémente" .-> llm_port
+  prompt_adapter -. "implémente" .-> prompt_port
+  tool_adapter -. "implémente" .-> tool_port
+  checkpoint_adapter -. "implémente" .-> checkpoint_port
+  trace_adapter -. "implémente" .-> trace_port
+  memory_adapter -. "implémente" .-> memory_port

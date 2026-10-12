@@ -24,8 +24,8 @@ export const activity: Namespace = {
     fr: "En attente d'une validation",
   },
   stallBudgetPaused: {
-    en: "Budget reached — paused",
-    fr: "Budget atteint — en pause",
+    en: "Estimated budget reached — paused",
+    fr: "Budget estimatif atteint — en pause",
   },
 
   noGuidance: {

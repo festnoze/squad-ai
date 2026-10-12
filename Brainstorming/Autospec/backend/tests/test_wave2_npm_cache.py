@@ -51,11 +51,11 @@ def captured_npm(monkeypatch, tmp_path):
     """
     calls: list[list[str]] = []
 
-    def _fake_run(cmd, **kwargs):
+    def _fake_run(self, cmd, cwd, env):
         calls.append(list(cmd))
         return _Completed()
 
-    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setattr(Pipeline, "_run_suite_process", _fake_run)
     monkeypatch.setattr(Pipeline, "_resolve_cmd", staticmethod(lambda cmd: list(cmd)))
     monkeypatch.setattr(Pipeline, "_node_modules_usable", staticmethod(lambda root: True))
     monkeypatch.setattr(settings, "workspace_root", tmp_path / "ws")

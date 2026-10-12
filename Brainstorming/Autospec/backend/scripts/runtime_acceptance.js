@@ -62,12 +62,15 @@ const FRONTEND = process.argv[4] || "";
 const BACKEND_WEB = process.argv[5] === "1";
 const BACKEND_PORT = Number(process.env.RUNTIME_BACKEND_PORT || 8000);
 const FRONTEND_PORT = Number(process.env.RUNTIME_FRONTEND_PORT || 5174);
+const NPM_COMMAND = process.env.RUNTIME_NPM_COMMAND || "npm";
 
 const procs = [];
 const startedAt = Date.now();
 
 function remaining(min = 1000) {
-  return Math.max(min, TIMEOUT - (Date.now() - startedAt));
+  const budget = TIMEOUT - (Date.now() - startedAt);
+  if (budget <= 0 && min > 0) throw new Error("budget runtime épuisé");
+  return Math.max(0, budget);
 }
 
 function record(line) {
@@ -78,9 +81,21 @@ function killTree(proc) {
   if (!proc || proc.killed) return;
   try {
     if (process.platform === "win32") {
-      spawnSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
+      spawnSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore", timeout: 5000 });
     } else {
-      proc.kill("SIGTERM");
+      // Children share the wrapper's process group, allowing a wrapper timeout
+      // to kill the entire gate. For normal cleanup, stop only this owned tree.
+      const listing = spawnSync("ps", ["-axo", "pid=,ppid="], { encoding: "utf8", timeout: 3000 });
+      const children = new Map();
+      for (const line of String(listing.stdout || "").trim().split("\n")) {
+        const [pid, parent] = line.trim().split(/\s+/).map(Number);
+        if (pid > 0 && parent > 0) children.set(parent, [...(children.get(parent) || []), pid]);
+      }
+      const visit = (pid) => {
+        for (const child of children.get(pid) || []) visit(child);
+        try { process.kill(pid, "SIGKILL"); } catch {}
+      };
+      visit(proc.pid);
     }
   } catch {
     try { proc.kill(); } catch {}
@@ -120,17 +135,42 @@ function reapWorkspacePortHolders(port) {
   }
 }
 
+function resolveCommand(cmd, args) {
+  if (process.platform !== "win32") return { cmd, args };
+  const windowsPath = path.win32;
+  if (/^npm(?:\.cmd|\.ps1)?$/i.test(windowsPath.basename(cmd))) {
+    // npm's Windows wrappers need a shell. Invoke npm's JS entry point with
+    // this Node executable instead, preserving every argument literally.
+    const dirs = [];
+    if (windowsPath.dirname(cmd) !== ".") dirs.push(windowsPath.dirname(cmd));
+    dirs.push(windowsPath.dirname(process.execPath));
+    const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === "PATH");
+    dirs.push(...String(process.env[pathKey] || "").split(";").map(dir => dir.trim().replace(/^"|"$/g, "")).filter(Boolean));
+    for (const dir of [...new Set(dirs)]) {
+      const cli = windowsPath.join(dir, "node_modules", "npm", "bin", "npm-cli.js");
+      if (fs.existsSync(cli)) return { cmd: process.execPath, args: [cli, ...args] };
+    }
+    throw new InfraError("npm-cli.js introuvable : installer npm avec Node ou configurer son chemin");
+  }
+  if (/\.(?:cmd|bat|ps1)$/i.test(cmd)) {
+    throw new InfraError(`Launcher shell non pris en charge : ${cmd}. Configurer un exécutable ou une commande Node explicite.`);
+  }
+  return { cmd, args };
+}
+
 function launch(label, cmd, args, cwd) {
   record(`[runtime] launch ${label}: ${cmd} ${args.join(" ")}`);
-  const proc = spawn(cmd, args, {
+  const resolved = resolveCommand(cmd, args);
+  const proc = spawn(resolved.cmd, resolved.args, {
     cwd,
-    shell: process.platform === "win32",
+    shell: false,
     env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
   let output = "";
-  proc.stdout.on("data", (d) => { output += d.toString(); });
-  proc.stderr.on("data", (d) => { output += d.toString(); });
+  proc.stdout.on("data", (d) => { output = (output + d.toString()).slice(-16000); });
+  proc.stderr.on("data", (d) => { output = (output + d.toString()).slice(-16000); });
+  proc.on("error", (error) => { proc._autospecSpawnError = error; });
   proc._autospecLabel = label;
   proc._autospecOutput = () => output.slice(-2000);
   procs.push(proc);
@@ -159,22 +199,31 @@ function fetchText(url, timeoutMs = 8000) {
   });
 }
 
-function waitForHttp(port, timeoutMs) {
+function waitForHttp(port, timeoutMs, proc = null) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (ok) => { if (!settled) { settled = true; resolve(ok); } };
     const tick = () => {
+      if (settled) return;
+      if (Date.now() > deadline || (proc && (proc._autospecSpawnError || proc.exitCode !== null))) {
+        return finish(false);
+      }
+      let retried = false;
+      const retry = () => {
+        if (retried || settled) return;
+        retried = true;
+        if (Date.now() > deadline) return finish(false);
+        setTimeout(tick, Math.min(250, Math.max(1, deadline - Date.now())));
+      };
       const req = http.get(`http://127.0.0.1:${port}/`, (res) => {
         res.resume();
-        resolve(res.statusCode && res.statusCode < 500);
+        finish(Boolean(res.statusCode && res.statusCode < 500));
       });
-      req.on("error", () => {
-        if (Date.now() > deadline) return resolve(false);
-        setTimeout(tick, 500);
-      });
+      req.on("error", retry);
       req.setTimeout(1500, () => {
         req.destroy();
-        if (Date.now() > deadline) return resolve(false);
-        setTimeout(tick, 500);
+        retry();
       });
     };
     tick();
@@ -203,8 +252,11 @@ function isPortFree(port) {
 
 async function startBackendIfNeeded() {
   if (!BACKEND_WEB) return false;
-  const main = path.join(WS, "main.py");
-  if (!fs.existsSync(main)) throw new Error("backend web demandé mais main.py absent");
+  const command = process.env.RUNTIME_BACKEND_COMMAND
+    ? JSON.parse(process.env.RUNTIME_BACKEND_COMMAND) : ["uv", "run", "python", "main.py"];
+  if (!Array.isArray(command) || command.length === 0 || command.some(p => typeof p !== "string")) {
+    throw new InfraError("Commande backend invalide");
+  }
 
   // Guard against validating a STALE/foreign server: if the target port is
   // already taken before we spawn anything, this is an external process the
@@ -213,8 +265,14 @@ async function startBackendIfNeeded() {
     throw new InfraError(`port :${BACKEND_PORT} déjà occupé par un process externe`);
   }
 
-  let proc = launch("backend", "uv", ["run", "python", "main.py"], WS);
-  if (await waitForHttp(BACKEND_PORT, Math.min(12000, remaining()))) return true;
+  let proc = launch("backend", command[0], command.slice(1), WS);
+  if (process.env.RUNTIME_BACKEND_LANGUAGE && process.env.RUNTIME_BACKEND_LANGUAGE !== "python") {
+    if (await waitForHttp(BACKEND_PORT, remaining(), proc)) return true;
+    if (proc._autospecSpawnError) throw new InfraError(proc._autospecSpawnError.message);
+    throw new Error(`backend web non joignable sur :${BACKEND_PORT}\n${proc._autospecOutput()}`);
+  }
+  if (await waitForHttp(BACKEND_PORT, Math.min(12000, remaining()), proc)) return true;
+  if (proc._autospecSpawnError) throw new InfraError(proc._autospecSpawnError.message);
 
   record("[runtime] python main.py n'a pas ouvert le port, essai uvicorn main:app");
   killTree(proc);
@@ -222,16 +280,18 @@ async function startBackendIfNeeded() {
     "run", "--with", "uvicorn", "uvicorn", "main:app",
     "--host", "127.0.0.1", "--port", String(BACKEND_PORT),
   ], WS);
-  if (await waitForHttp(BACKEND_PORT, remaining())) return true;
+  if (await waitForHttp(BACKEND_PORT, remaining(), proc)) return true;
+  if (proc._autospecSpawnError) throw new InfraError(proc._autospecSpawnError.message);
   throw new Error(`backend web non joignable sur :${BACKEND_PORT}\n${proc._autospecOutput()}`);
 }
 
 function runFrontendBuild() {
   if (!FRONTEND) return;
   record("[runtime] npm run build (frontend)");
-  const res = spawnSync("npm", ["run", "build"], {
+  const resolved = resolveCommand(NPM_COMMAND, ["run", "build"]);
+  const res = spawnSync(resolved.cmd, resolved.args, {
     cwd: FRONTEND,
-    shell: process.platform === "win32",
+    shell: false,
     encoding: "utf8",
     timeout: remaining(),
   });
@@ -253,11 +313,22 @@ function runFrontendBuild() {
 }
 
 async function startFrontendPreview() {
-  const proc = launch("frontend", "npm", [
+  if (!(await isPortFree(FRONTEND_PORT))) {
+    throw new InfraError(`port frontend :${FRONTEND_PORT} déjà occupé par un process externe`);
+  }
+  const proc = launch("frontend", NPM_COMMAND, [
     "run", "preview", "--", "--host", "127.0.0.1", "--port", String(FRONTEND_PORT),
+    "--strictPort",
   ], FRONTEND);
-  if (!(await waitForHttp(FRONTEND_PORT, remaining()))) {
+  if (!(await waitForHttp(FRONTEND_PORT, remaining(), proc))) {
+    if (proc._autospecSpawnError) throw new InfraError(proc._autospecSpawnError.message);
     throw new Error(`frontend preview non joignable sur :${FRONTEND_PORT}\n${proc._autospecOutput()}`);
+  }
+  // A server that wins the bind race makes Vite exit under --strictPort. Give
+  // that exit notification a turn before accepting the listener as ours.
+  await new Promise(resolve => setTimeout(resolve, 100));
+  if (proc.exitCode !== null || proc._autospecSpawnError) {
+    throw new InfraError(`frontend preview arrêté avant validation du port :${FRONTEND_PORT}`);
   }
   return `http://127.0.0.1:${FRONTEND_PORT}/`;
 }
@@ -471,7 +542,7 @@ async function runJourney(page) {
   return filled > 0 || true;
 }
 
-(async () => {
+async function main() {
   let browser;
   try {
     runFrontendBuild();
@@ -496,6 +567,14 @@ async function runJourney(page) {
 
     if (backendUp) record(`[runtime] ${await probeApi(backendOrigin)}`);
 
+    // A pure API is verified over HTTP. Requiring a browser here adds an
+    // unrelated infrastructure dependency and contributes no frontend evidence.
+    if (!requireApp) {
+      record(`[runtime] OK API ${target}`);
+      process.exitCode = 0;
+      return;
+    }
+
     // Playwright/chromium not resolvable or not launchable → ENVIRONMENT failure.
     if (!chromium) {
       throw new InfraError("playwright/chromium introuvable (require playwright/@playwright/test a échoué)");
@@ -507,20 +586,26 @@ async function runJourney(page) {
     }
     const visible = await checkPage(browser, target, requireApp);
     record(`[runtime] OK ${target} (${visible} caractères visibles)`);
-    process.exit(0);
+    process.exitCode = 0;
   } catch (err) {
     const detail = err && err.stack ? err.stack : String(err);
     if (err && err.infra) {
       record(`[runtime] INFRA ${err.message || detail}`);
-      process.exit(2);
+      process.exitCode = 2;
+    } else {
+      record(`[runtime] FAIL ${detail}`);
+      process.exitCode = 1;
     }
-    record(`[runtime] FAIL ${detail}`);
-    process.exit(1);
   } finally {
     if (browser) await browser.close().catch(() => {});
     for (const proc of procs) killTree(proc);
     // Filet anti-zombie : un descendant re-parenté peut survivre au killTree.
-    if (BACKEND_WEB) reapWorkspacePortHolders(BACKEND_PORT);
-    if (FRONTEND) reapWorkspacePortHolders(FRONTEND_PORT);
+    // Only reap a port for a child we actually launched. A rejected pre-existing
+    // listener remains somebody else's process even if its path mentions WS.
+    if (procs.some(p => String(p._autospecLabel).startsWith("backend"))) reapWorkspacePortHolders(BACKEND_PORT);
+    if (procs.some(p => p._autospecLabel === "frontend")) reapWorkspacePortHolders(FRONTEND_PORT);
   }
-})();
+}
+
+if (require.main === module) main();
+module.exports = { main, startFrontendPreview, waitForHttp, killTree, resolveCommand, launch, runFrontendBuild };

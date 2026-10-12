@@ -161,7 +161,10 @@ export function hasBuildableStory(stories: UserStory[] | undefined): boolean {
  *  (`aresume_build`) is the real authority and returns 409 if misused — this is
  *  pure UX gating. */
 export function canResumeBuild(project: ProjectState): boolean {
-  return DORMANT_PHASES.includes(project.phase) && hasBuildableStory(project.stories);
+  return DORMANT_PHASES.includes(project.phase) &&
+    (hasBuildableStory(project.stories) || project.bootstrap_status === "failed") &&
+    !["preparing", "verifying"].includes(project.bootstrap_status ?? "") &&
+    !["building", "deploying", "verifying"].includes(project.deploy_status ?? "");
 }
 
 export interface WorkItem {

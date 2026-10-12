@@ -51,7 +51,7 @@ async function createProject(page: Page, name: string, goal: string, budget?: st
   await ensureCreationForm(page);
   await page.getByPlaceholder("Nom du projet (optionnel)").fill(name);
   await page.getByPlaceholder(/Décris la feature/).fill(goal);
-  if (budget) await page.getByPlaceholder(/Budget max/).fill(budget);
+  if (budget) await page.getByRole("spinbutton", { name: /Budget estimatif en dollars/ }).fill(budget);
   await page.getByRole("button", { name: /Démarrer la spécification/ }).click();
   await dismissBrainstorm(page);
 }
@@ -153,8 +153,8 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await expect(page.getByTestId("story-US-1")).toBeVisible();
   await expect(page.getByTestId("story-US-2")).toBeVisible();
 
-  // === I1 — la jauge budget « 💸 $x / $10.00 » apparaît =====================
-  await expect(page.getByText(/\/ \$10\.00/)).toBeVisible();
+  // === I1 — le budget est présenté comme un garde-fou estimatif, pas une facture.
+  await expect(page.getByText(/garde-fou : \$10\.00/)).toBeVisible();
 
   // === l'itération se termine (US-1 puis US-2 « Terminé ») ==================
   await expect(page.getByTestId("story-US-1").getByText("Terminé")).toBeVisible({

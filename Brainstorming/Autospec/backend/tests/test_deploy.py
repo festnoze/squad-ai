@@ -18,7 +18,7 @@ def test_write_deploy_artifacts(tmp_path):
     assert ".github/workflows/ci.yml" in created
     assert (tmp_path / "Dockerfile").exists()
     assert (tmp_path / ".github" / "workflows" / "ci.yml").exists()
-    assert "uv run pytest" in (tmp_path / ".github" / "workflows" / "ci.yml").read_text(
+    assert "uv run --no-sync pytest" in (tmp_path / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
 
@@ -45,7 +45,7 @@ def test_dockerfile_backend_exposes_port():
     assert "python:3.12-slim" in text
     assert "EXPOSE 8123" in text
     # A pure backend has no frontend build stage / nginx.
-    assert "node:20-alpine" not in text
+    assert "node:22-alpine" not in text
     assert "nginx" not in text
 
 
@@ -53,22 +53,22 @@ def test_dockerfile_fullstack_is_multi_stage_one_image():
     """Fullstack kind : node build stage + python stage serving frontend/dist."""
     text = dockerfile_text(9001, "fullstack")
     _assert_header(text)
-    assert "FROM node:20-alpine AS fe" in text
+    assert "FROM node:22-alpine AS fe" in text
     assert "npm run build" in text
     assert "python:3.12-slim" in text
-    assert "COPY --from=fe /fe/dist ./frontend/dist" in text
+    assert "COPY --from=fe /fe/dist /app/frontend/dist" in text
     assert "EXPOSE 9001" in text
 
 
-def test_dockerfile_frontend_only_serves_via_nginx_port_80():
-    """Frontend-only SPA : node build stage → nginx:alpine, container port 80."""
+def test_dockerfile_frontend_only_serves_via_unprivileged_nginx():
+    """The frontend binds an unprivileged port, compatible with cap-drop ALL."""
     text = dockerfile_text(1234, "frontend")
     _assert_header(text)
-    assert "FROM node:20-alpine AS fe" in text
-    assert "FROM nginx:alpine" in text
+    assert "FROM node:22-alpine AS fe" in text
+    assert "FROM nginxinc/nginx-unprivileged:" in text
     assert "COPY --from=fe /fe/dist /usr/share/nginx/html" in text
-    # The container listens on 80 regardless of the resolved web port.
-    assert "EXPOSE 80" in text
+    assert "EXPOSE 8080" in text
+    assert "USER 101" in text
     assert "EXPOSE 1234" not in text
 
 
@@ -82,22 +82,21 @@ def test_managed_dockerfile_is_regenerated_on_drift(tmp_path):
     created = write_deploy_artifacts(tmp_path, port=8000, kind="frontend")
     assert "Dockerfile" in created
     body = (tmp_path / "Dockerfile").read_text(encoding="utf-8")
-    assert "FROM nginx:alpine" in body
+    assert "FROM nginxinc/nginx-unprivileged:" in body
 
 
-def test_legacy_marker_first_dockerfile_is_still_managed(tmp_path):
-    """Dockerfiles generated before the syntax-directive reorder carry the marker
-    on line 1 — they must still count as managed and be regenerated."""
+def test_unknown_legacy_marker_does_not_authorize_overwrite(tmp_path):
+    """An unsigned marker cannot tell a user repair from generated content."""
     dockerfile = tmp_path / "Dockerfile"
     dockerfile.write_text(
         f"{MANAGED_MARKER}\n# syntax=docker/dockerfile:1\nFROM python:3.12-slim\n",
         encoding="utf-8",
     )
     created = write_deploy_artifacts(tmp_path, port=8000, kind="backend")
-    assert "Dockerfile" in created
+    assert "Dockerfile" not in created
     lines = dockerfile.read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "# syntax=docker/dockerfile:1"
-    assert lines[1] == MANAGED_MARKER
+    assert lines[0] == MANAGED_MARKER
+    assert lines[1] == "# syntax=docker/dockerfile:1"
 
 
 def test_user_owned_dockerfile_is_preserved(tmp_path):

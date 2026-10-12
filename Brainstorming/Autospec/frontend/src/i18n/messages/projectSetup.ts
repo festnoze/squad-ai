@@ -34,12 +34,12 @@ export const projectSetup: Namespace = {
     fr: "Repo existant à étendre (chemin, optionnel — mode brownfield)",
   },
   budgetAriaLabel: {
-    en: "Maximum budget in dollars (empty = no limit)",
-    fr: "Budget maximum en dollars (vide = pas de limite)",
+    en: "Estimated budget in dollars (empty or 0 = no guardrail)",
+    fr: "Budget estimatif en dollars (vide ou 0 = sans garde-fou)",
   },
   budgetPlaceholder: {
-    en: "Max budget ($) — empty = no limit",
-    fr: "Budget max ($) — vide = pas de limite",
+    en: "Estimated budget ($) — empty = no guardrail",
+    fr: "Budget estimatif ($) — vide = sans garde-fou",
   },
   submitAutoSpec: {
     en: "🔁 Start the auto-spec loop",

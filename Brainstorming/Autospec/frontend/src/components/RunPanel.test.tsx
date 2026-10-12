@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { RunPanel } from "./RunPanel";
 import { PipelinePhase, ProjectState, StoryStatus, Task, Usage, UserStory } from "../types";
@@ -90,6 +90,7 @@ function renderPanel(
   onRestartFromScratch: () => void = vi.fn(),
   onUndeploy: () => void = vi.fn(),
   onVerifyDelivery: () => void = vi.fn(),
+  onResumeBuild: () => void = vi.fn(),
 ) {
   const utils = render(
     <RunPanel
@@ -100,7 +101,7 @@ function renderPanel(
       onPause={vi.fn()}
       onResume={vi.fn()}
       onStopApp={vi.fn()}
-      onResumeBuild={vi.fn()}
+      onResumeBuild={onResumeBuild}
       onRetryFailed={onRetryFailed}
       onRestartFromScratch={onRestartFromScratch}
       onDocument={vi.fn()}
@@ -121,6 +122,7 @@ function renderPanel(
     onRestartFromScratch,
     onUndeploy,
     onVerifyDelivery,
+    onResumeBuild,
   };
 }
 
@@ -241,6 +243,28 @@ describe("RunPanel", () => {
       makeProject({ usage: { ...NEUTRAL_USAGE, agent_calls: 0 } }),
     );
     expect(container.querySelector(".usage-meter")).toBeNull();
+  });
+
+  it("labels recorded cost and budget as estimates, not a bill or guaranteed spending cap", () => {
+    const { container } = renderPanel(makeProject({
+      budget_usd: 2,
+      usage: { ...NEUTRAL_USAGE, cost_usd: 2.25, agent_calls: 3 },
+    }));
+    const meter = container.querySelector(".usage-meter")!;
+    expect(meter).toHaveTextContent("Estimated: $2.2500 / guardrail: $2.00");
+    expect(meter).toHaveClass("over-budget");
+    expect(meter).toHaveAttribute("title", expect.stringContaining("not invoices"));
+    expect(screen.getByText("About cost estimates")).toBeVisible();
+    expect(screen.queryByText(/Incomplete estimate/)).not.toBeInTheDocument();
+  });
+
+  it("warns about unreported usage even when the recorded estimate is zero", () => {
+    renderPanel(makeProject({
+      usage: { ...NEUTRAL_USAGE, agent_calls: 2, failed_calls: 2, unreported_calls: 2 },
+    }));
+    expect(screen.getByText(/Estimated: \$0\.0000/)).toBeVisible();
+    expect(screen.getByText("⚠ Incomplete estimate: 2 call(s) without usage data")).toBeVisible();
+    expect(screen.getByText(/not invoices/)).toBeVisible();
   });
 
   it("delivery_issues : affiche une bannière de livraison bloquée", () => {
@@ -516,5 +540,105 @@ describe("RunPanel — filtres de logs (Q3)", () => {
     expect(screen.getByText(/building the thing/)).toBeInTheDocument();
     expect(screen.getByText(/another build line/)).toBeInTheDocument();
     expect(screen.queryByText(/\/3 lines/)).not.toBeInTheDocument();
+  });
+});
+
+describe("RunPanel — socle technique et images sans service HTTP", () => {
+  it.each([
+    ["preparing", "Preparing project foundation"],
+    ["verifying", "Checking project foundation"],
+  ] as const)("%s : le statut est visible et les contrôles concurrents sont bloqués", (status, label) => {
+    // A retry can publish its bootstrap status while phase is still dormant.
+    renderPanel(makeProject({
+      phase: "needs_attention",
+      brief: "a useful application",
+      bootstrap_status: status,
+      stories: [makeStory({ status: "todo" }), makeStory({ id: "done", status: "done" })],
+    }));
+    const statusPanel = screen.getByTestId("bootstrap-status");
+    expect(within(statusPanel).getByText(label)).toBeVisible();
+    expect(statusPanel).toHaveAttribute("aria-busy", "true");
+    expect(statusPanel).toHaveClass("deploy-chip-progress");
+    expect(screen.getByRole("button", { name: "▶ Run project" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Continue build|Retry initialization|Restart from scratch/ })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("verify-delivery")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "⏹ Stop" })).toBeEnabled();
+  });
+
+  it("échec sans story : ouvre le diagnostic et propose de reprendre l'initialisation", () => {
+    const { onResumeBuild, onRun } = renderPanel(makeProject({
+      phase: "needs_attention",
+      bootstrap_status: "failed",
+      bootstrap_detail: "Node.js executable not found",
+      technical_stack: { backend: "python", frontend: "react", database: "sqlite", source: "architect", template_version: "1" },
+      stories: [],
+    }));
+    const statusPanel = screen.getByTestId("bootstrap-status");
+    expect(statusPanel).toHaveAttribute("open");
+    expect(statusPanel).toHaveAttribute("aria-busy", "false");
+    expect(within(statusPanel).getByText("Node.js executable not found")).toBeVisible();
+    expect(statusPanel).toHaveTextContent("backend: python · frontend: react · database: sqlite");
+    expect(statusPanel).not.toHaveTextContent("template_version");
+    expect(statusPanel).not.toHaveTextContent("source:");
+    const retry = screen.getByRole("button", { name: "▶ Retry initialization" });
+    expect(retry).toHaveAttribute("title", "Check the project foundation again, then continue planning and building");
+    fireEvent.click(retry);
+    expect(onResumeBuild).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "▶ Run project" }));
+    expect(onRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /⋯ Delivery/ })).not.toBeInTheDocument();
+  });
+
+  it("socle vérifié : pas de reprise initiale fictive et lancement disponible", () => {
+    renderPanel(makeProject({ phase: "done", bootstrap_status: "ready", bootstrap_detail: "HTTP and SQLite verified" }));
+    expect(screen.getByText("Project foundation verified")).toBeVisible();
+    expect(screen.getByTestId("bootstrap-status")).toHaveClass("deploy-chip-ok");
+    expect(screen.getByRole("button", { name: "▶ Run project" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /Retry initialization/ })).not.toBeInTheDocument();
+  });
+
+  it.each([undefined, "", "skipped"] as const)("statut socle %s : aucun indicateur trompeur", (status) => {
+    renderPanel(makeProject({ bootstrap_status: status }));
+    expect(screen.queryByTestId("bootstrap-status")).not.toBeInTheDocument();
+  });
+
+  it("image CLI/bibliothèque : nom et retrait disponibles, sans lien localhost", () => {
+    const { onUndeploy } = renderPanel(makeProject({
+      deploy_status: "packaged",
+      deployed_image: "autospec/cli-project:latest",
+      deployed_container: "",
+      deploy_host_port: 0,
+      deploy_detail: "Image built and CLI help checked offline",
+    }));
+    const chip = screen.getByTestId("deploy-chip");
+    expect(chip).toHaveTextContent("Docker image verified");
+    expect(chip).toHaveTextContent("autospec/cli-project:latest");
+    expect(chip).toHaveAttribute("title", "Image built and CLI help checked offline");
+    expect(within(chip).queryByRole("link")).not.toBeInTheDocument();
+    const remove = within(chip).getByRole("button", { name: "Undeploy" });
+    expect(remove).toHaveAttribute("title", "Remove the packaged Docker image");
+    fireEvent.click(remove);
+    expect(onUndeploy).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["", "autospec-project"])("retrait échoué : conserve une action de nettoyage (%s)", (container) => {
+    const { onUndeploy } = renderPanel(makeProject({
+      deploy_status: "failed",
+      deployed_image: "autospec/project:latest",
+      deployed_container: container,
+      deploy_host_port: container ? 18042 : 0,
+      deploy_detail: "Docker daemon unavailable; removal unconfirmed",
+    }));
+    const chip = screen.getByTestId("deploy-chip");
+    expect(within(chip).queryByRole("link")).not.toBeInTheDocument();
+    const retry = within(chip).getByRole("button", { name: "Undeploy" });
+    if (!container) expect(retry).toHaveAttribute("title", "Remove the packaged Docker image");
+    fireEvent.click(retry);
+    expect(onUndeploy).toHaveBeenCalledTimes(1);
+  });
+
+  it("build Docker échoué sans ressource : aucun retrait fictif", () => {
+    renderPanel(makeProject({ deploy_status: "failed", deployed_image: "", deployed_container: "" }));
+    expect(within(screen.getByTestId("deploy-chip")).queryByRole("button", { name: "Undeploy" })).not.toBeInTheDocument();
   });
 });

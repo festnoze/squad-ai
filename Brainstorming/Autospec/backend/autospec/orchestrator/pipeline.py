@@ -29,6 +29,7 @@ from ..agents.runner import (
     AgentError,
     AgentRunner,
     ProcessRegistry,
+    active_budget_usd,
     active_processes,
     active_skills_enabled,
     extract_json,
@@ -93,6 +94,7 @@ from . import regression
 from .build_monitor import BuildMonitor
 from . import deploy
 from . import docker_deploy
+from . import stack as stack_selection
 from . import brownfield
 from . import sandbox
 from .events import bus
@@ -670,16 +672,86 @@ class _UsageTracker:
 
     def __init__(self, pipeline: "Pipeline"):
         self.pipeline = pipeline
+        self._active_calls = 0
+        self._budgeted_call = False
+        self._idle = asyncio.Event()
+        self._idle.set()
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
+        # Count every call, including ones admitted before a user added a cap.
+        # New budgeted calls must wait until ALL earlier usage is accounted for.
+        # These checks and updates have no await: admission is atomic on the
+        # owning event loop. A wakeup rechecks the cap and current occupancy.
+        while self._active_calls and (
+            self._budgeted_call or self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
+        ):
+            await self._idle.wait()
+        self._active_calls += 1
+        self._budgeted_call = self._budgeted_call or bool(
+            self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
+        )
+        self._idle.clear()
+        try:
+            return await self._arun(prompt, system_prompt, cwd, session_id, model)
+        finally:
+            # Synchronous release cannot itself be interrupted by cancellation.
+            self._active_calls -= 1
+            if not self._active_calls:
+                self._budgeted_call = False
+                self._idle.set()
+
+    def _account(self, result, role: str, iteration: int, *, failed: bool = False) -> float:
+        tier = settings.tier_for_role(role) or "unrouted"
+        cost = result.cost_usd if result else 0.0
+        inputs = result.input_tokens if result else 0
+        outputs = result.output_tokens if result else 0
+        if result and cost <= 0.0:
+            cost = (
+                inputs / 1_000_000 * settings.tier_price_in.get(tier, 0.0)
+                + outputs / 1_000_000 * settings.tier_price_out.get(tier, 0.0)
+            )
+        unreported = result is None or not result.usage_reported
+        # Use the SAME effective estimate for project and iteration ledgers.
+        # Failed responses can still report valid paid/estimated usage.
+        buckets = (self.pipeline.state.usage,
+                   self.pipeline.state.iteration_usage.setdefault(iteration, Usage()))
+        for usage in buckets:
+            usage.cost_usd += cost
+            usage.input_tokens += inputs
+            usage.output_tokens += outputs
+            usage.agent_calls += 1
+            usage.failed_calls += int(failed)
+            usage.unreported_calls += int(unreported)
+            usage.cost_by_tier[tier] = usage.cost_by_tier.get(tier, 0.0) + cost
+            usage.input_tokens_by_tier[tier] = usage.input_tokens_by_tier.get(tier, 0) + inputs
+            usage.output_tokens_by_tier[tier] = usage.output_tokens_by_tier.get(tier, 0) + outputs
+            usage.calls_by_tier[tier] = usage.calls_by_tier.get(tier, 0) + 1
+        self.pipeline._enforce_budget()
+        if unreported and not self.pipeline._stop_requested and (
+            self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
+        ):
+            # A timeout is not a free call. With a configured allowance, require
+            # a deliberate resume instead of automatically spending an unknown
+            # remainder through retries or watchdog recovery.
+            self.pipeline._stop_requested = True
+            self.pipeline._resume_event.set()
+            self.pipeline._chat(ChatRole.SYSTEM,
+                "💰 Usage non remonté : le budget restant ne peut plus être vérifié. "
+                "Arrêt des appels automatiques ; une reprise explicite est nécessaire.")
+        self.pipeline._sync()
+        return cost
+
+    async def _arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
+        self.pipeline._enforce_budget()
+        if self.pipeline._stop_requested:
+            raise AgentError("Appel agent non lancé : pipeline arrêtée ou budget estimatif atteint.")
+        iteration = self.pipeline.state.iteration
         phase = self.pipeline.state.phase.value
         item_id = _BUILD_ITEM.get() or f"phase:{phase}"
         role = _persona_role(system_prompt)
         # Track this call's CLI child process on the pipeline's registry so a
         # project switch / shutdown can kill it mid-flight. to_thread copies this
         # context into the worker thread where the process is actually spawned.
-        active_processes.set(self.pipeline._agent_procs)
-        skills_token = active_skills_enabled.set(bool(self.pipeline._setting("skills_enabled")))
         _t0 = time.monotonic()
         # W0.3/W0.4: resolve the model once (so both success and error telemetry
         # can attribute it) and record the prompt size for context-budget checks.
@@ -688,16 +760,29 @@ class _UsageTracker:
         chosen = model or _FORCE_MODEL.get() or settings.model_for_role(role, phase)
         prompt_chars = len(prompt or "")
         self.pipeline._check_context_budget(role, item_id, prompt_chars, chosen)
+        process_token = active_processes.set(self.pipeline._agent_procs)
+        skills_token = active_skills_enabled.set(bool(self.pipeline._setting("skills_enabled")))
+        remaining = (max(0.0, self.pipeline.state.budget_usd - self.pipeline.state.usage.cost_usd)
+                     if self.pipeline.state.budget_usd else None)
+        budget_token = active_budget_usd.set(remaining)
         try:
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
         except AgentError as exc:
+            effective_cost = self._account(exc.usage, role, iteration, failed=True)
+            if exc.budget_exhausted:
+                self.pipeline._stop_requested = True
+                self.pipeline._resume_event.set()
+                self.pipeline._chat(ChatRole.SYSTEM, "💰 Budget estimatif du harness atteint ; aucun nouvel appel agent ne sera lancé.")
             # Capture the failed round-trip too — a red/failed item's last call is
             # exactly what the operator wants to inspect.
             self.pipeline._record_interaction(
                 item_id=item_id, phase=phase, persona=role, prompt=prompt,
                 response="", ok=False, error=str(exc), model=chosen or "",
+                input_tokens=exc.usage.input_tokens if exc.usage else 0,
+                output_tokens=exc.usage.output_tokens if exc.usage else 0,
+                cost_usd=effective_cost,
             )
             self.pipeline.monitor.agent_call(
                 role=role, item_id=item_id,
@@ -707,40 +792,21 @@ class _UsageTracker:
             # Usage-window watchdog (M2): an exhausted Claude session window
             # triggers a clean stop + scheduled auto-resume, then the error
             # still propagates to the caller's normal handling.
-            await self.pipeline._aon_agent_error(exc)
+            if not self.pipeline._stop_requested:
+                await self.pipeline._aon_agent_error(exc)
+            raise
+        except asyncio.CancelledError:
+            self._account(None, role, iteration, failed=True)
+            self.pipeline._record_interaction(
+                item_id=item_id, phase=phase, persona=role, prompt=prompt,
+                response="", ok=False, error="Appel interrompu ; usage non remonté.", model=chosen or "",
+            )
             raise
         finally:
             active_skills_enabled.reset(skills_token)
-        usage = self.pipeline.state.usage
-        usage.cost_usd += res.cost_usd
-        usage.input_tokens += res.input_tokens
-        usage.output_tokens += res.output_tokens
-        usage.agent_calls += 1
-        # W4: per-tier cost ledger. Attribute this call's tokens/cost to its cost
-        # tier (boss/worker/checker). When the runner reports no cost (Codex/
-        # OpenAI/Ollama), estimate it from the tier's configured per-1M prices so
-        # the "$X on the meter" story holds across providers.
-        tier = settings.tier_for_role(role) or "unrouted"
-        tier_cost = res.cost_usd
-        if tier_cost <= 0.0:
-            tier_cost = (
-                res.input_tokens / 1_000_000 * settings.tier_price_in.get(tier, 0.0)
-                + res.output_tokens / 1_000_000 * settings.tier_price_out.get(tier, 0.0)
-            )
-            usage.cost_usd += tier_cost  # fold the estimate into the headline total too
-        usage.cost_by_tier[tier] = usage.cost_by_tier.get(tier, 0.0) + tier_cost
-        usage.input_tokens_by_tier[tier] = usage.input_tokens_by_tier.get(tier, 0) + res.input_tokens
-        usage.output_tokens_by_tier[tier] = usage.output_tokens_by_tier.get(tier, 0) + res.output_tokens
-        usage.calls_by_tier[tier] = usage.calls_by_tier.get(tier, 0) + 1
-        # Per-iteration breakdown: mirror the same deltas into this iteration's
-        # bucket (created on first use) so the UI can show cost/tokens per iteration.
-        it_usage = self.pipeline.state.iteration_usage.setdefault(
-            self.pipeline.state.iteration, Usage()
-        )
-        it_usage.cost_usd += res.cost_usd
-        it_usage.input_tokens += res.input_tokens
-        it_usage.output_tokens += res.output_tokens
-        it_usage.agent_calls += 1
+            active_processes.reset(process_token)
+            active_budget_usd.reset(budget_token)
+        effective_cost = self._account(res, role, iteration)
         # Optional Langfuse trace (O1): one generation per agent call. Best-effort
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
@@ -755,7 +821,7 @@ class _UsageTracker:
                 "provider": settings.agent_provider,
                 "session_id": res.session_id,
             },
-            cost_usd=res.cost_usd,
+            cost_usd=effective_cost,
             input_tokens=res.input_tokens,
             output_tokens=res.output_tokens,
             duration_ms=res.duration_ms,
@@ -765,7 +831,7 @@ class _UsageTracker:
             item_id=item_id, phase=phase, persona=role, prompt=prompt,
             response=res.text, ok=True, model=chosen or "",
             input_tokens=res.input_tokens, output_tokens=res.output_tokens,
-            cost_usd=res.cost_usd, duration_ms=res.duration_ms,
+            cost_usd=effective_cost, duration_ms=res.duration_ms,
         )
         self.pipeline.monitor.agent_call(
             role=role, item_id=item_id,
@@ -783,6 +849,8 @@ class Pipeline:
         self.runner = runner
         self._tracked = _UsageTracker(self)
         self._profile_overrides: dict[str, bool] = profiles.resolve_overrides(self.state)
+        if self.state.technical_stack.get("frontend") == "react":
+            self._profile_overrides["streams_enabled"] = True
         # Build monitor (always on): persisted JSONL timeline for post-mortem
         # failure analysis — mirrors every _log line, test run and agent call.
         self.monitor = BuildMonitor(state)
@@ -843,6 +911,10 @@ class Pipeline:
         self._setup_task: asyncio.Task | None = None
         self._doc_task: asyncio.Task | None = None
         self._deploy_task: asyncio.Task | None = None  # D1 on-demand docker deploy
+        self._deployment_lock = asyncio.Lock()
+        self._docker_cancel = threading.Event()
+        self._docker_worker: asyncio.Task | None = None
+        self._bootstrap_cancel = asyncio.Event()
         self._eval_task: asyncio.Task | None = None   # E6 on-demand evaluation
         self._security_task: asyncio.Task | None = None  # S1 on-demand security review
         self._retro_task: asyncio.Task | None = None  # E7 on-demand retrospective
@@ -915,6 +987,10 @@ class Pipeline:
 
     def _setting(self, name: str):
         """Read a setting with this pipeline's product-profile overrides applied."""
+        # Explicit operator configuration wins over profile defaults, including
+        # DOCKER_DELIVERY=0 on api/fullstack and =1 on cli/library.
+        if name == "docker_delivery" and "DOCKER_DELIVERY" in os.environ:
+            return settings.docker_delivery
         if name in self._profile_overrides:
             return self._profile_overrides[name]
         return getattr(settings, name)
@@ -1380,6 +1456,8 @@ class Pipeline:
         """Hard-stop everything (used when the project is deleted): cancel the
         lifecycle task and terminate the generated app if it runs."""
         self._stop_requested = True
+        self._docker_cancel.set()
+        self._bootstrap_cancel.set()
         self._stop_tick()  # B5: never tick after dispose
         # Kill any in-flight agent CLI call (claude/codex) and its sub-tree, so it
         # never survives the process as an orphan (cost/resource leak).
@@ -1447,6 +1525,9 @@ class Pipeline:
                 PipelinePhase.NEEDS_ATTENTION,
                 PipelinePhase.ERROR,
             ) and not (self._impact_task and not self._impact_task.done()):
+                # New human feedback is a fresh action, not a continuation of
+                # the stopped worker. Budget admission is still checked below.
+                self._stop_requested = False
                 self._impact_task = asyncio.create_task(self._aimpact_analysis(text))
 
     def _signal_stop(self) -> int:
@@ -1455,6 +1536,8 @@ class Pipeline:
         NOW instead of running to completion. Returns the number of killed procs.
         Synchronous so it can run from shutdown without an await."""
         self._stop_requested = True
+        self._docker_cancel.set()
+        self._bootstrap_cancel.set()
         self._stop_tick()  # B5: stop heartbeat
         self._resume_event.set()  # unblock a paused pipeline
         self._brainstorm_event.set()  # unblock a pending brainstorming offer
@@ -1577,10 +1660,10 @@ class Pipeline:
             u = self.state.usage
             self._chat(
                 ChatRole.SYSTEM,
-                f"💰 Budget atteint (coût ${u.cost_usd:.4f}, "
+                f"💰 Budget atteint (coût estimé ${u.cost_usd:.4f}, "
                 f"{u.input_tokens + u.output_tokens} tokens) — arrêt propre de la pipeline.",
             )
-            self._notify("warning", "Budget atteint", f"{self.state.name} : ${u.cost_usd:.4f}")
+            self._notify("warning", "Budget estimatif atteint", f"{self.state.name} : ≈ ${u.cost_usd:.4f}")
 
     async def aset_archived(self, value: bool) -> None:
         """Archive or unarchive the project (hide it without deleting it)."""
@@ -2158,7 +2241,22 @@ class Pipeline:
         analysis, no panel, the existing pytest pipeline unchanged); ON runs the
         deterministic heuristic and, when the LLM is reachable, an agent that may
         refine it. First iteration only, non-fatal."""
+        explicit = self.state.technical_stack.get("backend") or stack_selection.explicit_backend(
+            f"{self.state.goal}\n{self.state.brief}"
+        )
+        if explicit == "none" and self.state.technical_stack.get("kind") == "frontend":
+            return
+        if explicit:
+            self.state.backend_language = BackendLanguage(explicit)
+            self.state.language_rationale = "Stack explicitement demandée par l'utilisateur."
+            return
         if not settings.language_selector_enabled:
+            if settings.project_bootstrap and self.state.language_complexity < 0:
+                rec = recommend_language(self.state.goal, self.state.brief)
+                self.state.backend_language = BackendLanguage(rec["language"])
+                self.state.language_complexity = rec["complexity"]
+                self.state.language_criticality = rec["criticality"]
+                self.state.language_rationale = rec["rationale"]
             return
         if self.state.language_complexity >= 0:  # already analyzed
             return
@@ -2170,7 +2268,7 @@ class Pipeline:
             )
             reply = extract_json(result.text)
             lang = str(reply.get("language", "")).strip().lower()
-            if lang in ("python", "go", "rust"):
+            if lang in toolchain.SUPPORTED:
                 rec = {
                     "language": lang,
                     "complexity": _clamp_1_5(reply.get("complexity"), default=rec["complexity"]),
@@ -2244,6 +2342,104 @@ class Pipeline:
             msg += f" {rationale}"
         self._chat(ChatRole.SYSTEM, msg)
 
+    async def _aselect_stack(self) -> bool:
+        """Persist the stack once, before writing files or planning features."""
+        if not settings.project_bootstrap or settings.fake_agents or self.state.brownfield_path:
+            await self._aselect_language()
+            await self._aselect_streams()
+            return True
+        try:
+            await self._aselect_language()
+            self.state.technical_stack = stack_selection.resolve(self.state)
+        except ValueError as exc:
+            self.state.bootstrap_status = "failed"
+            self.state.bootstrap_detail = str(exc)
+            self._block_delivery(str(exc), source="bootstrap")
+            return False
+        frontend_only = self.state.technical_stack["kind"] == "frontend"
+        if not frontend_only:
+            self.state.backend_language = BackendLanguage(self.state.technical_stack["backend"])
+        # Before any file is written the streams must agree with the resolved
+        # contract, including partially declared streams and language overrides.
+        existing_frontend = next((s for s in self.state.streams if s.kind == StreamKind.FRONTEND), None)
+        others = [s for s in self.state.streams if s.kind not in (StreamKind.BACKEND, StreamKind.FRONTEND)]
+        for stream in others:
+            stream.primary = False
+        self.state.streams = [] if frontend_only else [backend_stream_for(self.state.backend_language)]
+        if self.state.technical_stack["frontend"] == "react":
+            frontend = existing_frontend or Stream(
+                id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend",
+            )
+            frontend.language = "react"
+            frontend.primary = frontend_only
+            self.state.streams.append(frontend)
+        self.state.streams.extend(others)
+        if self.state.technical_stack["frontend"] == "react":
+            self._profile_overrides["streams_enabled"] = True
+        contract = stack_selection.contract(self.state)
+        if contract not in self.state.build_guidance:
+            self.state.build_guidance.append(contract)
+        self._log("bootstrap", contract)
+        self._sync()
+        return True
+
+    async def _abootstrap_phase(self) -> bool:
+        """Fail early on an unusable toolchain; never spend dev repair attempts."""
+        if not settings.project_bootstrap or settings.fake_agents or self.state.brownfield_path:
+            return True
+        from . import bootstrap
+
+        if self._stop_requested:
+            return False
+        self._bootstrap_cancel.clear()
+        ws = workspace_dir(self.state.id)
+        already_verified = self.state.bootstrap_verified_once or (
+            self.state.bootstrap_status == "ready" and bool(self.state.bootstrap_fingerprint)
+        )
+        # Migrate older saved projects BEFORE persisting a transient status. A
+        # crash or a failed runtime check must not forget the successful gate.
+        self.state.bootstrap_verified_once = already_verified
+        self.state.bootstrap_status = "preparing"
+        self._sync()
+        try:
+            prepared = bootstrap.prepare(self.state, ws)
+            if not prepared.ok:
+                result = prepared
+            else:
+                self.state.bootstrap_status = "verifying"
+                self.state.bootstrap_detail = prepared.detail
+                self._sync()
+                if already_verified:
+                    result = await bootstrap.verify_runtime(
+                        self.state, ws, timeout_s=settings.bootstrap_timeout_s,
+                        cancel=self._bootstrap_cancel, repair_dependencies=True,
+                    )
+                else:
+                    result = await bootstrap.verify(
+                        self.state, ws, timeout_s=settings.bootstrap_timeout_s, cancel=self._bootstrap_cancel,
+                    )
+            self.state.bootstrap_detail = result.detail[-4000:]
+            self.state.bootstrap_fingerprint = result.fingerprint or self.state.bootstrap_fingerprint
+            self.state.bootstrap_status = "skipped" if result.skipped else ("ready" if result.ok else "failed")
+            if result.ok and not result.skipped:
+                self.state.bootstrap_verified_once = True
+            if not result.ok:
+                self._block_delivery(f"Socle technique non opérationnel : {result.detail}", source="bootstrap")
+                return False
+            self._chat(ChatRole.SYSTEM, f"🔧 Socle technique vérifié : {result.detail}")
+            return True
+        except asyncio.CancelledError:
+            self.state.bootstrap_status = "failed"
+            self.state.bootstrap_detail = "Vérification interrompue ; reprendre pour la rejouer."
+            raise
+        except Exception as exc:
+            self.state.bootstrap_status = "failed"
+            self.state.bootstrap_detail = str(exc)
+            self._block_delivery(f"Initialisation technique : {exc}", source="bootstrap")
+            return False
+        finally:
+            self._sync()
+
     def _ensure_stream(self, stream_id: str) -> bool:
         """ST-15: add a stream to the project if absent (from the catalog). Used
         when a feedback evolves the product into a new work area (e.g. a web UI →
@@ -2274,10 +2470,13 @@ class Pipeline:
     async def aset_language(self, language: str) -> ProjectState:
         """L2: user override of the backend language. Raises ValueError (->409)
         on an unknown language."""
+        if self.state.bootstrap_fingerprint or self.state.bootstrap_status in ("preparing", "verifying", "ready"):
+            raise ValueError("Le socle est déjà créé : créer un nouveau projet pour changer de langage.")
         try:
             self.state.backend_language = BackendLanguage(language.strip().lower())
         except ValueError:
-            raise ValueError(f"langage inconnu : {language!r} (python|go|rust)")
+            raise ValueError(f"langage inconnu : {language!r} (python|go|rust|node)")
+        self.state.technical_stack = {"backend": self.state.backend_language.value, "source": "explicit"}
         self._sync()
         return self.state
 
@@ -2359,12 +2558,13 @@ class Pipeline:
         self._setup_task = asyncio.create_task(self._asetup_run())
 
     async def _asetup_run(self) -> None:
-        ws = workspace.scaffold(self.state)
-        self._log("setup", "🧱 Création des composants approuvés…")
         try:
+            ws = workspace.scaffold(self.state)
+            self._log("setup", "🧱 Création des composants approuvés…")
             for line in await setup_exec.aexecute(self.state, ws):
                 self._log("setup", line)
         except Exception as exc:  # background task: surface, never crash silently
+            self._log("setup", f"❌ Erreur du setup des composants : {exc}")
             self._chat(ChatRole.SYSTEM, f"Erreur du setup des composants : {exc}")
         finally:
             self._sync()
@@ -2373,8 +2573,8 @@ class Pipeline:
 
     async def adeploy(self) -> dict:
         """Generate deployment artifacts (Dockerfile, .dockerignore, CI) for the
-        generated product (D1) and, when the project is a deployable web app,
-        kick off a background Docker build+deploy+verify+repair pass. Idempotent;
+        generated product (D1) and, when eligible, kick off a background Docker
+        build+verify pass (service deployment or CLI/library packaging). Idempotent;
         returns ``{"created": [...], "deploy_started": bool}``. Raises ValueError
         (-> 409) while the pipeline is actively building or when a deploy pass is
         already running."""
@@ -2385,18 +2585,23 @@ class Pipeline:
             raise ValueError(
                 "la pipeline est active : attends la fin avant de générer le déploiement"
             )
-        if self._deploy_task and not self._deploy_task.done():
+        if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
             raise ValueError("un déploiement Docker est déjà en cours")
+        async with self._deployment_lock:
+            return await self._aprepare_manual_deploy()
+
+    async def _aprepare_manual_deploy(self) -> dict:
         ws = workspace.scaffold(self.state)
         # Manual trigger: bypass the DOCKER_DELIVERY gate flag but keep the
-        # FAKE_AGENTS / web-candidate skips (never containerise a demo or a
-        # non-web product on an explicit deploy either).
+        # FAKE_AGENTS / eligibility skips (never containerise a demo or an
+        # unfinished project, including on an explicit deploy).
         run, _reason, kind = docker_deploy.should_run(self.state, ws, enabled=True)
         created = await asyncio.to_thread(
             deploy.write_deploy_artifacts,
             ws,
             port=self._resolve_web_port(ws),
             kind=kind or "backend",
+            **self._deploy_artifact_options(ws),
         )
         self._chat(
             ChatRole.SYSTEM,
@@ -2405,14 +2610,16 @@ class Pipeline:
         )
         deploy_started = False
         if run:
+            self._stop_requested = False
             self._deploy_task = asyncio.create_task(self._adeploy_task())
             deploy_started = True
         return {"created": created, "deploy_started": deploy_started}
 
     async def _adeploy_task(self) -> None:
         try:
-            await self._adocker_delivery_phase()
+            await self._adocker_delivery_phase(force=True)
         except Exception as exc:  # background task: surface, never crash silently
+            delivery_state.set_deploy(self.state, status="failed", detail=str(exc))
             self._chat(ChatRole.SYSTEM, f"Erreur de la livraison Docker : {exc}")
         finally:
             self._sync()
@@ -2465,12 +2672,51 @@ class Pipeline:
         deliberately KEPT in state (stable identity across redeploys — see
         ``delivery_state.set_deploy``). Raises ValueError (-> 409) while a
         deploy pass is running."""
-        if self._deploy_task and not self._deploy_task.done():
+        if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
             raise ValueError("un déploiement Docker est en cours")
-        await asyncio.to_thread(docker_deploy.undeploy, self.state.id)
-        delivery_state.set_deploy(self.state, status="", detail="")
+        async with self._deployment_lock:
+            result = await asyncio.to_thread(docker_deploy.undeploy, self.state.id)
+            if not result.ok:
+                delivery_state.set_deploy(self.state, status="failed", detail=result.detail)
+                self._sync()
+                raise ValueError(f"Retrait Docker non confirmé : {result.detail}")
+            delivery_state.clear_deploy(self.state)
         self._chat(ChatRole.SYSTEM, "🐳 Conteneur retiré du réseau Docker.")
         self._sync()
+
+    def _deploy_artifact_options(self, ws: Path) -> dict:
+        frontend = runtime_acceptance._frontend_root(self.state, ws)
+        return {
+            "language": self.state.backend_language.value,
+            "frontend_root": frontend.relative_to(ws).as_posix() if frontend else "frontend",
+        }
+
+    async def areconcile_deploy(self) -> None:
+        if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
+            return
+        if not (self.state.deployed_container or self.state.deployed_image or self.state.deploy_status):
+            return
+        async with self._deployment_lock:
+            # A daemon outage changes the verdict to failed, not the resource
+            # type. Keep inspecting a packaged image on subsequent refreshes.
+            packaged = self.state.deploy_status == "packaged" or (
+                not self.state.deployed_container
+                and (
+                    self.state.technical_stack.get("kind") in ("cli", "library")
+                    or self.state.product_profile in ("cli", "library-fast")
+                    or (bool(self.state.deployed_image) and not self.state.deploy_host_port)
+                )
+            )
+            inspect = docker_deploy.inspect_packaged_image if packaged else docker_deploy.inspect_deployment
+            result = await asyncio.to_thread(inspect, self.state.id)
+            if result.skipped:
+                delivery_state.clear_deploy(self.state)
+            else:
+                delivery_state.set_deploy(
+                    self.state, status=("packaged" if result.packaged else "deployed") if result.ok else "failed", detail=result.detail,
+                    image=result.image, container=result.container, host_port=result.host_port,
+                )
+            self._sync()
 
     async def adocument(self) -> None:
         """Tech-writer pass in the background: write the GENERATED project's
@@ -2487,6 +2733,7 @@ class Pipeline:
             raise ValueError("la pipeline est active : attends la fin avant de générer la doc")
         if self._doc_task and not self._doc_task.done():
             raise ValueError("une génération de doc est déjà en cours")
+        self._stop_requested = False  # explicit manual action; budget still applies
         self._doc_task = asyncio.create_task(self._adocument_task())
 
     async def _adocument_task(self) -> None:
@@ -3465,9 +3712,8 @@ class Pipeline:
                 self.state.phase = PipelinePhase.STOPPED
                 self._sync()
                 return
-            await self._aselect_language()
-            # ST-4: pick the project's work streams (gated; no-op when off).
-            await self._aselect_streams()
+            if not await self._aselect_stack():
+                raise DeliveryBlocked()
             # Scaffold the skeleton ONLY after the backend language is chosen —
             # scaffold() dispatches on it, so doing this earlier (when the
             # language is still the Python default) left a stray Python skeleton
@@ -3477,6 +3723,8 @@ class Pipeline:
                 streams_enabled=self._setting("streams_enabled"),
                 ui_tests_enabled=self._setting("ui_tests_enabled"),
             )
+            if not await self._abootstrap_phase():
+                raise DeliveryBlocked()
             await self._apropose_components()
 
             while not self._stop_requested:
@@ -3858,6 +4106,9 @@ class Pipeline:
             )
             plan_text = await self._arefine_plan(result.text, pkg)
             plan = extract_json(plan_text)
+        if not any(epic.get("stories") for epic in plan.get("epics", []) if isinstance(epic, dict)):
+            self._block_delivery("Le plan ne contient aucune story exécutable ; aucune livraison créée.", source="plan")
+            raise DeliveryBlocked()
         # The PO of a later iteration typically numbers from "US-1"/"EPIC-1"
         # again: deduplicate against previous iterations (else state.story()
         # becomes ambiguous and feature files get overwritten), remapping the
@@ -4109,6 +4360,7 @@ class Pipeline:
             res = await self._tracked.arun(
                 prompts.dev_revise(
                     story, pkg, workspace.feature_rel_path(story), critique,
+                    state=self.state,
                     architecture=self.state.architecture,
                     guidance="\n".join(self.state.build_guidance),
                     lessons="\n".join(self._effective_lessons()),
@@ -4197,12 +4449,10 @@ class Pipeline:
 
         def _run():
             try:
-                subprocess.run(
-                    cmd, cwd=str(ws),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    env=env, text=True, encoding="utf-8", errors="replace",
-                    timeout=settings.agent_timeout_s,
-                )
+                report.unlink(missing_ok=True)
+                proc = self._run_suite_process(cmd, ws, env)
+                if proc.returncode != 0:
+                    return None
             except (OSError, subprocess.TimeoutExpired):
                 return None
             try:
@@ -4280,7 +4530,7 @@ class Pipeline:
 
     async def _agit_ensure_repo(self, ws) -> bool:
         """Make sure ``ws`` is its OWN git work tree, initializing it (with an
-        Autospec identity) if needed. Returns False only if ``git init`` fails.
+        Autospec identity) if needed. Refuse redirected or invalid repositories.
 
         We must check that ``ws`` itself is a repo — NOT merely
         ``--is-inside-work-tree``, which is also true when the workspace is
@@ -4288,13 +4538,20 @@ class Pipeline:
         lives inside the Autospec checkout). In that case ``git init`` would be
         skipped and every ``git add -A`` / ``commit`` here would pollute the
         parent repository with the user's working changes and our scaffold
-        files — committed under the user's global git identity. Anchoring on
-        ``ws/.git`` guarantees an isolated repo (and respects a brownfield repo
-        that already carries its own ``.git``)."""
+        files — committed under the user's global git identity. Validate both
+        the local metadata and effective root before changing configuration or
+        bookkeeping (also for an existing brownfield repo)."""
+        ws = Path(ws)
+        if self._git_environment_redirected():
+            return False
         if (ws / ".git").exists():
+            if not await self._ahas_workspace_git(ws):
+                return False
             await self._aignore_bookkeeping(ws)
             return True
         if (await self._agit(ws, "init"))[0] != 0:
+            return False
+        if not await self._ahas_workspace_git(ws):
             return False
         await self._agit(ws, "config", "user.email", "autospec@local")
         await self._agit(ws, "config", "user.name", "Autospec")
@@ -4458,9 +4715,63 @@ class Pipeline:
             ws, "commit", "-m", f"iteration {self.state.iteration} snapshot", "--allow-empty"
         )
 
+    @staticmethod
+    def _git_environment_redirected() -> bool:
+        return any(os.environ.get(key) for key in (
+            "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        ))
+
+    async def _ahas_workspace_git(self, ws: Path) -> bool:
+        """Read-only boundary check: never discover an enclosing repository.
+
+        A local .git file is valid for a linked worktree; checking only whether
+        git considers cwd inside a worktree would also accept an unrelated
+        parent repository. Refuse inherited repository/index overrides too,
+        since those can redirect reads or rollback writes outside this project.
+        """
+        marker = ws / ".git"
+        if not marker.exists():
+            return False
+        if self._git_environment_redirected():
+            return False
+        code, root = await self._agit(ws, "rev-parse", "--show-toplevel")
+        if code != 0 or not root.strip():
+            return False
+        try:
+            if Path(root.strip()).resolve() != ws.resolve():
+                return False
+            if marker.is_dir():
+                # A symlink/junction to a parent's .git is not an owned repo.
+                return marker.resolve().is_relative_to(ws.resolve())
+            # Git also accepts an arbitrary .git file pointing at a parent's
+            # metadata and may report cwd as its root. A genuine linked worktree
+            # has a backlink; a submodule has an explicit local core.worktree.
+            code, metadata = await self._agit(ws, "rev-parse", "--absolute-git-dir")
+            if code != 0 or not metadata.strip():
+                return False
+            metadata_dir = Path(metadata.strip()).resolve()
+            backlink = metadata_dir / "gitdir"
+            if backlink.is_file():
+                target = Path(backlink.read_text(encoding="utf-8").strip())
+                if not target.is_absolute():
+                    target = metadata_dir / target
+                return target.resolve() == marker.resolve()
+            code, worktree = await self._agit(ws, "config", "--local", "--get", "core.worktree")
+            if code != 0 or not worktree.strip():
+                return False
+            target = Path(worktree.strip())
+            if not target.is_absolute():
+                target = metadata_dir / target
+            return target.resolve() == ws.resolve()
+        except (OSError, ValueError):
+            return False
+
     async def aiterations(self) -> list[int]:
         """R2: iteration numbers that have a workspace snapshot."""
         ws = workspace_dir(self.state.id)
+        if not await self._ahas_workspace_git(ws):
+            return []
         code, out = await self._agit(ws, "log", "--format=%s")
         if code != 0:
             return []
@@ -4481,6 +4792,8 @@ class Pipeline:
         ):
             raise ValueError("la pipeline est active : impossible de revenir en arrière")
         ws = workspace_dir(self.state.id)
+        if not await self._ahas_workspace_git(ws):
+            raise ValueError("aucun dépôt Git propre à ce workspace : retour au snapshot refusé")
         code, out = await self._agit(
             ws, "log", "-1", "--format=%H", f"--grep=iteration {iteration} snapshot"
         )
@@ -4503,13 +4816,17 @@ class Pipeline:
         when no such commit exists (git missing, or story never finished)."""
         self.state.story(sid)  # KeyError (-> 404) if absent
         ws = workspace_dir(self.state.id)
+        if not await self._ahas_workspace_git(ws):
+            return {"available": False, "diff": ""}
         code, out = await self._agit(
             ws, "log", "-1", "--format=%H", f"--grep=story {sid} done"
         )
         commit = out.strip()
         if code != 0 or not commit:
             return {"available": False, "diff": ""}
-        _, diff = await self._agit(ws, "show", commit)
+        code, diff = await self._agit(ws, "show", commit)
+        if code != 0:
+            return {"available": False, "diff": ""}
         return {"available": True, "diff": diff[:200_000]}
 
     # ------------------------------------------------------------ BUILD (Dev)
@@ -4686,6 +5003,7 @@ class Pipeline:
                     dev_prompt = prompts.dev_story(
                         story, pkg, workspace.feature_rel_path(story), self.state.architecture,
                         "\n".join(self.state.build_guidance),
+                        state=self.state,
                         ui_tests=self._ui_mode(story),
                         lessons="\n".join(self._effective_lessons()),
                         backend_language=self.state.backend_language.value,
@@ -5324,6 +5642,8 @@ class Pipeline:
         ``WEB_WIRING_TASK`` (ON). OFF restores the historic behaviour."""
         if not self._setting("web_wiring_task"):
             return
+        if self.state.bootstrap_status == "ready":
+            return  # entry point + API already executed by deterministic bootstrap
         if not self._expects_web_app():
             return
         lang = getattr(self.state.backend_language, "value", self.state.backend_language)
@@ -5582,7 +5902,7 @@ class Pipeline:
             )
             if uncovered:
                 msg = f"Traçabilité : {len(uncovered)} critère(s) sans test nommé ({', '.join(uncovered[:6])})."
-                delivery_state.append_issue(self.state, msg)
+                delivery_state.append_warning(self.state, msg)
                 self._log("traceability", "⚠️ " + msg)
             if orphans:
                 self._log(
@@ -5863,6 +6183,7 @@ class Pipeline:
                     subject, pkg, reason=getattr(target, "last_error", "") or "",
                     is_frontend=is_frontend, architecture=self.state.architecture,
                     available_skills=self._skills_catalog("dev"),
+                    state=self.state,
                 ),
                 system_prompt=persona("architect"),
             )
@@ -6890,6 +7211,7 @@ class Pipeline:
         file_scope = prompts.file_scope_block(
             list(getattr(target, "files_hint", []) or []),
             stream_zone=stream.file_root or "",
+            state=self.state,
         )
         # Retry informé : l'échec de la tentative précédente entre dans le
         # prompt (sinon le retry rejoue la même loterie à l'aveugle).
@@ -6923,6 +7245,7 @@ class Pipeline:
             dev_prompt = prompts.dev_story(
                 subject, pkg, workspace.feature_rel_path(subject), self.state.architecture,
                 "\n".join(self.state.build_guidance),
+                state=self.state,
                 ui_tests=self._ui_mode(subject),
                 lessons="\n".join(self._effective_lessons()),
                 backend_language=self.state.backend_language.value,
@@ -8044,6 +8367,13 @@ class Pipeline:
             raise ValueError("la pipeline est déjà active")
         if self._task and not self._task.done():
             raise ValueError("une tâche est déjà en cours")
+        if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
+            raise ValueError("un déploiement Docker est en cours")
+        if self.state.bootstrap_status == "failed" and not self.state.stories:
+            # Initialization can fail before the PO has created a single story.
+            # Resume must replay the preflight, not reject an empty backlog.
+            self.start()
+            return
         # P0c: no worker is active here (guards above), so any IN_PROGRESS/GREEN/RED
         # story or task is a crash/restart ORPHAN whose code is gone with its
         # worktree — reset it to TODO FIRST, otherwise an IN_PROGRESS orphan keeps
@@ -8198,6 +8528,10 @@ class Pipeline:
         s.build_guidance = []
         s.chat = []
         s.architecture = ""
+        s.bootstrap_status = ""
+        s.bootstrap_detail = ""
+        s.bootstrap_fingerprint = ""
+        s.bootstrap_verified_once = False
         s.plan_quality = -1
         s.language_complexity = -1
         s.language_criticality = -1
@@ -8242,6 +8576,8 @@ class Pipeline:
         (retry-failed / resume-build), not just the current one."""
         self._chat(ChatRole.SYSTEM, "▶ Reprise du build…")
         try:
+            if self.state.technical_stack and not await self._abootstrap_phase():
+                return
             await self._abuild_phase(all_iterations=all_iterations)
             if not self._delivery_blocked:
                 # Same gates as a full lifecycle run — an iteration finished
@@ -8402,13 +8738,17 @@ class Pipeline:
         task is unknown."""
         self.state.task(task_id)  # KeyError (-> 404) if absent
         ws = workspace_dir(self.state.id)
+        if not await self._ahas_workspace_git(ws):
+            return {"available": False, "diff": ""}
         code, out = await self._agit(
             ws, "log", "-1", "--format=%H", f"--grep=story {task_id} done"
         )
         commit = out.strip()
         if code != 0 or not commit:
             return {"available": False, "diff": ""}
-        _, diff = await self._agit(ws, "show", commit)
+        code, diff = await self._agit(ws, "show", commit)
+        if code != 0:
+            return {"available": False, "diff": ""}
         return {"available": True, "diff": diff[:200_000]}
 
     def _skills_catalog(self, role: str) -> str:
@@ -8481,6 +8821,7 @@ class Pipeline:
                     story, pkg, self.state.architecture,
                     available_skills=self._skills_catalog("dev"),
                     existing_plan=self._existing_plan_block(story),
+                    state=self.state,
                 ),
                 system_prompt=persona("architect"),
             )
@@ -8658,18 +8999,12 @@ class Pipeline:
         if settings.fake_agents:
             return True, "mode démo : tests UI court-circuités"
         ws = workspace_dir(self.state.id)
-        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        env = _minimal_env()
 
         def _run() -> tuple[bool, str]:
-            proc = subprocess.run(
+            proc = self._run_suite_process(
                 [settings.uv_cmd, "run", "pytest", "-q", "-m", "ui"],
-                cwd=str(ws),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                ws, env,
             )
             return proc.returncode == 0, proc.stdout
 
@@ -8774,6 +9109,27 @@ class Pipeline:
         )
         return any(s in low for s in signatures)
 
+    def _run_suite_process(self, cmd: list[str], cwd: Path, env: dict) -> subprocess.CompletedProcess:
+        """Generated tests/build scripts have the same bounds as entry points.
+
+        In particular, killing only npm/uv on Windows leaves its child holding
+        stdout open forever. The shared capped launcher kills the whole tree.
+        """
+        run = _run_capped_process(
+            self._resolve_cmd(cmd), cwd=cwd, env=env,
+            timeout=settings.test_suite_timeout_s, output_cap=256_000,
+            kill_tree=self._kill_tree, name="test-suite",
+        )
+        output = run.output
+        if run.launch_error:
+            output += f"\nLancement impossible : {run.launch_error}"
+        if run.timed_out:
+            output += f"\nSuite interrompue après {settings.test_suite_timeout_s:g}s (timeout)."
+        if run.pipe_leaked:
+            output += "\nProcessus enfant détaché : sortie incomplète, suite non validée."
+        failed = run.launch_error or run.timed_out or run.pipe_leaked
+        return subprocess.CompletedProcess(cmd, 1 if failed else (run.returncode or 0), stdout=output)
+
     async def _arun_pytest(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the test suite for the project's backend language (L2g).
 
@@ -8789,13 +9145,15 @@ class Pipeline:
         if settings.fake_agents:
             # Demo / e2e mode: no real code is written, trust the scripted dev.
             return True, "mode démo : vérification des tests court-circuitée", {}
+        if self.state.technical_stack.get("kind") == "frontend":
+            return True, "frontend seul : pas de suite backend", {}
         self._count_suite_run()  # P3: one REAL suite execution, whoever asked for it
         # Run in a worker thread via subprocess: asyncio's subprocess support is
         # unavailable on Windows' SelectorEventLoop (used by uvicorn), so we stay
         # off the event loop entirely for child processes.
         lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id) if ws is None else ws
-        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        env = _minimal_env()
         shared = self._is_shared_ws(ws)
 
         def _run() -> tuple[bool, str, dict[str, str]]:
@@ -8807,16 +9165,7 @@ class Pipeline:
                 os.close(fd)
             try:
                 cmd = self._maybe_sandbox(toolchain.test_command(lang, report_path), ws)
-                proc = subprocess.run(
-                    cmd,
-                    cwd=str(ws),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    env=env,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                )
+                proc = self._run_suite_process(cmd, ws, env)
                 results = toolchain.parse_results(lang, proc.stdout, report_path)
                 return proc.returncode == 0, proc.stdout, results
             finally:
@@ -9267,6 +9616,8 @@ class Pipeline:
             return True
         lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id)
+        if self.state.technical_stack and self.state.bootstrap_status == "ready":
+            return await self._asmoke_bootstrapped(ws)
         if lang != "python" or not (ws / "main.py").exists() or not (ws / "pyproject.toml").exists():
             # Finding 6 : un backend web NON-python saute les deux gates de boot.
             # Ce n'est pas un skip silencieux : on AVERTIT que la vérification à
@@ -9323,6 +9674,37 @@ class Pipeline:
         self._notify("error", "Smoke run échoué", msg[:200])
         return False
 
+    async def _asmoke_bootstrapped(self, ws: Path) -> bool:
+        """Exercise the actual entry points for every deterministic template."""
+        from . import bootstrap
+
+        if self._stop_requested:
+            return False
+        self._bootstrap_cancel.clear()
+        self.monitor.phase("smoke")
+
+        async def verify() -> tuple[bool, str]:
+            result = await bootstrap.verify_runtime(
+                self.state, ws, timeout_s=settings.bootstrap_timeout_s, cancel=self._bootstrap_cancel,
+            )
+            detail = ("__INFRA__ " if result.infra else "") + result.detail
+            return result.ok, detail
+
+        ok, detail = await verify()
+        if self._stop_requested:
+            return False
+        if not ok and not detail.startswith("__INFRA__"):
+            ok, detail = await self._arepair_delivery("smoke", detail, verify)
+        self.monitor.event("smoke", ok=ok, detail=detail[-600:])
+        if ok:
+            self._log("smoke", f"✅ Application reconstruite et démarrée : {detail}")
+            return True
+        if detail.startswith("__INFRA__"):
+            self._apark_infra("smoke", detail)
+        else:
+            self._block_delivery(f"Smoke run échoué : {detail}", source="smoke")
+        return False
+
     async def _aruntime_acceptance_phase(self) -> bool:
         """Optional browser/runtime acceptance gate for web/fullstack products."""
         ws = workspace_dir(self.state.id)
@@ -9333,7 +9715,8 @@ class Pipeline:
         runnable, _ = runtime_acceptance.should_run(
             self.state, ws, enabled=self._setting("runtime_acceptance_enabled")
         )
-        if runnable:
+        has_backend = self.state.technical_stack.get("kind") != "frontend"
+        if runnable and has_backend:
             pre_port = self._resolve_web_port(ws)
             free, port_detail = await self._aensure_own_port_free("runtime", pre_port)
             if not free:
@@ -9354,7 +9737,7 @@ class Pipeline:
         # libre — le gate ne doit jamais valider un serveur périmé/tiers. Si un
         # process EXTERNE tient le port : condition d'infra (non réparable).
         port = self._resolve_web_port(ws)
-        free, port_detail = await self._aensure_own_port_free("runtime", port)
+        free, port_detail = await self._aensure_own_port_free("runtime", port) if has_backend else (True, "")
         if not free:
             self._apark_infra("runtime", port_detail)
             return False
@@ -9367,7 +9750,10 @@ class Pipeline:
         if not ok:
 
             async def _averify() -> tuple[bool, str]:
-                await self._aensure_own_port_free("runtime", port)
+                if has_backend:
+                    free, port_detail = await self._aensure_own_port_free("runtime", port)
+                    if not free:
+                        return False, "__INFRA__ " + port_detail
                 res = await runtime_acceptance.arun_runtime_acceptance(
                     self.state,
                     ws,
@@ -9397,7 +9783,23 @@ class Pipeline:
         self._notify("error", "Runtime acceptance échoué", msg[:200])
         return False
 
-    async def _adocker_delivery_phase(self) -> bool:
+    async def _adocker_delivery_phase(self, *, force: bool = False) -> bool:
+        async with self._deployment_lock:
+            self._docker_cancel.clear()
+            try:
+                return await self._adocker_delivery_run(force=force)
+            except asyncio.CancelledError:
+                self._docker_cancel.set()
+                # asyncio cancellation does not stop a worker thread. Wait for
+                # its rollback/cleanup before disposal can delete the workspace.
+                if self._docker_worker:
+                    await asyncio.shield(self._docker_worker)
+                delivery_state.set_deploy(self.state, status="failed", detail="Déploiement interrompu.")
+                raise
+            finally:
+                docker_deploy.release_host_port(self.state.id)
+
+    async def _adocker_delivery_run(self, *, force: bool = False) -> bool:
         """Docker delivery gate (D1): build the DoD-accepted delivery into an
         image, deploy it on the shared ``autospec-net`` network and network-verify
         it (health + cross-container reachability), repairing in a fix-until-green
@@ -9405,7 +9807,7 @@ class Pipeline:
         iteration in needs_attention without burning any repair attempt. No-op
         when the gate is off / demo mode / non-web product."""
         ws = workspace_dir(self.state.id)
-        enabled = bool(self._setting("docker_delivery"))
+        enabled = force or bool(self._setting("docker_delivery"))
         run, reason, kind = docker_deploy.should_run(self.state, ws, enabled=enabled)
         if not run:
             # A non-web product cannot be containerised: when the gate is enabled
@@ -9427,7 +9829,8 @@ class Pipeline:
         # Regenerate the managed Dockerfile for the resolved kind (container port
         # is 80 for a frontend-only nginx image).
         await asyncio.to_thread(
-            deploy.write_deploy_artifacts, ws, port=port, kind=kind
+            deploy.write_deploy_artifacts, ws, port=port, kind=kind,
+            **self._deploy_artifact_options(ws),
         )
 
         if self._stop_requested:
@@ -9436,11 +9839,19 @@ class Pipeline:
         # --- infra pre-check : Docker daemon reachable ? ----------------------
         avail, out = await asyncio.to_thread(docker_deploy.docker_available)
         if not avail:
+            delivery_state.set_deploy(self.state, status="failed", detail=f"docker indisponible — {out}")
             self._apark_infra("docker", f"docker indisponible — {out}")
             return False
 
         network = self._setting("docker_network")
-        host_port = await asyncio.to_thread(docker_deploy.allocate_host_port, self.state)
+        try:
+            host_port = 0 if kind in ("cli", "library") else await asyncio.to_thread(
+                docker_deploy.allocate_host_port, self.state,
+            )
+        except (RuntimeError, OSError) as exc:
+            delivery_state.set_deploy(self.state, status="failed", detail=str(exc))
+            self._apark_infra("docker", str(exc))
+            return False
         delivery_state.set_deploy(self.state, status="building", host_port=host_port)
         self._sync()
 
@@ -9478,11 +9889,20 @@ class Pipeline:
                 kind=kind,
                 on_line=_on_line,
                 on_stage=_on_stage,
+                cancel_event=self._docker_cancel,
             )
 
-        result = await asyncio.to_thread(_run_deploy)
+        async def _execute():
+            self._docker_worker = asyncio.create_task(asyncio.to_thread(_run_deploy))
+            return await asyncio.shield(self._docker_worker)
+
+        result = await _execute()
         self.monitor.event("docker", ok=result.ok, infra=result.infra, detail=result.detail[:300])
 
+        if result.cancelled or self._stop_requested:
+            delivery_state.set_deploy(self.state, status="failed", detail="Déploiement interrompu.")
+            self._sync()
+            return False
         if result.infra:
             delivery_state.set_deploy(
                 self.state, status="failed", image=result.image,
@@ -9498,8 +9918,11 @@ class Pipeline:
                 return False
 
             async def _averify() -> tuple[bool, str]:
-                res = await asyncio.to_thread(_run_deploy)
-                return res.ok, res.detail
+                nonlocal result
+                result = await _execute()
+                if result.infra or result.cancelled:
+                    return False, f"__INFRA__{result.detail}"
+                return result.ok, result.detail
 
             dockerfile_text = ""
             try:
@@ -9515,11 +9938,20 @@ class Pipeline:
             ok, detail = await self._arepair_delivery(
                 "docker", report, _averify, prompt_builder=prompts.dev_fix_deploy
             )
+            if result.cancelled or self._stop_requested:
+                delivery_state.set_deploy(self.state, status="failed", detail="Déploiement interrompu.")
+                return False
+            if not ok and detail.startswith("__INFRA__"):
+                delivery_state.set_deploy(self.state, status="failed", detail=detail[9:])
+                self._apark_infra("docker", detail[9:])
+                return False
 
         if ok:
+            if result.packaged:
+                delivery_state.clear_deploy(self.state)
             delivery_state.set_deploy(
                 self.state,
-                status="deployed",
+                status="packaged" if result.packaged else "deployed",
                 image=result.image,
                 container=result.container,
                 host_port=host_port,
@@ -9528,6 +9960,7 @@ class Pipeline:
             self._log("docker", f"✅ Livraison Docker OK — {detail}")
             self._chat(
                 ChatRole.SYSTEM,
+                f"🐳 Image {result.image} construite et vérifiée." if result.packaged else
                 f"🐳 déployé sur http://localhost:{host_port} (réseau {network}).",
             )
             # Foreign-pair reachability warnings are surfaced but never block.
@@ -9629,7 +10062,7 @@ class Pipeline:
             else " (aucun framework web déclaré dans pyproject.toml — l'API n'a "
             "probablement jamais été câblée)"
         )
-        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        env = _minimal_env()
         cmd = self._resolve_cmd([settings.uv_cmd, "run", "python", "main.py"])
         timeout = settings.smoke_run_timeout_s
 
@@ -9837,12 +10270,7 @@ class Pipeline:
                 args += ["--cache", str(cache), "--prefer-offline"]
 
         def _run():
-            env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-            return subprocess.run(
-                self._resolve_cmd(args), cwd=str(root), stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, env=env, text=True,
-                encoding="utf-8", errors="replace", timeout=900,
-            )
+            return self._run_suite_process(args, root, _minimal_env())
 
         try:
             proc = await asyncio.to_thread(_run)
@@ -9918,7 +10346,7 @@ class Pipeline:
         # Safety net: the verify step also needs node_modules (idempotent — the
         # dev step usually installed/linked it already).
         await self._aensure_frontend_node_modules(root)
-        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        env = _minimal_env()
         shared = ws is None
 
         def _run() -> tuple[bool, str, dict[str, str]]:
@@ -9931,11 +10359,7 @@ class Pipeline:
                     toolchain.frontend_test_command(report_path), root
                 ))
                 try:
-                    test_proc = subprocess.run(
-                        test_cmd, cwd=str(root),
-                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                        env=env, text=True, encoding="utf-8", errors="replace",
-                    )
+                    test_proc = self._run_suite_process(test_cmd, root, env)
                 except OSError as exc:
                     # A missing toolchain (no node/npm) must fail THIS story, not
                     # crash the whole pipeline with an unhandled OSError.
@@ -9961,11 +10385,7 @@ class Pipeline:
                     self._maybe_sandbox(toolchain.frontend_build_command(), root)
                 )
                 try:
-                    build_proc = subprocess.run(
-                        build_cmd, cwd=str(root),
-                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                        env=env, text=True, encoding="utf-8", errors="replace",
-                    )
+                    build_proc = self._run_suite_process(build_cmd, root, env)
                 except OSError as exc:
                     return False, output + f"\n--- build indisponible : {exc}", results
                 if build_proc.returncode != 0:
@@ -10140,6 +10560,17 @@ class Pipeline:
         # back onto the event loop (asyncio subprocesses are unsupported on the
         # Windows SelectorEventLoop that uvicorn runs).
         loop = asyncio.get_running_loop()
+        if self.state.technical_stack.get("kind") == "frontend":
+            stream = next(iter(workspace.frontend_streams(self.state)), None)
+            if stream is None:
+                self.state.running = False
+                self._sync()
+                raise ValueError("Aucun frontend déclaré dans le socle technique.")
+            root = workspace.stream_root(self.state, stream)
+            self._stream_task = asyncio.create_task(asyncio.to_thread(
+                self._stream_preview_output, root, env, loop, f"run:{stream.id}", True,
+            ))
+            return
         self._stream_task = asyncio.create_task(
             asyncio.to_thread(self._stream_run_output, ws, env, loop, run_args)
         )
@@ -10167,7 +10598,7 @@ class Pipeline:
             )
 
     def _stream_preview_output(
-        self, root, env, loop: asyncio.AbstractEventLoop, source: str
+        self, root, env, loop: asyncio.AbstractEventLoop, source: str, primary: bool = False
     ) -> None:
         """Run `vite preview` in ``root`` and stream its output under ``source``
         (ST-8). Mirrors ``_stream_run_output`` but for a frontend stream."""
@@ -10180,13 +10611,20 @@ class Pipeline:
             )
         except OSError as exc:
             loop.call_soon_threadsafe(self._log, source, f"■ Échec du lancement : {exc}")
+            if primary:
+                loop.call_soon_threadsafe(self._on_run_finished, -1, str(exc))
             return
-        self._frontend_procs.append(proc)
+        if primary:
+            self._run_proc = proc
+        else:
+            self._frontend_procs.append(proc)
         assert proc.stdout
         for line in proc.stdout:
             loop.call_soon_threadsafe(self._log, source, line.rstrip())
         code = proc.wait()
         loop.call_soon_threadsafe(self._log, source, f"■ Preview frontend terminé (code {code}).")
+        if primary:
+            loop.call_soon_threadsafe(self._on_run_finished, code)
 
     def _stream_run_output(
         self, ws, env, loop: asyncio.AbstractEventLoop, run_args: list[str] | None = None

@@ -1,0 +1,238 @@
+VIEWPOINT shot probe
+graphics device: Direct3D12
+screen: 1280x720
+
+--- render ---
+shader URP/Lit    : Universal Render Pipeline/Lit
+shader URP/Unlit  : Universal Render Pipeline/Unlit
+shader GradientSky: Viewpoint/GradientSky
+shader Surface    : Viewpoint/Surface
+shader Backdrop   : Viewpoint/Backdrop
+Materials.Solid(platform): Solid_platform shader=Viewpoint/Surface
+platform surface: _Style=0 _Seed=0 _BaseMap=Plaster001_Color 1024x1024 _NormalMap=Plaster001_Normal 1024x1024
+Materials.Solid(battery,0.8): Solid_battery_e0.80 shader=Viewpoint/Surface
+RenderSettings.skybox: Viewpoint/GradientSky
+ambientMode: Trilight fog: True
+cube mesh: Cube
+--- font ---
+Fonts.Default: Manrope
+  dynamic: True material: Font Material
+builtin LegacyRuntime.ttf: LegacyRuntime
+OS fonts installed: 459
+font resource Fonts/Manrope: Manrope
+font in use: Manrope builtin=False
+shot 01_title: mean rgb 84,89,97
+--- menu labels ---
+Text under Menu: 30
+  [Title] font=Manrope size=72 chars=9 visible=True alpha=1,00 text="VIEWPOINT"
+  [Subtitle] font=Manrope size=22 chars=295 visible=True alpha=0,85 text="Posez des photos. Elles deviennent le monde.\n\nZQSD/WASD bo..."
+  [Hint] font=Manrope size=24 chars=64 visible=True alpha=1,00 text="Entree : commencer au niveau 1   ou cliquez un niveau ci-des..."
+  [LevelsLabel] font=Manrope size=18 chars=36 visible=True alpha=0,70 text="Choisir un niveau (18 / 25 atteints)"
+  [Label] font=Manrope size=14 chars=15 visible=True alpha=1,00 text="1. Premiers pas"
+  [Label] font=Manrope size=14 chars=17 visible=True alpha=1,00 text="2. Copie conforme"
+  [Label] font=Manrope size=14 chars=24 visible=True alpha=1,00 text="3. Prendre de la hauteur"
+  [Label] font=Manrope size=14 chars=13 visible=True alpha=1,00 text="4. Effacement"
+  [Label] font=Manrope size=14 chars=12 visible=True alpha=1,00 text="5. Belvedere"
+  [Label] font=Manrope size=14 chars=10 visible=True alpha=1,00 text="6. La cage"
+  [Label] font=Manrope size=14 chars=8 visible=True alpha=1,00 text="7. Pivot"
+  [Label] font=Manrope size=14 chars=13 visible=True alpha=1,00 text="8. Le coffret"
+  [Label] font=Manrope size=14 chars=11 visible=True alpha=1,00 text="9. L'enclos"
+  [Label] font=Manrope size=14 chars=12 visible=True alpha=1,00 text="10. Plongeon"
+  [Label] font=Manrope size=14 chars=16 visible=True alpha=1,00 text="11. Sous le pont"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="12. La vitrine"
+  [Label] font=Manrope size=14 chars=29 visible=True alpha=1,00 text="13. L'escalier sur l'escalier"
+  [Label] font=Manrope size=14 chars=23 visible=True alpha=1,00 text="14. La grande traversee"
+  [Label] font=Manrope size=14 chars=12 visible=True alpha=1,00 text="15. L'examen"
+  [Label] font=Manrope size=14 chars=13 visible=True alpha=1,00 text="16. Le cliche"
+  [Label] font=Manrope size=14 chars=20 visible=True alpha=1,00 text="17. Copie de travail"
+  [Label] font=Manrope size=14 chars=17 visible=True alpha=1,00 text="18. L'echafaudage"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="19. Verrouille"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="20. Verrouille"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="21. Verrouille"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="22. Verrouille"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="23. Verrouille"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="24. Verrouille"
+  [Label] font=Manrope size=14 chars=14 visible=True alpha=1,00 text="25. Verrouille"
+  [Tooltip] font=Manrope size=18 chars=45 visible=True alpha=0,70 text="Ce qui se pose retombe. Faites-en une marche."
+level grid: buttons=25 unlocked=18 thumbnails=1 text-only=24
+level grid cell: Level1 [Image:Level1 background 28x28] [RawImage:Thumb 160x90] [Image:Lock 32x40] [Text:Label] [Image:Focus 28x28]
+
+--- level 1 ---
+groups: platform=2 carvable=0 photographable=5 photo_item=1 battery=1 camera_item=0 teleporter=1
+renderers: 82 enabled=81 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -248.39, 2.26) size (68.83, 503.24, 78.83)
+markers: slabs=1 hidden=1 decals=3 halos=2
+  photo passerelle at (1.50, 0.90, -4.00) renderers=3 drawn=3 extent=1,11 offscreen (viewport 1,33,-0,22,0,7)
+  battery at (0.00, 0.00, 11.50) renderers=4 drawn=4 extent=0,91 ON SCREEN at 0,56,0,40
+camera pos (0.00, 1.65, -5.00) forward (-0.15, 0.06, 0.99) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -5.00)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: nothing within 100 m
+ray down   : Platform at 1,65 m
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=0.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=0.00 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 02_level1: mean rgb 162,176,185
+shot 03_level1_looking_down: mean rgb 166,168,171
+
+--- level 4 ---
+groups: platform=1 carvable=2 photographable=5 photo_item=1 battery=2 camera_item=0 teleporter=1
+renderers: 39 enabled=38 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.80, 2.26) size (68.83, 22.60, 78.83)
+markers: slabs=1 hidden=1 decals=4 halos=3
+  photo porte at (-3.00, 0.90, -5.00) renderers=3 drawn=3 extent=1,11 ON SCREEN at 0,56,0,40
+  battery at (3.00, 0.00, -6.00) renderers=4 drawn=4 extent=0,97 offscreen (viewport 1,12,0,15,3,4)
+  battery at (0.00, 0.00, 9.00) renderers=4 drawn=4 extent=0,90 ON SCREEN at 0,73,0,41
+camera pos (0.00, 1.65, -12.00) forward (-0.53, 0.05, 0.85) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -12.00)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: nothing within 100 m
+ray down   : Platform at 1,65 m
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=0.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=0.00 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 04_level4: mean rgb 161,173,185
+
+--- level 6 ---
+groups: platform=1 carvable=0 photographable=3 photo_item=2 battery=2 camera_item=0 teleporter=1
+renderers: 73 enabled=72 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.94, 2.26) size (68.83, 22.33, 78.83)
+markers: slabs=1 hidden=1 decals=5 halos=4
+  photo porte at (0.00, 0.90, -4.00) renderers=3 drawn=3 extent=1,11 ON SCREEN at 0,50,0,17
+  photo caisse at (-2.00, 0.90, -4.00) renderers=3 drawn=3 extent=1,11 ON SCREEN at 0,02,0,18
+  battery at (3.70, 0.00, 4.00) renderers=4 drawn=4 extent=0,93 ON SCREEN at 0,64,0,39
+  battery at (4.60, 0.00, 3.50) renderers=4 drawn=4 extent=0,95 ON SCREEN at 0,69,0,38
+camera pos (0.00, 1.65, -5.50) forward (0.00, 0.00, 1.00) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -5.50)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: nothing within 100 m
+ray down   : Platform at 1,65 m
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=0.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=0.00 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 04_level6: mean rgb 161,173,181
+
+--- level 16 ---
+groups: platform=2 carvable=1 photographable=5 photo_item=0 battery=2 camera_item=1 teleporter=1
+renderers: 81 enabled=80 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.94, 2.26) size (68.83, 22.33, 78.83)
+markers: slabs=1 hidden=1 decals=4 halos=3
+  battery at (3.00, 0.00, -3.00) renderers=4 drawn=4 extent=1,00 offscreen (viewport 1,60,-0,58,1,0)
+  battery at (0.80, 0.00, 7.00) renderers=4 drawn=4 extent=1,01 ON SCREEN at 0,53,0,40
+camera pos (0.00, 1.65, -4.00) forward (0.00, 0.00, 1.00) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -4.00)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: Cage at 9,00 m
+ray down   : Platform at 1,65 m
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=0.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=0.00 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 04_level16: mean rgb 161,174,183
+
+--- feedback moments ---
+camera pickup: taken, films=2
+viewfinder: True films=2
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=0.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=0.00 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 05_viewfinder: mean rgb 139,150,158
+capture: True held="cliche_1" raised=True roll=0 films=1
+held picture: snap_cliche_1 768x768
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=0.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=1.00 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 06_raised_photo: mean rgb 161,174,182
+rewind before: samples=46 events=1 history=2.25 s
+rewind mid-scrub: rewinding=True samples=46 history=1.62 s held=""
+--- feedback ---
+particles: systems=2 playing=2 emitting=2 alive=44
+volumes: 6
+  volume[SnapVignetteVeto] priority=5.0 global=False weight=1.00 enabled=True profile=SnapVignetteVeto overrides=1
+  volume[DioramaBlur] priority=10.0 global=True weight=1.00 enabled=False profile=DioramaBlur overrides=1
+  volume[RewindTreatment] priority=10.0 global=True weight=1.00 enabled=True profile=RewindTreatment overrides=4
+  volume[FallBlur] priority=10.0 global=True weight=0.00 enabled=True profile=FallBlur overrides=1
+  volume[DepartBloom] priority=10.0 global=True weight=0.00 enabled=True profile=DepartBloom overrides=2
+  volume[PhotoFocus] priority=10.0 global=True weight=0.74 enabled=True profile=PhotoFocus overrides=1
+post component: PostFx on PostFx enabled=True active=True
+post on camera: renderPostProcessing=True antialiasing=SubpixelMorphologicalAntiAliasing quality=High
+camera fov: 75.00 (base 75.00)
+placer anchor: parent=Camera local pos (0.000, 0.000, 0.000) offset 0.0000 m roll=0 local rot (0.000, 0.000, 0.000, 1.000) drift 0.000 deg scale (1.000, 1.000, 1.000)
+shot 07_rewind_mid_scrub: mean rgb 157,167,184
+rewind after: rewinding=False control=True
+
+--- interface moments ---
+menu: title shown, mode=Title
+level grid: buttons=25 unlocked=18 thumbnails=18 text-only=7
+level grid cell: Level1 [Image:Level1 background 28x28] [RawImage:Thumb 160x90] [Image:Lock 32x40] [Text:Label] [Image:Focus 28x28]
+shot 08_title_diorama: mean rgb 102,107,113
+level grid: buttons=25 unlocked=18 thumbnails=18 text-only=7
+level grid cell: Level1 [Image:Level1 background 28x28] [RawImage:Thumb 160x90] [Image:Lock 32x40] [Text:Label] [Image:Focus 28x28]
+shot 09_level_grid: mean rgb 102,107,113

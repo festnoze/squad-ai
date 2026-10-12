@@ -65,6 +65,7 @@ class BackendLanguage(str, Enum):
     PYTHON = "python"
     GO = "go"
     RUST = "rust"
+    NODE = "node"
 
 
 class StreamKind(str, Enum):
@@ -585,6 +586,10 @@ class Usage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     agent_calls: int = 0
+    failed_calls: int = 0
+    # Calls interrupted or returned without telemetry: the dollar/token totals
+    # are incomplete, not proof of zero cost. Old saved states default to zero.
+    unreported_calls: int = 0
     # W4: per-tier breakdown (boss/worker/checker) — the "$2.74 on the meter"
     # story. cost_by_tier may include estimated cost when a runner returns none.
     cost_by_tier: dict[str, float] = Field(default_factory=dict)
@@ -650,6 +655,14 @@ class ProjectState(BaseModel):
     language_complexity: int = -1   # technical complexity 1-5 (-1 = not analyzed)
     language_criticality: int = -1  # error-sensitivity 1-5 (-1 = not analyzed)
     language_rationale: str = ""
+    # A persisted decision made before scaffolding; agents build on this contract.
+    technical_stack: dict[str, str] = Field(default_factory=dict)
+    bootstrap_status: str = ""  # preparing | verifying | ready | failed | skipped
+    bootstrap_detail: str = ""
+    bootstrap_fingerprint: str = ""
+    # Monotonic until an explicit restart from scratch; transient verification
+    # failures must not send a developed product back to the initial demo gate.
+    bootstrap_verified_once: bool = False
     # B-IDEA: idea-maturity assessment + brainstorming-assist state.
     idea_maturity: str = ""        # "" (not assessed) | "structured" | "vague"
     idea_rationale: str = ""       # why the idea was judged structured/vague

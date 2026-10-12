@@ -470,7 +470,7 @@ export async function setProvider(
 
 export async function setLanguage(
   projectId: string,
-  language: "python" | "go" | "rust",
+  language: "python" | "go" | "rust" | "node",
 ): Promise<ProjectState> {
   // Idempotent (sets a value) -> safe to retry transient proxy failures.
   const { state } = await json<{ state: ProjectState }>(

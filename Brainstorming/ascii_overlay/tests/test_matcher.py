@@ -224,3 +224,28 @@ def test_identity_at_other_cell_sizes(cell):
     frame = frame_from_indices(idx, table)
     out = frame_to_indices(frame, table, MatchParams(hysteresis=0.0))
     assert np.array_equal(out, idx)
+
+
+@pytest.mark.parametrize("name", ["Ramp 10", "Symbols", "CP437 blocks", "Quadrants", "Braille"])
+def test_identity_holds_for_every_charset(name):
+    from ascii_overlay.glyphs import CHARSETS
+
+    table = get_table(8, 16, chars=CHARSETS[name])
+    idx = np.arange(table.count, dtype=np.int32).reshape(1, -1)
+    frame = frame_from_indices(idx, table)
+    out = frame_to_indices(frame, table, MatchParams(hysteresis=0.0))
+    assert np.array_equal(out, idx), name
+
+
+def test_quadrants_reproduce_a_two_by_two_mosaic():
+    """With the quadrant blocks a cell is a 2x2 mosaic: a bright top-left quarter is the top-left block."""
+    from ascii_overlay.glyphs import CHARSETS
+
+    table = get_table(8, 16, chars=CHARSETS["Quadrants"])
+    frame = np.zeros((16, 8, 4), dtype=np.uint8)
+    frame[:8, :4, :3] = 255
+    out = frame_to_indices(frame, table, MatchParams(hysteresis=0.0))
+    assert table.chars[out[0, 0]] == "\u2598"
+    frame[:, :, :3] = 255
+    out = frame_to_indices(frame, table, MatchParams(hysteresis=0.0))
+    assert table.chars[out[0, 0]] == "\u2588"

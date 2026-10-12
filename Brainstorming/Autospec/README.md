@@ -52,23 +52,108 @@ chat (spécification puis feedback), des boutons d'**interruption** (**⏸ Pause
 ▶ Reprendre**, **⏹ Stopper**) et un bouton **▶ Lancer le projet** qui exécute le
 `main.py` du code généré complètent l'interface.
 
-Un projet peut porter un **budget** (plafond de coût en $ et/ou de tokens, `0` =
-illimité) réglable à la création (champ **« Budget max ($) »**) ou après coup :
-à chaque point de contrôle, dès que l'usage atteint le plafond, la pipeline
-**s'arrête automatiquement** (message « 💰 Budget atteint ») et la jauge d'usage
-passe en rouge.
+Les montants en dollars sont des **estimations d'usage, pas des factures**. La
+facturation réelle dépend du fournisseur et du compte utilisé : l'interface ne
+déduit pas si un appel est couvert par un abonnement ou facturé à l'usage.
+Les données d'appels interrompus et les tarifs absents peuvent manquer au total ;
+un montant de `$0` ne garantit donc pas la gratuité. Un avertissement apparaît
+lorsque le backend signale des appels sans données d'usage ; les anciens
+historiques ne disposent pas nécessairement de cette information.
+
+Un projet peut porter un **budget estimatif** en dollars et/ou un seuil de tokens
+(`0` désactive le garde-fou), réglable à la création pour les dollars (champ
+**« Budget estimatif ($) »**) ou via l'API. Le seuil est vérifié avant chaque
+appel agent et à son retour. Lorsqu'un budget est actif, les appels du projet
+sont sérialisés pour ne pas allouer le même reliquat à plusieurs agents ; sans
+budget, leur parallélisme est conservé. Claude Code reçoit également le
+reliquat via son option native `--max-budget-usd`. Les tokens d'entrée incluent
+les lectures et écritures de cache Claude.
+
+Une erreur peut encore remonter une consommation : elle est conservée dans les
+totaux du projet et de l'itération. Si un appel interrompu ne remonte aucun usage
+et qu'un budget est configuré, les relances automatiques s'arrêtent jusqu'à une
+reprise explicite. Ce n'est **pas un plafond de facturation** : les estimations,
+l'usage non remonté et les appels déjà engagés lors d'un changement de budget
+peuvent empêcher de connaître le montant exact. La jauge reste informative.
 
 ## Providers de modèles (Claude / OpenAI / Ollama)
 
 Les agents tournent par défaut sur **claude code** (CLI Claude Code en
-headless, abonnement) ; **claude** passe par l'API Anthropic directe (clé).
-Deux providers **hors abonnement** sont disponibles via **LangChain** :
+headless, avec l'authentification configurée localement) ; **claude** passe par
+l'API Anthropic directe (clé). Deux autres providers sont disponibles via **LangChain** :
 **OpenAI** (clé API) et **Ollama** (modèles locaux). Sélection par
 `AGENT_PROVIDER` ou à chaud via le sélecteur 🤖 du header
 (`GET/POST /api/provider`). Ces providers étant de simples API de chat, les
 agents Dev y manipulent les fichiers du workspace à travers un **protocole
 d'outils JSON borné** (write/read confiné au workspace) — l'orchestrateur
 revérifie de toute façon la suite pytest lui-même.
+
+Le modèle du harness Claude Code est **Sonnet par défaut** (`CLAUDE_MODEL=sonnet`).
+`CLAUDE_MODEL=haiku` permet de choisir un modèle plus léger ; les overrides par
+phase restent disponibles.
+
+Sous Windows, les shims npm officiels Claude/Codex sont résolus vers leur
+exécutable natif ou leur script Node, sans réinterpréter les arguments dans un
+shell. Un lanceur personnalisé `.cmd`, `.bat` ou `.ps1` non reconnu est refusé :
+configurer un exécutable natif avec `CLAUDE_CMD` / `CODEX_CMD` à la place.
+L'arrêt d'un appel attend le nettoyage de ses processus enfants ; les sorties
+sont bornées à 16 Mio par flux et les dépassements sont signalés explicitement.
+
+## Socle technique vérifié avant les stories
+
+`PROJECT_BOOTSTRAP=1` active par défaut une création déterministe du socle,
+avant la planification PO. Le choix technique est conservé dans
+`technical_stack` : les demandes explicites de l'utilisateur sont prioritaires ;
+sinon la pré-analyse choisit une stack adaptée. Les templates prennent en charge
+Python/FastAPI, Go, Rust, Node.js et un frontend React/Vite/TypeScript. Une stack
+non prise en charge provoque un diagnostic explicite, sans substitution silencieuse.
+
+Avec le bootstrap actif, le choix par défaut privilégie Go pour les services
+standards, Python pour les petits prototypes et SQLite, Rust pour une forte
+criticité. `LANGUAGE_SELECTOR=1` autorise l'architecte LLM à affiner ce choix ;
+une demande explicite reste prioritaire.
+
+Le bootstrap installe les dépendances, exécute les tests du socle et vérifie le
+démarrage réel et l'accès HTTP avant d'engager les agents sur les fonctionnalités.
+Pour un fullstack, il vérifie aussi l'appel frontend → backend ; le template
+Python peut vérifier un aller-retour SQLite lorsqu'une base est requise.
+Les socles React sont aussi chargés dans Chromium pour détecter une page blanche
+ou une erreur JavaScript ; le build interdit les modules de tests/Vitest dans
+le bundle de production. Installer Chromium une fois depuis `frontend/` avec
+`npx playwright install chromium` (voir [les prérequis détaillés](DOCKER_DELIVERY.md)).
+Un prérequis absent ou une installation impossible bloque cette étape avec son
+diagnostic, sous une échéance `BOOTSTRAP_TIMEOUT_S=180`. Les checks restent
+distincts des tests fonctionnels des stories. Le mode démo `FAKE_AGENTS=1`
+continue de fonctionner sans installer les toolchains ni appeler Docker.
+
+## Livraison Docker
+
+Les templates exportés correspondent à la stack choisie : Python, Go, Rust,
+Node.js, frontend statique, CLI ou bibliothèque. Les fullstacks réunissent le
+frontend compilé et le backend dans une image ; un frontend seul est servi par
+nginx non-root sur le port interne 8080. Les dépendances sont installées à la
+construction, les secrets sont exclus du contexte et les modifications manuelles
+ou réparations de Dockerfile sont préservées.
+
+La construction et les contrôles Docker sont activés par défaut
+(`DOCKER_DELIVERY=1`) pour tous les nouveaux projets, y compris les CLI et
+bibliothèques. `DOCKER_DELIVERY=0` les désactive explicitement, quel que soit le
+profil. Les projets importés (`brownfield`) restent sur activation explicite.
+Le bouton de déploiement manuel peut
+lancer la livraison à la demande. Docker doit être opérationnel : un daemon
+absent est un problème d'infrastructure, pas une invitation à réparer le code.
+Les services sont publiés sur `127.0.0.1`, avec limites de ressources et rollback
+du conteneur précédent si le redéploiement échoue. Une CLI ou bibliothèque
+produit une image, sans service HTTP permanent.
+
+Les API/fullstacks du socle doivent satisfaire le contrat JSON de `/api/health`
+en HTTP 200 ; un frontend seul doit répondre en 2xx. Les sondes entre services
+contrôlent uniquement leur connectivité. SQLite utilise un volume persistant,
+conservé après Undeploy ; le candidat est testé sur une base isolée. Un rollback
+de conteneur ne restaure pas les migrations déjà appliquées aux données.
+
+Voir [DOCKER_DELIVERY.md](./DOCKER_DELIVERY.md) pour le contrat, les variables
+et les vérifications exécutables.
 
 ## Composants, livraison & feedback
 
@@ -171,7 +256,7 @@ Les agents sont exécutés via le **CLI Claude Code en mode headless**
 # Backend
 cd backend
 uv sync --extra dev
-uv run uvicorn autospec.api.server:app --reload --port 8100
+uv run uvicorn autospec.api.server:app --port 8100
 
 # Frontend (autre terminal)
 cd frontend
@@ -180,6 +265,11 @@ npm run dev   # http://localhost:5183
 ```
 
 Ou dans VS Code : **Run and Debug → Full Stack (Backend + Frontend)**.
+
+Sous Windows, lancer le backend sans `--reload` ni workers multiples : le
+préflight utilise les sous-processus asyncio, disponibles avec la boucle
+Proactor du serveur simple. Un lancement incompatible est signalé par un
+diagnostic de prérequis ; il ne déclenche pas de réparation LLM.
 
 ## Tests
 
@@ -215,7 +305,7 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 | --- | --- | --- |
 | `BMAD_DIR` | `../_bmad` | Dossier d'installation BMAD |
 | `CLAUDE_CMD` | auto (`claude.cmd`) | Binaire Claude Code |
-| `CLAUDE_MODEL` | `claude-opus-5` | Modèle à utiliser (provider claude code) |
+| `CLAUDE_MODEL` | `sonnet` | Modèle du harness Claude Code ; `haiku` possible pour réduire le coût |
 | `AGENT_PROVIDER` | `claude code` | Provider d'agents : `claude code` (harness CLI), `claude` (API Anthropic), `openai`, `ollama` (LangChain) |
 | `OPENAI_API_KEY` | (ou `OPENAI_API_KEY`) | Clé API du provider openai |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI |
@@ -226,6 +316,10 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 | `PROVIDER_TOOL_ROUNDS` | `8` | Cap de tours du protocole d'outils fichiers (providers LangChain) |
 | `COMPONENTS` | `0` | Phase « composants » (agent solutionneur après le brief) |
 | `SETUP_INSTALL` | `0` | Installe réellement les deps des composants (uv sync / npm install) |
+| `PROJECT_BOOTSTRAP` | `1` | Crée et vérifie le socle technique avant les stories |
+| `BOOTSTRAP_TIMEOUT_S` | `180` | Échéance du bootstrap et de ses contrôles initiaux |
+| `TEST_SUITE_TIMEOUT_S` | `180` | Échéance de chaque exécution de suite backend/frontend native |
+| `DOCKER_DELIVERY` | `1` | Docker pour tous les nouveaux projets, CLI/bibliothèques incluses ; brownfield sur activation explicite ; `0` prioritaire sur les profils |
 | `TECH_WRITER` | `0` | Tech-writer auto après chaque build (sinon bouton 📘 Doc) |
 | `UI_TESTS` | `0` | Tests d'acceptance UI Playwright pour les US `ui` |
 | `SESSION_MONITOR` | `1` | Watchdog fenêtre d'usage Claude (M2, provider claude uniquement) |

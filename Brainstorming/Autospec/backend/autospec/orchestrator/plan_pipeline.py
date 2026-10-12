@@ -620,7 +620,7 @@ async def _arun_s1(
     outcome = await refine.arefine_critic_first(
         runner,
         kind="le squelette du plan (epics, stories, tâches, complexité)",
-        criteria=prompts.structure_criteria(),
+        criteria=prompts.structure_criteria(state),
         initial_text=skeleton.model_dump_json(),
         revise=_revise,
         accept=_accept,
@@ -760,7 +760,7 @@ async def _aapply_resize(
             try:
                 res = await runner.arun(
                     prompts.decompose_finer(
-                        subject, pkg, reason=spec.resize.proposal, proactive=True
+                        subject, pkg, reason=spec.resize.proposal, proactive=True, state=state
                     ),
                     system_prompt=persona("architect"),
                 )
@@ -853,7 +853,7 @@ async def _across_review(
     ]
     try:
         res = await runner.arun(
-            prompts.po_cross_review(compact), system_prompt=persona("critic")
+            prompts.po_cross_review(compact, state=state), system_prompt=persona("critic")
         )
         reply = extract_json(res.text)
     except AgentError as exc:

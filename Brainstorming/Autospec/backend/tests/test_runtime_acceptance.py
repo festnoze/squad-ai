@@ -1,6 +1,16 @@
 """Runtime acceptance gate for web/fullstack deliveries."""
 
 import subprocess
+import asyncio
+import threading
+import time
+import sys
+import json
+import os
+import socket
+from pathlib import Path
+
+import pytest
 
 from autospec.config import settings
 from autospec.models import BackendLanguage, ProjectState, StoryStatus, Stream, StreamKind, UserStory
@@ -53,7 +63,7 @@ async def test_runtime_acceptance_invokes_node_script_for_frontend(monkeypatch):
         calls.append((cmd, kwargs))
         return subprocess.CompletedProcess(cmd, 0, stdout="[runtime] OK")
 
-    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setattr(runtime_acceptance, "_run_node", _fake_run)
     result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
     assert result.ok is True
     assert result.skipped is False
@@ -119,7 +129,7 @@ async def test_runtime_gate_passes_backend_port_and_journey_env(monkeypatch):
         captured["env"] = kwargs.get("env", {})
         return subprocess.CompletedProcess(cmd, 0, stdout="[runtime] OK")
 
-    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setattr(runtime_acceptance, "_run_node", _fake_run)
     result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
     assert result.ok is True
     assert captured["env"]["RUNTIME_BACKEND_PORT"] == "9200"
@@ -139,7 +149,7 @@ async def test_runtime_gate_journey_empty_when_no_done_gherkin(monkeypatch):
         captured["env"] = kwargs.get("env", {})
         return subprocess.CompletedProcess(cmd, 0, stdout="OK")
 
-    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setattr(runtime_acceptance, "_run_node", _fake_run)
     await runtime_acceptance.arun_runtime_acceptance(state, ws)
     assert captured["env"]["RUNTIME_JOURNEY"] == ""
 
@@ -155,7 +165,7 @@ async def test_runtime_gate_exit_2_is_infra(monkeypatch):
     ws, _frontend = _prep_frontend(state)
 
     monkeypatch.setattr(
-        subprocess, "run",
+        runtime_acceptance, "_run_node",
         lambda cmd, **k: subprocess.CompletedProcess(cmd, 2, stdout="playwright not installed"),
     )
     result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
@@ -172,7 +182,7 @@ async def test_runtime_gate_exit_1_is_repairable(monkeypatch):
     ws, _frontend = _prep_frontend(state)
 
     monkeypatch.setattr(
-        subprocess, "run",
+        runtime_acceptance, "_run_node",
         lambda cmd, **k: subprocess.CompletedProcess(cmd, 1, stdout="blank page on /"),
     )
     result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
@@ -191,7 +201,7 @@ async def test_runtime_launch_failure_is_infra(monkeypatch):
     def _boom(cmd, **k):
         raise OSError("node introuvable")
 
-    monkeypatch.setattr(subprocess, "run", _boom)
+    monkeypatch.setattr(runtime_acceptance, "_run_node", _boom)
     result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
     assert result.ok is False
     assert result.infra is True
@@ -215,3 +225,128 @@ async def test_runtime_non_python_backend_warns_and_skips(monkeypatch):
     assert result.skipped is True
     assert result.ok is True
     assert "non-python" in result.detail
+
+
+def test_javascript_runtime_lifecycle():
+    script = Path(__file__).with_name("runtime_acceptance.test.cjs")
+    result = subprocess.run([settings.node_cmd, "--test", str(script)], capture_output=True,
+                            text=True, encoding="utf-8", errors="replace", timeout=20)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+async def test_frontend_stack_never_starts_a_leftover_backend(monkeypatch):
+    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = _done_frontend_state("pure-frontend")
+    state.technical_stack = {"kind": "frontend", "frontend": "react", "backend": "none"}
+    ws, _ = _prep_frontend(state)
+    (ws / "main.py").write_text("import fastapi\n", encoding="utf-8")
+    captured = []
+    def run(cmd, **kwargs):
+        captured.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="OK")
+    monkeypatch.setattr(runtime_acceptance, "_run_node", run)
+    assert (await runtime_acceptance.arun_runtime_acceptance(state, ws)).ok
+    assert captured[0][-1] == "0"
+
+
+async def test_runtime_cancellation_waits_for_worker_tree_cleanup(monkeypatch):
+    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = _done_frontend_state("cancel-runtime")
+    ws, _ = _prep_frontend(state)
+    started = threading.Event()
+    cleaned = threading.Event()
+    def run(cmd, *, cancel_event, **kwargs):
+        started.set()
+        assert cancel_event.wait(2)
+        time.sleep(0.02)
+        cleaned.set()
+        raise subprocess.TimeoutExpired(cmd, 2)
+    monkeypatch.setattr(runtime_acceptance, "_run_node", run)
+    task = asyncio.create_task(runtime_acceptance.arun_runtime_acceptance(state, ws))
+    assert await asyncio.to_thread(started.wait, 2)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert cleaned.is_set()
+
+
+def test_runtime_timeout_reaps_the_actual_child_process(monkeypatch):
+    original = subprocess.Popen
+    processes = []
+    def launch(*args, **kwargs):
+        proc = original(*args, **kwargs)
+        processes.append(proc)
+        return proc
+    monkeypatch.setattr(subprocess, "Popen", launch)
+    with pytest.raises(subprocess.TimeoutExpired):
+        runtime_acceptance._run_node(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            cancel_event=threading.Event(), timeout=0.15,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        )
+    assert processes and processes[0].poll() is not None
+
+
+@pytest.mark.parametrize("manifest_name", [".autospec-bootstrap.json", ".autospec/bootstrap.json"])
+def test_native_backend_is_detected_from_current_or_legacy_manifest(tmp_path, manifest_name):
+    manifest = tmp_path / manifest_name
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps({"stack": {"kind": "api", "backend": "go"}}), encoding="utf-8")
+    assert runtime_acceptance._backend_web_candidate(tmp_path)
+
+
+def test_frontend_manifest_takes_precedence_over_legacy_backend_artifacts(tmp_path):
+    (tmp_path / ".autospec-bootstrap.json").write_text(json.dumps({"stack": {"kind": "frontend"}}), encoding="utf-8")
+    (tmp_path / "main.py").write_text("import fastapi\n", encoding="utf-8")
+    assert not runtime_acceptance._backend_web_candidate(tmp_path)
+
+
+def test_api_runtime_starts_and_cleans_a_real_owned_server_without_browser(tmp_path):
+    server = tmp_path / "server.py"
+    server.write_text(
+        "import os\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\n"
+        "class Handler(BaseHTTPRequestHandler):\n"
+        " def do_GET(self):\n"
+        "  self.send_response(200); self.end_headers(); self.wfile.write(b'{}')\n"
+        "HTTPServer(('127.0.0.1', int(os.environ['RUNTIME_BACKEND_PORT'])), Handler).serve_forever()\n",
+        encoding="utf-8",
+    )
+    with socket.socket() as available:
+        available.bind(("127.0.0.1", 0))
+        port = available.getsockname()[1]
+    env = {key: value for key, value in os.environ.items() if key.upper() in {
+        "PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP", "PATHEXT",
+    }}
+    env.update(RUNTIME_BACKEND_PORT=str(port), RUNTIME_BACKEND_LANGUAGE="native",
+               RUNTIME_BACKEND_COMMAND=json.dumps([sys.executable, "-u", str(server)]))
+    script = Path(__file__).parents[1] / "scripts" / "runtime_acceptance.js"
+    result = runtime_acceptance._run_node(
+        [settings.node_cmd, str(script), str(tmp_path), "5000", "", "1"],
+        cancel_event=threading.Event(), timeout=15, cwd=tmp_path, env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        encoding="utf-8", errors="replace",
+    )
+    assert result.returncode == 0, result.stdout
+    assert "OK API" in result.stdout
+    assert "DEP0190" not in result.stdout
+    with socket.socket() as check:
+        check.settimeout(0.5)
+        assert check.connect_ex(("127.0.0.1", port)) != 0, "runtime leaked its server"
+
+
+def test_runtime_resolves_and_executes_real_npm_without_command_shell():
+    gate = Path(__file__).parents[1] / "scripts" / "runtime_acceptance.js"
+    script = (
+        "const gate=require(process.argv[1]);"
+        "const command=gate.resolveCommand(process.argv[2],['--version']);"
+        "const r=require('node:child_process').spawnSync(command.cmd,command.args,{shell:false,encoding:'utf8'});"
+        "process.stdout.write(r.stdout||'');process.stderr.write(r.stderr||'');"
+        "process.exitCode=r.status===null?1:r.status;"
+    )
+    result = subprocess.run([settings.node_cmd, "-e", script, str(gate), settings.npm_cmd],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip()
+    assert "DEP0190" not in result.stderr

@@ -1414,3 +1414,40 @@ separe pas davantage. Le garde large jetait le panneau.
 D'ou `ErasableBlock.Owns(Renderer)`, et un garde qui ne saute que le visuel
 PROPRE du bloc. La regle generale : pour repondre "ce renderer est-il a X", il
 faut le demander a X, pas a la hierarchie.
+
+### C.25 V-HUD-02 se contredit, et son plafond de 420 px est impossible
+
+Deux erreurs dans le meme item, toutes deux trouvees en essayant de l'appliquer.
+
+**La barre verticale.** L'item demande "le pipe remplace par de l'espacement",
+puis ecrit "Texte inchange" dans la phrase suivante, et son acceptation exige la
+chaine "presente verbatim". Les trois ne peuvent pas tenir ensemble. C'est le
+contrat de gameplay qui tranche (regle : `docs/PRD.md` 12 epingle la chaine) :
+**la chaine reste octet pour octet**, pipe compris. Couper le label en deux ne
+sert d'ailleurs a rien : la moitie qui herite du pipe le dessine quand meme.
+
+**Le plafond de taille.** L'item ecrit "pas plus de 420 x 64 px". Largeurs
+REELLES, mesurees dans les advances `hmtx` de `Manrope.ttf` (unitsPerEm 2000),
+pour les chaines et les tailles que le PRD epingle lui-meme :
+
+| ligne epinglee | taille | largeur | 420 px ? |
+|---|---|---|---|
+| `Piles : 0 portee   \|   Teleporteur : 0 / 2` | 22 px | 347 px | tient |
+| `Piles : 12 portees   \|   Teleporteur : 10 / 12` | 22 px | 382 px | tient |
+| `Pellicule : 2  (clic droit : viser  clic gauche : declencher)` | 20 px | 476 px | **depasse** |
+
+Correction d'une version anterieure de cette annexe : elle annoncait 460 / 505 /
+610 px, estimes a 0,5 em par caractere, et presentait ces estimations dans un
+tableau comme si elles etaient mesurees. Elles etaient trop hautes d'environ
+30 %, et la conclusion en heritait. Le vrai partage est plus fin :
+
+  - la ligne de piles **tient** sous 420 px, glyphe et padding compris (~391 px) ;
+  - la ligne de pellicule ne tient pas, et aucune mise en page ne l'y fera
+    rentrer sans rogner une taille epinglee ou couper une chaine epinglee ;
+  - c'est la HAUTEUR a deux lignes qui casse le 64 px, pas la largeur.
+
+Donc : le panneau est **ajuste a son contenu, pas borne**. L'acceptation de
+V-HUD-02 vaut pour le cas a UNE ligne (pellicule a zero), ou le panneau tombe
+autour de 400-430 x 46. La lecon generale : un plafond de pixels ecrit a la main
+dans un PRD doit etre verifie contre les chaines reelles a la taille reelle avant
+d'etre promu en critere d'acceptation.

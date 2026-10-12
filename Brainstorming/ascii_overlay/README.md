@@ -30,8 +30,8 @@ itself without capturing its own output recursively.
 ## Controls
 
 The window has a coloured border (grey, orange when frozen, red when click-through)
-and a top bar with every setting: preset cell size, character size in pixels, tone
-mode, black ink, negative, refresh rate,
+and a single-row top bar with every setting: preset cell size, character size in
+pixels, character set, font, tone mode, black ink, negative, refresh rate,
 gamma, exposure, freeze, click-through, copy, save, live stats, full screen and a
 close button.
 Drag the bar or the canvas to move the window, drag an edge to resize it. Right
@@ -43,6 +43,8 @@ click opens a menu with the same actions and their keys.
 | `N` | Negative: dark source pixels count as ink instead of bright ones (for light content such as documents) |
 | `C` / `Shift+C` | Next / previous preset cell size (4x8, 6x12, 8x16, 12x24, 16x32) |
 | `+` / `-` | Character one pixel taller / shorter, from 4 to 128 px (the *Size* box takes any value) |
+| `K` / `Shift+K` | Next / previous character set (see *Character sets* below) |
+| `O` / `Shift+O` | Next / previous font |
 | `A` | Tone mode: auto (default) or literal ink ratio (see *Tone* below) |
 | `G` / `Shift+G` | Gamma up / down (tone curve of the source) |
 | `E` / `Shift+E` | Exposure up / down |
@@ -124,6 +126,33 @@ Over a light document that gives a wall of dense glyphs: press `N` (*Negative*) 
 that dark pixels are the ink instead; the white page becomes blank and the text
 becomes glyphs. *Black ink* (`I`) is independent: it only swaps the two display
 colours and never changes which glyphs are chosen.
+
+### Character sets
+
+| Set | Glyphs | Look |
+|---|---|---|
+| Full ASCII | the 95 printable characters | best shape fidelity, "random text" texture |
+| Ramp 10 | ` .:-=+*#%@` | the classic density ramp |
+| Ramp 70 | Paul Bourke's 70-character ramp | the usual converter look |
+| Symbols | punctuation and slashes only | line drawing, crisp contours |
+| Letters & digits | `A-Z a-z 0-9` | code-rain texture |
+| Uppercase | `A-Z` | teletype |
+| ASCII + blocks | printable ASCII plus `░▒▓█▀▄▌▐` and box drawing | ANSI art with text |
+| CP437 blocks | shades, half blocks and box drawing only | BBS / DOS screens, ink up to 100 % |
+| Quadrants | the 16 quarter-block combinations | a 2x2 mosaic per cell |
+| Braille | the 255 dot patterns | a 2x4 bitmap per cell, maximum fidelity |
+
+The last four are not ASCII. A glyph the chosen font lacks (braille in DejaVu Sans
+Mono or Consolas, quadrants in Consolas) is taken from the bundled DejaVu Sans, then
+from Segoe UI Symbol, fitted to the same cell; a glyph no font has is dropped instead
+of showing up as a box. Every frame copies as text whatever the set, in UTF-8.
+
+### Fonts
+
+The bundled DejaVu Sans Mono, plus whatever is installed among Consolas, Cascadia
+Mono, Lucida Console and Courier New. Drop `Px437_IBM_VGA_8x16.ttf` from the
+Ultimate Oldschool PC Font Pack into `assets/` and it appears as *IBM VGA 8x16*: at
+8x16 it is the exact DOS bitmap, with no binarisation loss.
 
 ## Tests
 

@@ -10,7 +10,6 @@ Idempotent: existing files are never overwritten.
 from __future__ import annotations
 
 import asyncio
-import subprocess
 from pathlib import Path
 
 from ..config import settings
@@ -126,19 +125,25 @@ def _ensure(path: Path, content: str) -> bool:
 
 
 def _run_install(args: list[str], cwd: Path) -> tuple[bool, str]:
+    # Dependency installers execute package lifecycle/build hooks. Give those
+    # hooks the same secret-free environment and bounded process-tree runner as
+    # generated tests, including npm's direct JS launcher on Windows.
+    from .bootstrap import _argv, BootstrapFailure
+    from .docker_deploy import _kill_tree
+    from .pipeline import _minimal_env, _run_capped_process
+
     try:
-        proc = subprocess.run(
-            args,
-            cwd=str(cwd),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=600,
+        proc = _run_capped_process(
+            _argv(args), cwd=cwd, env=_minimal_env(),
+            timeout=min(180, settings.agent_timeout_s), output_cap=20000,
+            kill_tree=_kill_tree, name="component-install",
         )
-        return proc.returncode == 0, (proc.stdout or "")[-1000:]
-    except (OSError, subprocess.TimeoutExpired) as exc:
+        if proc.launch_error:
+            return False, proc.launch_error
+        if proc.timed_out or proc.pipe_leaked:
+            return False, "Installation interrompue : délai dépassé ou sous-processus non terminé"
+        return proc.returncode == 0, proc.output[-1000:]
+    except (OSError, BootstrapFailure) as exc:
         return False, str(exc)
 
 

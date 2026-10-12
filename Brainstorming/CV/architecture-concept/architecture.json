@@ -1,0 +1,3264 @@
+{
+  "title": "Architecture API classique + workflow agentique",
+  "version": 2,
+  "assumptions": [
+    "Architecture illustrative : elle ne décrit pas une réalisation attestée du CV.",
+    "API Gateway et reverse proxy retenus pour AG / proxy.",
+    "Quatre couches logiques du backend ; les couches ne représentent pas nécessairement quatre déploiements.",
+    "Les flux d’exécution, événements, déploiement et télémétrie sont distincts des dépendances de code.",
+    "Les réponses synchrones reprennent le chemin inverse, omis dans la vue d’ensemble.",
+    "Les noms restent indépendants des fournisseurs et frameworks.",
+    "Tous les services externes à l’API sont représentés dans le périmètre infrastructure, avec distinction adaptateur interne / service distant.",
+    "Le workflow applicatif décrit les agents et les transitions ; un adaptateur LangGraph peut exécuter cette définition.",
+    "Skills = instructions et procédures ; tools = opérations exécutables derrière des ports.",
+    "Les agents échangent des messages via l’état du graphe / des handoffs explicites.",
+    "La relecture en ligne et les évaluations LLM hors du chemin de réponse sont deux mécanismes distincts.",
+    "Cache de réponse LLM, cache de prompts et checkpoints de workflow sont trois stockages distincts."
+  ],
+  "sections": [
+    {
+      "id": "clients",
+      "label": "Clients",
+      "visual_form": "Satellites d’entrée",
+      "scroll_motion": "Les satellites clients se séparent du sas."
+    },
+    {
+      "id": "edge",
+      "label": "Accès et sécurité",
+      "visual_form": "Enceinte extérieure",
+      "scroll_motion": "Les filtres et la passerelle se déploient."
+    },
+    {
+      "id": "api",
+      "label": "Tier 1 — Présentation / API",
+      "visual_form": "Plateau supérieur",
+      "scroll_motion": "La façade recule, les endpoints et filtres deviennent visibles."
+    },
+    {
+      "id": "app",
+      "label": "Tier 2 — Application et agents",
+      "visual_form": "Plateau de coordination et arène d’agents",
+      "scroll_motion": "Le plateau s’ouvre en pétales et expose les agents, les conditions et les connecteurs."
+    },
+    {
+      "id": "domain",
+      "label": "Tier 3 — Domaine",
+      "visual_form": "Noyau central",
+      "scroll_motion": "Les enveloppes s’écartent autour du noyau métier."
+    },
+    {
+      "id": "infra",
+      "label": "Tier 4 — Infrastructure : adaptateurs et services externes",
+      "visual_form": "Socle technique et cartouches de services",
+      "scroll_motion": "Les adaptateurs coulissent ; les cartouches LLM, cache, Langfuse et données se séparent à l’intérieur du socle."
+    },
+    {
+      "id": "delivery",
+      "label": "CI/CD et orchestration",
+      "visual_form": "Rail de fabrication et socle",
+      "scroll_motion": "Un artefact parcourt le rail et rejoint les réplicas et workers."
+    }
+  ],
+  "groups": [
+    {
+      "id": "interfaces",
+      "label": "Interfaces",
+      "section": "clients",
+      "nodes": [
+        "web",
+        "mobile",
+        "admin"
+      ],
+      "scope": "internal",
+      "focus": "clients"
+    },
+    {
+      "id": "protection",
+      "label": "Protection",
+      "section": "edge",
+      "nodes": [
+        "cdn",
+        "waf",
+        "proxy"
+      ],
+      "scope": "internal",
+      "focus": "edge"
+    },
+    {
+      "id": "routing",
+      "label": "Routage",
+      "section": "edge",
+      "nodes": [
+        "gateway",
+        "limits",
+        "balance"
+      ],
+      "scope": "internal",
+      "focus": "edge"
+    },
+    {
+      "id": "endpoints",
+      "label": "Endpoints",
+      "section": "api",
+      "nodes": [
+        "router",
+        "controller",
+        "pagination"
+      ],
+      "scope": "internal",
+      "focus": "api"
+    },
+    {
+      "id": "contracts",
+      "label": "Façade et contrats",
+      "section": "api",
+      "nodes": [
+        "facade",
+        "dto",
+        "api_mapper"
+      ],
+      "scope": "internal",
+      "focus": "api"
+    },
+    {
+      "id": "guards",
+      "label": "Filtres d’entrée",
+      "section": "api",
+      "nodes": [
+        "auth",
+        "validation",
+        "errors",
+        "correlation"
+      ],
+      "scope": "internal",
+      "focus": "api"
+    },
+    {
+      "id": "usecases",
+      "label": "Cas d’usage",
+      "section": "app",
+      "nodes": [
+        "create",
+        "read",
+        "workflow"
+      ],
+      "scope": "internal",
+      "focus": "app"
+    },
+    {
+      "id": "coordination",
+      "label": "Coordination",
+      "section": "app",
+      "nodes": [
+        "command_bus",
+        "query_bus",
+        "uow_port",
+        "schedule"
+      ],
+      "scope": "internal",
+      "focus": "app"
+    },
+    {
+      "id": "ports",
+      "label": "Ports / interfaces",
+      "section": "app",
+      "nodes": [
+        "repo_port",
+        "read_port",
+        "event_port",
+        "external_port"
+      ],
+      "scope": "internal",
+      "focus": "app"
+    },
+    {
+      "id": "models",
+      "label": "Modèles métier",
+      "section": "domain",
+      "nodes": [
+        "aggregate",
+        "entity",
+        "value",
+        "factory"
+      ],
+      "scope": "internal",
+      "focus": "domain"
+    },
+    {
+      "id": "rules",
+      "label": "Règles métier",
+      "section": "domain",
+      "nodes": [
+        "policy",
+        "invariants",
+        "domain_service"
+      ],
+      "scope": "internal",
+      "focus": "domain"
+    },
+    {
+      "id": "events",
+      "label": "Événements métier",
+      "section": "domain",
+      "nodes": [
+        "domain_event",
+        "event_payload"
+      ],
+      "scope": "internal",
+      "focus": "domain"
+    },
+    {
+      "id": "persistence",
+      "label": "Persistance",
+      "section": "infra",
+      "nodes": [
+        "repository",
+        "orm",
+        "db_mapper",
+        "transaction",
+        "driver",
+        "migrations"
+      ],
+      "scope": "internal",
+      "focus": "infra"
+    },
+    {
+      "id": "integrations",
+      "label": "Intégrations",
+      "section": "infra",
+      "nodes": [
+        "http",
+        "resilience",
+        "serialization",
+        "search_adapter",
+        "blob_adapter"
+      ],
+      "scope": "internal",
+      "focus": "infra"
+    },
+    {
+      "id": "messaging",
+      "label": "Asynchronisme",
+      "section": "infra",
+      "nodes": [
+        "outbox",
+        "relay",
+        "consumer",
+        "idempotency"
+      ],
+      "scope": "internal",
+      "focus": "infra"
+    },
+    {
+      "id": "technical",
+      "label": "Services techniques",
+      "section": "infra",
+      "nodes": [
+        "cache_adapter",
+        "config",
+        "secrets",
+        "health"
+      ],
+      "scope": "internal",
+      "focus": "infra"
+    },
+    {
+      "id": "data",
+      "label": "Stockage",
+      "section": "infra",
+      "nodes": [
+        "database",
+        "cache",
+        "search",
+        "blob"
+      ],
+      "scope": "remote",
+      "focus": "services"
+    },
+    {
+      "id": "queues",
+      "label": "Messagerie",
+      "section": "infra",
+      "nodes": [
+        "broker",
+        "dlq"
+      ],
+      "scope": "remote",
+      "focus": "services"
+    },
+    {
+      "id": "partners",
+      "label": "Services externes",
+      "section": "infra",
+      "nodes": [
+        "idp",
+        "payment",
+        "email"
+      ],
+      "scope": "remote",
+      "focus": "services"
+    },
+    {
+      "id": "buildchain",
+      "label": "Construire",
+      "section": "delivery",
+      "nodes": [
+        "git",
+        "quality",
+        "build"
+      ],
+      "scope": "internal",
+      "focus": "delivery"
+    },
+    {
+      "id": "release",
+      "label": "Livrer",
+      "section": "delivery",
+      "nodes": [
+        "registry",
+        "staging",
+        "rollout"
+      ],
+      "scope": "internal",
+      "focus": "delivery"
+    },
+    {
+      "id": "platform",
+      "label": "Orchestrer",
+      "section": "delivery",
+      "nodes": [
+        "iac",
+        "cluster",
+        "replicas",
+        "workers",
+        "vault"
+      ],
+      "scope": "internal",
+      "focus": "delivery"
+    },
+    {
+      "id": "collect",
+      "label": "Collecter",
+      "section": "infra",
+      "nodes": [
+        "instrument",
+        "collector"
+      ],
+      "scope": "internal",
+      "focus": "ops"
+    },
+    {
+      "id": "signals",
+      "label": "Observer",
+      "section": "infra",
+      "nodes": [
+        "traces",
+        "metrics",
+        "logs"
+      ],
+      "scope": "remote",
+      "focus": "ops"
+    },
+    {
+      "id": "react",
+      "label": "Réagir",
+      "section": "infra",
+      "nodes": [
+        "dashboard",
+        "alerts"
+      ],
+      "scope": "remote",
+      "focus": "ops"
+    },
+    {
+      "id": "agent_graph",
+      "label": "Workflow agentique",
+      "section": "app",
+      "nodes": [
+        "agent_run",
+        "graph_state",
+        "supervisor",
+        "route_decision",
+        "research_agent",
+        "analyst_agent",
+        "writer_agent",
+        "review_agent",
+        "quality_gate",
+        "run_output",
+        "run_failed",
+        "run_budget"
+      ],
+      "focus": "agentic",
+      "scope": "internal"
+    },
+    {
+      "id": "agent_capabilities",
+      "label": "Anatomie d’un agent",
+      "section": "app",
+      "nodes": [
+        "agent_profile",
+        "skills",
+        "skill_loader",
+        "tool_decision",
+        "tool_catalog",
+        "tool_dispatch",
+        "agent_messages",
+        "agent_response"
+      ],
+      "focus": "agent",
+      "scope": "internal"
+    },
+    {
+      "id": "ai_ports",
+      "label": "Ports IA / mémoire",
+      "section": "app",
+      "nodes": [
+        "llm_port",
+        "prompt_port",
+        "tool_port",
+        "memory_port",
+        "checkpoint_port",
+        "trace_port",
+        "graph_port"
+      ],
+      "focus": "agent",
+      "scope": "internal"
+    },
+    {
+      "id": "ai_adapters",
+      "label": "Adaptateurs IA / tools",
+      "section": "infra",
+      "nodes": [
+        "llm_adapter",
+        "prompt_adapter",
+        "tool_adapter",
+        "memory_adapter",
+        "checkpoint_adapter",
+        "langgraph_runtime",
+        "trace_adapter",
+        "llm_client",
+        "prompt_render"
+      ],
+      "focus": "infra",
+      "scope": "internal"
+    },
+    {
+      "id": "cache_layer",
+      "label": "Couche de cache",
+      "section": "infra",
+      "nodes": [
+        "cache_key",
+        "cache_lookup",
+        "cache_decision",
+        "cache_write",
+        "cached_output",
+        "prompt_local_cache",
+        "cache_invalidate"
+      ],
+      "focus": "cache",
+      "scope": "internal"
+    },
+    {
+      "id": "llm_services",
+      "label": "Services de modèles",
+      "section": "infra",
+      "nodes": [
+        "llm_provider",
+        "embedding_provider",
+        "judge_provider"
+      ],
+      "focus": "llm",
+      "scope": "remote"
+    },
+    {
+      "id": "memory_services",
+      "label": "Mémoire et cache distants",
+      "section": "infra",
+      "nodes": [
+        "response_cache",
+        "checkpoint_db",
+        "vector_db"
+      ],
+      "focus": "cache",
+      "scope": "remote"
+    },
+    {
+      "id": "lf_prompts",
+      "label": "Langfuse · prompts",
+      "section": "infra",
+      "nodes": [
+        "lf_prompts",
+        "prompt_version",
+        "prompt_variables"
+      ],
+      "focus": "langfuse",
+      "scope": "remote"
+    },
+    {
+      "id": "lf_traces",
+      "label": "Langfuse · traces",
+      "section": "infra",
+      "nodes": [
+        "lf_traces",
+        "lf_generation",
+        "lf_scores"
+      ],
+      "focus": "langfuse",
+      "scope": "remote"
+    },
+    {
+      "id": "lf_evals",
+      "label": "Langfuse · évaluations",
+      "section": "infra",
+      "nodes": [
+        "lf_datasets",
+        "lf_experiments",
+        "lf_eval",
+        "lf_code_eval",
+        "lf_feedback"
+      ],
+      "focus": "langfuse",
+      "scope": "remote"
+    },
+    {
+      "id": "evaluation_jobs",
+      "label": "Adaptateurs d’évaluation",
+      "section": "infra",
+      "nodes": [
+        "eval_job",
+        "eval_adapter"
+      ],
+      "focus": "langfuse",
+      "scope": "internal"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "web",
+      "label": "Frontend web",
+      "group": "interfaces",
+      "section": "clients",
+      "shape": "component"
+    },
+    {
+      "id": "mobile",
+      "label": "Client mobile",
+      "group": "interfaces",
+      "section": "clients",
+      "shape": "component"
+    },
+    {
+      "id": "admin",
+      "label": "Back-office",
+      "group": "interfaces",
+      "section": "clients",
+      "shape": "component"
+    },
+    {
+      "id": "cdn",
+      "label": "DNS / CDN",
+      "group": "protection",
+      "section": "edge",
+      "shape": "component"
+    },
+    {
+      "id": "waf",
+      "label": "WAF / TLS",
+      "group": "protection",
+      "section": "edge",
+      "shape": "component"
+    },
+    {
+      "id": "proxy",
+      "label": "Reverse proxy",
+      "group": "protection",
+      "section": "edge",
+      "shape": "component"
+    },
+    {
+      "id": "gateway",
+      "label": "API Gateway",
+      "group": "routing",
+      "section": "edge",
+      "shape": "component"
+    },
+    {
+      "id": "limits",
+      "label": "Quotas / rate limit",
+      "group": "routing",
+      "section": "edge",
+      "shape": "component"
+    },
+    {
+      "id": "balance",
+      "label": "Load balancer",
+      "group": "routing",
+      "section": "edge",
+      "shape": "component"
+    },
+    {
+      "id": "router",
+      "label": "Routeur / versioning",
+      "group": "endpoints",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "controller",
+      "label": "Contrôleurs REST",
+      "group": "endpoints",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "pagination",
+      "label": "Pagination / filtres",
+      "group": "endpoints",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "facade",
+      "label": "Façade API",
+      "group": "contracts",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "dto",
+      "label": "DTO entrée / sortie",
+      "group": "contracts",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "api_mapper",
+      "label": "Mapping des DTO",
+      "group": "contracts",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "auth",
+      "label": "Auth / autorisations",
+      "group": "guards",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "validation",
+      "label": "Validation des entrées",
+      "group": "guards",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "errors",
+      "label": "Gestion des erreurs",
+      "group": "guards",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "correlation",
+      "label": "Contexte de requête",
+      "group": "guards",
+      "section": "api",
+      "shape": "component"
+    },
+    {
+      "id": "create",
+      "label": "Créer une ressource",
+      "group": "usecases",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "read",
+      "label": "Lire une ressource",
+      "group": "usecases",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "workflow",
+      "label": "Orchestrer un workflow",
+      "group": "usecases",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "command_bus",
+      "label": "Bus de commandes",
+      "group": "coordination",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "query_bus",
+      "label": "Bus de requêtes",
+      "group": "coordination",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "uow_port",
+      "label": "Port transaction",
+      "group": "coordination",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "schedule",
+      "label": "Tâches planifiées",
+      "group": "coordination",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "repo_port",
+      "label": "Port repository",
+      "group": "ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "read_port",
+      "label": "Port de lecture",
+      "group": "ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "event_port",
+      "label": "Port d’événements",
+      "group": "ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "external_port",
+      "label": "Ports externes",
+      "group": "ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "aggregate",
+      "label": "Agrégats",
+      "group": "models",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "entity",
+      "label": "Entités",
+      "group": "models",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "value",
+      "label": "Objets valeur",
+      "group": "models",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "factory",
+      "label": "Fabriques métier",
+      "group": "models",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "policy",
+      "label": "Politiques métier",
+      "group": "rules",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "invariants",
+      "label": "Invariants",
+      "group": "rules",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "domain_service",
+      "label": "Services de domaine",
+      "group": "rules",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "domain_event",
+      "label": "Événements de domaine",
+      "group": "events",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "event_payload",
+      "label": "Contrats d’événements",
+      "group": "events",
+      "section": "domain",
+      "shape": "component"
+    },
+    {
+      "id": "repository",
+      "label": "Repositories concrets",
+      "group": "persistence",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "orm",
+      "label": "ORM / modèles de table",
+      "group": "persistence",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "db_mapper",
+      "label": "Mapping métier / table",
+      "group": "persistence",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "transaction",
+      "label": "Unité de travail",
+      "group": "persistence",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "driver",
+      "label": "Pilote de base",
+      "group": "persistence",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "migrations",
+      "label": "Migrations",
+      "group": "persistence",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "http",
+      "label": "Adaptateurs HTTP",
+      "group": "integrations",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "resilience",
+      "label": "Timeout / retry / circuit breaker",
+      "group": "integrations",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "serialization",
+      "label": "Sérialisation",
+      "group": "integrations",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "search_adapter",
+      "label": "Adaptateur recherche",
+      "group": "integrations",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "blob_adapter",
+      "label": "Adaptateur fichiers",
+      "group": "integrations",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "outbox",
+      "label": "Outbox transactionnelle",
+      "group": "messaging",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "relay",
+      "label": "Relais outbox",
+      "group": "messaging",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "consumer",
+      "label": "Consommateurs / workers",
+      "group": "messaging",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "idempotency",
+      "label": "Idempotence / dédoublon",
+      "group": "messaging",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cache_adapter",
+      "label": "Adaptateur cache",
+      "group": "technical",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "config",
+      "label": "Configuration",
+      "group": "technical",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "secrets",
+      "label": "Accès aux secrets",
+      "group": "technical",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "health",
+      "label": "Health / readiness",
+      "group": "technical",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "database",
+      "label": "Base relationnelle",
+      "group": "data",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cache",
+      "label": "Cache partagé",
+      "group": "data",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "search",
+      "label": "Moteur de recherche",
+      "group": "data",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "blob",
+      "label": "Stockage de fichiers",
+      "group": "data",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "broker",
+      "label": "Broker / files",
+      "group": "queues",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "dlq",
+      "label": "File de rejet (DLQ)",
+      "group": "queues",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "idp",
+      "label": "Identité OIDC",
+      "group": "partners",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "payment",
+      "label": "Paiement",
+      "group": "partners",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "email",
+      "label": "E-mail / notification",
+      "group": "partners",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "git",
+      "label": "Git / revue de code",
+      "group": "buildchain",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "quality",
+      "label": "Lint / tests / sécurité",
+      "group": "buildchain",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "build",
+      "label": "Build / image / SBOM",
+      "group": "buildchain",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "registry",
+      "label": "Registre d’artefacts",
+      "group": "release",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "staging",
+      "label": "Staging / vérifications",
+      "group": "release",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "rollout",
+      "label": "Déploiement progressif",
+      "group": "release",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "iac",
+      "label": "Infrastructure as Code",
+      "group": "platform",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "cluster",
+      "label": "Orchestrateur de conteneurs",
+      "group": "platform",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "replicas",
+      "label": "Réplicas API",
+      "group": "platform",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "workers",
+      "label": "Workers / jobs",
+      "group": "platform",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "vault",
+      "label": "Coffre de secrets",
+      "group": "platform",
+      "section": "delivery",
+      "shape": "component"
+    },
+    {
+      "id": "instrument",
+      "label": "Instrumentation",
+      "group": "collect",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "collector",
+      "label": "Collecteur de télémétrie",
+      "group": "collect",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "traces",
+      "label": "Traces distribuées",
+      "group": "signals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "metrics",
+      "label": "Métriques",
+      "group": "signals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "logs",
+      "label": "Journaux",
+      "group": "signals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "dashboard",
+      "label": "Tableaux de bord",
+      "group": "react",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "alerts",
+      "label": "Alertes / SLO",
+      "group": "react",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "agent_run",
+      "label": "Service de workflow",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "graph_state",
+      "label": "État partagé / messages",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "supervisor",
+      "label": "Agent superviseur",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "route_decision",
+      "label": "Quel agent appeler ?",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "decision"
+    },
+    {
+      "id": "research_agent",
+      "label": "Agent recherche",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "analyst_agent",
+      "label": "Agent analyse",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "writer_agent",
+      "label": "Agent synthèse",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "review_agent",
+      "label": "Agent relecteur",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "quality_gate",
+      "label": "Révision nécessaire ?",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "decision"
+    },
+    {
+      "id": "run_output",
+      "label": "Résultat structuré",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "run_failed",
+      "label": "Arrêt contrôlé",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "run_budget",
+      "label": "Budget / nombre d’itérations",
+      "group": "agent_graph",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "agent_profile",
+      "label": "Rôle / objectifs / contexte",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "skills",
+      "label": "Catalogue de skills",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "skill_loader",
+      "label": "Chargement des instructions",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "tool_decision",
+      "label": "Outil nécessaire ?",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "decision"
+    },
+    {
+      "id": "tool_catalog",
+      "label": "Tools disponibles",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "tool_dispatch",
+      "label": "Exécuteur de tools",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "agent_messages",
+      "label": "Messages / handoffs",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "agent_response",
+      "label": "Réponse modèle structurée",
+      "group": "agent_capabilities",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "llm_port",
+      "label": "Port génération LLM",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "prompt_port",
+      "label": "Port de prompts",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "tool_port",
+      "label": "Port d’exécution tools",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "memory_port",
+      "label": "Port mémoire / retrieval",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "checkpoint_port",
+      "label": "Port checkpoint",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "trace_port",
+      "label": "Port de traçage",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "graph_port",
+      "label": "Port d’orchestration",
+      "group": "ai_ports",
+      "section": "app",
+      "shape": "component"
+    },
+    {
+      "id": "llm_adapter",
+      "label": "Adaptateur LLM",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "prompt_adapter",
+      "label": "Adaptateur prompts",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "tool_adapter",
+      "label": "Adaptateurs de tools",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "memory_adapter",
+      "label": "Adaptateur retrieval",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "checkpoint_adapter",
+      "label": "Checkpointer",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "langgraph_runtime",
+      "label": "Exécuteur LangGraph",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "trace_adapter",
+      "label": "Adaptateur traces Langfuse",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "llm_client",
+      "label": "Client fournisseur LLM",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "prompt_render",
+      "label": "Compilation du prompt",
+      "group": "ai_adapters",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cache_key",
+      "label": "Clé contexte / prompt / modèle",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cache_lookup",
+      "label": "Lecture cache de réponse",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cache_decision",
+      "label": "Cache hit ou miss ?",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "decision"
+    },
+    {
+      "id": "cache_write",
+      "label": "Écriture / TTL",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cached_output",
+      "label": "Réponse LLM en cache",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "prompt_local_cache",
+      "label": "Cache local des prompts",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "cache_invalidate",
+      "label": "Invalidation / versions",
+      "group": "cache_layer",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "llm_provider",
+      "label": "Service LLM distant",
+      "group": "llm_services",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "embedding_provider",
+      "label": "Service embeddings",
+      "group": "llm_services",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "judge_provider",
+      "label": "Service LLM évaluateur",
+      "group": "llm_services",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "response_cache",
+      "label": "Cache de réponses LLM",
+      "group": "memory_services",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "checkpoint_db",
+      "label": "Stockage des checkpoints",
+      "group": "memory_services",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "vector_db",
+      "label": "Base vectorielle",
+      "group": "memory_services",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_prompts",
+      "label": "Registre de prompts",
+      "group": "lf_prompts",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "prompt_version",
+      "label": "Version / label du prompt",
+      "group": "lf_prompts",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "prompt_variables",
+      "label": "Variables et schéma",
+      "group": "lf_prompts",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_traces",
+      "label": "Traces / sessions / spans",
+      "group": "lf_traces",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_generation",
+      "label": "Générations / tokens / coût",
+      "group": "lf_traces",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_scores",
+      "label": "Scores / annotations",
+      "group": "lf_traces",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_datasets",
+      "label": "Datasets / références",
+      "group": "lf_evals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_experiments",
+      "label": "Expériences / régressions",
+      "group": "lf_evals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_eval",
+      "label": "Évaluateur LLM-as-judge",
+      "group": "lf_evals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_code_eval",
+      "label": "Évaluations déterministes",
+      "group": "lf_evals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "lf_feedback",
+      "label": "Feedback humain",
+      "group": "lf_evals",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "eval_job",
+      "label": "Job d’évaluation asynchrone",
+      "group": "evaluation_jobs",
+      "section": "infra",
+      "shape": "component"
+    },
+    {
+      "id": "eval_adapter",
+      "label": "Adaptateur LLM évaluateur",
+      "group": "evaluation_jobs",
+      "section": "infra",
+      "shape": "component"
+    }
+  ],
+  "flows": [
+    {
+      "id": "command",
+      "label": "Création d’une ressource",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "web",
+          "target": "cdn"
+        },
+        {
+          "source": "cdn",
+          "target": "waf"
+        },
+        {
+          "source": "waf",
+          "target": "proxy"
+        },
+        {
+          "source": "proxy",
+          "target": "gateway"
+        },
+        {
+          "source": "gateway",
+          "target": "limits"
+        },
+        {
+          "source": "limits",
+          "target": "balance"
+        },
+        {
+          "source": "balance",
+          "target": "router"
+        },
+        {
+          "source": "router",
+          "target": "auth"
+        },
+        {
+          "source": "auth",
+          "target": "validation"
+        },
+        {
+          "source": "validation",
+          "target": "controller"
+        },
+        {
+          "source": "controller",
+          "target": "dto"
+        },
+        {
+          "source": "dto",
+          "target": "api_mapper"
+        },
+        {
+          "source": "api_mapper",
+          "target": "facade"
+        },
+        {
+          "source": "facade",
+          "target": "command_bus"
+        },
+        {
+          "source": "command_bus",
+          "target": "create"
+        },
+        {
+          "source": "create",
+          "target": "aggregate"
+        },
+        {
+          "source": "aggregate",
+          "target": "policy"
+        },
+        {
+          "source": "policy",
+          "target": "invariants"
+        },
+        {
+          "source": "create",
+          "target": "repo_port"
+        },
+        {
+          "source": "repo_port",
+          "target": "repository"
+        },
+        {
+          "source": "repository",
+          "target": "db_mapper"
+        },
+        {
+          "source": "db_mapper",
+          "target": "orm"
+        },
+        {
+          "source": "orm",
+          "target": "driver"
+        },
+        {
+          "source": "driver",
+          "target": "database"
+        },
+        {
+          "source": "create",
+          "target": "uow_port"
+        },
+        {
+          "source": "uow_port",
+          "target": "transaction"
+        },
+        {
+          "source": "transaction",
+          "target": "orm"
+        },
+        {
+          "source": "auth",
+          "target": "idp",
+          "label": "Clés OIDC"
+        }
+      ]
+    },
+    {
+      "id": "query",
+      "label": "Lecture d’une ressource",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "web",
+          "target": "cdn"
+        },
+        {
+          "source": "cdn",
+          "target": "waf"
+        },
+        {
+          "source": "waf",
+          "target": "proxy"
+        },
+        {
+          "source": "proxy",
+          "target": "gateway"
+        },
+        {
+          "source": "gateway",
+          "target": "limits"
+        },
+        {
+          "source": "limits",
+          "target": "balance"
+        },
+        {
+          "source": "balance",
+          "target": "router"
+        },
+        {
+          "source": "router",
+          "target": "auth"
+        },
+        {
+          "source": "auth",
+          "target": "controller"
+        },
+        {
+          "source": "controller",
+          "target": "pagination"
+        },
+        {
+          "source": "pagination",
+          "target": "facade"
+        },
+        {
+          "source": "facade",
+          "target": "query_bus"
+        },
+        {
+          "source": "query_bus",
+          "target": "read"
+        },
+        {
+          "source": "read",
+          "target": "read_port"
+        },
+        {
+          "source": "read_port",
+          "target": "cache_adapter"
+        },
+        {
+          "source": "cache_adapter",
+          "target": "cache"
+        },
+        {
+          "source": "read_port",
+          "target": "repository"
+        },
+        {
+          "source": "repository",
+          "target": "orm"
+        },
+        {
+          "source": "orm",
+          "target": "driver"
+        },
+        {
+          "source": "driver",
+          "target": "database"
+        },
+        {
+          "source": "read",
+          "target": "dto"
+        },
+        {
+          "source": "dto",
+          "target": "controller"
+        }
+      ]
+    },
+    {
+      "id": "event",
+      "label": "Événement asynchrone",
+      "kind": "event",
+      "edges": [
+        {
+          "source": "create",
+          "target": "aggregate"
+        },
+        {
+          "source": "aggregate",
+          "target": "domain_event"
+        },
+        {
+          "source": "domain_event",
+          "target": "event_payload"
+        },
+        {
+          "source": "create",
+          "target": "event_port"
+        },
+        {
+          "source": "event_port",
+          "target": "outbox"
+        },
+        {
+          "source": "outbox",
+          "target": "database"
+        },
+        {
+          "source": "database",
+          "target": "relay"
+        },
+        {
+          "source": "relay",
+          "target": "broker"
+        },
+        {
+          "source": "broker",
+          "target": "consumer"
+        },
+        {
+          "source": "consumer",
+          "target": "idempotency"
+        },
+        {
+          "source": "idempotency",
+          "target": "workflow"
+        },
+        {
+          "source": "workflow",
+          "target": "external_port"
+        },
+        {
+          "source": "external_port",
+          "target": "http"
+        },
+        {
+          "source": "http",
+          "target": "resilience"
+        },
+        {
+          "source": "resilience",
+          "target": "email"
+        },
+        {
+          "source": "consumer",
+          "target": "dlq",
+          "label": "Après échecs"
+        },
+        {
+          "source": "outbox",
+          "target": "database",
+          "label": "Même transaction que la modification métier"
+        }
+      ]
+    },
+    {
+      "id": "delivery",
+      "label": "Livraison d’une version",
+      "kind": "delivery",
+      "edges": [
+        {
+          "source": "git",
+          "target": "quality"
+        },
+        {
+          "source": "quality",
+          "target": "build"
+        },
+        {
+          "source": "build",
+          "target": "registry"
+        },
+        {
+          "source": "registry",
+          "target": "staging"
+        },
+        {
+          "source": "staging",
+          "target": "rollout"
+        },
+        {
+          "source": "rollout",
+          "target": "cluster"
+        },
+        {
+          "source": "cluster",
+          "target": "replicas"
+        },
+        {
+          "source": "replicas",
+          "target": "router"
+        },
+        {
+          "source": "cluster",
+          "target": "workers"
+        },
+        {
+          "source": "workers",
+          "target": "consumer"
+        },
+        {
+          "source": "iac",
+          "target": "cluster"
+        },
+        {
+          "source": "vault",
+          "target": "secrets"
+        },
+        {
+          "source": "config",
+          "target": "replicas"
+        },
+        {
+          "source": "migrations",
+          "target": "database"
+        }
+      ]
+    },
+    {
+      "id": "telemetry",
+      "label": "Télémétrie et alerte",
+      "kind": "telemetry",
+      "edges": [
+        {
+          "source": "correlation",
+          "target": "instrument"
+        },
+        {
+          "source": "instrument",
+          "target": "collector"
+        },
+        {
+          "source": "controller",
+          "target": "instrument"
+        },
+        {
+          "source": "workflow",
+          "target": "instrument"
+        },
+        {
+          "source": "repository",
+          "target": "instrument"
+        },
+        {
+          "source": "consumer",
+          "target": "instrument"
+        },
+        {
+          "source": "collector",
+          "target": "traces"
+        },
+        {
+          "source": "traces",
+          "target": "dashboard"
+        },
+        {
+          "source": "collector",
+          "target": "metrics"
+        },
+        {
+          "source": "metrics",
+          "target": "dashboard"
+        },
+        {
+          "source": "collector",
+          "target": "logs"
+        },
+        {
+          "source": "logs",
+          "target": "dashboard"
+        },
+        {
+          "source": "metrics",
+          "target": "alerts"
+        },
+        {
+          "source": "health",
+          "target": "cluster"
+        }
+      ]
+    },
+    {
+      "id": "connections",
+      "label": "Connexions complémentaires",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "http",
+          "target": "serialization"
+        },
+        {
+          "source": "serialization",
+          "target": "payment"
+        },
+        {
+          "source": "search_adapter",
+          "target": "search"
+        },
+        {
+          "source": "blob_adapter",
+          "target": "blob"
+        },
+        {
+          "source": "secrets",
+          "target": "vault"
+        },
+        {
+          "source": "domain_service",
+          "target": "policy"
+        },
+        {
+          "source": "factory",
+          "target": "aggregate"
+        },
+        {
+          "source": "aggregate",
+          "target": "entity"
+        },
+        {
+          "source": "entity",
+          "target": "value"
+        },
+        {
+          "source": "schedule",
+          "target": "workflow"
+        }
+      ]
+    },
+    {
+      "id": "agentic",
+      "label": "Workflow multi-agents",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "web",
+          "target": "proxy"
+        },
+        {
+          "source": "proxy",
+          "target": "gateway"
+        },
+        {
+          "source": "gateway",
+          "target": "controller"
+        },
+        {
+          "source": "controller",
+          "target": "facade"
+        },
+        {
+          "source": "facade",
+          "target": "agent_run"
+        },
+        {
+          "source": "agent_run",
+          "target": "graph_port"
+        },
+        {
+          "source": "graph_port",
+          "target": "langgraph_runtime"
+        },
+        {
+          "source": "agent_run",
+          "target": "graph_state"
+        },
+        {
+          "source": "graph_state",
+          "target": "supervisor"
+        },
+        {
+          "source": "supervisor",
+          "target": "run_budget"
+        },
+        {
+          "source": "run_budget",
+          "target": "route_decision"
+        },
+        {
+          "source": "research_agent",
+          "target": "analyst_agent"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "writer_agent"
+        },
+        {
+          "source": "writer_agent",
+          "target": "review_agent"
+        },
+        {
+          "source": "review_agent",
+          "target": "quality_gate"
+        },
+        {
+          "source": "research_agent",
+          "target": "tool_decision"
+        },
+        {
+          "source": "tool_decision",
+          "target": "tool_dispatch"
+        },
+        {
+          "source": "tool_dispatch",
+          "target": "tool_port"
+        },
+        {
+          "source": "tool_port",
+          "target": "tool_adapter"
+        },
+        {
+          "source": "tool_adapter",
+          "target": "search"
+        },
+        {
+          "source": "research_agent",
+          "target": "agent_messages"
+        },
+        {
+          "source": "agent_messages",
+          "target": "graph_state"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "agent_messages"
+        },
+        {
+          "source": "graph_state",
+          "target": "checkpoint_port"
+        },
+        {
+          "source": "checkpoint_port",
+          "target": "checkpoint_adapter"
+        },
+        {
+          "source": "checkpoint_adapter",
+          "target": "checkpoint_db"
+        },
+        {
+          "source": "research_agent",
+          "target": "llm_port"
+        },
+        {
+          "source": "llm_port",
+          "target": "llm_adapter"
+        },
+        {
+          "source": "llm_adapter",
+          "target": "llm_client"
+        },
+        {
+          "source": "llm_client",
+          "target": "llm_provider"
+        },
+        {
+          "source": "langgraph_runtime",
+          "target": "supervisor",
+          "label": "Exécute la définition applicative"
+        },
+        {
+          "source": "route_decision",
+          "target": "research_agent",
+          "label": "Si recherche nécessaire"
+        },
+        {
+          "source": "route_decision",
+          "target": "analyst_agent",
+          "label": "Si analyse nécessaire"
+        },
+        {
+          "source": "route_decision",
+          "target": "writer_agent",
+          "label": "Si contexte suffisant"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "research_agent",
+          "label": "Demande de complément"
+        },
+        {
+          "source": "tool_adapter",
+          "target": "tool_dispatch",
+          "label": "Résultat du tool"
+        },
+        {
+          "source": "tool_dispatch",
+          "target": "research_agent",
+          "label": "Observation"
+        },
+        {
+          "source": "tool_decision",
+          "target": "analyst_agent",
+          "label": "Sans outil"
+        },
+        {
+          "source": "quality_gate",
+          "target": "writer_agent",
+          "label": "À réviser et budget disponible"
+        },
+        {
+          "source": "quality_gate",
+          "target": "run_output",
+          "label": "Validé"
+        },
+        {
+          "source": "quality_gate",
+          "target": "run_failed",
+          "label": "Budget atteint / échec"
+        },
+        {
+          "source": "run_output",
+          "target": "dto",
+          "label": "Réponse API"
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "label": "Skills, tools et échanges",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "research_agent",
+          "target": "agent_profile"
+        },
+        {
+          "source": "agent_profile",
+          "target": "skills"
+        },
+        {
+          "source": "skills",
+          "target": "skill_loader"
+        },
+        {
+          "source": "research_agent",
+          "target": "tool_decision"
+        },
+        {
+          "source": "tool_decision",
+          "target": "tool_catalog"
+        },
+        {
+          "source": "tool_catalog",
+          "target": "tool_dispatch"
+        },
+        {
+          "source": "tool_dispatch",
+          "target": "tool_port"
+        },
+        {
+          "source": "tool_port",
+          "target": "tool_adapter"
+        },
+        {
+          "source": "research_agent",
+          "target": "agent_messages"
+        },
+        {
+          "source": "agent_messages",
+          "target": "analyst_agent"
+        },
+        {
+          "source": "research_agent",
+          "target": "llm_port"
+        },
+        {
+          "source": "llm_port",
+          "target": "llm_adapter"
+        },
+        {
+          "source": "research_agent",
+          "target": "memory_port"
+        },
+        {
+          "source": "memory_port",
+          "target": "memory_adapter"
+        },
+        {
+          "source": "memory_adapter",
+          "target": "vector_db"
+        },
+        {
+          "source": "memory_adapter",
+          "target": "embedding_provider"
+        },
+        {
+          "source": "skill_loader",
+          "target": "research_agent",
+          "label": "Instructions chargées"
+        },
+        {
+          "source": "tool_adapter",
+          "target": "research_agent",
+          "label": "Résultat de l’action"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "agent_messages",
+          "label": "Message de retour"
+        },
+        {
+          "source": "agent_messages",
+          "target": "graph_state",
+          "label": "État partagé"
+        },
+        {
+          "source": "supervisor",
+          "target": "skills",
+          "label": "Skills propres à cet agent"
+        },
+        {
+          "source": "supervisor",
+          "target": "tool_catalog",
+          "label": "Tools autorisés"
+        },
+        {
+          "source": "supervisor",
+          "target": "llm_port",
+          "label": "Génération"
+        },
+        {
+          "source": "supervisor",
+          "target": "agent_messages",
+          "label": "Échange explicite"
+        },
+        {
+          "source": "research_agent",
+          "target": "skills",
+          "label": "Skills propres à cet agent"
+        },
+        {
+          "source": "research_agent",
+          "target": "tool_catalog",
+          "label": "Tools autorisés"
+        },
+        {
+          "source": "research_agent",
+          "target": "llm_port",
+          "label": "Génération"
+        },
+        {
+          "source": "research_agent",
+          "target": "agent_messages",
+          "label": "Échange explicite"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "skills",
+          "label": "Skills propres à cet agent"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "tool_catalog",
+          "label": "Tools autorisés"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "llm_port",
+          "label": "Génération"
+        },
+        {
+          "source": "analyst_agent",
+          "target": "agent_messages",
+          "label": "Échange explicite"
+        },
+        {
+          "source": "writer_agent",
+          "target": "skills",
+          "label": "Skills propres à cet agent"
+        },
+        {
+          "source": "writer_agent",
+          "target": "tool_catalog",
+          "label": "Tools autorisés"
+        },
+        {
+          "source": "writer_agent",
+          "target": "llm_port",
+          "label": "Génération"
+        },
+        {
+          "source": "writer_agent",
+          "target": "agent_messages",
+          "label": "Échange explicite"
+        },
+        {
+          "source": "review_agent",
+          "target": "skills",
+          "label": "Skills propres à cet agent"
+        },
+        {
+          "source": "review_agent",
+          "target": "tool_catalog",
+          "label": "Tools autorisés"
+        },
+        {
+          "source": "review_agent",
+          "target": "llm_port",
+          "label": "Génération"
+        },
+        {
+          "source": "review_agent",
+          "target": "agent_messages",
+          "label": "Échange explicite"
+        }
+      ]
+    },
+    {
+      "id": "llm_miss",
+      "label": "Appel LLM · cache miss",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "research_agent",
+          "target": "llm_port"
+        },
+        {
+          "source": "llm_port",
+          "target": "llm_adapter"
+        },
+        {
+          "source": "llm_adapter",
+          "target": "prompt_port"
+        },
+        {
+          "source": "prompt_port",
+          "target": "prompt_adapter"
+        },
+        {
+          "source": "prompt_adapter",
+          "target": "prompt_local_cache"
+        },
+        {
+          "source": "prompt_local_cache",
+          "target": "prompt_version"
+        },
+        {
+          "source": "prompt_version",
+          "target": "prompt_render"
+        },
+        {
+          "source": "prompt_render",
+          "target": "cache_key"
+        },
+        {
+          "source": "cache_key",
+          "target": "cache_lookup"
+        },
+        {
+          "source": "cache_lookup",
+          "target": "cache_decision"
+        },
+        {
+          "source": "llm_client",
+          "target": "llm_provider"
+        },
+        {
+          "source": "llm_provider",
+          "target": "agent_response"
+        },
+        {
+          "source": "agent_response",
+          "target": "cache_write"
+        },
+        {
+          "source": "cache_write",
+          "target": "response_cache"
+        },
+        {
+          "source": "agent_response",
+          "target": "research_agent"
+        },
+        {
+          "source": "cache_lookup",
+          "target": "response_cache",
+          "label": "Lire"
+        },
+        {
+          "source": "cache_decision",
+          "target": "llm_client",
+          "label": "Miss"
+        },
+        {
+          "source": "cache_write",
+          "target": "cached_output",
+          "label": "Réponse versionnée"
+        },
+        {
+          "source": "llm_adapter",
+          "target": "trace_port",
+          "label": "Trace de génération"
+        }
+      ]
+    },
+    {
+      "id": "llm_hit",
+      "label": "Appel LLM · cache hit",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "research_agent",
+          "target": "llm_port"
+        },
+        {
+          "source": "llm_port",
+          "target": "llm_adapter"
+        },
+        {
+          "source": "llm_adapter",
+          "target": "prompt_port"
+        },
+        {
+          "source": "prompt_port",
+          "target": "prompt_adapter"
+        },
+        {
+          "source": "prompt_adapter",
+          "target": "prompt_local_cache"
+        },
+        {
+          "source": "prompt_local_cache",
+          "target": "prompt_version"
+        },
+        {
+          "source": "prompt_version",
+          "target": "prompt_render"
+        },
+        {
+          "source": "prompt_render",
+          "target": "cache_key"
+        },
+        {
+          "source": "cache_key",
+          "target": "cache_lookup"
+        },
+        {
+          "source": "cache_lookup",
+          "target": "cache_decision"
+        },
+        {
+          "source": "cached_output",
+          "target": "agent_response"
+        },
+        {
+          "source": "agent_response",
+          "target": "research_agent"
+        },
+        {
+          "source": "cache_lookup",
+          "target": "response_cache",
+          "label": "Lire"
+        },
+        {
+          "source": "cache_decision",
+          "target": "cached_output",
+          "label": "Hit : pas d’appel fournisseur"
+        },
+        {
+          "source": "llm_adapter",
+          "target": "trace_port",
+          "label": "Trace du cache hit"
+        }
+      ]
+    },
+    {
+      "id": "prompts",
+      "label": "Prompt versionné",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "prompt_port",
+          "target": "prompt_adapter"
+        },
+        {
+          "source": "prompt_adapter",
+          "target": "prompt_local_cache"
+        },
+        {
+          "source": "lf_prompts",
+          "target": "prompt_version"
+        },
+        {
+          "source": "prompt_version",
+          "target": "prompt_variables"
+        },
+        {
+          "source": "prompt_variables",
+          "target": "prompt_render"
+        },
+        {
+          "source": "prompt_version",
+          "target": "cache_invalidate"
+        },
+        {
+          "source": "cache_invalidate",
+          "target": "cache_key"
+        },
+        {
+          "source": "prompt_local_cache",
+          "target": "lf_prompts",
+          "label": "Actualisation / version absente"
+        },
+        {
+          "source": "prompt_version",
+          "target": "prompt_local_cache",
+          "label": "Mettre en cache la version"
+        }
+      ]
+    },
+    {
+      "id": "langfuse",
+      "label": "Traces et évaluations",
+      "kind": "telemetry",
+      "edges": [
+        {
+          "source": "supervisor",
+          "target": "trace_port"
+        },
+        {
+          "source": "trace_port",
+          "target": "trace_adapter"
+        },
+        {
+          "source": "trace_adapter",
+          "target": "lf_traces"
+        },
+        {
+          "source": "lf_traces",
+          "target": "lf_generation"
+        },
+        {
+          "source": "research_agent",
+          "target": "trace_port"
+        },
+        {
+          "source": "tool_dispatch",
+          "target": "trace_port"
+        },
+        {
+          "source": "lf_traces",
+          "target": "eval_job"
+        },
+        {
+          "source": "eval_job",
+          "target": "eval_adapter"
+        },
+        {
+          "source": "eval_adapter",
+          "target": "judge_provider"
+        },
+        {
+          "source": "judge_provider",
+          "target": "lf_scores"
+        },
+        {
+          "source": "lf_feedback",
+          "target": "lf_scores"
+        },
+        {
+          "source": "lf_datasets",
+          "target": "lf_experiments"
+        },
+        {
+          "source": "lf_experiments",
+          "target": "lf_eval"
+        },
+        {
+          "source": "lf_eval",
+          "target": "judge_provider"
+        },
+        {
+          "source": "lf_experiments",
+          "target": "lf_code_eval"
+        },
+        {
+          "source": "lf_code_eval",
+          "target": "lf_scores"
+        },
+        {
+          "source": "eval_job",
+          "target": "lf_eval",
+          "label": "Configuration de l’évaluateur"
+        },
+        {
+          "source": "prompt_version",
+          "target": "lf_generation",
+          "label": "Lien à la version utilisée"
+        },
+        {
+          "source": "lf_scores",
+          "target": "quality",
+          "label": "Régressions contrôlées en CI"
+        }
+      ]
+    },
+    {
+      "id": "checkpoint",
+      "label": "État et reprise de workflow",
+      "kind": "execution",
+      "edges": [
+        {
+          "source": "graph_state",
+          "target": "checkpoint_port"
+        },
+        {
+          "source": "checkpoint_port",
+          "target": "checkpoint_adapter"
+        },
+        {
+          "source": "checkpoint_adapter",
+          "target": "checkpoint_db"
+        },
+        {
+          "source": "memory_port",
+          "target": "memory_adapter"
+        },
+        {
+          "source": "memory_adapter",
+          "target": "vector_db"
+        },
+        {
+          "source": "checkpoint_db",
+          "target": "graph_state",
+          "label": "Reprendre une exécution"
+        },
+        {
+          "source": "graph_state",
+          "target": "agent_messages",
+          "label": "Messages conservés"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "source": "controller",
+      "target": "facade",
+      "label": "appelle"
+    },
+    {
+      "source": "facade",
+      "target": "create",
+      "label": "appelle"
+    },
+    {
+      "source": "create",
+      "target": "aggregate",
+      "label": "utilise le domaine"
+    },
+    {
+      "source": "create",
+      "target": "repo_port",
+      "label": "dépend du contrat"
+    },
+    {
+      "source": "create",
+      "target": "uow_port",
+      "label": "dépend du contrat"
+    },
+    {
+      "source": "read",
+      "target": "read_port",
+      "label": "dépend du contrat"
+    },
+    {
+      "source": "workflow",
+      "target": "external_port",
+      "label": "dépend du contrat"
+    },
+    {
+      "source": "repository",
+      "target": "repo_port",
+      "label": "implémente"
+    },
+    {
+      "source": "repository",
+      "target": "read_port",
+      "label": "implémente"
+    },
+    {
+      "source": "transaction",
+      "target": "uow_port",
+      "label": "implémente"
+    },
+    {
+      "source": "http",
+      "target": "external_port",
+      "label": "implémente"
+    },
+    {
+      "source": "outbox",
+      "target": "event_port",
+      "label": "implémente"
+    },
+    {
+      "source": "cache_adapter",
+      "target": "read_port",
+      "label": "implémente"
+    },
+    {
+      "source": "repository",
+      "target": "aggregate",
+      "label": "reconstitue le modèle"
+    },
+    {
+      "source": "agent_run",
+      "target": "graph_port",
+      "label": "dépend du contrat"
+    },
+    {
+      "source": "langgraph_runtime",
+      "target": "graph_port",
+      "label": "implémente"
+    },
+    {
+      "source": "research_agent",
+      "target": "llm_port",
+      "label": "dépend du contrat"
+    },
+    {
+      "source": "llm_adapter",
+      "target": "llm_port",
+      "label": "implémente"
+    },
+    {
+      "source": "prompt_adapter",
+      "target": "prompt_port",
+      "label": "implémente"
+    },
+    {
+      "source": "tool_adapter",
+      "target": "tool_port",
+      "label": "implémente"
+    },
+    {
+      "source": "checkpoint_adapter",
+      "target": "checkpoint_port",
+      "label": "implémente"
+    },
+    {
+      "source": "trace_adapter",
+      "target": "trace_port",
+      "label": "implémente"
+    },
+    {
+      "source": "memory_adapter",
+      "target": "memory_port",
+      "label": "implémente"
+    }
+  ],
+  "scroll": [
+    {
+      "step": 0,
+      "focus": "all",
+      "label": "Machine assemblée",
+      "motion": "Silhouette compacte et flux discrets."
+    },
+    {
+      "step": 1,
+      "focus": "entry",
+      "label": "Entrée",
+      "motion": "Le sas frontal s’ouvre."
+    },
+    {
+      "step": 2,
+      "focus": "api",
+      "label": "Façade",
+      "motion": "Le capot expose les filtres et contrats."
+    },
+    {
+      "step": 3,
+      "focus": "app",
+      "label": "Application",
+      "motion": "Les deux chemins classique et agentique se distinguent."
+    },
+    {
+      "step": 4,
+      "focus": "agentic",
+      "label": "Arène d’agents",
+      "motion": "Le plateau se déploie en pétales ; les messages suivent une branche du graphe."
+    },
+    {
+      "step": 5,
+      "focus": "agent",
+      "label": "Un agent",
+      "motion": "Un pod s’extrait ; ses skills, tools, contexte et ports se séparent."
+    },
+    {
+      "step": 6,
+      "focus": "domain",
+      "label": "Noyau métier",
+      "motion": "Le noyau reste stable au centre."
+    },
+    {
+      "step": 7,
+      "focus": "llm",
+      "label": "Services de modèles",
+      "motion": "Le socle ouvre ses adaptateurs et les cartouches LLM."
+    },
+    {
+      "step": 8,
+      "focus": "cache",
+      "label": "Cache",
+      "motion": "Un embranchement hit / miss se révèle."
+    },
+    {
+      "step": 9,
+      "focus": "langfuse",
+      "label": "Langfuse",
+      "motion": "Une cartouche se décompose en faces prompts, traces et évaluations."
+    },
+    {
+      "step": 10,
+      "focus": "delivery",
+      "label": "Livraison",
+      "motion": "Le rail CI/CD se déroule jusqu’au socle de déploiement."
+    },
+    {
+      "step": 11,
+      "focus": "all",
+      "label": "Réassemblage",
+      "motion": "Les pièces rejoignent leur logement et les flux restent attachés."
+    }
+  ],
+  "sources": [
+    {
+      "title": "Langfuse SDK prompt caching",
+      "url": "https://langfuse.com/docs/prompt-management/features/caching"
+    },
+    {
+      "title": "LangGraph workflows and agents",
+      "url": "https://docs.langchain.com/oss/python/langgraph/workflows-agents"
+    },
+    {
+      "title": "Langfuse prompt management",
+      "url": "https://langfuse.com/docs/prompt-management/overview"
+    },
+    {
+      "title": "Langfuse evaluation",
+      "url": "https://langfuse.com/docs/evaluation/overview"
+    },
+    {
+      "title": "Langfuse observability",
+      "url": "https://langfuse.com/docs/observability/overview"
+    }
+  ],
+  "views": [
+    {
+      "id": "all",
+      "label": "Vue d’ensemble",
+      "sections": [],
+      "groups": []
+    },
+    {
+      "id": "entry",
+      "label": "Clients et accès",
+      "sections": [
+        "clients",
+        "edge"
+      ],
+      "groups": []
+    },
+    {
+      "id": "api",
+      "label": "Façade API",
+      "sections": [
+        "api"
+      ],
+      "groups": []
+    },
+    {
+      "id": "app",
+      "label": "Services applicatifs classiques",
+      "sections": [],
+      "groups": [
+        "usecases",
+        "coordination",
+        "ports"
+      ]
+    },
+    {
+      "id": "agentic",
+      "label": "Workflow multi-agents",
+      "sections": [],
+      "groups": [
+        "agent_graph"
+      ]
+    },
+    {
+      "id": "agent",
+      "label": "À l’intérieur d’un agent",
+      "sections": [],
+      "groups": [
+        "agent_capabilities",
+        "ai_ports"
+      ]
+    },
+    {
+      "id": "domain",
+      "label": "Cœur métier",
+      "sections": [
+        "domain"
+      ],
+      "groups": []
+    },
+    {
+      "id": "infra",
+      "label": "Infrastructure · adaptateurs",
+      "sections": [],
+      "groups": [
+        "persistence",
+        "integrations",
+        "messaging",
+        "technical",
+        "ai_adapters"
+      ]
+    },
+    {
+      "id": "llm",
+      "label": "Infrastructure · appel LLM",
+      "sections": [],
+      "groups": [
+        "ai_adapters",
+        "cache_layer",
+        "llm_services",
+        "lf_prompts"
+      ]
+    },
+    {
+      "id": "cache",
+      "label": "Infrastructure · caches et mémoire",
+      "sections": [],
+      "groups": [
+        "cache_layer",
+        "memory_services"
+      ]
+    },
+    {
+      "id": "langfuse",
+      "label": "Infrastructure · Langfuse",
+      "sections": [],
+      "groups": [
+        "lf_prompts",
+        "lf_traces",
+        "lf_evals",
+        "evaluation_jobs",
+        "llm_services"
+      ]
+    },
+    {
+      "id": "services",
+      "label": "Infrastructure · services externes",
+      "sections": [],
+      "groups": [
+        "data",
+        "queues",
+        "partners",
+        "llm_services",
+        "memory_services",
+        "lf_prompts",
+        "lf_traces",
+        "lf_evals",
+        "signals",
+        "react"
+      ]
+    },
+    {
+      "id": "ops",
+      "label": "Infrastructure · observabilité",
+      "sections": [],
+      "groups": [
+        "collect",
+        "signals",
+        "react",
+        "lf_traces"
+      ]
+    },
+    {
+      "id": "delivery",
+      "label": "CI/CD et orchestration",
+      "sections": [
+        "delivery"
+      ],
+      "groups": []
+    }
+  ],
+  "overview": [
+    {
+      "section": "clients",
+      "items": [
+        [
+          "o_clients",
+          "Interfaces web / mobile",
+          [
+            "interfaces"
+          ]
+        ]
+      ]
+    },
+    {
+      "section": "edge",
+      "items": [
+        [
+          "o_edge",
+          "Proxy / sécurité / gateway",
+          [
+            "protection",
+            "routing"
+          ]
+        ]
+      ]
+    },
+    {
+      "section": "api",
+      "items": [
+        [
+          "o_api",
+          "Façade / DTO / endpoints",
+          [
+            "endpoints",
+            "contracts",
+            "guards"
+          ]
+        ]
+      ]
+    },
+    {
+      "section": "app",
+      "items": [
+        [
+          "o_classic",
+          "Services API classiques",
+          [
+            "usecases",
+            "coordination",
+            "ports"
+          ]
+        ],
+        [
+          "o_graph",
+          "Workflow multi-agents",
+          [
+            "agent_graph"
+          ]
+        ],
+        [
+          "o_agent",
+          "Skills / tools / messages",
+          [
+            "agent_capabilities"
+          ]
+        ],
+        [
+          "o_aiports",
+          "Ports IA / mémoire",
+          [
+            "ai_ports"
+          ]
+        ]
+      ]
+    },
+    {
+      "section": "domain",
+      "items": [
+        [
+          "o_domain",
+          "Modèles / règles / événements",
+          [
+            "models",
+            "rules",
+            "events"
+          ]
+        ]
+      ]
+    },
+    {
+      "section": "infra",
+      "items": [
+        [
+          "o_persistence",
+          "Persistance / événements",
+          [
+            "persistence",
+            "messaging",
+            "data",
+            "queues"
+          ]
+        ],
+        [
+          "o_adapters",
+          "Adaptateurs / exécution",
+          [
+            "integrations",
+            "technical",
+            "ai_adapters"
+          ]
+        ],
+        [
+          "o_models",
+          "LLM / embeddings / judge",
+          [
+            "llm_services"
+          ]
+        ],
+        [
+          "o_cache",
+          "Caches / mémoire",
+          [
+            "cache_layer",
+            "memory_services"
+          ]
+        ],
+        [
+          "o_lf",
+          "Langfuse : prompts / traces / évaluations",
+          [
+            "lf_prompts",
+            "lf_traces",
+            "lf_evals",
+            "evaluation_jobs"
+          ]
+        ],
+        [
+          "o_ops",
+          "Observabilité générale",
+          [
+            "collect",
+            "signals",
+            "react"
+          ]
+        ],
+        [
+          "o_partners",
+          "Services partenaires",
+          [
+            "partners"
+          ]
+        ]
+      ]
+    },
+    {
+      "section": "delivery",
+      "items": [
+        [
+          "o_delivery",
+          "CI/CD / régressions",
+          [
+            "buildchain",
+            "release"
+          ]
+        ],
+        [
+          "o_runtime",
+          "Orchestration / IaC",
+          [
+            "platform"
+          ]
+        ]
+      ]
+    }
+  ]
+}

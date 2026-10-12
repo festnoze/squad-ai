@@ -11,7 +11,7 @@ describe("ProjectSetup (Q6 — labels a11y)", () => {
     expect(
       screen.getByLabelText(/Path to an existing repo to extend/),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(/Maximum budget in dollars/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Estimated budget in dollars/)).toBeInTheDocument();
   });
 
   it("soumission désactivée sans objectif, active dès qu'il est rempli", () => {
@@ -32,5 +32,17 @@ describe("ProjectSetup (Q6 — labels a11y)", () => {
       undefined,
       undefined,
     );
+  });
+
+  it("describes the budget as an estimated guardrail and preserves its numeric value", () => {
+    const onCreate = vi.fn();
+    render(<ProjectSetup onCreate={onCreate} busy={false} />);
+    const input = screen.getByLabelText(/Estimated budget in dollars/);
+    expect(input).toHaveAccessibleDescription(/execution guardrail.*not a billing cap/);
+    expect(screen.getByText(/Calls already running can exceed it/)).toBeVisible();
+    fireEvent.change(input, { target: { value: "2.5" } });
+    fireEvent.change(screen.getByLabelText("Feature or project description"), { target: { value: "API" } });
+    fireEvent.click(screen.getByRole("button", { name: /Start the specification/ }));
+    expect(onCreate).toHaveBeenCalledWith("API", "", false, 2.5, undefined, undefined);
   });
 });

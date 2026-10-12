@@ -978,7 +978,7 @@ async def test_deploy_returns_deploy_started_and_409_while_active(green_pytest, 
         lambda state, ws, *, enabled: (True, "", "backend"),
     )
 
-    async def _noop_deploy(self):
+    async def _noop_deploy(self, **kwargs):
         return None
 
     monkeypatch.setattr(pipeline_mod.Pipeline, "_adocker_delivery_phase", _noop_deploy)
@@ -1009,7 +1009,9 @@ async def test_undeploy_404_409_200(green_pytest, monkeypatch):
 
     torn_down: list[str] = []
     monkeypatch.setattr(
-        docker_deploy, "undeploy", lambda project_id: torn_down.append(project_id)
+        docker_deploy, "undeploy", lambda project_id: (
+            torn_down.append(project_id) or docker_deploy.DockerDeployResult(True, "removed")
+        )
     )
 
     async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:

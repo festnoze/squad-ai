@@ -219,13 +219,14 @@ describe("WorkspaceViews", () => {
         stories={[story({ id: "S2", epic_id: "E2", iteration: 2 })]}
         projectId="p5"
         iterationUsage={{
-          "2": { cost_usd: 0.05, input_tokens: 1000, output_tokens: 500, agent_calls: 3 },
+          "2": { cost_usd: 0.05, input_tokens: 1000, output_tokens: 500, agent_calls: 3, unreported_calls: 1 },
         }}
       />,
     );
     fireEvent.click(screen.getByRole("tab", { name: /Iterations/ }));
     const card = screen.getByTestId("iter-card-2");
-    expect(card).toHaveTextContent("$0.0500");
+    expect(card).toHaveTextContent("Estimated: $0.0500");
+    expect(card).toHaveTextContent("⚠ Incomplete estimate: 1 call(s) without usage data");
     expect(card).toHaveTextContent("1.5k tok");
     expect(card).toHaveTextContent("3 agent calls");
   });

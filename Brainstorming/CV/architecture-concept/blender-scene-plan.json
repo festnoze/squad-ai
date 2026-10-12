@@ -1,0 +1,1566 @@
+{
+  "title": "Réacteur modulaire — API et agents",
+  "status": "Proposition de scène ; géométrie Blender à créer",
+  "units": "metres",
+  "visual_direction": {
+    "body": "Graphite sombre, surfaces mates, chanfreins nets",
+    "structure": "Titane brossé et pièces usinées",
+    "flows": "Trajets cyan ; embranchements et évaluations ambre",
+    "lighting": "Éclairage studio, liseré froid et contre-jour chaud",
+    "silhouette": "Quatre plateaux octogonaux emboîtés, noyau métier, arène d’agents et socle technique"
+  },
+  "hierarchy": [
+    {
+      "id": "ROOT",
+      "parent": null,
+      "kind": "empty",
+      "children": [
+        "ENTRY",
+        "API",
+        "APPLICATION",
+        "DOMAIN",
+        "INFRASTRUCTURE",
+        "DELIVERY"
+      ]
+    },
+    {
+      "id": "ENTRY",
+      "parent": "ROOT",
+      "kind": "gate",
+      "semantic_sections": [
+        "clients",
+        "edge"
+      ],
+      "shape": "Sas et antennes clients",
+      "explode": [
+        0,
+        0,
+        0.4
+      ]
+    },
+    {
+      "id": "API",
+      "parent": "ROOT",
+      "kind": "plate",
+      "semantic_sections": [
+        "api"
+      ],
+      "shape": "Capot octogonal et façade à filtres",
+      "z": 2.7,
+      "explode": [
+        0,
+        0,
+        1.6
+      ]
+    },
+    {
+      "id": "APPLICATION",
+      "parent": "ROOT",
+      "kind": "plate",
+      "semantic_sections": [
+        "app"
+      ],
+      "shape": "Deux secteurs : services classiques et arène d’agents",
+      "z": 1.8,
+      "explode": [
+        0,
+        0,
+        0.8
+      ]
+    },
+    {
+      "id": "DOMAIN",
+      "parent": "ROOT",
+      "kind": "core",
+      "semantic_sections": [
+        "domain"
+      ],
+      "shape": "Cylindre central, anneaux segmentés et noyau stable",
+      "z": 0.9,
+      "explode": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "INFRASTRUCTURE",
+      "parent": "ROOT",
+      "kind": "base",
+      "semantic_sections": [
+        "infra"
+      ],
+      "shape": "Socle à tiroirs ; adaptateurs et services distants gardent le même parent",
+      "z": 0,
+      "explode": [
+        0,
+        0,
+        -0.8
+      ]
+    },
+    {
+      "id": "DELIVERY",
+      "parent": "ROOT",
+      "kind": "rail",
+      "semantic_sections": [
+        "delivery"
+      ],
+      "shape": "Rail vertical, artefact mobile et socle de déploiement",
+      "explode": [
+        1.6,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "AGENT_ARENA",
+      "parent": "APPLICATION",
+      "kind": "radial_assembly",
+      "shape": "Superviseur central, agents périphériques, aiguillages conditionnels",
+      "children": [
+        "POD_SUPERVISOR",
+        "POD_RESEARCH",
+        "POD_ANALYSIS",
+        "POD_SYNTHESIS",
+        "POD_REVIEW"
+      ]
+    },
+    {
+      "id": "LANGFUSE",
+      "parent": "INFRASTRUCTURE",
+      "kind": "cartridge",
+      "shape": "Un seul boîtier à trois faces : prompts, traces, évaluations",
+      "semantic_groups": [
+        "lf_prompts",
+        "lf_traces",
+        "lf_evals",
+        "evaluation_jobs"
+      ],
+      "explode": [
+        0,
+        -1.2,
+        0
+      ]
+    },
+    {
+      "id": "LLM_SERVICES",
+      "parent": "INFRASTRUCTURE",
+      "kind": "cartridge",
+      "shape": "Cartouches modèles, embeddings et judge",
+      "semantic_groups": [
+        "llm_services"
+      ],
+      "explode": [
+        -1.2,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "CACHE_SERVICES",
+      "parent": "INFRASTRUCTURE",
+      "kind": "cartridge",
+      "shape": "Mémoire rapide, aiguillage hit / miss et stockage distinct des checkpoints",
+      "semantic_groups": [
+        "cache_layer",
+        "memory_services"
+      ],
+      "explode": [
+        1.2,
+        0,
+        0
+      ]
+    }
+  ],
+  "agent_instances": [
+    {
+      "id": "POD_SUPERVISOR",
+      "parent": "AGENT_ARENA",
+      "semantic_node": "supervisor",
+      "children": [
+        "ROLE_CONTEXT",
+        "SKILLS",
+        "TOOLS",
+        "MESSAGES",
+        "PORTS"
+      ],
+      "geometry_shared": "agent_pod",
+      "explode_mode": "radial"
+    },
+    {
+      "id": "POD_RESEARCH",
+      "parent": "AGENT_ARENA",
+      "semantic_node": "research_agent",
+      "children": [
+        "ROLE_CONTEXT",
+        "SKILLS",
+        "TOOLS",
+        "MESSAGES",
+        "PORTS"
+      ],
+      "geometry_shared": "agent_pod",
+      "explode_mode": "radial"
+    },
+    {
+      "id": "POD_ANALYSIS",
+      "parent": "AGENT_ARENA",
+      "semantic_node": "analyst_agent",
+      "children": [
+        "ROLE_CONTEXT",
+        "SKILLS",
+        "TOOLS",
+        "MESSAGES",
+        "PORTS"
+      ],
+      "geometry_shared": "agent_pod",
+      "explode_mode": "radial"
+    },
+    {
+      "id": "POD_SYNTHESIS",
+      "parent": "AGENT_ARENA",
+      "semantic_node": "writer_agent",
+      "children": [
+        "ROLE_CONTEXT",
+        "SKILLS",
+        "TOOLS",
+        "MESSAGES",
+        "PORTS"
+      ],
+      "geometry_shared": "agent_pod",
+      "explode_mode": "radial"
+    },
+    {
+      "id": "POD_REVIEW",
+      "parent": "AGENT_ARENA",
+      "semantic_node": "review_agent",
+      "children": [
+        "ROLE_CONTEXT",
+        "SKILLS",
+        "TOOLS",
+        "MESSAGES",
+        "PORTS"
+      ],
+      "geometry_shared": "agent_pod",
+      "explode_mode": "radial"
+    }
+  ],
+  "part_mapping": [
+    {
+      "semantic_node": "web",
+      "asset_id": "part_web",
+      "logical_parent": "clients",
+      "assembly_parent": "ENTRY",
+      "subassembly": "interfaces",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "mobile",
+      "asset_id": "part_mobile",
+      "logical_parent": "clients",
+      "assembly_parent": "ENTRY",
+      "subassembly": "interfaces",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "admin",
+      "asset_id": "part_admin",
+      "logical_parent": "clients",
+      "assembly_parent": "ENTRY",
+      "subassembly": "interfaces",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cdn",
+      "asset_id": "part_cdn",
+      "logical_parent": "edge",
+      "assembly_parent": "ENTRY",
+      "subassembly": "protection",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "waf",
+      "asset_id": "part_waf",
+      "logical_parent": "edge",
+      "assembly_parent": "ENTRY",
+      "subassembly": "protection",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "proxy",
+      "asset_id": "part_proxy",
+      "logical_parent": "edge",
+      "assembly_parent": "ENTRY",
+      "subassembly": "protection",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "gateway",
+      "asset_id": "part_gateway",
+      "logical_parent": "edge",
+      "assembly_parent": "ENTRY",
+      "subassembly": "routing",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "limits",
+      "asset_id": "part_limits",
+      "logical_parent": "edge",
+      "assembly_parent": "ENTRY",
+      "subassembly": "routing",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "balance",
+      "asset_id": "part_balance",
+      "logical_parent": "edge",
+      "assembly_parent": "ENTRY",
+      "subassembly": "routing",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "router",
+      "asset_id": "part_router",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "endpoints",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "controller",
+      "asset_id": "part_controller",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "endpoints",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "pagination",
+      "asset_id": "part_pagination",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "endpoints",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "facade",
+      "asset_id": "part_facade",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "contracts",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "dto",
+      "asset_id": "part_dto",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "contracts",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "api_mapper",
+      "asset_id": "part_api_mapper",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "contracts",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "auth",
+      "asset_id": "part_auth",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "guards",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "validation",
+      "asset_id": "part_validation",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "guards",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "errors",
+      "asset_id": "part_errors",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "guards",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "correlation",
+      "asset_id": "part_correlation",
+      "logical_parent": "api",
+      "assembly_parent": "API",
+      "subassembly": "guards",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "create",
+      "asset_id": "part_create",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "usecases",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "read",
+      "asset_id": "part_read",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "usecases",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "workflow",
+      "asset_id": "part_workflow",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "usecases",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "command_bus",
+      "asset_id": "part_command_bus",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "coordination",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "query_bus",
+      "asset_id": "part_query_bus",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "coordination",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "uow_port",
+      "asset_id": "part_uow_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "coordination",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "schedule",
+      "asset_id": "part_schedule",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "coordination",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "repo_port",
+      "asset_id": "part_repo_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "read_port",
+      "asset_id": "part_read_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "event_port",
+      "asset_id": "part_event_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "external_port",
+      "asset_id": "part_external_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "aggregate",
+      "asset_id": "part_aggregate",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "models",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "entity",
+      "asset_id": "part_entity",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "models",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "value",
+      "asset_id": "part_value",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "models",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "factory",
+      "asset_id": "part_factory",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "models",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "policy",
+      "asset_id": "part_policy",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "rules",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "invariants",
+      "asset_id": "part_invariants",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "rules",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "domain_service",
+      "asset_id": "part_domain_service",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "rules",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "domain_event",
+      "asset_id": "part_domain_event",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "events",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "event_payload",
+      "asset_id": "part_event_payload",
+      "logical_parent": "domain",
+      "assembly_parent": "DOMAIN",
+      "subassembly": "events",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "repository",
+      "asset_id": "part_repository",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "persistence",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "orm",
+      "asset_id": "part_orm",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "persistence",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "db_mapper",
+      "asset_id": "part_db_mapper",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "persistence",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "transaction",
+      "asset_id": "part_transaction",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "persistence",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "driver",
+      "asset_id": "part_driver",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "persistence",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "migrations",
+      "asset_id": "part_migrations",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "persistence",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "http",
+      "asset_id": "part_http",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "integrations",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "resilience",
+      "asset_id": "part_resilience",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "integrations",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "serialization",
+      "asset_id": "part_serialization",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "integrations",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "search_adapter",
+      "asset_id": "part_search_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "integrations",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "blob_adapter",
+      "asset_id": "part_blob_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "integrations",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "outbox",
+      "asset_id": "part_outbox",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "messaging",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "relay",
+      "asset_id": "part_relay",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "messaging",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "consumer",
+      "asset_id": "part_consumer",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "messaging",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "idempotency",
+      "asset_id": "part_idempotency",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "messaging",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cache_adapter",
+      "asset_id": "part_cache_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "technical",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "config",
+      "asset_id": "part_config",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "technical",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "secrets",
+      "asset_id": "part_secrets",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "technical",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "health",
+      "asset_id": "part_health",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "technical",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "database",
+      "asset_id": "part_database",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "data",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cache",
+      "asset_id": "part_cache",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "data",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "search",
+      "asset_id": "part_search",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "data",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "blob",
+      "asset_id": "part_blob",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "data",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "broker",
+      "asset_id": "part_broker",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "queues",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "dlq",
+      "asset_id": "part_dlq",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "queues",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "idp",
+      "asset_id": "part_idp",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "partners",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "payment",
+      "asset_id": "part_payment",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "partners",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "email",
+      "asset_id": "part_email",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "partners",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "git",
+      "asset_id": "part_git",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "buildchain",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "quality",
+      "asset_id": "part_quality",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "buildchain",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "build",
+      "asset_id": "part_build",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "buildchain",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "registry",
+      "asset_id": "part_registry",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "release",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "staging",
+      "asset_id": "part_staging",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "release",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "rollout",
+      "asset_id": "part_rollout",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "release",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "iac",
+      "asset_id": "part_iac",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "platform",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cluster",
+      "asset_id": "part_cluster",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "platform",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "replicas",
+      "asset_id": "part_replicas",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "platform",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "workers",
+      "asset_id": "part_workers",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "platform",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "vault",
+      "asset_id": "part_vault",
+      "logical_parent": "delivery",
+      "assembly_parent": "DELIVERY",
+      "subassembly": "platform",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "instrument",
+      "asset_id": "part_instrument",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "collect",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "collector",
+      "asset_id": "part_collector",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "collect",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "traces",
+      "asset_id": "part_traces",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "signals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "metrics",
+      "asset_id": "part_metrics",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "signals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "logs",
+      "asset_id": "part_logs",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "signals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "dashboard",
+      "asset_id": "part_dashboard",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "react",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "alerts",
+      "asset_id": "part_alerts",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "react",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "agent_run",
+      "asset_id": "part_agent_run",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "graph_state",
+      "asset_id": "part_graph_state",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "supervisor",
+      "asset_id": "POD_SUPERVISOR",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "route_decision",
+      "asset_id": "part_route_decision",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "switch"
+    },
+    {
+      "semantic_node": "research_agent",
+      "asset_id": "POD_RESEARCH",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "analyst_agent",
+      "asset_id": "POD_ANALYSIS",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "writer_agent",
+      "asset_id": "POD_SYNTHESIS",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "review_agent",
+      "asset_id": "POD_REVIEW",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "quality_gate",
+      "asset_id": "part_quality_gate",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "switch"
+    },
+    {
+      "semantic_node": "run_output",
+      "asset_id": "part_run_output",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "run_failed",
+      "asset_id": "part_run_failed",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "run_budget",
+      "asset_id": "part_run_budget",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_graph",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "agent_profile",
+      "asset_id": "part_agent_profile",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "skills",
+      "asset_id": "part_skills",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "skill_loader",
+      "asset_id": "part_skill_loader",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "tool_decision",
+      "asset_id": "part_tool_decision",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "switch"
+    },
+    {
+      "semantic_node": "tool_catalog",
+      "asset_id": "part_tool_catalog",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "tool_dispatch",
+      "asset_id": "part_tool_dispatch",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "agent_messages",
+      "asset_id": "part_agent_messages",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "agent_response",
+      "asset_id": "part_agent_response",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "agent_capabilities",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "llm_port",
+      "asset_id": "part_llm_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "prompt_port",
+      "asset_id": "part_prompt_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "tool_port",
+      "asset_id": "part_tool_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "memory_port",
+      "asset_id": "part_memory_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "checkpoint_port",
+      "asset_id": "part_checkpoint_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "trace_port",
+      "asset_id": "part_trace_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "graph_port",
+      "asset_id": "part_graph_port",
+      "logical_parent": "app",
+      "assembly_parent": "APPLICATION",
+      "subassembly": "ai_ports",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "llm_adapter",
+      "asset_id": "part_llm_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "prompt_adapter",
+      "asset_id": "part_prompt_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "tool_adapter",
+      "asset_id": "part_tool_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "memory_adapter",
+      "asset_id": "part_memory_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "checkpoint_adapter",
+      "asset_id": "part_checkpoint_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "langgraph_runtime",
+      "asset_id": "part_langgraph_runtime",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "trace_adapter",
+      "asset_id": "part_trace_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "llm_client",
+      "asset_id": "part_llm_client",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "prompt_render",
+      "asset_id": "part_prompt_render",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "ai_adapters",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cache_key",
+      "asset_id": "part_cache_key",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cache_lookup",
+      "asset_id": "part_cache_lookup",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cache_decision",
+      "asset_id": "part_cache_decision",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "switch"
+    },
+    {
+      "semantic_node": "cache_write",
+      "asset_id": "part_cache_write",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cached_output",
+      "asset_id": "part_cached_output",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "prompt_local_cache",
+      "asset_id": "part_prompt_local_cache",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "cache_invalidate",
+      "asset_id": "part_cache_invalidate",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "cache_layer",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "llm_provider",
+      "asset_id": "part_llm_provider",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "llm_services",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "embedding_provider",
+      "asset_id": "part_embedding_provider",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "llm_services",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "judge_provider",
+      "asset_id": "part_judge_provider",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "llm_services",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "response_cache",
+      "asset_id": "part_response_cache",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "memory_services",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "checkpoint_db",
+      "asset_id": "part_checkpoint_db",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "memory_services",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "vector_db",
+      "asset_id": "part_vector_db",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "memory_services",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_prompts",
+      "asset_id": "part_lf_prompts",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_prompts",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "prompt_version",
+      "asset_id": "part_prompt_version",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_prompts",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "prompt_variables",
+      "asset_id": "part_prompt_variables",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_prompts",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_traces",
+      "asset_id": "part_lf_traces",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_traces",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_generation",
+      "asset_id": "part_lf_generation",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_traces",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_scores",
+      "asset_id": "part_lf_scores",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_traces",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_datasets",
+      "asset_id": "part_lf_datasets",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_evals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_experiments",
+      "asset_id": "part_lf_experiments",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_evals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_eval",
+      "asset_id": "part_lf_eval",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_evals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_code_eval",
+      "asset_id": "part_lf_code_eval",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_evals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "lf_feedback",
+      "asset_id": "part_lf_feedback",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "lf_evals",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "eval_job",
+      "asset_id": "part_eval_job",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "evaluation_jobs",
+      "geometry": "module"
+    },
+    {
+      "semantic_node": "eval_adapter",
+      "asset_id": "part_eval_adapter",
+      "logical_parent": "infra",
+      "assembly_parent": "INFRASTRUCTURE",
+      "subassembly": "evaluation_jobs",
+      "geometry": "module"
+    }
+  ],
+  "navigation": [
+    {
+      "mode": "Scroll narratif",
+      "behavior": "Progression déterministe de la caméra et de la décomposition ; retour parfaitement réversible."
+    },
+    {
+      "mode": "Focus au clic",
+      "behavior": "Centrer et cadrer l’assemblage sélectionné ; conserver un repère vers la vue globale."
+    },
+    {
+      "mode": "Inspection libre",
+      "behavior": "Rotation orbitale, zoom borné et sélection des pièces ; la molette est réservée à ce mode lorsqu’il est activé."
+    },
+    {
+      "mode": "Décomposition",
+      "behavior": "Curseur d’ouverture global puis local : plateau → agent → skills / tools ; socle → Langfuse → capacités."
+    }
+  ],
+  "scroll_storyboard": [
+    {
+      "step": 0,
+      "focus": "all",
+      "label": "Machine assemblée",
+      "motion": "Silhouette compacte et flux discrets."
+    },
+    {
+      "step": 1,
+      "focus": "entry",
+      "label": "Entrée",
+      "motion": "Le sas frontal s’ouvre."
+    },
+    {
+      "step": 2,
+      "focus": "api",
+      "label": "Façade",
+      "motion": "Le capot expose les filtres et contrats."
+    },
+    {
+      "step": 3,
+      "focus": "app",
+      "label": "Application",
+      "motion": "Les deux chemins classique et agentique se distinguent."
+    },
+    {
+      "step": 4,
+      "focus": "agentic",
+      "label": "Arène d’agents",
+      "motion": "Le plateau se déploie en pétales ; les messages suivent une branche du graphe."
+    },
+    {
+      "step": 5,
+      "focus": "agent",
+      "label": "Un agent",
+      "motion": "Un pod s’extrait ; ses skills, tools, contexte et ports se séparent."
+    },
+    {
+      "step": 6,
+      "focus": "domain",
+      "label": "Noyau métier",
+      "motion": "Le noyau reste stable au centre."
+    },
+    {
+      "step": 7,
+      "focus": "llm",
+      "label": "Services de modèles",
+      "motion": "Le socle ouvre ses adaptateurs et les cartouches LLM."
+    },
+    {
+      "step": 8,
+      "focus": "cache",
+      "label": "Cache",
+      "motion": "Un embranchement hit / miss se révèle."
+    },
+    {
+      "step": 9,
+      "focus": "langfuse",
+      "label": "Langfuse",
+      "motion": "Une cartouche se décompose en faces prompts, traces et évaluations."
+    },
+    {
+      "step": 10,
+      "focus": "delivery",
+      "label": "Livraison",
+      "motion": "Le rail CI/CD se déroule jusqu’au socle de déploiement."
+    },
+    {
+      "step": 11,
+      "focus": "all",
+      "label": "Réassemblage",
+      "motion": "Les pièces rejoignent leur logement et les flux restent attachés."
+    }
+  ],
+  "flow_representation": {
+    "mesh": "Courbes ou tubes simples pour les connecteurs",
+    "animation": "Paquets lumineux suivant les arêtes du modèle ; seul le scénario actif est détaillé",
+    "anchoring": "Extrémités attachées à des ports nommés sur les pièces, recalculées pendant le mouvement",
+    "semantic_styles": {
+      "request": "continu",
+      "agent_message": "paquet entre pods",
+      "conditional": "aiguillage allumé",
+      "telemetry": "signal vers Langfuse",
+      "evaluation": "retour de score",
+      "cache": "bifurcation hit / miss"
+    }
+  },
+  "blender_authoring": {
+    "workflow": "Script Python paramétrique ; primitives, répétitions, chanfreins, UV et matériaux PBR",
+    "collections": "Hiérarchie identique au plan de scène ; noms stables et pivots locaux",
+    "animation": "Translations et rotations des pièces ; assemblage / éclatement / focus stockés séparément",
+    "deliverables": [
+      "reactor-api.blend",
+      "reactor-api.glb",
+      "scene-manifest.json"
+    ],
+    "labels": "Libellés détaillés en surimpression web, associés aux IDs de pièces"
+  },
+  "web_runtime": {
+    "format": "GLB / glTF 2.0",
+    "rendering": "Three.js ou React Three Fiber",
+    "drivers": "Un paramètre de scroll commun pour la caméra, les poses et les connecteurs",
+    "effects": "Halo limité aux trajets actifs ; éviter de superposer des coques transparentes complètes",
+    "accessibility": "Réduire les mouvements selon la préférence utilisateur ; conserver le contenu du CV en HTML"
+  },
+  "performance_targets": {
+    "status": "Budgets de conception à valider après export",
+    "triangles": [
+      60000,
+      100000
+    ],
+    "glb_megabytes": [
+      2,
+      5
+    ],
+    "strategies": [
+      "Réutiliser la géométrie des pods et des petites pièces",
+      "Baker les détails de surface utiles",
+      "Limiter les textures et les matériaux",
+      "Niveaux de détail pour les sous-pièces",
+      "Arrêter le rendu hors écran"
+    ]
+  }
+}

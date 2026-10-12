@@ -85,4 +85,13 @@ describe("LlmActivity", () => {
     await waitFor(() => expect(screen.getByText("failed")).toBeInTheDocument());
     expect(screen.getByText("timeout")).toBeInTheDocument();
   });
+
+  it("labels per-call amounts as estimates and discloses potentially missing usage", async () => {
+    getItemInteractions.mockResolvedValue([call()]);
+    render(<LlmActivity projectId="p1" itemId="US-1" />);
+    const estimate = await screen.findByText("Estimated: $0.0123");
+    expect(estimate).toHaveAttribute("title", expect.stringContaining("not invoices"));
+    expect(screen.getByText("About cost estimates")).toBeVisible();
+    expect(screen.getByText(/Interrupted calls/)).toHaveTextContent("missing pricing");
+  });
 });

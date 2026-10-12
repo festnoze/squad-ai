@@ -17,7 +17,7 @@ import re
 from ..config import settings
 from . import pytest_report
 
-SUPPORTED = ("python", "go", "rust")
+SUPPORTED = ("python", "go", "rust", "node")
 
 # ST-6: the frontend toolchain (React+Vite+TS+Vitest) lives alongside the
 # backend languages but is NOT a backend language — it is selected per stream
@@ -56,6 +56,8 @@ def test_command(language: str, report_path: str) -> list[str]:
     if lang == "rust":
         # --no-fail-fast: report every test, not just up to the first failure.
         return [settings.cargo_cmd, "test", "--no-fail-fast", "-q"]
+    if lang == "node":
+        return [settings.node_cmd, "--test", "--test-reporter=tap"]
     return [
         settings.uv_cmd, "run", "pytest", "-q",
         "--json-report", f"--json-report-file={report_path}",
@@ -74,6 +76,8 @@ def run_command(language: str, args: list[str] | None = None) -> list[str]:
         return [settings.go_cmd, "run", ".", *extra]
     if lang == "rust":
         return [settings.cargo_cmd, "run", "-q", *(["--", *extra] if extra else [])]
+    if lang == "node":
+        return [settings.node_cmd, "main.js", *extra]
     return [settings.uv_cmd, "run", "python", "main.py", *extra]
 
 
@@ -87,6 +91,11 @@ def parse_results(language: str, stdout: str, report_path: str) -> dict[str, str
         return _parse_go(stdout)
     if lang == "rust":
         return _parse_rust(stdout)
+    if lang == "node":
+        return {
+            m.group(2).strip(): "failed" if m.group(1) else "passed"
+            for m in re.finditer(r"^\s*(not )?ok \d+ - (.+)$", stdout, re.MULTILINE)
+        }
     return pytest_report.parse(report_path)
 
 

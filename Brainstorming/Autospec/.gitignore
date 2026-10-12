@@ -8,6 +8,8 @@ workspace/
 backend/.e2e-workspace/
 backend/.diag-workspace/
 backend/.env
+!backend/.env.example
+backend/.test-*/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.cache/

@@ -58,12 +58,11 @@ def test_web_and_fullstack_profiles_enable_strict_dod(monkeypatch):
 
 
 def test_docker_delivery_override_per_profile():
-    """Web-facing profiles auto-containerise (docker_delivery True) ; library-fast,
-    cli et brownfield ne le font jamais (False)."""
-    for profile in ("api", "web-ssr", "fullstack"):
+    """All new products are packaged; brownfield remains an explicit opt-in."""
+    for profile in ("api", "web-ssr", "fullstack", "library-fast", "cli"):
         state = ProjectState(id=f"p-dd-{profile}", name="n", goal="g", product_profile=profile)
         assert profiles.resolve_overrides(state)["docker_delivery"] is True
-    for profile in ("library-fast", "cli", "brownfield"):
+    for profile in ("brownfield",):
         state = ProjectState(id=f"p-dd-{profile}", name="n", goal="g", product_profile=profile)
         assert profiles.resolve_overrides(state)["docker_delivery"] is False
 

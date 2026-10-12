@@ -8,7 +8,7 @@ first iteration.
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from ..config import settings
 from ..models import ProjectState, Stream, StreamKind, UserStory
@@ -230,6 +230,18 @@ RUST_MAIN_TEMPLATE = """fn main() {{
 RUST_GITIGNORE = """/target/
 """ + BOOKKEEPING_IGNORE
 
+NODE_MAIN_TEMPLATE = '''console.log("Projet généré par Autospec — aucune fonctionnalité câblée pour l'instant.");
+'''
+
+NODE_PACKAGE_TEMPLATE = '''{{
+  "name": "{package}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {{"start": "node main.js", "test": "node --test"}}
+}}
+'''
+
 # ---- Frontend (ST-6): Vite + React + TS + Vitest -------------------------
 # A minimal but real Vite+React+TS skeleton with Vitest wired so `npm run build`
 # (tsc && vite build) and `npm exec -- vitest run` work from the first dev
@@ -298,7 +310,23 @@ export default defineConfig(({ mode }) => {
   const target = env.VITE_BACKEND_URL?.trim() || "http://127.0.0.1:8000";
   const proxy = { "/api": { target, changeOrigin: true } };
   return {
-    plugins: [react()],
+    plugins: [react(), {
+      name: "autospec-production-modules",
+      apply: "build",
+      generateBundle(_options, bundle) {
+        // Tests can live next to features, but must never execute in a browser.
+        // Inspect Rollup's real module graph, not minified bundle text.
+        for (const output of Object.values(bundle)) {
+          if (output.type !== "chunk") continue;
+          for (const moduleId of Object.keys(output.modules)) {
+            const id = moduleId.replace(/\\\\/g, "/").split("?")[0];
+            if (/\\/(?:@vitest|vitest)\\//.test(id) || /\\.(?:test|spec)\\.[cm]?[jt]sx?$/.test(id)) {
+              this.error(`Test-only module in production bundle: ${id}`);
+            }
+          }
+        }
+      },
+    }],
     server: { proxy },
     preview: { proxy },
     test: {
@@ -318,6 +346,7 @@ FE_INDEX_HTML_TEMPLATE = """<!doctype html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
     <title>{name}</title>
   </head>
   <body>
@@ -346,7 +375,12 @@ FE_APP_TSX = '''import React from "react";
 // NE PAS câbler une feature en éditant ce fichier — deux items parallèles y
 // entreraient en conflit de merge. N'éditer App.tsx que pour changer le
 // LAYOUT global (une seule tâche d'intégration à la fois).
-const featureModules = import.meta.glob("./features/*.tsx", { eager: true }) as Record<
+const featureModules = import.meta.glob([
+  "./features/*.tsx",
+  "!./features/*.test.tsx",
+  "!./features/*.spec.tsx",
+  "!./features/*.d.tsx",
+], { eager: true }) as Record<
   string,
   { default?: React.ComponentType }
 >;
@@ -399,8 +433,46 @@ def feature_rel_path(story: UserStory) -> str:
     return f"features/{story.id.lower().replace('-', '_')}.feature"
 
 
-def _ensure(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _inside(ws: Path, path: Path) -> Path:
+    """Validate before every scaffold write, including existing junctions.
+
+    Scaffold runs before bootstrap.prepare, and also independently for existing
+    projects. Checking only a stream's root misses e.g. frontend/src -> outside.
+    """
+    try:
+        relative = path.relative_to(ws)
+    except ValueError as exc:
+        raise ValueError(f"Chemin du scaffold hors du projet : {path}") from exc
+    # Persistence may create ws concurrently. Anchor the root once, then resolve
+    # its child, rather than comparing two independently changing root lookups.
+    resolved_root = ws.resolve()
+    resolved_path = (resolved_root / relative).resolve()
+
+    def comparison_path(resolved: Path) -> Path | PureWindowsPath:
+        # Python/Windows can retain the extended prefix for a missing child
+        # while omitting it for its newly-created parent. These spellings refer
+        # to the same location. Only normalize standard drive/UNC prefixes;
+        # never turn device namespaces (e.g. GLOBALROOT) into ordinary paths.
+        value = str(resolved)
+        if isinstance(resolved, PureWindowsPath):
+            if value.startswith("\\\\?\\UNC\\"):
+                return PureWindowsPath("\\\\" + value[8:])
+            if re.match(r"^\\\\\?\\[A-Za-z]:\\", value):
+                return PureWindowsPath(value[4:])
+        return resolved
+
+    if ".." in relative.parts or not comparison_path(resolved_path).is_relative_to(comparison_path(resolved_root)):
+        raise ValueError(f"Chemin du scaffold hors du projet : {path}")
+    return path
+
+
+def _mkdir(ws: Path, path: Path) -> None:
+    _inside(ws, path).mkdir(parents=True, exist_ok=True)
+
+
+def _ensure(ws: Path, path: Path, content: str) -> None:
+    _inside(ws, path)
+    _mkdir(ws, path.parent)
     if not path.exists():
         path.write_text(content, encoding="utf-8")
 
@@ -424,10 +496,16 @@ def scaffold(
     (e.g. ``frontend/``). The backend skeleton is unchanged, so the flag-off
     path stays byte-identical."""
     lang = _backend_language(state)
-    if lang == "go":
+    if (getattr(state, "technical_stack", {}) or {}).get("kind") == "frontend":
+        ws = workspace_dir(state.id)
+        _mkdir(ws, ws)
+        _ensure(ws, ws / ".gitignore", BOOKKEEPING_IGNORE + ".env\n.env.*\n")
+    elif lang == "go":
         ws = _scaffold_go(state)
     elif lang == "rust":
         ws = _scaffold_rust(state)
+    elif lang == "node":
+        ws = _scaffold_node(state)
     else:
         ws = _scaffold_python(state, ui_tests_enabled=ui_tests_enabled)
     if settings.streams_enabled if streams_enabled is None else streams_enabled:
@@ -450,11 +528,17 @@ def stream_root(state: ProjectState, stream: Stream) -> Path:
     """The workspace-relative root directory for a stream (ST-6). ``file_root``
     defaults to ``frontend`` for a frontend stream so the zone stays disjoint
     from the backend at the repo root."""
-    root = (stream.file_root or "").strip().strip("/\\")
+    root = (stream.file_root or "").strip()
+    portable = root.replace("\\", "/")
+    if "\x00" in root or ":" in root or PureWindowsPath(root).drive or PurePosixPath(portable).is_absolute() or ".." in portable.split("/"):
+        raise ValueError(f"Chemin du stream {stream.id!r} hors du projet : {root!r}")
     if not root and stream.kind == StreamKind.FRONTEND:
         root = "frontend"
     ws = workspace_dir(state.id)
-    return ws / root if root else ws
+    target = _inside(ws, ws / root if root else ws)
+    if (stream.kind == StreamKind.FRONTEND or toolchain.is_frontend(stream.language)) and target.resolve() == ws.resolve():
+        raise ValueError("Le frontend doit être dans un sous-dossier du projet")
+    return target
 
 
 def scaffold_frontend(state: ProjectState, stream: Stream) -> Path:
@@ -463,49 +547,51 @@ def scaffold_frontend(state: ProjectState, stream: Stream) -> Path:
     ``vitest run`` work from the first dev iteration; the dev agent adds
     components + ``*.test.tsx`` under ``src/``."""
     root = stream_root(state, stream)
+    ws = workspace_dir(state.id)
     pkg = package_name(state)
-    (root / "src").mkdir(parents=True, exist_ok=True)
-    _ensure(root / ".gitignore", FE_GITIGNORE)
-    _ensure(root / "package.json", FE_PACKAGE_JSON_TEMPLATE.format(package=pkg))
-    _ensure(root / "tsconfig.json", FE_TSCONFIG_TEMPLATE)
-    _ensure(root / "vite.config.ts", FE_VITE_CONFIG_TEMPLATE)
-    _ensure(root / "index.html", FE_INDEX_HTML_TEMPLATE.format(name=state.name))
-    _ensure(root / "src" / "setupTests.ts", FE_SETUP_TESTS)
-    _ensure(root / "src" / "main.tsx", FE_MAIN_TSX)
-    _ensure(root / "src" / "App.tsx", FE_APP_TSX)
-    _ensure(root / "src" / "App.test.tsx", FE_APP_TEST_TSX)
+    _mkdir(ws, root / "src")
+    _ensure(ws, root / ".gitignore", FE_GITIGNORE)
+    _ensure(ws, root / "package.json", FE_PACKAGE_JSON_TEMPLATE.format(package=pkg))
+    _ensure(ws, root / "tsconfig.json", FE_TSCONFIG_TEMPLATE)
+    _ensure(ws, root / "vite.config.ts", FE_VITE_CONFIG_TEMPLATE)
+    _ensure(ws, root / "index.html", FE_INDEX_HTML_TEMPLATE.format(name=state.name))
+    _ensure(ws, root / "src" / "setupTests.ts", FE_SETUP_TESTS)
+    _ensure(ws, root / "src" / "main.tsx", FE_MAIN_TSX)
+    _ensure(ws, root / "src" / "App.tsx", FE_APP_TSX)
+    _ensure(ws, root / "src" / "App.test.tsx", FE_APP_TEST_TSX)
     # Plugin convention: feature components are auto-discovered from this dir
     # (import.meta.glob in App.tsx) — no shared-file wiring between items.
-    (root / "src" / "features").mkdir(parents=True, exist_ok=True)
-    _ensure(root / "src" / "features" / ".gitkeep", "")
+    _mkdir(ws, root / "src" / "features")
+    _ensure(ws, root / "src" / "features" / ".gitkeep", "")
     return root
 
 
 def _scaffold_python(state: ProjectState, *, ui_tests_enabled: bool | None = None) -> Path:
     ws = workspace_dir(state.id)
     pkg = package_name(state)
-    (ws / pkg).mkdir(parents=True, exist_ok=True)
-    (ws / "features").mkdir(exist_ok=True)
-    (ws / "tests" / "steps").mkdir(parents=True, exist_ok=True)
+    _mkdir(ws, ws / pkg)
+    _mkdir(ws, ws / "features")
+    _mkdir(ws, ws / "tests" / "steps")
 
     ui_enabled = settings.ui_tests_enabled if ui_tests_enabled is None else ui_tests_enabled
     ui_dep = '\n    "pytest-playwright>=0.5",' if ui_enabled else ""
-    _ensure(ws / ".gitignore", GITIGNORE_TEMPLATE)
+    _ensure(ws, ws / ".gitignore", GITIGNORE_TEMPLATE)
     _ensure(
+        ws,
         ws / "pyproject.toml",
         PYPROJECT_TEMPLATE.format(package=pkg, name=state.name, ui_dep=ui_dep),
     )
-    _ensure(ws / pkg / "__init__.py", "")
+    _ensure(ws, ws / pkg / "__init__.py", "")
     # Plugin convention: features are auto-discovered from <pkg>/features/ so
     # parallel work items never wire themselves by editing main.py.
-    (ws / pkg / "features").mkdir(parents=True, exist_ok=True)
-    _ensure(ws / pkg / "features" / "__init__.py", FEATURES_INIT_TEMPLATE.format(package=pkg))
-    _ensure(ws / "tests" / "__init__.py", "")
-    _ensure(ws / "tests" / "steps" / "__init__.py", "")
+    _mkdir(ws, ws / pkg / "features")
+    _ensure(ws, ws / pkg / "features" / "__init__.py", FEATURES_INIT_TEMPLATE.format(package=pkg))
+    _ensure(ws, ws / "tests" / "__init__.py", "")
+    _ensure(ws, ws / "tests" / "steps" / "__init__.py", "")
     if ui_enabled:
-        (ws / "tests" / "ui").mkdir(parents=True, exist_ok=True)
-        _ensure(ws / "tests" / "ui" / "__init__.py", "")
-    _ensure(ws / "main.py", MAIN_TEMPLATE.format(package=pkg))
+        _mkdir(ws, ws / "tests" / "ui")
+        _ensure(ws, ws / "tests" / "ui" / "__init__.py", "")
+    _ensure(ws, ws / "main.py", MAIN_TEMPLATE.format(package=pkg))
     return ws
 
 
@@ -514,10 +600,10 @@ def _scaffold_go(state: ProjectState) -> Path:
     start, the dev adds `*_test.go` + package code."""
     ws = workspace_dir(state.id)
     pkg = package_name(state)
-    (ws / "features").mkdir(parents=True, exist_ok=True)
-    _ensure(ws / ".gitignore", GO_GITIGNORE)
-    _ensure(ws / "go.mod", GO_MOD_TEMPLATE.format(package=pkg))
-    _ensure(ws / "main.go", GO_MAIN_TEMPLATE)
+    _mkdir(ws, ws / "features")
+    _ensure(ws, ws / ".gitignore", GO_GITIGNORE)
+    _ensure(ws, ws / "go.mod", GO_MOD_TEMPLATE.format(package=pkg))
+    _ensure(ws, ws / "main.go", GO_MAIN_TEMPLATE.format())
     return ws
 
 
@@ -526,17 +612,26 @@ def _scaffold_rust(state: ProjectState) -> Path:
     dev adds modules + `#[cfg(test)]` tests (or files under `tests/`)."""
     ws = workspace_dir(state.id)
     pkg = package_name(state)
-    (ws / "features").mkdir(parents=True, exist_ok=True)
-    _ensure(ws / ".gitignore", RUST_GITIGNORE)
-    _ensure(ws / "Cargo.toml", CARGO_TOML_TEMPLATE.format(package=pkg))
-    _ensure(ws / "src" / "main.rs", RUST_MAIN_TEMPLATE)
+    _mkdir(ws, ws / "features")
+    _ensure(ws, ws / ".gitignore", RUST_GITIGNORE)
+    _ensure(ws, ws / "Cargo.toml", CARGO_TOML_TEMPLATE.format(package=pkg))
+    _ensure(ws, ws / "src" / "main.rs", RUST_MAIN_TEMPLATE.format())
+    return ws
+
+
+def _scaffold_node(state: ProjectState) -> Path:
+    ws = workspace_dir(state.id)
+    _mkdir(ws, ws)
+    _ensure(ws, ws / "package.json", NODE_PACKAGE_TEMPLATE.format(package=package_name(state).replace("_", "-")))
+    _ensure(ws, ws / "main.js", NODE_MAIN_TEMPLATE)
+    _ensure(ws, ws / ".gitignore", FE_GITIGNORE + BOOKKEEPING_IGNORE + ".env\n.env.*\n")
     return ws
 
 
 def write_feature_files(state: ProjectState, stories: list[UserStory]) -> None:
     ws = workspace_dir(state.id)
     for story in stories:
-        path = ws / feature_rel_path(story)
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path = _inside(ws, ws / feature_rel_path(story))
+        _mkdir(ws, path.parent)
         gherkin = story.gherkin.strip() + "\n"
         path.write_text(gherkin, encoding="utf-8")

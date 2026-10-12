@@ -28,6 +28,45 @@ def _feedback(state: ProjectState) -> str:
     return "\n".join(f"- {f}" for f in state.feedback[-10:]) or "(aucun)"
 
 
+def _foundation_context(state: ProjectState | None, package_name: str = "<pkg>") -> str:
+    """The verified foundation is an input to planning, never unfinished work."""
+    if state is None or state.bootstrap_status != "ready" or not state.technical_stack:
+        return ""
+    stack = state.technical_stack
+    convention = "Respecte les points d'entrée et les conventions existants de la stack choisie."
+    if stack.get("backend") == "python" and stack.get("kind") in {"api", "fullstack", "backend"}:
+        convention = (
+            f"FastAPI existe déjà : ajoute les routes métier dans `{package_name}/features/<feature>.py` "
+            "avec `def register(app):` ; `app` est l'instance FastAPI existante. "
+            "La factory découvre et appelle ces hooks ; ne recrée ni app ni serveur, "
+            "et n'utilise pas le hook sans argument `register()`."
+        )
+    if stack.get("kind") == "frontend":
+        convention = "Le produit est frontend-only : étends React existant ; aucun backend ni projet Python à ajouter."
+    return f"""SOCLE TECHNIQUE DÉJÀ VÉRIFIÉ (bootstrap_status=ready) :
+{json.dumps(stack, ensure_ascii=False)}
+Le scaffold, l'installation, les points d'entrée et les checks techniques ont déjà
+été exécutés avec succès. Ne planifie AUCUNE story/tâche d'amorçage, scaffolding,
+app factory, lancement uvicorn, configuration initiale ou recréation de serveur.
+Planifie seulement le DELTA fonctionnel demandé ; préserve les tests du socle.
+{convention}
+Pour un besoin minuscule (un endpoint simple et/ou un petit écran), MAXIMUM 2 stories
+dans 1 epic, idéalement 1 story. Une tâche backend et une frontend suffisent si
+deux streams sont nécessaires. Livre les tests avec le comportement ; ne crée
+pas de tâches séparées pour des couches, fichiers, câblages ou tests triviaux.
+"""
+
+
+def _native_verification_rule() -> str:
+    return """Lis les manifests présents et lance TOUTES les suites pertinentes :
+   Python (`pyproject.toml`) → `uv run pytest` ; Go (`go.mod`) → `go test ./...` ;
+   Rust (`Cargo.toml`) → `cargo test` ; Node (`package.json`) → le script de test
+   déclaré (`npm test` ou `npm run test:unit`). Si un frontend existe, lance aussi
+   ses tests et son build depuis son propre répertoire (manifest/frontend_root).
+   N'exécute pas une commande Python sur un projet sans Python. Toutes les suites
+   natives et les tests du socle doivent RESTER verts."""
+
+
 def _criteria_block(story: UserStory) -> str:
     """Render acceptance criteria as '- [AC-n] text' lines (ids referenced by QA)."""
     return "\n".join(f"- [{c.id}] {c.text}" for c in story.acceptance_criteria)
@@ -149,15 +188,16 @@ def dev_revise(
     lessons: str = "",
     available_skills: str = "",
     knowledge: str = "",
+    state: ProjectState | None = None,
 ) -> str:
-    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance, lessons=lessons, available_skills=available_skills)}
+    verification = _native_verification_rule() if state is not None else "`uv run pytest` doit RESTER verte après tes modifications."
+    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance, lessons=lessons, available_skills=available_skills, backend_language=state.backend_language.value if state else 'python', state=state)}
 {knowledge}
 ⚠️ BOUCLE DE RAFFINEMENT — le code de cette story passe déjà au vert, mais un
 critique a relevé des points d'amélioration :
 {critique}
 
-Améliore le code en intégrant ces retours. CONTRAINTE ABSOLUE : toute la suite
-`uv run pytest` doit RESTER verte après tes modifications. Réponds avec le même
+Améliore le code en intégrant ces retours. CONTRAINTE ABSOLUE : {verification} Réponds avec le même
 objet JSON que précédemment."""
 
 
@@ -202,7 +242,7 @@ Règles :
    frontend, démarrage du serveur, requêtes HTTP) pour confirmer le diagnostic.
 2. Corrige la VRAIE cause côté code/config — n'affaiblis JAMAIS un test, ne
    supprime aucune vérification, ne contourne pas le gate.
-3. CONTRAINTE ABSOLUE : toute la suite `uv run pytest` doit RESTER verte.
+3. CONTRAINTE ABSOLUE : {_native_verification_rule()}
 4. Reste minimal : c'est une réparation de câblage, pas une réécriture.
 
 Réponds avec EXACTEMENT UN objet JSON :
@@ -242,16 +282,16 @@ applicatif ET le `Dockerfile`. Causes classiques à vérifier en priorité :
 - l'application écoute sur `127.0.0.1` (localhost) au lieu de `0.0.0.0` : depuis
   l'hôte/le réseau Docker le conteneur paraît muet → le health check échoue.
   Fais écouter le serveur sur `0.0.0.0` (host `0.0.0.0`, pas `localhost`) ;
-- le port sur lequel écoute l'app dans `main.py` ne correspond pas au `EXPOSE`
+- le port sur lequel écoute le point d'entrée natif ne correspond pas au `EXPOSE`
   du Dockerfile ni au label `autospec.port` : aligne le port applicatif, le
   `EXPOSE` et le port publié ;
 - le build frontend (`frontend/dist`) est absent de l'image : dans un Dockerfile
   multi-stage, le `COPY --from=<stage> /fe/dist ./frontend/dist` (ou vers le
   répertoire servi) manque ou pointe un mauvais chemin de sortie (ex. sortie
   Angular vs Vite `dist/`) → le backend sert une page vide ;
-- une dépendance présente dans `.venv` mais ABSENTE de `pyproject.toml` : l'image
-  installe via `uv sync --no-dev` et plante à l'import au démarrage. Déclare la
-  dépendance manquante dans `pyproject.toml` ;
+- une dépendance présente sur l'hôte mais ABSENTE du manifest/lockfile de la
+  stack : déclare-la parmi les dépendances de production (pas de dev uniquement)
+  et installe-la pendant le build de l'image, jamais au démarrage ;
 - des hypothèses de chemins liées à la disposition de l'hôte (chemins absolus,
   fichiers hors image, cwd) qui n'existent pas dans le conteneur.
 
@@ -260,7 +300,7 @@ Règles :
    logs`) pour confirmer le diagnostic avant de corriger.
 2. Corrige la VRAIE cause côté code/config/Dockerfile — n'affaiblis JAMAIS un
    test, ne supprime aucune vérification, ne contourne pas le gate.
-3. CONTRAINTE ABSOLUE : toute la suite `uv run pytest` doit RESTER verte.
+3. CONTRAINTE ABSOLUE : {_native_verification_rule()}
 4. Reste minimal : c'est une réparation d'empaquetage/câblage, pas une réécriture.
 
 Réponds avec EXACTEMENT UN objet JSON :
@@ -279,6 +319,8 @@ def decompose_story(
     architecture: str = "",
     available_skills: str = "",
     existing_plan: str = "",
+    *,
+    state: ProjectState | None = None,
 ) -> str:
     """SK-2: split a backend story into per-LAYER sub-tasks, each built by a
     focused subagent (tiny context window) in parallel then aggregated. The
@@ -297,6 +339,21 @@ def decompose_story(
         if existing_plan
         else ""
     )
+    wiring = f"""- CONVENTION D'AUTO-ENREGISTREMENT : le scaffold câble les features via
+  `{package_name}/features/<module>.py` (hook `register()`). Si une sous-tâche doit
+  enregistrer/exposer sa feature, son `file_globs` DOIT inclure son module
+  `{package_name}/features/<son_module>.py` - sinon le scope guard retirera ce
+  fichier légitime avant merge. Une sous-tâche de couche interne (entité,
+  repository, service) n'a PAS à créer de module features/ : ne pas en générer.
+- AMORÇAGE WEB : cette convention câble les ROUTES, PAS le démarrage du serveur.
+  Si le produit doit ÉCOUTER sur un port, la DERNIÈRE sous-tâche est une tâche
+  d'amorçage (`file_globs` = `["main.py", "{package_name}/app.py", "pyproject.toml"]`,
+  `depends_on` toutes les autres) : app factory `create_app()` qui monte les
+  routes publiées par les features, `python main.py` nu qui démarre
+  `uvicorn.run(create_app(), host="0.0.0.0", port=8000)`, `--help` sans port.
+  L'usine l'ajoute d'office si tu l'oublies."""
+    if _foundation_context(state):
+        wiring = _foundation_context(state, package_name)
     return f"""Tu es l'architecte d'un pipeline automatisé. Tu DÉCOMPOSES une user story
 backend en SOUS-TÂCHES par COUCHE : chacune est confiée à un sous-agent focalisé
 (fenêtre de contexte réduite), les sous-tâches indépendantes sont construites EN
@@ -329,19 +386,7 @@ VIDE ou à un seul élément.
   permet de PARALLÉLISER en sûreté : deux sous-tâches qui revendiquent un MÊME
   fichier seront sérialisées automatiquement. Vise des zones DISJOINTES par couche ;
   ne JAMAIS laisser deux sous-tâches réécrire le même fichier sans `depends_on`.
-- CONVENTION D'AUTO-ENREGISTREMENT : le scaffold câble les features via
-  `{package_name}/features/<module>.py` (hook `register()`). Si une sous-tâche doit
-  enregistrer/exposer sa feature, son `file_globs` DOIT inclure son module
-  `{package_name}/features/<son_module>.py` - sinon le scope guard retirera ce
-  fichier légitime avant merge. Une sous-tâche de couche interne (entité,
-  repository, service) n'a PAS à créer de module features/ : ne pas en générer.
-- AMORÇAGE WEB : cette convention câble les ROUTES, PAS le démarrage du serveur.
-  Si le produit doit ÉCOUTER sur un port, la DERNIÈRE sous-tâche est une tâche
-  d'amorçage (`file_globs` = `["main.py", "{package_name}/app.py", "pyproject.toml"]`,
-  `depends_on` toutes les autres) : app factory `create_app()` qui monte les
-  routes publiées par les features, `python main.py` nu qui démarre
-  `uvicorn.run(create_app(), host="0.0.0.0", port=8000)`, `--help` sans port.
-  L'usine l'ajoute d'office si tu l'oublies.
+{wiring}
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{
@@ -373,6 +418,7 @@ def decompose_finer(
     architecture: str = "",
     available_skills: str = "",
     proactive: bool = False,
+    state: ProjectState | None = None,
 ) -> str:
     """Adaptive split: a unit (US or task) either FAILED its dev attempts
     (reactive, default) or was judged too big at SPEC time by the S2 resize
@@ -419,7 +465,8 @@ Acceptance Gherkin (vision de bout en bout, NE PAS la modifier) :
 {reason_label} :
 \"\"\"{(reason or 'non disponible')[:1500]}\"\"\"
 
-{sizing_rules()}
+{_foundation_context(state, package_name)}
+{sizing_rules(state)}
 
 Règles de découpage :
 - {front_rule}
@@ -1415,7 +1462,7 @@ En cas de doute, choisis "go".
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{
-  "language": "python|go|rust",
+  "language": "python|go|rust|node",
   "complexity": <1-5>,
   "criticality": <1-5>,
   "rationale": "<une phrase en français justifiant le choix>"
@@ -1515,13 +1562,28 @@ Réponds avec EXACTEMENT UN objet JSON :
 # ---------------------------------------------------------- Architect (design)
 
 def architect_design(state: ProjectState, package_name: str) -> str:
+    from ..orchestrator.stack import contract
     titles = [s.title for s in state.stories_of_iteration(state.iteration)]
     stories = "\n".join(f"- {t}" for t in titles) or "(aucune)"
     # V3-F4.3: accepted ADRs + architecture notes ("" when injection is off —
     # the flag-off prompt stays byte-identical).
     knowledge = knowledge_context(state, audience="architect")
+    integration = """Si le produit est une app WEB avec un frontend buildé (SPA React/Vite…), le design
+DOIT inclure l'exigence d'INTÉGRATION (mode INTÉGRÉ) : le backend sert le build
+`frontend/dist` à la racine `/` (montage statique + fallback SPA) et le frontend
+consomme l'API en URLs RELATIVES (`/api/...`, jamais `http://localhost:...`).
+C'est vérifié à l'exécution par la gate runtime - un montage manquant est un échec."""
+    if _foundation_context(state):
+        integration = (
+            "Préserve l'intégration déjà vérifiée : URLs API relatives et assets servis "
+            "depuis AUTOSPEC_STATIC_DIR pour un fullstack. Un frontend-only reste autonome. "
+            "Décris uniquement les nouveaux modules/comportements demandés, sans travaux "
+            "d'initialisation ou de remplacement de la factory existante."
+        )
     return f"""Tu es l'architecte technique d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief}\"\"\"
+{contract(state)}
+{_foundation_context(state, package_name)}
 
 Stories planifiées de l'itération courante :
 {stories}
@@ -1531,11 +1593,7 @@ qui guidera le QA et le développeur. Pas de sur-ingénierie : juste assez pour
 guider l'implémentation (architecture cible en couches/modules, composants clés,
 conventions de nommage, contraintes transverses).
 
-Si le produit est une app WEB avec un frontend buildé (SPA React/Vite…), le design
-DOIT inclure l'exigence d'INTÉGRATION (mode INTÉGRÉ) : le backend sert le build
-`frontend/dist` à la racine `/` (montage statique + fallback SPA) et le frontend
-consomme l'API en URLs RELATIVES (`/api/...`, jamais `http://localhost:...`).
-C'est vérifié à l'exécution par la gate runtime - un montage manquant est un échec.
+{integration}
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{"message": "<une phrase, français>", "design": "<markdown court : architecture cible (couches/modules), composants clés, conventions de nommage, contraintes transverses>"}}"""
@@ -1551,6 +1609,25 @@ def _streams_plan_block(state: ProjectState) -> str:
     if not (settings.streams_enabled or state.streams):
         return ""
     stream_ids = ", ".join(s.id for s in state.effective_streams())
+    wiring = """MIEUX : le scaffold AUTO-DÉCOUVRE les features (`<pkg>/features/<feature>.py`
+exposant `register()` ; `frontend/src/features/<Feature>.tsx` en export default) —
+une feature câblée par convention n'a besoin d'AUCUNE tâche d'intégration
+POUR SES ROUTES.
+AMORÇAGE WEB (OBLIGATOIRE dès que le produit doit ÉCOUTER sur un port) : la
+convention câble les ROUTES, jamais le DÉMARRAGE DU SERVEUR. Le plan DOIT donc
+porter UNE tâche d'amorçage, en FIN de chaîne backend (elle `depends_on` toutes
+les autres tâches backend), avec `main.py`, `<pkg>/app.py` et `pyproject.toml`
+dans ses `file_globs` : une app factory `create_app()` qui monte les routes
+publiées par les features, puis `python main.py` SANS argument qui démarre
+`uvicorn.run(create_app(), host="0.0.0.0", port=8000)` (`--help` affiche l'aide
+sans lier de port). L'usine l'ajoute d'office si le plan l'oublie, mais c'est au
+plan de la porter."""
+    if _foundation_context(state):
+        wiring = """SOCLE VÉRIFIÉ : aucun travail d'amorçage, de configuration ou d'intégration
+technique déjà couverte par le bootstrap. Les dépendances entre streams portent
+sur les NOUVEAUX contrats métier, pas sur la recréation du serveur.
+Avec FastAPI, le hook de feature est `register(app)` sur l'application existante.
+Un changement simple API + écran tient dans une story et deux tâches au maximum."""
     return f"""
 
 DÉCOUPAGE MULTI-STREAM (le travail est réparti en streams parallèles).
@@ -1576,19 +1653,7 @@ réécrire le même fichier par deux tâches parallèles — les FICHIERS PARTAG
 UNE tâche d'INTÉGRATION par story/stream : les tâches de feature créent leurs
 PROPRES fichiers et exportent ; la tâche d'intégration fait le câblage et
 `depends_on` les features. C'est LA cause n°1 des conflits de merge inter-stream.
-MIEUX : le scaffold AUTO-DÉCOUVRE les features (`<pkg>/features/<feature>.py`
-exposant `register()` ; `frontend/src/features/<Feature>.tsx` en export default) —
-une feature câblée par convention n'a besoin d'AUCUNE tâche d'intégration
-POUR SES ROUTES.
-AMORÇAGE WEB (OBLIGATOIRE dès que le produit doit ÉCOUTER sur un port) : la
-convention câble les ROUTES, jamais le DÉMARRAGE DU SERVEUR. Le plan DOIT donc
-porter UNE tâche d'amorçage, en FIN de chaîne backend (elle `depends_on` toutes
-les autres tâches backend), avec `main.py`, `<pkg>/app.py` et `pyproject.toml`
-dans ses `file_globs` : une app factory `create_app()` qui monte les routes
-publiées par les features, puis `python main.py` SANS argument qui démarre
-`uvicorn.run(create_app(), host="0.0.0.0", port=8000)` (`--help` affiche l'aide
-sans lier de port). L'usine l'ajoute d'office si le plan l'oublie, mais c'est au
-plan de la porter.
+{wiring}
 
 TECHNICAL STORIES (TS) — découpage fin du travail technique/complexe.
 Pour un travail TECHNIQUE transverse ou une pièce COMPLEXE qui n'est pas une vraie
@@ -1609,6 +1674,7 @@ Champs TS : {{"id", "technical": true, "contract": "...", "depends_on": [...],
 
 
 def po_plan(state: ProjectState, package_name: str) -> str:
+    from ..orchestrator.stack import contract
     existing = [
         {"id": s.id, "title": s.title, "status": s.status.value}
         for s in state.stories
@@ -1619,6 +1685,8 @@ def po_plan(state: ProjectState, package_name: str) -> str:
     knowledge = knowledge_context(state, audience="po")
     return f"""Tu es le PO/Scrum Master d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief}\"\"\"
+{contract(state)}
+{_foundation_context(state, package_name)}
 
 Stories déjà existantes dans le projet (itérations précédentes) :
 {json.dumps(existing, ensure_ascii=False)}
@@ -1629,9 +1697,8 @@ stories. Adapte la granularité à la complexité : une petite feature = 1 epic 
 - avoir une description classique ("En tant que..., je veux..., afin de...") ;
 - avoir des critères d'acceptance précis et testables ;
 - avoir un test d'acceptance Gherkin (langue: français, mots-clés Gherkin
-  anglais: Feature/Scenario/Given/When/Then) exécutable avec pytest-bdd contre
-  du code Python du package `{package_name}` (teste des fonctions/classes
-  Python, PAS d'interface graphique ni de réseau) ;
+  anglais: Feature/Scenario/Given/When/Then), implémenté avec la suite native
+  du backend {state.backend_language.value} (package `{package_name}`) ;
 - déclarer ses dépendances vers d'autres stories via leurs ids quand l'ordre
   d'implémentation compte (les stories sans dépendance mutuelle pourront être
   implémentées en parallèle) ;
@@ -1672,12 +1739,27 @@ ce même JSON (ou des stories existantes listées plus haut)."""
 
 # ------------------------------------------- PO pipeline (RFC po-pipeline-v2)
 
-def sizing_rules() -> str:
+def sizing_rules(state: ProjectState | None = None) -> str:
     """§5 — the ONE shared "découpe" brain: the granularity rules consumed by
     S1 (`po_structure`), its critic (`structure_criteria`), the S2 cross critic
     and the reactive `decompose_finer`, so the system's notion of "right-sized"
     never forks between proactive and reactive paths."""
     budget = settings.task_file_budget
+    wiring = """  MIEUX : le scaffold AUTO-DÉCOUVRE `<pkg>/features/<feature>.py` (`register()`)
+  et `frontend/src/features/<Feature>.tsx` (export default) — une feature câblée
+  par convention n'a besoin d'AUCUNE tâche d'intégration POUR SES ROUTES.
+- AMORÇAGE WEB : la convention câble les ROUTES, PAS le démarrage du serveur.
+  Un produit qui doit ÉCOUTER sur un port porte TOUJOURS une tâche d'amorçage en
+  FIN de chaîne backend (app factory `<pkg>/app.py` + `main.py` qui lance
+  `uvicorn.run(create_app(), host="0.0.0.0", port=8000)`, `--help` sans port),
+  avec `main.py`/`<pkg>/app.py`/`pyproject.toml` dans ses `file_globs`. L'usine
+  l'ajoute d'office si le plan l'oublie."""
+    if _foundation_context(state):
+        wiring = """- SOCLE VÉRIFIÉ : aucun amorçage/serveur à planifier. Modifie les points
+  d'entrée seulement si le nouveau comportement le nécessite réellement.
+  En FastAPI, les features utilisent `register(app)` ; garde la factory existante.
+- PETIT BESOIN : un endpoint simple et/ou un petit écran = MAXIMUM 2 stories,
+  idéalement une, avec tests inclus. Aucune tâche de couche/câblage triviale."""
     return f"""RÈGLES DE DÉCOUPE (communes à tout le pipeline) :
 - BUDGET FICHIERS : une feuille (tâche, ou story sans tâches) doit tenir dans UNE
   session d'un agent de codage → au plus {budget} fichiers créés/modifiés
@@ -1695,20 +1777,12 @@ def sizing_rules() -> str:
   les tâches de feature créent leurs PROPRES fichiers et exportent ; le câblage
   dans les fichiers partagés est fait par la tâche d'intégration qui `depends_on`
   les features. C'est LA cause n°1 des conflits de merge entre unités parallèles.
-  MIEUX : le scaffold AUTO-DÉCOUVRE `<pkg>/features/<feature>.py` (`register()`)
-  et `frontend/src/features/<Feature>.tsx` (export default) — une feature câblée
-  par convention n'a besoin d'AUCUNE tâche d'intégration POUR SES ROUTES.
-- AMORÇAGE WEB : la convention câble les ROUTES, PAS le démarrage du serveur.
-  Un produit qui doit ÉCOUTER sur un port porte TOUJOURS une tâche d'amorçage en
-  FIN de chaîne backend (app factory `<pkg>/app.py` + `main.py` qui lance
-  `uvicorn.run(create_app(), host="0.0.0.0", port=8000)`, `--help` sans port),
-  avec `main.py`/`<pkg>/app.py`/`pyproject.toml` dans ses `file_globs`. L'usine
-  l'ajoute d'office si le plan l'oublie.
+{wiring}
 - NI TROP GROS NI TROP FIN : fusionner les unités triviales adjacentes qui ne
   justifient pas chacune une session d'agent."""
 
 
-def file_scope_block(file_globs: list[str], *, stream_zone: str = "") -> str:
+def file_scope_block(file_globs: list[str], *, stream_zone: str = "", state: ProjectState | None = None) -> str:
     """The dev prompt's FILE SCOPE block for a unit built IN PARALLEL with
     others: stay inside the declared globs / stream zone, never touch the
     shared entry-point files unless they are explicitly in scope. This is the
@@ -1719,6 +1793,15 @@ def file_scope_block(file_globs: list[str], *, stream_zone: str = "") -> str:
         zone = f"le dossier `{stream_zone}/`"
     if not zone:
         return ""
+    hook = "register(app)" if _foundation_context(state) and state.technical_stack.get("backend") == "python" else "register()"
+    registration = f"""- CÂBLAGE PAR AUTO-DÉCOUVERTE (convention du scaffold) : dépose ta feature dans
+  `<pkg>/features/<feature>.py` (fonction `{hook}`) côté backend, ou
+  `frontend/src/features/<Feature>.tsx` (export default) côté frontend — elle
+  est câblée automatiquement, sans éditer `main.py`/`App.tsx`."""
+    if _foundation_context(state) and state.technical_stack.get("backend") != "python":
+        registration = """- CÂBLAGE NATIF : inspecte et réutilise les exports/imports et points d'entrée
+  existants de la stack sélectionnée. Aucun module ou mécanisme Python à créer.
+  Le socle est déjà vérifié ; ajoute uniquement le comportement métier demandé."""
     return f"""
 PÉRIMÈTRE FICHIERS — cette unité est construite EN PARALLÈLE d'autres ; deux
 unités qui modifient le même fichier entrent en CONFLIT DE MERGE et le travail
@@ -1728,10 +1811,7 @@ vert doit être rejoué :
   `frontend/src/App.tsx`, `frontend/src/index.css`, `README.md`…) : n'y touche
   PAS sauf s'ils figurent EXPLICITEMENT dans ton périmètre — leur câblage
   appartient à une tâche d'intégration dédiée.
-- CÂBLAGE PAR AUTO-DÉCOUVERTE (convention du scaffold) : dépose ta feature dans
-  `<pkg>/features/<feature>.py` (fonction `register()`) côté backend, ou
-  `frontend/src/features/<Feature>.tsx` (export default) côté frontend — elle
-  est câblée automatiquement, sans éditer `main.py`/`App.tsx`.
+{registration}
 - S'il te faut du code hors périmètre, crée un NOUVEAU fichier dans ta zone et
   exporte-le, plutôt que d'éditer le fichier d'une autre unité.
 """
@@ -1779,7 +1859,7 @@ importe-le : deux définitions divergentes rendent la suite combinée rouge.
 """
 
 
-def structure_criteria() -> str:
+def structure_criteria(state: ProjectState | None = None) -> str:
     """Quality criteria for the S1 structure critic (critic-first loop)."""
     return f"""- Chaque user story suit INVEST (indépendante, négociable, valeur, estimable,
   petite, testable) ; les titres portent UNE intention claire.
@@ -1789,7 +1869,8 @@ def structure_criteria() -> str:
   justifie la note ; une feuille `complex` doit être découpée en tâches.
 - Dépendances (`depends_on`) minimales, sans cycle ; l'ordre permet un maximum
   de parallélisme ; priorités kanban sensées.
-{sizing_rules()}"""
+{_foundation_context(state)}
+{sizing_rules(state)}"""
 
 
 CROSS_SPEC_CRITERIA = (
@@ -1834,6 +1915,7 @@ def po_structure(state: ProjectState, package_name: str, repo_files: list[str] |
     """S1 maker: the plan SKELETON + a complexity judgment per leaf. No
     descriptions/AC/gherkin here — S2 writes the specs, per story, in parallel.
     The unique marker « SQUELETTE du plan » keys the ScriptedRunner reply."""
+    from ..orchestrator.stack import contract
     existing = [
         {"id": s.id, "title": s.title, "status": s.status.value}
         for s in state.stories
@@ -1844,6 +1926,11 @@ def po_structure(state: ProjectState, package_name: str, repo_files: list[str] |
   feuille va créer ou modifier (chemins relatifs, jokers autorisés). Voici
   l'arbre réel du repo (vérifie tes globs contre lui, pas de `**` racine) :
 \"\"\"{listing}\"\"\""""
+    elif _foundation_context(state):
+        globs_rule = (
+            "- `file_globs` : les fichiers existants du socle ou les NOUVEAUX modules "
+            "métier à modifier/créer ; le repo existe déjà, respecte sa structure."
+        )
     else:
         globs_rule = (
             "- `area` : la zone indicative de la feuille (ex. « domaine/persistance », "
@@ -1857,11 +1944,13 @@ ultérieure spécifiera chaque story en parallèle).
 
 Brief produit :
 \"\"\"{state.brief}\"\"\"
+{contract(state)}
+{_foundation_context(state, package_name)}
 
 Stories déjà existantes dans le projet (itérations précédentes) :
 {json.dumps(existing, ensure_ascii=False)}
 {_sizing_lessons_block(state)}{_structure_streams_block(state)}{knowledge_context(state, audience="po")}{cartography_context(state)}
-{sizing_rules()}
+{sizing_rules(state)}
 
 Ta mission : découpe ce brief en 1 à 3 EPICs contenant chacun 1 à 5 user
 stories (titres seulement). Pour CHAQUE FEUILLE (tâche, ou story sans tâches),
@@ -1955,6 +2044,12 @@ Ses tâches (écris la mini-spec de CHACUNE — description + critères) :
   graphique ni de réseau) ; UN scénario par critère, chacun tagué `@AC-x` (l'id
   EXACT du critère qu'il vérifie).
 """
+        if _foundation_context(state):
+            gherkin_rule = """
+- "gherkin" : scénarios en français, mots-clés anglais, UN scénario par critère
+  tagué `@AC-x`. Les tests utiliseront la suite native de la stack et les tests
+  frontend si la story est UI ; ne crée pas de dépendance Python pour Go/Rust/Node.
+"""
     remake_block = ""
     if remake_reason:
         remake_block = f"""
@@ -1967,6 +2062,7 @@ SPÉCIFIE la story ci-dessous (et uniquement elle) à partir du squelette valid�
 
 Brief produit :
 \"\"\"{state.brief}\"\"\"
+{_foundation_context(state, package_name)}
 
 Story à spécifier (squelette) :
 {json.dumps({k: v for k, v in skeleton_story.items() if k != "tasks"}, ensure_ascii=False)}
@@ -2031,7 +2127,7 @@ Réponds avec EXACTEMENT UN objet JSON :
 }}"""
 
 
-def po_cross_review(specs: list[dict]) -> str:
+def po_cross_review(specs: list[dict], *, state: ProjectState | None = None) -> str:
     """The ONE transversal S2 critic: sees ALL the specs (compact) and hunts
     EXCLUSIVELY for inter-node defects — the ones a per-node critic is
     structurally blind to. Output: flagged node ids + reason → targeted
@@ -2044,7 +2140,8 @@ pas le style d'une story isolée).
 Ce que tu cherches (exclusivement) :
 {CROSS_SPEC_CRITERIA}
 
-{sizing_rules()}
+{_foundation_context(state)}
+{sizing_rules(state)}
 
 Spécifications de l'itération (compactes) :
 {json.dumps(specs, ensure_ascii=False, indent=1)}
@@ -2105,6 +2202,12 @@ _LANG_PROFILE = {
         "test_fw": "les tests Rust (`#[cfg(test)] mod tests { ... }` ou fichiers sous `tests/`)",
         "test_cmd": "cargo test",
         "file_hint": "tests/{snake}.rs",
+    },
+    "node": {
+        "project": "un projet Node.js ESM (package.json présent, main.js)",
+        "test_fw": "node:test et node:assert/strict (fichiers *.test.js)",
+        "test_cmd": "node --test",
+        "file_hint": "tests/{snake}.test.js",
     },
 }
 
@@ -2261,7 +2364,7 @@ PROCESSUS OBLIGATOIRE (TDD outside-in, en {backend_language}) :
    passer les tests un à un, du comportement externe vers l'interne.
 3. Relance `{prof['test_cmd']}` jusqu'à ce que TOUTE la suite soit verte (les
    tests des stories précédentes doivent rester verts).
-4. Câble la nouvelle fonctionnalité dans le point d'entrée ({"main.go" if backend_language == "go" else "src/main.rs"}) si pertinent.
+4. Câble la nouvelle fonctionnalité dans le point d'entrée ({ {"go": "main.go", "rust": "src/main.rs", "node": "main.js"}[backend_language] }) si pertinent.
 
 CONTRAINTES :
 - Ne modifie JAMAIS les fichiers .feature ni autospec-state.json.
@@ -2294,16 +2397,20 @@ def dev_story(
     file_scope: str = "",
     previous_failure: str = "",
     dependency_contracts: str = "",
+    state: ProjectState | None = None,
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
     guidance_block = _guidance_block(guidance, item_guidance, story.id)
+    foundation = _foundation_context(state, package_name)
+    if foundation:
+        guidance_block += "\n" + foundation
     lessons_block = (
         f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
         if lessons
         else ""
     )
-    if (backend_language or "python").lower() in ("go", "rust"):
+    if (backend_language or "python").lower() in ("go", "rust", "node"):
         return _dev_story_native(
             backend_language, story, package_name, feature_rel_path,
             arch_block, guidance_block, lessons_block, _format_test_plan(story),
@@ -2316,6 +2423,31 @@ def dev_story(
     plan = _format_test_plan(story)
     plan_section = ""
     plan_step = ""
+    wiring = f"""Câble la fonctionnalité — de préférence par AUTO-DÉCOUVERTE : dépose un
+   module `{package_name}/features/<ta_feature>.py` exposant `register()`
+   (main.py les découvre automatiquement) plutôt que d'éditer `main.py`, que
+   des unités parallèles modifieraient en conflit. Le projet DOIT rester
+   lançable tel quel. Pour un CLI, expose la commande. Pour une APP WEB / API
+   (FastAPI, Flask…), `python main.py` DOIT DÉMARRER LE SERVEUR
+   (`if __name__ == "__main__":` → `uvicorn.run(app, host="0.0.0.0", port=8000)`
+   — host `0.0.0.0`, PAS `127.0.0.1` : l'app doit rester joignable une fois
+   empaquetée dans un conteneur Docker)
+   — SEULE cette évolution du point d'entrée justifie de toucher `main.py` —
+   et la DÉPENDANCE D'EXÉCUTION (ex. `uvicorn`) DOIT être déclarée dans
+   `pyproject.toml` (`dependencies`). Ne te contente JAMAIS d'imprimer des
+   instructions de lancement à la place du démarrage réel.
+   SI TA TÂCHE PORTE `main.py` DANS SON PÉRIMÈTRE : `python main.py` NU (sans
+   aucun argument) DOIT DÉMARRER LE SERVEUR et rester en écoute ; `--help`/`-h`
+   affiche l'aide et ne lie AUCUN port. Une bannière suivie d'un `return 0` est
+   un ÉCHEC du smoke run."""
+    if foundation:
+        wiring = (
+            f"Étends le socle vérifié. Pour FastAPI, crée `{package_name}/features/<ta_feature>.py` "
+            "avec `def register(app):` et déclare tes routes sur cette instance. "
+            "Préserve le serveur, la factory et leurs tests existants ; aucun démarrage à recréer."
+        )
+        if state.technical_stack.get("kind") not in {"api", "fullstack", "backend"}:
+            wiring = "Étends les modules existants de la CLI/bibliothèque, conserve son point d'entrée et ses tests."
     if plan:
         plan_section = f"""
 L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
@@ -2351,23 +2483,7 @@ PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
    des tests unitaires TDD si tu crées de la logique non couverte.
 {"5" if plan else "4"}. Relance `uv run pytest` jusqu'à ce que TOUTE la suite soit verte (les tests
    des stories précédentes doivent rester verts).
-{"6" if plan else "5"}. Câble la fonctionnalité — de préférence par AUTO-DÉCOUVERTE : dépose un
-   module `{package_name}/features/<ta_feature>.py` exposant `register()`
-   (main.py les découvre automatiquement) plutôt que d'éditer `main.py`, que
-   des unités parallèles modifieraient en conflit. Le projet DOIT rester
-   lançable tel quel. Pour un CLI, expose la commande. Pour une APP WEB / API
-   (FastAPI, Flask…), `python main.py` DOIT DÉMARRER LE SERVEUR
-   (`if __name__ == "__main__":` → `uvicorn.run(app, host="0.0.0.0", port=8000)`
-   — host `0.0.0.0`, PAS `127.0.0.1` : l'app doit rester joignable une fois
-   empaquetée dans un conteneur Docker)
-   — SEULE cette évolution du point d'entrée justifie de toucher `main.py` —
-   et la DÉPENDANCE D'EXÉCUTION (ex. `uvicorn`) DOIT être déclarée dans
-   `pyproject.toml` (`dependencies`). Ne te contente JAMAIS d'imprimer des
-   instructions de lancement à la place du démarrage réel.
-   SI TA TÂCHE PORTE `main.py` DANS SON PÉRIMÈTRE : `python main.py` NU (sans
-   aucun argument) DOIT DÉMARRER LE SERVEUR et rester en écoute ; `--help`/`-h`
-   affiche l'aide et ne lie AUCUN port. Une bannière suivie d'un `return 0` est
-   un ÉCHEC du smoke run.
+{"6" if plan else "5"}. {wiring}
 
 CONTRAINTES :
 - Ne modifie JAMAIS les fichiers .feature ni autospec-state.json.

@@ -165,6 +165,9 @@ def tmp_workspace(tmp_path, monkeypatch):
     # keeps the historical single-sleep path.
     monkeypatch.setattr(settings, "resume_reprobe_min", 0)
     monkeypatch.setattr(settings, "docker_delivery", False)
+    # Bootstrap integration tests opt in; ordinary unit tests must not install
+    # dependencies or launch applications merely by constructing a pipeline.
+    monkeypatch.setattr(settings, "project_bootstrap", False)
     # V3-F1: observations add an extractor LLM call per terminal work item — a
     # developer's .env enabling them must not change tests that don't opt in.
     monkeypatch.setattr(settings, "observations_enabled", False)

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Epic, Usage, UserStory } from "../types";
 import { useI18n } from "../i18n/i18n";
 import { epicProgress, EpicProgressBar } from "./Board";
+import { CostEstimateNote } from "./CostEstimateNote";
 
 function formatTokens(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -65,6 +66,7 @@ export function IterationsView({
         <h2>{t("iterationsView.title")}</h2>
         <span className="iter-hint">{t("iterationsView.hint")}</span>
       </div>
+      {iterationUsage && Object.keys(iterationUsage).length > 0 && <CostEstimateNote />}
       <div className="iter-timeline">
         {iters.map((n) => {
           const iterEpics = epics.filter((e) => e.iteration === n);
@@ -104,7 +106,7 @@ export function IterationsView({
 
               {usage && (
                 <div className="iter-usage" title={t("iterationsView.usageTitle")}>
-                  💰 ${usage.cost_usd.toFixed(4)} · 🔢{" "}
+                  {t("common.estimatedCost", { cost: usage.cost_usd.toFixed(4) })} · 🔢{" "}
                   {formatTokens(usage.input_tokens + usage.output_tokens)} tok ·{" "}
                   {t(
                     usage.agent_calls > 1
@@ -113,6 +115,9 @@ export function IterationsView({
                     { calls: usage.agent_calls },
                   )}
                 </div>
+              )}
+              {(usage?.unreported_calls ?? 0) > 0 && (
+                <CostEstimateNote unreportedCalls={usage?.unreported_calls} />
               )}
 
               {iterEpics.length > 0 && (

@@ -186,7 +186,10 @@ def test_frontend_scaffold_auto_discovers_feature_components(tmp_path, monkeypat
     root = workspace.scaffold_frontend(state, stream)
 
     app = (root / "src" / "App.tsx").read_text(encoding="utf-8")
-    assert 'import.meta.glob("./features/*.tsx"' in app
+    assert 'import.meta.glob([' in app
+    assert '"./features/*.tsx"' in app
+    assert '"!./features/*.test.tsx"' in app
+    assert '"!./features/*.spec.tsx"' in app
     assert (root / "src" / "features").is_dir()
     tsconfig = (root / "tsconfig.json").read_text(encoding="utf-8")
     assert "vite/client" in tsconfig                   # types du glob Vite

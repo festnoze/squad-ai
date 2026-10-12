@@ -34,6 +34,12 @@ def append_issue(state: ProjectState, message: str) -> None:
     state.delivery_issues = [*state.delivery_issues, message]
 
 
+def append_warning(state: ProjectState, message: str) -> None:
+    """Retain advisory evidence without contradicting the blocking gate verdict."""
+    if message not in state.delivery_issues:
+        state.delivery_issues = [*state.delivery_issues, message]
+
+
 def set_deploy(
     state: ProjectState,
     *,
@@ -54,3 +60,12 @@ def set_deploy(
     if host_port:
         state.deploy_host_port = host_port
     state.deploy_detail = detail[:2000]
+
+
+def clear_deploy(state: ProjectState) -> None:
+    """Forget a deployment only after Docker confirmed its removal."""
+    state.deploy_status = ""
+    state.deploy_detail = ""
+    state.deployed_image = ""
+    state.deployed_container = ""
+    state.deploy_host_port = 0
