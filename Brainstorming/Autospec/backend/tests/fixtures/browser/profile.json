@@ -1,7 +1,9 @@
 {
   "browser": {
     "timeout_ms": 15000, "desktop_width": 1280, "mobile_width": 390,
-    "client_ticket_count": 6, "staff_ticket_count": 12,
+    "client_ticket_count": 6, "staff_ticket_count": 12
+  },
+  "browser_probes": {
     "search_a": "ASCII", "search_b": "Unicode",
     "search_a_marker": "ASCII marker shared", "search_b_marker": "Unicode Éclair",
     "french_action_labels": {"create":"Créer un ticket","ticket_nav":"Tickets","admin_nav":"Administration","dashboard_nav":"Tableau de bord","logout":"Se déconnecter","submit":"Envoyer","send":"Publier"}

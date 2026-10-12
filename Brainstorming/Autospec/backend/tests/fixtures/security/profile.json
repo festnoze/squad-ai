@@ -9,11 +9,11 @@
   "statuses": {
     "ok": 200, "created": 201, "no_content": 204, "unauthorized": 401,
     "forbidden": 403, "invisible": 404, "conflict": 409, "invalid": 422,
-    "rate_limited": 429, "db_fault": [500, 503]
+    "rate_limited": 429, "db_busy": 503
   },
   "password": {"min": 14, "max": 128, "memory_kib": 19456, "iterations": 2, "parallelism": 1},
   "rate": {"failures": 10, "window_seconds": 60},
-  "session": {"absolute_seconds": 28800, "min_token_chars": 43,
+  "session": {"absolute_seconds": 28800, "min_entropy_bits": 256,
     "modes": {"https": true, "http_local_explicit": false, "http_without_exception": true}},
   "browser_required": ["SEC-10", "SEC-12"]
 }

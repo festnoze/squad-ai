@@ -6,6 +6,7 @@ port publishing. The product keeps network=none: no host/LAN/registry egress.
 from __future__ import annotations
 
 import json
+import base64
 import math
 import re
 import shutil
@@ -61,7 +62,7 @@ def _node_command(command: list[str], *, report: bool = False, dist: bool = Fals
     # Native Linux tmpfs source avoids broken cross-filesystem symlinks in
     # Docker Desktop Windows binds. Deps stay image-owned /opt read-only, with
     # only Vite's cache redirected to /tmp. Export only selected report/dist.
-    setup = 'mkdir -p /tmp/product /tmp/vite-cache; cp -r /app/. /tmp/product/; ln -s /opt/node_modules /tmp/product/node_modules; cd /tmp/product; '
+    setup = 'mkdir -p /tmp/product /tmp/vite-cache /tmp/vite-config-cache; cp -r /app/. /tmp/product/; ln -s /opt/node_modules /tmp/product/node_modules; cd /tmp/product; '
     if coverage_directory is not None and not re.fullmatch(r"/tmp/autospec-coverage-[a-f0-9]{32}", coverage_directory):
         raise _unavailable("Coverage export requires a fresh factory-owned directory")
     if not report and not dist and coverage_directory is None:
@@ -77,6 +78,39 @@ def _node_command(command: list[str], *, report: bool = False, dist: bool = Fals
             script += f'if [ -f {file} ] && [ ! -L {file} ]; then cp {file} /app/suite-coverage.json; fi; '
         script += 'exit "$status"'
     return ["/bin/sh", "-c", script, "autospec", *command]
+
+
+def _qualified_vitest(stage: Path, *, coverage: bool) -> str:
+    """Only recipes proven for these exact locked versions are admitted.
+
+    npm ci verifies package bytes against SRI in the attested dependency image.
+    This preflight additionally forbids an implicit/runtime provider install or
+    mixing CLI/provider versions. Manifest ranges are not silently qualified.
+    """
+    try:
+        package=json.loads((stage/'package.json').read_text(encoding='utf-8'))
+        locked=json.loads((stage/'package-lock.json').read_text(encoding='utf-8'))
+        deps={**package.get('dependencies',{}),**package.get('devDependencies',{})}
+        packages=locked['packages']
+        version=packages['node_modules/vitest']['version']
+        if version not in {'2.1.9','4.1.11'} or deps.get('vitest')!=version:
+            raise ValueError('unqualified CLI/version range')
+        names=['vitest','@vitest/coverage-v8'] if coverage else ['vitest']
+        for name in names:
+            record=packages['node_modules/'+name]
+            distribution=name.rsplit('/',1)[-1]
+            expected=f'https://registry.npmjs.org/{name}/-/{distribution}-{version}.tgz'
+            integrity=record['integrity']
+            if not isinstance(integrity,str) or not integrity.startswith('sha512-'):
+                raise ValueError('sha512 SRI required')
+            digest=base64.b64decode(integrity.removeprefix('sha512-'),validate=True)
+            if (len(digest)!=64 or integrity!='sha512-'+base64.b64encode(digest).decode() or
+                record.get('link') or record.get('resolved')!=expected or record.get('version')!=version or deps.get(name)!=version):
+                raise ValueError('manifest/lock/provider/SRI identity differs')
+        return version
+    except (OSError,TypeError,ValueError,KeyError) as exc:
+        raise _unavailable('Node suite/coverage needs admitted locked vitest and matching explicit provider/SRI '
+            '(2.1.9 or 4.1.11); request missing dependencies through the coordinator') from exc
 
 
 def _coverage_inventory(stage: Path, source: str, ecosystem: str = "python") -> dict[str, str]:
@@ -106,7 +140,8 @@ def _coverage_inventory(stage: Path, source: str, ecosystem: str = "python") -> 
     return inventory
 
 
-def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[str, int]) -> dict:
+def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[str, int],
+                       *, v4_implicit_else: bool = False) -> dict:
     """Normalize executable-line and branch-arm counts, including untouched files.
 
     Source-only totals are recalculated later. Test/native/helper files cannot
@@ -135,9 +170,21 @@ def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[
             locations = branch_maps[key]["locations"]
             if not isinstance(branch, list) or not isinstance(locations, list) or len(branch) != len(locations):
                 raise ValueError("Incomplete Istanbul branch arms")
-            for location in locations:
+            for index,location in enumerate(locations):
+                # Vitest4's AST-based V8 remapper emits an unlocated implicit
+                # else arm for `if (...) statement` with no explicit else.
+                # Its ACTUAL counter is retained, not replaced by a fake zero
+                # or invented position. Only this exact observed v4 shape is
+                # admitted; the enclosing source-bound if location is required.
+                if location=={'start':{},'end':{}}:
+                    enclosing=branch_maps[key]
+                    if (not v4_implicit_else or index!=1 or len(locations)!=2 or enclosing.get('type')!='if' or
+                        enclosing.get('loc')!=locations[0] or
+                        enclosing.get('line')!=locations[0].get('start',{}).get('line')):
+                        raise ValueError('Unqualified unlocated Istanbul branch arm')
+                    continue
                 for point in ("start", "end"):
-                    line = location[point]["line"]
+                    line = location.get(point,{}).get('line')
                     if type(line) is not int or not 1 <= line <= line_counts[normal]:
                         raise ValueError("Invalid Istanbul branch source")
             arms.extend(branch)
@@ -228,19 +275,15 @@ class IsolatedValidator:
                 package = json.loads((stage / "package.json").read_text(encoding="utf-8"))
                 has_vitest = "vitest" in {**package.get("dependencies", {}), **package.get("devDependencies", {})}
                 if has_vitest:
-                    command = ["node", "/opt/node_modules/vitest/vitest.mjs", "run", "--reporter=json", "--outputFile=suite-report.json", "--maxWorkers=2", "--minWorkers=1", *test_args]
+                    version = _qualified_vitest(stage,coverage=coveragepath is not None)
+                    workers = ['--maxWorkers=1','--fileParallelism=false'] if version=='4.1.11' else ['--maxWorkers=2','--minWorkers=1']
+                    command = ["node", "/opt/node_modules/vitest/vitest.mjs", "run", "--reporter=json", "--outputFile=suite-report.json", *workers, *test_args]
                     parser = vitest_evidence
                     coverage_directory = None
                     if coveragepath is not None:
-                        deps = {**package.get("dependencies", {}), **package.get("devDependencies", {})}
-                        locked = json.loads((stage / "package-lock.json").read_text(encoding="utf-8"))["packages"]
-                        version = locked["node_modules/vitest"]["version"]
-                        if ("@vitest/coverage-v8" not in deps or version != "2.1.9" or
-                            locked.get("node_modules/@vitest/coverage-v8", {}).get("version") != version):
-                            raise _unavailable("Node coverage needs locked vitest/@vitest/coverage-v8 2.1.9; request it through the dependency coordinator")
                         coverage_directory = "/tmp/autospec-coverage-" + uuid.uuid4().hex
                         include = ("" if coverage_source == "." else coverage_source + "/") + "**/*.{js,jsx,cjs,mjs,ts,tsx,cts,mts}"
-                        command += ["--coverage.enabled", "--coverage.provider=v8", "--coverage.all=true",
+                        command += ["--coverage.enabled", "--coverage.provider=v8", *(['--coverage.all=true'] if version=='2.1.9' else []),
                                     f"--coverage.include={include}", "--coverage.exclude=**/*.{test,spec,config}.*",
                                     "--coverage.exclude=**/{test,tests,__tests__}/**", "--coverage.exclude=**/*.d.ts",
                                     "--coverage.exclude=**/{setupTests,testSetup}.*", "--coverage.reporter=json",
@@ -282,8 +325,10 @@ class IsolatedValidator:
                     if report.stat().st_size > 20_000_000:
                         raise ValueError("coverage exceeds limit")
                     coverage = json.loads(report.read_text(encoding="utf-8"))
+                    atomic_json(coveragepath.with_suffix('.raw.json'),coverage)
                     if ecosystem == "node":
-                        coverage = _istanbul_coverage(coverage, coverage_inventory, coverage_line_counts)
+                        coverage = _istanbul_coverage(coverage, coverage_inventory, coverage_line_counts,
+                            v4_implicit_else=version=='4.1.11' if has_vitest else False)
                     else:
                         totals = coverage["totals"]
                         for key in ("covered_lines", "num_statements", "missing_lines", "num_branches", "covered_branches"):
@@ -294,10 +339,10 @@ class IsolatedValidator:
                     coverage = _admit_source_coverage(coverage, coverage_inventory, coverage_source,
                                                      source_fingerprint, environment)
                     atomic_json(coveragepath, coverage)
-                except (OSError, KeyError, TypeError, ValueError):
+                except (OSError, KeyError, TypeError, ValueError) as exc:
                     coverage = None
                     evidence = replace(evidence, report_valid=False)
-                    output += "\nCOVERAGE_EVIDENCE_INVALID: missing/invalid fresh coverage report"
+                    output += "\nCOVERAGE_EVIDENCE_INVALID: missing/invalid fresh coverage report: " + str(exc)[:1000]
                     atomic_json(coveragepath, {"invalid_report": True})
             return IsolatedSuiteResult(evidence, output, environment.fingerprint, environment.image, source_fingerprint, coverage, executed)
 
@@ -564,7 +609,8 @@ class RuntimeSession:
                  ecosystem: str = "python", docker: str = "docker", env: dict[str, str] | None = None,
                  connection_timeout: float = 15, application_origin: bool = False,
                  local_cookie_mode: bool = False, persistent_database: bool = False,
-                 mount_stage: bool = True,use_image_command: bool = False):
+                 mount_stage: bool = True,use_image_command: bool = False,
+                 host_port: int = 0, preserve_database: bool = False):
         if not 1 <= port <= 65535 or ecosystem not in {"python", "node"}:
             raise _unavailable("Invalid runtime port/ecosystem")
         if not math.isfinite(connection_timeout) or connection_timeout <= 0:
@@ -576,6 +622,8 @@ class RuntimeSession:
             raise _unavailable("Baked runtime requires an immutable local image ID")
         if type(use_image_command) is not bool or use_image_command and mount_stage:
             raise _unavailable('Plain image command requires a baked immutable runtime, without source mount')
+        if type(host_port) is not int or not 0 <= host_port <= 65535 or type(preserve_database) is not bool:
+            raise _unavailable('Invalid factory-owned ingress port/database retention mode')
         self.stage, self.image, self.command = Path(stage), image, command
         self.port, self.ecosystem, self.docker = port, ecosystem, docker
         self.env = dict(env or {})
@@ -606,6 +654,7 @@ class RuntimeSession:
         self.transition = True
         self.detached = False
         self.persistent_database = persistent_database
+        self.preserve_database = preserve_database
         self.mount_stage = mount_stage
         self.use_image_command = use_image_command
         self.volume_name = "autospec-validation-" + uuid.uuid4().hex if persistent_database else None
@@ -620,7 +669,7 @@ class RuntimeSession:
         class Server(socketserver.ThreadingTCPServer):
             daemon_threads = True
             allow_reuse_address = False
-        self.server = Server(("127.0.0.1", 0), Handler)
+        self.server = Server(("127.0.0.1", host_port), Handler)
         self.host_port = self.server.server_address[1]
         self.origin = f"http://127.0.0.1:{self.host_port}"
         if application_origin:
@@ -642,7 +691,10 @@ class RuntimeSession:
             if self.use_image_command:
                 self._attest_image_command()
             if self.persistent_database:
-                self._create_volume()
+                if self.volume_identity is None:
+                    self._create_volume()
+                else:
+                    self._assert_volume()
             self._launch()
             self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
             self.thread.start()
@@ -666,6 +718,66 @@ class RuntimeSession:
             return {key: data[key] for key in ("Name", "Driver", "CreatedAt", "Labels")}
         except (KeyError, TypeError, ValueError) as exc:
             raise _unavailable("Validation volume identity cannot be verified") from exc
+
+    def restore_owned_database(self, owner: str, identity: dict) -> None:
+        """Restore an externally journaled volume, never discover/adopt by PID.
+
+        A supervisor must additionally validate its publication journal and
+        container configuration. This API is not available to model tools.
+        """
+        if self.closed or self.thread is not None or not self.persistent_database or self.volume_requested:
+            raise _unavailable('Database restoration requires a new retained session')
+        if (not isinstance(owner, str) or not re.fullmatch(r'[a-f0-9]{32}', owner) or
+            not isinstance(identity, dict) or set(identity) != {'Name','Driver','CreatedAt','Labels'} or
+            not isinstance(identity['Name'],str) or not re.fullmatch(r'autospec-validation-[a-f0-9]{32}',identity['Name']) or
+            identity['Driver'] != 'local' or not isinstance(identity['CreatedAt'],str) or not identity['CreatedAt'] or
+            identity['Labels'] != {'autospec.run_id':owner,'autospec.kind':'validation-state'}):
+            raise _unavailable('Invalid externally owned database identity')
+        self.owner = owner
+        self.volume_name = identity['Name']
+        self.volume_identity = json.loads(json.dumps(identity))
+        self.volume_requested = True
+        self._assert_volume()
+
+    def restore_owned_container(self, identifier: str) -> "RuntimeSession":
+        """Attach ingress to an exact journal-owned hardened running container."""
+        with self.operation_lock:
+            if self.closed or self.thread is not None or not self.use_image_command or not self.volume_identity:
+                raise _unavailable('Container restoration requires a new immutable retained session')
+            if not isinstance(identifier,str) or not re.fullmatch(r'[a-f0-9]{64}',identifier):
+                raise _unavailable('Invalid externally owned container ID')
+            self._attest_image_command()
+            self.identifier, self.transition = identifier, False
+            info = self.inspect_configuration()
+            expected_mount = {'type':'volume','destination':self.DATABASE_DIRECTORY,'rw':True,
+                              'name':self.volume_name}
+            if (not info['running'] or info['user'] != '65532:65532' or not info['read_only'] or
+                info['cap_drop'] != ['ALL'] or info['privileged'] or
+                info['security_opt'] != ['no-new-privileges=true'] or info['network_mode'] != 'none' or
+                info['published_ports'] or info['runtime_command'] != self.command or info['runtime_entrypoint'] not in (None,[]) or
+                len(info['mounts']) != 1 or any(info['mounts'][0].get(k) != v for k,v in expected_mount.items())):
+                self.identifier, self.transition = None, True
+                raise _unavailable('Journal-owned container is not the hardened immutable publication')
+            self.thread = threading.Thread(target=self.server.serve_forever,daemon=True)
+            self.thread.start()
+            return self
+
+    def release_ingress(self) -> None:
+        """Factory handoff: close owned host relays, retain daemon resources.
+
+        The external registry must retain exact identities BEFORE this call.
+        This is not a product stop or an authorization to adopt foreign state.
+        """
+        with self.operation_lock:
+            self.transition = True
+            self._disconnect()
+            if self.thread is not None and self.server is not None:
+                self.server.shutdown()
+                self.thread.join(timeout=2)
+            if self.server is not None:
+                self.server.server_close()
+            self.thread = self.server = None
+            self.closed = True
 
     def _assert_volume(self) -> None:
         if self.volume_identity is None or self._volume_attestation() != self.volume_identity:
@@ -703,6 +815,46 @@ class RuntimeSession:
                 raise _unavailable(f"Validation volume initialization failed: {out} {err}")
         finally:
             _cleanup_container(self.docker, init_name, self.owner)
+
+    def prepare_owned_database(self) -> None:
+        """Attest/initialize the owned volume before product PID1 starts."""
+        with self.operation_lock:
+            if self.closed or self.thread is not None or self.identifier is not None or not self.persistent_database or not self.use_image_command:
+                raise _unavailable('Prelaunch database preparation requires a new immutable retained session')
+            require_sandbox(self.stage,self.image,docker=self.docker)
+            self._attest_image_command()
+            if self.volume_identity is None:self._create_volume()
+            else:self._assert_volume()
+
+    def run_database_command(self,command: list[str],*,container_name: str,timeout: float = 30) -> dict:
+        """Exact reviewed migration in a TEMPORARY NETNONE image/DB container.
+
+        No app PID1, host source, credentials or fixture seed is involved. The
+        caller journals the UUID and pending operation BEFORE invoking this.
+        Never available to agent tools. Daemon-side cleanup is exact-owned even
+        after the native Docker client is cancelled or times out.
+        """
+        with self.operation_lock:
+            command=_runtime_argv(command)
+            if (self.closed or self.thread is not None or self.identifier is not None or not self.volume_identity or
+                not self.use_image_command or not re.fullmatch(r'autospec-sandbox-[a-f0-9]{32}',container_name) or
+                not math.isfinite(timeout) or timeout<=0):
+                raise _unavailable('Migration requires an attested prelaunch database and bounded owned UUID')
+            self._attest_image_command();self._assert_volume()
+            argv=docker_run_cmd(command,str(self.stage),self.image,self.docker,run_id=self.owner,container_name=container_name)
+            argv.remove('--rm')  # retain exact exit identity until supervised cleanup
+            at=argv.index('-v');del argv[at:at+2]
+            at=argv.index('--entrypoint')
+            argv[at:at]=['--mount',self._volume_mount(),*[part for key,value in self.env.items() for part in ('--env',f'{key}={value}')]]
+            try:
+                rc,out,err=_run_tracked(argv,'',None,timeout)
+                identifier=_container_identity(self.docker,container_name,self.owner)
+                if identifier is None:raise _unavailable('Migration container exit identity could not be attested')
+                return {'argv':command,'return_code':rc,'container_id':identifier,'container_name':container_name,
+                        'image_id':self.image,'owner':self.owner,'volume':json.loads(json.dumps(self.volume_identity)),
+                        'stdout_sha256':hashlib.sha256(out.encode()).hexdigest(),'stderr_sha256':hashlib.sha256(err.encode()).hexdigest()}
+            finally:
+                _cleanup_container(self.docker,container_name,self.owner)
 
     def _volume_mount(self) -> str:
         self._assert_volume()
@@ -961,11 +1113,13 @@ class RuntimeSession:
             result = _docker_call([self.docker, "logs", "--tail", "100", identifier], capture_output=True, text=True, timeout=3, check=False)
             return (result.stdout + result.stderr)[-12000:]
 
-    def close(self):
+    def close(self, *, preserve_database: bool | None = None):
         with self.operation_lock:
-            self._close_owned()
+            if preserve_database is not None and type(preserve_database) is not bool:
+                raise _unavailable('Database retention requires an explicit boolean')
+            self._close_owned(self.preserve_database if preserve_database is None else preserve_database)
 
-    def _close_owned(self):
+    def _close_owned(self, preserve_database: bool = False):
         if self.thread is not None and self.server is not None:
             self.server.shutdown()
             self.thread.join(timeout=2)
@@ -979,7 +1133,7 @@ class RuntimeSession:
             self.transition = True
             self._disconnect()
             _cleanup_container(self.docker, self.identifier or self.name, self.owner)
-            if self.volume_requested:
+            if self.volume_requested and not preserve_database:
                 current = self._volume_attestation()
                 if current is not None:
                     # Creation may have reached the daemon before cancellation

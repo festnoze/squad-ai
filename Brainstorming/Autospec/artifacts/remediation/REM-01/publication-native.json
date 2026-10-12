@@ -1,0 +1,201 @@
+{
+  "actual_configuration": {
+    "cap_drop": [
+      "ALL"
+    ],
+    "container_id": "d284b06d9787773bff333e3ec0582e03681f32f03ecd422796db47ecf00136a8",
+    "image_id": "sha256:57858d0b484a50bf83c29c0b076af3e66b63e6541e91e0a8b339f9119581ae7e",
+    "mounts": [
+      {
+        "destination": "/var/lib/autospec-validation",
+        "name": "autospec-validation-cecec7f2ee524708946633e552b48a64",
+        "rw": true,
+        "source": "/var/lib/docker/volumes/autospec-validation-cecec7f2ee524708946633e552b48a64/_data",
+        "type": "volume"
+      }
+    ],
+    "network_mode": "none",
+    "owner": "e3831f50638a406bae063b89d7427b4f",
+    "privileged": false,
+    "published_ports": {},
+    "read_only": true,
+    "running": true,
+    "runtime_command": [
+      "/opt/venv/bin/python",
+      "main.py"
+    ],
+    "runtime_entrypoint": null,
+    "security_opt": [
+      "no-new-privileges=true"
+    ],
+    "user": "65532:65532",
+    "version": 1,
+    "volume": {
+      "CreatedAt": "2026-10-12T10:58:37Z",
+      "Driver": "local",
+      "Labels": {
+        "autospec.kind": "validation-state",
+        "autospec.run_id": "e3831f50638a406bae063b89d7427b4f"
+      },
+      "Name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+    }
+  },
+  "after_factory_death": {
+    "container_created": "2026-10-12T10:58:40.093147629Z",
+    "container_fingerprint": "12369134213fac36c4c66138aa05a62b6e91f6b3013e5aec6bbdd31f18959207",
+    "container_id": "4804acac0b150968693fbd2594381ff888a007f0cba1789123d2dbdf7dbfd8de",
+    "container_name": "autospec-sandbox-ba663ee2e7f049499eb02998bf799a5f",
+    "host_port": 50996,
+    "migration": "none",
+    "origin": "http://127.0.0.1:50996",
+    "owner": "e3831f50638a406bae063b89d7427b4f",
+    "project_id": "project",
+    "reason": "",
+    "spec": {
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "database_path": "/var/lib/autospec-validation/support.sqlite",
+      "health_path": "/api/health",
+      "image_id": "sha256:57858d0b484a50bf83c29c0b076af3e66b63e6541e91e0a8b339f9119581ae7e",
+      "internal_port": 8000,
+      "local_cookie_mode": true,
+      "migration_command": null,
+      "runtime_command": [
+        "/opt/venv/bin/python",
+        "main.py"
+      ],
+      "snapshot_hash": "c9a1523c2f56f5b37cda8f7345c8e77caeb84aaa7875e9942220ec9fe05e3225"
+    },
+    "status": "running",
+    "version": 1,
+    "volume_identity": {
+      "CreatedAt": "2026-10-12T10:58:37Z",
+      "Driver": "local",
+      "Labels": {
+        "autospec.kind": "validation-state",
+        "autospec.run_id": "e3831f50638a406bae063b89d7427b4f"
+      },
+      "Name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+    },
+    "volume_name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+  },
+  "after_handoff": {
+    "container_created": "2026-10-12T10:58:40.093147629Z",
+    "container_fingerprint": "12369134213fac36c4c66138aa05a62b6e91f6b3013e5aec6bbdd31f18959207",
+    "container_id": "4804acac0b150968693fbd2594381ff888a007f0cba1789123d2dbdf7dbfd8de",
+    "container_name": "autospec-sandbox-ba663ee2e7f049499eb02998bf799a5f",
+    "host_port": 50996,
+    "migration": "none",
+    "origin": "http://127.0.0.1:50996",
+    "owner": "e3831f50638a406bae063b89d7427b4f",
+    "project_id": "project",
+    "reason": "",
+    "spec": {
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "database_path": "/var/lib/autospec-validation/support.sqlite",
+      "health_path": "/api/health",
+      "image_id": "sha256:57858d0b484a50bf83c29c0b076af3e66b63e6541e91e0a8b339f9119581ae7e",
+      "internal_port": 8000,
+      "local_cookie_mode": true,
+      "migration_command": null,
+      "runtime_command": [
+        "/opt/venv/bin/python",
+        "main.py"
+      ],
+      "snapshot_hash": "c9a1523c2f56f5b37cda8f7345c8e77caeb84aaa7875e9942220ec9fe05e3225"
+    },
+    "status": "running",
+    "version": 1,
+    "volume_identity": {
+      "CreatedAt": "2026-10-12T10:58:37Z",
+      "Driver": "local",
+      "Labels": {
+        "autospec.kind": "validation-state",
+        "autospec.run_id": "e3831f50638a406bae063b89d7427b4f"
+      },
+      "Name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+    },
+    "volume_name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+  },
+  "after_stop_restart": {
+    "container_created": "2026-10-12T10:59:23.835461068Z",
+    "container_fingerprint": "2fdf843e9e5c3d72b16cf1cd85ab7faefcfd1989969770347a707466a6096006",
+    "container_id": "d284b06d9787773bff333e3ec0582e03681f32f03ecd422796db47ecf00136a8",
+    "container_name": "autospec-sandbox-ba663ee2e7f049499eb02998bf799a5f",
+    "host_port": 50996,
+    "migration": "none",
+    "origin": "http://127.0.0.1:50996",
+    "owner": "e3831f50638a406bae063b89d7427b4f",
+    "project_id": "project",
+    "reason": "",
+    "spec": {
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "database_path": "/var/lib/autospec-validation/support.sqlite",
+      "health_path": "/api/health",
+      "image_id": "sha256:57858d0b484a50bf83c29c0b076af3e66b63e6541e91e0a8b339f9119581ae7e",
+      "internal_port": 8000,
+      "local_cookie_mode": true,
+      "migration_command": null,
+      "runtime_command": [
+        "/opt/venv/bin/python",
+        "main.py"
+      ],
+      "snapshot_hash": "c9a1523c2f56f5b37cda8f7345c8e77caeb84aaa7875e9942220ec9fe05e3225"
+    },
+    "status": "running",
+    "version": 1,
+    "volume_identity": {
+      "CreatedAt": "2026-10-12T10:58:37Z",
+      "Driver": "local",
+      "Labels": {
+        "autospec.kind": "validation-state",
+        "autospec.run_id": "e3831f50638a406bae063b89d7427b4f"
+      },
+      "Name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+    },
+    "volume_name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+  },
+  "canary_egress_rc": 0,
+  "canary_egress_stdout": "[\"host.docker.internal\", \"1.1.1.1\"]\n",
+  "host_sentinel_port": 50993,
+  "image_id": "sha256:57858d0b484a50bf83c29c0b076af3e66b63e6541e91e0a8b339f9119581ae7e",
+  "initial": {
+    "container_created": "2026-10-12T10:58:40.093147629Z",
+    "container_fingerprint": "12369134213fac36c4c66138aa05a62b6e91f6b3013e5aec6bbdd31f18959207",
+    "container_id": "4804acac0b150968693fbd2594381ff888a007f0cba1789123d2dbdf7dbfd8de",
+    "container_name": "autospec-sandbox-ba663ee2e7f049499eb02998bf799a5f",
+    "host_port": 50996,
+    "migration": "none",
+    "origin": "http://127.0.0.1:50996",
+    "owner": "e3831f50638a406bae063b89d7427b4f",
+    "project_id": "project",
+    "reason": "",
+    "spec": {
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "database_path": "/var/lib/autospec-validation/support.sqlite",
+      "health_path": "/api/health",
+      "image_id": "sha256:57858d0b484a50bf83c29c0b076af3e66b63e6541e91e0a8b339f9119581ae7e",
+      "internal_port": 8000,
+      "local_cookie_mode": true,
+      "migration_command": null,
+      "runtime_command": [
+        "/opt/venv/bin/python",
+        "main.py"
+      ],
+      "snapshot_hash": "c9a1523c2f56f5b37cda8f7345c8e77caeb84aaa7875e9942220ec9fe05e3225"
+    },
+    "status": "running",
+    "version": 1,
+    "volume_identity": {
+      "CreatedAt": "2026-10-12T10:58:37Z",
+      "Driver": "local",
+      "Labels": {
+        "autospec.kind": "validation-state",
+        "autospec.run_id": "e3831f50638a406bae063b89d7427b4f"
+      },
+      "Name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+    },
+    "volume_name": "autospec-validation-cecec7f2ee524708946633e552b48a64"
+  },
+  "source_snapshot": "c9a1523c2f56f5b37cda8f7345c8e77caeb84aaa7875e9942220ec9fe05e3225",
+  "source_unchanged": true
+}
