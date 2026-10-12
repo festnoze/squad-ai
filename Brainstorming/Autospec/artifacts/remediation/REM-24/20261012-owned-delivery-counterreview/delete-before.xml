@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="8" skipped="0" tests="8" time="3.788" timestamp="2026-10-12T14:13:29.668341+02:00" hostname="635ROM-IT-L157"><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-False-fullstack]" time="0.021"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-False-cli]" time="0.011"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-True-fullstack]" time="0.008"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[False-True-cli]" time="0.006"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-False-fullstack]" time="0.010"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-False-cli]" time="0.010"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-True-fullstack]" time="0.008"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase><testcase classname="Autospec.artifacts.remediation.REM-24.20261012-owned-delivery-counterreview.test_delete_contract_counterproof" name="test_delete_contract_uses_external_journal_even_before_state_flush[True-True-cli]" time="0.007"><failure message="Failed: async def functions are not natively supported.&#10;You need to install a suitable plugin for your async framework, for example:&#10;  - anyio&#10;  - pytest-asyncio&#10;  - pytest-tornasync&#10;  - pytest-trio&#10;  - pytest-twisted">async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted</failure></testcase></testsuite></testsuites>
