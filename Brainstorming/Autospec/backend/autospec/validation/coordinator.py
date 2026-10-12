@@ -663,6 +663,118 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
     return results
 
 
+def _current_rows(report, expected, snapshot, oracle):
+    """Reject mixed/partial pack identities before publishing any receipts."""
+    if isinstance(report, dict):
+        if (report.get("snapshot_hash"), report.get("contract_hash")) != (snapshot, oracle):
+            raise AdapterUnavailable("pack snapshot/oracle identity differs")
+        rows = report["requirements"]
+    else:
+        rows = report
+    if (not isinstance(rows, list) or len(rows) != len(expected) or
+            {row.get("id") for row in rows} != set(expected)):
+        raise AdapterUnavailable("pack IDs missing, unknown or duplicated")
+    result = []
+    for row in rows:
+        if (row.get("snapshot_hash", snapshot), row.get("contract_hash", oracle)) != (snapshot, oracle):
+            raise AdapterUnavailable("requirement snapshot/oracle identity differs")
+        result.append({**row, "snapshot_hash": snapshot, "contract_hash": oracle})
+    return result
+
+
+async def _native_browser_packs(contract, harness, store, snapshot_hash):
+    """Execute native probes, actual UI contributions, then bounded native joins.
+
+    A first NV caused only by not-yet-observed UI may be admitted only after a
+    fresh complete native execution consumes those exact current X/V. Native
+    FAIL, missing execution and absent retained native artifacts never promote.
+    ARC's narrow client contribution is published before its full native pack.
+    """
+    from .security_contracts import SecurityVerifier
+    from .business_contracts import BusinessContractVerifier
+    from .architecture_contracts import ArchitectureContractVerifier
+    from .architecture_browser import collect_architecture_client
+    from .browser_contracts import PlaywrightHarness, BrowserVerifier, BROWSER_IDS
+    from .evidence_join import (CROSSED_IDS, publish_backend_receipt,
+                               publish_browser_receipts, join_rechecked_native)
+    known = {r.id for r in contract.requirements}
+    records, limits, published = {}, [], set()
+    adapter = EvidenceAdapter(harness.adapter, store)
+    builders = {"SEC-": lambda: SecurityVerifier(contract, adapter),
+                "FUN-": lambda: BusinessContractVerifier(adapter, contract),
+                "ARC-": lambda: ArchitectureContractVerifier(adapter, contract)}
+    for prefix, build in builders.items():
+        if prefix == "ARC-" and "ARC-06" in known:
+            try:
+                browser = PlaywrightHarness(adapter, bindings=harness.bindings.browser_bindings,
+                                            routes=harness.bindings.browser_routes)
+                report = await collect_architecture_client(contract, browser, snapshot_hash)
+                rows = _current_rows(report, {"ARC-06"}, snapshot_hash, contract.contract_hash)
+                tagged = any(p.get("type") == "X" and "ARC-06:error_client" in p.get("checks", ())
+                             for p in rows[0].get("proofs", ()))
+                if not tagged or rows[0]["status"] == "NOT_VERIFIED":
+                    raise AdapterUnavailable("complete native ARC-06 client contribution absent")
+                await publish_browser_receipts(store, rows)
+            except Exception as exc:
+                limits.append("architecture client unavailable: " + type(exc).__name__)
+        expected = {rid for rid in known if rid.startswith(prefix)}
+        if not expected:
+            continue
+        try:
+            rows = _current_rows(await build().verify(snapshot_hash), expected, snapshot_hash, contract.contract_hash)
+            for row in rows:
+                rid = row["id"]
+                if rid in records:
+                    raise AdapterUnavailable("duplicate native requirement")
+                if rid in CROSSED_IDS:
+                    try:
+                        if await publish_backend_receipt(store, row):
+                            published.add(rid)
+                        elif row.get("native_complete") is True:
+                            raise AdapterUnavailable("intact actual native artifact absent")
+                    except Exception as exc:
+                        row["native_complete"] = False
+                        row["limits"] = list(row.get("limits", ())) + ["native backend receipt unavailable: " + type(exc).__name__]
+                        if row["status"] != "FAIL":
+                            row["status"] = "NOT_VERIFIED"
+                records[rid] = row
+        except Exception as exc:
+            limits.append(prefix + " native pack unavailable: " + type(exc).__name__)
+    browser_rows = {}
+    try:
+        browser = PlaywrightHarness(adapter, bindings=harness.bindings.browser_bindings,
+                                    routes=harness.bindings.browser_routes)
+        report = await BrowserVerifier(contract, browser).verify(snapshot_hash)
+        rows = _current_rows(report, set(BROWSER_IDS) & known, snapshot_hash, contract.contract_hash)
+        await publish_browser_receipts(store, rows)
+        browser_rows = {row["id"]: row for row in rows}
+    except Exception as exc:
+        limits.append("browser unavailable: " + type(exc).__name__)
+    for prefix in ("SEC-", "FUN-"):
+        selected = sorted(rid for rid in CROSSED_IDS & published & browser_rows.keys()
+                          if rid.startswith(prefix) and records[rid]["status"] != "FAIL")
+        if not selected:
+            continue
+        try:
+            rows = _current_rows(await builders[prefix]().verify(snapshot_hash, ids=selected),
+                                 set(selected), snapshot_hash, contract.contract_hash)
+            for row in rows:
+                rid = row["id"]
+                records[rid] = join_rechecked_native(records[rid], row, browser_rows.pop(rid))
+        except Exception as exc:
+            limits.append(prefix + " cross-layer native replay unavailable: " + type(exc).__name__)
+            for rid in selected:
+                records[rid]["limits"].append("current cross-layer native replay unavailable")
+                if records[rid]["status"] != "FAIL":
+                    records[rid]["status"] = "NOT_VERIFIED"
+    for rid, row in browser_rows.items():
+        if rid in records:
+            _merge(records[rid], row)
+        else:
+            records[rid] = row
+    return records, limits
+
+
 async def verify_project(state,contract,snapshot_root,snapshot_hash,evidence_root)->list[dict]:
     """SEC/FUN/ARC -> browser -> quality sequentially, one row per source ID.
 
@@ -674,34 +786,10 @@ async def verify_project(state,contract,snapshot_root,snapshot_hash,evidence_roo
     try:
         context,store=_context(contract,snapshot_root,snapshot_hash,evidence_root,instrumented=True)
         async with context as harness:
-            from .security_contracts import SecurityVerifier
-            from .business_contracts import BusinessContractVerifier
-            from .architecture_contracts import ArchitectureContractVerifier
-            from .browser_contracts import PlaywrightHarness,BrowserVerifier
             from .quality_contracts import QualityVerifier
             adapter=EvidenceAdapter(harness.adapter,store)
-            for name,build in (("security",lambda:SecurityVerifier(contract,adapter)),
-                               ("business",lambda:BusinessContractVerifier(adapter,contract)),
-                               ("architecture",lambda:ArchitectureContractVerifier(adapter,contract))):
-                try:
-                    report=await build().verify(snapshot_hash)
-                    rows=report if isinstance(report,list) else report["requirements"]
-                    for row in rows:
-                        rid=row["id"]
-                        if rid not in known or rid in records: raise AdapterUnavailable("unknown/duplicate native ID")
-                        records[rid]=row
-                except Exception as exc: limits.append(name+" unavailable: "+type(exc).__name__)
-            try:
-                browser=PlaywrightHarness(adapter,bindings=harness.bindings.browser_bindings,routes=harness.bindings.browser_routes)
-                report=await BrowserVerifier(contract,browser).verify(snapshot_hash)
-                for row in report["requirements"]:
-                    rid=row["id"]
-                    if rid not in known: raise AdapterUnavailable("unknown browser ID")
-                    if rid in records: _merge(records[rid],row)
-                    else: records[rid]=row
-                # Quality can consume independently stored native records. No
-                # invented coverage/E2E success if runner has not produced them.
-            except Exception as exc: limits.append("browser unavailable: "+type(exc).__name__)
+            native_records,native_limits=await _native_browser_packs(contract,harness,store,snapshot_hash)
+            records.update(native_records);limits.extend(native_limits)
             try:
                 try: await _reuse_reviewed_e2e(contract,store,snapshot_root)
                 except Exception: await _execute_e2e(contract,harness,store,snapshot_hash)

@@ -755,10 +755,14 @@ class BrowserVerifier:
         await p.goto(self.harness.adapter.base_url+path); await self.detail_ready(p); c.check("known_detail", await c.visible(p, "reply"))
         await p.goto(self.harness.adapter.base_url+self.harness.routes["ticket"].format(id=str(uuid4())))
         await self.ui(p, "error").wait_for()
-        c.check("missing_clears_previous_detail", not await self.ui(p, "reply").is_visible())
+        cleared = not await self.ui(p, "reply").is_visible()
+        c.check("missing_clears_previous_detail", cleared)
+        c.check("ui_clear", cleared)
         c.check("missing_error", await c.visible(p, "error"))
 
-    async def _fun06(self, c): await self._ux07(c)
+    async def _fun06(self, c):
+        await self._ux07(c)
+        c.check("ui_draft", bool(c.checks) and all(check["passed"] for check in c.checks))
 
     async def _fun12(self, c):
         p = await c.page(); await self.login(c, p, "alice")
@@ -779,6 +783,7 @@ class BrowserVerifier:
         empty=await c.page();await self.login(c,empty,"empty_client")
         await self.ui(empty,"dashboard_nav").click()
         await self._dashboard_check(c,empty,{"total":0,"open":0,"in_progress":0,"resolved":0,"closed":0})
+        c.check("ui_refresh", bool(c.checks) and all(check["passed"] for check in c.checks))
 
     async def verify_e2e(self, snapshot_hash, *, mode, scenario_ids=None):
         """Execute source-defined scenarios separately on freshly prepared DBs.
