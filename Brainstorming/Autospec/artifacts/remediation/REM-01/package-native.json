@@ -1,0 +1,41 @@
+{
+  "detached": {
+    "absence_checked": true,
+    "alias": "autospec/qualified-package-244210e48437b655:551d79c92fb64369b1cad5c9c281c5bb",
+    "owner": "551d79c92fb64369b1cad5c9c281c5bb",
+    "project_id": "project",
+    "spec": {
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "image_id": "sha256:396da256417ee83742bb2bafe20609a17558a2c86728fc079371908c49a30a4b",
+      "runtime_command": [
+        "/opt/venv/bin/python",
+        "main.py"
+      ],
+      "snapshot_hash": "ebc90f6fcea2ae9bd56010e71685abc37b403d4d289b34a0d05e1099682cdf48"
+    },
+    "status": "detached",
+    "version": 1
+  },
+  "initial": {
+    "absence_checked": true,
+    "alias": "autospec/qualified-package-244210e48437b655:551d79c92fb64369b1cad5c9c281c5bb",
+    "created_this_call": true,
+    "owner": "551d79c92fb64369b1cad5c9c281c5bb",
+    "project_id": "project",
+    "spec": {
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "image_id": "sha256:396da256417ee83742bb2bafe20609a17558a2c86728fc079371908c49a30a4b",
+      "runtime_command": [
+        "/opt/venv/bin/python",
+        "main.py"
+      ],
+      "snapshot_hash": "ebc90f6fcea2ae9bd56010e71685abc37b403d4d289b34a0d05e1099682cdf48"
+    },
+    "status": "packaged",
+    "version": 1
+  },
+  "owned_alias_absent": true,
+  "shared_alias": "autospec/package-shared-proof:b2880ad0dbf94f19aa5c31ed93d41c5f",
+  "shared_image_id": "sha256:396da256417ee83742bb2bafe20609a17558a2c86728fc079371908c49a30a4b",
+  "source_unchanged": true
+}

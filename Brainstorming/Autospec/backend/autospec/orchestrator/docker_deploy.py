@@ -46,6 +46,7 @@ class DockerDeployResult:
     host_port: int = 0
     cancelled: bool = False
     packaged: bool = False
+    created_package_alias: str = ""  # this exact call only; empty for reuse/recovery
 
 
 class DockerRuntimeError(RuntimeError):
@@ -499,8 +500,20 @@ def check_cross_reachability(own_container: str, deployed: list[dict]) -> tuple[
     return ok, "\n".join(lines)
 
 
-def undeploy(project_id: str, *, publication_root: Path | None = None) -> DockerDeployResult:
+def undeploy(project_id: str, *, publication_root: Path | None = None,
+             packaging_root: Path | None = None, expected_package_alias: str | None = None,
+             expected_package_image_id: str | None = None) -> DockerDeployResult:
     """Remove owned resources, reporting every actual failure to the caller."""
+    if packaging_root is not None:
+        if publication_root is not None:return DockerDeployResult(False,'Ambiguous package/publication cleanup authority',infra=True)
+        from .owned_packages import PackageRegistry
+        try:
+            record=PackageRegistry(packaging_root).detach(project_id,expected_alias=expected_package_alias,
+                expected_image_id=expected_package_image_id)
+            return DockerDeployResult(True,'Exact owned package alias detached; shared immutable image untouched',
+                image=record['spec']['image_id'],packaged=True)
+        except (OSError,RuntimeError,ValueError) as exc:
+            return DockerDeployResult(False,str(exc),infra=True,packaged=True)
     if publication_root is not None:
         from .owned_publication import PublicationRegistry
         try:
@@ -691,8 +704,26 @@ def inspect_deployment(project_id: str, *, publication_root: Path | None = None)
         return DockerDeployResult(False, str(exc), infra=True)
 
 
-def inspect_packaged_image(project_id: str) -> DockerDeployResult:
+def inspect_packaged_image(project_id: str, *, packaging_root: Path | None = None,
+                           qualified_image_id: str | None = None,
+                           expected_snapshot: str | None = None,
+                           expected_runtime_command=None,
+                           expected_contract_hash: str | None = None) -> DockerDeployResult:
     """A packaged CLI/library owns an image, not a long-running container."""
+    if packaging_root is not None or qualified_image_id is not None:
+        from .owned_packages import PackageRegistry,PackageSpec,attest_package_image
+        try:
+            spec=None
+            if qualified_image_id is not None:
+                spec=PackageSpec(qualified_image_id,expected_snapshot,expected_contract_hash,expected_runtime_command)
+            if packaging_root is not None:
+                record=PackageRegistry(packaging_root).inspect(project_id,expected=spec)
+                return DockerDeployResult(bool(record['packaged']),'Exact qualified package alias present' if record['packaged'] else 'Owned package absent/detached',
+                    image=record.get('spec',{}).get('image_id',''),packaged=True,skipped=not record.get('registered'))
+            attest_package_image(spec)
+            return DockerDeployResult(True,'Qualified immutable image freshly re-attested; no alias removal authority',image=spec.image_id,packaged=True)
+        except (OSError,RuntimeError,ValueError,TypeError) as exc:
+            return DockerDeployResult(False,str(exc),infra=True,packaged=True)
     image = image_name(project_id)
     rc, out = _docker(["image", "inspect", image], timeout=15.0)
     if rc != 0:
@@ -844,6 +875,7 @@ def deploy_and_verify(
     publication_database_path: str | None = None,
     publication_health_path: str | None = None,
     publication_migration_command: list[str] | tuple[str,...] | None = None,
+    packaging_root: Path | None = None,
 ) -> DockerDeployResult:
     """Build and verify a candidate before replacing the last working delivery.
 
@@ -856,7 +888,18 @@ def deploy_and_verify(
     if qualified_image_id is not None or getattr(state,'acceptance_contract_hash',''):
         # Contract publication never enters the legacy rebuild/shared-network
         # route, even when a caller forgot the independently qualified facts.
-        if publication_root is not None and kind not in {'cli','library'}:
+        if kind in {'cli','library'}:
+            from .owned_packages import PackageRegistry,PackageSpec
+            try:
+                if packaging_root is None:raise DockerRuntimeError('PACKAGING_REGISTRY_REQUIRED: no legacy/latest-name fallback')
+                spec=PackageSpec(qualified_image_id,expected_snapshot,getattr(state,'acceptance_contract_hash',''),expected_runtime_command)
+                record=PackageRegistry(packaging_root).package(state.id,ws,spec,cancel_event=cancel_event)
+                return DockerDeployResult(True,'Qualified immutable CLI/library package journaled; alias '+record['alias'],
+                    image=spec.image_id,packaged=True,created_package_alias=record['alias'] if record['created_this_call'] else '')
+            except (OSError,RuntimeError,ValueError,TypeError) as exc:
+                return DockerDeployResult(False,str(exc),image=qualified_image_id or '',infra=True,packaged=True,
+                    cancelled=cancel_event is not None and cancel_event.is_set())
+        if publication_root is not None:
             from .owned_publication import PublicationRegistry,PublicationSpec
             try:
                 if publication_contract_hash!=getattr(state,'acceptance_contract_hash',''):
