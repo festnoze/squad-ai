@@ -1,10 +1,12 @@
 # Préparation de contre-revue du launcher — pas un lancement
 
-12octobre2026, cible préparatoire88b79de1. Aucune création de campagne,
+12 octobre 2026, cible préparatoire 88b79de1 puis admission 9c05c5fc. Aucune création de campagne,
 pipeline.start, runner.arun, providerCLI, test/init/auth réseau ou génération
-n'est exécutée par ce document. Le wrapper generation-only REM-25 n'est pas
-encore présent dans cette révision ; son chemin/SHA final devra être fourni
-pour une revue indépendante et les contre-tests offline avant démarrage.
+n'est exécutée par ce document. Le wrapper generation-only est maintenant
+présent dans 9c05c5fc, avec un P1 unknown persona confirmé dans la contre-revue
+séparée : fallback dev et cache préchauffé doivent être corrigés. Le launcher
+concret reste absent ; son chemin/SHA final devra être fourni pour une revue
+indépendante et les contre-tests offline avant démarrage.
 
 ## Prérequis d'admission à relire
 
@@ -26,11 +28,15 @@ pour une revue indépendante et les contre-tests offline avant démarrage.
 4. Modèle imposé au wrapper à chaque appel ; prévenir override model du caller,
    routage phase/tier et escalation. Une simple CLAUDE_MODEL=sonnet ne suffit
    pas si MODEL_BUILD/MODEL_CHECKER ou _FORCE_MODEL la remplacent.
+   Le wrapper exige exactement Sonnet et refuse ces écarts ; le launcher doit
+   mettre tous les routages sur Sonnet ou les désactiver pour rester nominal.
+   Activer GENERATION_ONLY_AGENTS avant construction/import du runner, recréer
+   via make_runner et vérifier GenerationOnlyRunner ; FAKE_AGENTS doit être OFF.
 5. Cap nouveau run40USD estimés, distinct de l'ancien coût historique incomplet ;
    sérialisation, REM23OFF, réserves/coût connu/inconnu durables, aucun reset
    de journal pour contourner COST_UNREPORTED. Ne pas affirmer un hard cap de
    facturationClaude à partir du flagmax-budget-usd.
-6. REFINE/SECURITY_REVIEW/EVALUATOR/LANGFUSEOFF, et surtout admission de rôle
+6. REFINE/SECURITY_REVIEW/EVALUATOR/INDEPENDENCE/LANGFUSE OFF, et surtout admission de rôle
    génération-seule AVANT touteCLI : critic/judge/security-reviewer/evaluator
    refusés même si flag/endpointforce. qa/dev/dev-frontend/PO et autres rôles de
    génération explicitement nécessaires restent autorisés. Rôle inconnu ou
