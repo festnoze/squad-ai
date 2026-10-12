@@ -201,6 +201,82 @@ def test_advisory_is_not_inferred_to_be_exploitable_without_exact_review(tmp_pat
     with pytest.raises(AdapterUnavailable):apply_audit_review(raw,proof,evidence_root=tmp_path,snapshot_hash=snapshot,contract_hash=contract)
 
 
+def _audit_disposition_fixture(tmp_path,arbitration,*,approval_fault=None):
+    """Synthetic parser receipts only: no real auditor or human waiver issued."""
+    from dataclasses import asdict
+    from autospec.validation.delivery_evidence import apply_audit_review,audit_review_subject,audit_risk_subject
+    from autospec.validation.support_adapter import Proof
+    snapshot,contract="a"*64,"c"*64
+    raw=dict(status="AVAILABLE",findings=[dict(scope="backend",package="fixture-risk",id="TEST:high",version="1",
+        severity="unknown",exploitable=None,arbitration=None)],artifacts=[],scope="synthetic offline protocol only")
+    if approval_fault is not None:
+        subject=audit_risk_subject(raw["findings"][0],snapshot,contract)
+        payload=dict(version=1,kind="audit_risk_acceptance",authority="human",subject=subject,snapshot_hash=snapshot,
+            contract_hash=contract,approved=True,authorized_by="Synthetic protocol actor; not a real human waiver",
+            rationale="Synthetic format acceptance only, never a production risk decision",date="2026-10-12T12:00:00Z")
+        if approval_fault=="machine_authority":payload["authority"]="gpt_source_reviewer"
+        elif approval_fault=="human_denied":payload["approved"]=False
+        elif approval_fault=="different_advisory":payload["subject"]="f"*64
+        elif approval_fault=="different_snapshot":payload["snapshot_hash"]="f"*64
+        elif approval_fault=="different_contract":payload["contract_hash"]="f"*64
+        elif approval_fault=="missing_date":payload.pop("date")
+        path=tmp_path/"synthetic-risk-approval.json";path.write_text(json.dumps(payload))
+        proof=Proof("R",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,contract,
+            ("OPS-05:accepted_risk:"+subject,),True,"Synthetic fixture only; NOT real human approval")
+        if approval_fault=="unscoped":proof=Proof(**{**asdict(proof),"checks":("OPS-05:audit",)})
+        elif approval_fault=="checks_string":proof=Proof(**{**asdict(proof),"checks":"OPS-05:accepted_risk:"+subject})
+        elif approval_fault=="false_proof":proof=Proof(**{**asdict(proof),"passed":False})
+        elif approval_fault=="tampered_bytes":path.write_text("{}")
+        arbitration["approval"]=asdict(proof)
+    assessment=dict(scope="backend",package="fixture-risk",id="TEST:high",severity="high",exploitable=True,
+        arbitration=arbitration,rationale="Synthetic high/reachable protocol assertion, not product evidence")
+    path=tmp_path/"synthetic-assessment.json";path.write_text(json.dumps(dict(assessments=[assessment])))
+    proof=Proof("R",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,contract,("OPS-05:audit:"+audit_review_subject(raw),),
+        True,"Synthetic fixture only; not benchmark review")
+    return apply_audit_review(raw,proof,evidence_root=tmp_path,snapshot_hash=snapshot,contract_hash=contract)
+
+
+@pytest.mark.parametrize("case",["no_arbitration","rejected","pending","deny_release","fix_required","contradictory_accepted","approval_false"])
+def test_known_high_audit_refusal_or_pending_is_not_shipping_permission(tmp_path,case):
+    from autospec.validation.delivery_evidence import audit_disposition_checks
+    arbitration=None if case=="no_arbitration" else dict(decision="audit_disposition",owner="synthetic protocol actor",
+        rationale="Synthetic metatest only",date="2026-10-12T12:00:00Z",disposition="rejected",approved=False)
+    if case=="pending":arbitration["disposition"]="pending"
+    elif case in {"deny_release","fix_required"}:arbitration["decision"]=case
+    elif case=="contradictory_accepted":arbitration.update(disposition="accepted_risk",approved=True,decision="deny_release")
+    elif case=="approval_false":arbitration.update(disposition="accepted_risk",approved=False)
+    audit=_audit_disposition_fixture(tmp_path,arbitration)
+    checks=audit_disposition_checks(audit,evidence_root=tmp_path,snapshot_hash="a"*64,contract_hash="c"*64)
+    assert len(checks)==1 and checks[0]["passed"] is False
+    assert len(checks[0]["observed"]["blocking"])==1
+
+
+@pytest.mark.parametrize("fault",["unknown","missing_disposition","nonbool","missing_approval_bool","accepted_without_proof"])
+def test_unknown_or_unsigned_audit_permission_cannot_pass(tmp_path,fault):
+    arbitration=dict(decision="audit_disposition",owner="synthetic protocol actor",rationale="Synthetic metatest only",
+        date="2026-10-12T12:00:00Z",disposition="accepted_risk",approved=True)
+    if fault=="unknown":arbitration["disposition"]="we_will_fix_later"
+    elif fault=="missing_disposition":arbitration.pop("disposition")
+    elif fault=="nonbool":arbitration["approved"]="true"
+    elif fault=="missing_approval_bool":arbitration.pop("approved")
+    with pytest.raises(AdapterUnavailable):_audit_disposition_fixture(tmp_path,arbitration)
+
+
+@pytest.mark.parametrize("fault",["nominal","machine_authority","human_denied","different_advisory","different_snapshot","different_contract","missing_date","unscoped","checks_string","false_proof","tampered_bytes"])
+def test_accepted_risk_needs_exact_existing_human_scope_R_not_classifier_bool(tmp_path,fault):
+    from autospec.validation.delivery_evidence import audit_disposition_checks
+    arbitration=dict(decision="accepted_by_existing_external_authority",owner="synthetic protocol actor",rationale="Synthetic metatest only",
+        date="2026-10-12T12:00:00Z",disposition="accepted_risk",approved=True)
+    if fault=="nominal":
+        audit=_audit_disposition_fixture(tmp_path,arbitration,approval_fault=fault)
+        assert audit_disposition_checks(audit,evidence_root=tmp_path,snapshot_hash="a"*64,contract_hash="c"*64)[0]["passed"] is True
+        # Retained waiver bytes are rechecked, not trusted from a cached bool.
+        Path(arbitration["approval"]["path"]).write_text("{}")
+        with pytest.raises(AdapterUnavailable):audit_disposition_checks(audit,evidence_root=tmp_path,snapshot_hash="a"*64,contract_hash="c"*64)
+    else:
+        with pytest.raises(AdapterUnavailable):_audit_disposition_fixture(tmp_path,arbitration,approval_fault=fault)
+
+
 def _delivery_plan(source,root,snapshot,fixture_fingerprint,*,negative=False):
     from autospec.validation.delivery_evidence import ReviewedDeliveryPlan
     from autospec.validation.support_adapter import Proof
