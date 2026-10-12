@@ -5,6 +5,8 @@ import pytest
 
 from autospec.orchestrator.arbitration import ClaimArbiter
 from autospec.orchestrator.claims import ClaimError, canonical_claim, canonical_path, claims_conflict, file_in_scope
+from autospec.orchestrator.independence import TaskClaim,analyze,declared_serialization,globs_overlap
+from autospec.agents.file_broker import ClaimViolation, ExecutionContext, FileBroker, active_write_authorizer
 
 
 @pytest.mark.parametrize("path", ["../clock.py", "src/../errors.py", "/tmp/file.py", r"C:\project\a.py",
@@ -118,3 +120,99 @@ async def test_claim_expansion_is_all_or_nothing(tmp_path):
     assert not await arbiter.authorize_write("B", "b.py", project_root=tmp_path / "other-project")
     with pytest.raises(ClaimError, match="another workspace"):
         await arbiter.reserve("C", [canonical_claim("b.py", project_root=tmp_path / "other", owner="C")])
+
+
+@pytest.mark.parametrize("pattern,path",[("test*.py","test_auth.py"),("[ab]*.py","auth.py"),
+    ("foo?/x","foo1/x"),("src/test*.py","src/test_auth.py"),("foo*/x","foobar/x")])
+def test_first_segment_wildcard_cannot_claim_a_false_literal_directory(pattern,path):
+    from autospec.orchestrator.claims import path_matches
+    assert path_matches(path,pattern)
+    assert globs_overlap(pattern,path) and globs_overlap(path,pattern)
+    tasks=[TaskClaim("A",stream="left",file_globs=(pattern,)),TaskClaim("B",stream="right",file_globs=(path,))]
+    assert analyze(tasks).conflict_pairs==[("A","B")]
+    assert declared_serialization(tasks)=={"B":("A",)}
+
+
+@pytest.mark.parametrize("left,right",[("src/test*.py","other/test_auth.py"),("literal.py","different.py"),
+    ("foo/*.py","bar/*.py"),("one/a?","two/a1")])
+def test_literal_distinct_ancestors_remain_provably_disjoint(left,right):
+    assert not globs_overlap(left,right)
+
+
+@pytest.mark.parametrize("pattern,path",[("test*.py","test_auth.py"),("[ab]*.py","auth.py"),("foo?/x","foo1/x")])
+async def test_active_root_glob_writer_blocks_literal_owner_before_any_batch(tmp_path,pattern,path):
+    arbiter=ClaimArbiter(project_root=tmp_path)
+    a=canonical_claim(pattern,project_root=tmp_path,owner="active-outside-batch",windows=False)
+    b=canonical_claim(path,project_root=tmp_path,owner="incoming-batch",windows=False)
+    assert (await arbiter.reserve(a.owner,[a])).status=="granted"
+    denied=await arbiter.reserve(b.owner,[b])
+    assert denied.status=="waiting_claim" and denied.blockers==(a.owner,)
+    assert await arbiter.authorize_write(a.owner,path,project_root=tmp_path,windows=False)
+    assert not await arbiter.authorize_write(b.owner,path,project_root=tmp_path,windows=False)
+    assert await arbiter.authorize_batch(a.owner,(path,),project_root=tmp_path)
+    assert not await arbiter.authorize_batch(b.owner,(path,),project_root=tmp_path)
+    assert b.owner not in (await arbiter.snapshot())["active"]
+    await arbiter.release(a.owner)
+    assert (await arbiter.reserve(b.owner,[b])).status=="granted"
+    assert await arbiter.authorize_batch(b.owner,(path,),project_root=tmp_path)
+
+
+async def test_simultaneous_root_glob_and_literal_reservations_have_one_writer(tmp_path):
+    arbiter=ClaimArbiter(project_root=tmp_path);barrier=asyncio.Event()
+    async def reserve(owner,path):
+        await barrier.wait()
+        return await arbiter.reserve(owner,[canonical_claim(path,project_root=tmp_path,owner=owner)])
+    pending=[asyncio.create_task(reserve("glob","test*.py")),asyncio.create_task(reserve("literal","test_auth.py"))]
+    barrier.set();decisions=await asyncio.gather(*pending)
+    assert sorted(d.status for d in decisions)==["granted","waiting_claim"]
+    authorized=[owner for owner in ("glob","literal") if await arbiter.authorize_batch(owner,("test_auth.py",),project_root=tmp_path)]
+    assert len(authorized)==1
+
+
+async def test_readers_may_share_root_glob_but_writer_still_waits(tmp_path):
+    arbiter=ClaimArbiter(project_root=tmp_path)
+    for owner,path in (("reader-a","test*.py"),("reader-b","test_auth.py")):
+        assert (await arbiter.reserve(owner,[canonical_claim(path,project_root=tmp_path,owner=owner,mode="read")])).status=="granted"
+        assert not await arbiter.authorize_batch(owner,("test_auth.py",),project_root=tmp_path)
+    writer=await arbiter.reserve("writer",[canonical_claim("test_auth.py",project_root=tmp_path,owner="writer")])
+    assert writer.status=="waiting_claim" and writer.blockers==("reader-a","reader-b")
+
+
+async def test_active_wildcard_claim_refuses_entire_real_broker_batch_before_mutation(tmp_path):
+    arbiter = ClaimArbiter(project_root=tmp_path)
+    active = canonical_claim("test*.py", project_root=tmp_path, owner="active")
+    incoming = canonical_claim("test_auth.py", project_root=tmp_path, owner="incoming")
+    assert (await arbiter.reserve("active", [active])).status == "granted"
+    assert (await arbiter.reserve("incoming", [incoming])).status == "waiting_claim"
+    loop = asyncio.get_running_loop()
+
+    async def mediated_write(owner, files):
+        broker = FileBroker(ExecutionContext("claims-counterprobe", tmp_path, task_id=owner))
+
+        def authorize(paths):
+            allowed = asyncio.run_coroutine_threadsafe(
+                arbiter.authorize_batch(owner, paths, project_root=tmp_path), loop
+            ).result(timeout=5)
+            if not allowed:
+                raise ClaimViolation("The active reservation does not authorize this entire batch")
+
+        token = active_write_authorizer.set(authorize)
+        try:
+            return await asyncio.to_thread(broker.apply, {"tool": "write_files", "files": files})
+        finally:
+            active_write_authorizer.reset(token)
+
+    # The first path is otherwise writable. No partial write is permitted when
+    # the later conflicting path belongs to the already-active wildcard owner.
+    with pytest.raises(ClaimViolation):
+        await mediated_write("incoming", [
+            {"path": "unclaimed.py", "content": "must not be created"},
+            {"path": "test_auth.py", "content": "must not overwrite the active owner"},
+        ])
+    assert not (tmp_path / "unclaimed.py").exists()
+    assert not (tmp_path / "test_auth.py").exists()
+    await mediated_write("active", [{"path": "test_auth.py", "content": "active owner output"}])
+    assert (tmp_path / "test_auth.py").read_text() == "active owner output"
+    with pytest.raises(ClaimViolation):
+        await mediated_write("incoming", [{"path": "test_auth.py", "content": "loser output"}])
+    assert (tmp_path / "test_auth.py").read_text() == "active owner output"

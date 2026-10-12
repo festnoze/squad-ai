@@ -79,8 +79,11 @@ def _static_prefix(glob: str) -> str:
             break
     prefix = g[:cut]
     # Truncate to the last complete segment so "src/comp*" → "src/".
-    if cut < len(g) and "/" in prefix:
-        prefix = prefix[: prefix.rfind("/") + 1]
+    if cut < len(g):
+        # A wildcard inside the FIRST segment has no complete literal path
+        # ancestor. "test*.py" is not the directory "test/"; claiming that
+        # would incorrectly prove it disjoint from "test_auth.py".
+        prefix = prefix[: prefix.rfind("/") + 1] if "/" in prefix else ""
     return prefix
 
 
