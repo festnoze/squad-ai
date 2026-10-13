@@ -31,6 +31,72 @@ async def test_explicit_language_does_not_need_an_agent(language, goal, monkeypa
         assert not state.streams and not state.delivery_ready
 
 
+@pytest.mark.parametrize("language", ["go", "rust"])
+async def test_explicit_unvalidated_backend_is_rejected_before_provider_call(language, monkeypatch):
+    monkeypatch.setattr(settings, "project_bootstrap", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = ProjectState(
+        id=f"early-{language}", name="app", goal=f"API backend en {language}", auto_spec=True,
+    )
+    runner = FakeRunner([])
+    pipeline = Pipeline(state, runner)
+    monkeypatch.setattr(pipeline, "_sync", lambda: None)
+    monkeypatch.setattr(pipeline, "_log", lambda *args, **kwargs: None)
+    monkeypatch.setattr(pipeline.monitor, "event", lambda *args, **kwargs: None)
+
+    await pipeline._alifecycle()
+
+    assert runner.calls == []
+    assert state.bootstrap_status == "failed"
+    assert state.technical_stack["backend"] == language
+    assert "choisir Python/FastAPI ou Node.js" in state.bootstrap_detail
+    assert state.phase == PipelinePhase.NEEDS_ATTENTION
+
+
+@pytest.mark.parametrize("language,framework", [("go", "net/http"), ("rust", "axum")])
+async def test_inferred_unsupported_stack_is_normalized_without_provider_call(language, framework, monkeypatch):
+    monkeypatch.setattr(settings, "project_bootstrap", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = ProjectState(
+        id=f"inferred-{language}", name="app", goal="Service web",
+        technical_stack={
+            "kind": "api", "backend": language, "framework": framework,
+            "frontend": "none", "database": "none", "source": "inferred",
+        },
+    )
+    runner = FakeRunner([])
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aselect_stack()
+    assert runner.calls == []
+    assert state.technical_stack["backend"] == "python"
+    assert state.technical_stack["framework"] == "fastapi"
+    assert state.technical_stack["source"] == "inferred"
+
+
+@pytest.mark.parametrize("language,framework", [("go", "net/http"), ("rust", "axum")])
+async def test_frozen_inferred_unsupported_stack_migrates_without_provider_call(
+    language, framework, monkeypatch,
+):
+    monkeypatch.setattr(settings, "project_bootstrap", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = ProjectState(
+        id=f"frozen-inferred-{language}", name="app", goal="Service web",
+        technical_stack=stack.freeze({
+            "kind": "api", "backend": language, "framework": framework,
+            "frontend": "none", "database": "none", "source": "inferred",
+        }),
+    )
+    runner = FakeRunner([])
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aselect_stack()
+    assert runner.calls == []
+    assert state.technical_stack["backend"] == "python"
+    assert state.technical_stack["framework"] == "fastapi"
+    assert state.technical_stack["source"] == "inferred"
+
+
 def test_unsupported_explicit_framework_is_not_silently_replaced():
     state = ProjectState(id="unsupported", name="app", goal="Application Django et Vue")
     with pytest.raises(ValueError, match="sans template"):
@@ -127,7 +193,6 @@ def test_explicit_unsupported_backend_language_is_not_silently_replaced(goal):
     ("A CLI written in JavaScript", "node"),
     ("API Python et frontend React en JavaScript", "python"),
     ("JavaScript frontend avec API Python", "python"),
-    ("Rust API without a JavaScript backend", "rust"),
     ("API Python sans Java", "python"), ("API Python sans C#", "python"),
     ("API Python sans C++", "python"), ("API Python sans .NET", "python"),
     ("API Python sans PHP", "python"), ("API Python sans Ruby", "python"),
@@ -194,14 +259,19 @@ def test_english_go_is_not_a_language_request():
 
 
 @pytest.mark.parametrize("goal,backend", [
-    ("Une API Rust sans Python", "rust"),
     ("API FastAPI sans Django", "python"),
-    ("Build an API in Go without Flask", "go"),
     ("Node.js API, not Python", "node"),
 ])
 def test_excluded_technology_is_not_a_required_stack(goal, backend):
     state = ProjectState(id="excluded", name="app", goal=goal)
     assert stack.resolve(state)["backend"] == backend
+
+
+@pytest.mark.parametrize("goal", ["Une API Rust sans Python", "Build an API in Go without Flask"])
+def test_explicit_unvalidated_go_rust_are_rejected_even_when_other_languages_are_excluded(goal):
+    state = ProjectState(id="unsupported-native", name="app", goal=goal)
+    with pytest.raises(ValueError, match="initialisation complète"):
+        stack.resolve(state)
 
 
 @pytest.mark.parametrize("goal", [
@@ -213,13 +283,20 @@ def test_explicitly_excluded_database_does_not_create_sqlite(goal):
     assert stack.resolve(state)["database"] == "none"
 
 
-@pytest.mark.parametrize("framework,backend", [("fastapi", "python"), ("axum", "rust"), ("node:http", "node"), ("net/http", "go")])
+@pytest.mark.parametrize("framework,backend", [("fastapi", "python"), ("node:http", "node")])
 def test_explicit_framework_selects_its_matching_backend(framework, backend):
     state = ProjectState(id="explicit-framework", name="app", goal="API", backend_language=BackendLanguage.GO,
                          technical_stack={"framework": framework})
     chosen = stack.resolve(state)
     assert chosen["backend"] == backend
     assert chosen["source"] == "explicit"
+
+
+@pytest.mark.parametrize("framework", ["axum", "net/http"])
+def test_explicit_go_rust_framework_is_rejected_before_scaffold(framework):
+    state = ProjectState(id="unsupported-framework", name="app", goal="API", technical_stack={"framework": framework})
+    with pytest.raises(ValueError, match="initialisation complète"):
+        stack.resolve(state)
 
 
 @pytest.mark.parametrize("root", ["../outside", "frontend/../../outside", "/outside", "C:\\outside", "C:outside", "\\\\server\\share", "frontend:alternate"])
@@ -232,7 +309,7 @@ def test_stream_escape_is_rejected_before_scaffolding(root):
 
 def test_explicit_unsupported_database_pair_fails_before_scaffold():
     state = ProjectState(id="sqlite-go", name="app", goal="API en Go et SQLite")
-    with pytest.raises(ValueError, match="Python/FastAPI"):
+    with pytest.raises(ValueError, match="initialisation complète"):
         stack.resolve(state)
 
 

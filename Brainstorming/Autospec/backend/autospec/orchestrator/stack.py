@@ -10,7 +10,68 @@ from pathlib import PurePosixPath, PureWindowsPath
 from ..models import ProjectState
 
 BACKENDS = {"python": "fastapi", "go": "net/http", "rust": "axum", "node": "node:http"}
+# Greenfield creation is supported only when the entire initialization chain is
+# implemented: scaffold + lock resolution + isolated tests + runtime preflight.
+# Go/Rust templates exist, but their locked Linux validation profile does not.
+INITIALIZATION_CAPABILITIES = {
+    "python": frozenset({"scaffold", "lock", "isolated_tests", "runtime_preflight"}),
+    "node": frozenset({"scaffold", "lock", "isolated_tests", "runtime_preflight"}),
+    "go": frozenset({"scaffold"}),
+    "rust": frozenset({"scaffold"}),
+}
+REQUIRED_INITIALIZATION_CAPABILITIES = frozenset(
+    {"scaffold", "lock", "isolated_tests", "runtime_preflight"}
+)
+SUPPORTED_INITIAL_BACKENDS = frozenset(
+    backend for backend, capabilities in INITIALIZATION_CAPABILITIES.items()
+    if REQUIRED_INITIALIZATION_CAPABILITIES <= capabilities
+)
 _DECISION_FIELDS = ("backend", "framework", "frontend", "database", "kind")
+
+
+def supports_initialization(backend: str) -> bool:
+    """Whether a backend can pass every deterministic greenfield foundation gate."""
+    capabilities = INITIALIZATION_CAPABILITIES.get(str(backend or "").lower(), frozenset())
+    return REQUIRED_INITIALIZATION_CAPABILITIES <= capabilities
+
+
+def unsupported_initialization_message(backend: str) -> str:
+    return (
+        f"Stack backend {backend!r} explicitement demandée, mais son initialisation complète "
+        "(aucun profil Linux complet attesté : verrou de dépendances, tests isolés et préflight runtime) "
+        "n'est pas encore validée. "
+        "Aucune substitution automatique ne sera faite : choisir Python/FastAPI ou Node.js, "
+        "ou importer un projet existant (brownfield)."
+    )
+
+
+def explicit_unsupported_initial_backend(state: ProjectState) -> str:
+    """Return an explicitly requested Go/Rust backend before any analysis call.
+
+    ``backend_language`` alone is not explicit intent: it can be an old or
+    context-derived recommendation.
+    """
+    requested = dict(getattr(state, "technical_stack", {}) or {})
+    if requested.get("kind") == "frontend":
+        return ""
+    backend = str(requested.get("backend") or "").strip().lower()
+    framework_backend = next(
+        (language for language, framework in BACKENDS.items()
+         if framework == requested.get("framework")),
+        "",
+    )
+    if backend in {"go", "rust"} and requested.get("source") != "inferred":
+        return backend
+    if framework_backend in {"go", "rust"} and requested.get("source") != "inferred":
+        return framework_backend
+    prose_backend = explicit_backend(f"{state.goal}\n{state.brief}")
+    return prose_backend if prose_backend in {"go", "rust"} else ""
+
+
+def supported_default_backend(backend: str) -> str:
+    """Clamp a context/model recommendation to the attested bootstrap catalog."""
+    normalized = str(backend or "").strip().lower()
+    return normalized if supports_initialization(normalized) else "python"
 
 
 def freeze(decision: dict[str, str], *, rationale: str = "") -> dict[str, str]:
@@ -40,6 +101,13 @@ def _sealed(requested: dict[str, str]) -> dict[str, str] | None:
     if freeze(requested)["decision_sha256"] != requested["decision_sha256"]:
         raise ValueError("Décision de stack modifiée : résoudre explicitement un nouveau contrat avant bootstrap.")
     backend, kind = requested["backend"], requested["kind"]
+    if kind != "frontend" and not supports_initialization(backend):
+        # A frozen context recommendation may predate the current capability
+        # catalog. Let resolve() migrate that inferred decision as one unit;
+        # an explicitly requested unsupported stack must still fail closed.
+        if requested.get("source") != "inferred":
+            raise ValueError(unsupported_initialization_message(backend))
+        return None
     supported = (
         kind == "frontend" and backend == requested["framework"] == requested["database"] == "none"
         and requested["frontend"] == "react"
@@ -250,11 +318,29 @@ def resolve(state: ProjectState) -> dict[str, str]:
                 "database": "none", "kind": kind, "source": requested.get("source", "explicit")}
 
     framework_backend = next((language for language, framework in BACKENDS.items() if framework == requested.get("framework")), "")
-    explicit = requested.get("backend") or framework_backend or explicit_backend(text)
-    backend = explicit or state.backend_language.value
+    explicit_text = explicit_backend(text)
+    if requested.get("source") == "inferred":
+        if explicit_text:
+            if not supports_initialization(explicit_text):
+                raise ValueError(unsupported_initialization_message(explicit_text))
+            backend = explicit_text
+            framework = BACKENDS[backend]
+            source = "explicit"
+        else:
+            candidate = requested.get("backend") or framework_backend or state.backend_language.value
+            backend = supported_default_backend(candidate)
+            framework = (requested.get("framework") or BACKENDS[backend]) if backend == candidate else BACKENDS[backend]
+            source = "inferred"
+        explicit = explicit_text
+    else:
+        explicit = requested.get("backend") or framework_backend or explicit_text
+        if explicit and not supports_initialization(explicit):
+            raise ValueError(unsupported_initialization_message(explicit))
+        backend = explicit or supported_default_backend(state.backend_language.value)
+        framework = requested.get("framework") or BACKENDS.get(backend, "")
+        source = requested.get("source") or ("explicit" if explicit else "inferred")
     if backend not in BACKENDS:
         raise ValueError(f"Backend {backend!r} sans template : choisir python, go, rust ou node.")
-    framework = requested.get("framework") or BACKENDS[backend]
     frontend = requested.get("frontend") or ("react" if kind in ("fullstack", "frontend") else "none")
     database = requested.get("database")
     if database is None:
@@ -275,7 +361,7 @@ def resolve(state: ProjectState) -> dict[str, str]:
     return {
         "backend": backend, "framework": framework, "frontend": frontend,
         "database": database, "kind": kind,
-        "source": requested.get("source") or ("explicit" if explicit else "inferred"),
+        "source": source,
     }
 
 

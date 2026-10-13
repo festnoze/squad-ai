@@ -43,7 +43,7 @@ def test_selected_stack_produces_nonroot_self_contained_image(language, kind):
 
 @pytest.mark.parametrize("language,expected,unexpected", [
     ("python", "pytest", "go test"),
-    ("go", "go test ./...", "pytest"),
+    ("go", "go test -mod=readonly ./...", "pytest"),
     ("rust", "cargo test --locked", "pytest"),
     ("node", "npm test", "pytest"),
 ])
@@ -143,12 +143,55 @@ def test_invalid_options_fail_before_writing_any_file(tmp_path, options):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_lockfiles_are_enforced_and_failures_cannot_fall_back():
+def test_lockfiles_are_required_and_inconsistent_locks_fail_closed():
     python = dockerfile_text(8000)
     node = dockerfile_text(8000, language="node")
     rust = dockerfile_text(8000, language="rust")
-    assert "if [ -f uv.lock ]; then uv sync --frozen --no-dev; else" in python
-    assert "if [ -f package-lock.json ]; then npm ci; else" in node
-    assert "if [ -f Cargo.lock ]; then cargo build --release --locked; else" in rust
-    for body in [python, node, rust]:
-        assert "||" not in body
+    go = dockerfile_text(8000, language="go")
+    assert "test -f pyproject.toml && test -f uv.lock && uv sync --locked --no-dev" in python
+    assert "test -f package.json && test -f package-lock.json && npm ci" in node
+    assert "test -f Cargo.toml && test -f Cargo.lock && cargo build --release --locked" in rust
+    assert "test -f go.mod && test -f go.sum && go mod verify" in go
+    assert "go build -mod=readonly" in go
+    for body in [python, node, rust, go]:
+        assert "npm install" not in body
+        assert "uv sync --no-dev" not in body
+        assert "cargo build --release;" not in body
+        assert "go mod download" not in body
+
+
+@pytest.mark.parametrize("language,required", [
+    ("python", ["test -f pyproject.toml", "test -f uv.lock", "uv sync --locked"]),
+    ("go", ["test -f go.mod", "test -f go.sum", "go mod verify", "-mod=readonly"]),
+    ("rust", ["test -f Cargo.toml", "test -f Cargo.lock", "cargo test --locked", "cargo build --release --locked"]),
+    ("node", ["test -f package.json", "test -f package-lock.json", "npm ci"]),
+])
+def test_ci_requires_manifest_lock_pair_and_has_no_unlocked_fallback(tmp_path, language, required):
+    write_deploy_artifacts(tmp_path, language=language)
+    workflow = (tmp_path / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    for fragment in required:
+        assert fragment in workflow
+    for forbidden in ["npm install", "uv sync --extra", "uv sync ||", "cargo test;", "cargo build --release;", "go mod download"]:
+        assert forbidden not in workflow
+
+
+def test_frontend_docker_and_ci_require_lock_instead_of_npm_install(tmp_path):
+    write_deploy_artifacts(tmp_path, kind="frontend")
+    dockerfile = (tmp_path / "Dockerfile").read_text(encoding="utf-8")
+    workflow = (tmp_path / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    for body in (dockerfile, workflow):
+        assert "test -f package.json" in body
+        assert "test -f package-lock.json" in body
+        assert "npm ci" in body
+        assert "npm install" not in body
+
+
+def test_verified_python_and_node_build_images_are_immutable():
+    python = dockerfile_text(8000, language="python")
+    node = dockerfile_text(8000, language="node")
+    frontend = dockerfile_text(8000, kind="frontend")
+    assert "ghcr.io/astral-sh/uv@sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58" in python
+    assert "pip install" not in python
+    for body in (node, frontend):
+        assert "node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392" in body
+        assert "node:22-alpine" not in body

@@ -1,6 +1,6 @@
 import pytest
 
-from autospec.models import ProjectState
+from autospec.models import BackendLanguage, ProjectState
 from autospec.orchestrator import stack
 
 
@@ -57,3 +57,62 @@ def test_unrelated_or_in_brief_does_not_hide_stack_conflict():
 def test_node_toolchain_is_not_a_second_required_backend():
     state = ProjectState(id="node-tools", name="app", goal="API en Python, React construit avec Node.js", technical_stack={"backend": "python"})
     assert stack.resolve(state)["backend"] == "python"
+
+
+@pytest.mark.parametrize("language", ["go", "rust"])
+def test_explicit_unqualified_backend_fails_during_stack_resolution(language):
+    state = ProjectState(id=f"explicit-{language}", name="app", goal=f"API backend en {language}")
+    with pytest.raises(ValueError, match="initialisation complète.*Aucune substitution automatique"):
+        stack.resolve(state)
+
+
+@pytest.mark.parametrize("language", ["go", "rust"])
+def test_context_recommendation_is_clamped_to_a_complete_initialization_stack(language):
+    state = ProjectState(
+        id=f"inferred-{language}", name="app", goal="Service web",
+        backend_language=BackendLanguage(language), product_profile="api",
+    )
+    decision = stack.resolve(state)
+    assert decision["backend"] == "python"
+    assert decision["framework"] == "fastapi"
+    assert decision["source"] == "inferred"
+
+
+@pytest.mark.parametrize("language,framework", [("go", "net/http"), ("rust", "axum")])
+def test_persisted_inferred_unsupported_stack_falls_back_as_one_decision(language, framework):
+    state = ProjectState(
+        id=f"persisted-{language}", name="app", goal="Service web",
+        technical_stack={
+            "kind": "api", "backend": language, "framework": framework,
+            "frontend": "none", "database": "none", "source": "inferred",
+        },
+    )
+    decision = stack.resolve(state)
+    assert (decision["backend"], decision["framework"], decision["source"]) == (
+        "python", "fastapi", "inferred",
+    )
+
+
+@pytest.mark.parametrize("language,framework", [("go", "net/http"), ("rust", "axum")])
+def test_frozen_inferred_unsupported_stack_migrates_as_one_decision(language, framework):
+    decision = stack.freeze({
+        "kind": "api", "backend": language, "framework": framework,
+        "frontend": "none", "database": "none", "source": "inferred",
+    })
+    state = ProjectState(
+        id=f"frozen-inferred-{language}", name="app", goal="Service web",
+        technical_stack=decision,
+    )
+    resolved = stack.resolve(state)
+    assert (resolved["backend"], resolved["framework"], resolved["source"]) == (
+        "python", "fastapi", "inferred",
+    )
+
+
+@pytest.mark.parametrize("language", ["go", "rust"])
+def test_explicit_unsupported_backend_is_detected_before_spec_analysis(language):
+    state = ProjectState(id=f"early-{language}", name="app", goal=f"API en {language}")
+    assert stack.explicit_unsupported_initial_backend(state) == language
+    state.backend_language = BackendLanguage(language)
+    state.goal = "Service web"
+    assert stack.explicit_unsupported_initial_backend(state) == ""

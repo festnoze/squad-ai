@@ -2555,6 +2555,41 @@ class Pipeline:
         analysis, no panel, the existing pytest pipeline unchanged); ON runs the
         deterministic heuristic and, when the LLM is reachable, an agent that may
         refine it. First iteration only, non-fatal."""
+        requested_stack = self.state.technical_stack
+        if requested_stack.get("source") == "inferred":
+            explicit_text = stack_selection.explicit_backend(
+                f"{self.state.goal}\n{self.state.brief}"
+            )
+            if explicit_text:
+                self.state.backend_language = BackendLanguage(explicit_text)
+                self.state.language_rationale = "Contrainte de stack explicite prioritaire sur la recommandation."
+                return
+            candidate = str(requested_stack.get("backend") or "").strip().lower()
+            if not candidate:
+                candidate = next(
+                    (language for language, framework in stack_selection.BACKENDS.items()
+                     if framework == requested_stack.get("framework")),
+                    "",
+                )
+            if candidate in stack_selection.BACKENDS:
+                backend = stack_selection.supported_default_backend(candidate)
+                if backend != candidate:
+                    requested_stack["backend"] = backend
+                    requested_stack["framework"] = stack_selection.BACKENDS[backend]
+                    # The previous seal described the unsupported inferred
+                    # choice. Drop only its digest so _aselect_stack can
+                    # resolve and freeze the supported migrated decision.
+                    requested_stack.pop("decision_sha256", None)
+                    self.state.language_rationale = (
+                        f"La recommandation contextuelle {candidate} ne dispose pas encore "
+                        "de la chaîne d'initialisation vérifiée ; Python/FastAPI est retenu."
+                    )
+                else:
+                    self.state.language_rationale = str(
+                        requested_stack.get("rationale") or "Stack contextuelle conservée, catalogue vérifié."
+                    )
+                self.state.backend_language = BackendLanguage(backend)
+                return
         explicit = self.state.technical_stack.get("backend") or stack_selection.explicit_backend(
             f"{self.state.goal}\n{self.state.brief}"
         )
@@ -2664,10 +2699,29 @@ class Pipeline:
             return True
         try:
             await self._aselect_language()
+            recommended_backend = self.state.backend_language.value
+            supported_backend = stack_selection.supported_default_backend(recommended_backend)
+            if supported_backend != recommended_backend and not stack_selection.explicit_unsupported_initial_backend(self.state):
+                self.state.backend_language = BackendLanguage(supported_backend)
+                self.state.language_rationale = (
+                    f"La recommandation contextuelle {recommended_backend} ne dispose pas encore "
+                    "de toute la chaîne d'initialisation vérifiée ; Python/FastAPI est retenu "
+                    "pour ce nouveau projet."
+                )
+                self._chat(
+                    ChatRole.SYSTEM,
+                    f"🧭 Recommandation {recommended_backend} indisponible pour le bootstrap complet ; "
+                    f"socle initial déterministe : {supported_backend}/FastAPI si backend requis.",
+                )
             self.state.technical_stack = stack_selection.freeze(
                 stack_selection.resolve(self.state), rationale=self.state.language_rationale,
             )
         except ValueError as exc:
+            explicit_backend = stack_selection.explicit_unsupported_initial_backend(self.state)
+            if explicit_backend:
+                self.state.backend_language = BackendLanguage(explicit_backend)
+                self.state.technical_stack.setdefault("backend", explicit_backend)
+                self.state.technical_stack.setdefault("source", "explicit")
             self.state.bootstrap_status = "failed"
             self.state.bootstrap_detail = str(exc)
             self._block_delivery(str(exc), source="bootstrap")
@@ -4065,6 +4119,21 @@ class Pipeline:
                     f"Profil produit '{self.state.product_profile}' appliqué : "
                     + ", ".join(f"{k}={v}" for k, v in sorted(applied_profile.items())),
                 )
+            # Reject an explicit Go/Rust choice before SPEC or any provider
+            # call: these greenfield stacks do not yet have the complete
+            # locked/tested/runtime-preflight chain.
+            if settings.project_bootstrap and not settings.fake_agents and not self.state.brownfield_path:
+                explicit_backend = stack_selection.explicit_unsupported_initial_backend(self.state)
+                if explicit_backend:
+                    detail = stack_selection.unsupported_initialization_message(explicit_backend)
+                    detail = f"ISOLATION_UNAVAILABLE: {detail}"
+                    self.state.backend_language = BackendLanguage(explicit_backend)
+                    self.state.technical_stack.setdefault("backend", explicit_backend)
+                    self.state.technical_stack.setdefault("source", "explicit")
+                    self.state.bootstrap_status = "failed"
+                    self.state.bootstrap_detail = detail
+                    self._block_delivery(detail, source="stack-capability")
+                    raise DeliveryBlocked()
             await self._abrownfield_init()
             brief = await self._aspec_phase()
             if brief is None:  # stopped during interview
