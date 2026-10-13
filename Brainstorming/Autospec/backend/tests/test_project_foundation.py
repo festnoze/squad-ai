@@ -358,12 +358,16 @@ def test_frontend_scaffold_rejects_unsafe_root_without_stack_selection(root):
         workspace.scaffold_frontend(state, stream)
 
 
-async def test_failed_initialization_can_resume_without_stories(monkeypatch):
+async def test_failed_initialization_requires_explicit_full_restart_without_stories(monkeypatch):
     state = ProjectState(id="retry-bootstrap", name="app", goal="API", brief="API", phase=PipelinePhase.NEEDS_ATTENTION, bootstrap_status="failed")
     pipeline = Pipeline(state, FakeRunner([]))
     resumed = AsyncMock()
     monkeypatch.setattr(pipeline, "_alifecycle", resumed)
-    await pipeline.aresume_build()
+    with pytest.raises(ValueError, match="action utilisateur explicite"):
+        await pipeline.aresume_build()
+    assert pipeline._task is None and resumed.await_count == 0
+    await pipeline.aresume_build(explicit_request=True)
+    assert state.generation_checkpoint["resume_action"] == "explicit-bootstrap-restart"
     await pipeline._task
     resumed.assert_awaited_once()
 

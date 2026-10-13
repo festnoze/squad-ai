@@ -78,23 +78,40 @@ def admit_vertical(contract: AcceptanceContract, result: dict, *, snapshot_hash:
         auth = profiles[0]["auth"]
     else:
         raise MilestoneError("reviewed vertical authentication profile missing")
-    expected = {"schema", "browser_create", "api_read", "db_committed"}
+    expected_order = ["schema", "browser_create", "frontend_wiring", "api_read", "db_committed", "restart"]
     if auth:
-        expected.update({"bootstrap", "argon2", "browser_login"})
+        expected_order[1:1] = ["bootstrap", "argon2", "browser_login"]
+    else:
+        expected_order.insert(1,"authentication")
+    expected=set(expected_order)
     errors, stages = [], {}
+    if result.get("status") != "PASS":
+        errors.append("vertical result status is not PASS")
     if result.get("snapshot_hash") != snapshot_hash or result.get("contract_hash") != contract.contract_hash:
         errors.append("vertical result identity differs")
-    for stage in result.get("stages", []):
+    raw_stages=result.get("stages", [])
+    actual_order=[stage.get("name") if isinstance(stage,dict) else None for stage in raw_stages] if isinstance(raw_stages,list) else []
+    if actual_order != expected_order:
+        errors.append("vertical stages are not in the required order")
+    for stage in raw_stages if isinstance(raw_stages,list) else []:
         name = stage.get("name") if isinstance(stage, dict) else None
         if name not in expected or name in stages:
             errors.append("unknown/duplicate vertical stage: " + str(name))
+            continue
+        if name == "authentication" and not auth:
+            if stage.get("passed") is True and stage.get("status") == "N/A" and not stage.get("proofs"):
+                stages[name] = dict(stage, admitted_proofs=[])
+            else:
+                errors.append("unauthenticated profile must explicitly mark authentication N/A")
+                stages[name] = dict(stage, admitted_proofs=[])
             continue
         proofs = [proof for proof in stage.get("proofs", []) if isinstance(proof, dict) and
                   _valid_proof(proof, "VERTICAL", root=Path(evidence_root).resolve(),
                                snapshot=snapshot_hash, contract=contract.contract_hash) and
                   "VERTICAL:" + name in proof["checks"]]
         kinds = {proof["type"] for proof in proofs}
-        if stage.get("passed") is not True or "X" not in kinds or name.startswith("browser_") and "V" not in kinds:
+        if (stage.get("passed") is not True or "X" not in kinds or
+                (name.startswith("browser_") or name == "frontend_wiring") and "V" not in kinds):
             errors.append("vertical stage unproven: " + name)
         stages[name] = dict(stage, admitted_proofs=proofs)
     if expected - stages.keys():

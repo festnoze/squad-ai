@@ -9270,7 +9270,7 @@ class Pipeline:
                 self.state.phase = PipelinePhase.DONE
             self._sync()
 
-    async def aresume_build(self) -> None:
+    async def aresume_build(self, *, explicit_request: bool = False) -> None:
         """Resume the build phase of a dormant iteration in the background.
 
         After a backend restart, in-progress stories are reverted to TODO and
@@ -9278,8 +9278,15 @@ class Pipeline:
         re-runs the build over the iteration's still-to-build stories (TODO or
         RED), then restores a terminal phase.
 
-        Raises ValueError (-> 409) if the pipeline is still active, or if the
-        current iteration has no story left to build."""
+        An empty pre-plan project is a separate, explicitly authorized flow:
+        only the manual ``resume-build`` HTTP action may admit it, and its
+        durable continuation journal must be written before a task is created.
+        The same manual action may restart an empty project whose deterministic
+        bootstrap failed before planning; that is a distinct full lifecycle
+        restart, never an implicit timer/startup retry.
+
+        Raises ValueError (-> 409) if the pipeline is still active, if an
+        explicit user action is required, or if there is no story to build."""
         if self.state.phase not in (
             PipelinePhase.STOPPED,
             PipelinePhase.DONE,
@@ -9291,9 +9298,32 @@ class Pipeline:
             raise ValueError("une tâche est déjà en cours")
         if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
             raise ValueError("un déploiement Docker est en cours")
+        from . import prebuild_resume
+
+        if prebuild_resume.is_plan_candidate(self.state):
+            # This is not a normal build resume and must never fall through to
+            # start() or _aresume_build_run(): that could replay PLAN without
+            # proving the source/contract/bootstrap/budget snapshot. Admission
+            # is synchronous and persists UNKNOWN before exposing its task.
+            prebuild_resume.start(self, explicit_request=explicit_request)
+            return
         if self.state.bootstrap_status == "failed" and not self.state.stories:
-            # Initialization can fail before the PO has created a single story.
-            # Resume must replay the preflight, not reject an empty backlog.
+            if explicit_request is not True:
+                raise ValueError(
+                    "Redémarrage complet après échec du socle : action utilisateur explicite requise."
+                )
+            # This is deliberately not the pre-plan continuation above: an
+            # explicit user request re-runs the full lifecycle after a failed
+            # bootstrap. Persist its distinct reason before starting it.
+            self.state.generation_checkpoint = {
+                **self.state.generation_checkpoint,
+                "resume_action": "explicit-bootstrap-restart",
+            }
+            self._chat(
+                ChatRole.SYSTEM,
+                "🔁 Redémarrage complet explicitement demandé après échec du socle technique.",
+            )
+            self._sync()
             self.start()
             return
         # P0c: no worker is active here (guards above), so any IN_PROGRESS/GREEN/RED

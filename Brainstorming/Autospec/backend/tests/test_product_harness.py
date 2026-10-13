@@ -46,7 +46,7 @@ def fixture_definition():
         title="Fixture "+name+str(i),description="Independent fixture description") for name in ("alice","bob") for i in range(6)]
     return dict(accounts=accounts,tickets=tickets,metadata=dict(provisioning=["migrate_fresh","bootstrap","seed"],
         bootstrap_actor="emma",vertical_actor="alice",quality_actor="alice",fixture_scope="independent metatest, not benchmark product"),
-        commands=dict(migrate_fresh={},bootstrap=dict(credentials={"$ref":"accounts.emma"}),
+        commands=dict(migrate_fresh={},bootstrap=dict(credentials={"$ref":"accounts.emma"},fault=""),
                       seed=dict(payload=dict(accounts={"$ref":"accounts"},tickets=rows))))
 
 
@@ -61,19 +61,19 @@ def reviewed_fixture_file(root,source,snapshot,definition=None):
     return path
 
 
-def make_bindings(root,source,snapshot):
+def make_bindings(root,source,snapshot,*,auth_required=True):
     files={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in source.iterdir() if p.is_file()}
     tables={name:TableBinding(name,{c:c for c in columns.split()}) for name,columns in TABLE_COLUMNS.items()}
     review_path=root/"bindings-review.json"; write_json(review_path,{"scope":"independent test fixture bindings, not benchmark review"})
     proof=Proof("R",str(review_path),hashlib.sha256(review_path.read_bytes()).hexdigest(),snapshot,CONTRACT,("PRODUCT:bindings",))
     commands={name:CommandBinding(("/opt/venv/bin/python","main.py",name),parameters)
-        for name,parameters in (("migrate_fresh",("fault",)),("bootstrap",("credentials",)),("seed",("payload",)),("reject",()))}
+        for name,parameters in (("migrate_fresh",("fault",)),("bootstrap",("credentials","fault")),("seed",("payload",)),("reject",()))}
     hook=InstrumentationBinding("main","app",clock_module="main",clock_attribute="now",
         business_tables=("tickets","messages"),audit_table="ticket_events",
         races={"ticket_patch":(("PATCH",r"/api/tickets/[a-f0-9-]+"),),"ticket_create":(("POST","/api/tickets"),)},proxy_headers=False)
     binding=ReviewedProductBindings(snapshot,CONTRACT,files,proof,"/var/lib/autospec-validation/support.sqlite",
         tables,commands,("/opt/venv/bin/python","main.py"),"/api/auth/login","csrf_token","/api/tickets/{id}",
-        instrumentation=hook,local_cookie_mode=True,query_plans={"tickets":("SELECT * FROM tickets WHERE owner_id=?",("owner",))},
+        auth_required=auth_required,instrumentation=hook,local_cookie_mode=True,query_plans={"tickets":("SELECT * FROM tickets WHERE owner_id=?",("owner",))},
         browser_bindings=dict(email="#email",password="#password",login="#login",ticket_list="#tickets",create="#create",title="#title",description="#description",submit="#submit",detail="#detail"),
         browser_routes=dict(home="/",ticket="/tickets/{id}",admin="/admin"))
     return replace(binding,review=replace(proof,checks=("PRODUCT:bindings","PRODUCT:bindings:"+binding.fingerprint())))
@@ -149,6 +149,30 @@ async def test_adapter_exposes_exact_supervised_runtime_for_confined_browser(sim
     await harness.adapter.close()
 
 
+@pytest.mark.asyncio
+async def test_missing_browser_observer_is_not_verified_and_no_auth_is_explicit_n_a(simple_profile,monkeypatch):
+    from types import SimpleNamespace
+    root,source,snapshot,_=simple_profile
+    binding=make_bindings(root,source,snapshot,auth_required=False)
+    runtime=SimpleNamespace(database_path=binding.database_path,exec=lambda *a,**k:None,
+        origin="http://127.0.0.1:1",volume_name="owned-volume",identifier="owned-container")
+    async def identity():return snapshot
+    async def oracle():return CONTRACT
+    async def fixtures(*a,**k):raise AdapterUnavailable("no fixture needed without auth/browser")
+    harness=ProductHarness(runtime,binding,snapshot_root=source,evidence_root=root/"evidence",
+        fixture_factory=fixtures,snapshot_hash=identity,contract_hash=oracle)
+    harness._command_receipts=[{"command":"migrate_fresh","exit_code":0}]
+    async def schema(_name):
+        return {"tables":[{"name":name} for name in binding.tables],"foreign_key_check":[],"user_version":1}
+    monkeypatch.setattr(harness,"observe",schema)
+    receipt=await harness.verify_vertical(snapshot,CONTRACT)
+    assert receipt["status"]=="NOT_VERIFIED",receipt
+    auth=next(s for s in receipt["stages"] if s["name"]=="authentication")
+    assert auth["passed"] and auth["status"]=="N/A" and not auth["proofs"]
+    assert not next(s for s in receipt["stages"] if s["name"]=="browser_create")["proofs"]
+    await harness.adapter.close()
+
+
 REAL=pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_PRODUCT_HARNESS")!="1",reason="opt-in real Linux/Chromium fixture campaign")
 
 
@@ -183,8 +207,9 @@ async def actual_browser_smoke(adapter,snapshot,contract):
     harness=PlaywrightHarness(adapter,bindings=dict(email="#email",password="#password",login="#login",ticket_list="#tickets",
         create="#create",title="#title",description="#description",submit="#submit",detail="#detail"),
         routes=dict(home="/",ticket="/tickets/{id}",admin="/admin"))
+    nonce=uuid4().hex
     return await browser_smoke(harness,snapshot,contract,adapter.manifest.accounts["alice"],
-        title="Genuine Linux browser creation",description="Actual Argon2 HTTP and committed SQLite audit")
+        title="Genuine Linux browser creation "+nonce,description="Actual Argon2 HTTP and committed SQLite audit "+nonce)
 
 
 @REAL
@@ -194,12 +219,18 @@ async def test_real_linux_vertical_and_owned_volume_persistence(linux_fixture_so
         await h.adapter.prepare_case("VERTICAL")
         receipt=await h.verify_vertical(h.bindings.snapshot_hash,CONTRACT,browser_smoke=actual_browser_smoke)
         assert receipt["status"]=="PASS",receipt
-        assert [s["name"] for s in receipt["stages"]]==["schema","bootstrap","argon2","browser_login","browser_create","api_read","db_committed"]
+        assert [s["name"] for s in receipt["stages"]]==["schema","bootstrap","argon2","browser_login","browser_create","frontend_wiring","api_read","db_committed","restart"]
         for stage in receipt["stages"]:
             assert stage["passed"] and stage["proofs"]
             for p in stage["proofs"]: assert Proof(**p).intact(snapshot_hash=h.bindings.snapshot_hash,contract_hash=CONTRACT)
         tickets=(await h.observe("business_state"))["tickets"]
-        created=next(t for t in tickets if t["title"]=="Genuine Linux browser creation")
+        browser_proof=next(Proof(**p) for s in receipt["stages"] if s["name"]=="restart" for p in s["proofs"])
+        browser_observed=json.loads(Path(browser_proof.path).read_text())["observed"]
+        title,description=browser_observed["expected_title"],browser_observed["expected_description"]
+        created=next(t for t in tickets if t["title"]==title)
+        assert created["description"]==description and receipt["ticket_id"]==created["id"]
+        restart_observed=browser_observed
+        assert restart_observed["before_container"]!=restart_observed["after_container"] and restart_observed["same_owned_volume"]
         first_id=h.runtime.identifier;origin=h.runtime.origin
         persisted=await h.verify_persistence(h.bindings.snapshot_hash,CONTRACT,ticket_id=created["id"])
         assert persisted["status"]=="PASS",persisted
@@ -371,14 +402,47 @@ async def test_rate_buckets_use_actual_linux_socket_ips_not_forwarded_header(lin
 
 @REAL
 @pytest.mark.asyncio
-@pytest.mark.parametrize("bug,stage",[("weak_hash","argon2"),("lost_commit","db_committed")])
-async def test_real_linux_bad_fixture_cannot_pass_vertical(linux_fixture_source,tmp_path,bug,stage):
+@pytest.mark.parametrize("bug,stage",[("weak_hash","argon2"),("lost_commit","db_committed"),
+    ("weak_bootstrap","bootstrap"),("static_detail","browser_create"),("wrong_detail","browser_create"),
+    ("local_echo_with_unused_get","browser_create"),
+    ("restart_noop","restart"),("missing_detail_get","frontend_wiring")])
+async def test_real_linux_bad_fixture_cannot_pass_vertical(linux_fixture_source,tmp_path,monkeypatch,bug,stage):
     definition=fixture_definition();definition["commands"]["seed"]["payload"]["bug"]=bug
+    if bug=="weak_bootstrap": definition["commands"]["bootstrap"]["fault"]=bug
     async with session(linux_fixture_source,tmp_path,definition=definition) as h:
         await h.adapter.prepare_case("VERTICAL")
+        if bug=="restart_noop": monkeypatch.setattr(h.runtime,"restart",lambda:None)
         receipt=await h.verify_vertical(h.bindings.snapshot_hash,CONTRACT,browser_smoke=actual_browser_smoke)
         assert receipt["status"]!="PASS",receipt
-        assert not next(s for s in receipt["stages"] if s["name"]==stage)["passed"]
+        failed_stage=next(s for s in receipt["stages"] if s["name"]==stage)
+        assert not failed_stage["passed"]
+        # A browser-dependent mutant is only refuted when the isolated browser
+        # observer actually ran. Missing X evidence means NOT_VERIFIED, not a
+        # successful negative test for the mutant.
+        x_proofs=[p for p in failed_stage["proofs"] if p["type"]=="X"]
+        if bug in {"static_detail","wrong_detail","local_echo_with_unused_get","restart_noop","missing_detail_get"} and not x_proofs:
+            assert receipt["status"]=="NOT_VERIFIED",receipt
+            return
+        if bug=="weak_bootstrap":
+            assert next(s for s in receipt["stages"] if s["name"]=="argon2")["passed"]
+        if bug in {"static_detail","wrong_detail"}:
+            browser_proof=Proof(**x_proofs[0])
+            checks=json.loads(Path(browser_proof.path).read_text())["checks"]
+            assert not next(c for c in checks if c["check"]=="VERTICAL:detail_contains_created_values")["passed"]
+        if bug=="local_echo_with_unused_get":
+            browser_proof=Proof(**x_proofs[0])
+            evidence=json.loads(Path(browser_proof.path).read_text())
+            assert not next(c for c in evidence["checks"] if c["check"]=="VERTICAL:detail_matches_get_response")["passed"]
+            assert any(r["method"]=="GET" and r["path"].startswith("/api/tickets/") for r in evidence["requests"])
+        if bug=="missing_detail_get":
+            browser_proof=Proof(**x_proofs[0])
+            evidence=json.loads(Path(browser_proof.path).read_text())
+            assert not next(c for c in evidence["checks"] if c["check"]=="VERTICAL:frontend_wiring")["passed"]
+            assert not any(r["method"]=="GET" and r["path"].startswith("/api/tickets/") for r in evidence["requests"])
+        if bug=="restart_noop":
+            restart_proof=Proof(**x_proofs[0])
+            observed=json.loads(Path(restart_proof.path).read_text())["observed"]
+            assert observed["before_container"]==observed["after_container"] and not observed["replaced_container"]
 
 
 @REAL

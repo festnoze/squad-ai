@@ -46,16 +46,31 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
     ticket_id, limits = None, []
     try:
         page = await case.page()
-        await harness.control(page,"email").fill(actor_fixture.email)
-        await harness.control(page,"password").fill(actor_fixture.password)
-        async with page.expect_response(lambda r: r.request.method=="POST" and urlsplit(r.url).path=="/api/auth/login") as response:
-            await harness.control(page,"login").click()
-        case.check("browser_login", (await response.value).status, 200)
-        case.check("authenticated_list", await case.visible(page,"ticket_list"))
-        await case.capture(page,"browser_login")
+        auth_required = getattr(harness.adapter,"auth_required",True)
+        if auth_required:
+            if actor_fixture is None:
+                raise AdapterUnavailable("authenticated vertical actor fixture absent")
+            await harness.control(page,"email").fill(actor_fixture.email)
+            await harness.control(page,"password").fill(actor_fixture.password)
+            async with page.expect_response(lambda r: r.request.method=="POST" and urlsplit(r.url).path=="/api/auth/login") as response:
+                await harness.control(page,"login").click()
+            case.check("browser_login", (await response.value).status, 200)
+            case.check("authenticated_list", await case.visible(page,"ticket_list"))
+            await case.capture(page,"browser_login")
+        else:
+            case.check("authentication", "N/A", "N/A")
         await harness.control(page,"create").click()
         await harness.control(page,"title").fill(title)
         await harness.control(page,"description").fill(description)
+        detail_responses=[]
+        def record_detail_response(response):
+            try:
+                path=urlsplit(response.url).path
+                if response.request.method=="GET" and re.fullmatch(r"/api/tickets/[^/]+",path):
+                    detail_responses.append(response)
+            except Exception:
+                pass
+        page.on("response",record_detail_response)
         async with page.expect_response(lambda r: r.request.method=="POST" and urlsplit(r.url).path=="/api/tickets") as response:
             await harness.control(page,"submit").click()
         created = await response.value
@@ -64,7 +79,31 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
             ticket_id = (await created.json()).get("id")
         case.check("server_ticket_id", isinstance(ticket_id,str) and bool(ticket_id))
         case.check("detail_navigation", await case.visible(page,"detail"))
+        detail_text = await harness.control(page,"detail").inner_text() if ticket_id else ""
+        expected_detail_path="/api/tickets/"+str(ticket_id)
+        detail_response=next((r for r in reversed(detail_responses) if urlsplit(r.url).path==expected_detail_path),None)
+        detail_payload={}
+        if detail_response is not None and detail_response.status==200:
+            try: detail_payload=await detail_response.json()
+            except Exception: detail_payload={}
+        response_matches_created=(detail_response is not None and detail_response.status==200 and
+            detail_payload.get("id")==ticket_id and detail_payload.get("title")==title and
+            detail_payload.get("description")==description)
+        display_matches_response=(detail_response is not None and detail_response.status==200 and
+            isinstance(detail_payload.get("title"),str) and isinstance(detail_payload.get("description"),str) and
+            detail_payload["title"] in detail_text and detail_payload["description"] in detail_text)
+        case.check("detail_get_response_matches_created_values",response_matches_created)
+        case.check("detail_contains_created_values",
+            {"title":title in detail_text,"description":description in detail_text},
+            {"title":True,"description":True})
+        case.check("detail_matches_get_response",display_matches_response)
         await case.capture(page,"browser_create")
+        sent = {(row["method"], row["path"]) for row in case.requests}
+        required_requests = {("POST", "/api/tickets"), ("GET", "/api/tickets/" + str(ticket_id))}
+        if auth_required:
+            required_requests.add(("POST", "/api/auth/login"))
+        case.check("frontend_wiring", required_requests <= sent and bool(ticket_id) and display_matches_response)
+        await case.capture(page,"frontend_wiring")
         case.check("unhandled_console", case.console_errors, [])
     except AdapterUnavailable as exc:
         limits.append(str(exc))
@@ -83,6 +122,7 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
     failed = any(not x["passed"] for x in case.checks)
     return {"status":"FAIL" if failed else "NOT_VERIFIED" if limits or not ticket_id else "PASS",
             "scope":"vertical browser login/create only, not product acceptance", "ticket_id":ticket_id,
+            "ticket_values":{"title":title,"description":description},
             "proofs":case.proofs,"limits":limits,"contract_hash":contract_hash,"snapshot_hash":snapshot_hash,
             "environment_limits":harness.environment_limits,
             "browser_environment":harness.browser_environment}

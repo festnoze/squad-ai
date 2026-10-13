@@ -12,6 +12,27 @@ from tests.test_product_harness import (CONTRACT,REAL,fixture_definition,make_bi
 
 
 @pytest.mark.asyncio
+async def test_vertical_browser_receives_no_actor_only_for_frozen_no_auth_profile(monkeypatch):
+    import autospec.validation.coordinator as coordinator
+    import autospec.validation.browser_contracts as browser_module
+    seen={}
+    class Browser:
+        def __init__(self,*args,**kwargs): pass
+    async def smoke(browser,snapshot,contract,actor,**kwargs):
+        seen["actor"]=actor
+        return {"status":"NOT_VERIFIED"}
+    monkeypatch.setattr(browser_module,"PlaywrightHarness",Browser)
+    monkeypatch.setattr(browser_module,"browser_smoke",smoke)
+    bindings=SimpleNamespace(auth_required=False,browser_bindings={},browser_routes={})
+    harness=SimpleNamespace(bindings=bindings,adapter=object(),manifest=SimpleNamespace(metadata={},accounts={}))
+    await coordinator._browser_smoke(harness,"a"*64,CONTRACT,auth_required=False)
+    assert seen["actor"] is None
+    bindings.auth_required=True
+    with pytest.raises(AdapterUnavailable,match="frozen contract"):
+        await coordinator._browser_smoke(harness,"a"*64,CONTRACT,auth_required=False)
+
+
+@pytest.mark.asyncio
 async def test_missing_binding_inputs_returns_exact_57_ids_without_false_pass(tmp_path):
     docs=Path(__file__).resolve().parents[2]/"docs/validation/support-client"
     contract=import_contract((docs/"01_specification.md").read_text(encoding="utf-8"),

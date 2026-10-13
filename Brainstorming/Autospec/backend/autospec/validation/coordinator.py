@@ -297,15 +297,18 @@ def _context(contract,snapshot_root,snapshot_hash,evidence_root,*,instrumented=F
     return context,store
 
 
-async def _browser_smoke(harness,snapshot,contract):
+async def _browser_smoke(harness,snapshot,contract,*,auth_required):
     from .browser_contracts import PlaywrightHarness,browser_smoke
-    if not harness.bindings.auth_required:
-        raise AdapterUnavailable("source-reviewed no-auth browser creation port is not implemented")
+    if type(auth_required) is not bool or harness.bindings.auth_required!=auth_required:
+        raise AdapterUnavailable("browser auth mode differs from frozen contract")
     binding=harness.bindings
     browser=PlaywrightHarness(harness.adapter,bindings=binding.browser_bindings,routes=binding.browser_routes)
-    actor=harness.manifest.metadata.get("vertical_actor")
-    if actor not in harness.manifest.accounts: raise AdapterUnavailable("explicit vertical fixture actor absent")
-    return await browser_smoke(browser,snapshot,contract,harness.manifest.accounts[actor],
+    actor=None
+    if auth_required:
+        actor=harness.manifest.metadata.get("vertical_actor")
+        if actor not in harness.manifest.accounts: raise AdapterUnavailable("explicit vertical fixture actor absent")
+        actor=harness.manifest.accounts[actor]
+    return await browser_smoke(browser,snapshot,contract,actor,
         title="Independent vertical "+uuid4().hex,description="Independent isolated browser/API/SQLite smoke")
 
 
@@ -315,7 +318,7 @@ async def verify_vertical(state,contract,snapshot_root,snapshot_hash,evidence_ro
         context,_=_context(contract,snapshot_root,snapshot_hash,evidence_root,phase="vertical")
         async with context as harness:
             await harness.adapter.prepare_case("VERTICAL")
-            async def browser(adapter,snapshot,oracle): return await _browser_smoke(harness,snapshot,oracle)
+            async def browser(adapter,snapshot,oracle): return await _browser_smoke(harness,snapshot,oracle,auth_required=_auth(contract))
             return await harness.verify_vertical(snapshot_hash,contract.contract_hash,browser_smoke=browser)
     except Exception as exc:
         # No product exception text/argv/stdin/logs: may contain credentials.
@@ -665,7 +668,7 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
                     {"mount_types":[m["type"] for m in mounts],"owned_volume":h.runtime.volume_name,"origin":h.runtime.origin})
             await finish("OPS-02",checks,limits,repro=("inspect exact owned container configuration and actual baked source; external R must review exclusions/no runtime installer",))
             await h.adapter.prepare_case("VERTICAL")
-            async def smoke(adapter,snapshot,oracle): return await _browser_smoke(h,snapshot,oracle)
+            async def smoke(adapter,snapshot,oracle): return await _browser_smoke(h,snapshot,oracle,auth_required=_auth(contract))
             vertical=await h.verify_vertical(snapshot_hash,contract.contract_hash,browser_smoke=smoke)
             checks=[];limits=[];extra=[]
             if vertical["status"]=="NOT_VERIFIED": limits.extend(vertical["limits"])

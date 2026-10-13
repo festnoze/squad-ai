@@ -262,9 +262,9 @@ async def run(pipeline, ticket) -> None:
         await pipeline._checkpoint()
         if pipeline._stop_requested:
             return
-        # An opt-in single deterministic constraint revision, not critic/judge
-        # inference or a recursive lifecycle retry. Default PLAN stays zero.
-        await pipeline._aplan_phase(constraint_revision_limit=1)
+        # Continue through the pipeline's existing PLAN implementation. This
+        # helper does not add or promise a maker-correction policy.
+        await pipeline._aplan_phase()
         await pipeline._aarchitect_phase()
         await pipeline._aapproval_gate("plan")
         if pipeline._stop_requested:
