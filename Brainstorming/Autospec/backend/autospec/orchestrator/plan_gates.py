@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+import hashlib
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
 from ..contracts import AcceptanceContract
-from .claims import ClaimError, canonical_claim
+from .claims import ClaimError, canonical_claim, canonical_path
+from .independence import globs_overlap
 
 
 @dataclass(frozen=True)
@@ -18,10 +20,16 @@ class PlanPolicy:
     require_milestones: bool = True
     required_shared_contracts: tuple[str, ...] = ()
     expected_stack_sha256: str = ""
+    required_vertical_checks: tuple[str, ...] = ()
+    expected_stack: dict | None = None
 
     def __post_init__(self):
         if type(self.max_lots) is not int or self.max_lots < 1:
             raise ValueError("max_lots must be positive")
+        if (not isinstance(self.required_vertical_checks,tuple) or
+            any(not isinstance(v,str) or not v for v in self.required_vertical_checks) or
+            len(set(self.required_vertical_checks)) != len(self.required_vertical_checks)):
+            raise ValueError("required_vertical_checks must be unique literal check names")
 
 
 @dataclass(frozen=True)
@@ -45,13 +53,93 @@ class PlanAdmission:
     version: int = 1
 
 
-def plan_contract_prompt(contract: AcceptanceContract, policy: PlanPolicy) -> str:
+def vertical_contract_checks(contract: AcceptanceContract, technical_stack: dict) -> tuple[str, ...]:
+    """Plan intent from reviewed source + factory stack, never product prose.
+
+    The caller supplies the frozen factory decision, NOT plan.technical_stack.
+    Runtime evidence still has its own stricter independent gate.
+    """
+    if technical_stack.get("kind") != "fullstack":
+        return ()
+    profiles = [f.expected for f in contract.facts if f.kind == "vertical_profile"]
+    if any(f.kind == "security_profile" for f in contract.facts):
+        auth = True
+    elif len(profiles) == 1 and isinstance(profiles[0],dict) and type(profiles[0].get("auth")) is bool:
+        auth = profiles[0]["auth"]
+    elif profiles:
+        raise ValueError("reviewed vertical profile invalid")
+    else:
+        return ()  # No inferred authentication requirement for legacy contracts.
+    checks = ["schema"]
+    if auth:
+        checks += ["bootstrap","argon2","browser_login"]
+    checks += ["browser_create","api_read","db_committed"]
+    if technical_stack.get("database") not in (None,"none"):
+        checks.append("restart")
+    frontend = technical_stack.get("frontend")
+    if isinstance(frontend, str) and frontend.strip().lower() not in {"", "none", "backend-only"}:
+        checks.append("frontend_wiring")
+    return tuple(checks)
+
+
+def constraint_findings(admission: PlanAdmission) -> list[dict]:
+    """Machine reasons are not critic opinions, review R or waivable findings."""
+    return [dict(id="constraint:"+hashlib.sha256(error.encode("utf-8")).hexdigest(),
+                 kind="constraint",severity="major",confirmed=True,message=error,
+                 contract_hash=admission.contract_hash,source="deterministic_plan_gate")
+            for error in dict.fromkeys(admission.errors)]
+
+
+MAX_REJECTED_PLAN_BYTES = 1024*1024
+
+
+def rejected_plan_record(text: str | None, admission: PlanAdmission, *, planning_context: dict | None = None,
+                         capture_origin: str = "maker_response") -> dict:
+    """Pure bounded receipt; pipeline persists outside product BEFORE raising.
+
+    Never replace full maker JSON with the truncated interaction-ring copy.
+    Above the explicit bound, retain hash/size/reasons but say capture missing;
+    no partial transcript is represented as the full rejected plan.
+    """
+    if (not isinstance(admission,PlanAdmission) or admission.status == "pass" or
+        capture_origin not in {"maker_response","assembled_plan","unavailable"} or
+        (text is None and capture_origin != "unavailable") or
+        (text is not None and not isinstance(text,str))):
+        raise ValueError("a rejected maker text and its admission are required")
+    raw = text.encode("utf-8") if text is not None else None
+    complete = raw is not None and len(raw) <= MAX_REJECTED_PLAN_BYTES
+    return dict(version=1,status="rejected",contract_hash=admission.contract_hash,
+                response_sha256=hashlib.sha256(raw).hexdigest() if raw is not None else None,
+                response_bytes=len(raw) if raw is not None else None,capture_origin=capture_origin,
+                source_text_available=raw is not None,
+                capture_complete=complete,capture_limit_bytes=MAX_REJECTED_PLAN_BYTES,
+                capture_limit_exceeded=raw is not None and not complete,response=text if complete else None,
+                admission=asdict(admission),findings=constraint_findings(admission),
+                planning_context=planning_context or {})
+
+
+def plan_contract_prompt(contract: AcceptanceContract, policy: PlanPolicy, *, planning_context: dict | None = None) -> str:
     """Shared fragment for both structured and legacy PO makers (no inference)."""
     data = {"contract_hash": contract.contract_hash,
             "requirements": contract.payload()["requirements"],
             "contract_facts": {fact.id: fact.expected for fact in contract.facts},
             "max_lots": policy.max_lots, "technical_stack_sha256": policy.expected_stack_sha256,
-            "required_shared_contracts": list(policy.required_shared_contracts)}
+            "required_shared_contracts": list(policy.required_shared_contracts),
+            "required_vertical_checks": list(policy.required_vertical_checks)}
+    if planning_context is not None:
+        data["workspace_layout"] = planning_context
+    vertical = ""
+    if policy.required_vertical_checks:
+        auth = "bootstrap explicite, vrai hash, login navigateur, " if "browser_login" in policy.required_vertical_checks else ""
+        vertical = (
+            "Ajoute milestones.vertical_contract={check:ID feuille} pour CHAQUE required_vertical_checks. "
+            "Chaque propriétaire appartient à foundation ou est le jalon vertical. Le premier lot métier "
+            "doit implémenter un parcours COMPLET selon ces checks : schéma/migration, "+auth+
+            "création UI, lecture API/DB, persistance après redémarrage et câblage frontend réel. "
+            "Une Auth API seule, SELECT 1, React monté ou health ne suffit PAS. Les changements de "
+            "App.tsx/navigation/client HTTP nécessaires au parcours sont AVANT ce jalon, jamais reportés "
+            "après les fonctionnalités aval. La déclaration est une intention, pas une preuve PASS.\n"
+        )
     return (
         "\n\nCONTRAT D'ADMISSION GELÉ — attentes indépendantes du code produit.\n"
         "Le score du juge ne compense aucune violation. Ne modifie pas les attentes.\n"
@@ -60,6 +148,7 @@ def plan_contract_prompt(contract: AcceptanceContract, policy: PlanPolicy) -> st
         "max_lots ne compte JAMAIS les tâches/stories. Chaque feuille appartient à un seul lot.\n"
         "Ajoute milestones={foundation:[IDs feuilles],vertical:ID feuille}; le jalon vertical "
         "dépend de chaque fondation, les autres feuilles dépendent du jalon vertical.\n"
+        + vertical +
         "Mappe requirement_ids sur stories/tâches pour couvrir tous les B/M; recopie contract_facts "
         "exactement. Déclare uses_contracts et shared_contracts=[{name,owner,consumers,preexisting,evidence}]; "
         "chaque consommateur dépend du propriétaire, sauf preuve d'un contrat préexistant. "
@@ -188,6 +277,10 @@ def _shape_errors(plan: Any) -> list[str]:
         strings(milestones.get("foundation", []), "foundation owners")
         if not isinstance(milestones.get("vertical", ""), str):
             errors.append("vertical owner must be a string")
+        if "vertical_contract" in milestones:
+            mapping = milestones["vertical_contract"]
+            if not isinstance(mapping,dict) or any(not isinstance(k,str) or not isinstance(v,str) for k,v in mapping.items()):
+                errors.append("vertical_contract must map literal checks to leaf IDs")
     return errors
 
 
@@ -265,7 +358,8 @@ def admit_plan(plan: dict, contract: AcceptanceContract, policy: PlanPolicy, *,
 
     if policy.expected_stack_sha256:
         stack = plan.get("technical_stack", {})
-        if not isinstance(stack, dict) or stack.get("decision_sha256") != policy.expected_stack_sha256:
+        if (not isinstance(stack, dict) or stack.get("decision_sha256") != policy.expected_stack_sha256 or
+            (policy.expected_stack is not None and stack != policy.expected_stack)):
             errors.append("plan stack differs from frozen technical_stack decision")
 
     if policy.require_milestones:
@@ -284,6 +378,15 @@ def admit_plan(plan: dict, contract: AcceptanceContract, policy: PlanPolicy, *,
             for tid in leaves:
                 if tid not in foundation and tid != vertical and not _reaches(edges, tid, vertical):
                     errors.append(f"{tid}: feature work is not gated by vertical milestone {vertical}")
+        if policy.required_vertical_checks:
+            mapping = milestones.get("vertical_contract", {})
+            if not isinstance(mapping,dict) or set(mapping) != set(policy.required_vertical_checks):
+                errors.append("vertical_contract must declare every required first-slice check exactly")
+            else:
+                allowed = set(foundation) | {vertical}
+                for check,owner in mapping.items():
+                    if owner not in leaves or owner not in allowed:
+                        errors.append(f"vertical_contract {check}: owner must complete before the vertical milestone")
 
     definitions = {}
     for shared in plan.get("shared_contracts", []):
@@ -346,8 +449,11 @@ def admit_plan(plan: dict, contract: AcceptanceContract, policy: PlanPolicy, *,
                         # A root-zoned backend does not own nested frontend or
                         # other stream roots merely because they share the repo.
                         forbidden += tuple(root for root in roots.values() if root)
-                    canonical_claim(glob, project_root=project_root, owner=tid, stream_root=roots[stream],
-                                    incompatible_prefixes=forbidden)
+                    claim = canonical_claim(glob, project_root=project_root, owner=tid, stream_root=roots[stream],
+                                            incompatible_prefixes=forbidden)
+                    if (not roots[stream] and ("/" in claim.path or claim.path == "**") and
+                        any(globs_overlap(claim.path, canonical_path(prefix)+"/**") for prefix in forbidden)):
+                        errors.append(f"{tid}: wildcard claim may span an incompatible stream root: {claim.path}")
                 except ClaimError as exc:
                     errors.append(f"{tid}: {exc}")
     if not contract.facts:

@@ -28,6 +28,39 @@ def _feedback(state: ProjectState) -> str:
     return "\n".join(f"- {f}" for f in state.feedback[-10:]) or "(aucun)"
 
 
+def plan_workspace_context(state: ProjectState, package_name: str) -> dict:
+    """Factory scaffold paths, never a guessed backend/ wrapper or business oracle."""
+    backend = state.technical_stack.get("backend",state.backend_language.value)
+    roots = {stream.id: (stream.file_root or ("frontend" if stream.kind.value == "frontend" else "")).replace("\\", "/").rstrip("/")
+             for stream in state.effective_streams()}
+    roots.setdefault("", "")
+    front = [roots[s.id] for s in state.effective_streams() if s.kind.value == "frontend"]
+    return dict(version=1,iteration=state.iteration,bootstrap_status=state.bootstrap_status,bootstrap_fingerprint=state.bootstrap_fingerprint,
+                backend=backend,technical_stack=dict(state.technical_stack),
+                python_package_root=package_name if backend == "python" else None,
+                stream_roots=roots,incompatible_backend_prefixes=["backend"] if backend == "python" else [],
+                backend_claim_examples=[package_name+"/features/**","tests/**"] if backend == "python" else [],
+                frontend_claim_examples=[root+"/src/features/**" for root in front],
+                frontend_entrypoints=[root+"/src/App.tsx" for root in front])
+
+
+def _workspace_plan_block(state: ProjectState, package_name: str) -> str:
+    context = plan_workspace_context(state,package_name)
+    ui = ("Le câblage métier de la PREMIÈRE tranche (App/navigation/client API/login/création/lecture) "
+          "appartient aux fondations du jalon vertical. Ne reporte PAS App.tsx ni l'UI métier en fin "
+          "de toutes les fonctionnalités. Une auto-découverte de composant ne prouve pas un parcours.\n"
+          if context["frontend_entrypoints"] else "Aucun frontend n'est déclaré : ne crée pas d'App/navigation UI fictive.\n")
+    return (
+        "RACINES CANONIQUES DU SOCLE (faits de fabrique, chemins relatifs au workspace) :\n"+
+        json.dumps(context,ensure_ascii=False,sort_keys=True)+"\n"
+        "Un id de stream n'est PAS un dossier. Pour Python, le package est directement à la racine : "
+        f"`{package_name}/...`, JAMAIS `backend/{package_name}/...`. Le stream backend a une racine vide. "
+        "Les globs frontend incluent leur vraie racine déclarée. Les futurs modules valides sont permis ; "
+        "ne déplace pas le socle pour faire correspondre un plan erroné.\n"
+        + ui
+    )
+
+
 def _foundation_context(state: ProjectState | None, package_name: str = "<pkg>") -> str:
     """The verified foundation is an input to planning, never unfinished work."""
     if state is None or state.bootstrap_status != "ready" or not state.technical_stack:
@@ -49,6 +82,10 @@ Le scaffold, l'installation, les points d'entrée et les checks techniques ont d
 été exécutés avec succès. Ne planifie AUCUNE story/tâche d'amorçage, scaffolding,
 app factory, lancement uvicorn, configuration initiale ou recréation de serveur.
 Planifie seulement le DELTA fonctionnel demandé ; préserve les tests du socle.
+Le socle ne contient PAS encore le métier : si requis par le brief, migration métier, bootstrap explicite
+des comptes, sessions/login, création/lecture d'objet, client HTTP, navigation et
+câblage App nécessaires au premier parcours restent du DELTA à réaliser AVANT
+le jalon vertical. Ne confonds pas sonde technique et première tranche métier.
 {convention}
 Pour un besoin minuscule (un endpoint simple et/ou un petit écran), MAXIMUM 2 stories
 dans 1 epic, idéalement 1 story. Une tâche backend et une frontend suffisent si
@@ -1687,6 +1724,7 @@ def po_plan(state: ProjectState, package_name: str) -> str:
 \"\"\"{state.brief}\"\"\"
 {contract(state)}
 {_foundation_context(state, package_name)}
+{_workspace_plan_block(state, package_name)}
 
 Stories déjà existantes dans le projet (itérations précédentes) :
 {json.dumps(existing, ensure_ascii=False)}
@@ -1776,7 +1814,8 @@ def sizing_rules(state: ProjectState | None = None) -> str:
   une SEULE tâche d'INTÉGRATION par story/stream a le droit de les modifier —
   les tâches de feature créent leurs PROPRES fichiers et exportent ; le câblage
   dans les fichiers partagés est fait par la tâche d'intégration qui `depends_on`
-  les features. C'est LA cause n°1 des conflits de merge entre unités parallèles.
+  ses features. Pour la première tranche métier, elle précède le jalon vertical,
+  pas toutes les fonctionnalités aval. C'est LA cause n°1 des conflits de merge.
 {wiring}
 - NI TROP GROS NI TROP FIN : fusionner les unités triviales adjacentes qui ne
   justifient pas chacune une session d'agent."""
@@ -1946,6 +1985,7 @@ Brief produit :
 \"\"\"{state.brief}\"\"\"
 {contract(state)}
 {_foundation_context(state, package_name)}
+{_workspace_plan_block(state, package_name)}
 
 Stories déjà existantes dans le projet (itérations précédentes) :
 {json.dumps(existing, ensure_ascii=False)}

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -55,9 +56,17 @@ class PlanPipelineError(Exception):
 class PlanAdmissionError(Exception):
     """Contract admission failed. MUST NOT trigger a permissive legacy fallback."""
 
-    def __init__(self, admission: PlanAdmission):
+    def __init__(self, admission: PlanAdmission, *, rejected_text: str | None = None, capture_origin="unavailable"):
         self.admission = admission
-        super().__init__("Plan refused: " + "; ".join(admission.errors))
+        self.rejected_text = rejected_text
+        self.capture_origin = capture_origin
+        # Exact diagnostics are private receipt data; exception strings can be
+        # copied into traceback logs, monitor events, or SSE by generic handlers.
+        # Keep only this fixed, non-sensitive category for operators/tests.
+        message = "Plan refused by deterministic admission constraints"
+        if "planning review provider unavailable" in admission.errors:
+            message += ": planning review provider unavailable"
+        super().__init__(message)
 
 
 # ------------------------------------------------------------ stage artifacts
@@ -595,12 +604,15 @@ async def _arun_s1(
     contract: AcceptanceContract | None = None,
     plan_policy: PlanPolicy | None = None,
     workspace_root: Path | None = None,
+    admission_observer: Callable[[str,PlanAdmission],None] | None = None,
 ) -> S1Skeleton:
     """S1: maker + deterministic validation (1 repair retry), then ONE
     critic-first structure review whose every revision is re-validated
     deterministically (a revision that breaks the contract is rejected)."""
     existing_ids = {s.id for s in state.stories}
-    stream_roots = _stream_roots(state)
+    context = prompts.plan_workspace_context(state,pkg)
+    stream_roots = context["stream_roots"]
+    incompatible = tuple(context["incompatible_backend_prefixes"])
 
     def _validate(skel: S1Skeleton) -> list[str]:
         errors, warnings = validate_skeleton(
@@ -614,21 +626,33 @@ async def _arun_s1(
                 report.warnings.append(w)
         if contract is not None:
             report.admission = admit_plan(skel.model_dump(), contract, plan_policy,
-                                         project_root=workspace_root, stream_roots=stream_roots)
+                                         project_root=workspace_root, stream_roots=stream_roots,incompatible_prefixes=incompatible)
             errors.extend(report.admission.errors)
         return errors
 
-    parse = _parse_model(S1Skeleton, _validate)
+    parse_model = _parse_model(S1Skeleton, _validate)
+    last_text = {"value": None}
+    def parse(text):
+        last_text["value"] = text
+        from .plan_gates import MAX_REJECTED_PLAN_BYTES
+        if len(text.encode("utf-8")) > MAX_REJECTED_PLAN_BYTES:
+            result = None,["maker plan exceeds bounded capture/parse limit"]
+        else:
+            result = parse_model(text)
+        if contract is not None and result[1] and admission_observer is not None:
+            admission_observer(text,PlanAdmission("fail",contract.contract_hash,tuple(result[1])))
+        return result
     prompt = prompts.po_structure(state, pkg, repo_files)
     if contract is not None:
-        prompt += plan_contract_prompt(contract, plan_policy)
+        prompt += plan_contract_prompt(contract, plan_policy,planning_context=context)
     skeleton, error = await amake_validated(
         runner, prompt=prompt, system_prompt=persona("po-structure"), parse=parse
     )
     if skeleton is None:
         if contract is not None:
             raise PlanAdmissionError(PlanAdmission("fail", contract.contract_hash,
-                                     (f"S1 invalid after bounded repair: {error}",)))
+                                     (f"S1 invalid after bounded repair: {error}",)),
+                                     rejected_text=last_text["value"],capture_origin="maker_response" if last_text["value"] is not None else "unavailable")
         raise PlanPipelineError(f"S1 : squelette invalide après réparation — {error}")
 
     # Critic-first structure review (no opening judge; a failed critic call is
@@ -1079,6 +1103,7 @@ async def arun_po_pipeline(
     plan_policy: PlanPolicy | None = None,
     findings: tuple[PlanFinding, ...] = (),
     dependency_requests: tuple[Any, ...] = (),
+    admission_observer: Callable[[str,PlanAdmission],None] | None = None,
 ) -> tuple[dict, PlanPipelineReport]:
     """Run the full PO pipeline and return ``(plan_dict, report)``.
 
@@ -1104,6 +1129,7 @@ async def arun_po_pipeline(
     skeleton = await _arun_s1(
         runner, state, pkg, repo_files=repo_files, log=log, report=report,
         contract=contract, plan_policy=plan_policy, workspace_root=workspace_root,
+        admission_observer=admission_observer,
     )
     report.leaves = len(skeleton.leaves())
 
@@ -1173,11 +1199,12 @@ async def arun_po_pipeline(
     if contract is not None:
         report.admission = admit_plan(
             plan, contract, plan_policy, findings=findings, project_root=workspace_root,
-            stream_roots=_stream_roots(state), dependency_requests=dependency_requests,
+            stream_roots=prompts.plan_workspace_context(state,pkg)["stream_roots"], dependency_requests=dependency_requests,
+            incompatible_prefixes=tuple(prompts.plan_workspace_context(state,pkg)["incompatible_backend_prefixes"]),
             provider_available=not report.review_errors,
         )
         if report.admission.status != "pass":
-            raise PlanAdmissionError(report.admission)
+            raise PlanAdmissionError(report.admission,rejected_text=json.dumps(plan,ensure_ascii=False),capture_origin="assembled_plan")
     if report.degradations:
         log(
             _LOG_SRC,
