@@ -6,7 +6,7 @@ import time
 import uuid
 from enum import Enum
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 
 class PipelinePhase(str, Enum):
@@ -667,7 +667,8 @@ class ProjectState(BaseModel):
     acceptance_contract_hash: str = ""
     acceptance_max_lots: int = 7
     acceptance_result: dict = Field(default_factory=dict)
-    plan_admission: dict = Field(default_factory=dict)
+    plan_admission_public: dict = Field(default_factory=dict)
+    plan_structure: dict = Field(default_factory=dict)
     plan_findings: list[dict] = Field(default_factory=list)
     # REM-03/22: durable latest checkpoint and bounded live activity metadata.
     # Sidecar-compatible defaults keep earlier saved projects loadable.
@@ -759,6 +760,39 @@ class ProjectState(BaseModel):
     deploy_detail: str = ""        # last verify summary / failure tail (~2000 chars)
     error: str = ""
     created_at: float = Field(default_factory=time.time)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_plan_admission(cls, value):
+        """Drop old private diagnostics; legacy admissions must be revalidated.
+
+        The old key is accepted only as an input migration. It is never a model
+        field and therefore can never be emitted by checkpoint/API serialization.
+        """
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        legacy_key = "plan_admission" in data
+        legacy = data.pop("plan_admission", None)
+        if legacy_key:
+            # A legacy structure is not authoritative after its diagnostics and
+            # candidate have been discarded, so require a fresh admission.
+            data["plan_structure"] = {}
+            if isinstance(legacy, dict) and legacy and not data.get("plan_admission_public"):
+                data["plan_admission_public"] = {
+                    "version": 1, "status": "not_verified",
+                    "reason": "legacy_admission_requires_revalidation",
+                }
+        if isinstance(data.get("plan_findings"), list):
+            data["plan_findings"] = [finding for finding in data["plan_findings"]
+                if not (isinstance(finding, dict) and finding.get("kind") == "constraint")]
+        if legacy_key or "plan_admission_public" not in data:
+            # A legacy issue may be a formatted constraint error without a
+            # reliable source tag. Old suggestions are also untrusted model
+            # output. Drop both public review lists from the legacy checkpoint.
+            data["plan_review_issues"] = []
+            data["plan_review_suggestions"] = []
+        return data
 
     def story(self, story_id: str) -> UserStory:
         for s in self.stories:

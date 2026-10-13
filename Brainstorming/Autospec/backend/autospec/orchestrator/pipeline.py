@@ -41,7 +41,7 @@ from ..agents.runner import (
     close_owned_process,
 )
 from ..agents.personas import FALLBACK_PERSONAS, persona
-from ..agents.file_broker import (ExecutionContext, ClaimViolation, IsolationViolation,
+from ..agents.file_broker import (ExecutionContext, FileBroker, ClaimViolation, IsolationViolation,
     active_execution, active_dependency_handler, active_write_authorizer, active_claim_handler)
 from ..config import settings
 from .. import observability
@@ -107,6 +107,7 @@ from . import brownfield
 from . import sandbox
 from . import repair_policy
 from . import acceptance, claims, plan_gates, dependencies
+from .plan_admission_telemetry import public_plan_admission
 from .events import bus
 
 logger = logging.getLogger(__name__)
@@ -921,6 +922,9 @@ class _UsageTracker:
             raise AgentError("Appel agent non lancé : pipeline arrêtée ou budget estimatif atteint.")
         iteration = self.pipeline.state.iteration
         phase = self.pipeline.state.phase.value
+        private_plan_call = phase == PipelinePhase.PLAN.value
+        audit_prompt = (f"[private plan prompt sha256={hashlib.sha256(prompt.encode('utf-8')).hexdigest()} bytes={len(prompt.encode('utf-8'))}]"
+                        if private_plan_call else prompt)
         item_id = _BUILD_ITEM.get() or f"phase:{phase}"
         role = _persona_role(system_prompt)
         # Track this call's CLI child process on the pipeline's registry so a
@@ -999,8 +1003,9 @@ class _UsageTracker:
             # Capture the failed round-trip too — a red/failed item's last call is
             # exactly what the operator wants to inspect.
             self.pipeline._record_interaction(
-                item_id=item_id, phase=phase, persona=role, prompt=prompt,
-                response="", ok=False, error=str(exc), model=chosen or "",
+                item_id=item_id, phase=phase, persona=role, prompt=audit_prompt,
+                response="", ok=False,
+                error="Plan provider call failed (private details omitted)" if private_plan_call else str(exc), model=chosen or "",
                 input_tokens=exc.usage.input_tokens if exc.usage else 0,
                 output_tokens=exc.usage.output_tokens if exc.usage else 0,
                 cost_usd=effective_cost,
@@ -1008,7 +1013,7 @@ class _UsageTracker:
             self.pipeline.monitor.agent_call(
                 role=role, item_id=item_id,
                 duration_ms=(time.monotonic() - _t0) * 1000,
-                ok=False, error=str(exc), model=chosen or "", prompt_chars=prompt_chars,
+                ok=False, error="Plan provider call failed (private details omitted)" if private_plan_call else str(exc), model=chosen or "", prompt_chars=prompt_chars,
             )
             # Usage-window watchdog (M2): an exhausted Claude session window
             # triggers a clean stop + scheduled auto-resume, then the error
@@ -1023,7 +1028,7 @@ class _UsageTracker:
             if provider_entered:
                 effective_cost = self._account(usage, role, iteration, failed=True)
             self.pipeline._record_interaction(
-                item_id=item_id, phase=phase, persona=role, prompt=prompt,
+                item_id=item_id, phase=phase, persona=role, prompt=audit_prompt,
                 response="", ok=False, error="Appel interrompu ; usage non remonté.", model=chosen or "",
                 input_tokens=usage.input_tokens if usage else 0,
                 output_tokens=usage.output_tokens if usage else 0,
@@ -1055,14 +1060,15 @@ class _UsageTracker:
         # Optional Langfuse trace (O1): one generation per agent call. Best-effort
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
-            name=f"agent:{self.pipeline.state.phase.value}",
+            name=f"agent:{phase}",
             model=provider_model(settings.agent_provider) or settings.agent_provider,
-            input_text=prompt,
-            output_text=res.text,
+            input_text=audit_prompt,
+            output_text=(f"[private plan response sha256={hashlib.sha256(res.text.encode('utf-8')).hexdigest()} bytes={len(res.text.encode('utf-8'))}]"
+                         if private_plan_call else res.text),
             metadata={
                 "project_id": self.pipeline.state.id,
                 "project": self.pipeline.state.name,
-                "phase": self.pipeline.state.phase.value,
+                "phase": phase,
                 "provider": settings.agent_provider,
                 "session_id": res.session_id,
             },
@@ -1073,8 +1079,9 @@ class _UsageTracker:
         )
         # Capture the round-trip for the live item-activity view (O2).
         self.pipeline._record_interaction(
-            item_id=item_id, phase=phase, persona=role, prompt=prompt,
-            response=res.text, ok=True, model=chosen or "",
+            item_id=item_id, phase=phase, persona=role, prompt=audit_prompt,
+            response=(f"[private plan response sha256={hashlib.sha256(res.text.encode('utf-8')).hexdigest()} bytes={len(res.text.encode('utf-8'))}]"
+                      if private_plan_call else res.text), ok=True, model=chosen or "",
             input_tokens=res.input_tokens, output_tokens=res.output_tokens,
             cost_usd=effective_cost, duration_ms=res.duration_ms,
         )
@@ -4481,7 +4488,7 @@ class Pipeline:
                 if admitted["status"] != "PASS":
                     return False, "VERTICAL_CONTRACT_FAILED: " + "; ".join(admitted["findings"])
                 digest = milestone_gates.save_receipt(admitted, supervisor)
-                self.state.plan_admission["vertical_receipt_hash"] = digest
+                self.state.plan_structure["vertical_receipt_hash"] = digest
                 self.monitor.event("vertical_milestone", ok=True, snapshot_hash=snapshot.digest,
                                    contract_hash=contract.contract_hash, receipt_hash=digest)
                 self._sync()
@@ -4736,16 +4743,58 @@ class Pipeline:
                 self._sync()
 
     def _admit_contract_plan(self, plan, contract, policy):
-        roots = {stream.id: stream.file_root for stream in self.state.streams}
-        roots.setdefault("", "")
+        roots = prompts.plan_workspace_context(self.state, workspace.package_name(self.state))["stream_roots"]
         try:
-            findings = tuple(plan_gates.PlanFinding(**value) for value in self.state.plan_findings)
+            findings = tuple(plan_gates.PlanFinding(**value) for value in self.state.plan_findings
+                             if not (value.get("kind") == "constraint" and
+                                     value.get("source") == "deterministic_plan_gate"))
         except (TypeError, ValueError) as exc:
             self._block_delivery("Registre de findings invalide ; aucune admission implicite.", source="plan")
             raise DeliveryBlocked() from exc
         return plan_gates.admit_plan(plan, contract, policy, findings=findings,
             project_root=workspace_dir(self.state.id), stream_roots=roots,
             incompatible_prefixes=("backend",) if self.state.backend_language == BackendLanguage.PYTHON else ())
+
+    def _record_contract_plan_admission(self, text, admission, context, *, capture_origin="maker_response"):
+        """Retain exact deterministic reason/response before bool or exception.
+
+        Machine constraints are recomputed, never waivers or reviewer opinions.
+        Full bounded text is supervisor-only, not the public interaction ring.
+        """
+        self.state.plan_findings = [value for value in self.state.plan_findings
+            if not (value.get("kind") == "constraint" and value.get("source") == "deterministic_plan_gate")]
+        response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest() if isinstance(text, str) else None
+        response_bytes = len(text.encode("utf-8")) if isinstance(text, str) else None
+        capture_complete = response_bytes is not None and response_bytes <= plan_gates.MAX_REJECTED_PLAN_BYTES
+        receipt_sha = None
+        if admission.status != "pass":
+            record = plan_gates.rejected_plan_record(text, admission, planning_context=context,capture_origin=capture_origin)
+            raw = json.dumps(record,sort_keys=True,ensure_ascii=False,separators=(",", ":"),allow_nan=False).encode("utf-8")
+            receipt_sha = hashlib.sha256(raw).hexdigest()
+            try:
+                broker = FileBroker(ExecutionContext("plan-rejection-evidence", acceptance.supervisor_root(self.state.id)))
+                relative = "plans/rejected/"+receipt_sha+".json"
+                path = broker.path(relative)
+                path.parent.mkdir(parents=True,exist_ok=True)
+                path = broker.path(relative)
+                try:
+                    with path.open("xb") as out:
+                        out.write(raw);out.flush();os.fsync(out.fileno())
+                except FileExistsError:
+                    if path.read_bytes() != raw:
+                        raise IsolationViolation("immutable plan rejection receipt differs")
+                receipt_sha = hashlib.sha256(raw).hexdigest()
+            except (OSError,IsolationViolation) as exc:
+                self.state.plan_admission_public = {"version": 1, "status": "not_verified",
+                    "reason": "receipt_unavailable", "capture_complete": False}
+                self._sync()
+                self._block_delivery("Conservation du plan rejeté indisponible ; aucune poursuite implicite.", source="plan")
+                raise DeliveryBlocked() from None
+        public = public_plan_admission(admission, response_sha256=response_sha,
+            response_bytes=response_bytes, capture_complete=capture_complete, receipt_sha256=receipt_sha)
+        self.state.plan_admission_public = public
+        self.monitor.event("plan_admission", **public)
+        self._sync()
 
     async def _aplan_phase(self) -> None:
         self.state.phase = PipelinePhase.PLAN
@@ -4756,7 +4805,8 @@ class Pipeline:
         if contract is not None and not contract.facts:
             self._block_delivery("Contrat source non formalisé/revu : planification refusée avant appel provider.", source="plan")
             raise DeliveryBlocked()
-        contract_prompt = plan_gates.plan_contract_prompt(contract, policy) if contract else ""
+        context = prompts.plan_workspace_context(self.state, pkg)
+        contract_prompt = plan_gates.plan_contract_prompt(contract, policy, planning_context=context) if contract else ""
         await self._amaybe_build_constitution()  # W3: standard-once, enforced every round
         plan: dict = {}
         # PO pipeline (RFC po-pipeline-v2): the multi-stage PO replaces the
@@ -4774,6 +4824,7 @@ class Pipeline:
                     log=self._log,
                     contract=contract,
                     plan_policy=policy,
+                    admission_observer=lambda text, admitted:self._record_contract_plan_admission(text, admitted, context),
                 )
                 pipeline_used = True
                 self.state.calibration_for().degradations += len(report.degradations)
@@ -4787,13 +4838,13 @@ class Pipeline:
                     f"{len(report.degradations)} dégradation(s).",
                 )
             except plan_pipeline.PlanAdmissionError as exc:
-                self.state.plan_admission = asdict(exc.admission)
-                self._block_delivery("Admission du plan refusée : " + "; ".join(exc.admission.errors), source="plan")
+                self._record_contract_plan_admission(exc.rejected_text, exc.admission, context,capture_origin=exc.capture_origin)
+                self._block_delivery("Admission du plan refusée par les contraintes déterministes.", source="plan")
                 raise DeliveryBlocked() from exc
             except plan_pipeline.PlanPipelineError as exc:
                 if contract is not None:
-                    self._block_delivery(f"Planification sous contrat indisponible : {exc}", source="plan")
-                    raise DeliveryBlocked() from exc
+                    self._block_delivery("Planification sous contrat indisponible ; détails conservés côté superviseur.", source="plan")
+                    raise DeliveryBlocked() from None
                 self._log("po-pipeline", f"Pipeline PO en échec ({exc}) — repli sur le PO mono-passe.")
         if not pipeline_used:
             result = await self._tracked.arun(
@@ -4804,9 +4855,9 @@ class Pipeline:
             plan = extract_json(plan_text)
         if contract is not None:
             admission = self._admit_contract_plan(plan, contract, policy)
-            self.state.plan_admission = asdict(admission)
+            self._record_contract_plan_admission(json.dumps(plan,ensure_ascii=False), admission, context,capture_origin="assembled_plan")
             if admission.status != "pass":
-                self._block_delivery("Admission du plan refusée : " + "; ".join(admission.errors or admission.warnings), source="plan")
+                self._block_delivery("Admission du plan refusée par les contraintes déterministes.", source="plan")
                 raise DeliveryBlocked()
         if not any(epic.get("stories") for epic in plan.get("epics", []) if isinstance(epic, dict)):
             self._block_delivery("Le plan ne contient aucune story exécutable ; aucune livraison créée.", source="plan")
@@ -4936,14 +4987,12 @@ class Pipeline:
         if contract is not None:
             remap = lambda value: task_id_map.get(value, id_map.get(value, value))
             milestones = plan.get("milestones", {})
-            self.state.plan_admission.update(
+            self.state.plan_structure.update(
                 milestones={"foundation": [remap(v) for v in milestones.get("foundation", [])],
-                            "vertical": remap(milestones.get("vertical", ""))},
+                            "vertical": remap(milestones.get("vertical", "")),
+                            "vertical_contract": {check:remap(owner) for check,owner in milestones.get("vertical_contract", {}).items()}},
                 lots=[{"id": lot["id"], "members": [remap(v) for v in lot["members"]]}
                       for lot in plan.get("lots", [])],
-                shared_contracts=[dict(shared, owner=remap(shared.get("owner", "")),
-                    consumers=[remap(v) for v in shared.get("consumers", [])])
-                    for shared in plan.get("shared_contracts", [])],
             )
             try:
                 milestone_gates.milestone_owners(self.state, milestone_gates.strict_graph(self.state))
@@ -5029,13 +5078,19 @@ class Pipeline:
     async def _arefine_plan(self, initial_text: str, pkg: str) -> str:
         contract = self._acceptance_contract()
         policy = acceptance.plan_policy(self.state, contract) if contract else None
-        fragment = plan_gates.plan_contract_prompt(contract, policy) if contract else ""
+        context = prompts.plan_workspace_context(self.state, pkg)
+        fragment = plan_gates.plan_contract_prompt(contract, policy, planning_context=context) if contract else ""
 
         async def _admission(text: str) -> bool:
-            try:
-                return self._admit_contract_plan(extract_json(text), contract, policy).status == "pass"
-            except AgentError:
-                return False
+            if len(text.encode("utf-8")) > plan_gates.MAX_REJECTED_PLAN_BYTES:
+                admission = plan_gates.PlanAdmission("fail",contract.contract_hash,("maker plan exceeds bounded capture/parse limit",))
+            else:
+                try:
+                    admission = self._admit_contract_plan(extract_json(text), contract, policy)
+                except AgentError:
+                    admission = plan_gates.PlanAdmission("fail",contract.contract_hash,("maker JSON invalid or extraction failed",))
+            self._record_contract_plan_admission(text, admission, context)
+            return admission.status == "pass"
 
         async def _revise(previous: str, critique: str) -> str:
             res = await self._tracked.arun(
@@ -5055,7 +5110,7 @@ class Pipeline:
             admission=_admission if contract else None,
         )
         if contract is not None and outcome.stopped_reason in {"judge_error", "critic_error", "constraint_rejected"}:
-            self._block_delivery(f"Revue de plan non admissible : {outcome.stopped_reason}.", source="plan")
+            self._block_delivery("Revue de plan non admissible ; détails conservés dans le reçu superviseur.", source="plan")
             raise DeliveryBlocked()
         self._note_refine_degraded("po", outcome)
         if outcome.stopped_reason != "disabled":

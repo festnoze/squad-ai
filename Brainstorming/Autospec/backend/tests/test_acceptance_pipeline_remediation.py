@@ -149,12 +149,12 @@ async def test_legacy_po_path_is_admitted_and_preserves_milestones_mapping():
     runner = FakeRunner([json.dumps(admitted_plan())])
     pipeline = Pipeline(state, runner)
     await pipeline._aplan_phase()
-    assert state.plan_admission["status"] == "pass"
+    assert state.plan_admission_public["status"] == "pass"
     assert source.contract_hash in runner.calls[0]["prompt"]
     new = state.stories[-1]
     assert new.id != "S-1" and new.tasks[0].id != "T-0"
-    assert state.plan_admission["milestones"]["foundation"] == [new.tasks[0].id]
-    assert state.plan_admission["milestones"]["vertical"] == new.tasks[1].id
+    assert state.plan_structure["milestones"]["foundation"] == [new.tasks[0].id]
+    assert state.plan_structure["milestones"]["vertical"] == new.tasks[1].id
     assert new.tasks[1].depends_on == [new.tasks[0].id]
     assert all(task.requirement_ids == ["BOOK-01"] for task in new.tasks)
 

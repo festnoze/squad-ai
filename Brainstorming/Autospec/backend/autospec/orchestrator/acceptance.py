@@ -7,7 +7,7 @@ from pathlib import Path
 from ..contracts import AcceptanceContract, ContractError, ContractStore
 from ..models import ProjectState
 from ..storage import workspace_dir
-from .plan_gates import PlanPolicy
+from .plan_gates import PlanPolicy, vertical_contract_checks
 
 
 def supervisor_root(project_id: str) -> Path:
@@ -75,4 +75,6 @@ def plan_policy(state: ProjectState, contract: AcceptanceContract) -> PlanPolicy
                    and isinstance(f.expected.get("name"), str))
     return PlanPolicy(max_lots=validate_plan_limits(contract, state.acceptance_max_lots),
                       required_shared_contracts=shared,
-                      expected_stack_sha256=state.technical_stack.get("decision_sha256", ""))
+                      expected_stack_sha256=state.technical_stack.get("decision_sha256", ""),
+                      expected_stack=dict(state.technical_stack),
+                      required_vertical_checks=vertical_contract_checks(contract, state.technical_stack))

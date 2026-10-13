@@ -32,10 +32,10 @@ def strict_graph(state: ProjectState) -> streams.WorkGraph:
 
 
 def milestone_owners(state: ProjectState, graph: streams.WorkGraph) -> tuple[set[str], str]:
-    admission = state.plan_admission
+    admission = state.plan_admission_public
     if admission.get("status") != "pass" or admission.get("contract_hash") != state.acceptance_contract_hash:
         raise MilestoneError("no current admitted plan")
-    values = admission.get("milestones", {})
+    values = state.plan_structure.get("milestones", {})
     foundation, vertical = set(values.get("foundation", [])), values.get("vertical", "")
     if not foundation or not foundation <= graph.items.keys() or vertical not in graph.items or vertical in foundation:
         raise MilestoneError("foundation/vertical owners unavailable")
@@ -52,7 +52,7 @@ def milestone_owners(state: ProjectState, graph: streams.WorkGraph) -> tuple[set
     if not all(reaches(vertical, owner) for owner in foundation):
         raise MilestoneError("vertical no longer depends on every foundation owner")
     declared = set()
-    for lot in admission.get("lots", []):
+    for lot in state.plan_structure.get("lots", []):
         for member in lot.get("members", []):
             matches = {item.id for item in graph if item.id == member or item.story_id == member}
             if not matches:
@@ -113,7 +113,7 @@ def save_receipt(receipt: dict, store: Path) -> str:
 
 
 def load_receipt(state: ProjectState, contract: AcceptanceContract, store: Path) -> dict | None:
-    digest = state.plan_admission.get("vertical_receipt_hash", "")
+    digest = state.plan_structure.get("vertical_receipt_hash", "")
     if not digest:
         return None
     if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
