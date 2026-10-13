@@ -12,7 +12,16 @@ export const planAdmissionPanel = {
   partial: { fr: "Capture privée incomplète ; l’empreinte identifie le candidat complet.", en: "Private capture incomplete; the fingerprint identifies the complete candidate." },
   bytes: { fr: "Octets du candidat", en: "Candidate bytes" },
   lots: { fr: "Nombre de lots", en: "Lot count" },
+  diagnosticSummary: { fr: "Motifs de refus (résumé)", en: "Rejection reasons (summary)" },
+  occurrences: { fr: "occurrence(s)", en: "occurrence(s)" },
   omitted: { fr: "Diagnostics supplémentaires non affichés", en: "Additional diagnostics not displayed" },
+  receiptHelp: {
+    fr: "Le reçu technique complet reste privé et n’est pas affiché ici. Copiez sa référence pour demander à un mainteneur d’examiner le diagnostic, sans partager le candidat.",
+    en: "The full technical receipt stays private and is not shown here. Copy its reference to ask a maintainer to inspect the diagnostic without sharing the candidate.",
+  },
+  copyReceiptReference: { fr: "Copier la référence privée", en: "Copy private receipt reference" },
+  receiptCopied: { fr: "Référence copiée. Elle n’accorde pas accès au reçu.", en: "Reference copied. It does not grant access to the receipt." },
+  receiptCopyUnavailable: { fr: "Copie indisponible dans ce navigateur. La référence reste visible ci-dessus.", en: "Clipboard unavailable in this browser. The reference remains visible above." },
   error: { fr: "Contrainte bloquante", en: "Blocking constraint" },
   warning: { fr: "Avertissement", en: "Warning" },
   plan_json: { fr: "Le candidat JSON est invalide.", en: "The JSON candidate is invalid." },
@@ -31,5 +40,5 @@ export const planAdmissionPanel = {
   unresolved_finding: { fr: "Un finding confirmé reste sans résolution.", en: "A confirmed finding remains unresolved." },
   review_unavailable: { fr: "La revue nécessaire est indisponible ou invalide.", en: "The required review is unavailable or invalid." },
   plan_schema: { fr: "La structure du plan est invalide.", en: "The plan structure is invalid." },
-  other_constraint: { fr: "Une autre contrainte déterministe n’est pas satisfaite ; consulter le reçu privé.", en: "Another deterministic constraint is unsatisfied; consult the private receipt." },
+  other_constraint: { fr: "Une autre contrainte déterministe n’est pas satisfaite.", en: "Another deterministic constraint is unsatisfied." },
 } as const;

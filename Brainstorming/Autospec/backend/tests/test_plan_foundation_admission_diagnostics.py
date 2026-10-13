@@ -19,7 +19,7 @@ from autospec.orchestrator import acceptance, plan_gates, stack, workspace
 from autospec.orchestrator.pipeline import Pipeline, DeliveryBlocked
 from autospec.orchestrator.build_monitor import BuildMonitor
 from autospec.orchestrator.events import bus
-from autospec.storage import workspace_dir
+from autospec.storage import load_state, workspace_dir
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -308,6 +308,33 @@ def test_public_admission_never_serializes_private_candidate_diagnostics(foundat
     events=[event for _,event in bus.replay_since(0) if event.get('project_id')==state.id]
     assert events and candidate_secret not in json.dumps(events) and error_secret not in json.dumps(events)
     assert state.plan_admission_public['diagnostics'][0]['code']=='other_constraint'
+
+
+def test_rejected_admission_projection_survives_real_state_reload(foundation, monkeypatch, tmp_path):
+    state, contract, _ = foundation
+    monkeypatch.setattr(settings, 'workspace_root', tmp_path / 'isolated-workspaces')
+    acceptance.supervisor_root(state.id).mkdir(parents=True)
+    candidate_secret = 'PRIVATE_CANDIDATE_RELOAD_28f1'
+    error_secret = 'PRIVATE_ERROR_RELOAD_73ab'
+    admission = plan_gates.PlanAdmission('fail', contract.contract_hash,
+        (f'contract coverage missing: {error_secret}',))
+    pipeline = Pipeline(state, FakeRunner([]))
+
+    pipeline._record_contract_plan_admission(candidate_secret, admission,
+        {'file_root': 'private/path', 'candidate': error_secret})
+
+    reloaded = load_state(state.id)
+    assert reloaded is not None
+    assert reloaded.plan_admission_public == state.plan_admission_public
+    assert reloaded.plan_admission_public['status'] == 'fail'
+    assert reloaded.plan_admission_public['diagnostic_counts'] == {'coverage': 1}
+    serialized = reloaded.model_dump_json()
+    for private_text in (candidate_secret, error_secret, 'private/path'):
+        assert private_text not in serialized
+    receipt_path, receipt = receipt_for(reloaded)
+    assert receipt_path.is_file()
+    assert receipt['response'] == candidate_secret
+    assert error_secret in receipt['admission']['errors'][0]
 
 
 def test_legacy_state_discards_raw_plan_diagnostics_and_requires_revalidation():

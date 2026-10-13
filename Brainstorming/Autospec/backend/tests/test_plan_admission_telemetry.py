@@ -3,6 +3,7 @@ import json
 from dataclasses import replace
 
 import pytest
+from autospec.orchestrator import plan_admission_telemetry
 from autospec.orchestrator.plan_admission_telemetry import public_plan_admission
 from autospec.orchestrator.plan_gates import PlanAdmission
 
@@ -43,6 +44,34 @@ def test_bounded_deduplicated_diagnostics_counts_and_fingerprints():
     assert len(json.dumps(value).encode()) < 16000
     assert len(project(replace(BASE, errors=BASE.errors*100))["diagnostics"]) == 1
     assert project(replace(BASE, warnings=("arbitrary maker warning",)))["diagnostics"][-1]["severity"] == "warning"
+
+
+@pytest.mark.parametrize(("message", "expected"), [
+    ("maker JSON invalid or extraction failed", "plan_json"),
+    ("maker plan exceeds bounded capture/parse limit", "candidate_limit"),
+    ("lots must be explicit_groups, not inferred", "lot_definition"),
+    ("9 explicit lots exceeds maximum 7", "lot_limit"),
+    ("contract coverage missing: PRIVATE_REQUIREMENT", "coverage"),
+    ("contract invariant differs or missing: PRIVATE_FACT", "source_invariant"),
+    ("plan stack differs from frozen decision", "stack"),
+    ("vertical_contract does not map all checks", "vertical_contract"),
+    ("milestone order is invalid", "milestone"),
+    ("dependency request unresolved: PRIVATE_PACKAGE", "dependency_pending"),
+    ("dependency graph contains a cycle", "dependency_graph"),
+    ("file claim escapes root: PRIVATE_PATH", "file_claims"),
+    ("shared contract has unknown consumer: PRIVATE_ID", "shared_contract"),
+    ("confirmed major finding remains unresolved: PRIVATE_TEXT", "unresolved_finding"),
+    ("provider unavailable during required review", "review_unavailable"),
+    ("plan ID must be unique", "plan_schema"),
+    ("PRIVATE_TEXT arbitrary diagnostic", "other_constraint"),
+])
+def test_safe_reason_classification_is_complete_and_does_not_interpolate(message, expected):
+    admission = replace(BASE, errors=(message,))
+    value = project(admission)
+    assert plan_admission_telemetry._code(message) == expected
+    assert value["diagnostics"][0]["code"] == expected
+    assert value["diagnostic_counts"] == {expected: 1}
+    assert message not in json.dumps(value)
 
 
 def test_missing_or_incomplete_capture_is_explicit():
