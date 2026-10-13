@@ -61,10 +61,20 @@ class DependencyRequest:
     version: int = 1
 
     def __post_init__(self):
-        if self.version != 1 or not self.task_id.strip() or self.ecosystem not in ("python", "node"):
+        # This dataclass is the untrusted tool-call boundary. In Python bool is
+        # an int subclass (True == 1), and regex/path operations on non-strings
+        # can otherwise leak TypeError/AttributeError instead of a typed refusal.
+        if type(self.version) is not int or self.version != 1:
             raise DependencyError("invalid dependency request identity/ecosystem/version")
-        if self.scope not in ("runtime", "dev"):
+        if (not isinstance(self.task_id, str) or not self.task_id.strip() or
+            not isinstance(self.ecosystem, str) or self.ecosystem not in ("python", "node")):
+            raise DependencyError("invalid dependency request identity/ecosystem/version")
+        if not isinstance(self.scope, str) or self.scope not in ("runtime", "dev"):
             raise DependencyError("scope must be runtime or dev")
+        if (not isinstance(self.package, str) or not isinstance(self.constraint, str) or
+            not isinstance(self.manifest, str) or not isinstance(self.lock, str) or
+            not isinstance(self.reason, str)):
+            raise DependencyError("dependency request fields must be strings")
         pattern = r"[A-Za-z0-9][A-Za-z0-9_.-]*" if self.ecosystem == "python" else r"(?:@[a-z0-9_.-]+/)?[a-z0-9][a-z0-9_.-]*"
         if not re.fullmatch(pattern, self.package):
             raise DependencyError("invalid package name")
