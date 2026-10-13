@@ -6,6 +6,8 @@ from autospec.agents.runner import FakeRunner
 from autospec.models import PipelinePhase, ProjectState
 from autospec.orchestrator.deploy import (
     MANAGED_MARKER,
+    _NODE_IMAGE,
+    _UV_PYTHON_IMAGE,
     dockerfile_text,
     write_deploy_artifacts,
 )
@@ -42,10 +44,10 @@ def test_dockerfile_backend_exposes_port():
     """Backend kind : python image running main.py with EXPOSE {port}."""
     text = dockerfile_text(8123, "backend")
     _assert_header(text)
-    assert "python:3.12-slim" in text
+    assert f"FROM {_UV_PYTHON_IMAGE} AS runtime" in text
     assert "EXPOSE 8123" in text
     # A pure backend has no frontend build stage / nginx.
-    assert "node:22-alpine" not in text
+    assert f"FROM {_NODE_IMAGE}" not in text
     assert "nginx" not in text
 
 
@@ -53,9 +55,9 @@ def test_dockerfile_fullstack_is_multi_stage_one_image():
     """Fullstack kind : node build stage + python stage serving frontend/dist."""
     text = dockerfile_text(9001, "fullstack")
     _assert_header(text)
-    assert "FROM node:22-alpine AS fe" in text
+    assert f"FROM {_NODE_IMAGE} AS fe" in text
     assert "npm run build" in text
-    assert "python:3.12-slim" in text
+    assert f"FROM {_UV_PYTHON_IMAGE} AS runtime" in text
     assert "COPY --from=fe /fe/dist /app/frontend/dist" in text
     assert "EXPOSE 9001" in text
 
@@ -64,7 +66,7 @@ def test_dockerfile_frontend_only_serves_via_unprivileged_nginx():
     """The frontend binds an unprivileged port, compatible with cap-drop ALL."""
     text = dockerfile_text(1234, "frontend")
     _assert_header(text)
-    assert "FROM node:22-alpine AS fe" in text
+    assert f"FROM {_NODE_IMAGE} AS fe" in text
     assert "FROM nginxinc/nginx-unprivileged:" in text
     assert "COPY --from=fe /fe/dist /usr/share/nginx/html" in text
     assert "EXPOSE 8080" in text

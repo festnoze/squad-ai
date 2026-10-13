@@ -15,6 +15,10 @@ from ..config import settings
 MANAGED_MARKER = "# autospec:managed"
 _DIGEST_PREFIX = "# autospec:sha256="
 _HEADER = f"# syntax=docker/dockerfile:1\n{MANAGED_MARKER}\n"
+# These immutable references were exercised by the repository's native
+# delivery evidence. Do not replace them with freshly guessed digests.
+_UV_PYTHON_IMAGE = "ghcr.io/astral-sh/uv@sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58"
+_NODE_IMAGE = "node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392"
 _KINDS = {"backend", "fullstack", "frontend", "cli", "library"}
 _LANGUAGES = {"python", "go", "rust", "node"}
 
@@ -97,7 +101,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --extra dev || uv sync
+      - run: test -f pyproject.toml && test -f uv.lock && uv sync --locked --extra dev
       - run: uv run pytest
 """
 
@@ -149,32 +153,31 @@ def _options(port: int, kind: str, language: str, frontend_root: str) -> tuple[s
 
 
 def _frontend_stage(root: str) -> str:
-    return f"""FROM node:22-alpine AS fe
+    return f"""FROM {_NODE_IMAGE} AS fe
 WORKDIR /fe
 COPY {root}/ ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN test -f package.json && test -f package-lock.json && npm ci
 RUN npm run build
 """
 
 
 def _backend_stages(language: str, kind: str) -> str:
     if language == "python":
-        return """FROM python:3.12-slim AS runtime
+        return f"""FROM {_UV_PYTHON_IMAGE} AS runtime
 WORKDIR /app
-RUN pip install --no-cache-dir uv
 COPY . .
-RUN if [ -f uv.lock ]; then uv sync --frozen --no-dev; else uv sync --no-dev; fi
+RUN test -f pyproject.toml && test -f uv.lock && uv sync --locked --no-dev
 RUN useradd --uid 10001 --create-home app && mkdir -p /app/data && chown app:app /app/data
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER app
 """
     if language == "node":
-        return """FROM node:22-alpine AS backend-build
+        return f"""FROM {_NODE_IMAGE} AS backend-build
 WORKDIR /app
 COPY . .
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN test -f package.json && test -f package-lock.json && npm ci
 RUN npm run build --if-present && npm prune --omit=dev
-FROM node:22-alpine AS runtime
+FROM {_NODE_IMAGE} AS runtime
 WORKDIR /app
 COPY --from=backend-build /app /app
 RUN mkdir -p /app/data && chown node:node /app/data
@@ -182,11 +185,11 @@ ENV NODE_ENV=production
 USER node
 """
     if language == "go":
-        build = "go build ./..." if kind == "library" else 'go build -trimpath -ldflags="-s -w" -o /out/app .'
+        build = "go build -mod=readonly ./..." if kind == "library" else 'go build -mod=readonly -trimpath -ldflags="-s -w" -o /out/app .'
         stage = f"""FROM golang:1-bookworm AS backend-build
 WORKDIR /app
 COPY . .
-RUN go mod download && {build}
+RUN test -f go.mod && test -f go.sum && go mod verify && {build}
 """
         if kind == "library":
             return stage + "RUN useradd --uid 10001 --create-home app\nUSER app\n"
@@ -201,7 +204,7 @@ USER app
     stage = """FROM rust:1-slim-bookworm AS backend-build
 WORKDIR /app
 COPY . .
-RUN if [ -f Cargo.lock ]; then cargo build --release --locked; else cargo build --release; fi
+RUN test -f Cargo.toml && test -f Cargo.lock && cargo build --release --locked
 """
     if kind == "library":
         return stage + "RUN useradd --uid 10001 --create-home app\nUSER app\n"
@@ -274,26 +277,25 @@ jobs:
         body += {
             "python": """      - uses: astral-sh/setup-uv@v5
       - run: |
-          if [ -f uv.lock ]; then uv sync --frozen --all-extras; else uv sync --all-extras; fi
+          test -f pyproject.toml && test -f uv.lock && uv sync --locked --all-extras
       - run: uv run --no-sync pytest
 """,
             "go": """      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test ./...
-      - run: go build ./...
+      - run: test -f go.mod && test -f go.sum && go mod verify && go test -mod=readonly ./...
+      - run: go build -mod=readonly ./...
 """,
             "rust": """      - uses: dtolnay/rust-toolchain@stable
       - run: |
-          if [ -f Cargo.lock ]; then cargo test --locked; else cargo test; fi
-      - run: |
-          if [ -f Cargo.lock ]; then cargo build --release --locked; else cargo build --release; fi
+          test -f Cargo.toml && test -f Cargo.lock && cargo test --locked
+      - run: test -f Cargo.toml && test -f Cargo.lock && cargo build --release --locked
 """,
             "node": """      - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          test -f package.json && test -f package-lock.json && npm ci
       - run: npm test
       - run: npm run build --if-present
 """,
@@ -303,7 +305,7 @@ jobs:
         with:
           node-version: '22'
       - run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          test -f package.json && test -f package-lock.json && npm ci
         working-directory: {root}
       - run: npm test
         working-directory: {root}
