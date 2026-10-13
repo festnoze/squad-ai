@@ -641,6 +641,7 @@ class ProductHarness:
             transport_factory=lambda ip:httpx.AsyncHTTPTransport(local_address=ip,
                 limits=httpx.Limits(max_keepalive_connections=0)) if ip=="127.0.0.1" else LinuxLoopbackTransport(self,ip))
         self.adapter.live_sqlite=True # supervisor capability, never a product claim
+        self.adapter.auth_required=bindings.auth_required
         self.adapter.supervised_runtime=runtime # exact owned namespace; no browser host fallback
         self.adapter.native_security_observation=self.collect_security_observation
         self.adapter.security_snapshot_root=self.snapshot_root
@@ -1096,7 +1097,17 @@ class ProductHarness:
                 found=[r for r in users if r["id"]==account.id]
                 names=[r["command"] for r in self._command_receipts if r["exit_code"]==0]
                 explicit="migrate_fresh" in names and "bootstrap" in names and names.index("migrate_fresh")<names.index("bootstrap")
-                return {"actor_id":account.id,"count":len(found),"role":found[0]["role"] if found else None,"commands":self._command_receipts},explicit and len(found)==1 and found[0]["role"]=="admin"
+                strong=False
+                if len(found)==1:
+                    try:
+                        from argon2 import PasswordHasher,extract_parameters
+                        from argon2.low_level import Type
+                        params=extract_parameters(found[0]["password_hash"])
+                        strong=(PasswordHasher().verify(found[0]["password_hash"],account.password) and
+                            params.type==Type.ID and params.memory_cost>=19456 and params.time_cost>=2 and params.parallelism==1)
+                    except Exception: strong=False
+                return {"actor_id":account.id,"count":len(found),"role":found[0]["role"] if found else None,
+                    "bootstrap_argon2":strong,"commands":self._command_receipts},explicit and len(found)==1 and found[0]["role"]=="admin" and strong
             await stage("bootstrap",bootstrap)
             async def argon2():
                 from argon2 import PasswordHasher,extract_parameters
@@ -1112,38 +1123,79 @@ class ProductHarness:
                 except Exception: return {"verified":False},False
             await stage("argon2",argon2)
         if any(not s["passed"] and s["proofs"] for s in stages):
-            for name in (("browser_login","browser_create","api_read","db_committed") if self.bindings.auth_required else ("browser_create","api_read","db_committed")):
+            if not self.bindings.auth_required:
+                stages.append(dict(name="authentication",passed=True,status="N/A",proofs=[]))
+            for name in (("browser_login","browser_create","frontend_wiring","api_read","db_committed","restart") if self.bindings.auth_required else ("browser_create","frontend_wiring","api_read","db_committed","restart")):
                 stages.append(dict(name=name,passed=False,proofs=[]))
             await self._identity()
             return dict(status="FAIL",snapshot_hash=snapshot_hash,contract_hash=contract_hash,stages=stages,
                 ticket_id=None,limits=["downstream business smoke not executed after observed prerequisite failure"],
                 scope="narrow smoke; prerequisite counterexample is not full product acceptance")
         ticket_id=None
+        result={}
         if browser_smoke is None:
-            for name in (("browser_login","browser_create") if self.bindings.auth_required else ("browser_create",)):
+            if not self.bindings.auth_required:
+                stages.append(dict(name="authentication",passed=True,status="N/A",proofs=[]))
+            for name in (("browser_login","browser_create","frontend_wiring") if self.bindings.auth_required else ("browser_create","frontend_wiring")):
                 stages.append(dict(name=name,passed=False,proofs=[])); limits.append(name+": reviewed real browser port absent")
         else:
             result=await browser_smoke(self.adapter,snapshot_hash,contract_hash)
             ticket_id=result.get("ticket_id"); limits.extend(result.get("limits",[]))
-            for name in (("browser_login","browser_create") if self.bindings.auth_required else ("browser_create",)):
+            if not self.bindings.auth_required:
+                stages.append(dict(name="authentication",passed=True,status="N/A",proofs=[]))
+            for name in (("browser_login","browser_create","frontend_wiring") if self.bindings.auth_required else ("browser_create","frontend_wiring")):
                 proofs=[p for p in result.get("proofs",[]) if isinstance(p,Proof) and "VERTICAL:"+name in p.checks]
                 passed=result.get("status")=="PASS" and {"X","V"}<={p.type for p in proofs} and all(p.passed and p.intact(snapshot_hash=snapshot_hash,contract_hash=contract_hash) for p in proofs)
                 stages.append(dict(name=name,passed=passed,proofs=[p.__dict__ for p in proofs]))
+            if result.get("status") == "FAIL" and not any(not s["passed"] and any(not p.get("passed",False) for p in s["proofs"]) for s in stages):
+                limits.append("browser observer returned FAIL without an admissible failing proof")
         actor=self.manifest.metadata.get("vertical_actor","alice") if self.bindings.auth_required else None
         async def api_read():
             if not isinstance(ticket_id,str) or not ticket_id: raise AdapterUnavailable("browser creation server ID absent")
             r=await self.adapter.request(actor,"GET",self.bindings.ticket_path.replace("{id}",ticket_id))
-            return dict(status=r.status_code,ticket_id=r.json().get("id")),r.status_code==200 and r.json().get("id")==ticket_id
+            body=r.json(); values=result.get("ticket_values",{})
+            expected_title=values.get("title"); expected_description=values.get("description")
+            passed=(r.status_code==200 and body.get("id")==ticket_id and
+                isinstance(expected_title,str) and bool(expected_title) and body.get("title")==expected_title and
+                isinstance(expected_description,str) and bool(expected_description) and body.get("description")==expected_description)
+            return dict(status=r.status_code,ticket_id=body.get("id"),title=body.get("title"),description=body.get("description"),
+                expected_title=expected_title,expected_description=expected_description),passed
         await stage("api_read",api_read)
         async def db_committed():
             if not ticket_id: raise AdapterUnavailable("browser creation server ID absent")
             rows=(await self._database())["rows"]; tickets=[r for r in rows["tickets"] if r["id"]==ticket_id]
             events=[r for r in rows["ticket_events"] if r["ticket_id"]==ticket_id]
-            passed=len(tickets)==1 and bool(events)
+            values=result.get("ticket_values",{})
+            passed=(len(tickets)==1 and bool(events) and isinstance(values.get("title"),str) and
+                tickets[0]["title"]==values.get("title") and tickets[0]["description"]==values.get("description"))
             if actor: passed=passed and tickets[0]["owner_id"]==self.manifest.accounts[actor].id
             return dict(ticket_id=ticket_id,ticket_count=len(tickets),audit_count=len(events)),passed
-        await stage("db_committed",db_committed); await self._identity()
-        failed=any(not s["passed"] and s["proofs"] for s in stages)
+        await stage("db_committed",db_committed)
+        async def restart():
+            if not isinstance(ticket_id,str) or not ticket_id: raise AdapterUnavailable("browser creation server ID absent")
+            before=(await self._database())["rows"]
+            old_volume=self.runtime.volume_name; old_container=self.runtime.identifier
+            await self.restart()
+            after=(await self._database())["rows"]
+            response=await self.adapter.request(actor,"GET",self.bindings.ticket_path.replace("{id}",ticket_id))
+            body=response.json(); values=result.get("ticket_values",{})
+            replaced=bool(old_container and self.runtime.identifier and old_container!=self.runtime.identifier)
+            same_volume=bool(old_volume and self.runtime.volume_name==old_volume)
+            passed=(replaced and same_volume and before==after and response.status_code==200 and body.get("id")==ticket_id and
+                body.get("title")==values.get("title") and body.get("description")==values.get("description"))
+            return dict(before_sha256=hashlib.sha256(json.dumps(before,sort_keys=True).encode()).hexdigest(),
+                after_sha256=hashlib.sha256(json.dumps(after,sort_keys=True).encode()).hexdigest(),
+                before_container=old_container,after_container=self.runtime.identifier,volume=old_volume,
+                same_owned_volume=same_volume,replaced_container=replaced,status=response.status_code,
+                ticket_id=body.get("id"),title=body.get("title"),description=body.get("description"),
+                expected_title=values.get("title"),expected_description=values.get("description")),passed
+        if all(s["passed"] for s in stages) and not limits:
+            await stage("restart",restart)
+        else:
+            stages.append(dict(name="restart",passed=False,proofs=[]))
+            limits.append("restart: not executed after incomplete prerequisite chain")
+        await self._identity()
+        failed=any(not s["passed"] and any(not p.get("passed",False) for p in s["proofs"]) for s in stages)
         return dict(status="FAIL" if failed else "PASS" if stages and all(s["passed"] for s in stages) and not limits else "NOT_VERIFIED",
             snapshot_hash=snapshot_hash,contract_hash=contract_hash,stages=stages,limits=limits,
             ticket_id=ticket_id,

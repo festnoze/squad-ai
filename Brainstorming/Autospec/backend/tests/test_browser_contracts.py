@@ -93,8 +93,12 @@ async def test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db
             row=conn.execute("SELECT * FROM tickets WHERE id=?",(result["ticket_id"],)).fetchone()
             assert row["owner_id"]==manifest.accounts["alice"].id
             assert row["title"]=="Narrow foundation browser probe"
+            assert row["description"]=="Independent fixture description for foundation probe"
         finally:conn.close()
-        assert {"VERTICAL:browser_login","VERTICAL:browser_create"} <= {tag for proof in result["proofs"] for tag in proof.checks}
+        assert {"VERTICAL:browser_login","VERTICAL:browser_create","VERTICAL:frontend_wiring"} <= {tag for proof in result["proofs"] for tag in proof.checks}
+        evidence=json.loads(Path(result["proofs"][0].path).read_text())
+        assert next(c for c in evidence["checks"] if c["check"]=="VERTICAL:detail_get_response_matches_created_values")["passed"]
+        assert next(c for c in evidence["checks"] if c["check"]=="VERTICAL:detail_matches_get_response")["passed"]
     finally:subject.stop_http()
 
 

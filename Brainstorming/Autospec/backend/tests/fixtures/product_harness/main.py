@@ -53,7 +53,7 @@ def cli(action,params):
         if not a: return 2
         with connect() as con:
             if con.execute("SELECT COUNT(*) FROM users").fetchone()[0]: return 3
-            put_account(con,a)
+            put_account(con,a,params.get("fault")=="weak_bootstrap")
         return 0
     if action=="seed":
         p=params["payload"]
@@ -132,7 +132,12 @@ def detail(id:str,request:Request):
         a,e=authenticate(request,con)
         if e: return e
         row=con.execute("SELECT * FROM tickets WHERE id=? AND owner_id=?",(id,a["id"])).fetchone()
-        return dict(row) if row else error(404,"NOT_FOUND")
+        if not row: return error(404,"NOT_FOUND")
+        result=dict(row)
+        if request.headers.get("x-fixture-view")=="browser":
+            result["title"]="server:"+result["title"]
+            result["description"]="server:"+result["description"]
+        return result
 @app.patch("/api/tickets/{id}")
 async def patch(id:str,request:Request):
     p=await request.json()
@@ -173,13 +178,20 @@ async def message(id:str,request:Request):
 @app.get("/api/health")
 def health(): return {"status":"ok"}
 
-HTML='''<!doctype html><html><body><form id="auth"><input id="email" aria-label="Email"><input id="password" type="password" aria-label="Password"><button id="login">Login</button></form><section id="tickets" hidden><button id="create">Créer</button><form id="creation" hidden><input id="title" aria-label="Title"><textarea id="description" aria-label="Description"></textarea><button id="submit">Envoyer</button></form></section><article id="detail" hidden></article><script>
+HTML='''<!doctype html><html><body><form id="auth"><input id="email" aria-label="Email"><input id="password" type="password" aria-label="Password"><button id="login">Login</button></form><section id="tickets" hidden><button id="create">Créer</button><form id="creation" hidden><input id="title" aria-label="Title"><textarea id="description" aria-label="Description"></textarea><button id="submit">Envoyer</button></form></section><article id="detail" data-bug="__BUG__" hidden></article><script>
 let csrf=''; document.querySelector('#auth').onsubmit=async e=>{e.preventDefault();let r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value})});let p=await r.json();if(r.ok){csrf=p.csrf_token;auth.hidden=true;tickets.hidden=false;}};
-create.onclick=()=>creation.hidden=false; creation.onsubmit=async e=>{e.preventDefault();let r=await fetch('/api/tickets',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({title:title.value,description:description.value,client_request_id:crypto.randomUUID()})});let p=await r.json();if(r.ok){history.pushState({},'',`/tickets/${p.id}`);let d=await fetch(`/api/tickets/${p.id}`);let t=await d.json();detail.textContent=t.title||'missing';detail.hidden=false;creation.hidden=true;}};
+create.onclick=()=>creation.hidden=false; creation.onsubmit=async e=>{e.preventDefault();let r=await fetch('/api/tickets',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({title:title.value,description:description.value,client_request_id:crypto.randomUUID()})});let p=await r.json();if(r.ok){history.pushState({},'',`/tickets/${p.id}`);let bug=detail.dataset.bug;let t;if(bug==='missing_detail_get'){t={title:p.title,description:description.value};}else if(bug==='local_echo_with_unused_get'){let d=await fetch(`/api/tickets/${p.id}`,{headers:{'X-Fixture-View':'browser'}});await d.json();t={title:p.title,description:description.value};}else{let d=await fetch(`/api/tickets/${p.id}`);t=await d.json();}detail.textContent=bug==='static_detail'?'Ticket créé':bug==='wrong_detail'?t.title+' (wrong)\\n'+t.description:t.title+'\\n'+t.description;detail.hidden=false;creation.hidden=true;}};
 </script></body></html>'''
 @app.get("/",response_class=HTMLResponse)
 @app.get("/tickets/{id}",response_class=HTMLResponse)
-def home(): return HTML
+def home():
+    bug=""
+    try:
+        with connect() as con:
+            row=con.execute("SELECT value FROM fixture_flags WHERE name='bug'").fetchone()
+            bug=row[0] if row else ""
+    except Exception: pass
+    return HTML.replace("__BUG__",bug)
 if __name__=="__main__":
     if len(sys.argv)>1: sys.exit(cli(sys.argv[1],json.load(sys.stdin)))
     if os.path.exists(DB):

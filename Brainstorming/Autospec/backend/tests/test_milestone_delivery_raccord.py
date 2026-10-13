@@ -22,8 +22,9 @@ def setup(auth=False):
              Task(id="R", story_id="S", depends_on=["V"])]
     state = ProjectState(id="book-milestones", name="Books", goal="Books", brief=brief,
         acceptance_contract_hash=contract.contract_hash, stories=[UserStory(id="S", epic_id="E", title="Books", tasks=tasks)],
-        plan_admission={"status": "pass", "contract_hash": contract.contract_hash,
-                        "milestones": {"foundation": ["F"], "vertical": "V"}, "lots": [{"id": "L", "members": ["S"]}]})
+        plan_admission_public={"status": "pass", "contract_hash": contract.contract_hash},
+        plan_structure={"milestones": {"foundation": ["F"], "vertical": "V"},
+                        "lots": [{"id": "L", "members": ["S"]}]})
     acceptance.contract_store(state.id).save(contract)
     return state, contract
 
@@ -36,11 +37,15 @@ def proof(store, kind, check, snapshot, contract):
 
 
 def vertical_result(store, snapshot, contract, auth=False):
-    names = ["schema", "browser_create", "api_read", "db_committed"]
+    names = ["schema"]
     if auth: names += ["bootstrap", "argon2", "browser_login"]
-    return {"contract_hash": contract.contract_hash, "snapshot_hash": snapshot, "stages": [
+    else: names += ["authentication"]
+    names += ["browser_create", "frontend_wiring", "api_read", "db_committed", "restart"]
+    stages = [
         {"name": name, "passed": True, "proofs": [proof(store, kind, "VERTICAL:" + name, snapshot, contract)
-            for kind in (["X", "V"] if name.startswith("browser_") else ["X"])]} for name in names]}
+            for kind in (["X", "V"] if name.startswith("browser_") or name == "frontend_wiring" else ["X"])]} for name in names]
+    if not auth: stages[1] = {"name":"authentication", "passed":True, "status":"N/A", "proofs":[]}
+    return {"status":"PASS", "contract_hash": contract.contract_hash, "snapshot_hash": snapshot, "stages": stages}
 
 
 @pytest.mark.parametrize("auth", [False, True])
@@ -50,7 +55,7 @@ def test_vertical_requires_actual_full_chain_and_intact_external_receipt(tmp_pat
     result = vertical_result(tmp_path, snapshot, contract, auth)
     admitted = milestones.admit_vertical(contract, result, snapshot_hash=snapshot, evidence_root=tmp_path)
     assert admitted["status"] == "PASS"
-    state.plan_admission["vertical_receipt_hash"] = milestones.save_receipt(admitted, tmp_path)
+    state.plan_structure["vertical_receipt_hash"] = milestones.save_receipt(admitted, tmp_path)
     assert milestones.load_receipt(state, contract, tmp_path)["status"] == "PASS"
     path = tmp_path / "XVERTICAL-db_committed.json"
     path.write_text("modified")
@@ -58,17 +63,47 @@ def test_vertical_requires_actual_full_chain_and_intact_external_receipt(tmp_pat
         milestones.load_receipt(state, contract, tmp_path)
 
 
-@pytest.mark.parametrize("problem", ["health_only", "missing_db", "no_visual", "wrong_snapshot", "failed", "duplicate"])
+@pytest.mark.parametrize("problem", ["health_only", "missing_db", "no_visual", "wrong_snapshot", "failed", "duplicate", "contradictory_status", "reordered"])
 def test_vertical_false_green_refused(tmp_path, problem):
     state, contract = setup()
     snapshot = "a" * 64
     result = vertical_result(tmp_path, snapshot, contract)
     if problem == "health_only": result["stages"] = [{"name": "health", "passed": True, "proofs": []}]
-    elif problem == "missing_db": result["stages"] = result["stages"][:-1]
-    elif problem == "no_visual": result["stages"][1]["proofs"] = result["stages"][1]["proofs"][:1]
+    elif problem == "missing_db": result["stages"] = [s for s in result["stages"] if s["name"] != "db_committed"]
+    elif problem == "no_visual": next(s for s in result["stages"] if s["name"]=="browser_create")["proofs"] = [
+        p for p in next(s for s in result["stages"] if s["name"]=="browser_create")["proofs"] if p["type"]=="X"]
     elif problem == "wrong_snapshot": result["snapshot_hash"] = "b" * 64
     elif problem == "failed": result["stages"][2]["passed"] = False
     elif problem == "duplicate": result["stages"].append(result["stages"][0])
+    elif problem == "contradictory_status": result["status"] = "NOT_VERIFIED"
+    elif problem == "reordered": result["stages"][1],result["stages"][2] = result["stages"][2],result["stages"][1]
+    admitted=milestones.admit_vertical(contract, result, snapshot_hash=snapshot, evidence_root=tmp_path)
+    assert admitted["status"] == "NOT_VERIFIED"
+    if problem == "missing_db": assert any("db_committed" in finding for finding in admitted["findings"])
+
+
+@pytest.mark.parametrize("problem", ["missing_restart", "missing_frontend", "missing_na", "false_na", "login_when_no_auth"])
+def test_vertical_mandatory_stages_and_explicit_no_auth_are_non_reducible(tmp_path, problem):
+    _, contract = setup()
+    snapshot = "a" * 64
+    result = vertical_result(tmp_path, snapshot, contract)
+    if problem == "missing_restart": result["stages"] = [s for s in result["stages"] if s["name"] != "restart"]
+    elif problem == "missing_frontend": result["stages"] = [s for s in result["stages"] if s["name"] != "frontend_wiring"]
+    elif problem == "missing_na": result["stages"] = [s for s in result["stages"] if s["name"] != "authentication"]
+    elif problem == "false_na": next(s for s in result["stages"] if s["name"] == "authentication")["status"] = "PASS"
+    elif problem == "login_when_no_auth":
+        result["stages"].append({"name":"browser_login", "passed":True,
+            "proofs":[proof(tmp_path,"X","VERTICAL:browser_login",snapshot,contract),
+                      proof(tmp_path,"V","VERTICAL:browser_login",snapshot,contract)]})
+    admitted = milestones.admit_vertical(contract, result, snapshot_hash=snapshot, evidence_root=tmp_path)
+    assert admitted["status"] == "NOT_VERIFIED", admitted
+
+
+def test_authenticated_vertical_cannot_reduce_bootstrap_or_argon2_requirements(tmp_path):
+    _, contract = setup(auth=True)
+    snapshot = "a" * 64
+    result = vertical_result(tmp_path, snapshot, contract, auth=True)
+    result["stages"] = [s for s in result["stages"] if s["name"] not in {"bootstrap", "argon2"}]
     assert milestones.admit_vertical(contract, result, snapshot_hash=snapshot, evidence_root=tmp_path)["status"] == "NOT_VERIFIED"
 
 
@@ -81,7 +116,7 @@ def test_post_admission_graph_mutations_never_silently_sanitized(problem):
     elif problem == "duplicate": state.stories[0].tasks.append(Task(id="R", story_id="S"))
     elif problem == "bypass": state.task("R").depends_on = ["F"]
     elif problem == "added":
-        state.plan_admission["lots"][0]["members"] = ["F", "V", "R"]
+        state.plan_structure["lots"][0]["members"] = ["F", "V", "R"]
         state.stories[0].tasks.append(Task(id="NEW", story_id="S", depends_on=["V"]))
     with pytest.raises(milestones.MilestoneError):
         milestones.milestone_owners(state, milestones.strict_graph(state))
@@ -98,7 +133,7 @@ async def test_pipeline_vertical_probe_persists_receipt_before_downstream(monkey
         return vertical_result(acceptance.supervisor_root(state.id), snapshot, contract)
     monkeypatch.setattr(pipeline, "_avertical_probe", probe)
     assert await pipeline._avertical_milestone()
-    assert state.plan_admission["vertical_receipt_hash"]
+    assert state.plan_structure["vertical_receipt_hash"]
     assert not state.delivery_ready and not pipeline.runner.calls
 
 

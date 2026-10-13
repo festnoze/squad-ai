@@ -755,6 +755,21 @@ async def test_pause_resume_unknown_project_404(green_pytest):
         assert (await client.post("/api/projects/inconnu/resume")).status_code == 404
 
 
+async def test_manual_resume_build_route_attests_explicit_request(monkeypatch):
+    observed = []
+
+    class PipelinePort:
+        async def aresume_build(self, *, explicit_request=False):
+            observed.append(explicit_request)
+
+    pipeline = PipelinePort()
+    monkeypatch.setattr(server, "_pipeline", lambda _project_id: pipeline)
+    async with make_client([]) as client:
+        response = await client.post("/api/projects/manual-resume/resume-build")
+    assert response.status_code == 200
+    assert observed == [True]
+
+
 async def test_story_diff_available_on_done_project(green_pytest):
     async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
         project_id = await _acreate_done_project(client)

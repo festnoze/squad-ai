@@ -889,7 +889,12 @@ async def acancel_resume(project_id: str) -> dict:
 @app.post("/api/projects/{project_id}/resume-build")
 async def aresume_build(project_id: str) -> dict:
     pipeline = _pipeline(project_id)
-    await _acall_pipeline(pipeline.aresume_build(), f"Projet inconnu : {project_id}")
+    # This route is the explicit user action that may admit a pre-plan
+    # continuation or a distinct failed-bootstrap full restart. Internal timers
+    # and recovery calls keep the default false and cannot authorize either.
+    await _acall_pipeline(
+        pipeline.aresume_build(explicit_request=True), f"Projet inconnu : {project_id}"
+    )
     return {"ok": True}
 
 

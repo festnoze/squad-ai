@@ -53,8 +53,8 @@ def pending(monkeypatch):
         assert kwargs["repair_dependencies"] is False
         calls.append("runtime")
         return bootstrap.BootstrapResult(True, "Controlled runtime port only", fingerprint=prepared.fingerprint)
-    async def plan(*, constraint_revision_limit):
-        assert constraint_revision_limit == 1
+    # Match Pipeline._aplan_phase(self): reject any accidental new keyword.
+    async def plan():
         calls.append("plan")
         state.epics = [Epic(id="E", title="One lot")]
         state.stories = [UserStory(id="S", epic_id="E", title="Book")]
@@ -97,6 +97,49 @@ async def test_user_intent_required_not_inferred_from_terminal_state(pending):
     with pytest.raises(ValueError, match="explicite"):
         p.start(pipeline)
     assert calls == [] and pipeline._task is None
+
+
+async def test_pipeline_resume_preplan_requires_explicit_request_and_never_falls_back(pending, monkeypatch):
+    pipeline, calls = pending
+    monkeypatch.setattr(pipeline, "start", lambda: pytest.fail("pre-plan fallback restarted lifecycle"))
+    with pytest.raises(ValueError, match="explicite"):
+        await pipeline.aresume_build()
+    assert calls == [] and pipeline.runner.calls == [] and pipeline._task is None
+    assert not p._journal_path(pipeline.state).exists()
+
+    # Even an explicit request cannot turn a failed/stale pre-plan bootstrap
+    # into the separate full-lifecycle restart path.
+    pipeline.state.bootstrap_status = "failed"
+    with pytest.raises(ValueError, match="Socle vérifié ready"):
+        await pipeline.aresume_build(explicit_request=True)
+    assert calls == [] and pipeline.runner.calls == [] and pipeline._task is None
+    assert not p._journal_path(pipeline.state).exists()
+
+
+async def test_pipeline_explicit_preplan_dispatch_journals_before_plan_task(pending, monkeypatch):
+    pipeline, calls = pending
+
+    async def delivery():
+        calls.append("common-delivery-gates")
+        pipeline.state.delivery_ready = True
+        return True  # State-machine metatest only; not product delivery evidence.
+
+    monkeypatch.setattr(pipeline, "_adelivery_gates", delivery)
+    await pipeline.aresume_build(explicit_request=True)
+
+    # aresume_build returns synchronously after helper admission; the durable
+    # UNKNOWN receipt exists before its background continuation can run.
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert pipeline.state.phase == PipelinePhase.PLAN and pipeline._task is not None
+    assert len(journal["attempts"]) == 1 and journal["attempts"][0]["outcome"] == "UNKNOWN"
+    assert journal["attempts"][0]["explicit_request"] is True
+
+    await asyncio.wait_for(pipeline._task, timeout=5)
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert journal["attempts"][0]["outcome"] == "done"
+    assert calls == ["runtime", "plan", "architect", "approval", "build", "common-delivery-gates"]
+    assert pipeline.state.phase == PipelinePhase.DONE and pipeline.state.delivery_ready
+    assert pipeline.runner.calls == []
 
 
 @pytest.mark.parametrize("value", [False, None, 1, "true"])
@@ -315,7 +358,7 @@ async def test_final_journal_failure_never_keeps_done_or_releases_unknown(pendin
 async def test_cancel_at_plan_preserves_unknown_cost_and_stops(pending,monkeypatch):
     pipeline,calls=pending
     entered=asyncio.Event()
-    async def plan(**kwargs):
+    async def plan():
         entered.set()
         await asyncio.Event().wait()
     monkeypatch.setattr(pipeline,"_aplan_phase",plan)
