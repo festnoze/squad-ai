@@ -151,7 +151,13 @@ def test_node_manifest_lock_runtime_dev_and_ignore_scripts(tmp_path):
     assert all("--ignore-scripts" in argv and "--package-lock-only" in argv for argv in calls)
 
 
-@pytest.mark.parametrize("kwargs", [{"manifest": "../pyproject.toml"}, {"lock": "other/uv.lock"}, {"package": "--evil"}, {"constraint": "https://evil"}, {"scope": "local"}])
+@pytest.mark.parametrize("kwargs", [
+    {"manifest": "../pyproject.toml"}, {"lock": "other/uv.lock"},
+    {"package": "--evil"}, {"constraint": "https://evil"}, {"scope": "local"},
+    {"version": True}, {"version": 1.0}, {"task_id": None},
+    {"ecosystem": None}, {"package": []}, {"constraint": None},
+    {"manifest": None}, {"lock": None}, {"reason": None},
+])
 def test_request_validation(kwargs):
     data = request().__dict__ | kwargs
     with pytest.raises(DependencyError):
