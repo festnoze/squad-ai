@@ -14,7 +14,9 @@ Two layers are covered, and NO real docker is ever touched:
   ``docker_available`` are stubbed at the pipeline layer so no docker binary is
   ever invoked."""
 
+import socket
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -300,6 +302,33 @@ def test_cross_reachability_foreign_pair_is_warning_only(monkeypatch):
 
 # ------------------------------------------------------- allocate_host_port
 
+def _fake_reservation_socket(monkeypatch, expected_port):
+    """Replace only the allocator's reservation socket with a deterministic bind."""
+    bound = []
+    real_socket = docker_deploy.socket
+
+    class FakeSocket:
+        def setsockopt(self, *_args):
+            pass
+
+        def bind(self, address):
+            assert address == ("127.0.0.1", expected_port)
+            bound.append(address)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        docker_deploy,
+        "socket",
+        SimpleNamespace(
+            socket=lambda: FakeSocket(),
+            SOL_SOCKET=real_socket.SOL_SOCKET,
+            SO_EXCLUSIVEADDRUSE=getattr(real_socket, "SO_EXCLUSIVEADDRUSE", 0),
+        ),
+    )
+    return bound
+
 def test_allocate_host_port_reuses_persisted(monkeypatch):
     """A state that already owns a port keeps it (stable across redeploys)."""
     state = ProjectState(id="alloc-reuse", name="a", goal="g")
@@ -314,10 +343,12 @@ def test_allocate_host_port_returns_base_when_free(monkeypatch):
     monkeypatch.setattr(settings, "docker_host_port_base", 18000)
     monkeypatch.setattr(docker_deploy, "list_deployed", lambda: [])
     monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: True)
+    reservation_binds = _fake_reservation_socket(monkeypatch, 18000)
     from autospec import storage
     monkeypatch.setattr(storage, "list_states", lambda: [])
     state = ProjectState(id="alloc-base", name="a", goal="g")
     assert docker_deploy.allocate_host_port(state) == 18000
+    assert reservation_binds == [("127.0.0.1", 18000)]
 
 
 def test_allocate_host_port_skips_collisions(monkeypatch):
@@ -334,8 +365,10 @@ def test_allocate_host_port_skips_collisions(monkeypatch):
     from autospec import storage
     monkeypatch.setattr(storage, "list_states", lambda: [other])
     monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: port != 18002)
+    reservation_binds = _fake_reservation_socket(monkeypatch, 18003)
     state = ProjectState(id="alloc-collide", name="a", goal="g")
     assert docker_deploy.allocate_host_port(state) == 18003
+    assert reservation_binds == [("127.0.0.1", 18003)]
 
 
 def test_allocate_claims_published_ports_even_without_state_file(monkeypatch):
@@ -351,8 +384,10 @@ def test_allocate_claims_published_ports_even_without_state_file(monkeypatch):
     from autospec import storage
     monkeypatch.setattr(storage, "list_states", lambda: [])  # no state files at all
     monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: True)
+    reservation_binds = _fake_reservation_socket(monkeypatch, 18001)
     state = ProjectState(id="alloc-orphan", name="a", goal="g")
     assert docker_deploy.allocate_host_port(state) == 18001
+    assert reservation_binds == [("127.0.0.1", 18001)]
 
 
 def test_allocate_ignores_container_internal_port_label(monkeypatch):

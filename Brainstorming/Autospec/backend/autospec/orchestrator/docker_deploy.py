@@ -236,14 +236,45 @@ def docker_available() -> tuple[bool, str]:
     return rc == 0, out.strip()
 
 
-def ensure_network(network: str) -> tuple[bool, str]:
-    """Ensure the shared network exists (create if missing, tolerate races)."""
+def _validated_extra_labels(labels: dict[str, str] | None) -> list[tuple[str, str]]:
+    """Validate additive Docker labels without allowing managed-label override."""
+    if labels is None:
+        return []
+    if not isinstance(labels, dict):
+        raise ValueError("extra_labels must be a dictionary")
+    reserved = {LABEL_PROJECT, LABEL_PORT, LABEL_ACTIVE}
+    result: list[tuple[str, str]] = []
+    for key, value in labels.items():
+        if not isinstance(key, str) or not key.strip() or "=" in key:
+            raise ValueError("Docker label keys must be non-empty strings without '='")
+        if key in reserved:
+            raise ValueError(f"extra label cannot override managed label {key}")
+        if not isinstance(value, str):
+            raise ValueError(f"Docker label value for {key} must be a string")
+        result.append((key, value))
+    return result
+
+
+def ensure_network(
+    network: str, *, extra_labels: dict[str, str] | None = None,
+) -> tuple[bool, str]:
+    """Ensure the shared network exists (create if missing, tolerate races).
+
+    Optional labels are applied only when this call creates the network. They
+    let isolated integrations identify resources they own without changing the
+    shared network's default behavior.
+    """
     rc, out = _docker(["network", "inspect", network], timeout=15.0)
     if rc == 0:
         return True, ""
     if looks_like_daemon_down(out):
         return False, out
-    rc, out = _docker(["network", "create", network], timeout=30.0)
+    rc, out = _docker([
+        "network", "create",
+        *[part for key, value in _validated_extra_labels(extra_labels)
+          for part in ("--label", f"{key}={value}")],
+        network,
+    ], timeout=30.0)
     if rc == 0:
         return True, ""
     # A concurrent creation (another pipeline) is not an error for us.
@@ -289,6 +320,7 @@ def replace_container(
     container_port: int,
     project_id: str,
     *, data_volume: str | None = None,
+    extra_labels: dict[str, str] | None = None,
 ) -> tuple[bool, str]:
     """Start a fresh name; replacement/rollback is owned by deploy_and_verify."""
     rc, out = _docker(
@@ -307,6 +339,8 @@ def replace_container(
             f"{LABEL_PORT}={container_port}",
             "--label",
             f"{LABEL_ACTIVE}={int(name == container_name(project_id))}",
+            *[part for key, value in _validated_extra_labels(extra_labels)
+              for part in ("--label", f"{key}={value}")],
             "--restart",
             "on-failure:3",
             "--cap-drop", "ALL",
