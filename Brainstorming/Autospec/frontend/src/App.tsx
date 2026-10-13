@@ -43,7 +43,7 @@ import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { CommandPalette, paletteItems } from "./components/CommandPalette";
 import { ConfirmHost, confirmAction } from "./components/ConfirmDialog";
 import { MobileNav, type MobilePane } from "./components/MobileNav";
-import { PlanReviewPanel } from "./components/PlanReviewPanel";
+import { PlanAdmissionPanel } from "./components/PlanAdmissionPanel";
 import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
 import { ObservationsPanel } from "./components/ObservationsPanel";
@@ -909,12 +909,7 @@ export default function App() {
               architecture={project.architecture ?? ""}
               planQuality={project.plan_quality ?? -1}
             />
-            <PlanReviewPanel
-              planQuality={project.plan_quality ?? -1}
-              issues={project.plan_review_issues ?? []}
-              suggestions={project.plan_review_suggestions ?? []}
-              calibration={project.calibration?.[String(project.iteration ?? 1)]}
-            />
+            <PlanAdmissionPanel diagnostic={project.plan_admission_public} />
             {/* V3-F7 : boucle d'observation — panneaux invisibles (null) tant
                 que le projet n'a ni observation, ni décision, ni mémoire
                 (feature flags OFF → colonne inchangée). */}

@@ -503,8 +503,8 @@ export interface ProjectState {
   created_at: number;
   architecture: string;
   plan_quality: number;
-  plan_review_issues?: string[];
-  plan_review_suggestions?: string[];
+  /** Safe, bounded backend projection; validated again by PlanAdmissionPanel. */
+  plan_admission_public?: unknown;
   backend_language?: "python" | "go" | "rust" | "node";
   technical_stack?: Record<string, string>;
   agent_activity?: Record<string, AgentExecution>;
