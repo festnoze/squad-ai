@@ -140,3 +140,75 @@ def test_tables_build_at_any_height(height):
     assert table.chars[0] == " " and table.coverage[0] == 0.0
     assert table.count >= 8  # even 4x8 keeps a usable ramp of distinct glyphs
     assert 0.15 < float(table.coverage.max()) <= 0.7  # tiny cells can be 60 % ink
+
+
+def test_every_charset_builds_with_the_space_first():
+    from ascii_overlay.glyphs import CHARSETS
+
+    for name, chars in CHARSETS.items():
+        table = build_table(8, 16, chars=chars)
+        assert table.chars[0] == " " and table.coverage[0] == 0.0, name
+        assert table.count >= 8, (name, table.chars)
+        assert set(table.chars) <= set(chars) | {" "}, name
+    braille = build_table(8, 16, chars=CHARSETS["Braille"])
+    assert braille.count >= 200  # 255 dot patterns, a few merge at 8x16
+    blocks = build_table(8, 16, chars=CHARSETS["CP437 blocks"])
+    assert float(blocks.coverage.max()) == 1.0  # the full block is 100 % ink
+    ramp = build_table(8, 16, chars=CHARSETS["Ramp 10"])
+    assert ramp.count == 10
+
+
+def test_missing_glyphs_are_dropped_not_rendered_as_boxes():
+    """A code point no font defines must not survive as a 'missing glyph' box."""
+    table = build_table(8, 16, chars=" A\uffff\u0378\U000f0000B")  # unassigned / private use
+    assert set(table.chars) == {" ", "A", "B"}
+
+
+def test_glyphs_the_font_lacks_come_from_the_fallback_fonts():
+    """DejaVu Sans Mono has no braille: the bundled DejaVu Sans supplies it, fitted to the cell."""
+    from ascii_overlay.glyphs import CHARSETS, FALLBACK_FONTS, rasterize_with_fallback
+
+    assert FALLBACK_FONTS, "DejaVuSans.ttf must be bundled in assets/"
+    chars = " \u2801\u28ff"
+    alone, present_alone = rasterize_with_fallback(chars, 8, 16, fallbacks=())
+    assert not present_alone[1:].any()
+    bitmaps, present = rasterize_with_fallback(chars, 8, 16)
+    assert present.all()
+    assert bitmaps[2].any() and (bitmaps[2] > 0).sum() > (bitmaps[1] > 0).sum()  # full cell has more dots than one
+    table = build_table(8, 16, chars=CHARSETS["Braille"])
+    assert table.count >= 200
+
+
+def test_fonts_list_has_the_bundled_font_first():
+    from ascii_overlay.glyphs import DEFAULT_FONT_NAME, FONTS
+
+    names = list(FONTS)
+    assert names[0] == DEFAULT_FONT_NAME
+    for path in FONTS.values():
+        assert path.is_file()
+    if "Consolas" in FONTS:
+        # Consolas has neither braille nor quadrants: both come from the fallback fonts.
+        from ascii_overlay.glyphs import CHARSETS
+
+        assert build_table(8, 16, FONTS["Consolas"], CHARSETS["Braille"]).count >= 200
+        assert build_table(8, 16, FONTS["Consolas"], CHARSETS["Quadrants"]).count == 16
+
+
+def test_block_elements_are_drawn_exactly_whatever_the_font():
+    from ascii_overlay.glyphs import CHARSETS, FONTS, synthesize
+
+    full = synthesize("\u2588", 8, 16)
+    assert full is not None and (full == 255).all()
+    upper = synthesize("\u2580", 8, 16)
+    assert (upper[:8] == 255).all() and (upper[8:] == 0).all()
+    shades = [synthesize(c, 8, 16) for c in "\u2591\u2592\u2593"]
+    assert [round(float((s > 0).mean()), 2) for s in shades] == [0.25, 0.5, 0.75]
+    cross = synthesize("\u253c", 8, 16)
+    assert cross[:, 4].all() and cross[8, :].all()  # a vertical and a horizontal line through the centre
+    assert synthesize("A", 8, 16) is None
+    for font in FONTS.values():
+        table = build_table(8, 16, font, CHARSETS["CP437 blocks"])
+        assert float(table.coverage.max()) == 1.0, font
+        assert table.count == len(CHARSETS["CP437 blocks"])  # nothing merged, nothing missing
+    quad = build_table(12, 24, chars=CHARSETS["Quadrants"])
+    assert quad.count == 16 and sorted(set(np.round(quad.coverage, 2))) == [0.0, 0.25, 0.5, 0.75, 1.0]

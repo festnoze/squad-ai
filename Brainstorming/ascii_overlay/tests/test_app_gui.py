@@ -52,10 +52,21 @@ def app():
 
 @pytest.fixture
 def window(app):
-    from ascii_overlay.app import OverlayWindow
+    from ascii_overlay.app import FONTS, OverlayWindow
 
     w = OverlayWindow()
     w.timer.stop()  # the test drives the ticks itself
+    # Settings persist between runs (and a failed run may leave anything): start from the defaults.
+    w.set_cell(8, 16)
+    w.set_charset("Full ASCII")
+    w.set_font(list(FONTS)[0])
+    w.set_black_ink(False)
+    w.set_negative(False)
+    w.set_auto_tone(True)
+    w.set_gamma(1.0)
+    w.set_exposure(1.0)
+    w.set_fps(20)
+    w.set_frozen(False)
     w.resize(1000, 400)
     w.move(150, 150)
     w.show()
@@ -209,6 +220,24 @@ def test_bar_widgets_drive_the_same_state_as_the_keys(window, app):
     assert window.fps == FPS_CHOICES[0] and window.timer.interval() == 1000 // FPS_CHOICES[0]
     window.bar.gamma.setValue(1.5)
     assert window.params.gamma == 1.5
+    window.bar.charset.setCurrentText("Ramp 10")
+    assert window.charset == "Ramp 10" and window.table.count == 10
+    window.tick()
+    assert window.image is not None
+    window.cycle_charset()
+    assert window.charset == "Ramp 70" and window.bar.charset.currentText() == "Ramp 70"
+    window.set_charset("Braille")
+    window.tick()
+    assert window.table.count >= 200
+    from ascii_overlay.app import FONTS
+    if len(FONTS) > 1:
+        second = list(FONTS)[1]
+        window.bar.font.setCurrentText(second)
+        assert window.font_name == second
+        window.tick()
+        assert window.image is not None
+        window.set_font(list(FONTS)[0])
+    window.set_charset("Full ASCII")
     window.bar.freeze.setChecked(True)
     assert window.frozen is True
     # And the other way round: a key press updates the bar.

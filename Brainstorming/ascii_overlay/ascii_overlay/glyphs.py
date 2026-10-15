@@ -21,6 +21,49 @@ DEFAULT_FONT = ASSETS_DIR / "DejaVuSansMono.ttf"
 # Printable ASCII, space first so that index 0 is always the blank glyph.
 PRINTABLE = "".join(chr(c) for c in range(32, 127))
 
+_LETTERS_DIGITS = "".join(chr(c) for c in range(48, 58)) + "".join(chr(c) for c in range(65, 91)) + "".join(chr(c) for c in range(97, 123))
+_BLOCKS = "\u2591\u2592\u2593\u2588\u2580\u2584\u258c\u2590"  # ░ ▒ ▓ █ ▀ ▄ ▌ ▐
+_BOX = "\u2500\u2502\u250c\u2510\u2514\u2518\u251c\u2524\u252c\u2534\u253c"  # ─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼
+_QUADRANTS = "\u2598\u259d\u2580\u2596\u258c\u259e\u259b\u2597\u259a\u2590\u259c\u2584\u2599\u259f\u2588"
+_BRAILLE = "".join(chr(0x2800 + i) for i in range(1, 256))
+
+# Character sets offered by the app. Every set starts with the space (index 0 = blank).
+# Sets beyond the first six are not ASCII: they need a font that has the glyphs
+# (DejaVu Sans Mono has them all); missing glyphs are dropped at build time.
+CHARSETS: dict[str, str] = {
+    "Full ASCII": PRINTABLE,
+    "Ramp 10": " .:-=+*#%@",
+    "Ramp 70": " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+    "Symbols": " .,:;'`\"^~-_=+*/\\|()[]{}<>!?",
+    "Letters & digits": " " + _LETTERS_DIGITS,
+    "Uppercase": " " + "".join(chr(c) for c in range(65, 91)),
+    "ASCII + blocks": PRINTABLE + _BLOCKS + _BOX,
+    "CP437 blocks": " " + _BLOCKS + _BOX,
+    "Quadrants": " " + _QUADRANTS,
+    "Braille": " " + _BRAILLE,
+}
+DEFAULT_CHARSET = "Full ASCII"
+
+# Fonts: the bundled one first, then Windows monospace fonts when present.
+_WINDOWS_FONTS = Path("C:/Windows/Fonts")
+_FONT_CANDIDATES: tuple[tuple[str, Path], ...] = (
+    ("DejaVu Sans Mono", DEFAULT_FONT),
+    ("IBM VGA 8x16", ASSETS_DIR / "Px437_IBM_VGA_8x16.ttf"),
+    ("Consolas", _WINDOWS_FONTS / "consola.ttf"),
+    ("Cascadia Mono", _WINDOWS_FONTS / "CascadiaMono.ttf"),
+    ("Lucida Console", _WINDOWS_FONTS / "lucon.ttf"),
+    ("Courier New", _WINDOWS_FONTS / "cour.ttf"),
+)
+FONTS: dict[str, Path] = {name: path for name, path in _FONT_CANDIDATES if path.is_file()}
+DEFAULT_FONT_NAME = "DejaVu Sans Mono"
+
+# Fonts tried, in order, for a character the chosen font lacks (braille in DejaVu Sans
+# Mono or Consolas, for instance). Only the glyph comes from the fallback; it is
+# fitted to the same cell.
+FALLBACK_FONTS: tuple[Path, ...] = tuple(
+    p for p in (ASSETS_DIR / "DejaVuSans.ttf", _WINDOWS_FONTS / "seguisym.ttf") if p.is_file()
+)
+
 # Preset cell sizes offered by the app: (width, height) in pixels.
 CELL_SIZES: tuple[tuple[int, int], ...] = ((4, 8), (6, 12), (8, 16), (12, 24), (16, 32))
 # Any character height in this range is allowed; the width follows the font's aspect.
@@ -124,15 +167,16 @@ def fold_blur(features: np.ndarray, cell_w: int, cell_h: int) -> np.ndarray:
     return blur_adjoint_3x3(features.reshape(k, cell_h, cell_w)).reshape(k, cell_w * cell_h).astype(np.float32)
 
 
-def _fit_font(font_path: Path, cell_w: int, cell_h: int) -> tuple[ImageFont.FreeTypeFont, int]:
-    """Largest font size whose advance fits the cell width and whose line fits the height.
+def _fit_font(font_path: Path, cell_w: int, cell_h: int, ref: str = "M") -> tuple[ImageFont.FreeTypeFont, int]:
+    """Largest font size whose widest `ref` character fits the cell width and whose line fits the height.
 
     Returns the font and the baseline y offset inside the cell.
     """
     best = None
+    ref_chars = sorted(set(ref)) or ["M"]
     for size in range(max(2, cell_h // 2), cell_h * 2 + 1):
         font = ImageFont.truetype(str(font_path), size)
-        advance = font.getlength("M")
+        advance = max(font.getlength(c) for c in ref_chars)
         ascent, descent = font.getmetrics()
         if advance <= cell_w + 0.01 and ascent + descent <= cell_h:
             best = (font, ascent, descent)
@@ -149,8 +193,8 @@ def _fit_font(font_path: Path, cell_w: int, cell_h: int) -> tuple[ImageFont.Free
 
 
 def rasterize(chars: str, cell_w: int, cell_h: int, font_path: Path = DEFAULT_FONT) -> np.ndarray:
-    """Binary bitmaps (K, ch, cw) uint8 {0, 255} of `chars` in a (cw, ch) cell."""
-    font, baseline = _fit_font(font_path, cell_w, cell_h)
+    """Binary bitmaps (K, ch, cw) uint8 {0, 255} of `chars` in a (cw, ch) cell, from one font."""
+    font, baseline = _fit_font(font_path, cell_w, cell_h, chars)
     bitmaps = np.zeros((len(chars), cell_h, cell_w), dtype=np.uint8)
     for k, ch in enumerate(chars):
         img = Image.new("L", (cell_w, cell_h), 0)
@@ -164,12 +208,118 @@ def rasterize(chars: str, cell_w: int, cell_h: int, font_path: Path = DEFAULT_FO
     return bitmaps
 
 
-def build_table(cell_w: int, cell_h: int, font_path: Path = DEFAULT_FONT, chars: str = PRINTABLE) -> GlyphTable:
-    """Rasterise `chars`, drop glyphs that became identical after binarisation, derive features."""
+# Block elements and box drawing are drawn geometrically, not taken from the font:
+# a font's full block is a glyph with side bearings and line gaps (77 % of the cell
+# in DejaVu Sans Mono at 8x16), which breaks the tiling and the tone. Drawn here they
+# fill the cell exactly: the full block is 100 % ink, the shades 25 / 50 / 75 %.
+_QUADRANT_BITS = {  # code point -> (top-left, top-right, bottom-left, bottom-right)
+    0x2598: (1, 0, 0, 0), 0x259D: (0, 1, 0, 0), 0x2580: (1, 1, 0, 0), 0x2596: (0, 0, 1, 0),
+    0x258C: (1, 0, 1, 0), 0x259E: (0, 1, 1, 0), 0x259B: (1, 1, 1, 0), 0x2597: (0, 0, 0, 1),
+    0x259A: (1, 0, 0, 1), 0x2590: (0, 1, 0, 1), 0x259C: (1, 1, 0, 1), 0x2584: (0, 0, 1, 1),
+    0x2599: (1, 0, 1, 1), 0x259F: (0, 1, 1, 1), 0x2588: (1, 1, 1, 1),
+}
+_SHADE_QUARTERS = {0x2591: 1, 0x2592: 2, 0x2593: 3}  # ░ ▒ ▓ : ink pixels per 2x2 tile
+_BOX_ARMS = {  # code point -> (up, down, left, right)
+    0x2500: (0, 0, 1, 1), 0x2502: (1, 1, 0, 0), 0x250C: (0, 1, 0, 1), 0x2510: (0, 1, 1, 0),
+    0x2514: (1, 0, 0, 1), 0x2518: (1, 0, 1, 0), 0x251C: (1, 1, 0, 1), 0x2524: (1, 1, 1, 0),
+    0x252C: (0, 1, 1, 1), 0x2534: (1, 0, 1, 1), 0x253C: (1, 1, 1, 1),
+}
+
+
+def synthesize(ch: str, cell_w: int, cell_h: int) -> np.ndarray | None:
+    """Exact bitmap (ch, cw) uint8 {0, 255} for block elements and box drawing, else None."""
+    cp = ord(ch)
+    bm = np.zeros((cell_h, cell_w), dtype=np.uint8)
+    if cp in _QUADRANT_BITS:
+        tl, tr, bl, br = _QUADRANT_BITS[cp]
+        hw, hh = cell_w // 2, cell_h // 2
+        if tl:
+            bm[:hh, :hw] = 255
+        if tr:
+            bm[:hh, hw:] = 255
+        if bl:
+            bm[hh:, :hw] = 255
+        if br:
+            bm[hh:, hw:] = 255
+        return bm
+    if cp in _SHADE_QUARTERS:
+        n = _SHADE_QUARTERS[cp]
+        yy, xx = np.mgrid[0:cell_h, 0:cell_w]
+        phase = (yy % 2) * 2 + (xx % 2)  # 2x2 ordered dither: 0 3 / 2 1 lights up in this order
+        order = np.array([0, 3, 2, 1])[phase]
+        bm[order < n] = 255
+        return bm
+    if cp in _BOX_ARMS:
+        up, down, left, right = _BOX_ARMS[cp]
+        t = max(1, round(cell_h / 16))  # line thickness
+        cx, cy = cell_w // 2, cell_h // 2
+        x0, x1 = cx - t // 2, cx - t // 2 + t
+        y0, y1 = cy - t // 2, cy - t // 2 + t
+        if up:
+            bm[:y1, x0:x1] = 255
+        if down:
+            bm[y0:, x0:x1] = 255
+        if left:
+            bm[y0:y1, :x1] = 255
+        if right:
+            bm[y0:y1, x0:] = 255
+        return bm
+    return None
+
+
+def _missing_mask(bitmaps: np.ndarray, chars: str, cell_w: int, cell_h: int, font_path: Path) -> np.ndarray:
+    """True where the font rendered its 'missing glyph' box (compared with an undefined code point)."""
+    notdef = rasterize("\uffff", cell_w, cell_h, font_path)[0]
+    missing = np.zeros(len(chars), dtype=bool)
+    if notdef.any():
+        for k, ch in enumerate(chars):
+            missing[k] = ch != " " and np.array_equal(bitmaps[k], notdef)
+    return missing
+
+
+def rasterize_with_fallback(
+    chars: str, cell_w: int, cell_h: int, font_path: Path = DEFAULT_FONT, fallbacks: tuple[Path, ...] = FALLBACK_FONTS
+) -> tuple[np.ndarray, np.ndarray]:
+    """Bitmaps of `chars` from `font_path`, glyphs it lacks taken from the fallback fonts.
+
+    Returns (bitmaps, present) where present[k] is False when no font had the glyph.
+    """
     bitmaps = rasterize(chars, cell_w, cell_h, font_path)
+    missing = _missing_mask(bitmaps, chars, cell_w, cell_h, font_path)
+    for k, ch in enumerate(chars):
+        drawn = synthesize(ch, cell_w, cell_h)
+        if drawn is not None:
+            bitmaps[k] = drawn
+            missing[k] = False
+    for fb in fallbacks:
+        if not missing.any():
+            break
+        idx = np.nonzero(missing)[0]
+        sub = "".join(chars[k] for k in idx)
+        sub_bitmaps = rasterize(sub, cell_w, cell_h, fb)
+        sub_missing = _missing_mask(sub_bitmaps, sub, cell_w, cell_h, fb)
+        for j, k in enumerate(idx):
+            if not sub_missing[j]:
+                bitmaps[k] = sub_bitmaps[j]
+                missing[k] = False
+    return bitmaps, ~missing
+
+
+def build_table(cell_w: int, cell_h: int, font_path: Path = DEFAULT_FONT, chars: str = PRINTABLE) -> GlyphTable:
+    """Rasterise `chars`, drop missing glyphs and duplicates after binarisation, derive features.
+
+    The space is always first, so index 0 is the blank glyph whatever the set. A
+    character the font lacks is taken from the fallback fonts, and dropped when none
+    has it, so a "missing glyph" box never becomes a candidate.
+    """
+    if not chars.startswith(" "):
+        chars = " " + chars.replace(" ", "")
+    bitmaps, present = rasterize_with_fallback(chars, cell_w, cell_h, font_path)
     keep: list[int] = []
     seen: set[bytes] = set()
     for k in range(len(chars)):
+        if not present[k]:
+            continue
         key = bitmaps[k].tobytes()
         if key in seen:
             continue
@@ -202,12 +352,12 @@ def load_table(path: Path) -> GlyphTable:
     return GlyphTable(cell_w, cell_h, str(z["chars"]), z["bitmaps"], features, z["coverage"], fold_blur(features, cell_w, cell_h))
 
 
-_CACHE: dict[tuple[int, int, str], GlyphTable] = {}
+_CACHE: dict[tuple[int, int, str, str], GlyphTable] = {}
 
 
-def get_table(cell_w: int, cell_h: int, font_path: Path = DEFAULT_FONT) -> GlyphTable:
-    """Memoised `build_table`: rasterising 95 glyphs takes a few milliseconds, once per size."""
-    key = (cell_w, cell_h, str(font_path))
+def get_table(cell_w: int, cell_h: int, font_path: Path = DEFAULT_FONT, chars: str = PRINTABLE) -> GlyphTable:
+    """Memoised `build_table`: rasterising a set takes a few milliseconds, once per (size, font, set)."""
+    key = (cell_w, cell_h, str(font_path), chars)
     if key not in _CACHE:
-        _CACHE[key] = build_table(cell_w, cell_h, font_path)
+        _CACHE[key] = build_table(cell_w, cell_h, font_path, chars)
     return _CACHE[key]

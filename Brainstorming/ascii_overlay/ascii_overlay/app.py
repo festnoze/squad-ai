@@ -31,7 +31,18 @@ from PySide6.QtWidgets import (
 
 from . import win32
 from .capture import Capture
-from .glyphs import CELL_SIZES, MAX_CELL_HEIGHT, MIN_CELL_HEIGHT, GlyphTable, cell_for_height, get_table
+from .glyphs import (
+    CELL_SIZES,
+    CHARSETS,
+    DEFAULT_CHARSET,
+    DEFAULT_FONT_NAME,
+    FONTS,
+    MAX_CELL_HEIGHT,
+    MIN_CELL_HEIGHT,
+    GlyphTable,
+    cell_for_height,
+    get_table,
+)
 from .matcher import MatchParams, MatchState, frame_to_indices, render, to_text
 
 APP_NAME = "ascii_overlay"
@@ -50,16 +61,16 @@ COLOR_BORDER_GHOST = QColor(200, 60, 60)
 BAR_STYLE = """
 QWidget#bar { background: #202020; }
 QLabel { color: #c8c8c8; font: 9pt 'Segoe UI'; }
-QPushButton, QComboBox, QDoubleSpinBox {
+QPushButton, QComboBox, QDoubleSpinBox, QSpinBox {
     color: #e6e6e6; background: #333; border: 1px solid #555; border-radius: 3px;
-    padding: 1px 6px; min-height: 20px; font: 9pt 'Segoe UI';
+    padding: 1px 5px; min-height: 20px; font: 9pt 'Segoe UI';
 }
-QPushButton:hover, QComboBox:hover, QDoubleSpinBox:hover { background: #3d3d3d; }
+QPushButton:hover, QComboBox:hover, QDoubleSpinBox:hover, QSpinBox:hover { background: #3d3d3d; }
 QPushButton:checked { background: #2d6cdf; border-color: #4b86ea; }
 QPushButton#close { color: #f0f0f0; font-weight: bold; padding: 1px 8px; }
 QPushButton#close:hover { background: #c0392b; }
 QComboBox QAbstractItemView { background: #2a2a2a; color: #e6e6e6; selection-background-color: #2d6cdf; }
-QDoubleSpinBox::up-button, QDoubleSpinBox::down-button { width: 12px; }
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button, QSpinBox::up-button, QSpinBox::down-button { width: 12px; }
 """
 
 
@@ -78,39 +89,51 @@ class TopBar(QWidget):
         self.setAutoFillBackground(True)
         self.setStyleSheet(BAR_STYLE)
         self.setMouseTracking(True)
+        # One single row: no separate labels, every control shows its own value
+        # (a prefix or a suffix where a bare number would be ambiguous).
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(6, 3, 6, 3)
-        lay.setSpacing(6)
+        lay.setContentsMargins(4, 2, 4, 2)
+        lay.setSpacing(4)
 
-        def label(text: str) -> QLabel:
-            lbl = QLabel(text)
-            lay.addWidget(lbl)
-            return lbl
-
-        label("Cell")
         self.cell = QComboBox()
         for cw, ch in CELL_SIZES:
             self.cell.addItem(f"{cw}x{ch}")
         self.cell.addItem("Custom")
-        self.cell.setToolTip("Preset cell sizes (C / Shift+C)")
+        self.cell.setToolTip("Cell: preset sizes (C / Shift+C)")
         self.cell.currentIndexChanged.connect(self._preset_chosen)
         lay.addWidget(self.cell)
 
-        label("Size")
         self.size = QSpinBox()
         self.size.setRange(MIN_CELL_HEIGHT, MAX_CELL_HEIGHT)
         self.size.setSuffix(" px")
         self.size.setToolTip(
-            f"Height of one character in pixels, {MIN_CELL_HEIGHT} to {MAX_CELL_HEIGHT}; the width follows the font.\n"
+            f"Character height in pixels, {MIN_CELL_HEIGHT} to {MAX_CELL_HEIGHT}; the width follows the font (+ / -).\n"
             "Small: more characters, finer picture. Large: fewer, bigger characters."
         )
         self.size.valueChanged.connect(window.set_cell_height)
         lay.addWidget(self.size)
 
-        label("Tone")
+        self.charset = QComboBox()
+        self.charset.addItems(list(CHARSETS))
+        self.charset.setToolTip(
+            "Character set (K / Shift+K).\n"
+            "The first six are pure ASCII; blocks, quadrants and braille are drawn or taken from a fallback font."
+        )
+        self.charset.currentTextChanged.connect(window.set_charset)
+        lay.addWidget(self.charset)
+
+        self.font = QComboBox()
+        self.font.addItems(list(FONTS))
+        self.font.setToolTip("Font the glyphs are rasterised from (O / Shift+O)")
+        self.font.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        self.font.setMinimumContentsLength(12)
+        self.font.setMaximumWidth(170)
+        self.font.currentTextChanged.connect(window.set_font)
+        lay.addWidget(self.font)
+
         self.tone = QComboBox()
-        self.tone.addItems(["Auto", "Literal"])
-        self.tone.setToolTip("Auto: black is the space, white the densest glyph.\nLiteral: exact ink ratio.")
+        self.tone.addItems(["Auto tone", "Literal"])
+        self.tone.setToolTip("Auto: black is the space, white the densest glyph.\nLiteral: exact ink ratio (A).")
         self.tone.currentIndexChanged.connect(lambda i: window.set_auto_tone(i == 0))
         lay.addWidget(self.tone)
 
@@ -129,27 +152,29 @@ class TopBar(QWidget):
         self.negative.toggled.connect(window.set_negative)
         lay.addWidget(self.negative)
 
-        label("Hz")
-        self.fps = QComboBox()
-        self.fps.addItems([str(f) for f in FPS_CHOICES])
-        self.fps.currentIndexChanged.connect(lambda i: window.set_fps(FPS_CHOICES[i]))
-        lay.addWidget(self.fps)
-
-        label("Gamma")
         self.gamma = QDoubleSpinBox()
         self.gamma.setRange(0.2, 4.0)
         self.gamma.setSingleStep(0.1)
         self.gamma.setDecimals(2)
+        self.gamma.setPrefix("\u03b3 ")
+        self.gamma.setToolTip("Gamma: tone curve of the source, above 1 darkens (G / Shift+G)")
         self.gamma.valueChanged.connect(window.set_gamma)
         lay.addWidget(self.gamma)
 
-        label("Exposure")
         self.exposure = QDoubleSpinBox()
         self.exposure.setRange(0.1, 4.0)
         self.exposure.setSingleStep(0.1)
         self.exposure.setDecimals(2)
+        self.exposure.setPrefix("exp ")
+        self.exposure.setToolTip("Exposure: multiplies the source luminance (E / Shift+E)")
         self.exposure.valueChanged.connect(window.set_exposure)
         lay.addWidget(self.exposure)
+
+        self.fps = QComboBox()
+        self.fps.addItems([f"{f} Hz" for f in FPS_CHOICES])
+        self.fps.setToolTip("Refresh rate (R)")
+        self.fps.currentIndexChanged.connect(lambda i: window.set_fps(FPS_CHOICES[i]))
+        lay.addWidget(self.fps)
 
         self.freeze = QPushButton("Freeze")
         self.freeze.setCheckable(True)
@@ -157,10 +182,10 @@ class TopBar(QWidget):
         self.freeze.toggled.connect(window.set_frozen)
         lay.addWidget(self.freeze)
 
-        self.ghost = QPushButton("Click-through")
+        self.ghost = QPushButton("Click-thru")
         self.ghost.setCheckable(True)
         self.ghost.setToolTip(
-            "Clicks and keys go to the window underneath the canvas (T).\n"
+            "Click-through: clicks and keys go to the window underneath the canvas (T).\n"
             "This bar stays clickable: hover it to get the controls back, or press Ctrl+Alt+A."
         )
         self.ghost.toggled.connect(window.set_click_through)
@@ -178,16 +203,19 @@ class TopBar(QWidget):
 
         lay.addStretch(1)
         self.stats = QLabel("")
-        self.stats.setToolTip("cells | pipeline time | capture backend")
+        self.stats.setToolTip("columns x rows  |  glyphs in the set  |  pipeline time (the HUD, H, shows more)")
+        # Reserve the room the widest stats text can need, so the window's minimum
+        # width (derived from this bar's size hint) never squeezes the other controls.
+        self.stats.setMinimumWidth(self.stats.fontMetrics().horizontalAdvance("9999x999 · 999 · 99 ms") + 8)
         lay.addWidget(self.stats)
 
-        self.fullscreen = QPushButton("⛶")
+        self.fullscreen = QPushButton("\u26f6")
         self.fullscreen.setCheckable(True)
         self.fullscreen.setToolTip("Full screen on the current monitor (F11)")
         self.fullscreen.toggled.connect(window.set_fullscreen)
         lay.addWidget(self.fullscreen)
 
-        self.close_btn = QPushButton("✕")
+        self.close_btn = QPushButton("\u2715")
         self.close_btn.setObjectName("close")
         self.close_btn.setToolTip("Quit (Esc)")
         self.close_btn.clicked.connect(window.close)
@@ -206,13 +234,15 @@ class TopBar(QWidget):
     def refresh(self) -> None:
         w = self.window_
         widgets = (
-            self.cell, self.size, self.tone, self.invert, self.negative, self.fps, self.gamma, self.exposure,
-            self.freeze, self.ghost, self.fullscreen,
+            self.cell, self.size, self.charset, self.font, self.tone, self.invert, self.negative, self.fps,
+            self.gamma, self.exposure, self.freeze, self.ghost, self.fullscreen,
         )
         for widget in widgets:
             widget.blockSignals(True)
         self.cell.setCurrentIndex(CELL_SIZES.index(w.cell) if w.cell in CELL_SIZES else len(CELL_SIZES))
         self.size.setValue(w.cell[1])
+        self.charset.setCurrentText(w.charset)
+        self.font.setCurrentText(w.font_name)
         self.tone.setCurrentIndex(0 if w.params.auto_tone else 1)
         self.invert.setChecked(w.black_ink)
         self.negative.setChecked(w.params.negative)
@@ -221,12 +251,11 @@ class TopBar(QWidget):
         self.exposure.setValue(w.params.exposure)
         self.freeze.setChecked(w.frozen)
         self.ghost.setChecked(w.ghost)
-        self.ghost.setText("Click-through ON" if w.ghost else "Click-through")
+        self.ghost.setText("Click-thru ON" if w.ghost else "Click-thru")
         self.fullscreen.setChecked(w.isFullScreen())
         for widget in widgets:
             widget.blockSignals(False)
-        rows, cols = w.grid
-        self.stats.setText(f"{cols}x{rows}  {w.last_ms:.0f} ms  {w.capture.last_backend}")
+        self.stats.setText(w.stats_text())
 
     # The bar's empty area moves the window like a title bar.
     def mousePressEvent(self, event: QMouseEvent) -> None:  # noqa: N802
@@ -308,12 +337,18 @@ class OverlayWindow(QWidget):
         self.params.tone_weight = float(self.settings.value("tone_weight", MatchParams.tone_weight))
         self.params.auto_tone = self.settings.value("auto_tone", True, type=bool)
         self.cell: tuple[int, int] = cell_for_height(int(self.settings.value("cell_height", 16)))
+        self.charset: str = str(self.settings.value("charset", DEFAULT_CHARSET))
+        if self.charset not in CHARSETS:
+            self.charset = DEFAULT_CHARSET
+        self.font_name: str = str(self.settings.value("font", DEFAULT_FONT_NAME))
+        if self.font_name not in FONTS:
+            self.font_name = next(iter(FONTS))
         self.fps = int(self.settings.value("fps", 20))
         if self.fps not in FPS_CHOICES:
             self.fps = 20
         self.show_hud = self.settings.value("hud", False, type=bool)
 
-        self.table: GlyphTable = get_table(*self.cell)
+        self.table: GlyphTable = self._build_table()
         self.state = MatchState()
         self.capture = Capture()
         self.frozen = False
@@ -375,6 +410,8 @@ class OverlayWindow(QWidget):
         s.setValue("tone_weight", self.params.tone_weight)
         s.setValue("auto_tone", self.params.auto_tone)
         s.setValue("cell_height", self.cell[1])
+        s.setValue("charset", self.charset)
+        s.setValue("font", self.font_name)
         s.setValue("fps", self.fps)
         s.setValue("hud", self.show_hud)
         self.capture.close()
@@ -439,10 +476,16 @@ class OverlayWindow(QWidget):
         self.last_ms = (time.perf_counter() - t0) * 1000.0
         self.last_capture_ms = (t1 - t0) * 1000.0
         self.canvas.update()
-        self.bar.stats.setText(f"{cols}x{rows}  {self.last_ms:.0f} ms  {self.capture.last_backend}")
+        self.bar.stats.setText(self.stats_text())
+
+    def stats_text(self) -> str:
+        rows, cols = self.grid
+        return f"{cols}x{rows} \u00b7 {self.table.count} \u00b7 {self.last_ms:.0f} ms"
 
     def force_refresh(self) -> None:
+        """Forget the last frame and the last match: the next tick rebuilds everything."""
         self.last_frame = None
+        self.indices = None  # they index the previous glyph table, which may have changed
         self.state.reset()
         self.bar.refresh()
         self.update()
@@ -463,6 +506,9 @@ class OverlayWindow(QWidget):
 
     # ------------------------------------------------------------------ setters (bar + keys)
 
+    def _build_table(self) -> GlyphTable:
+        return get_table(*self.cell, FONTS[self.font_name], CHARSETS[self.charset])
+
     def set_cell(self, width: int, height: int) -> None:
         """Any cell size; the glyph table for it is built on first use and cached."""
         cell = (max(2, int(width)), max(MIN_CELL_HEIGHT, min(MAX_CELL_HEIGHT, int(height))))
@@ -470,8 +516,30 @@ class OverlayWindow(QWidget):
             self.bar.refresh()
             return
         self.cell = cell
-        self.table = get_table(*cell)
+        self.table = self._build_table()
         self.force_refresh()
+
+    def set_charset(self, name: str) -> None:
+        if name not in CHARSETS:
+            return
+        self.charset = name
+        self.table = self._build_table()
+        self.force_refresh()
+
+    def cycle_charset(self, step: int = 1) -> None:
+        names = list(CHARSETS)
+        self.set_charset(names[(names.index(self.charset) + step) % len(names)])
+
+    def set_font(self, name: str) -> None:
+        if name not in FONTS:
+            return
+        self.font_name = name
+        self.table = self._build_table()
+        self.force_refresh()
+
+    def cycle_font(self, step: int = 1) -> None:
+        names = list(FONTS)
+        self.set_font(names[(names.index(self.font_name) + step) % len(names)])
 
     def set_cell_height(self, height: int) -> None:
         self.set_cell(*cell_for_height(height))
@@ -498,7 +566,7 @@ class OverlayWindow(QWidget):
     def set_black_ink(self, enabled: bool) -> None:
         """Swap the display colours only: the chosen glyphs stay the same."""
         self.black_ink = bool(enabled)
-        if self.indices is not None:
+        if self.indices is not None and int(self.indices.max()) < self.table.count:
             img = render(self.indices, self.table, self.black_ink)
             self.image = QImage(img.data, img.shape[1], img.shape[0], img.shape[1], QImage.Format_Grayscale8).copy()
         self.bar.refresh()
@@ -633,6 +701,10 @@ class OverlayWindow(QWidget):
             self.copy_text()
         elif key == Qt.Key_C:
             self.cycle_cell(-1 if shift else 1)
+        elif key == Qt.Key_K:
+            self.cycle_charset(-1 if shift else 1)
+        elif key == Qt.Key_O:
+            self.cycle_font(-1 if shift else 1)
         elif key in (Qt.Key_Plus, Qt.Key_Equal):
             self.set_cell_height(self.cell[1] + 1)
         elif key in (Qt.Key_Minus, Qt.Key_Underscore):
@@ -719,6 +791,8 @@ class OverlayWindow(QWidget):
         add(f"Next preset cell size (now {self.table.cell_w}x{self.table.cell_h})", self.cycle_cell, "C")
         add("Character one pixel taller", lambda: self.set_cell_height(self.cell[1] + 1), "+")
         add("Character one pixel shorter", lambda: self.set_cell_height(self.cell[1] - 1), "-")
+        add(f"Next character set (now {self.charset})", self.cycle_charset, "K")
+        add(f"Next font (now {self.font_name})", self.cycle_font, "O")
         add("Literal ink ratio" if self.params.auto_tone else "Auto tone (black..white)", self.toggle_auto_tone, "A")
         add("Gamma +", lambda: self.step_gamma(1), "G")
         add("Gamma -", lambda: self.step_gamma(-1), "Shift+G")

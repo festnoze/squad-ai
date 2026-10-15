@@ -1,0 +1,15 @@
+#architecture-api-explorer { color:var(--foreground); }
+#architecture-api-explorer [data-diagram] { width:100%; margin:16px 0 12px; }
+#architecture-api-explorer .architecture-diagram { display:block; width:100%; }
+#architecture-api-explorer .architecture-diagram text { fill:var(--foreground); font-size:12px; font-weight:400; }
+#architecture-api-explorer .architecture-diagram .section-label { font-weight:500; }
+#architecture-api-explorer .architecture-diagram .secondary { fill:var(--muted-foreground); }
+#architecture-api-explorer .architecture-diagram .component { fill:var(--card); stroke:var(--border); stroke-width:1; }
+#architecture-api-explorer .architecture-diagram .active-component { fill:color-mix(in srgb,var(--viz-series-1) 12%,var(--card)); }
+#architecture-api-explorer .architecture-diagram .connection { fill:none; stroke:var(--border); stroke-width:1; }
+#architecture-api-explorer .architecture-diagram .active { stroke:var(--viz-series-1); stroke-width:1.5; }
+#architecture-api-explorer .architecture-diagram .dependency { stroke:var(--muted-foreground); stroke-dasharray:2 5; }
+#architecture-api-explorer .architecture-diagram .event { stroke-dasharray:7 4; }
+#architecture-api-explorer .legend-mark { display:inline-block; width:22px; height:0; border-top:2px solid var(--viz-series-1); margin-right:6px; vertical-align:middle; }
+#architecture-api-explorer .legend-mark.event { border-top-style:dashed; }
+#architecture-api-explorer .legend-mark.dependency { border-top:2px dotted var(--muted-foreground); }

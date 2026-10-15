@@ -31,6 +31,17 @@ namespace Viewpoint
     /// its sky is RenderSettings.skybox, and its camera renders the world's
     /// post-processing minus the vignette. All the studio keeps of its own is
     /// the 40 degree sun pitch PRD 14.5 asks for.
+    ///
+    /// The studio has a SECOND job since PRD_VISUAL 4.12 V-MENU-02: the level
+    /// grid's thumbnails. Same principle, one step larger - instead of the
+    /// display content of one photo it builds a WHOLE LEVEL in the same private
+    /// corner, shoots it at 160 x 90 from the spawn the player would wake at,
+    /// and tears it down. It is the same studio because it is the same promise:
+    /// a thumbnail lit, graded and skied like the level it stands for is a
+    /// picture of that level, and a thumbnail lit by anything else is a poster.
+    /// See RequestLevelThumbnail, which is the whole of that half's public
+    /// surface, and BuildThumbnailLevel, which says how a level can stand in the
+    /// studio for two frames without the running game ever noticing.
     /// </summary>
     public sealed class PhotoSnaps : MonoBehaviour
     {
@@ -181,10 +192,90 @@ namespace Viewpoint
         const int GrainCell = 2;
         const int GrainLevels = 2;
 
+        /// <summary>
+        /// PRD_VISUAL 4.12 V-MENU-02: the level grid's thumbnail, at the size
+        /// the item pins, 160 x 90. Sixteen by nine and not the square of a
+        /// polaroid, because a level thumbnail is a view of the WORLD and the
+        /// game is played in 16:9; Menu centre-crops whatever shape it gets into
+        /// a 16:9 box, so a square readback would silently lose 44 percent of
+        /// its height on the way to the button.
+        ///
+        /// Memory: 160 x 90 RGBA32 is 57.6 kB, so the whole cache of 25 is
+        /// 1.4 MB against the 18 MB of the polaroid cache. Stated here rather
+        /// than discovered later, like SnapSize's own figure above.
+        /// </summary>
+        public const int ThumbnailWidth = 160;
+        public const int ThumbnailHeight = 90;
+
+        /// <summary>
+        /// The budget V-MENU-02 accepts for the whole grid: "building all 25 for
+        /// thumbnails takes under 2 s in total at first launch". It is not a
+        /// throttle, it is a MEASUREMENT threshold: see ReportThumbnailBudget,
+        /// which times what was actually built and says in the player log
+        /// whether the full grid would fit. A budget nobody measures is a
+        /// sentence in a document, and this project has learned what those cost.
+        /// </summary>
+        const float ThumbnailBudgetSeconds = 2f;
+
+        /// <summary>
+        /// The volume layers a thumbnail camera reads: layer 0 (Default) and
+        /// nothing else.
+        ///
+        /// Deliberately NOT the studio's VolumeLayers. The vignette veto of
+        /// BuildVignetteVolume exists because a post vignette doubles with the
+        /// white polaroid frame, and a level thumbnail has no frame: it is a
+        /// small window on the world and it should be graded exactly as the
+        /// world is, vignette included. Worse, that veto is a LOCAL volume in an
+        /// 8 m box at the studio origin, while a thumbnail camera stands at the
+        /// level's spawn, which is a different distance away in every level - so
+        /// reading the PhotoStudio layer here would hand the veto to some levels
+        /// and not to others, which is the kind of difference nobody could ever
+        /// explain from the pictures.
+        /// </summary>
+        const int ThumbnailVolumeLayers = 1;
+
+        /// <summary>
+        /// Every group a level's components join, so that a level built for a
+        /// thumbnail can be taken straight back out of them (see ScrubGroups).
+        ///
+        /// The CONSTANTS and never the literals, so a rename in Groups follows
+        /// here instead of leaving a string that matches nothing. The known
+        /// maintenance cost is that a NEW group would have to be added to this
+        /// list too; the follow-up that removes the cost for good is a
+        /// Groups.RemoveAll(Component), which lives in a file this pass does not
+        /// own.
+        /// </summary>
+        static readonly string[] LevelGroups =
+        {
+            Groups.Photographable,
+            Groups.Carvable,
+            Groups.Breakable,
+            Groups.Cage,
+            Groups.Erasable,
+            Groups.Platform,
+            Groups.PlacedContent,
+            Groups.PhotoItem,
+            Groups.Battery,
+            Groups.CopyableBattery,
+            Groups.CameraItem,
+            Groups.Teleporter,
+        };
+
         static PhotoSnaps _instance;
 
         readonly Dictionary<string, Texture2D> _cache = new Dictionary<string, Texture2D>();
         readonly List<string> _queue = new List<string>();
+
+        /// The level thumbnails of V-MENU-02, and the levels still waiting for
+        /// one. Keyed by the zero based level index the menu speaks in, and kept
+        /// for the whole life of this studio, which is the whole life of the
+        /// run: the item asks for the result to be "cached for the session" and
+        /// Main builds exactly one PhotoSnaps at boot and never replaces it.
+        readonly Dictionary<int, Texture2D> _levelCache = new Dictionary<int, Texture2D>();
+        readonly List<int> _levelQueue = new List<int>();
+
+        /// Reused by ScrubGroups so that twenty-five sweeps allocate one list.
+        readonly List<MonoBehaviour> _scrubBuffer = new List<MonoBehaviour>();
 
         Camera _camera;
         Light _sun;
@@ -203,6 +294,35 @@ namespace Viewpoint
         WaitForEndOfFrame _endOfFrame;
         bool _ready;
         bool _draining;
+
+        /// The second camera and the second target, for the level thumbnails.
+        /// Built on the first request rather than in BuildStudio: every run has
+        /// a studio, only some runs open the level grid, and the polaroid path
+        /// is left exactly as it was rather than having its camera borrowed and
+        /// handed back (a restore that goes wrong once leaves every polaroid
+        /// framed like a level, which is the sort of coupling this file avoids).
+        Camera _levelCamera;
+        RenderTexture _levelTarget;
+
+        /// Set once a thumbnail render has thrown: the grid then stays text
+        /// only for the rest of the run rather than trying the same broken
+        /// build twenty-five times, and the polaroids carry on regardless.
+        bool _levelThumbnailsOff;
+
+        /// What ReportThumbnailBudget measures. _levelWork is the time spent
+        /// INSIDE this class (building the level, reading the pixels back,
+        /// tearing it down); _levelWall is the clock the player experiences,
+        /// which also contains the two frames every shot has to wait for.
+        ///
+        /// The wall clock is summed SHOT BY SHOT rather than taken from the
+        /// first shot to the last. A player who opens the grid, plays for ten
+        /// minutes and opens it again would otherwise have those ten idle
+        /// minutes counted as the cost of two pictures, and the budget line
+        /// below would report a catastrophe that never happened.
+        int _levelShots;
+        float _levelShotStart;
+        float _levelWallSeconds;
+        float _levelWorkSeconds;
 
         /// <summary>The rendered snap when it is ready, the computed thumbnail otherwise.</summary>
         public static Texture2D GetTexture(string id)
@@ -225,6 +345,55 @@ namespace Viewpoint
             {
                 _instance.Enqueue(id);
             }
+        }
+
+        /// <summary>
+        /// The thumbnail of one level for the grid of PRD_VISUAL 4.12
+        /// V-MENU-02, by its zero based index: the picture once it exists, null
+        /// while it does not, and a render queued the first time it is asked
+        /// for. The name is the one the item pins.
+        ///
+        /// POLLING IS REQUESTING, which is what makes this one method enough.
+        /// Menu binds this half of the item by reflection (appendix C.23: the
+        /// two halves are two files, and a compile-time call to a method whose
+        /// shape was still being written would take the whole game down if it
+        /// slipped a round), and it accepts either a Get / Request pair or a
+        /// single method that does both. A single method is the honest shape
+        /// here: a caller that polls every frame until a picture arrives has
+        /// already said everything a separate request would say.
+        ///
+        /// A caller may therefore call this every frame for every cell, and
+        /// does. Nothing accumulates: the queue refuses duplicates and the cache
+        /// answers straight away once a level has been shot.
+        ///
+        /// LOCKED LEVELS ARE NOT PRE-WARMED, and that is a decision rather than
+        /// an omission. The item says "cache 25 textures at first title screen",
+        /// but the studio renders exactly what it is ASKED for, and the menu
+        /// asks only for unlocked levels on purpose (a picture of a level the
+        /// player has never reached is a spoiler nobody requested). Three
+        /// reasons to leave it that way rather than pre-warm here:
+        ///   - at a first launch only level 1 is unlocked, so pre-warming would
+        ///     build twenty-four levels whose pictures are never drawn;
+        ///   - the work would land on the one frame of the game the player is
+        ///     watching an animation on, which is the very thing the menu's own
+        ///     pacing avoids;
+        ///   - the 2 s the item budgets is a budget for pictures the player
+        ///     SEES, and it is measured either way (ReportThumbnailBudget times
+        ///     what was built and projects the full twenty-five).
+        /// A run that unlocks everything therefore ends up with all 25 cached
+        /// for the session, which is the state the acceptance describes.
+        ///
+        /// Null is a supported answer forever: a headless run has no rasterizer
+        /// and never builds a studio at all, and the grid it draws is the grid
+        /// of before this tier (same strings, same twenty-five buttons).
+        /// </summary>
+        public static Texture2D RequestLevelThumbnail(int index)
+        {
+            if (_instance == null)
+            {
+                return null;
+            }
+            return _instance.LevelThumbnail(index);
         }
 
         void Awake()
@@ -301,6 +470,19 @@ namespace Viewpoint
                 Destroy(_vignetteProfile);
                 _vignetteProfile = null;
             }
+            // The thumbnail half, torn down exactly like the polaroid half
+            // above: its camera lets its target go before the target is
+            // released, and the pictures it read back belong to nobody else.
+            if (_levelCamera != null)
+            {
+                _levelCamera.targetTexture = null;
+            }
+            if (_levelTarget != null)
+            {
+                _levelTarget.Release();
+                Destroy(_levelTarget);
+                _levelTarget = null;
+            }
             foreach (KeyValuePair<string, Texture2D> entry in _cache)
             {
                 if (entry.Value != null)
@@ -310,6 +492,15 @@ namespace Viewpoint
             }
             _cache.Clear();
             _queue.Clear();
+            foreach (KeyValuePair<int, Texture2D> level in _levelCache)
+            {
+                if (level.Value != null)
+                {
+                    Destroy(level.Value);
+                }
+            }
+            _levelCache.Clear();
+            _levelQueue.Clear();
         }
 
         void BuildStudio()
@@ -608,14 +799,35 @@ namespace Viewpoint
             }
         }
 
+        /// <summary>
+        /// One queue walker for both kinds of picture, and never two.
+        ///
+        /// A polaroid and a level thumbnail share the sun, the sky, the ambient
+        /// and the fog, and a second coroutine would be free to build a level
+        /// into the studio in the middle of a polaroid's two frame exposure.
+        /// Serial, that cannot happen: one picture is finished before the next
+        /// is begun, whichever kind it is.
+        ///
+        /// Polaroids go first, always. A polaroid is the picture on an item the
+        /// player is about to pick up (gameplay PRD 6.9) and a thumbnail is a
+        /// decoration on a menu; a player who opens the grid mid run must not
+        /// push the game's own pictures behind twenty-five level builds.
+        /// </summary>
         IEnumerator Drain()
         {
             _draining = true;
-            while (_queue.Count > 0)
+            while (_queue.Count > 0 || _levelQueue.Count > 0)
             {
-                string id = _queue[0];
-                _queue.RemoveAt(0);
-                yield return RenderOne(id);
+                if (_queue.Count > 0)
+                {
+                    string id = _queue[0];
+                    _queue.RemoveAt(0);
+                    yield return RenderOne(id);
+                    continue;
+                }
+                int index = _levelQueue[0];
+                _levelQueue.RemoveAt(0);
+                yield return RenderLevelThumbnail(index);
             }
             _draining = false;
         }
@@ -662,6 +874,419 @@ namespace Viewpoint
 
             snap.name = "snap_" + id;
             _cache[id] = snap;
+        }
+
+        // ---- Level thumbnails (PRD_VISUAL 4.12 V-MENU-02) --------------------
+
+        /// <summary>The cached thumbnail, or null with a render queued.</summary>
+        Texture2D LevelThumbnail(int index)
+        {
+            Texture2D ready;
+            // Unity's == reports a destroyed texture as null, so a cache entry
+            // that somehow died is re-rendered rather than handed out as a hole.
+            if (_levelCache.TryGetValue(index, out ready) && ready != null)
+            {
+                return ready;
+            }
+            EnqueueLevel(index);
+            return null;
+        }
+
+        /// <summary>
+        /// Queues one level. Silently ignored with no studio (headless), out of
+        /// range, already rendered, already queued, or once a build has thrown.
+        /// </summary>
+        void EnqueueLevel(int index)
+        {
+            if (!_ready || _levelThumbnailsOff)
+            {
+                return;
+            }
+            if (index < 0 || index >= LevelDefs.Count)
+            {
+                return;
+            }
+            if (_levelCache.ContainsKey(index) || _levelQueue.Contains(index))
+            {
+                return;
+            }
+            _levelQueue.Add(index);
+            if (!_draining)
+            {
+                StartCoroutine(Drain());
+            }
+        }
+
+        /// <summary>
+        /// One level thumbnail: build the level in the studio, shoot it from its
+        /// own spawn, tear it down. That is the technique V-MENU-02 names, and
+        /// the rhythm is RenderOne's: two waits, because the first ends the
+        /// frame the camera was switched on in and the second guarantees a full
+        /// render of the new content landed in the target.
+        ///
+        /// The two frames are also what makes the picture COMPLETE. A level's
+        /// pieces build their visuals in Awake (the teleporter's pad, a battery's
+        /// body) or in Start (a polaroid item's picture, a block's texture seed,
+        /// which both need the position the builder gives them AFTER the object
+        /// wakes), and Start only runs on the frame after the build. Shooting in
+        /// the same frame would photograph a level with its polaroids missing.
+        /// </summary>
+        IEnumerator RenderLevelThumbnail(int index)
+        {
+            LevelDef def = LevelDefs.GetDef(index);
+            if (def == null)
+            {
+                yield break;
+            }
+
+            float started = Time.realtimeSinceStartup;
+            _levelShotStart = started;
+
+            GameObject root = BuildThumbnailLevel(index, def);
+            if (root == null)
+            {
+                yield break;
+            }
+            _levelWorkSeconds += Time.realtimeSinceStartup - started;
+
+            yield return null;
+            SettleThumbnailLevel(root);
+            yield return _endOfFrame;
+
+            FinishThumbnail(index, root);
+        }
+
+        /// <summary>
+        /// The pass that has to happen AFTER the level's Start methods and
+        /// before the shot: a second layering, and a second scrub.
+        ///
+        /// The layering is not belt and braces here, it is load bearing.
+        /// PhotoItem builds its picture in Start and puts ITSELF back on the
+        /// Interact layer while doing it (its trigger has to be found by the
+        /// interaction ray in a real level), so a polaroid item laid on
+        /// PhotoStudio at build time is back on Interact by the time the shutter
+        /// opens - culled out of the very frame it was waited for, and carrying
+        /// a trigger collider on a gameplay layer while it waits. Re-applied
+        /// here, both go away.
+        ///
+        /// The scrub is the belt: nothing registers in Start today, and the day
+        /// something does, this is where it stops being the live game's problem.
+        /// </summary>
+        void SettleThumbnailLevel(GameObject root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+            try
+            {
+                ScrubGroups(root.transform);
+                SetLayerRecursive(root.transform, Layers.PhotoStudio);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[PhotoSnaps] Level thumbnail could not be settled: " + e);
+            }
+        }
+
+        /// <summary>
+        /// Builds one level into the studio and aims the thumbnail camera at its
+        /// spawn. Returns the root that has to be torn down, or null when
+        /// nothing was built.
+        ///
+        /// THE LEVEL LEAVES THE GROUPS BEFORE ANY OTHER SCRIPT CAN SEE IT, and
+        /// that is the whole reason this is a method of its own. A level's
+        /// components register in OnEnable (PRD 15.3), so LevelBuilder.Build
+        /// puts a second teleporter, a second set of platforms and a second set
+        /// of batteries into the global registry the game plays by: with a live
+        /// level loaded that is a level counted twice, and BootTests asserts
+        /// those counts to the unit. ScrubGroups runs here, in the same
+        /// synchronous block as the build and before the first yield, so no
+        /// Update, no probe and no test ever observes a frame in which the
+        /// studio's copy is a member of anything.
+        ///
+        /// Scrubbed rather than DISABLED, for the reason the two frames above
+        /// exist: `enabled = false` would also cancel Start, and with it the
+        /// polaroid items' pictures and the blocks' texture seeds. The copy
+        /// therefore lives its two frames complete but unregistered, animating
+        /// its own ring and its own batteries and touching nothing outside
+        /// itself.
+        /// </summary>
+        GameObject BuildThumbnailLevel(int index, LevelDef def)
+        {
+            GameObject root = null;
+            try
+            {
+                EnsureLevelCamera();
+
+                root = new GameObject("LevelThumb_" + (index + 1));
+                root.layer = Layers.PhotoStudio;
+                // Under the studio itself and not under _contentRoot, which
+                // belongs to the polaroids and is emptied by ClearContent.
+                // Left at the parent's origin, so a piece placed at a design
+                // position lands at exactly the same offset from the studio as
+                // it does from the world's own level root, and the camera below
+                // can be aimed with the level's own spawn.
+                root.transform.SetParent(transform, false);
+
+                LevelBuilder.Build(root.transform, def);
+                ScrubGroups(root.transform);
+                // The snap cameras cull everything but PhotoStudio, so a single
+                // piece left on World would be a hole in the picture. Done after
+                // the build, like RenderOne does for photo content, and done
+                // AGAIN after the level's Start methods have run: see
+                // SettleThumbnailLevel, which is where the pass that matters is.
+                SetLayerRecursive(root.transform, Layers.PhotoStudio);
+
+                // The level's own first frame: the player's eye height above the
+                // spawn, the spawn's yaw, no pitch. PlayerController.Respawn
+                // poses the body from the same three numbers through the same
+                // one mirror (DesignSpace), so this is the view the player gets
+                // when the level opens rather than a view invented for a menu -
+                // which is what makes a thumbnail "recognisably that level".
+                _levelCamera.transform.localPosition =
+                    DesignSpace.ToUnity(def.Spawn) + new Vector3(0f, PlayerController.EyeHeight, 0f);
+                _levelCamera.transform.localRotation =
+                    Quaternion.Euler(0f, DesignSpace.YawToUnityDegrees(def.SpawnYaw), 0f);
+
+                // The world's light, on the studio's sun, before the shutter:
+                // the same copy RenderOne makes and for the same reason
+                // (PRD_VISUAL V-SNAP-01).
+                //
+                // A thumbnail therefore inherits the two documented differences
+                // the studio's sun already carries, and it inherits them rather
+                // than fixing them because fixing either one here would change
+                // what the POLAROIDS look like, which is a promise about
+                // placement and not a menu decoration. The sun is pitched at 40
+                // degrees where the level's is at 45 (PRD 14.5), and it casts no
+                // shadow, so a thumbnail is a shadowless picture of its level.
+                // A second light of the studio's own would double the lighting
+                // instead of replacing it, since both would share the PhotoStudio
+                // layer, so this is a follow-up for whoever owns the studio's
+                // lighting next and not a line to sneak in here.
+                SyncSunToWorld();
+                _levelCamera.enabled = true;
+                return root;
+            }
+            catch (System.Exception e)
+            {
+                // A level that cannot be built is the end of the thumbnails and
+                // of nothing else. Without this the coroutine would die with
+                // _draining stuck true, and no polaroid would ever render again
+                // for the rest of the run - a menu decoration taking the game's
+                // own pictures down with it.
+                _levelThumbnailsOff = true;
+                _levelQueue.Clear();
+                if (_levelCamera != null)
+                {
+                    _levelCamera.enabled = false;
+                }
+                if (root != null)
+                {
+                    DestroyImmediate(root);
+                }
+                Debug.LogError("[PhotoSnaps] Level thumbnails off, level " + (index + 1)
+                    + " could not be built in the studio: " + e);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Reads the shot back, tears the level down and books the time.
+        ///
+        /// DestroyImmediate and not Destroy, for the reason Main.ClearLevel
+        /// gives: Unity defers Destroy to the end of the frame, and a level left
+        /// standing for one more frame is one more frame of a second teleporter
+        /// in a studio that is about to build the next level into the same
+        /// space. Groups.Clear is NOT called here, and must not be: the registry
+        /// is global, so clearing it would empty the LIVE level the player is
+        /// paused in. This copy took itself out of the groups at build time, so
+        /// there is nothing left to clear.
+        /// </summary>
+        void FinishThumbnail(int index, GameObject root)
+        {
+            float started = Time.realtimeSinceStartup;
+            try
+            {
+                Texture2D shot = ReadBackLevel(index);
+                _levelCamera.enabled = false;
+                DestroyImmediate(root);
+
+                _levelCache[index] = shot;
+                _levelShots++;
+                _levelWorkSeconds += Time.realtimeSinceStartup - started;
+                _levelWallSeconds += Time.realtimeSinceStartup - _levelShotStart;
+                if (_levelQueue.Count == 0)
+                {
+                    ReportThumbnailBudget();
+                }
+            }
+            catch (System.Exception e)
+            {
+                _levelThumbnailsOff = true;
+                _levelQueue.Clear();
+                if (_levelCamera != null)
+                {
+                    _levelCamera.enabled = false;
+                }
+                if (root != null)
+                {
+                    DestroyImmediate(root);
+                }
+                Debug.LogError("[PhotoSnaps] Level thumbnails off, level " + (index + 1)
+                    + " could not be read back: " + e);
+            }
+        }
+
+        /// <summary>
+        /// The second camera and its 160 x 90 target, built on first use.
+        ///
+        /// Everything it shares with the polaroid camera is shared on purpose
+        /// (the PhotoStudio culling mask, the sky, HDR, MSAA, the world's
+        /// post-processing), and the three things it does not share are the
+        /// three that make it a window on a level rather than a print: the
+        /// player's own field of view instead of the placement frustum's, a
+        /// 16:9 aspect instead of a square, and the Default volume layer alone
+        /// instead of the studio's vignette veto.
+        /// </summary>
+        void EnsureLevelCamera()
+        {
+            if (_levelCamera != null)
+            {
+                return;
+            }
+
+            _levelTarget = new RenderTexture(ThumbnailWidth, ThumbnailHeight, 24, RenderTextureFormat.ARGB32);
+            _levelTarget.name = "LevelThumbTarget";
+            _levelTarget.filterMode = FilterMode.Bilinear;
+            _levelTarget.wrapMode = TextureWrapMode.Clamp;
+            // Four samples, as on the polaroid target and for the same reason
+            // (PRD_VISUAL V-PIPE-01): URP takes the sample count from the TARGET
+            // TEXTURE for a camera that renders into one. It matters more here
+            // than anywhere: at 160 x 90 a platform edge is one pixel wide, and
+            // an aliased one reads as a broken picture rather than as a level.
+            _levelTarget.antiAliasing = 4;
+            _levelTarget.Create();
+
+            GameObject cameraObject = new GameObject("LevelThumbCamera");
+            cameraObject.transform.SetParent(transform, false);
+            cameraObject.layer = Layers.PhotoStudio;
+            _levelCamera = cameraObject.AddComponent<Camera>();
+            _levelCamera.orthographic = false;
+            _levelCamera.fieldOfView = PlayerController.CameraFov;
+            _levelCamera.nearClipPlane = CameraNear;
+            // The studio's own far plane, which is beyond the player camera's:
+            // nothing the game would draw at the horizon is clipped out of a
+            // thumbnail. The player's figure is private to PlayerController, and
+            // copying the number here is exactly the drift this project has
+            // learned to refuse (README, the viewfinder square).
+            _levelCamera.farClipPlane = CameraFar;
+            _levelCamera.cullingMask = Layers.PhotoStudioMask;
+            _levelCamera.clearFlags = CameraClearFlags.Skybox;
+            _levelCamera.backgroundColor = Palette.Get("sky_horizon");
+            _levelCamera.allowHDR = true;
+            _levelCamera.allowMSAA = true;
+            _levelCamera.useOcclusionCulling = false;
+            _levelCamera.targetTexture = _levelTarget;
+            _levelCamera.aspect = (float)ThumbnailWidth / ThumbnailHeight;
+            _levelCamera.enabled = false;
+
+            UniversalAdditionalCameraData cameraData = _levelCamera.GetUniversalAdditionalCameraData();
+            cameraData.renderPostProcessing = true;
+            cameraData.volumeLayerMask = ThumbnailVolumeLayers;
+            cameraData.volumeTrigger = _levelCamera.transform;
+        }
+
+        /// <summary>
+        /// Takes every component of a freshly built studio level out of every
+        /// group it just joined. See BuildThumbnailLevel for why this runs
+        /// before the first yield and why it scrubs instead of disabling.
+        ///
+        /// Groups.Remove is silent on a member that is not there, so asking for
+        /// all twelve groups on every component is both correct and cheaper to
+        /// read than a table of which type joins which group - a table that
+        /// would be a second copy of what each component's OnEnable already
+        /// says, free to drift from it.
+        /// </summary>
+        void ScrubGroups(Transform root)
+        {
+            root.GetComponentsInChildren(true, _scrubBuffer);
+            for (int i = 0; i < _scrubBuffer.Count; i++)
+            {
+                MonoBehaviour member = _scrubBuffer[i];
+                if (member == null)
+                {
+                    continue;
+                }
+                for (int g = 0; g < LevelGroups.Length; g++)
+                {
+                    Groups.Remove(member, LevelGroups[g]);
+                }
+            }
+            _scrubBuffer.Clear();
+        }
+
+        /// <summary>
+        /// The thumbnail readback. No print finish: PaintPolaroidPrint's grain,
+        /// black lift, vignette and hairline describe a PAPER PRINT of a
+        /// placement, and a level thumbnail is a window on a level, shown on a
+        /// menu button with no white frame around it.
+        /// </summary>
+        Texture2D ReadBackLevel(int index)
+        {
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = _levelTarget;
+            Texture2D shot = new Texture2D(ThumbnailWidth, ThumbnailHeight, TextureFormat.RGBA32, false);
+            shot.ReadPixels(new Rect(0f, 0f, ThumbnailWidth, ThumbnailHeight), 0, 0, false);
+            RenderTexture.active = previous;
+            shot.wrapMode = TextureWrapMode.Clamp;
+            shot.filterMode = FilterMode.Bilinear;
+            shot.name = "level_thumb_" + (index + 1);
+            shot.Apply(false, false);
+            return shot;
+        }
+
+        /// <summary>
+        /// What the thumbnails actually cost, in the player's log, every time
+        /// the queue empties. This is V-MENU-02's "under 2 s in total at first
+        /// launch" turned into evidence instead of a hope.
+        ///
+        /// Two clocks, because they answer two different questions. The WORK is
+        /// what this class spends building levels and reading pixels, and it is
+        /// the number a future change to LevelBuilder would move. The WALL is
+        /// what the player waits, and it is dominated by the two frames every
+        /// shot has to wait for: twenty-five levels cannot arrive in less than
+        /// fifty frames, which is 0.8 s at 60 Hz whatever the work costs.
+        ///
+        /// The projection to the full grid is an extrapolation from the levels
+        /// actually built, and it is deliberately pessimistic in one way and
+        /// optimistic in another: the FIRST level pays for every shared material
+        /// and decal texture the builder caches, while a run that has unlocked
+        /// two levels says nothing about the twenty-five level case beyond an
+        /// average. It is a smoke alarm, not a benchmark, and it is the only one
+        /// a player run can produce without building levels nobody asked for.
+        /// </summary>
+        void ReportThumbnailBudget()
+        {
+            if (_levelShots <= 0)
+            {
+                return;
+            }
+            int total = LevelDefs.Count;
+            float projected = (_levelWallSeconds / _levelShots) * total;
+            string line = "[PhotoSnaps] Level thumbnails: " + _levelShots + " of " + total
+                + " in " + _levelWallSeconds.ToString("0.000") + " s wall, "
+                + _levelWorkSeconds.ToString("0.000") + " s of it building and reading back; all "
+                + total + " would be about " + projected.ToString("0.000") + " s (V-MENU-02 budget "
+                + ThumbnailBudgetSeconds.ToString("0.0") + " s).";
+            if (projected > ThumbnailBudgetSeconds)
+            {
+                Debug.LogWarning(line + " Over budget.");
+            }
+            else
+            {
+                Debug.Log(line);
+            }
         }
 
         Texture2D ReadBack(string id)

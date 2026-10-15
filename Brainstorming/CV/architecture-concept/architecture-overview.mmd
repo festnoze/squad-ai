@@ -1,0 +1,45 @@
+flowchart TB
+  C["Frontend web / mobile / back-office"] --> E["Reverse proxy / WAF / API Gateway"]
+  E --> API["Tier 1 · Façade API / DTO / contrôleurs / streaming"]
+  subgraph APP["Tier 2 · Application"]
+    CLASSIC["Services API classiques / cas d’usage"]
+    GRAPH["Workflow agentique / superviseur / conditions"]
+    AGENTS["Recherche / analyse / synthèse / relecture"]
+    CAPS["Skills / tools / échanges / état partagé"]
+    PORTS["Ports LLM / prompts / cache / mémoire / traces / persistance"]
+    GRAPH --> AGENTS --> CAPS --> PORTS
+  end
+  API --> CLASSIC
+  API --> GRAPH
+  DOMAIN["Tier 3 · Domaine / agrégats / règles / événements"]
+  CLASSIC --> DOMAIN
+  CLASSIC --> PORTS
+  subgraph INFRA["Tier 4 · Infrastructure : adaptateurs internes ET services externes"]
+    AD["Adaptateurs : repositories / ORM / clients LLM / checkpointer / tools / Langfuse"]
+    DATA[("BDD / cache applicatif / checkpoints / base vectorielle")]
+    LLM["LLM / embeddings / LLM évaluateur"]
+    CACHE["Cache de réponses LLM / cache local de prompts / hit-miss / versions"]
+    subgraph LF["Langfuse · un service, plusieurs capacités"]
+      PROMPTS["Prompts / versions / labels"]
+      TRACES["Traces / générations / sessions / scores"]
+      EVAL["Datasets / expériences / évaluations / feedback"]
+    end
+    EXT["Recherche / fichiers / identité / paiement / notifications / broker"]
+    OPS["Métriques / logs / dashboards / alertes"]
+    AD --> DATA
+    AD --> CACHE
+    AD --> LLM
+    AD --> PROMPTS
+    AD --> TRACES
+    AD --> EXT
+    TRACES --> EVAL
+    EVAL -->|LLM-as-judge| LLM
+    CACHE -->|miss| LLM
+    PROMPTS -->|version dans la clé| CACHE
+  end
+  PORTS --> AD
+  AD -. implémente .-> PORTS
+  PIPE["CI/CD · tests / images / staging / régressions"] --> RUN["Orchestrateur / réplicas API / workers / secrets / IaC"]
+  RUN -->|héberge| API
+  EVAL -->|résultats de régression| PIPE
+  API -->|télémétrie| AD

@@ -615,6 +615,19 @@ namespace Viewpoint
 
             _label.font = font;
 
+            // WITHOUT THIS THE LABEL DRAWS IN HAIRLINES. Manrope.ttf is a
+            // variable font whose DEFAULT INSTANCE is ExtraLight (OS/2
+            // usWeightClass 200), and the legacy font importer has no axis
+            // support, so a TextMesh that only sets .font inherits weight 200.
+            // In world space, at this size and against a pale sky, that is
+            // barely a mark. Fonts.StyleFor gives the synthesised weight the
+            // interface was designed around, and answers Regular for the
+            // fallback font so a checkout without Manrope is not made bold.
+            //
+            // It lives here rather than in Fonts.Apply because this label is a
+            // TextMesh, not a uGUI Text, and cannot go through Apply at all.
+            _label.fontStyle = Fonts.StyleFor(TextWeight.Regular);
+
             // Same guard as the font itself, one level down: handing the
             // renderer a null material would draw the label in the error shader
             // (or in nothing at all), which is strictly worse than leaving it

@@ -252,6 +252,14 @@ namespace Viewpoint
         /// </summary>
         VolumeProfile _dioramaBlurProfile;
 
+        /// <summary>
+        /// The Volume that reads that profile. Held for the teardown alone: it
+        /// has to be unhooked from the profile before the profile is destroyed,
+        /// and finding it again through the hierarchy at OnDestroy would mean
+        /// walking a subtree Unity may already have taken apart.
+        /// </summary>
+        Volume _dioramaBlurVolume;
+
         static GameState State
         {
             get { return GameState.Instance; }
@@ -344,6 +352,14 @@ namespace Viewpoint
                 postObject.transform.SetParent(transform, false);
                 PostFx = postObject.AddComponent<PostFx>();
             });
+
+            // After PostFx and isolated for the same reason: the diorama is a
+            // decoration of the title screen, nothing above depends on it, and
+            // a checkout where it throws must still reach a playable game. On
+            // that failure MenuDiorama stays null, DriveMenuDiorama holds
+            // MenuDioramaShowing at false, and the menu keeps the strong dim it
+            // had before this item.
+            Step("menu diorama", BuildMenuDiorama);
         }
 
         static void Step(string what, Action build)
@@ -399,6 +415,23 @@ namespace Viewpoint
                 Menu.LevelSelected -= StartAt;
             }
             UnsubscribeTeleporter();
+
+            // A ScriptableObject made with CreateInstance has no owner and is
+            // not collected on its own, so the blur profile has to be let go by
+            // hand (PhotoSnaps does the same with its vignette veto). The
+            // Volume is cleared FIRST: component destruction order is not
+            // guaranteed, and a Volume left holding a destroyed profile is read
+            // by the volume manager on its way out.
+            if (_dioramaBlurVolume != null)
+            {
+                _dioramaBlurVolume.sharedProfile = null;
+                _dioramaBlurVolume = null;
+            }
+            if (_dioramaBlurProfile != null)
+            {
+                Destroy(_dioramaBlurProfile);
+                _dioramaBlurProfile = null;
+            }
         }
 
         // ---- Frame ----------------------------------------------------------
@@ -444,6 +477,11 @@ namespace Viewpoint
                 // treatment: none of them describes a world the player is in.
                 DrivePostFx(false, false);
             }
+
+            // Last, and from the SAME Menu.Mode this method has already read
+            // twice: that is the whole reason the diorama has no Show call of
+            // its own (see the note on MenuDiorama). One read, one decision.
+            DriveMenuDiorama();
         }
 
         /// <summary>
@@ -817,6 +855,461 @@ namespace Viewpoint
         {
             Cursor.lockState = captured ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !captured;
+        }
+
+        // ---- Menu diorama (PRD_VISUAL 4.12 V-MENU-01) -----------------------
+
+        /// <summary>
+        /// Turns the diorama, and decides whether it is on screen at all, from
+        /// the Menu.Mode that Update has already read. There is no Show call
+        /// and no setter for the menu to reach for, which is the point: the two
+        /// halves of this item cannot disagree about whether a title screen is
+        /// up, because there is only one read.
+        ///
+        /// SWITCHED OFF THE FRAME THE MENU LEAVES THE TITLE, and that timing is
+        /// deliberate rather than convenient. The diorama camera clears to the
+        /// sky and sits at depth 1, so while it is on it OVERDRAWS the whole
+        /// frame: letting it linger through Menu's 0.2 s fade out (V-MENU-04)
+        /// would hold a picture of three islands over a level the player has
+        /// already started. The overlay fading off a live level is exactly what
+        /// that item describes. Coming the other way there is nothing to time:
+        /// the diorama appears on the frame the menu begins fading IN, under a
+        /// dim Menu is crossing from 0.82 to 0.42 over 0.25 s.
+        ///
+        /// Pause is absent from the test on purpose. V-MENU-01: "Pause keeps
+        /// the live level behind a stronger dim (it is where the player is)."
+        ///
+        /// UNSCALED TIME, like Menu's own transitions: a menu that stopped
+        /// turning because something set Time.timeScale would read as a freeze.
+        /// The angle is accumulated in a float of its own rather than read back
+        /// off the transform, so 2 degrees per second stays a RATE instead of
+        /// becoming a sum of quaternion rounding over a long title screen.
+        /// </summary>
+        void DriveMenuDiorama()
+        {
+            if (MenuDiorama == null)
+            {
+                MenuDioramaShowing = false;
+                return;
+            }
+
+            bool showing = Menu != null
+                && (Menu.Mode == MenuMode.Title || Menu.Mode == MenuMode.Victory);
+            MenuDioramaShowing = showing;
+
+            if (MenuDiorama.gameObject.activeSelf != showing)
+            {
+                MenuDiorama.gameObject.SetActive(showing);
+            }
+
+            if (!showing || _dioramaTable == null)
+            {
+                return;
+            }
+
+            _dioramaSpinDegrees = Mathf.Repeat(
+                _dioramaSpinDegrees + (DioramaSpinDegreesPerSecond * Time.unscaledDeltaTime),
+                360f);
+            _dioramaTable.localRotation = Quaternion.Euler(0f, _dioramaSpinDegrees, 0f);
+        }
+
+        /// <summary>
+        /// Builds the little world the title and victory screens float over.
+        ///
+        /// This is the half the constants at the top of this file were waiting
+        /// for. They were committed together with the three public properties
+        /// and no builder at all, which is appendix C.23 ("une moitie d'item ne
+        /// trouve jamais son autre moitie") happening again, and nothing could
+        /// catch it: an unread private const and a never-assigned auto-property
+        /// are both silent to the compiler. Menu.cs had already landed its half,
+        /// reading MenuDioramaShowing to choose between a 0.42 dim and the 0.82
+        /// pause dim, so until this method ran that lighter branch was
+        /// unreachable and the title screen was what it had always been, a flat
+        /// dim over the live sky.
+        ///
+        /// WHY THIS IS NOT LevelBuilder.Build. V-MENU-01 asks for a scene
+        /// "built from the same builders as a level", and what that buys is the
+        /// same VOCABULARY: beveled slabs with the paved lip of V-GEO-04, the
+        /// tapered rock masses of V-GEO-02, the teleporter's pad and floating
+        /// ring, the polaroid's rounded frame, and the one palette all of them
+        /// are coloured out of. The level builder ITSELF cannot be used, and
+        /// not for want of wanting to. LevelBuilder exposes exactly one public
+        /// entry point, Build(Transform, LevelDef): it registers everything it
+        /// makes in the static Groups registry, gives its blocks colliders, and
+        /// returns a live Teleporter carrying a trigger and a departure event.
+        /// Groups is what ClearLevel wipes on every level load and what
+        /// BootTests counts to the unit against the level data, so a diorama
+        /// built through it would be counted as part of whatever level is in
+        /// play and would lose its own registrations the first time the player
+        /// pressed start. Its Add* helpers are all private, and LevelBuilder.cs
+        /// is not this pass's file to change. So the props below are assembled
+        /// from ProceduralMeshes and Materials, which is what those helpers are
+        /// themselves made of.
+        ///
+        /// NOTHING HERE CARRIES A COLLIDER, which is the invariant the
+        /// DioramaLayer note at the top of this file leans on: row 10 of the
+        /// collision matrix pairs with World and Player, and that file belongs
+        /// to someone else, so the diorama stays out of physics by having no
+        /// physics to be in. Every object below is made with new GameObject and
+        /// never with GameObject.CreatePrimitive, which is the call that would
+        /// hand one out behind the caller's back.
+        ///
+        /// THE ROOT IS SWITCHED OFF BEFORE ITS CHILDREN EXIST. A Volume
+        /// registers with the volume manager when it is ENABLED, and a Camera
+        /// renders as soon as it is: building into a live root would put one
+        /// frame of a title screen on the screen during Awake and leave the
+        /// blur in every camera's stack until the first Update took it away.
+        /// Under an inactive parent neither ever wakes, so neither has to be
+        /// undone.
+        /// </summary>
+        void BuildMenuDiorama()
+        {
+            var rootObject = new GameObject("MenuDiorama");
+            rootObject.layer = DioramaLayer;
+            rootObject.SetActive(false);
+            rootObject.transform.SetParent(transform, false);
+            rootObject.transform.localPosition = DioramaOrigin;
+            MenuDiorama = rootObject.transform;
+
+            // The turning half. The camera and the blur are children of the
+            // ROOT and hold still, so the sky and its sun disc stay put behind
+            // a scene on a turntable rather than swinging with it.
+            _dioramaTable = NewDioramaObject("Table", MenuDiorama, Vector3.zero).transform;
+
+            BuildDioramaContent();
+            BuildDioramaCamera();
+            BuildDioramaBlur();
+        }
+
+        /// <summary>
+        /// The three islands and what stands on them.
+        ///
+        /// The numbers live here as locals rather than up with the constants at
+        /// the top of the file, and the split is by SCOPE: those are read by
+        /// the camera, the blur and the spin, in three different methods, while
+        /// every number below is used once, here.
+        ///
+        /// THE FRAMING IS THE CONSTRAINT AND THE TABLE TURNS. DioramaFovDegrees
+        /// records a bounding radius of 7.5 m against a half width of 8.2 m at
+        /// the eye's distance, and a turntable means that radius has to hold at
+        /// every angle rather than at the one a layout was composed from. The
+        /// furthest corner below is 7.4 m from the axis.
+        ///
+        /// THE THREE SIT AT THREE HEIGHTS, and that is the difference between a
+        /// place and a diagram: three slabs on one plane read as a floor plan.
+        /// Staggered, their rock masses overlap and part again as the table
+        /// turns, and the scene says what a level in this game actually is,
+        /// islands hanging over an abyss. The spread is kept inside the band the
+        /// shading is tuned for: Viewpoint/Surface's height fog thickens below
+        /// y = 2 and saturates 12 m down, so the lowest rock here (-3.4 m)
+        /// picks up the same haze a level's does and no more.
+        ///
+        /// ONE THING THE TURNTABLE COSTS, said out loud rather than left to be
+        /// discovered on a frame: Viewpoint/Surface samples its maps triplanar
+        /// from WORLD position, so a surface that rotates has its grain slide
+        /// across it instead of travelling with it. At 2 degrees per second
+        /// that is 26 cm a second at the outermost corner and 14 on the main
+        /// island: a slow, uniform creep in the stone, not a swim. The two ways
+        /// out were both worse. Sampling in object space is a change to a
+        /// shader this pass does not own. Orbiting the CAMERA instead would
+        /// nail the grain down and swing the sky and its sun disc across the
+        /// frame in exchange, which is the trade the note on _dioramaTable
+        /// already refused, and a moving sun behind a static title is the more
+        /// expensive artefact of the two.
+        /// </summary>
+        void BuildDioramaContent()
+        {
+            var mainSize = new Vector3(5.4f, 0.45f, 4.6f);
+            var mainCentre = new Vector3(0.4f, 0f, -0.3f);
+            BuildDioramaIsland("MainIsland", mainSize, mainCentre, 0x5EED01);
+            BuildDioramaTeleporter(
+                mainCentre + new Vector3(0f, mainSize.y * 0.5f, 0f));
+
+            var westSize = new Vector3(3.8f, 0.4f, 3.2f);
+            var westCentre = new Vector3(-4.6f, -1.15f, 1.9f);
+            BuildDioramaIsland("WestIsland", westSize, westCentre, 0x5EED02);
+            // Turned off axis so the two prints are never edge on together: one
+            // faces the eye while the other shows its paper, and the turntable
+            // trades them every ninety seconds.
+            BuildDioramaPolaroid(
+                "WestPolaroid",
+                westCentre + new Vector3(0.2f, westSize.y * 0.5f, -0.3f),
+                -22f);
+
+            var eastSize = new Vector3(3.2f, 0.4f, 2.8f);
+            var eastCentre = new Vector3(4.3f, 1.05f, -2.2f);
+            BuildDioramaIsland("EastIsland", eastSize, eastCentre, 0x5EED03);
+            BuildDioramaPolaroid(
+                "EastPolaroid",
+                eastCentre + new Vector3(-0.1f, eastSize.y * 0.5f, 0.4f),
+                18f);
+        }
+
+        /// <summary>
+        /// A slab with a rock mass under it, the pair of V-GEO-02 and V-GEO-04.
+        ///
+        /// Both meshes are built at their REAL size and drawn at unit scale,
+        /// never as a scaled primitive, for the reason LevelBuilder's own skirt
+        /// states: Viewpoint/Surface samples its maps triplanar from world
+        /// position, and a non-uniform scale skews the normals, which breaks
+        /// the lighting and the triplanar blend together.
+        ///
+        /// The skirt hangs from the slab's UNDERSIDE and its transform origin is
+        /// the TOP of the mass, which is the contract IslandSkirt states and the
+        /// anchor the Rock style measures its fade to the abyss from. The depth
+        /// rule is LevelBuilder's, repeated rather than shared because its
+        /// method is private: 55 percent of the wide span, capped by the narrow
+        /// one so an elongated slab gets a mass and not a fin (appendix C.19).
+        /// </summary>
+        void BuildDioramaIsland(string name, Vector3 size, Vector3 centre, int seed)
+        {
+            GameObject slab = NewDioramaObject(name, _dioramaTable, centre);
+            // 2.5 cm of ordinary chamfer and 6 cm of paved lip on the four top
+            // edges: the two numbers V-GEO-04 pins, and the ones every platform
+            // in a level is built with.
+            slab.AddComponent<MeshFilter>().sharedMesh =
+                ProceduralMeshes.BeveledBox(size, 0.025f, 0.06f);
+            slab.AddComponent<MeshRenderer>().sharedMaterial = Materials.Solid("platform");
+
+            GameObject skirt = NewDioramaObject(
+                "Skirt", slab.transform, new Vector3(0f, -size.y * 0.5f, 0f));
+            float span = Mathf.Max(size.x, size.z);
+            float depth = Mathf.Clamp(
+                Mathf.Min(span * 0.55f, Mathf.Min(size.x, size.z)), 1.5f, 9f);
+            skirt.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.IslandSkirt(
+                new Vector3(size.x * 0.94f, size.y, size.z * 0.94f), depth, seed);
+            skirt.AddComponent<MeshRenderer>().sharedMaterial = Materials.Solid("platform_side");
+        }
+
+        /// <summary>
+        /// The teleporter of the main island, at the radii the real one uses
+        /// (Teleporter's pad is 1.3 to 1.5, its ring 1.05 to 1.25), so the shape
+        /// a player will meet in level 1 is the shape the title screen showed
+        /// them.
+        ///
+        /// IT IS SHOWN CHARGED. The ring is the one emissive in this scene and
+        /// it is what gives the title screen the game's own bloom: the threshold
+        /// is 1.05 in HDR (V-POST-01), so only a value above 1 crosses it, and
+        /// the ring's 2.2 multiplier on a pale blue clears it while the pad,
+        /// the slabs and the prints stay under. An idle teleporter at 0.15 would
+        /// have crossed nothing and the picture would have had no light in it at
+        /// all. Nothing here charges or discharges: there is no Teleporter
+        /// component, no battery and no trigger, only the look.
+        /// </summary>
+        void BuildDioramaTeleporter(Vector3 standOn)
+        {
+            GameObject pad = NewDioramaObject(
+                "Teleporter", _dioramaTable, standOn + new Vector3(0f, 0.11f, 0f));
+            pad.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.Rod(1.4f, 0.22f, 24);
+            pad.AddComponent<MeshRenderer>().sharedMaterial = Materials.Solid("teleporter");
+
+            GameObject track = NewDioramaObject(
+                "TeleporterTrack", _dioramaTable, standOn + new Vector3(0f, 0.025f, 0f));
+            track.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.Ring(1.72f, 1.92f, 0.05f);
+            track.AddComponent<MeshRenderer>().sharedMaterial =
+                Materials.Solid("teleporter_ring", 1.4f);
+
+            GameObject ring = NewDioramaObject(
+                "TeleporterRing", _dioramaTable, standOn + new Vector3(0f, 1.35f, 0f));
+            ring.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.Torus(1.05f, 1.25f);
+            ring.AddComponent<MeshRenderer>().sharedMaterial =
+                Materials.Solid("teleporter_ring", 2.2f);
+        }
+
+        /// <summary>
+        /// An instant print on a post.
+        ///
+        /// THE PROPORTIONS ARE PhotoItem'S, ENLARGED. Its frame is 0.72 by 0.82
+        /// with a 0.62 by 0.588 window, which is a Polaroid 600 to within a
+        /// percent; every number below is that shape times 1.5. The scale is
+        /// the one liberty this prop takes and it is taken with eyes open: a
+        /// life-sized print is 72 cm across at 15 m through a 34 degree lens,
+        /// which is about thirty pixels of a 1080 frame and reads as a speck.
+        /// The RATIOS are untouched, so it is still unmistakably the object the
+        /// game hands the player, the way a display model is.
+        ///
+        /// THE PICTURE IS A BACKDROP GRADIENT AND NOT A RENDER. Materials
+        /// .Backdrop is the sky-over-ground ramp this game already paints the
+        /// backdrop of a placed photo with, so the window reads as a landscape
+        /// at this distance without the diorama having to own a render target,
+        /// a queue or a second studio. Nothing in this scene is photographable
+        /// and nothing here may reach into PhotoSnaps, whose camera and cache
+        /// belong to the level in play.
+        ///
+        /// The quad goes on the frame's -z side, because that is the side
+        /// ProceduralMeshes.Quad faces (its normal is 0, 0, -1). Two details of
+        /// how it is fitted are PhotoItem's and are copied rather than
+        /// improvised, because getting either wrong is visible at a glance.
+        /// It is BIGGER than the window by a 2 cm tuck on every side and sits
+        /// INSIDE the slab, 3 mm behind the face: a picture exactly the size of
+        /// the hole leaves a hairline of background around itself, and one
+        /// placed in front of the face covers the paper it is meant to be
+        /// mounted behind. And its height is asked of
+        /// RoundedFrameApertureCenterY rather than recomputed, because an
+        /// instant print's border is wider at the BOTTOM, so the window is not
+        /// centred on the frame and a picture that assumed it was would sit
+        /// visibly low in the paper.
+        /// </summary>
+        void BuildDioramaPolaroid(string name, Vector3 standOn, float yawDegrees)
+        {
+            const float Scale = 1.5f;
+            const float PostHeight = 0.9f;
+            var outer = new Vector2(0.72f * Scale, 0.82f * Scale);
+            var inner = new Vector2(0.62f * Scale, 0.588f * Scale);
+            const float Thickness = 0.035f * Scale;
+            const float PaperTuck = 0.02f * Scale;
+            const float PictureRecess = 0.003f * Scale;
+
+            GameObject post = NewDioramaObject(
+                name + "Post", _dioramaTable, standOn + new Vector3(0f, PostHeight * 0.5f, 0f));
+            post.AddComponent<MeshFilter>().sharedMesh =
+                ProceduralMeshes.Rod(0.045f, PostHeight, 8);
+            post.AddComponent<MeshRenderer>().sharedMaterial = Materials.Solid("stone");
+
+            GameObject frame = NewDioramaObject(
+                name,
+                _dioramaTable,
+                standOn + new Vector3(0f, PostHeight + (outer.y * 0.5f), 0f));
+            frame.transform.localRotation = Quaternion.Euler(0f, yawDegrees, 0f);
+            frame.AddComponent<MeshFilter>().sharedMesh =
+                ProceduralMeshes.RoundedFrame(outer, inner, 0.018f * Scale, Thickness);
+            frame.AddComponent<MeshRenderer>().sharedMaterial = Materials.Solid("frame");
+
+            GameObject picture = NewDioramaObject(
+                name + "Picture",
+                frame.transform,
+                new Vector3(
+                    0f,
+                    ProceduralMeshes.RoundedFrameApertureCenterY(outer, inner),
+                    -((Thickness * 0.5f) - PictureRecess)));
+            picture.AddComponent<MeshFilter>().sharedMesh = ProceduralMeshes.Quad(
+                new Vector2(inner.x + (PaperTuck * 2f), inner.y + (PaperTuck * 2f)));
+            picture.AddComponent<MeshRenderer>().sharedMaterial =
+                Materials.Backdrop("sky_top", "platform");
+        }
+
+        /// <summary>
+        /// The second camera of V-MENU-01.
+        ///
+        /// A CHILD OF THE ROOT AND NOT OF THE TABLE, so the orbit is the world
+        /// turning under a still eye rather than an eye flying around a world.
+        /// That costs one transform write a frame (the table's) instead of a
+        /// position and a rotation, and it keeps the sky and its sun disc put:
+        /// a camera on the turntable would swing the whole sky with it and the
+        /// scene would read as spinning rather than as being circled.
+        ///
+        /// IT IS LEFT UNTAGGED. PlayerController tags its own camera MainCamera
+        /// and Teleporter's billboards ask Camera.main for it every level, so a
+        /// second camera claiming that tag would point the labels of the level
+        /// in play at an eye 1200 m away.
+        /// </summary>
+        void BuildDioramaCamera()
+        {
+            GameObject cameraObject = NewDioramaObject(
+                "DioramaCamera", MenuDiorama, DioramaEyePosition);
+            cameraObject.transform.localRotation = Quaternion.LookRotation(
+                DioramaEyeTarget - DioramaEyePosition, Vector3.up);
+
+            Camera cam = cameraObject.AddComponent<Camera>();
+            cam.orthographic = false;
+            cam.fieldOfView = DioramaFovDegrees;
+            cam.nearClipPlane = DioramaNear;
+            cam.farClipPlane = DioramaFar;
+            cam.cullingMask = DioramaMask;
+            cam.depth = DioramaCameraDepth;
+            // Skybox, so the game's own gradient sky is the background rather
+            // than a flat fill: RenderSettings.skybox is global and resolved at
+            // render time, so this picks up whatever the environment installed.
+            // The background colour is the fallback for a frame taken before it
+            // did, and it is the horizon of that same sky.
+            cam.clearFlags = CameraClearFlags.Skybox;
+            cam.backgroundColor = Palette.Get("sky_horizon");
+            // Without HDR the ring's emission is clamped to white before the
+            // bloom ever sees it, and a threshold of 1.05 would then catch
+            // nothing at all: see BuildDioramaTeleporter.
+            cam.allowHDR = true;
+            cam.allowMSAA = true;
+            cam.useOcclusionCulling = false;
+
+            UniversalAdditionalCameraData cameraData = cam.GetUniversalAdditionalCameraData();
+            cameraData.renderPostProcessing = true;
+            // Default plus this layer: the game's grading and bloom come from
+            // the two default profiles, which apply to every camera whatever
+            // its mask, and the blur below comes from this layer. What the mask
+            // KEEPS OUT is PostFx's four bands, which sit on Layers.Player. A
+            // title screen must not inherit a rewind's desaturation or the
+            // motion blur of the fall that ended the last run.
+            cameraData.volumeLayerMask = DioramaVolumeLayers;
+            cameraData.volumeTrigger = cam.transform;
+
+            MenuDioramaCamera = cam;
+        }
+
+        /// <summary>
+        /// The depth of field V-MENU-01 asks for behind the text.
+        ///
+        /// GLOBAL, so it needs no trigger collider: a local Volume is decided by
+        /// measuring the camera against the volume's OWN colliders, and this
+        /// subtree carries none by design. Being global costs nothing here,
+        /// because it is on a layer only this camera reads.
+        ///
+        /// Both halves of every override are written. A value set with
+        /// overrideState left false does nothing whatsoever and looks exactly
+        /// like a value that was set, which is the trap PostFx's class comment
+        /// spells out at length.
+        /// </summary>
+        void BuildDioramaBlur()
+        {
+            GameObject volumeObject = NewDioramaObject("DioramaBlur", MenuDiorama, Vector3.zero);
+
+            _dioramaBlurProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+            _dioramaBlurProfile.name = "DioramaBlur";
+
+            // Added with no overrides, then armed one parameter at a time, so
+            // this profile carries only what it means to change and everything
+            // else keeps coming from the two default profiles.
+            DepthOfField dof = _dioramaBlurProfile.Add<DepthOfField>(false);
+            // Written even though it defaults to true: a component with active
+            // false is skipped by the volume manager in complete silence.
+            dof.active = true;
+            OverrideDioramaParameter(dof.mode, DepthOfFieldMode.Gaussian);
+            OverrideDioramaParameter(dof.gaussianStart, DioramaBlurStart);
+            OverrideDioramaParameter(dof.gaussianEnd, DioramaBlurEnd);
+            OverrideDioramaParameter(dof.gaussianMaxRadius, DioramaBlurRadius);
+
+            _dioramaBlurVolume = volumeObject.AddComponent<Volume>();
+            _dioramaBlurVolume.isGlobal = true;
+            _dioramaBlurVolume.priority = DioramaBlurPriority;
+            _dioramaBlurVolume.weight = 1f;
+            _dioramaBlurVolume.sharedProfile = _dioramaBlurProfile;
+        }
+
+        /// <summary>
+        /// Writes a volume parameter's value AND arms it, through the property
+        /// rather than the backing field, so a clamped parameter clamps. This is
+        /// PostFx.Override, and it is repeated rather than shared because that
+        /// one is private and PostFx.cs is not this pass's file.
+        /// </summary>
+        static void OverrideDioramaParameter<T>(VolumeParameter<T> parameter, T value)
+        {
+            parameter.overrideState = true;
+            parameter.value = value;
+        }
+
+        /// <summary>
+        /// A bare object on the diorama layer. The layer is set BEFORE anything
+        /// is parented or added to it, as everywhere else in this project: a
+        /// Volume registers with the volume manager under the layer its object
+        /// carries at the instant it is enabled, and a camera culls by the
+        /// layers its children carry when it renders.
+        /// </summary>
+        static GameObject NewDioramaObject(string name, Transform parent, Vector3 localPosition)
+        {
+            var go = new GameObject(name);
+            go.layer = DioramaLayer;
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPosition;
+            return go;
         }
 
         // ---- Probes ---------------------------------------------------------
