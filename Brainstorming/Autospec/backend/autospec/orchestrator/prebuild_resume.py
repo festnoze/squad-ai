@@ -12,9 +12,10 @@ import hashlib
 import json
 import math
 import os
+import re
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from ..config import settings
@@ -216,6 +217,91 @@ def start(pipeline, *, explicit_request: bool = False) -> None:
     pipeline._task = asyncio.create_task(run(pipeline, ticket))
 
 
+def _current_journal_row(journal: dict, pipeline, ticket) -> dict:
+    receipt = ticket.get("receipt") if isinstance(ticket, dict) else None
+    continuation_id = receipt.get("continuation_id") if isinstance(receipt, dict) else None
+    if (not isinstance(continuation_id, str) or not continuation_id
+            or receipt.get("project_id") != pipeline.state.id
+            or receipt.get("explicit_request") is not True
+            or pipeline.state.generation_checkpoint.get("continuation_id") != continuation_id):
+        raise ValueError("Identité de continuation PLAN invalide.")
+    rows = [row for row in journal["attempts"]
+            if row.get("continuation_id") == continuation_id]
+    if (len(rows) != 1 or rows[0].get("outcome") != "UNKNOWN"
+            or rows[0].get("project_id") != pipeline.state.id
+            or rows[0].get("explicit_request") is not True):
+        raise ValueError("Continuation PLAN absente ou déjà réconciliée.")
+    return rows[0]
+
+
+def plan_maker_correction_attempts_used(pipeline, ticket) -> int:
+    """Count every durable correction intent; UNKNOWN consumes the sole turn."""
+    path = _journal_path(pipeline.state)
+    with file_lock(path.with_suffix(".lock")):
+        journal = _read_journal(path)
+        _current_journal_row(journal, pipeline, ticket)
+        used = 0
+        for row in journal["attempts"]:
+            correction = row.get("plan_correction")
+            if correction is None:
+                continue
+            if (not isinstance(correction, dict) or correction.get("version") != 1
+                    or correction.get("outcome") not in {"UNKNOWN", "admitted", "rejected"}
+                    or correction.get("attempt") != 1):
+                raise ValueError("Journal de correction PLAN invalide ; reprise refusée.")
+            used += 1
+        return used
+
+
+def record_plan_maker_correction(pipeline, ticket, decision) -> None:
+    """Consume the unique maker correction durably before its provider dispatch."""
+    if (not getattr(decision, "allowed", False) or getattr(decision, "next_attempt", None) != 1
+            or not getattr(decision, "issues", ())):
+        raise ValueError("Admission de correction PLAN invalide.")
+    path = _journal_path(pipeline.state)
+    with file_lock(path.with_suffix(".lock")):
+        journal = _read_journal(path)
+        row = _current_journal_row(journal, pipeline, ticket)
+        if any(isinstance(item, dict) and item.get("plan_correction") is not None
+               for item in journal["attempts"]):
+            raise ValueError("Correction maker PLAN déjà consommée ; seconde révision refusée.")
+        correction = dict(
+            version=1, attempt=1, outcome="UNKNOWN", admitted_at=time.time(),
+            contract_hash=decision.contract_hash,
+            rejected_response_sha256=decision.response_sha256,
+            rejection_receipt_sha256=decision.rejection_receipt_sha256,
+            issues=[asdict(issue) for issue in decision.issues],
+            usage_before=pipeline.state.usage.model_dump(mode="json"),
+        )
+        row["plan_correction"] = correction
+        atomic_json(path, journal)
+
+
+def finish_plan_maker_correction(pipeline, ticket, *, outcome: str,
+                                 response_sha256: str | None = None,
+                                 admission_status: str | None = None) -> None:
+    """Resolve a returned correction; interruption or write failure stays UNKNOWN."""
+    if outcome not in {"admitted", "rejected"}:
+        raise ValueError("Résultat de correction PLAN invalide.")
+    if response_sha256 is not None and not re.fullmatch(r"[a-f0-9]{64}", response_sha256):
+        raise ValueError("Hash de réponse corrigée invalide.")
+    if admission_status not in {"pass", "fail", "not_verified"}:
+        raise ValueError("Admission déterministe corrigée invalide.")
+    path = _journal_path(pipeline.state)
+    with file_lock(path.with_suffix(".lock")):
+        journal = _read_journal(path)
+        row = _current_journal_row(journal, pipeline, ticket)
+        correction = row.get("plan_correction")
+        if not isinstance(correction, dict) or correction.get("outcome") != "UNKNOWN":
+            raise ValueError("Intention de correction PLAN absente ou déjà réconciliée.")
+        correction.update(outcome=outcome, finished_at=time.time(),
+                          response_sha256=response_sha256,
+                          admission_status=admission_status,
+                          usage_after=pipeline.state.usage.model_dump(mode="json"),
+                          cost_incomplete=bool(pipeline.state.usage.unreported_calls))
+        atomic_json(path, journal)
+
+
 def _finish_journal(pipeline, ticket) -> None:
     path = _journal_path(pipeline.state)
     with file_lock(path.with_suffix(".lock")):
@@ -262,9 +348,10 @@ async def run(pipeline, ticket) -> None:
         await pipeline._checkpoint()
         if pipeline._stop_requested:
             return
-        # Continue through the pipeline's existing PLAN implementation. This
-        # helper does not add or promise a maker-correction policy.
-        await pipeline._aplan_phase()
+        # Only an explicit pre-plan continuation opts into the single bounded
+        # deterministic maker correction. Ordinary lifecycle PLAN stays off.
+        await pipeline._aplan_phase(plan_maker_revision_limit=1,
+                                    plan_continuation_ticket=ticket)
         await pipeline._aarchitect_phase()
         await pipeline._aapproval_gate("plan")
         if pipeline._stop_requested:
