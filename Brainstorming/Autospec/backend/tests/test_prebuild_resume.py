@@ -502,6 +502,24 @@ async def test_nonrepairable_plan_finding_prevents_maker_correction_dispatch(pen
     assert not pipeline.state.stories and not pipeline.state.epics
 
 
+@pytest.mark.parametrize("confirmed", [1, "true"])
+async def test_malformed_major_finding_confirmation_fails_closed_before_correction(
+        pending, monkeypatch, confirmed):
+    pipeline, calls = pending
+    pipeline.state.plan_findings = [{"id": "security", "severity": "major", "confirmed": confirmed,
+        "resolution": "", "evidence": "review.json", "rationale": "unresolved blocker",
+        "decided_by": "reviewer"}]
+    pipeline.runner.queue(json.dumps(_plan_for(pipeline, wrong_limit=True)),
+                          json.dumps(_plan_for(pipeline)))
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert pipeline.state.phase == PipelinePhase.NEEDS_ATTENTION
+    assert len(pipeline.runner.calls) == 1
+    assert "plan_correction" not in journal["attempts"][0]
+    assert not pipeline.state.stories and not pipeline.state.epics
+
+
 async def test_preplan_correction_is_not_repeated_on_later_explicit_continuation(pending, monkeypatch):
     pipeline, calls = pending
     runner = pipeline.runner

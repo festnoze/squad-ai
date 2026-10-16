@@ -4883,10 +4883,17 @@ class Pipeline:
             if (row.get("kind") == "constraint"
                     and row.get("source") == "deterministic_plan_gate"):
                 continue
-            if (row.get("confirmed") is True
-                    and row.get("severity") in {"major", "critical"}
-                    and row.get("resolution") not in {"resolved", "refuted", "accepted"}):
-                return True
+            if row.get("severity") in {"major", "critical"}:
+                confirmed = row.get("confirmed")
+                # Persisted findings are JSON, so bool annotations are not
+                # enforced at runtime (and bool is an int subclass in Python).
+                # Malformed confirmation must not make a non-repairable review
+                # finding eligible for a provider correction.
+                if type(confirmed) is not bool:
+                    return True
+                if (confirmed
+                        and row.get("resolution") not in {"resolved", "refuted", "accepted"}):
+                    return True
         return False
 
     async def _acorrect_preplan_maker_once(self, *, ticket, contract, plan_policy,

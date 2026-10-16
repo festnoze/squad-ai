@@ -23,7 +23,9 @@ Commande exécutée depuis la racine du worktree :
 & 'C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\.venv\Scripts\python.exe' -m pytest -q --basetemp backend\_pytest-rem07-run7 backend\tests\test_plan_maker_correction_policy.py backend\tests\test_prebuild_resume.py backend\tests\test_plan_gates.py backend\tests\test_acceptance_pipeline_remediation.py backend\tests\test_plan_foundation_admission_diagnostics.py backend\tests\test_plan_pipeline.py
 ```
 
-Résultat : **237 passed**. L’utilisation d’un `--basetemp` sous le worktree était nécessaire, car le répertoire temporaire Windows par défaut a refusé l’accès (`WinError 5`). `ruff` n’est pas installé dans cet environnement (`No module named ruff`).
+Résultat initial : **237 passed**. La contre-revue a ensuite relevé que des champs JSON mal typés (`confirmed: 1` ou `confirmed: "true"`) pouvaient autoriser une tentative correctrice inutile malgré le rejet final du gate. Le classifieur traite maintenant ces findings majeurs mal formés en mode fail-closed; les deux mutations sont testées.
+
+Rejeu de qualification (16 octobre 2026), même suite avec les deux cas négatifs supplémentaires : **239 passed**. L’utilisation d’un `--basetemp` sous le worktree était nécessaire, car le répertoire temporaire Windows par défaut a refusé l’accès (`WinError 5`). `ruff` n’est pas installé dans cet environnement (`No module named ruff`).
 
 ## Limites
 
