@@ -4,7 +4,9 @@ from pathlib import Path
 import pytest
 
 from autospec.contracts import import_contract
-from autospec.validation.browser_contracts import BrowserVerifier, browser_generation_requirements, browser_smoke
+from autospec.validation.browser_contracts import (BrowserVerifier, _check_optional_no_auth_login_visibility,
+    _exact_detail_bindings, browser_generation_requirements, browser_smoke)
+from autospec.validation.support_adapter import AdapterUnavailable
 from tests.fixtures.browser.app import BrowserSubject, browser_contract, retain_browser_fixture_report
 
 
@@ -96,10 +98,28 @@ async def test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db
             assert row["description"]=="Independent fixture description for foundation probe"
         finally:conn.close()
         assert {"VERTICAL:browser_login","VERTICAL:browser_create","VERTICAL:frontend_wiring"} <= {tag for proof in result["proofs"] for tag in proof.checks}
-        evidence=json.loads(Path(result["proofs"][0].path).read_text())
+        observer=next(proof for proof in result["proofs"] if proof.type=="X")
+        evidence=json.loads(Path(observer.path).read_text())
         assert next(c for c in evidence["checks"] if c["check"]=="VERTICAL:detail_get_response_matches_created_values")["passed"]
         assert next(c for c in evidence["checks"] if c["check"]=="VERTICAL:detail_matches_get_response")["passed"]
     finally:subject.stop_http()
+
+
+def test_wrong_detail_without_exact_field_bindings_is_not_admissible():
+    class UnreviewedDetailBinding:
+        bindings={"detail":"#detail"}
+    with pytest.raises(AdapterUnavailable,match="exact detail title/description browser bindings required"):
+        _exact_detail_bindings(UnreviewedDetailBinding())
+
+
+@pytest.mark.asyncio
+async def test_no_auth_smoke_does_not_require_login_binding():
+    class NoLoginHarness:
+        bindings={"ticket_list":"#tickets"}
+        def control(self,*args): raise AssertionError("no-auth flow must not resolve a login locator")
+    class Checks:
+        def check(self,*args): raise AssertionError("no login element is not a browser check")
+    await _check_optional_no_auth_login_visibility(NoLoginHarness(),Checks(),object())
 
 
 async def test_all_six_source_e2e_execute_together_with_fresh_independent_fixtures(tmp_path):

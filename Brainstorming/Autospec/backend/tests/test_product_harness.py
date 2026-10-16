@@ -37,17 +37,18 @@ def write_json(path,value):
     path.write_bytes(json.dumps(value,sort_keys=True,ensure_ascii=True).encode())
 
 
-def fixture_definition():
+def fixture_definition(*,public_mode=False):
     accounts={name:dict(id=str(uuid5(NS,name)),email=name+"@example.test",password="$generated",role=role)
         for name,role in zip(("alice","bob","camille","dylan","emma"),("client","client","agent","agent","admin"))}
     tickets={name+str(i):str(uuid5(NS,name+str(i))) for name in ("alice","bob") for i in range(6)}
     tickets.update(alice_open=tickets["alice0"],alice_second=tickets["alice1"],bob=tickets["bob0"])
     rows=[dict(id=tickets[name+str(i)],owner_id={"$ref":"accounts."+name+".id"},
         title="Fixture "+name+str(i),description="Independent fixture description") for name in ("alice","bob") for i in range(6)]
-    return dict(accounts=accounts,tickets=tickets,metadata=dict(provisioning=["migrate_fresh","bootstrap","seed"],
+    provisioning=["migrate_fresh","seed"] if public_mode else ["migrate_fresh","bootstrap","seed"]
+    return dict(accounts=accounts,tickets=tickets,metadata=dict(provisioning=provisioning,
         bootstrap_actor="emma",vertical_actor="alice",quality_actor="alice",fixture_scope="independent metatest, not benchmark product"),
         commands=dict(migrate_fresh={},bootstrap=dict(credentials={"$ref":"accounts.emma"},fault=""),
-                      seed=dict(payload=dict(accounts={"$ref":"accounts"},tickets=rows))))
+                      seed=dict(payload=dict(accounts={"$ref":"accounts"},tickets=rows,public_mode=public_mode))))
 
 
 def reviewed_fixture_file(root,source,snapshot,definition=None):
@@ -74,7 +75,7 @@ def make_bindings(root,source,snapshot,*,auth_required=True):
     binding=ReviewedProductBindings(snapshot,CONTRACT,files,proof,"/var/lib/autospec-validation/support.sqlite",
         tables,commands,("/opt/venv/bin/python","main.py"),"/api/auth/login","csrf_token","/api/tickets/{id}",
         auth_required=auth_required,instrumentation=hook,local_cookie_mode=True,query_plans={"tickets":("SELECT * FROM tickets WHERE owner_id=?",("owner",))},
-        browser_bindings=dict(email="#email",password="#password",login="#login",ticket_list="#tickets",create="#create",title="#title",description="#description",submit="#submit",detail="#detail"),
+        browser_bindings=dict(email="#email",password="#password",login="#login",ticket_list="#tickets",create="#create",title="#title",description="#description",submit="#submit",detail="#detail",detail_title="#detail-title",detail_description="#detail-description"),
         browser_routes=dict(home="/",ticket="/tickets/{id}",admin="/admin"))
     return replace(binding,review=replace(proof,checks=("PRODUCT:bindings","PRODUCT:bindings:"+binding.fingerprint())))
 
@@ -190,9 +191,9 @@ def linux_fixture_source(tmp_path_factory):
     return base,source,snapshot
 
 
-def session(linux,case_root,*,instrumented=False,definition=None,image_id=None):
+def session(linux,case_root,*,instrumented=False,definition=None,image_id=None,auth_required=True):
     base,source,snapshot=linux
-    binding=make_bindings(case_root,source,snapshot)
+    binding=make_bindings(case_root,source,snapshot,auth_required=auth_required)
     fixtures=reviewed_fixture_file(case_root,source,snapshot,definition)
     path=case_root/"product-bindings.json"; write_json(path,asdict(binding))
     async def identity(): return snapshot
@@ -205,10 +206,11 @@ def session(linux,case_root,*,instrumented=False,definition=None,image_id=None):
 async def actual_browser_smoke(adapter,snapshot,contract):
     from autospec.validation.browser_contracts import PlaywrightHarness,browser_smoke
     harness=PlaywrightHarness(adapter,bindings=dict(email="#email",password="#password",login="#login",ticket_list="#tickets",
-        create="#create",title="#title",description="#description",submit="#submit",detail="#detail"),
+        create="#create",title="#title",description="#description",submit="#submit",detail="#detail",detail_title="#detail-title",detail_description="#detail-description"),
         routes=dict(home="/",ticket="/tickets/{id}",admin="/admin"))
     nonce=uuid4().hex
-    return await browser_smoke(harness,snapshot,contract,adapter.manifest.accounts["alice"],
+    actor=adapter.manifest.accounts["alice"] if adapter.auth_required else None
+    return await browser_smoke(harness,snapshot,contract,actor,
         title="Genuine Linux browser creation "+nonce,description="Actual Argon2 HTTP and committed SQLite audit "+nonce)
 
 
@@ -247,6 +249,29 @@ async def test_real_linux_vertical_and_owned_volume_persistence(linux_fixture_so
                 values=result.get("proofs",[])+[p for stage in result.get("stages",[]) for p in stage["proofs"]]
                 for proof in values: proof["path"]=str(dest/Path(proof["path"]).name)
             write_json(dest/"receipt.json",receipt);write_json(dest/"persistence.json",persisted)
+
+
+@REAL
+@pytest.mark.asyncio
+async def test_real_linux_vertical_without_auth_skips_login_http(linux_fixture_source,tmp_path):
+    definition=fixture_definition(public_mode=True)
+    async with session(linux_fixture_source,tmp_path,definition=definition,auth_required=False) as h:
+        await h.adapter.prepare_case("VERTICAL")
+        receipt=await h.verify_vertical(h.bindings.snapshot_hash,CONTRACT,browser_smoke=actual_browser_smoke)
+        assert receipt["status"]=="PASS",receipt
+        assert [s["name"] for s in receipt["stages"]]==[
+            "schema","authentication","browser_create","frontend_wiring","api_read","db_committed","restart"]
+        auth=next(s for s in receipt["stages"] if s["name"]=="authentication")
+        assert auth["passed"] and auth["status"]=="N/A" and auth["proofs"]==[]
+        browser=next(s for s in receipt["stages"] if s["name"]=="browser_create")
+        observer=next(Proof(**p) for p in browser["proofs"] if p["type"]=="X")
+        evidence=json.loads(Path(observer.path).read_text())
+        assert not any(r["method"]=="POST" and r["path"]=="/api/auth/login" for r in evidence["requests"])
+        assert next(c for c in evidence["checks"] if c["check"]=="VERTICAL:authentication")["observed"]=="N/A"
+        restart=next(s for s in receipt["stages"] if s["name"]=="restart")
+        restart_proof=next(Proof(**p) for p in restart["proofs"])
+        observed=json.loads(Path(restart_proof.path).read_text())["observed"]
+        assert observed["replaced_container"] and observed["same_owned_volume"] and observed["status"]==200
 
 
 @REAL
@@ -422,13 +447,17 @@ async def test_real_linux_bad_fixture_cannot_pass_vertical(linux_fixture_source,
         x_proofs=[p for p in failed_stage["proofs"] if p["type"]=="X"]
         if bug in {"static_detail","wrong_detail","local_echo_with_unused_get","restart_noop","missing_detail_get"} and not x_proofs:
             assert receipt["status"]=="NOT_VERIFIED",receipt
-            return
+            pytest.skip(f"mutant {bug!r} not evaluated: browser X evidence is absent and vertical result is NOT_VERIFIED")
         if bug=="weak_bootstrap":
             assert next(s for s in receipt["stages"] if s["name"]=="argon2")["passed"]
-        if bug in {"static_detail","wrong_detail"}:
+        if bug=="static_detail":
             browser_proof=Proof(**x_proofs[0])
             checks=json.loads(Path(browser_proof.path).read_text())["checks"]
             assert not next(c for c in checks if c["check"]=="VERTICAL:detail_contains_created_values")["passed"]
+        if bug=="wrong_detail":
+            browser_proof=Proof(**x_proofs[0])
+            checks=json.loads(Path(browser_proof.path).read_text())["checks"]
+            assert not next(c for c in checks if c["check"]=="VERTICAL:detail_matches_get_response")["passed"]
         if bug=="local_echo_with_unused_get":
             browser_proof=Proof(**x_proofs[0])
             evidence=json.loads(Path(browser_proof.path).read_text())
