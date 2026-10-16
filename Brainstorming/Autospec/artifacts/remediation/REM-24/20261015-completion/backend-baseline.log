@@ -1,0 +1,1381 @@
+................................s....................................... [  1%]
+.......................................................................s [  3%]
+...................................................sssssssssssssss...... [  5%]
+..........sssssssssssssssssssssss....................................... [  7%]
+...............F........................................................ [  9%]
+..........F.F.................................s......................... [ 11%]
+........................................................................ [ 13%]
+..................s.....................s............................... [ 15%]
+..sssss..........................................................s...... [ 17%]
+........................................................................ [ 19%]
+.....................................ss..s.............................. [ 21%]
+........................................................................ [ 23%]
+........................................................................ [ 25%]
+.....................................s.................................. [ 27%]
+........................................................................ [ 29%]
+..........................................F............................. [ 31%]
+........................................................................ [ 33%]
+........................................................................ [ 35%]
+sssss...................ss.........................F.................... [ 37%]
+........................................................................ [ 39%]
+............s............................ss........ss................... [ 41%]
+........................................................................ [ 43%]
+....ss................s............................ss................... [ 45%]
+........................................................................ [ 47%]
+............................s........ss................................. [ 49%]
+........................................................................ [ 51%]
+........................................................................ [ 53%]
+........................................................................ [ 55%]
+........................................................................ [ 57%]
+...........................................ssssssssssssssss............s [ 59%]
+........................................................................ [ 61%]
+........................................................................ [ 63%]
+........................................................................ [ 64%]
+...............................................sss...................... [ 66%]
+..s................F.................................................... [ 68%]
+.......FF............................................................... [ 70%]
+...............................................s........................ [ 72%]
+........................................................................ [ 74%]
+.............s...................................................F...... [ 76%]
+.............................................................sssss...... [ 78%]
+..............................sss....................................... [ 80%]
+........................................................................ [ 82%]
+...................................FF................................... [ 84%]
+................F.....F................................................. [ 86%]
+........................................................................ [ 88%]
+.......................................F................................ [ 90%]
+........................................................................ [ 92%]
+............ss.......................................................... [ 94%]
+........................................F...F........................... [ 96%]
+......F............................................sF................... [ 98%]
+........................................................                 [100%]
+================================== FAILURES ===================================
+___ test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db ____
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_vertical_smoke_is_real_br0')
+
+    async def test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db(tmp_path):
+        contract=browser_contract(); subject=BrowserSubject(tmp_path/"product",contract)
+        subject.start_http()
+        try:
+            manifest=await subject.adapter.prepare_case("VERTICAL")
+            result=await browser_smoke(subject.harness(),subject.snapshot,contract.contract_hash,manifest.accounts["alice"],
+                                      title="Narrow foundation browser probe",description="Independent fixture description for foundation probe")
+            assert result["status"]=="PASS",result
+            conn=subject.connect()
+            try:
+                row=conn.execute("SELECT * FROM tickets WHERE id=?",(result["ticket_id"],)).fetchone()
+                assert row["owner_id"]==manifest.accounts["alice"].id
+                assert row["title"]=="Narrow foundation browser probe"
+                assert row["description"]=="Independent fixture description for foundation probe"
+            finally:conn.close()
+            assert {"VERTICAL:browser_login","VERTICAL:browser_create","VERTICAL:frontend_wiring"} <= {tag for proof in result["proofs"] for tag in proof.checks}
+>           evidence=json.loads(Path(result["proofs"][0].path).read_text())
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_browser_contracts.py:99:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python312\Lib\pathlib.py:1028: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <encodings.cp1252.IncrementalDecoder object at 0x000001A30A1E6390>
+input = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x05\x00\x00\x00\x03\x84\x08\x02\x00\x00\x00qw\x0bT\x00\x00\x10\x00IDATx\...\x08\xff?\x00\x00\x00\xff\xffy\xc9\x14F\x00\x00\x00\x06IDAT\x03\x00\xcf\xe2;\x86\nCX\xdd\x00\x00\x00\x00IEND\xaeB`\x82'
+final = True
+
+    def decode(self, input, final=False):
+>       return codecs.charmap_decode(input,self.errors,decoding_table)[0]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d in position 161: character maps to <undefined>
+
+C:\Python312\Lib\encodings\cp1252.py:23: UnicodeDecodeError
+_________________ test_real_footprint_over_budget_is_counted __________________
+
+streams_setup = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A309947F80>
+
+    async def test_real_footprint_over_budget_is_counted(streams_setup, monkeypatch):
+        """The dev's commit touches more files than the leaf budget \u2192 the item still
+        ships (indicative budget) but the calibration records the overrun."""
+        monkeypatch.setattr(settings, "task_file_budget", 3)
+        state = _state([_us("US-1")], "calib-budget")
+        pipeline = Pipeline(state, ScriptedRunner())
+
+        async def _fat_dev(subject, worktree, pkg, is_frontend):
+            for i in range(5):  # budget is 3
+                (Path(worktree) / f"gen_{i}.py").write_text(f"# {i}\n", encoding="utf-8")
+            return True, ""
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _fat_dev)
+        await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+        assert state.story("US-1").status == StoryStatus.DONE
+>       assert state.calibration_for().over_budget_tasks == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = PlanCalibration(reactive_splits=0, over_budget_tasks=0, degradations=0, scope_violations=0, merge_requeues=0, canary_r...requeue_refunds=0, solo_requeues=0, suite_runs=0, canary_verdicts={'green': 1}, items_delivered=1, suites_per_item=0.0).over_budget_tasks
+E        +    where PlanCalibration(reactive_splits=0, over_budget_tasks=0, degradations=0, scope_violations=0, merge_requeues=0, canary_r...requeue_refunds=0, solo_requeues=0, suite_runs=0, canary_verdicts={'green': 1}, items_delivered=1, suites_per_item=0.0) = calibration_for()
+E        +      where calibration_for = ProjectState(id='calib-budget', name='calib', goal='g', auto_spec=False, product_profile='auto', spec_mode='interview'...eployed_image='', deployed_container='', deploy_host_port=0, deploy_detail='', error='', created_at=1792068549.3598576).calibration_for
+
+tests\test_calibration.py:55: AssertionError
+________________ test_merge_requeue_and_p2b_resume_are_counted ________________
+
+streams_setup = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A309A4A4B0>
+
+    async def test_merge_requeue_and_p2b_resume_are_counted(streams_setup, monkeypatch):
+        """A merge conflict counts a requeue; the preserved branch shipping without
+        a dev rebuild counts a P2b resume � the ratio proves what P2b saves."""
+        monkeypatch.setattr(settings, "dev_max_attempts", 2)
+        state = _state([_us("US-1")], "calib-p2b")
+        pipeline = Pipeline(state, ScriptedRunner())
+        merges = []
+
+        async def _dev(subject, worktree, pkg, is_frontend):
+            return True, ""
+
+        async def _merge(repo, branch, wid, worktree=None):
+            merges.append(wid)
+            return len(merges) > 1, []
+
+        async def _verify(subject, worktree, is_frontend):
+            subject.status = StoryStatus.GREEN
+            return True, ""
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+        monkeypatch.setattr(pipeline, "_amerge_work_item", _merge)
+        monkeypatch.setattr(pipeline, "_averify_resumed", _verify)
+        await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+        calib = state.calibration_for()
+        assert calib.merge_requeues == 1
+>       assert calib.p2b_resumes == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = PlanCalibration(reactive_splits=0, over_budget_tasks=0, degradations=0, scope_violations=0, merge_requeues=1, canary_r...requeue_refunds=1, solo_requeues=0, suite_runs=0, canary_verdicts={'green': 1}, items_delivered=1, suites_per_item=0.0).p2b_resumes
+
+tests\test_calibration.py:99: AssertionError
+____ test_own_nested_repo_returns_only_its_commits_and_rolls_back_locally _____
+
+nested_project = (WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/...urns_o0/unrelated-parent/projects/nested-app'), <autospec.orchestrator.pipeline.Pipeline object at 0x000001A3094C8320>)
+
+    async def test_own_nested_repo_returns_only_its_commits_and_rolls_back_locally(nested_project):
+        parent, ws, pipeline = nested_project
+        before_head = git(parent, "rev-parse", "HEAD")
+        before_diff = git(parent, "diff")
+        git(ws, "init")
+        commit_file(ws, "local-story.txt", "local story\n", "story US-1 done")
+        commit_file(ws, "local-task.txt", "local task\n", "story T-1 done")
+        commit_file(ws, "version.txt", "v1\n", "iteration 1 snapshot")
+        commit_file(ws, "version.txt", "v2\n", "iteration 2 snapshot")
+        story = await pipeline.astory_diff("US-1")
+        task = await pipeline.atask_diff("T-1")
+>       assert story["available"] and "local-story.txt" in story["diff"]
+E       assert (False)
+
+tests\test_git_diff_isolation.py:104: AssertionError
+________________ test_resume_green_branch_rebases_then_merges _________________
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_resume_green_branch_rebas0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A307959460>
+
+    async def test_resume_green_branch_rebases_then_merges(tmp_path, monkeypatch):
+        """The merge-conflict requeue path: green branch preserved, HEAD advanced
+        (sibling, other file) \u2192 resume returns a worktree rebased on HEAD, and the
+        merge lands the preserved work WITHOUT any dev rebuild."""
+        monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+        pipeline = Pipeline(_state("mp-res"), ScriptedRunner())
+        ws = workspace_dir("mp-res")
+        await _init_repo(pipeline, ws)
+        wt = await pipeline._aworktree_add(ws, "autospec/wi-r")
+        assert wt is not None
+        (Path(wt) / "green.txt").write_text("green", encoding="utf-8")
+        await pipeline._acommit_story(wt, "r")
+        await pipeline._aworktree_remove(ws, wt, "autospec/wi-r", keep_branch=True)
+
+        # A sibling advances HEAD on a DIFFERENT file meanwhile.
+        (ws / "sibling.txt").write_text("s", encoding="utf-8")
+        await pipeline._agit(ws, "add", "-A")
+        await pipeline._agit(ws, "commit", "-m", "sibling")
+
+        resumed = await pipeline._aresume_green_branch(ws, "autospec/wi-r")
+>       assert resumed is not None
+E       assert None is not None
+
+tests\test_merge_preserve.py:122: AssertionError
+___ test_TST_05_admits_twelve_actual_browser_runs_and_intact_visual_proofs ____
+
+fut = <coroutine object Browser.close at 0x000001A30AB66DC0>, timeout = 5
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+
+        Coroutine will be wrapped in Task.
+
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+
+        If the wait is cancelled, the task is also cancelled.
+
+        If the task supresses the cancellation and returns a value instead,
+        that value is returned.
+
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+
+
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+
+            if fut.done():
+                return fut.result()
+
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+
+        async with timeouts.timeout(timeout):
+>           return await fut
+                   ^^^^^^^^^
+
+C:\Python312\Lib\asyncio\tasks.py:520:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\playwright\async_api\_generated.py:16578: in close
+    return mapping.from_maybe_impl(await self._impl_obj.close(reason=reason))
+                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\playwright\_impl\_browser.py:242: in close
+    await self._channel.send("close", None, {"reason": reason})
+.venv\Lib\site-packages\playwright\_impl\_connection.py:76: in send
+    return await self._connection.wrap_api_call(
+.venv\Lib\site-packages\playwright\_impl\_connection.py:630: in wrap_api_call
+    return await cb()
+           ^^^^^^^^^^
+.venv\Lib\site-packages\playwright\_impl\_connection.py:147: in _inner_send
+    done, _ = await asyncio.wait(
+C:\Python312\Lib\asyncio\tasks.py:464: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {<Future finished exception=Error('Task was cancelled\nCall log:\n  - operation was aborted: Task was cancelled\n')>, <Future pending>}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = <ProactorEventLoop running=False closed=False debug=False>
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter <= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+
+        for f in fs:
+            f.add_done_callback(_on_completion)
+
+        try:
+>           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Python312\Lib\asyncio\tasks.py:550: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+self = <autospec.validation.browser_contracts.PlaywrightHarness object at 0x000001A30A402E10>
+
+    async def close(self):
+        failure=None
+        try:
+            if self.contexts:
+                try:
+                    results=await asyncio.wait_for(asyncio.gather(*(c.close() for c in self.contexts),return_exceptions=True),5)
+                    failure=next((x for x in results if isinstance(x,Exception)),None)
+                except Exception as exc: failure=exc
+            if self.browser:
+>               try: await asyncio.wait_for(self.browser.close(),5)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+autospec\validation\browser_contracts.py:217:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python312\Lib\asyncio\tasks.py:519: in wait_for
+    async with timeouts.timeout(timeout):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x000001A30AB6D200>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+C:\Python312\Lib\asyncio\timeouts.py:115: TimeoutError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_TST_05_admits_twelve_actu0')
+
+    async def test_TST_05_admits_twelve_actual_browser_runs_and_intact_visual_proofs(tmp_path):
+        """Only TST05 is qualified here; other records remain admission meta-fixtures."""
+        contract=browser_contract();subject=BrowserSubject(tmp_path/"product",contract)
+        fixture=QualityFixture(tmp_path/"admission-records",contract)
+        fixture.snapshot=subject.snapshot;fixture.evidence_root=tmp_path
+        subject.start_http();runs=[];proofs=[]
+        try:
+            for mode in ["alone","together"]:
+                groups=[[f"E2E-{i:02d}"] for i in range(1,7)] if mode=="alone" else [None]
+                for ids in groups:
+>                   report=await BrowserVerifier(contract,subject.harness()).verify_e2e(subject.snapshot,mode=mode,scenario_ids=ids)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_quality_contracts.py:144:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\validation\browser_contracts.py:870: in verify_e2e
+    await self.harness.close()
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <autospec.validation.browser_contracts.PlaywrightHarness object at 0x000001A30A402E10>
+
+    async def close(self):
+        failure=None
+        try:
+            if self.contexts:
+                try:
+                    results=await asyncio.wait_for(asyncio.gather(*(c.close() for c in self.contexts),return_exceptions=True),5)
+                    failure=next((x for x in results if isinstance(x,Exception)),None)
+                except Exception as exc: failure=exc
+            if self.browser:
+                try: await asyncio.wait_for(self.browser.close(),5)
+                except Exception as exc: failure=exc
+        finally:
+            self.contexts.clear()
+            try:
+                if self.docker_browser: await asyncio.to_thread(self.docker_browser.close)
+            finally:
+                if self.playwright: await asyncio.wait_for(self.playwright.stop(),5)
+                self.browser=self.playwright=None
+>       if failure: raise AdapterUnavailable("owned browser channel cleanup failed") from failure
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       autospec.validation.support_adapter.AdapterUnavailable: owned browser channel cleanup failed
+
+autospec\validation\browser_contracts.py:226: AdapterUnavailable
+______ test_real_argon2_runtime_request_and_clean_lock_validation[False] ______
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_real_argon2_runtime_reque0')
+nested_repository = False
+
+    @pytest.mark.parametrize("nested_repository", [False, True])
+    def test_real_argon2_runtime_request_and_clean_lock_validation(tmp_path, nested_repository):
+        if nested_repository:
+            # A distinct ancestor config is sufficient to reproduce pytest's root
+            # discovery in a nested repository. No Git command or hostile hook runs.
+            ancestor = tmp_path / "repo"
+            ancestor.mkdir()
+            (ancestor / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+            tmp_path = ancestor / "run"
+            tmp_path.mkdir()
+        root = tmp_path / "product"
+        root.mkdir()
+        (root / "pyproject.toml").write_text('[project]\nname="argon2-fixture"\nversion="0.1.0"\nrequires-python=">=3.12"\ndependencies=[]\n[project.optional-dependencies]\ndev=["pytest>=8", "pytest-json-report>=1.5"]\n', encoding="utf-8")
+        proc = run_command(["uv", "lock", "--python", sys.executable], cwd=root, env=minimal_environment())
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        manager = CleanEnvironmentManager(tmp_path / "supervisor/cache")
+>       bad = manager.prepare(root, "python")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_rem_clean_install_integration.py:35:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <autospec.orchestrator.environments.CleanEnvironmentManager object at 0x000001A30A9BC710>
+project_root = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_real_argon2_runtime_reque0/product')
+ecosystem = 'python', mode = 'tests'
+
+    def prepare(self, project_root: Path, ecosystem: str, mode: str = "tests", *, tool_versions: dict[str, str] | None = None, platform_id: str | None = None) -> CleanEnvironment:
+        root = Path(project_root).resolve()
+        if ecosystem not in ("python", "node") or mode not in ("runtime", "tests"):
+            raise EnvironmentError("unsupported ecosystem or environment mode")
+        if self.cache_root.is_relative_to(root) or root.is_relative_to(self.cache_root):
+            raise EnvironmentError("cache must be outside producer writable root")
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        names = ("pyproject.toml", "uv.lock") if ecosystem == "python" else ("package.json", "package-lock.json")
+        for name in names:
+            if not (root / name).is_file() or not (root / name).resolve().is_relative_to(root):
+                raise EnvironmentError(f"DECLARATION_MISSING: {name}")
+        versions = tool_versions or self.tool_versions(ecosystem)
+        required = {"uv", "python"} if ecosystem == "python" else {"node", "npm"}
+        if not required <= versions.keys() or any(not versions[key] for key in required):
+            raise EnvironmentError("toolchain versions are required")
+        inputs = {"ecosystem": ecosystem, "mode": mode, "files": {n: hashlib.sha256((root / n).read_bytes()).hexdigest() for n in names}, "tool_versions": versions, "tool_commands": {"uv": self.uv_cmd, "npm": self.npm_cmd, "node": self.node_cmd, "python": self.python_cmd}, "platform": platform_id or f"{sys.platform}/{platform.machine()}/{platform.python_implementation()}"}
+        fingerprint = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
+        # Full identity stays in the attestation. Compact names avoid uv's
+        # Windows MAX_PATH failures for wheel metadata under deep test roots;
+        # any theoretical prefix collision fails the exact-input check below.
+        cache = self.cache_root / fingerprint[:24]
+        with file_lock(self.cache_root / f"{fingerprint}.lock", timeout=180):
+            marker = cache / "attestation.json"
+            if marker.exists():
+                attestation = json.loads(marker.read_text(encoding="utf-8"))
+                if attestation.get("version") != 1 or attestation.get("inputs") != inputs or attestation.get("clean_creation") is not True:
+                    raise EnvironmentError("CACHE_ATTESTATION_INVALID")
+                env = CleanEnvironment(ecosystem, mode, fingerprint, cache, attestation, True)
+                env.verify()
+                return env
+            # Create at its FINAL absolute path: Python virtualenv launchers
+            # embed their location and must never be renamed after creation.
+            # Failed/incomplete paths are never reused or promoted to ready.
+            if cache.exists():
+                raise EnvironmentError("CACHE_INCOMPLETE: supervisor cleanup required")
+            cache.mkdir()
+            for name in names:
+                shutil.copy2(root / name, cache / name)
+            child_env = minimal_environment()
+            if ecosystem == "python":
+                child_env["UV_PROJECT_ENVIRONMENT"] = str(cache / ".venv")
+                data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+                optional_dev = "dev" in data.get("project", {}).get("optional-dependencies", {})
+                flags = ["--extra", "dev"] if mode == "tests" and optional_dev else ["--no-dev"] if mode == "runtime" else []
+                # uv also includes a declared PEP 735 dev group by default.
+                command = [self.uv_cmd, "sync", "--locked", "--no-build", "--no-install-project", "--python", self.python_cmd, *flags]
+            else:
+                command = [self.npm_cmd, "ci", "--ignore-scripts", *(["--include=dev"] if mode == "tests" else ["--omit=dev"])]
+            try:
+                result = self.runner(command, cwd=cache, env=child_env)
+                if result.returncode:
+                    diagnostics = (result.stdout or "") + (getattr(result, "stderr", "") or "")
+>                   raise EnvironmentError(f"CLEAN_INSTALL_FAILED: exit {result.returncode}; {diagnostics[-2000:]}")
+E                   autospec.orchestrator.environments.EnvironmentError: CLEAN_INSTALL_FAILED: exit 2; Using CPython 3.12.1 interpreter at: C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\.venv\Scripts\python.exe
+E                   Creating virtual environment at: .venv
+E                   Resolved 9 packages in 8ms
+E                   Prepared 1 package in 261ms
+E                   error: Failed to install: pluggy-1.7.0-py3-none-any.whl (pluggy==1.7.0)
+E                     Caused by: Failed to persist temporary file to C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\_pytest-completion-baseline\test_real_argon2_runtime_reque0\supervisor\cache\d9daf6f46479c8838e240983\.venv\Lib\site-packages\pluggy-1.7.0.dist-info\REQUESTED: failed to persist temporary file: Le chemin d’accès spécifié est introuvable. (os error 3)
+
+autospec\orchestrator\environments.py:203: EnvironmentError
+______ test_real_argon2_runtime_request_and_clean_lock_validation[True] _______
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_real_argon2_runtime_reque1/repo/run')
+nested_repository = True
+
+    @pytest.mark.parametrize("nested_repository", [False, True])
+    def test_real_argon2_runtime_request_and_clean_lock_validation(tmp_path, nested_repository):
+        if nested_repository:
+            # A distinct ancestor config is sufficient to reproduce pytest's root
+            # discovery in a nested repository. No Git command or hostile hook runs.
+            ancestor = tmp_path / "repo"
+            ancestor.mkdir()
+            (ancestor / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+            tmp_path = ancestor / "run"
+            tmp_path.mkdir()
+        root = tmp_path / "product"
+        root.mkdir()
+        (root / "pyproject.toml").write_text('[project]\nname="argon2-fixture"\nversion="0.1.0"\nrequires-python=">=3.12"\ndependencies=[]\n[project.optional-dependencies]\ndev=["pytest>=8", "pytest-json-report>=1.5"]\n', encoding="utf-8")
+        proc = run_command(["uv", "lock", "--python", sys.executable], cwd=root, env=minimal_environment())
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        manager = CleanEnvironmentManager(tmp_path / "supervisor/cache")
+>       bad = manager.prepare(root, "python")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_rem_clean_install_integration.py:35:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <autospec.orchestrator.environments.CleanEnvironmentManager object at 0x000001A30A3D04A0>
+project_root = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_real_argon2_runtime_reque1/repo/run/product')
+ecosystem = 'python', mode = 'tests'
+
+    def prepare(self, project_root: Path, ecosystem: str, mode: str = "tests", *, tool_versions: dict[str, str] | None = None, platform_id: str | None = None) -> CleanEnvironment:
+        root = Path(project_root).resolve()
+        if ecosystem not in ("python", "node") or mode not in ("runtime", "tests"):
+            raise EnvironmentError("unsupported ecosystem or environment mode")
+        if self.cache_root.is_relative_to(root) or root.is_relative_to(self.cache_root):
+            raise EnvironmentError("cache must be outside producer writable root")
+        self.cache_root.mkdir(parents=True, exist_ok=True)
+        names = ("pyproject.toml", "uv.lock") if ecosystem == "python" else ("package.json", "package-lock.json")
+        for name in names:
+            if not (root / name).is_file() or not (root / name).resolve().is_relative_to(root):
+                raise EnvironmentError(f"DECLARATION_MISSING: {name}")
+        versions = tool_versions or self.tool_versions(ecosystem)
+        required = {"uv", "python"} if ecosystem == "python" else {"node", "npm"}
+        if not required <= versions.keys() or any(not versions[key] for key in required):
+            raise EnvironmentError("toolchain versions are required")
+        inputs = {"ecosystem": ecosystem, "mode": mode, "files": {n: hashlib.sha256((root / n).read_bytes()).hexdigest() for n in names}, "tool_versions": versions, "tool_commands": {"uv": self.uv_cmd, "npm": self.npm_cmd, "node": self.node_cmd, "python": self.python_cmd}, "platform": platform_id or f"{sys.platform}/{platform.machine()}/{platform.python_implementation()}"}
+        fingerprint = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
+        # Full identity stays in the attestation. Compact names avoid uv's
+        # Windows MAX_PATH failures for wheel metadata under deep test roots;
+        # any theoretical prefix collision fails the exact-input check below.
+        cache = self.cache_root / fingerprint[:24]
+        with file_lock(self.cache_root / f"{fingerprint}.lock", timeout=180):
+            marker = cache / "attestation.json"
+            if marker.exists():
+                attestation = json.loads(marker.read_text(encoding="utf-8"))
+                if attestation.get("version") != 1 or attestation.get("inputs") != inputs or attestation.get("clean_creation") is not True:
+                    raise EnvironmentError("CACHE_ATTESTATION_INVALID")
+                env = CleanEnvironment(ecosystem, mode, fingerprint, cache, attestation, True)
+                env.verify()
+                return env
+            # Create at its FINAL absolute path: Python virtualenv launchers
+            # embed their location and must never be renamed after creation.
+            # Failed/incomplete paths are never reused or promoted to ready.
+            if cache.exists():
+                raise EnvironmentError("CACHE_INCOMPLETE: supervisor cleanup required")
+            cache.mkdir()
+            for name in names:
+                shutil.copy2(root / name, cache / name)
+            child_env = minimal_environment()
+            if ecosystem == "python":
+                child_env["UV_PROJECT_ENVIRONMENT"] = str(cache / ".venv")
+                data = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+                optional_dev = "dev" in data.get("project", {}).get("optional-dependencies", {})
+                flags = ["--extra", "dev"] if mode == "tests" and optional_dev else ["--no-dev"] if mode == "runtime" else []
+                # uv also includes a declared PEP 735 dev group by default.
+                command = [self.uv_cmd, "sync", "--locked", "--no-build", "--no-install-project", "--python", self.python_cmd, *flags]
+            else:
+                command = [self.npm_cmd, "ci", "--ignore-scripts", *(["--include=dev"] if mode == "tests" else ["--omit=dev"])]
+            try:
+                result = self.runner(command, cwd=cache, env=child_env)
+                if result.returncode:
+                    diagnostics = (result.stdout or "") + (getattr(result, "stderr", "") or "")
+>                   raise EnvironmentError(f"CLEAN_INSTALL_FAILED: exit {result.returncode}; {diagnostics[-2000:]}")
+E                   autospec.orchestrator.environments.EnvironmentError: CLEAN_INSTALL_FAILED: exit 2; Using CPython 3.12.1 interpreter at: C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\.venv\Scripts\python.exe
+E                   Creating virtual environment at: .venv
+E                   Resolved 9 packages in 5ms
+E                   error: Failed to install: pytest-9.1.1-py3-none-any.whl (pytest==9.1.1)
+E                     Caused by: Failed to persist temporary file to C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\_pytest-completion-baseline\test_real_argon2_runtime_reque1\repo\run\supervisor\cache\d9daf6f46479c8838e240983\.venv\Lib\site-packages\..\..\Scripts\py.test.exe: failed to persist temporary file: Le chemin d’accès spécifié est introuvable. (os error 3)
+
+autospec\orchestrator\environments.py:203: EnvironmentError
+__________________ test_scripted_runner_drives_full_pipeline __________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A309D3E9C0>
+
+    async def test_scripted_runner_drives_full_pipeline(monkeypatch):
+        # Demo mode: scripted agents + pytest short-circuit, no Claude CLI, no uv.
+        monkeypatch.setattr(settings, "fake_agents", True)
+        state = ProjectState(id="demo-1", name="demo", goal="d�mo")
+        pipeline = Pipeline(state, ScriptedRunner())
+        pipeline.start()
+
+>       await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE, timeout=8)
+
+tests\test_scripted.py:26:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function test_scripted_runner_drives_full_pipeline.<locals>.<lambda> at 0x000001A30A9FD760>
+timeout = 8, interval = 0.01
+
+    async def wait_until(predicate, timeout=90.0 if os.name=="nt" else 20.0, interval=0.01):
+        import asyncio
+
+        deadline = asyncio.get_event_loop().time() + timeout
+        while not predicate():
+            if asyncio.get_event_loop().time() > deadline:
+>               raise TimeoutError("condition not met in time")
+E               TimeoutError: condition not met in time
+
+tests\conftest.py:234: TimeoutError
+_______________ test_exhausted_merge_conflict_tries_finer_split _______________
+
+fut = <coroutine object Pipeline._abuild_phase at 0x000001A309AC4040>
+timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+
+        Coroutine will be wrapped in Task.
+
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+
+        If the wait is cancelled, the task is also cancelled.
+
+        If the task supresses the cancellation and returns a value instead,
+        that value is returned.
+
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+
+
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+
+            if fut.done():
+                return fut.result()
+
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+
+        async with timeouts.timeout(timeout):
+>           return await fut
+                   ^^^^^^^^^
+
+C:\Python312\Lib\asyncio\tasks.py:520:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\pipeline.py:5742: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+autospec\orchestrator\pipeline.py:6326: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Python312\Lib\asyncio\tasks.py:464: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {<Task finished name='Task-14323' coro=<Pipeline._abuild_work_item() done, defined at C:\Users\e.millerioux\.codex\wor...t=None>, <Task cancelled name='Task-14324' coro=<Event.wait() done, defined at C:\Python312\Lib\asyncio\locks.py:199>>}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = <ProactorEventLoop running=False closed=False debug=False>
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter <= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+
+        for f in fs:
+            f.add_done_callback(_on_completion)
+
+        try:
+>           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Python312\Lib\asyncio\tasks.py:550: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A30AD6A690>
+
+    async def test_exhausted_merge_conflict_tries_finer_split(streams_on, monkeypatch):
+        """A green item whose merge conflicts PERSISTENTLY (attempts exhausted) is a
+        sizing smell � its file zones keep colliding with siblings. The finer split
+        must be attempted before declaring it FAILED (not only on red tests)."""
+        monkeypatch.setattr(settings, "dev_max_attempts", 1)
+        state = _streams_state([_us("US-1", stream="backend")])
+        pipeline = Pipeline(state, ScriptedRunner())
+        split_calls = []
+
+        async def _green(subject, worktree, pkg, is_frontend):
+            return True, ""
+
+        async def _no_merge(repo, branch, wid, worktree=None):
+            return False, ["app.py"]
+
+        async def _spy_split(item, subject, target, *, force=False):
+            split_calls.append(target.last_error)
+            return False  # judged indivisible \u2192 falls through to FAILED
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _green)
+        monkeypatch.setattr(pipeline, "_amerge_work_item", _no_merge)
+        monkeypatch.setattr(pipeline, "_amaybe_split_on_failure", _spy_split)
+>       await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+tests\test_split_on_failure.py:252:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python312\Lib\asyncio\tasks.py:519: in wait_for
+    async with timeouts.timeout(timeout):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x000001A30AD93B00>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+C:\Python312\Lib\asyncio\timeouts.py:115: TimeoutError
+____________ test_merge_conflict_requeue_resumes_preserved_branch _____________
+
+fut = <coroutine object Pipeline._abuild_phase at 0x000001A309AC4580>
+timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+
+        Coroutine will be wrapped in Task.
+
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+
+        If the wait is cancelled, the task is also cancelled.
+
+        If the task supresses the cancellation and returns a value instead,
+        that value is returned.
+
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+
+
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+
+            if fut.done():
+                return fut.result()
+
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+
+        async with timeouts.timeout(timeout):
+>           return await fut
+                   ^^^^^^^^^
+
+C:\Python312\Lib\asyncio\tasks.py:520:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\pipeline.py:5742: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+autospec\orchestrator\pipeline.py:6326: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Python312\Lib\asyncio\tasks.py:464: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {<Task cancelled name='Task-14333' coro=<Event.wait() done, defined at C:\Python312\Lib\asyncio\locks.py:199>>, <Task ...c-remediation-integration\squad-ai\Brainstorming\Autospec\backend\autospec\orchestrator\pipeline.py:7684> result=None>}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = <ProactorEventLoop running=False closed=False debug=False>
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter <= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+
+        for f in fs:
+            f.add_done_callback(_on_completion)
+
+        try:
+>           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Python312\Lib\asyncio\tasks.py:550: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A30A057350>
+
+    async def test_merge_conflict_requeue_resumes_preserved_branch(streams_on, monkeypatch):
+        """P2b: after a merge conflict, the green branch is preserved; the next pass
+        RESUMES it (rebase + re-verify + merge) � the dev agent runs exactly once."""
+        monkeypatch.setattr(settings, "dev_max_attempts", 2)
+        state = _streams_state([_us("US-1", stream="backend")])
+        pipeline = Pipeline(state, ScriptedRunner())
+        dev_runs, merges = [], []
+
+        async def _dev(subject, worktree, pkg, is_frontend):
+            dev_runs.append(subject.id)
+            return True, ""
+
+        async def _merge(repo, branch, wid, worktree=None):
+            merges.append(wid)
+            return len(merges) > 1, []  # first merge conflicts, second lands
+
+        async def _verify(subject, worktree, is_frontend):
+            subject.status = StoryStatus.GREEN
+            return True, ""
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+        monkeypatch.setattr(pipeline, "_amerge_work_item", _merge)
+        monkeypatch.setattr(pipeline, "_averify_resumed", _verify)
+>       await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+tests\test_split_on_failure.py:283:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python312\Lib\asyncio\tasks.py:519: in wait_for
+    async with timeouts.timeout(timeout):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x000001A309CA7D00>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+C:\Python312\Lib\asyncio\timeouts.py:115: TimeoutError
+________ test_persistent_merge_conflict_fails_after_exhausting_retries ________
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A307B76960>
+
+    async def test_persistent_merge_conflict_fails_after_exhausting_retries(streams_on, monkeypatch):
+        # A conflict that never clears: the item is re-queued and rebuilt on the
+        # updated HEAD each attempt, and only ends FAILED once the FUSION budget
+        # (requeue_max, P0-B) is exhausted, aborting cleanly on every failed merge.
+        monkeypatch.setattr(settings, "dev_max_attempts", 2)
+        monkeypatch.setattr(settings, "requeue_max", 1)
+        state = _streams_state([_us("US-1", stream="backend")])
+        pipeline = Pipeline(state, ScriptedRunner())
+
+        aborts = []
+        real_agit = pipeline._agit
+
+        async def _agit(ws, *args):
+            if args[:1] == ("merge",) and "--abort" not in args:
+                return 1, "CONFLICT (content): merge conflict in app.py"
+            if args[:2] == ("merge", "--abort"):
+                aborts.append(ws)
+                return await real_agit(ws, *args)
+            return await real_agit(ws, *args)
+
+        monkeypatch.setattr(pipeline, "_agit", _agit)
+        await pipeline._abuild_phase()
+
+        story = state.story("US-1")
+        assert story.status == StoryStatus.FAILED
+        assert story.last_error.startswith("conflit de merge inter-stream")
+        # P0-B: a merge conflict is a FUSION failure, so every dev attempt it
+        # consumed on entry is refunded: only the requeue budget was spent (one
+        # requeue, then the terminal attempt that exhausted it).
+        assert story.attempts == 0
+        assert story.requeue_attempts == 2
+        # Two build attempts � (one merge + one in-lock retry) = four clean aborts.
+>       assert len(aborts) == 4
+E       AssertionError: assert 2 == 4
+E        +  where 2 = len([WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/...quad-ai/Brainstorming/Autospec/backend/_pytest-completion-baseline/test_persistent_merge_conflict0/workspace/wt-proj')])
+
+tests\test_streams_build.py:210: AssertionError
+_________ test_dynamic_scheduler_starts_dependent_before_slow_sibling _________
+
+fut = <coroutine object Pipeline._abuild_phase at 0x000001A3097FFDF0>
+timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+
+        Coroutine will be wrapped in Task.
+
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+
+        If the wait is cancelled, the task is also cancelled.
+
+        If the task supresses the cancellation and returns a value instead,
+        that value is returned.
+
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+
+
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+
+            if fut.done():
+                return fut.result()
+
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+
+        async with timeouts.timeout(timeout):
+>           return await fut
+                   ^^^^^^^^^
+
+C:\Python312\Lib\asyncio\tasks.py:520:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\pipeline.py:5742: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+autospec\orchestrator\pipeline.py:6326: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Python312\Lib\asyncio\tasks.py:464: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {<Task finished name='Task-14439' coro=<Pipeline._abuild_work_item() done, defined at C:\Users\e.millerioux\.codex\wor...t=None>, <Task cancelled name='Task-14442' coro=<Event.wait() done, defined at C:\Python312\Lib\asyncio\locks.py:199>>}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = <ProactorEventLoop running=False closed=False debug=False>
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter <= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+
+        for f in fs:
+            f.add_done_callback(_on_completion)
+
+        try:
+>           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Python312\Lib\asyncio\tasks.py:550: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A3078BDFA0>
+
+    async def test_dynamic_scheduler_starts_dependent_before_slow_sibling(streams_on, monkeypatch):
+        """Dynamic dataflow: a dependent item starts as soon as its dependency merges,
+        WITHOUT waiting for a slow independent sibling to finish � proof there is no
+        batch barrier. The old batched gather() would deadlock this exact shape (A
+        waits for C, but C couldn't start until A's batch finished)."""
+        # One story, three tasks: A (slow, independent), B (fast, independent),
+        # C (depends on B). cap = max_parallel_devs = 2 (conftest) \u2192 A and B start
+        # together; C must slot in the instant B merges, while A is still running.
+        state = _streams_state([
+            _us("US-1", tasks=[
+                _task("T-A", "US-1", stream="backend"),
+                _task("T-B", "US-1", stream="backend"),
+                _task("T-C", "US-1", stream="backend", depends_on=["T-B"]),
+            ])
+        ])
+        pipeline = Pipeline(state, ScriptedRunner())
+
+        started: list[str] = []
+        c_started = asyncio.Event()
+
+        async def _spy(subject, worktree, pkg, is_frontend):
+            started.append(subject.id)
+            if subject.id == "T-C":
+                c_started.set()
+            if subject.id == "T-A":
+                # The slow sibling blocks until the dependent C has started. Under a
+                # batch barrier C can't start while A runs \u2192 this would time out.
+                await asyncio.wait_for(c_started.wait(), timeout=20)
+            return True, ""
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
+
+>       await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+tests\test_streams_build.py:380:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python312\Lib\asyncio\tasks.py:519: in wait_for
+    async with timeouts.timeout(timeout):
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x000001A305F30E40>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+C:\Python312\Lib\asyncio\timeouts.py:115: TimeoutError
+___________________ test_task_diff_available_after_rebuild ____________________
+
+streams_on = None
+
+    async def test_task_diff_available_after_rebuild(streams_on):
+        state = _state([_task("T-back", "US-1")])
+        pipeline = _register(state)
+        async with _client() as client:
+            r = await client.post("/api/projects/task-proj/tasks/T-back/rebuild")
+            assert r.status_code == 200
+            if pipeline._task is not None:
+                await pipeline._task
+            d = await client.get("/api/projects/task-proj/tasks/T-back/diff")
+            assert d.status_code == 200
+            body = d.json()
+            assert body["ok"] is True
+>           assert body["available"] is True
+E           assert False is True
+
+tests\test_task_actions.py:137: AssertionError
+__________________ test_requeue_budget_exhausted_ends_failed __________________
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A307B0C680>
+
+    async def test_requeue_budget_exhausted_ends_failed(streams_on, monkeypatch):
+        """Past ``requeue_max`` the historic ending is restored (split-on-failure is
+        pinned OFF by the conftest, so: FAILED) - the loop stays bounded."""
+        monkeypatch.setattr(settings, "requeue_max", 1)
+        state = _state("budget-conflict-exhausted")
+        pipeline = Pipeline(state, ScriptedRunner())
+        merges: list[str] = []
+
+        async def _dev(subject, worktree, pkg, is_frontend):
+            return True, ""
+
+        async def _verify(subject, worktree, is_frontend):
+            subject.status = StoryStatus.GREEN
+            return True, ""
+
+        async def _merge(repo, branch, wid, worktree=None):
+            merges.append(wid)
+            return False, ["app.py"]
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+        monkeypatch.setattr(pipeline, "_averify_resumed", _verify)
+        monkeypatch.setattr(pipeline, "_amerge_work_item", _merge)
+        await asyncio.wait_for(pipeline._abuild_phase(), timeout=60)
+
+        story = state.story("US-1")
+        assert story.status == StoryStatus.FAILED
+>       assert len(merges) == 2                 # one requeue, then the terminal pass
+        ^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 0 == 2
+E        +  where 0 = len([])
+
+tests\test_wave1_requeue_budget.py:120: AssertionError
+________________ test_a_replay_that_goes_green_merges_the_item ________________
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A309BB75F0>
+
+    async def test_a_replay_that_goes_green_merges_the_item(streams_on, monkeypatch):
+        """The repair WORKS on the replay: the item is green, merged and DONE without
+        ever re-running the dev (the first red never was a code failure)."""
+        monkeypatch.setattr(settings, "empty_red_is_infra", True)
+        state = _state("budget-empty-red-healed")
+        pipeline = Pipeline(state, ScriptedRunner())
+        calls: list[object] = []
+        purged: list[object] = []
+
+        async def _pytest(ws=None):
+            calls.append(ws)
+            if len(calls) == 1:
+                return False, "no interpreter found", {}
+            return True, "", {"tests/test_a.py::test_a": "passed"}
+
+        monkeypatch.setattr(pipeline, "_arun_pytest", _pytest)
+        monkeypatch.setattr(
+            Pipeline, "_purge_venv_dir",
+            staticmethod(lambda ws: purged.append(ws) or True),
+        )
+        await asyncio.wait_for(pipeline._abuild_phase(), timeout=60)
+
+        story = state.story("US-1")
+>       assert story.status == StoryStatus.DONE
+E       AssertionError: assert <StoryStatus.FAILED: 'failed'> == <StoryStatus.DONE: 'done'>
+E
+E         - done
+E         + failed
+
+tests\test_wave1_requeue_budget.py:241: AssertionError
+____________ test_a_contended_burst_is_verified_by_a_single_canary ____________
+
+burst_env = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A309CBD760>
+
+    async def test_a_contended_burst_is_verified_by_a_single_canary(burst_env, monkeypatch):
+        pipeline = _pipeline("burst-green")
+        h = _Harness(pipeline, monkeypatch)
+
+        await asyncio.wait_for(pipeline._abuild_phase(), timeout=180)
+
+        state = pipeline.state
+        assert sorted(h.merged) == list(_IDS)          # the three merges landed
+>       assert len(h.canary_runs) == 1                 # ONE suite for three merges
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 2 == 1
+E        +  where 2 = len(['shared', 'shared'])
+E        +    where ['shared', 'shared'] = <tests.test_wave2_canary_batch._Harness object at 0x000001A309CBC830>.canary_runs
+
+tests\test_wave2_canary_batch.py:159: AssertionError
+_______ test_a_a_persistent_conflict_is_rebuilt_solo_instead_of_failing _______
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000001A30A95F800>
+
+    async def test_a_a_persistent_conflict_is_rebuilt_solo_instead_of_failing(
+        streams_on, monkeypatch
+    ):
+        """``requeue_max`` = 1, so T-A's merge conflicts 1 + 1 times and the historic
+        code ended it FAILED. It now gets ONE solo rebuild on the final HEAD, where
+        the mocked merge lands - and it is DONE."""
+        monkeypatch.setattr(settings, "solo_on_conflict", True)
+        monkeypatch.setattr(settings, "requeue_max", 1)
+        state = _state("solo-conflict", [_task("T-A", files=["a.py"]),
+                                         _task("T-B", files=["b.py"])])
+        pipeline = Pipeline(state, ScriptedRunner())
+        starts, solo_snapshots, rivals = _trace_workers(pipeline, monkeypatch)
+        merges: list[str] = []
+        devs: list[str] = []
+
+        async def _dev(subject, worktree, pkg, is_frontend):
+            devs.append(subject.id)
+            return True, ""
+
+        async def _verify(subject, worktree, is_frontend):
+            subject.status = StoryStatus.GREEN
+            return True, ""
+
+        async def _merge(repo, branch, wid, worktree=None):
+            merges.append(wid)
+            if wid != "T-A":
+                return True, []
+            return merges.count("T-A") > 2, ["a.py"]
+
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+        monkeypatch.setattr(pipeline, "_averify_resumed", _verify)
+        monkeypatch.setattr(pipeline, "_amerge_work_item", _merge)
+        await asyncio.wait_for(pipeline._abuild_phase(), timeout=60)
+
+        task_a = state.task("T-A")
+        assert task_a.status == StoryStatus.DONE        # never FAILED on a fusion clash
+        assert state.task("T-B").status == StoryStatus.DONE
+        assert merges.count("T-A") == 3                 # 2 conflicts, then the solo merge
+        assert task_a.solo_attempted is True            # the one grant was spent
+        assert task_a.requeue_attempts == 2             # budget exhausted BEFORE the solo
+>       assert devs.count("T-A") == 1                   # the solo pass ran NO dev at all
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 3 == 1
+E        +  where 3 = <built-in method count of list object at 0x000001A30A48A200>('T-A')
+E        +    where <built-in method count of list object at 0x000001A30A48A200> = ['T-A', 'T-B', 'T-A', 'T-A'].count
+
+tests\test_wave2_solo.py:152: AssertionError
+============================== warnings summary ===============================
+tests/test_bootstrap.py::test_fastapi_feature_register_receives_application
+  C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_factory_control_boundary.py::test_real_loopback_factory_control_cli_served_gui_and_dev_proxy
+  C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\.venv\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/test_factory_control_boundary.py::test_real_loopback_factory_control_cli_served_gui_and_dev_proxy
+  C:\Users\e.millerioux\.codex\worktrees\autospec-remediation-integration\squad-ai\Brainstorming\Autospec\backend\.venv\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================ slowest 10 durations =============================
+128.04s call     tests/test_wave2_canary_batch.py::test_a_contended_burst_is_verified_by_a_single_canary
+112.63s call     tests/test_quality_contracts.py::test_TST_05_admits_twelve_actual_browser_runs_and_intact_visual_proofs
+92.99s call     tests/test_streams_build.py::test_cycle_is_broken_at_ingestion_and_everything_builds
+77.62s call     tests/test_streams_build.py::test_parallel_items_actually_overlap
+75.80s call     tests/test_split_on_failure.py::test_auto_split_on_failure_then_subtasks_build_green
+68.90s call     tests/test_streams_build.py::test_independent_cross_stream_items_build_in_parallel_and_reach_done
+67.10s call     tests/test_streams_build.py::test_persistent_merge_conflict_fails_after_exhausting_retries
+63.66s call     tests/test_streams_build.py::test_merge_is_serialized_by_lock
+60.33s call     tests/test_streams_build.py::test_dynamic_scheduler_starts_dependent_before_slow_sibling
+57.28s call     tests/test_streams_build.py::test_frontend_task_starts_only_after_backend_dep_is_merged
+=========================== short test summary info ===========================
+FAILED tests/test_browser_contracts.py::test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db
+FAILED tests/test_calibration.py::test_real_footprint_over_budget_is_counted
+FAILED tests/test_calibration.py::test_merge_requeue_and_p2b_resume_are_counted
+FAILED tests/test_git_diff_isolation.py::test_own_nested_repo_returns_only_its_commits_and_rolls_back_locally
+FAILED tests/test_merge_preserve.py::test_resume_green_branch_rebases_then_merges
+FAILED tests/test_quality_contracts.py::test_TST_05_admits_twelve_actual_browser_runs_and_intact_visual_proofs
+FAILED tests/test_rem_clean_install_integration.py::test_real_argon2_runtime_request_and_clean_lock_validation[False]
+FAILED tests/test_rem_clean_install_integration.py::test_real_argon2_runtime_request_and_clean_lock_validation[True]
+FAILED tests/test_scripted.py::test_scripted_runner_drives_full_pipeline - Ti...
+FAILED tests/test_split_on_failure.py::test_exhausted_merge_conflict_tries_finer_split
+FAILED tests/test_split_on_failure.py::test_merge_conflict_requeue_resumes_preserved_branch
+FAILED tests/test_streams_build.py::test_persistent_merge_conflict_fails_after_exhausting_retries
+FAILED tests/test_streams_build.py::test_dynamic_scheduler_starts_dependent_before_slow_sibling
+FAILED tests/test_task_actions.py::test_task_diff_available_after_rebuild - a...
+FAILED tests/test_wave1_requeue_budget.py::test_requeue_budget_exhausted_ends_failed
+FAILED tests/test_wave1_requeue_budget.py::test_a_replay_that_goes_green_merges_the_item
+FAILED tests/test_wave2_canary_batch.py::test_a_contended_burst_is_verified_by_a_single_canary
+FAILED tests/test_wave2_solo.py::test_a_a_persistent_conflict_is_rebuilt_solo_instead_of_failing
+18 failed, 3531 passed, 107 skipped, 3 warnings in 3972.27s (1:06:12)

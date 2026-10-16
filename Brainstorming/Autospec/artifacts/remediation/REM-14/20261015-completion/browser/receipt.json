@@ -1,0 +1,43 @@
+{
+  "base_image_id": "sha256:2c1f4e0fd6450f43ddb46d60c2a6df30855a8588e165b1f2559fb0eda8d7ff35",
+  "binds": [],
+  "cap_drop": [
+    "ALL"
+  ],
+  "client_network_exposed": false,
+  "container_id": "90bb48988615b72ef116ecde85f187b17a70ce85120fb0e434edc401974891af",
+  "control_token_published": false,
+  "cookie_roundtrip": true,
+  "core_integrity": "sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==",
+  "database_mount": false,
+  "host_canary_requests": [],
+  "host_chromium": false,
+  "image_id": "sha256:08a9c65535afbd50473448e3119ef6701b1880059f8ff53444aa55eab1f6cc6f",
+  "install_hooks": false,
+  "network_mode": "container:54de354cccfad6ce47127ae6730005bfa6493fb1d403c19cab7357de965a2d24",
+  "observed": {
+    "database_mount": false,
+    "docker_socket": false,
+    "external_udp": "ENETUNREACH",
+    "product_source": false,
+    "root_write": "EROFS",
+    "uid": 65532
+  },
+  "origin_preserved": true,
+  "package_integrity": "sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==",
+  "parent_id": "54de354cccfad6ce47127ae6730005bfa6493fb1d403c19cab7357de965a2d24",
+  "parent_network_mode": "none",
+  "playwright": "1.63.0",
+  "published_ports": {},
+  "qualified": true,
+  "read_only": true,
+  "recipe_sha256": "b20b61565994e276b437142226815a797fe7caab34a0b1c4b7a710d8b16f11f5",
+  "relay_port": 53420,
+  "scope": "actual isolated browser meta-test, not generated product acceptance",
+  "screenshot_sha256": "e6798155f09dac3ba2939baeee86bccde4862591fa6072445278b22270b48b14",
+  "security_opt": [
+    "no-new-privileges=true"
+  ],
+  "source_free": true,
+  "user": "65532:65532"
+}

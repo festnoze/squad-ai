@@ -1,0 +1,41 @@
+..................................F..................................... [ 47%]
+........................................................................ [ 94%]
+........                                                                 [100%]
+================================== FAILURES ===================================
+________ test_backend_glob_cannot_span_mixed_case_nested_frontend_root ________
+
+foundation = (ProjectState(id='plan-foundation', name='relais-support-rem25-20261012-final', goal='Support', auto_spec=False, produ...ainstorming/Autospec/backend/_pytest-rem10-parent-20261015/test_backend_glob_cannot_span_0/workspace/plan-foundation'))
+
+    def test_backend_glob_cannot_span_mixed_case_nested_frontend_root(foundation):
+        state,contract,ws=foundation
+        state.streams[1].file_root='Web/Front'
+>       plan=candidate(foundation)
+             ^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_plan_foundation_admission_diagnostics.py:304:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_plan_foundation_admission_diagnostics.py:103: in candidate
+    checks = acceptance.plan_policy(state,contract).required_vertical_checks
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+state = ProjectState(id='plan-foundation', name='relais-support-rem25-20261012-final', goal='Support', auto_spec=False, produc...eployed_image='', deployed_container='', deploy_host_port=0, deploy_detail='', error='', created_at=1792068850.1551485)
+contract = AcceptanceContract(brief="# Support client � sp�cification produit et technique\n\nVersion : 0.2, apr�s critique crois...ram�tr�es ; pas toute la combinatoire en navigateur.')), reviewed_by='parent-source-only-review-2026-10-12', version=1)
+
+    def plan_policy(state: ProjectState, contract: AcceptanceContract) -> PlanPolicy:
+        # ``ready`` is a cached lifecycle value, not proof that the physical
+        # deterministic scaffold still exists. Validate it before PLAN can call a
+        # provider. Brownfield and deliberately unbootstrapped projects retain
+        # their existing path; a ready greenfield stack must have its exact manifest.
+        if state.bootstrap_status == "ready":
+            foundation = bootstrap.verify_plan_foundation(
+                state, workspace_dir(state.id), state.bootstrap_fingerprint,
+            )
+            if not foundation.ok:
+>               raise ContractError(foundation.detail)
+E               autospec.contracts.ContractError: Socle PLAN absent ou incoh�rent : Les chemins du manifeste bootstrap diff�rent du socle attendu
+
+autospec\orchestrator\acceptance.py:83: ContractError
+=========================== short test summary info ===========================
+FAILED tests/test_plan_foundation_admission_diagnostics.py::test_backend_glob_cannot_span_mixed_case_nested_frontend_root
+1 failed, 151 passed in 20.25s

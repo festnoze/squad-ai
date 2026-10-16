@@ -1,0 +1,96 @@
+{
+  "snapshot_hash": "b3428407c8b4979af1988ad37edcb77006dba0722adaa9b3da048c894f222c5a",
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "checks": [
+    {
+      "check": "VERTICAL:browser_login",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:authenticated_list",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:browser_create",
+      "observed": 201,
+      "expected": 201,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:server_ticket_id",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:detail_navigation",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:detail_get_response_matches_created_values",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:detail_contains_created_values",
+      "observed": {
+        "title": true,
+        "description": true
+      },
+      "expected": {
+        "title": true,
+        "description": true
+      },
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:detail_matches_get_response",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:frontend_wiring",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "VERTICAL:unhandled_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/tickets",
+      "payload": {
+        "title": "Genuine Linux browser creation 20aa63e5aa75436bbfe8dc1b255a0738",
+        "description": "Actual Argon2 HTTP and committed SQLite audit 20aa63e5aa75436bbfe8dc1b255a0738",
+        "client_request_id": "2f298025-d6bd-430b-a259-9cca6289a784"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/68098845-60db-4be9-a279-8f62a09b4106",
+      "payload": null,
+      "query": {}
+    }
+  ]
+}

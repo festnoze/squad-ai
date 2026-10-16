@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="7.118" timestamp="2026-10-15T14:50:50.846730+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_browser_contracts" name="test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db" time="4.344"><failure message="UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d in position 161: character maps to &lt;undefined&gt;">tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-remediation-integration/squad-ai/Brainstorming/Autospec/backend/_pytest-rem14-local-counterexample/test_vertical_smoke_is_real_br0')
+
+    async def test_vertical_smoke_is_real_browser_login_create_plus_server_id_and_db(tmp_path):
+        contract=browser_contract(); subject=BrowserSubject(tmp_path/"product",contract)
+        subject.start_http()
+        try:
+            manifest=await subject.adapter.prepare_case("VERTICAL")
+            result=await browser_smoke(subject.harness(),subject.snapshot,contract.contract_hash,manifest.accounts["alice"],
+                                      title="Narrow foundation browser probe",description="Independent fixture description for foundation probe")
+            assert result["status"]=="PASS",result
+            conn=subject.connect()
+            try:
+                row=conn.execute("SELECT * FROM tickets WHERE id=?",(result["ticket_id"],)).fetchone()
+                assert row["owner_id"]==manifest.accounts["alice"].id
+                assert row["title"]=="Narrow foundation browser probe"
+                assert row["description"]=="Independent fixture description for foundation probe"
+            finally:conn.close()
+            assert {"VERTICAL:browser_login","VERTICAL:browser_create","VERTICAL:frontend_wiring"} &lt;= {tag for proof in result["proofs"] for tag in proof.checks}
+&gt;           evidence=json.loads(Path(result["proofs"][0].path).read_text())
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_browser_contracts.py:99:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Python312\Lib\pathlib.py:1028: in read_text
+    return f.read()
+           ^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;encodings.cp1252.IncrementalDecoder object at 0x0000026210F44050&gt;
+input = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x05\x00\x00\x00\x03\x84\x08\x02\x00\x00\x00qw\x0bT\x00\x00\x10\x00IDATx\...\x08\xff?\x00\x00\x00\xff\xffy\xc9\x14F\x00\x00\x00\x06IDAT\x03\x00\xcf\xe2;\x86\nCX\xdd\x00\x00\x00\x00IEND\xaeB`\x82'
+final = True
+
+    def decode(self, input, final=False):
+&gt;       return codecs.charmap_decode(input,self.errors,decoding_table)[0]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       UnicodeDecodeError: 'charmap' codec can't decode byte 0x9d in position 161: character maps to &lt;undefined&gt;
+
+C:\Python312\Lib\encodings\cp1252.py:23: UnicodeDecodeError</failure></testcase></testsuite></testsuites>
