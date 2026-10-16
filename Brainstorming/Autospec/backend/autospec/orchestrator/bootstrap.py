@@ -568,6 +568,49 @@ def prepare(state: Any, ws: Path) -> BootstrapResult:
         return BootstrapResult(False, f"Bootstrap : {exc}")
 
 
+def verify_plan_foundation(state: Any, ws: Path, expected_fingerprint: str) -> BootstrapResult:
+    """Revalidate the persisted deterministic socle before PLAN admission.
+
+    The state flag is only a cached result: this check binds the physical
+    manifest back to that state, verifies the factory-owned path set, and
+    confirms every declared artifact is still a regular in-workspace file.
+    Product edits to those files are deliberately allowed; v1 manifests do not
+    retain per-file content hashes, and the fingerprint identifies the initial
+    scaffold rather than asserting that those files remain byte-identical.
+    """
+    if getattr(state, "brownfield_path", "") or getattr(state, "product_profile", "") == "brownfield":
+        return BootstrapResult(True, "Projet existant : aucun socle déterministe à revalider", skipped=True)
+    stack = _stack(state)
+    if not stack:
+        return BootstrapResult(False, "Socle PLAN absent : stack déterministe manquante")
+    try:
+        _validate_runtime_paths(state, ws)
+        manifest_path = _existing_manifest(ws)
+        if manifest_path.is_symlink() or not manifest_path.is_file():
+            raise ValueError("Le manifeste bootstrap doit être un fichier régulier")
+        manifest_stat = manifest_path.stat()
+        if manifest_stat.st_size > 1_048_576 or manifest_stat.st_nlink != 1:
+            raise ValueError("Le manifeste bootstrap dépasse la limite ou possède un alias physique")
+        manifest = _read_manifest(ws, stack)
+        if (not isinstance(expected_fingerprint, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", expected_fingerprint)
+                or manifest["fingerprint"] != expected_fingerprint):
+            raise ValueError("Empreinte du socle différente de l'état PLAN")
+        expected_files = sorted(_templates(state, ws, stack))
+        if manifest["files"] != expected_files:
+            raise ValueError("Les chemins du manifeste bootstrap diffèrent du socle attendu")
+        for name in manifest["files"]:
+            path = _safe_path(ws, name)
+            if path.is_symlink() or not path.is_file():
+                raise ValueError(f"Fichier bootstrap absent ou non régulier : {name}")
+            if path.stat().st_nlink != 1:
+                raise ValueError(f"Fichier bootstrap lié à un alias physique : {name}")
+        return BootstrapResult(True, "Manifeste et fichiers du socle revalidés",
+                               fingerprint=manifest["fingerprint"], files=tuple(manifest["files"]))
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return BootstrapResult(False, f"Socle PLAN absent ou incohérent : {exc}", infra=True)
+
+
 def _argv(argv: list[str]) -> list[str]:
     """Resolve npm's JS entrypoint on Windows instead of shell-interpreting args."""
     executable = shutil.which(argv[0])

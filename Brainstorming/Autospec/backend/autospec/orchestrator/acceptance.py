@@ -7,6 +7,7 @@ from pathlib import Path
 from ..contracts import AcceptanceContract, ContractError, ContractStore
 from ..models import ProjectState
 from ..storage import workspace_dir
+from . import bootstrap
 from .plan_gates import PlanPolicy, vertical_contract_checks
 
 
@@ -70,6 +71,16 @@ def validate_plan_limits(contract: AcceptanceContract, max_lots: int) -> int:
 
 
 def plan_policy(state: ProjectState, contract: AcceptanceContract) -> PlanPolicy:
+    # ``ready`` is a cached lifecycle value, not proof that the physical
+    # deterministic scaffold still exists. Validate it before PLAN can call a
+    # provider. Brownfield and deliberately unbootstrapped projects retain
+    # their existing path; a ready greenfield stack must have its exact manifest.
+    if state.bootstrap_status == "ready":
+        foundation = bootstrap.verify_plan_foundation(
+            state, workspace_dir(state.id), state.bootstrap_fingerprint,
+        )
+        if not foundation.ok:
+            raise ContractError(foundation.detail)
     shared = tuple(str(f.expected["name"]) for f in contract.facts
                    if f.kind == "shared_contract" and isinstance(f.expected, dict)
                    and isinstance(f.expected.get("name"), str))
