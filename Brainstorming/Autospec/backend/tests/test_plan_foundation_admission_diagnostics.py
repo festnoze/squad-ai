@@ -13,9 +13,9 @@ import pytest
 from autospec.agents import prompts
 from autospec.agents.runner import FakeRunner
 from autospec.config import settings
-from autospec.contracts import ContractFact, import_contract
+from autospec.contracts import ContractError, ContractFact, import_contract
 from autospec.models import ProjectState, Stream, StreamKind, Task, UserStory, StoryStatus, PipelinePhase
-from autospec.orchestrator import acceptance, plan_gates, stack, workspace
+from autospec.orchestrator import acceptance, bootstrap, plan_gates, stack, workspace
 from autospec.orchestrator.pipeline import Pipeline, DeliveryBlocked
 from autospec.orchestrator.build_monitor import BuildMonitor
 from autospec.orchestrator.events import bus
@@ -45,11 +45,56 @@ def foundation(monkeypatch):
                  Stream(id='frontend',kind=StreamKind.FRONTEND,language='react',file_root='frontend')])
     acceptance.contract_store(state.id).save(contract)
     ws = workspace.scaffold(state,streams_enabled=True,ui_tests_enabled=False)
-    # Runtime readiness is fictional here; the tree is the REAL trusted factory
-    # scaffold. Native runtime qualification is a separate parent-owned probe.
-    state.bootstrap_status='ready';state.bootstrap_fingerprint='a'*64
+    # Use the real deterministic manifest interface. Native runtime
+    # qualification remains a separate parent-owned probe.
+    prepared = bootstrap.prepare(state, ws)
+    assert prepared.ok
+    state.bootstrap_status='ready';state.bootstrap_fingerprint=prepared.fingerprint
     monkeypatch.setattr(settings,'generation_only_agents',True)
     return state,contract,ws
+
+
+@pytest.mark.parametrize('damage', ['missing_file', 'non_regular_file', 'changed_fingerprint',
+                                    'changed_file_set', 'invalid_manifest', 'state_fingerprint'])
+def test_plan_policy_revalidates_physical_foundation_before_admission(foundation,damage):
+    state,contract,ws=foundation
+    manifest_path=ws/bootstrap.MANIFEST
+    manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
+    if damage == 'missing_file':
+        (ws/'main.py').unlink()
+    elif damage == 'non_regular_file':
+        (ws/'main.py').unlink()
+        (ws/'main.py').mkdir()
+    elif damage == 'changed_fingerprint':
+        manifest['fingerprint']='b'*64
+        manifest_path.write_text(json.dumps(manifest),encoding='utf-8')
+    elif damage == 'changed_file_set':
+        manifest['files'].remove('main.py')
+        manifest_path.write_text(json.dumps(manifest),encoding='utf-8')
+    elif damage == 'invalid_manifest':
+        manifest_path.write_text('{invalid json',encoding='utf-8')
+    else:
+        state.bootstrap_fingerprint='b'*64
+
+    with pytest.raises(ContractError,match='Socle PLAN'):
+        acceptance.plan_policy(state,contract)
+
+
+def test_plan_policy_allows_legitimate_bootstrap_file_content_edit(foundation):
+    state,contract,ws=foundation
+    project_config=ws/'pyproject.toml'
+    project_config.write_text(project_config.read_text(encoding='utf-8')+'\n# legitimate product edit\n',encoding='utf-8')
+    assert acceptance.plan_policy(state,contract).max_lots == 7
+
+
+async def test_missing_foundation_file_refuses_plan_before_provider(foundation):
+    state,contract,ws=foundation
+    (ws/'main.py').unlink()
+    runner=FakeRunner([])
+    pipeline=Pipeline(state,runner)
+    with pytest.raises(ContractError,match='Socle PLAN'):
+        await pipeline._aplan_phase()
+    assert not runner.calls and not state.stories
 
 
 def candidate(foundation):
@@ -256,6 +301,13 @@ def test_backend_broad_glob_cannot_own_frontend(foundation,glob):
 def test_backend_glob_cannot_span_mixed_case_nested_frontend_root(foundation):
     state,contract,ws=foundation
     state.streams[1].file_root='Web/Front'
+    # The changed root changes the factory-owned scaffold path set. Rebuild the
+    # deterministic fixture manifest for that exact state before evaluating the
+    # independent glob boundary below.
+    (ws/bootstrap.MANIFEST).unlink()
+    prepared=bootstrap.prepare(state,ws)
+    assert prepared.ok
+    state.bootstrap_status='ready';state.bootstrap_fingerprint=prepared.fingerprint
     plan=candidate(foundation)
     tasks=plan['epics'][0]['stories'][0]['tasks']
     tasks[0]['file_globs']=['Web/*/**']
@@ -263,6 +315,17 @@ def test_backend_glob_cannot_span_mixed_case_nested_frontend_root(foundation):
     tasks[2]['file_globs']=['Web/Front/src/vertical.test.tsx']
     admission=Pipeline(state,FakeRunner([]))._admit_contract_plan(plan,contract,acceptance.plan_policy(state,contract))
     assert admission.status=='fail' and any('incompatible stream root' in error for error in admission.errors)
+
+
+async def test_missing_foundation_without_formal_contract_refuses_plan_before_provider(foundation,monkeypatch):
+    state,_,ws=foundation
+    (ws/'main.py').unlink()
+    runner=FakeRunner([])
+    pipeline=Pipeline(state,runner)
+    monkeypatch.setattr(pipeline,'_acceptance_contract',lambda:None)
+    with pytest.raises(DeliveryBlocked):
+        await pipeline._aplan_phase()
+    assert not runner.calls and not state.stories
 
 
 def test_backend_root_level_nonrecursive_glob_is_still_admissible(foundation):

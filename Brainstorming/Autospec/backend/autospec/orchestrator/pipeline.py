@@ -4870,6 +4870,19 @@ class Pipeline:
         self._sync()
         pkg = workspace.package_name(self.state)
         contract = self._acceptance_contract()
+        # Formal acceptance contracts use ``plan_policy`` below to revalidate
+        # the deterministic bootstrap. Projects without a formal contract still
+        # need the same pre-provider check once their greenfield foundation has
+        # been marked ready; otherwise a removed scaffold file is only noticed
+        # after planning has already consumed a provider call.
+        if contract is None and self.state.bootstrap_status == "ready":
+            from . import bootstrap
+            foundation = bootstrap.verify_plan_foundation(
+                self.state, workspace_dir(self.state.id), self.state.bootstrap_fingerprint,
+            )
+            if not foundation.ok:
+                self._block_delivery(foundation.detail, source="plan")
+                raise DeliveryBlocked()
         policy = acceptance.plan_policy(self.state, contract) if contract else None
         if contract is not None and not contract.facts:
             self._block_delivery("Contrat source non formalisé/revu : planification refusée avant appel provider.", source="plan")
