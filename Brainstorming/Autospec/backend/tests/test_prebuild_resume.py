@@ -53,8 +53,10 @@ def pending(monkeypatch):
         assert kwargs["repair_dependencies"] is False
         calls.append("runtime")
         return bootstrap.BootstrapResult(True, "Controlled runtime port only", fingerprint=prepared.fingerprint)
-    # Match Pipeline._aplan_phase(self): reject any accidental new keyword.
-    async def plan():
+    # The continuation explicitly opts into the bounded PLAN correction path.
+    async def plan(*, plan_maker_revision_limit=0, plan_continuation_ticket=None):
+        assert plan_maker_revision_limit == 1
+        assert plan_continuation_ticket is not None
         calls.append("plan")
         state.epics = [Epic(id="E", title="One lot")]
         state.stories = [UserStory(id="S", epic_id="E", title="Book")]
@@ -358,7 +360,7 @@ async def test_final_journal_failure_never_keeps_done_or_releases_unknown(pendin
 async def test_cancel_at_plan_preserves_unknown_cost_and_stops(pending,monkeypatch):
     pipeline,calls=pending
     entered=asyncio.Event()
-    async def plan():
+    async def plan(**kwargs):
         entered.set()
         await asyncio.Event().wait()
     monkeypatch.setattr(pipeline,"_aplan_phase",plan)
@@ -370,3 +372,209 @@ async def test_cancel_at_plan_preserves_unknown_cost_and_stops(pending,monkeypat
     assert pipeline.state.phase==PipelinePhase.STOPPED
     assert pipeline.state.usage.unreported_calls==1 and pipeline.runner.calls==[]
     assert (await p.prebuild_resume(pipeline,explicit_request=True)).result=="REFUSED"
+
+
+def _plan_for(pipeline, *, wrong_limit=False):
+    return {
+        "epics": [{"id": "E-1", "title": "Books", "stories": [{
+            "id": "S-1", "title": "Book endpoint", "requirement_ids": ["BOOK-01"],
+            "tasks": [
+                {"id": "T-0", "title": "Foundation", "file_globs": ["books/foundation.py"],
+                 "requirement_ids": ["BOOK-01"]},
+                {"id": "T-1", "title": "Vertical", "file_globs": ["books/vertical.py"],
+                 "depends_on": ["T-0"], "requirement_ids": ["BOOK-01"]},
+            ],
+        }]}],
+        "lot_definition": "explicit_groups", "lots": [{"id": "L-1", "members": ["S-1"]}],
+        "milestones": {"foundation": ["T-0"], "vertical": "T-1"},
+        "contract_facts": {"LIMIT": {"max_lots": 2 if wrong_limit else 1}},
+        "technical_stack": dict(pipeline.state.technical_stack),
+    }
+
+
+def _use_real_plan_phase(pipeline, monkeypatch):
+    monkeypatch.setattr(pipeline, "_aplan_phase",
+        Pipeline._aplan_phase.__get__(pipeline, Pipeline))
+
+
+async def _run_plan_continuation(pipeline, calls, monkeypatch):
+    async def delivery():
+        calls.append("common-delivery-gates")
+        pipeline.state.delivery_ready = True
+        return True  # State-machine metatest; not product delivery evidence.
+    monkeypatch.setattr(pipeline, "_adelivery_gates", delivery)
+    _use_real_plan_phase(pipeline, monkeypatch)
+    p.start(pipeline, explicit_request=True)
+    await asyncio.wait_for(pipeline._task, timeout=5)
+
+
+async def test_preplan_correction_is_one_deterministic_maker_call_after_durable_unknown(pending, monkeypatch):
+    pipeline, calls = pending
+    runner = pipeline.runner
+    runner.queue(json.dumps(_plan_for(pipeline, wrong_limit=True)),
+                 json.dumps(_plan_for(pipeline)))
+    original_arun = runner.arun
+    observed_intent = []
+
+    async def inspect_correction_intent(prompt, system_prompt, **kwargs):
+        if len(runner.calls) == 1:
+            journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+            observed_intent.append(journal["attempts"][0]["plan_correction"]["outcome"])
+        return await original_arun(prompt, system_prompt, **kwargs)
+
+    monkeypatch.setattr(runner, "arun", inspect_correction_intent)
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    correction = journal["attempts"][0]["plan_correction"]
+    assert pipeline.state.phase == PipelinePhase.DONE and pipeline.state.delivery_ready
+    assert len(runner.calls) == 2 and observed_intent == ["UNKNOWN"]
+    assert correction["outcome"] == "admitted" and correction["admission_status"] == "pass"
+    assert correction["rejection_receipt_sha256"]
+    receipts = list((acceptance.supervisor_root(pipeline.state.id) / "plans" / "rejected").glob("*.json"))
+    assert len(receipts) == 1  # The initial immutable rejection survives the correction.
+    assert runner.calls[1]["system_prompt"] == runner.calls[0]["system_prompt"]
+    assert "Erreurs du gate" in runner.calls[1]["prompt"]
+    assert "Réponse maker rejetée" in runner.calls[1]["prompt"]
+    assert not any("critic" in call["system_prompt"].lower()
+                   or "judge" in call["system_prompt"].lower() for call in runner.calls)
+
+
+async def test_preplan_correction_rejection_does_not_loop_or_create_backlog(pending, monkeypatch):
+    pipeline, calls = pending
+    runner = pipeline.runner
+    initially_rejected = _plan_for(pipeline, wrong_limit=True)
+    still_invalid = _plan_for(pipeline)
+    still_invalid["lots"].append({"id": "L-2", "members": ["S-1"]})
+    runner.queue(json.dumps(initially_rejected), json.dumps(still_invalid),
+                 json.dumps(_plan_for(pipeline)))
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    correction = journal["attempts"][0]["plan_correction"]
+    assert pipeline.state.phase == PipelinePhase.NEEDS_ATTENTION
+    assert not pipeline.state.stories and not pipeline.state.epics
+    assert len(runner.calls) == 2  # Initial plan + sole correction, no third request.
+    assert correction["outcome"] == "rejected" and correction["admission_status"] == "fail"
+    assert len(list((acceptance.supervisor_root(pipeline.state.id) / "plans" / "rejected").glob("*.json"))) == 2
+
+
+@pytest.mark.parametrize("blocked_fact", ["budget", "unknown_usage"])
+async def test_preplan_correction_refuses_unknown_or_exhausted_cost_before_second_call(
+        pending, monkeypatch, blocked_fact):
+    pipeline, calls = pending
+    runner = pipeline.runner
+    runner.queue(json.dumps(_plan_for(pipeline, wrong_limit=True)),
+                 json.dumps(_plan_for(pipeline)))
+    original_arun = pipeline._tracked.arun
+
+    async def synthesize_unreconciled_cost(*args, **kwargs):
+        result = await original_arun(*args, **kwargs)
+        if blocked_fact == "budget":
+            pipeline.state.usage.cost_usd = pipeline.state.budget_usd
+        else:
+            pipeline.state.usage.unreported_calls = 1
+        return result
+
+    monkeypatch.setattr(pipeline._tracked, "arun", synthesize_unreconciled_cost)
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert pipeline.state.phase == PipelinePhase.NEEDS_ATTENTION
+    assert len(runner.calls) == 1
+    assert "plan_correction" not in journal["attempts"][0]
+    assert not pipeline.state.stories and not pipeline.state.epics
+
+
+async def test_nonrepairable_plan_finding_prevents_maker_correction_dispatch(pending, monkeypatch):
+    pipeline, calls = pending
+    pipeline.state.plan_findings = [{"id": "security", "severity": "major", "confirmed": True,
+        "resolution": "", "evidence": "review.json", "rationale": "unresolved blocker",
+        "decided_by": "reviewer"}]
+    pipeline.runner.queue(json.dumps(_plan_for(pipeline, wrong_limit=True)),
+                          json.dumps(_plan_for(pipeline)))
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert pipeline.state.phase == PipelinePhase.NEEDS_ATTENTION
+    assert len(pipeline.runner.calls) == 1
+    assert "plan_correction" not in journal["attempts"][0]
+    assert not pipeline.state.stories and not pipeline.state.epics
+
+
+@pytest.mark.parametrize("confirmed", [1, "true"])
+async def test_malformed_major_finding_confirmation_fails_closed_before_correction(
+        pending, monkeypatch, confirmed):
+    pipeline, calls = pending
+    pipeline.state.plan_findings = [{"id": "security", "severity": "major", "confirmed": confirmed,
+        "resolution": "", "evidence": "review.json", "rationale": "unresolved blocker",
+        "decided_by": "reviewer"}]
+    pipeline.runner.queue(json.dumps(_plan_for(pipeline, wrong_limit=True)),
+                          json.dumps(_plan_for(pipeline)))
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert pipeline.state.phase == PipelinePhase.NEEDS_ATTENTION
+    assert len(pipeline.runner.calls) == 1
+    assert "plan_correction" not in journal["attempts"][0]
+    assert not pipeline.state.stories and not pipeline.state.epics
+
+
+async def test_preplan_correction_is_not_repeated_on_later_explicit_continuation(pending, monkeypatch):
+    pipeline, calls = pending
+    runner = pipeline.runner
+    rejected = json.dumps(_plan_for(pipeline, wrong_limit=True))
+    runner.queue(rejected, rejected, rejected)
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+    assert len(runner.calls) == 2
+
+    # A completed-but-rejected revision consumes the unique project-plan turn.
+    await _run_plan_continuation(pipeline, calls, monkeypatch)
+    assert len(runner.calls) == 3  # Second invocation's maker only, no correction.
+    journal = json.loads(p._journal_path(pipeline.state).read_text(encoding="utf-8"))
+    assert len(journal["attempts"]) == 2
+    assert journal["attempts"][0]["plan_correction"]["outcome"] == "rejected"
+    assert "plan_correction" not in journal["attempts"][1]
+
+
+async def test_ordinary_plan_default_stays_off_and_opt_in_requires_the_continuation_ticket(
+        pending, monkeypatch):
+    pipeline, _ = pending
+    _use_real_plan_phase(pipeline, monkeypatch)
+    with pytest.raises(ValueError, match="continuation journal"):
+        await Pipeline._aplan_phase(pipeline, plan_maker_revision_limit=1)
+    with pytest.raises(ValueError, match="0 or 1"):
+        await Pipeline._aplan_phase(pipeline, plan_maker_revision_limit=2,
+                                    plan_continuation_ticket={})
+    forged_id = "forged-but-matching-checkpoint"
+    pipeline.state.generation_checkpoint["continuation_id"] = forged_id
+    forged_ticket = {"receipt": {"continuation_id": forged_id,
+                                  "project_id": pipeline.state.id,
+                                  "explicit_request": True}}
+    with pytest.raises(ValueError, match="Continuation PLAN absente"):
+        await Pipeline._aplan_phase(pipeline, plan_maker_revision_limit=1,
+                                    plan_continuation_ticket=forged_ticket)
+    assert pipeline.runner.calls == []
+
+    pipeline.runner.queue(json.dumps(_plan_for(pipeline, wrong_limit=True)))
+    with pytest.raises(DeliveryBlocked):
+        await Pipeline._aplan_phase(pipeline)
+    assert len(pipeline.runner.calls) == 1  # The legacy/default route never self-corrects.
+    assert not pipeline.state.stories and not pipeline.state.epics
+
+
+async def test_optin_requires_strict_explicit_flag_in_ticket_and_current_journal(pending, monkeypatch):
+    pipeline, _ = pending
+    ticket = p.admit(pipeline, explicit_request=True)
+    continuation_id = ticket["receipt"]["continuation_id"]
+    pipeline.state.generation_checkpoint["continuation_id"] = continuation_id
+    path = p._journal_path(pipeline.state)
+    journal = json.loads(path.read_text(encoding="utf-8"))
+    journal["attempts"][0]["explicit_request"] = False
+    atomic_json(path, journal)
+
+    _use_real_plan_phase(pipeline, monkeypatch)
+    with pytest.raises(ValueError, match="Continuation PLAN absente"):
+        await Pipeline._aplan_phase(pipeline, plan_maker_revision_limit=1,
+                                    plan_continuation_ticket=ticket)
+    assert pipeline.runner.calls == []
