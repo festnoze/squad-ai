@@ -64,11 +64,17 @@ def cli(action,params):
                 if not con.execute("SELECT id FROM tickets WHERE id=?",(t["id"],)).fetchone():
                     con.execute("INSERT INTO tickets VALUES(?,?,?,?,?,?,?,?,?,?)",(t["id"],t["owner_id"],t["title"],t["description"],"open","normal",None,1,"2026-10-01T12:00:00Z","2026-10-01T12:00:00Z"))
             con.execute("INSERT OR REPLACE INTO fixture_flags VALUES('bug',?)",(p.get("bug",""),))
+            con.execute("INSERT OR REPLACE INTO fixture_flags VALUES('public_mode',?)",("true" if p.get("public_mode",False) is True else "false",))
         return 0
     if action=="reject": return 9
     return 2
 def error(status,code): return JSONResponse({"error":{"code":code,"message":code}},status_code=status)
 def authenticate(request,con,mutation=False):
+    public=con.execute("SELECT value FROM fixture_flags WHERE name='public_mode'").fetchone()
+    if public and public[0]=="true":
+        actor=con.execute("SELECT * FROM users WHERE email_normalized='alice@example.test'").fetchone()
+        if not actor or not actor["active"]: return None,error(401,"UNAUTHENTICATED")
+        return dict(actor),None
     token=request.cookies.get("sid","")
     row=con.execute("SELECT users.*,sessions.csrf,sessions.expires_at FROM users JOIN sessions ON users.id=sessions.user_id WHERE sessions.token_hash=?",(hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
     if not row or not row["active"] or row["expires_at"]<=now(): return None,error(401,"UNAUTHENTICATED")
@@ -178,20 +184,22 @@ async def message(id:str,request:Request):
 @app.get("/api/health")
 def health(): return {"status":"ok"}
 
-HTML='''<!doctype html><html><body><form id="auth"><input id="email" aria-label="Email"><input id="password" type="password" aria-label="Password"><button id="login">Login</button></form><section id="tickets" hidden><button id="create">Créer</button><form id="creation" hidden><input id="title" aria-label="Title"><textarea id="description" aria-label="Description"></textarea><button id="submit">Envoyer</button></form></section><article id="detail" data-bug="__BUG__" hidden></article><script>
+HTML='''<!doctype html><html><body><form id="auth" __AUTH_STATE__><input id="email" aria-label="Email"><input id="password" type="password" aria-label="Password"><button id="login">Login</button></form><section id="tickets" __TICKETS_STATE__><button id="create">Créer</button><form id="creation" hidden><input id="title" aria-label="Title"><textarea id="description" aria-label="Description"></textarea><button id="submit">Envoyer</button></form></section><article id="detail" data-bug="__BUG__" hidden><h1 id="detail-title"></h1><p id="detail-description"></p></article><script>
 let csrf=''; document.querySelector('#auth').onsubmit=async e=>{e.preventDefault();let r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value})});let p=await r.json();if(r.ok){csrf=p.csrf_token;auth.hidden=true;tickets.hidden=false;}};
-create.onclick=()=>creation.hidden=false; creation.onsubmit=async e=>{e.preventDefault();let r=await fetch('/api/tickets',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({title:title.value,description:description.value,client_request_id:crypto.randomUUID()})});let p=await r.json();if(r.ok){history.pushState({},'',`/tickets/${p.id}`);let bug=detail.dataset.bug;let t;if(bug==='missing_detail_get'){t={title:p.title,description:description.value};}else if(bug==='local_echo_with_unused_get'){let d=await fetch(`/api/tickets/${p.id}`,{headers:{'X-Fixture-View':'browser'}});await d.json();t={title:p.title,description:description.value};}else{let d=await fetch(`/api/tickets/${p.id}`);t=await d.json();}detail.textContent=bug==='static_detail'?'Ticket créé':bug==='wrong_detail'?t.title+' (wrong)\\n'+t.description:t.title+'\\n'+t.description;detail.hidden=false;creation.hidden=true;}};
+create.onclick=()=>creation.hidden=false; creation.onsubmit=async e=>{e.preventDefault();let r=await fetch('/api/tickets',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:JSON.stringify({title:title.value,description:description.value,client_request_id:crypto.randomUUID()})});let p=await r.json();if(r.ok){history.pushState({},'',`/tickets/${p.id}`);let bug=detail.dataset.bug;let t;if(bug==='missing_detail_get'){t={title:p.title,description:description.value};}else if(bug==='local_echo_with_unused_get'){let d=await fetch(`/api/tickets/${p.id}`,{headers:{'X-Fixture-View':'browser'}});await d.json();t={title:p.title,description:description.value};}else{let d=await fetch(`/api/tickets/${p.id}`);t=await d.json();}document.querySelector('#detail-title').textContent=bug==='static_detail'?'Ticket créé':bug==='wrong_detail'?t.title+' (wrong)':t.title;document.querySelector('#detail-description').textContent=t.description;detail.hidden=false;creation.hidden=true;}};
 </script></body></html>'''
 @app.get("/",response_class=HTMLResponse)
 @app.get("/tickets/{id}",response_class=HTMLResponse)
 def home():
-    bug=""
+    bug="";public=False
     try:
         with connect() as con:
             row=con.execute("SELECT value FROM fixture_flags WHERE name='bug'").fetchone()
             bug=row[0] if row else ""
+            public_row=con.execute("SELECT value FROM fixture_flags WHERE name='public_mode'").fetchone()
+            public=bool(public_row and public_row[0]=="true")
     except Exception: pass
-    return HTML.replace("__BUG__",bug)
+    return HTML.replace("__BUG__",bug).replace("__AUTH_STATE__","hidden" if public else "").replace("__TICKETS_STATE__","" if public else "hidden")
 if __name__=="__main__":
     if len(sys.argv)>1: sys.exit(cli(sys.argv[1],json.load(sys.stdin)))
     if os.path.exists(DB):

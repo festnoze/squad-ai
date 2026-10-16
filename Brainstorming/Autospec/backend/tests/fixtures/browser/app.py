@@ -33,7 +33,7 @@ def fixture_snapshot(bug):
     files = [Path(__file__), Path(__file__).with_name("ui.html"), Path(inspect.getfile(SQLiteSupportSubject))]
     return hashlib.sha256(b"".join(path.read_bytes() for path in files) + bug.encode()).hexdigest()
 CONTROLS = {name: "#" + identifier for name, identifier in {
-    "email":"email", "password":"password", "login":"login", "ticket_list":"ticket-list", "detail":"detail", "detail_title":"detail-title", "detail_status":"detail-status",
+    "email":"email", "password":"password", "login":"login", "ticket_list":"ticket-list", "detail":"detail", "detail_title":"detail-title", "detail_description":"detail-description", "detail_status":"detail-status",
     "create":"create", "ticket_nav":"tickets", "admin_nav":"admin-nav", "title":"title", "description":"description", "submit":"submit", "search":"search",
     "reply":"reply", "send":"send", "messages":"messages", "visibility":"visibility", "logout":"logout",
     "refresh":"refresh", "retry":"retry", "reply_retry":"reply-retry", "loading":"loading", "empty":"empty", "error":"error",

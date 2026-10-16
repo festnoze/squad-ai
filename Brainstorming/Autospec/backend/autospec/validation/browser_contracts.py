@@ -30,6 +30,17 @@ BROWSER_NETWORK_LIMITS = ["HTTP(S) interception, blocked Service Workers and den
     "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."]
 
 
+def _exact_detail_bindings(harness):
+    required={"detail_title","detail_description"}
+    if not required<=set(harness.bindings):
+        raise AdapterUnavailable("exact detail title/description browser bindings required for frontend wiring")
+
+
+async def _check_optional_no_auth_login_visibility(harness,case,page):
+    if "login" in harness.bindings:
+        case.check("login_hidden",await harness.control(page,"login").is_visible(),False)
+
+
 async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *, title, description, viewport_width=1280):
     """Narrow real-browser foundation proof, NOT a SEC/FUN/UX acceptance verdict.
 
@@ -59,6 +70,8 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
             await case.capture(page,"browser_login")
         else:
             case.check("authentication", "N/A", "N/A")
+            await _check_optional_no_auth_login_visibility(harness,case,page)
+            case.check("ticket_list_visible", await case.visible(page,"ticket_list"))
         await harness.control(page,"create").click()
         await harness.control(page,"title").fill(title)
         await harness.control(page,"description").fill(description)
@@ -89,9 +102,11 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
         response_matches_created=(detail_response is not None and detail_response.status==200 and
             detail_payload.get("id")==ticket_id and detail_payload.get("title")==title and
             detail_payload.get("description")==description)
+        _exact_detail_bindings(harness)
+        rendered_title=await harness.control(page,"detail_title").inner_text()
+        rendered_description=await harness.control(page,"detail_description").inner_text()
         display_matches_response=(detail_response is not None and detail_response.status==200 and
-            isinstance(detail_payload.get("title"),str) and isinstance(detail_payload.get("description"),str) and
-            detail_payload["title"] in detail_text and detail_payload["description"] in detail_text)
+            rendered_title==detail_payload.get("title") and rendered_description==detail_payload.get("description"))
         case.check("detail_get_response_matches_created_values",response_matches_created)
         case.check("detail_contains_created_values",
             {"title":title in detail_text,"description":description in detail_text},
@@ -102,6 +117,8 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
         required_requests = {("POST", "/api/tickets"), ("GET", "/api/tickets/" + str(ticket_id))}
         if auth_required:
             required_requests.add(("POST", "/api/auth/login"))
+        else:
+            case.check("no_login_http",not any(method=="POST" and path=="/api/auth/login" for method,path in sent))
         case.check("frontend_wiring", required_requests <= sent and bool(ticket_id) and display_matches_response)
         await case.capture(page,"frontend_wiring")
         case.check("unhandled_console", case.console_errors, [])
