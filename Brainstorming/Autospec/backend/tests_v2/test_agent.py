@@ -119,9 +119,25 @@ def test_stray_line_before_the_json_is_tolerated():
 
 def test_is_error_is_a_cli_error_with_partial_result():
     with pytest.raises(AgentError) as info:
-        parse_cli_output(_payload(is_error=True, result="API Error: 529"))
-    assert info.value.kind == "cli" and "529" in str(info.value)
+        parse_cli_output(_payload(is_error=True, result="API Error: 400 invalid request"))
+    assert info.value.kind == "cli" and "400" in str(info.value)
     assert info.value.result.cost_usd == pytest.approx(0.0123)
+
+
+@pytest.mark.parametrize("detail", [
+    "API Error: Can't reach the API server - check your internet or DNS (ENOTFOUND)",
+    "API Error: 529 Overloaded", "API Error: socket hang up (ECONNRESET)",
+])
+def test_provider_connectivity_errors_are_network(detail):
+    with pytest.raises(AgentError) as info:
+        parse_cli_output(_payload(is_error=True, result=detail))
+    assert info.value.kind == "network"
+
+
+def test_a_usage_limit_is_its_own_kind():
+    with pytest.raises(AgentError) as info:
+        parse_cli_output(_payload(is_error=True, result="Claude AI usage limit reached|1793640000"))
+    assert info.value.kind == "limit"
 
 
 def test_non_success_subtype_is_a_cli_error():
@@ -212,7 +228,7 @@ async def test_tool_calls_require_a_cwd(fake):
 
 
 @pytest.mark.parametrize(("scenario", "kind", "has_result"), [
-    ("is_error", "cli", True),
+    ("is_error", "network", True),  # the fake emits "API Error: 529 overloaded"
     ("budget", "budget", True),
     ("garbage", "cli", False),
     ("nonzero", "cli", False),

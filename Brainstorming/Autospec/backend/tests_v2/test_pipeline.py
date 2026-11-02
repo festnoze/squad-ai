@@ -258,6 +258,38 @@ async def test_agent_timeout_costs_an_attempt_and_restarts_a_fresh_session(ws, s
     assert dev_calls[1].resume_session_id is None
 
 
+async def test_a_provider_blip_is_retried_without_costing_an_attempt(ws, settings, monkeypatch):
+    monkeypatch.setattr(Pipeline, "network_retry_delays_s", (0.0, 0.0))
+    runner = _runner(dev=[AgentError("Can't reach the API server", "network"), demo_dev(PKG)])
+    state = await Pipeline(_state(), ws, runner, settings).arun()
+
+    assert state.phase == Phase.DONE, state.error
+    assert state.story("US-1").attempts == 1
+
+
+async def test_a_provider_outage_parks_the_project_and_refunds_the_attempt(ws, settings, monkeypatch):
+    monkeypatch.setattr(Pipeline, "network_retry_delays_s", (0.0,))
+    outage = AgentError("Can't reach the API server (ENOTFOUND)", "network")
+    runner = _runner(dev=outage)
+    state = await Pipeline(_state(), ws, runner, settings).arun()
+
+    assert state.phase == Phase.NEEDS_ATTENTION
+    assert "ENOTFOUND" in state.error
+    assert state.story("US-1").attempts == 0, "an outage must not burn the dev's attempts"
+    assert [c.role for c in runner.calls].count("dev") == 2, "one call plus one retry"
+
+    resumed = await Pipeline(Store(ws).load(), ws, _runner(), settings).arun()
+    assert resumed.phase == Phase.DONE, resumed.error
+
+
+async def test_a_usage_limit_parks_at_once(ws, settings):
+    runner = _runner(qa=AgentError("usage limit reached", "limit"))
+    state = await Pipeline(_state(), ws, runner, settings).arun()
+
+    assert state.phase == Phase.NEEDS_ATTENTION and "usage limit" in state.error
+    assert [c.role for c in runner.calls] == ["po", "qa"]
+
+
 async def test_project_budget_parks_before_overspending(ws, settings):
     runner = _runner()
     state = await Pipeline(_state(), ws, runner, replace(settings, project_budget_usd=0.025)).arun()

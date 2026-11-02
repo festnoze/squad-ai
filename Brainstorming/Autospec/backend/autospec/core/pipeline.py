@@ -30,6 +30,9 @@ class Parked(Exception):
 
 
 class Pipeline:
+    # Waits before re-trying a call the provider could not serve (network, overload).
+    network_retry_delays_s: tuple[float, ...] = (30.0, 90.0)
+
     def __init__(self, state: ProjectState, ws: Path, runner: AgentRunner, settings: Settings,
                  *, on_event: Callable[[dict], None] | None = None):
         self.state = state
@@ -77,15 +80,21 @@ class Pipeline:
             timeout_s=self.settings.agent_timeout_s,
             max_budget_usd=round(min(self.settings.call_budget_usd, remaining), 2),
         )
-        self._emit("agent_start", role=role, resume=bool(resume))
-        try:
-            result = await self.runner.arun(call)
-        except AgentError as exc:
-            self._account(exc.result)
-            self._emit("agent_error", role=role, kind=exc.kind, message=str(exc)[:500])
-            if exc.kind in ("budget", "unavailable"):
-                raise Parked(f"{role} agent: {exc}") from exc
-            raise
+        delays = list(self.network_retry_delays_s)
+        while True:
+            self._emit("agent_start", role=role, resume=bool(resume))
+            try:
+                result = await self.runner.arun(call)
+                break
+            except AgentError as exc:
+                self._account(exc.result)
+                self._emit("agent_error", role=role, kind=exc.kind, message=str(exc)[:500])
+                if exc.kind == "network" and delays:
+                    await asyncio.sleep(delays.pop(0))  # provider blip: the agent did nothing wrong
+                    continue
+                if exc.kind in ("budget", "unavailable", "network", "limit"):
+                    raise Parked(f"{role} agent: {exc}") from exc
+                raise
         self._account(result)
         self._emit("agent_end", role=role, cost_usd=result.cost_usd, turns=result.num_turns,
                    denials=len(result.denials))
@@ -292,6 +301,10 @@ class Pipeline:
                                                    repo_tree=verify.repo_tree(self.ws)), None
             try:
                 result = await self._acall("dev", prompt, Capability.DEV, resume=resume)
+            except Parked:
+                story.attempts -= 1  # an infrastructure stop is not a failed attempt
+                self._save()
+                raise
             except AgentError as exc:
                 feedback = story.last_error = f"the dev session ended with an error: {exc}"
                 story.dev_session_id = None

@@ -45,7 +45,9 @@ class AgentError(RuntimeError):
     """A session that produced no usable result.
 
     ``kind`` is one of: "timeout", "cli" (non-zero exit / is_error), "budget",
-    "unavailable" (CLI not found). ``result`` carries the partial usage when known.
+    "unavailable" (CLI not found), "network" (provider unreachable or overloaded,
+    transient) and "limit" (subscription usage limit). ``result`` carries the partial
+    usage when known.
     """
 
     def __init__(self, message: str, kind: str, result: AgentResult | None = None):

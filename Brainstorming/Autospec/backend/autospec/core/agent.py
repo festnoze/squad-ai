@@ -141,11 +141,25 @@ def parse_cli_output(stdout: str) -> AgentResult:
     )
     subtype = data.get("subtype")
     if data.get("is_error") or subtype != "success":
-        kind = "budget" if subtype == "error_max_budget_usd" else "cli"
         detail = data.get("result") or data.get("errors") or ""
+        kind = "budget" if subtype == "error_max_budget_usd" else _infra_kind(str(detail)) or "cli"
         raise AgentError(f"claude session failed ({subtype}): {_tail(str(detail), 500)}",
                          kind=kind, result=result)
     return result
+
+
+_NETWORK = re.compile(r"can't reach the api|ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|"
+                      r"socket hang up|overloaded|\b529\b|\b503\b|connection error", re.IGNORECASE)
+_LIMIT = re.compile(r"usage limit|limit reached|rate limit", re.IGNORECASE)
+
+
+def _infra_kind(detail: str) -> str | None:
+    """A provider-side failure, not the agent's work: "network" (transient) or "limit"."""
+    if _LIMIT.search(detail):
+        return "limit"
+    if _NETWORK.search(detail):
+        return "network"
+    return None
 
 
 def _tail(text: str, limit: int = 2000) -> str:
