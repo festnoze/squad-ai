@@ -1,0 +1,447 @@
+{
+  "date": "2026-11-02",
+  "config": "c",
+  "project": "B5",
+  "model": "sonnet",
+  "git_sha": "964d808a",
+  "brief_sha256": "b20d9a2599427a9f76a41a69cfeef57dd1b5330ce35fec8b4d6ac4cd91f64f0a",
+  "bench_version": 2,
+  "m1_completed": false,
+  "m2_duration_s": 9701.16,
+  "m3_cost_usd": 2.455044,
+  "m4_agent_calls": 21,
+  "m8_interventions": 0,
+  "factory": {
+    "completed": false,
+    "phase": "needs_attention",
+    "error": "US-8 failed: the dev session ended with an error: claude session failed (success): API Error: Can't reach the API server � check your internet or DNS (ENOTFOUND)",
+    "workspace": "C:\\Dev\\squad-ai\\.claude\\worktrees\\autospec-bench\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\c\\B5-150751\\relais-support-cfc780e3",
+    "duration_s": 9701.16,
+    "cost_usd": 2.455044,
+    "agent_calls": 21,
+    "timed_out": false,
+    "stories": [
+      {
+        "id": "US-1",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-2",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-3",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-4",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-5",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-6",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-7",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-8",
+        "status": "failed",
+        "attempts": 3
+      },
+      {
+        "id": "US-9",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-10",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-11",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-12",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-13",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-14",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-15",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-16",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-17",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-18",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-19",
+        "status": "todo",
+        "attempts": 0
+      },
+      {
+        "id": "US-20",
+        "status": "todo",
+        "attempts": 0
+      }
+    ]
+  },
+  "oracle": {
+    "lock_present": true,
+    "env_built": true,
+    "env_detail": "",
+    "frontend_built": true,
+    "frontend_detail": "",
+    "m5_suite": {
+      "green": false,
+      "passed": 85,
+      "failed": 5,
+      "detail": "...ient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\r\n    from starlette.testclient import TestClient as TestClient  # noqa\r\n\r\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\r\n=========================== short test summary info ===========================\r\nFAILED tests/acceptance/test_us_8.py::test_ac1_role_scope_defaults_and_total\r\nFAILED tests/acceptance/test_us_8.py::test_ac2_stable_order_no_duplicate_no_gap\r\nFAILED tests/acceptance/test_us_8.py::test_ac2_page_beyond_last_is_empty_with_total\r\nFAILED tests/acceptance/test_us_8.py::test_ac3_bounds_rejected_and_max_accepted\r\nFAILED tests/acceptance/test_us_8.py::test_ac4_anonymous_gets_401 - Assertion...\r\n5 failed, 69 passed, 1 warning in 28.41s\r\n",
+      "frontend": {
+        "green": true,
+        "passed": 16,
+        "failed": 0,
+        "detail": "\n> relais-support-frontend@0.1.0 test\n> vitest run\n\n\n RUN  v5.0.5 C:/Users/e.millerioux/AppData/Local/Temp/bench-oracle-f9xq30cv/product/frontend\n\n\n Test Files  10 passed (10)\n      Tests  16 passed (16)\n   Start at  18:04:40\n   Duration  4.32s (environment 78%, import 12%, tests 7%, transform 2%, worker 1%)\n\n\n"
+      }
+    },
+    "m6_oracle": {
+      "passed": 5,
+      "total": 57,
+      "rate": 0.088,
+      "not_automated": 22,
+      "checks": [
+        {
+          "id": "SEC-01",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-02",
+          "passed": false,
+          "detail": "deactivate -> 405 {\"error\":{\"code\":\"method_not_allowed\",\"message\":\"Méthode non autorisée.\"}}"
+        },
+        {
+          "id": "SEC-03",
+          "passed": false,
+          "detail": "password of 129 characters -> 201, expected 422"
+        },
+        {
+          "id": "SEC-04",
+          "passed": false,
+          "detail": "deactivate sec04-off"
+        },
+        {
+          "id": "SEC-05",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-06",
+          "passed": false,
+          "detail": "deactivate"
+        },
+        {
+          "id": "SEC-07",
+          "passed": false,
+          "detail": "GET /api/tickets {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "SEC-08",
+          "passed": false,
+          "detail": "anonymous PATCH /api/users/{} -> 405; anonymous GET /api/tickets -> 404; anonymous PATCH /api/tickets/{} -> 405; anonymous GET /api/tickets/{}/messages -> 404; anonymous POST /api/tickets/{}/messages -> 405; anonymous GET /api/tickets/{}/history -> 404 (+4)"
+        },
+        {
+          "id": "SEC-09",
+          "passed": false,
+          "detail": "GET /api/tickets/10/messages {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "SEC-10",
+          "passed": false,
+          "detail": "messages -> [405, 405, 405]"
+        },
+        {
+          "id": "SEC-11",
+          "passed": false,
+          "detail": "GET /api/tickets {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "SEC-12",
+          "passed": false,
+          "detail": "GET /api/tickets/2/messages {'page': 1, 'page_size': 50} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "SEC-13",
+          "passed": false,
+          "detail": "deactivate the second admin"
+        },
+        {
+          "id": "SEC-14",
+          "passed": false,
+          "detail": "deactivate sec14"
+        },
+        {
+          "id": "SEC-15",
+          "passed": false,
+          "detail": "no Cache-Control: no-store on ['tickets', 'messages', 'dashboard']"
+        },
+        {
+          "id": "FUN-01",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "FUN-02",
+          "passed": false,
+          "detail": "GET /api/tickets {'page': 1, 'page_size': 50} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "FUN-03",
+          "passed": false,
+          "detail": "priority change -> 405 {\"error\":{\"code\":\"method_not_allowed\",\"message\":\"Méthode non autorisée.\"}}"
+        },
+        {
+          "id": "FUN-04",
+          "passed": false,
+          "detail": "assign"
+        },
+        {
+          "id": "FUN-05",
+          "passed": false,
+          "detail": "client message -> 405 {\"error\":{\"code\":\"method_not_allowed\",\"message\":\"Méthode non autorisée.\"}}"
+        },
+        {
+          "id": "FUN-06",
+          "passed": false,
+          "detail": "GET /api/tickets/16/history {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "FUN-07",
+          "passed": false,
+          "detail": "GET /api/tickets {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}; after restart: nothing recorded before the restart"
+        },
+        {
+          "id": "FUN-08",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "FUN-09",
+          "passed": false,
+          "detail": "assign"
+        },
+        {
+          "id": "FUN-10",
+          "passed": false,
+          "detail": "public message"
+        },
+        {
+          "id": "FUN-11",
+          "passed": false,
+          "detail": "GET /api/tickets {'page_size': 1} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "FUN-12",
+          "passed": false,
+          "detail": "GET /api/dashboard -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}, expected {total, by_status: {open, in_progress, resolved, closed}}"
+        },
+        {
+          "id": "FUN-13",
+          "passed": false,
+          "detail": "GET /api/tickets/15/history {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "ARC-01",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-03",
+          "passed": false,
+          "detail": "GET /api/tickets {} -> 404 {\"error\":{\"code\":\"not_found\",\"message\":\"Ressource introuvable.\"}}"
+        },
+        {
+          "id": "ARC-04",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-06",
+          "passed": false,
+          "detail": "OpenAPI misses ['PATCH /api/users/{}', 'GET /api/tickets', 'PATCH /api/tickets/{}', 'GET /api/tickets/{}/messages', 'POST /api/tickets/{}/messages', 'GET /api/tickets/{}/history', 'GET /api/dashboard']"
+        },
+        {
+          "id": "ARC-07",
+          "passed": false,
+          "detail": "message"
+        },
+        {
+          "id": "ARC-08",
+          "passed": false,
+          "detail": "message"
+        },
+        {
+          "id": "ARC-09",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-01",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-03",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-04",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-06",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-07",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-08",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "TST-01",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-03",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-04",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-06",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "OPS-01",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "OPS-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "OPS-03",
+          "passed": false,
+          "detail": "anonymous GET /api/tickets -> 404, expected 401"
+        },
+        {
+          "id": "OPS-04",
+          "passed": false,
+          "detail": "public message; after restart: nothing recorded before the restart"
+        },
+        {
+          "id": "OPS-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "OPS-06",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": "GET / -> 200"
+    },
+    "duration_s": 56.2
+  },
+  "rejudged": {
+    "git_sha": "03d3a7f0",
+    "note": "parked at US-8/20 by a provider DNS outage (ENOTFOUND x3, fixed in 03d3a7f0); oracle fixes: 8.3 temp path, locked WAL"
+  }
+}

@@ -639,3 +639,26 @@ Prochaines étapes proposées, dans l'ordre :
 - **Phase 3 livrée côté noyau** : profil fullstack (FastAPI + React/Vite/TypeScript, tests
   d'acceptance pytest et vitest, garde-fous sur la configuration de test du frontend), vérifié de
   bout en bout avec de vrais npm, uv et git. Mesure B4 à suivre.
+
+### 11.2 Mise à jour : fullstack (B4) et Relais Support (B5)
+
+| Projet | B : harness nu | C : v2 (taille adaptative) |
+|---|---|---|
+| B4 compteur fullstack | 1,8 min, 0,11 $, suite 8/8, oracle 8/8 | 8,2 min, 0,32 $, suite 20/20, oracle 8/8 |
+| B5 Relais Support | 16 min, 2,29 $, suite 165/165, 33 des 35 critères automatisés | 20 stories planifiées ; 7 livrées en 38 min puis garé par une coupure DNS du fournisseur ; reprise en cours |
+
+- **Le harness nu tient jusqu'à B5.** Sur le produit qui avait mis v1 en échec en octobre
+  (116 min, 21,81 $, 27 critères en échec), une seule session Claude Code confinée livre en
+  16 min un produit dont 33 des 35 critères automatisables passent. Les deux échecs sont réels :
+  `X-Forwarded-For` accepté par uvicorn (SEC-04) et pas de document OpenAPI (ARC-06).
+- **Les défauts trouvés par ces runs sont tous d'infrastructure**, aucun de méthode :
+  - oracle : chemins Windows 8.3 sur lesquels Vitest échoue, fichier WAL de SQLite verrouillé ;
+  - noyau : une panne réseau du fournisseur consommait les tentatives du dev (désormais
+    réessayée, puis projet garé sans pénalité) ;
+  - temps de vérification : un contrôle « rouge » de 3 min 40 sur B5, à cause de tests rouges
+    lents ; chaque passage de suite émet désormais sa durée.
+- Lecture provisoire, à confirmer par la fin de la reprise B5 : la valeur de la méthode n'apparaît
+  toujours pas dans la qualité mesurée, car l'oracle ne voit pas de différence. Ce qu'elle apporte
+  de démontré, c'est la confiance : tests d'acceptance écrits avant et intouchables, preuve rejouée
+  en environnement propre, reprise après panne. Son coût devrait donc être celui d'une couche de
+  vérification autour du harness, et non celui d'un pipeline de stories.
