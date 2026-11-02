@@ -270,12 +270,32 @@ class World:
                       extra_env={"RELAIS_DB": str(self.db), "RELAIS_ORIGIN": origin})
 
     def db_bytes(self) -> bytes:
-        """Raw bytes of the database file and its journals (read only, format agnostic)."""
+        """Raw bytes of the database file and its journals (read only, format agnostic).
+
+        On Windows the running server may hold the WAL without read sharing: SQLite's own
+        online backup (which includes the committed WAL content) is then read instead.
+        """
         data = b""
+        locked = False
         for suffix in ("", "-wal", "-journal"):
             path = Path(f"{self.db}{suffix}")
             if path.is_file():
-                data += path.read_bytes()
+                try:
+                    data += path.read_bytes()
+                except PermissionError:
+                    locked = True
+        if locked:
+            import sqlite3
+            copy = Path(f"{self.db}.oracle-backup")
+            source = sqlite3.connect(f"file:{self.db}?mode=ro", uri=True)
+            target = sqlite3.connect(copy)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+                source.close()
+            data += copy.read_bytes()
+            copy.unlink(missing_ok=True)
         return data
 
     # -- HTTP helpers
