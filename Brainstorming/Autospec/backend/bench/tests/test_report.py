@@ -32,3 +32,19 @@ def test_oracle_only_rows_show_not_applicable_completion(tmp_path):
             m3_cost_usd=None, m4_agent_calls=None)
 
     assert "| B2 | v1-legacy | sonnet | n/a |  |  |  |" in build(tmp_path)
+
+
+def test_rows_with_not_automated_criteria_show_their_count(tmp_path):
+    checks = [{"id": "SEC-01", "passed": True, "detail": ""},
+              {"id": "UX-01", "passed": False, "detail": "NOT_AUTOMATED"},
+              {"id": "UX-02", "passed": False, "detail": "NOT_AUTOMATED"}]
+    oracle = {"m5_suite": {"green": True, "passed": 3, "failed": 0},
+              "m6_oracle": {"passed": 1, "total": 3, "rate": 0.333, "checks": checks},
+              "m7_smoke": {"ok": True, "detail": ""}}
+    _result(tmp_path, "2026-11-03", "c", "B5", 1, oracle=oracle)
+    _result(tmp_path, "2026-11-03", "c", "B4", 1)
+
+    text = build(tmp_path)
+
+    assert "| 3/3 vert | 1/3 (2 NOT_AUTOMATED) | oui |" in text
+    assert "| 10/10 vert | 9/10 | oui |" in text

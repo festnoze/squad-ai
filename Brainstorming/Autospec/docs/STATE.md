@@ -8,11 +8,21 @@ travail ajoute une entrée au journal, en tête.
 - Phases 0, 1 et 2 faites : banc opérationnel, noyau v2 séquentiel pour les profils lib, cli et api,
   mesuré sur B1 à B3 (résultats et lecture : `docs/REFONTE_V2.md` section 11, tableau :
   `docs/bench/README.md`).
-- Prochaine étape proposée : phase 3 (fullstack, B4) et B5, pour trouver où le harness nu échoue.
+- Phase 3 livrée côté noyau (fullstack) ; taille adaptative mesurée et adoptée (v2 trois fois moins
+  chère sur B1-B3). Prochaine étape : mesurer B4 (fullstack) et B5 (Relais Support) en B et C.
 - Branche de travail : `refonte-v2`. Référence v1 : tag `v1-ref` et branche `v1-archive` (`5dea3e71`).
 - Contrats des modules du noyau : `docs/v2/CONTRACTS.md`.
 
 ## Journal
+
+### 2026-11-02 (soir) : variance, taille adaptative, fullstack
+
+- N = 2 sur B1-B3 pour B et C, lancés depuis un worktree git figé (`.claude/worktrees/autospec-bench`)
+  pour que le code mesuré ne bouge pas pendant que les sous-agents modifient le noyau.
+- Taille adaptative du PO : une story si le produit tient dans une session ; v2 à 0,18-0,26 $ sur B1-B3.
+- Phase 3 : profil fullstack (scaffold React/Vite/TS, vitest dans la vérification, smoke GET /),
+  363 tests v2 verts. Défaut Windows corrigé : `os.replace` de l'état refusé par un accès concurrent.
+
 
 ### 2026-11-02 (suite) : premiers runs réels
 

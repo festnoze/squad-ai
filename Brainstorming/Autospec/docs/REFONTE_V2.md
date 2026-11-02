@@ -623,3 +623,19 @@ Prochaines étapes proposées, dans l'ordre :
 2. B5 dans le banc (brief existant, oracle automatisé tiré du référentiel de 57 critères), en B et C.
 3. Variante « une seule story » de la v2 sur B1 à B3, pour mesurer le coût minimal de la méthode.
 4. N = 2 sur chaque cellule pour connaître la variance avant toute conclusion définitive.
+
+### 11.1 Mise à jour : variance et taille adaptative (2 novembre, suite)
+
+- **Variance** (N = 2 sur B1 à B3) : chaque run des deux configurations atteint 100 % à l'oracle.
+  Le harness nu reste stable (0,5 à 1 min, 0,04 à 0,10 $) ; la v2 multi-stories varie davantage
+  (le PO découpe B3 en 5 puis 7 stories, 13 puis 20 min).
+- **Taille adaptative** (règle 5.5 passée) : le PO ne produit qu'une story quand le produit tient
+  dans une session. Sur B1, B2 et B3, la v2 tombe à 1,4 / 2,5 / 2,9 min et 0,18 / 0,26 / 0,26 $,
+  avec 100 % à l'oracle : environ trois fois moins cher que la version multi-stories, sans perte.
+  L'écart avec le harness nu n'est plus que de 2 à 4 fois, soit le prix de la QA indépendante et de
+  la vérification en environnement propre.
+- Un défaut d'infrastructure Windows trouvé en route (remplacement atomique de l'état refusé par
+  un accès concurrent au fichier) est corrigé par de courtes nouvelles tentatives.
+- **Phase 3 livrée côté noyau** : profil fullstack (FastAPI + React/Vite/TypeScript, tests
+  d'acceptance pytest et vitest, garde-fous sur la configuration de test du frontend), vérifié de
+  bout en bout avec de vrais npm, uv et git. Mesure B4 à suivre.

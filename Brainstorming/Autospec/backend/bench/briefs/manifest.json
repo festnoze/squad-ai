@@ -1,5 +1,5 @@
 {
-  "bench_version": 1,
+  "bench_version": 2,
   "hash": "sha256 of the file, CRLF normalized to LF",
   "briefs": {
     "B1": {
@@ -25,6 +25,16 @@
       "sha256": "460941ee61ec2ee0872057609e4d454a8dc549b56d06f72f1c5bc8ad0e24ea69",
       "package": "counter_app",
       "profile": "fullstack"
+    },
+    "B5": {
+      "file": "B5-relais-support.md",
+      "sha256": "b20d9a2599427a9f76a41a69cfeef57dd1b5330ce35fec8b4d6ac4cd91f64f0a",
+      "package": "relais_support",
+      "profile": "fullstack",
+      "refs": {
+        "docs/validation/support-client/01_specification.md": "0a99950df5ee132253fa5aefb1a8f6e4f7a4b64c1436072564be6d28195fb0f3",
+        "docs/validation/support-client/02_requirements_verification.md": "efdab8ea54208557f01abcb5324172e42b9c5cf88536611d64ba65b92564cbf4"
+      }
     }
   }
 }

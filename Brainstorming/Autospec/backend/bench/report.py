@@ -12,6 +12,14 @@ from bench.paths import DOCS_BENCH_DIR
 CONFIG_NAMES = {"a": "A v1", "b": "B harness nu", "c": "C v2"}
 
 
+def _not_automated(m6: dict) -> str:
+    """Suffix of the M6 cell when the oracle lists criteria it cannot verify (B5)."""
+    count = m6.get("not_automated")
+    if count is None:
+        count = sum(1 for c in m6.get("checks") or [] if c.get("detail") == "NOT_AUTOMATED")
+    return f" ({count} NOT_AUTOMATED)" if count else ""
+
+
 def _row(result: dict) -> str:
     oracle = result.get("oracle") or {}
     m5 = oracle.get("m5_suite") or {}
@@ -27,7 +35,7 @@ def _row(result: dict) -> str:
         f"{cost:.2f} $" if isinstance(cost, (int, float)) else "",
         str(result.get("m4_agent_calls") or ""),
         f"{m5.get('passed', 0)}/{m5.get('passed', 0) + m5.get('failed', 0)}" + (" vert" if m5.get("green") else ""),
-        f"{m6.get('passed', 0)}/{m6.get('total', 0)}",
+        f"{m6.get('passed', 0)}/{m6.get('total', 0)}" + _not_automated(m6),
         "oui" if m7.get("ok") else "non",
         result.get("git_sha", ""),
     ])
