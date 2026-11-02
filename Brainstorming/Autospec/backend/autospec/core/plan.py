@@ -28,8 +28,21 @@ def story_number(story_id: str) -> int:
 
 
 def acceptance_file(story_id: str) -> str:
-    """Repo-relative POSIX path of the QA acceptance tests of a story."""
+    """Repo-relative POSIX path of the QA acceptance tests of a story (pytest)."""
     return f"tests/acceptance/test_us_{story_number(story_id)}.py"
+
+
+def _frontend_acceptance_file(story_id: str) -> str:
+    return f"frontend/src/acceptance/us_{story_number(story_id)}.test.tsx"
+
+
+def acceptance_files(story_id: str, profile: Profile | str | None) -> list[str]:
+    """Every file the QA agent may write for a story: the pytest file, plus the vitest
+    file ``frontend/src/acceptance/us_<n>.test.tsx`` for the fullstack profile."""
+    files = [acceptance_file(story_id)]
+    if profile is not None and Profile(profile) is Profile.FULLSTACK:
+        files.append(_frontend_acceptance_file(story_id))
+    return files
 
 
 def _load(text: str, what: str) -> dict:
@@ -197,13 +210,36 @@ def parse_plan(text: str, *, profile: Profile | str | None) -> tuple[Profile, li
     return chosen, epics, stories
 
 
-def parse_qa(text: str, story: Story) -> list[AcceptanceTest]:
-    """The QA mapping criterion -> nodeids; every criterion of ``story`` covered."""
+def _nodeid_error(nodeid: str, story_id: str, profile: Profile | str | None) -> str:
+    """Why ``nodeid`` is not one of the story's acceptance tests ("" when it is)."""
+    files = acceptance_files(story_id, profile)
+    path, sep, name = nodeid.partition("::")
+    if "\\" in path:
+        return f"nodeid {nodeid!r} must use / (POSIX path)"
+    shapes = f"{files[0]}::test_name"
+    if len(files) > 1:
+        shapes += f" or {files[1]}::<describe and test titles joined by \" > \">"
+    if not sep or not name.strip():
+        return f"nodeid {nodeid!r} must look like {shapes}"
+    if path in files:
+        return ""
+    where = " or ".join(files)
+    if path == _frontend_acceptance_file(story_id):
+        return f"nodeid {nodeid!r}: frontend tests exist only in the fullstack profile; use {where}"
+    return f"nodeid {nodeid!r} must be in {where}"
+
+
+def parse_qa(text: str, story: Story, *, profile: Profile | str | None = None) -> list[AcceptanceTest]:
+    """The QA mapping criterion -> nodeids; every criterion of ``story`` covered.
+
+    Nodeids must live in ``acceptance_files(story.id, profile)``: the pytest file always,
+    the vitest file (``<file>::<titles joined by " > ">``) only for the fullstack profile.
+    ``profile=None`` accepts the pytest file only.
+    """
     data = _load(text, "QA answer")
     raw_tests = data.get("tests")
     if not isinstance(raw_tests, list) or not raw_tests:
         raise PlanError('"tests" must be a non-empty list of {"ac_id", "nodeids"}')
-    expected_file = acceptance_file(story.id)
     known = [c.id for c in story.criteria]
     mapping: dict[str, list[str]] = {}
     errors: list[str] = []
@@ -221,13 +257,9 @@ def parse_qa(text: str, story: Story) -> list[AcceptanceTest]:
             continue
         for nodeid in nodeids:
             nodeid = nodeid.removeprefix("./")
-            path, sep, name = nodeid.partition("::")
-            if "\\" in path:
-                errors.append(f"{ac_id}: nodeid {nodeid!r} must use / (POSIX path)")
-            elif not sep or not name:
-                errors.append(f"{ac_id}: nodeid {nodeid!r} must look like {expected_file}::test_name")
-            elif path != expected_file:
-                errors.append(f"{ac_id}: nodeid {nodeid!r} must be in {expected_file}")
+            error = _nodeid_error(nodeid, story.id, profile)
+            if error:
+                errors.append(f"{ac_id}: {error}")
             elif nodeid not in mapping.setdefault(ac_id, []):
                 mapping[ac_id].append(nodeid)
     missing = [ac for ac in known if not mapping.get(ac)]

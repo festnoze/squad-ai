@@ -21,7 +21,10 @@ from autospec.core.procs import run_capped
 from autospec.core.settings import Settings
 
 TOOLS = "Read,Edit,Write,Glob,Grep,Bash"
-QA_ALLOWED = ("Read", "Edit", "Write", "Glob", "Grep", "Bash(uv run pytest:*)")
+# npm always runs from the repo root on the fullstack frontend (CONTRACTS.md 8.1); the rule is
+# granted to every profile because it is harmless where no frontend/ exists.
+QA_ALLOWED = ("Read", "Edit", "Write", "Glob", "Grep", "Bash(uv run pytest:*)",
+              "Bash(npm --prefix frontend:*)")
 DEV_ALLOWED = (*QA_ALLOWED, "Bash(uv add:*)", "Bash(uv remove:*)", "Bash(uv sync:*)",
                "Bash(uv lock:*)")
 

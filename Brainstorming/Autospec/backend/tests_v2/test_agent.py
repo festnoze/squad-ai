@@ -11,6 +11,8 @@ from pathlib import Path
 
 import pytest
 from autospec.core.agent import (
+    DEV_ALLOWED,
+    QA_ALLOWED,
     ClaudeCodeRunner,
     _child_env,
     build_argv,
@@ -28,6 +30,7 @@ SYSTEM_FILE = Path("sys.md")
 BASE_TAIL = ["--safe-mode", "--strict-mcp-config", "--permission-mode", "dontAsk",
              "--permission-prompts", "none", "--append-system-prompt-file", str(SYSTEM_FILE)]
 TOOLS = "Read,Edit,Write,Glob,Grep,Bash"
+NPM = "Bash(npm --prefix frontend:*)"
 
 
 def _call(capability=Capability.DEV, **overrides) -> AgentCall:
@@ -46,19 +49,28 @@ def test_text_call_has_no_tool_at_all():
     assert "--restricted" not in argv and "--allowedTools" not in argv
 
 
-def test_qa_call_may_only_run_pytest():
+def test_qa_call_may_only_run_pytest_and_frontend_npm():
     argv = build_argv(SETTINGS, _call(Capability.QA), SYSTEM_FILE)
     assert argv == ["-p", "--output-format", "json", "--model", "sonnet", "--restricted",
                     "--tools", TOOLS, "--allowedTools", "Read", "Edit", "Write", "Glob", "Grep",
-                    "Bash(uv run pytest:*)", *BASE_TAIL]
+                    "Bash(uv run pytest:*)", NPM, *BASE_TAIL]
 
 
 def test_dev_call_may_also_manage_dependencies():
     argv = build_argv(SETTINGS, _call(Capability.DEV), SYSTEM_FILE)
     assert argv == ["-p", "--output-format", "json", "--model", "sonnet", "--restricted",
                     "--tools", TOOLS, "--allowedTools", "Read", "Edit", "Write", "Glob", "Grep",
-                    "Bash(uv run pytest:*)", "Bash(uv add:*)",
+                    "Bash(uv run pytest:*)", NPM, "Bash(uv add:*)",
                     "Bash(uv remove:*)", "Bash(uv sync:*)", "Bash(uv lock:*)", *BASE_TAIL]
+
+
+def test_npm_is_only_allowed_against_the_frontend_directory():
+    """CONTRACTS.md 8.1: npm runs from the repo root as `npm --prefix frontend <args>`;
+    a bare `npm`, `npx` or `cd frontend` stays denied, for every profile."""
+    for allowed in (QA_ALLOWED, DEV_ALLOWED):
+        npm_rules = [rule for rule in allowed if "npm" in rule or "npx" in rule]
+        assert npm_rules == [NPM]
+        assert not [rule for rule in allowed if "cd " in rule or rule == "Bash"]
 
 
 def test_call_model_budget_and_resume_flags():

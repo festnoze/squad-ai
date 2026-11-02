@@ -5,11 +5,18 @@ import pytest
 from autospec.core import prompts
 from autospec.core.jsonx import extract_json
 from autospec.core.models import AcceptanceCriterion, AcceptanceTest, Profile, Story
-from autospec.core.plan import parse_dev, parse_plan, parse_qa
+from autospec.core.plan import PlanError, parse_dev, parse_plan, parse_qa
 
 BUDGET = 1_500  # static characters per builder (docs/REFONTE_V2.md 4.2)
+# Fullstack QA and dev prompts carry a second toolchain (vitest, npm): raised, capped at 1,900.
+FULLSTACK_BUDGET = 1_900
 EM_DASH = chr(0x2014)
 PROFILES = [Profile.LIB, Profile.CLI, Profile.API]
+ALL_PROFILES = [*PROFILES, Profile.FULLSTACK]
+PY3 = "tests/acceptance/test_us_3.py"
+UI3 = "frontend/src/acceptance/us_3.test.tsx"
+NPM_COMMANDS = ("`npm --prefix frontend install <pkg>`", "`npm --prefix frontend test`",
+                "`npm --prefix frontend run build`")
 
 
 def _story(sid="US-3", tests=False) -> Story:
@@ -29,9 +36,10 @@ def _minimal_story() -> Story:
 
 def _all_prompts() -> list[str]:
     story = _story(tests=True)
-    built = [prompts.pm_brief("Une CLI de todo"), prompts.dev_retry("FAILED x")]
-    built += [prompts.po_plan("# Brief", package="todo", profile=p) for p in [None, *PROFILES]]
-    for profile in [*PROFILES, Profile.FULLSTACK]:
+    built = [prompts.pm_brief("Une CLI de todo"), prompts.dev_retry("FAILED x"),
+             prompts.dev_retry("FAILED x", profile=Profile.FULLSTACK)]
+    built += [prompts.po_plan("# Brief", package="todo", profile=p) for p in [None, *ALL_PROFILES]]
+    for profile in ALL_PROFILES:
         built.append(prompts.qa_tests(story, package="todo", profile=profile, repo_tree="todo/"))
         built.append(prompts.dev_story(story, package="todo", profile=profile, repo_tree="todo/"))
     return built + list(prompts.SYSTEM.values())
@@ -58,10 +66,17 @@ def test_system_prompts_state_the_bash_allowlist(role, allowed, denied):
     """A real session ran `pwd; ls`, got denied and stopped without running pytest."""
     persona = prompts.SYSTEM[role]
     for part in (*allowed, *NO_CHAINING, "Read, Glob and Grep", "never ls, cat, find or pwd",
-                 "already the project root", "not a reason to stop"):
+                 "already the project root", "not a reason to stop",
+                 # CONTRACTS.md 8.1: the runner allows `npm --prefix frontend:*` to QA and dev.
+                 "`npm --prefix frontend ...` (never cd) if there is a frontend/"):
         assert part in persona
     for part in denied:
         assert part not in persona
+
+
+def test_system_prompts_guard_the_frontend_acceptance_tests():
+    assert "vitest" in prompts.SYSTEM["qa"] and "acceptance files you are given" in prompts.SYSTEM["qa"]
+    assert "tests/acceptance/ nor frontend/src/acceptance/" in prompts.SYSTEM["dev"]
 
 
 def test_builders_repeat_the_tool_hint():
@@ -75,6 +90,29 @@ def test_builders_repeat_the_tool_hint():
     assert "Bash only for `uv run pytest ...`, one command" in qa and "uv add <pkg>" not in qa
     for text in (dev, retry):
         assert all(command in text for command in DEV_COMMANDS)
+
+
+def test_fullstack_builders_add_npm_to_the_tool_hint():
+    story = _story(tests=True)
+    qa = prompts.qa_tests(story, package="todo", profile="fullstack", repo_tree="")
+    dev = prompts.dev_story(story, package="todo", profile="fullstack", repo_tree="")
+    retry = prompts.dev_retry("FAILED", profile="fullstack")
+    assert "Bash only for `uv run pytest ...`, `npm --prefix frontend ...`, one command per call" in qa
+    assert "uv add <pkg>" not in qa
+    for text in (dev, retry):
+        assert all(command in text for command in DEV_COMMANDS)
+        assert "`uv lock`, `npm --prefix frontend ...`, one command per call, no chaining" in text
+
+
+@pytest.mark.parametrize("profile", PROFILES)
+def test_python_profiles_never_mention_the_frontend(profile):
+    """lib, cli and api user prompts are unchanged by the fullstack profile."""
+    story = _story(tests=True)
+    for text in (prompts.qa_tests(story, package="todo", profile=profile, repo_tree=""),
+                 prompts.dev_story(story, package="todo", profile=profile, repo_tree=""),
+                 prompts.dev_retry("FAILED", profile=profile), prompts.dev_retry("FAILED")):
+        for word in ("npm", "frontend", "vitest", "React"):
+            assert word not in text
 
 
 def test_no_em_dash_anywhere():
@@ -93,11 +131,22 @@ def test_every_prompt_ends_with_its_json_object():
     ("po-choose", lambda p: prompts.po_plan("b", package="p", profile=None)),
     ("qa", lambda p: prompts.qa_tests(_minimal_story(), package="p", profile=p, repo_tree="")),
     ("dev", lambda p: prompts.dev_story(_minimal_story(), package="p", profile=p, repo_tree="")),
-    ("retry", lambda p: prompts.dev_retry("f")),
+    ("retry", lambda p: prompts.dev_retry("f", profile=p)),
+    ("retry-default", lambda p: prompts.dev_retry("f")),
 ])
-@pytest.mark.parametrize("profile", [*PROFILES, Profile.FULLSTACK])
+@pytest.mark.parametrize("profile", ALL_PROFILES)
 def test_static_text_stays_under_budget(name, build, profile):
-    assert len(build(profile)) <= BUDGET, name
+    budget = FULLSTACK_BUDGET if profile is Profile.FULLSTACK and name in ("qa", "dev") else BUDGET
+    assert len(build(profile)) <= budget, name
+
+
+@pytest.mark.parametrize("build", [
+    lambda p: prompts.qa_tests(_minimal_story(), package="p", profile=p, repo_tree=""),
+    lambda p: prompts.dev_story(_minimal_story(), package="p", profile=p, repo_tree=""),
+])
+def test_fullstack_overhead_is_bounded(build):
+    """The second toolchain costs at most 450 characters over the api prompt."""
+    assert len(build(Profile.FULLSTACK)) - len(build(Profile.API)) <= 450
 
 
 # --------------------------------------------------------------------------- pm
@@ -107,7 +156,7 @@ def test_pm_brief_content():
     text = prompts.pm_brief("  Une CLI de todo en français  ")
     assert "<goal>\nUne CLI de todo en français\n</goal>" in text
     for part in ("Public interface", "contract", "exit codes", "language of the goal",
-                 "lib, cli or api", "Do not ask questions"):
+                 "lib, cli, api or fullstack", "smallest that fits", "Do not ask questions"):
         assert part in text
     assert set(extract_json(text)) == {"brief"}
 
@@ -119,20 +168,43 @@ def test_po_plan_content_and_rules():
     text = prompts.po_plan("# Todo\nUne CLI.", package="todo_cli", profile=Profile.CLI)
     assert "<brief>\n# Todo\nUne CLI.\n</brief>" in text
     assert "`todo_cli`" in text and "Profile `cli` (fixed)" in text and "python -m todo_cli" in text
-    for part in ("verbatim", "never rename", "Vertical slices", "1 to 7 stories", "2 to 5 criteria",
-                 "US-1 creates the entry point", "observable", "depends_on", "gherkin", "priority",
+    for part in ("verbatim", "never rename", "observable", "depends_on", "gherkin", "priority",
                  "brief's language"):
         assert part in text
     assert set(extract_json(text)) == {"profile", "epics", "stories"}
 
 
+ADAPTIVE_SIZING = (
+    "exactly ONE story (up to 15 criteria) when the whole product fits one focused agent session",
+    "roughly up to 8 source files and 8 public operations",
+    "Only a bigger product is split into small vertical slices of 2 to 5 criteria",
+    "US-1 creating the entry point",
+)
+
+
+@pytest.mark.parametrize("profile", [None, *ALL_PROFILES])
+def test_po_plan_sizes_adaptively(profile):
+    """docs/REFONTE_V2.md 11 and CONTRACTS.md 8.4: one story unless the product exceeds a session."""
+    text = prompts.po_plan("b", package="p", profile=profile)
+    for part in ADAPTIVE_SIZING:
+        assert part in text
+    assert "1 to 7 stories" not in text
+    assert "as few user stories as it needs" in prompts.SYSTEM["po"]
+
+
 def test_po_plan_lets_the_po_choose_the_profile():
     text = prompts.po_plan("b", package="pkg", profile=None)
-    assert "Choose the profile" in text and '"profile": "lib|cli|api"' in text
-    assert "(fixed)" not in text
+    assert "Choose the profile" in text and '"profile": "lib|cli|api|fullstack"' in text
+    assert "fullstack (API + React page)" in text and "(fixed)" not in text
 
 
-@pytest.mark.parametrize("profile", PROFILES)
+def test_po_plan_fullstack_kind():
+    text = prompts.po_plan("b", package="counter_app", profile=Profile.FULLSTACK)
+    assert "Profile `fullstack` (fixed)" in text and "`counter_app/app.py`" in text
+    assert "create_app()" in text and "/api/" in text and "React page of frontend/" in text
+
+
+@pytest.mark.parametrize("profile", ALL_PROFILES)
 def test_po_plan_example_json_is_a_valid_plan(profile):
     """The example the PO copies must pass the parser that reads its answer."""
     parsed_profile, epics, stories = parse_plan(prompts.po_plan("b", package="p", profile=profile),
@@ -172,13 +244,47 @@ def test_qa_tests_profile_specific_instructions():
     assert "from todo.app import create_app" in api and "TestClient(create_app())" in api
     assert "monkeypatch" in api
     assert "TestClient(create_app())" in full and "profile fullstack" in full
+    assert "from todo.app import create_app" in full and "monkeypatch.setenv" in full
 
 
-def test_qa_tests_example_json_is_accepted_by_the_parser():
+def test_qa_tests_fullstack_content():
+    story = _story()
+    text = prompts.qa_tests(story, package="todo", profile=Profile.FULLSTACK, repo_tree="todo/\nfrontend/")
+    assert f"in `{PY3}` and `{UI3}`" in text and "profile fullstack" in text
+    for criterion in story.criteria:
+        assert f"- {criterion.id}: {criterion.text}" in text
+    # API criteria in pytest, UI criteria in vitest + testing-library rendering <App /> (CONTRACTS.md 8.4).
+    for part in ("pytest for API criteria", "TestClient(create_app())", "vitest for UI criteria",
+                 "@testing-library/react", "`render(<App />)` from `../App` only", "`globalThis.fetch = vi.fn(",
+                 "new Response(JSON.stringify(body))", "afterEach(cleanup)", "no jest-dom",
+                 "assert visible text and fetch calls"):
+        assert part in text
+    assert f"Run `uv run pytest {PY3}` and `npm --prefix frontend test -- src/acceptance/us_3.test.tsx`" in text
+    for part in ("FAIL now", "never bend a test", "Write only these two files, no product code",
+                 "install nothing", "Black-box", "tmp_path", "no network"):
+        assert part in text
+    assert "only pytest and httpx exist" not in text and "nothing outside tests/acceptance/" not in text
+    nodeids = extract_json(text)["tests"][0]["nodeids"]
+    assert nodeids == [f"{PY3}::test_ac1_<slug>", f"{UI3}::<describe> > ac1 <test title>"]
+
+
+@pytest.mark.parametrize("profile", ALL_PROFILES)
+def test_qa_tests_example_json_is_accepted_by_the_parser(profile):
     story = _minimal_story()
-    tests = parse_qa(prompts.qa_tests(story, package="p", profile="lib", repo_tree=""), story)
+    tests = parse_qa(prompts.qa_tests(story, package="p", profile=profile, repo_tree=""), story,
+                     profile=profile)
     assert tests[0].ac_id == "US-1.AC-1"
     assert tests[0].nodeids[0].startswith("tests/acceptance/test_us_1.py::test_ac1_")
+    frontend = [n for n in tests[0].nodeids if n.startswith("frontend/")]
+    assert len(frontend) == (profile is Profile.FULLSTACK)
+
+
+def test_qa_fullstack_example_needs_the_profile_to_parse():
+    """The pipeline must pass profile= to parse_qa, or a fullstack answer is rejected."""
+    story = _minimal_story()
+    text = prompts.qa_tests(story, package="p", profile=Profile.FULLSTACK, repo_tree="")
+    with pytest.raises(PlanError, match="fullstack"):
+        parse_qa(text, story)
 
 
 # --------------------------------------------------------------------------- dev
@@ -207,9 +313,32 @@ def test_dev_story_entry_point_per_profile():
     lib = prompts.dev_story(story, package="todo", profile="lib", repo_tree="")
     cli = prompts.dev_story(story, package="todo", profile="cli", repo_tree="")
     api = prompts.dev_story(story, package="todo", profile="api", repo_tree="")
+    full = prompts.dev_story(story, package="todo", profile="fullstack", repo_tree="")
     assert "`import todo` keeps working" in lib
     assert "`python -m todo --help` exits 0" in cli
     assert "create_app()" in api and "GET /health" in api and "$PORT" in api
+    assert "`todo/app.py` keeps `create_app()`, GET /health and serves the built frontend/dist" in full
+    assert "(GET / and its assets)" in full and "$PORT" in full
+
+
+def test_dev_story_fullstack_content():
+    story = _story(tests=True)
+    story.acceptance_tests[0].nodeids.append(f"{UI3}::counter > ac1 shows 0")
+    text = prompts.dev_story(story, package="todo", profile=Profile.FULLSTACK, repo_tree="todo/\nfrontend/")
+    assert f"Its acceptance tests are in `{PY3}` and `{UI3}`." in text and "profile fullstack" in text
+    assert f"  tests: {PY3}::test_ac1_add, {UI3}::counter > ac1 shows 0" in text
+    assert f"1. Run `uv run pytest {PY3}` and `npm --prefix frontend test -- src/acceptance/us_3.test.tsx`" in text
+    assert "code in `todo/` and frontend/src/" in text
+    assert ("FULL suite `uv run pytest`, `npm --prefix frontend test` and `npm --prefix frontend run build` "
+            "(must pass)") in text
+    assert all(command in text for command in NPM_COMMANDS)
+    for part in ("TDD", "tests/unit/", "refactor",
+                 "Never modify, rename or delete anything under tests/acceptance/ or frontend/src/acceptance/",
+                 "vitest test file selection", "conftest.py", "[tool.pytest]", "`uv add <name>`", "never pip",
+                 "clean environment (uv.lock, npm ci)", "public interface exactly", "No network",
+                 "language of the criteria"):
+        assert part in text
+    assert set(extract_json(text)) == {"summary", "dependencies_added"}
 
 
 def test_dev_story_without_qa_mapping_lists_criteria_only():
@@ -235,6 +364,22 @@ def test_dev_retry_content():
         assert part in text
     assert parse_dev(text) == {"summary": "<what you fixed, 1 to 3 sentences>",
                                "dependencies_added": ["<names given to uv add>"]}
+
+
+@pytest.mark.parametrize("profile", [None, *PROFILES])
+def test_dev_retry_python_wording_is_the_default(profile):
+    assert prompts.dev_retry("F", profile=profile) == prompts.dev_retry("F")
+
+
+def test_dev_retry_fullstack_content():
+    text = prompts.dev_retry("FAILED vitest", profile="fullstack")
+    assert "<failure>\nFAILED vitest\n</failure>" in text
+    for part in ("pyproject.toml, uv.lock and npm ci",
+                 "FULL suite `uv run pytest`, `npm --prefix frontend test` and `npm --prefix frontend run build`",
+                 "Never modify, rename or delete anything under tests/acceptance/ or frontend/src/acceptance/",
+                 "`uv add <name>`", "never pip", "public interface", "No network"):
+        assert part in text
+    assert parse_dev(text)["dependencies_added"] == ["<names given to uv add>"]
 
 
 def test_dev_retry_keeps_the_tail_of_a_long_failure():

@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="create a project and build it")
     run.add_argument("--name", required=True)
     run.add_argument("--package")
-    run.add_argument("--profile", choices=[p.value for p in Profile if p != Profile.FULLSTACK])
+    run.add_argument("--profile", choices=[p.value for p in Profile])
     source = run.add_mutually_exclusive_group(required=True)
     source.add_argument("--brief-file", type=Path)
     source.add_argument("--goal")

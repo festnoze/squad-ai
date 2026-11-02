@@ -18,7 +18,7 @@ from .ports import AgentCall, AgentError, AgentResult, AgentRunner, Capability
 from .settings import Settings
 from .store import Store
 
-ACCEPTANCE_DIR = "tests/acceptance/"
+ACCEPTANCE_DIRS = ("tests/acceptance/", "frontend/src/acceptance/")
 PLAN_MAX_ATTEMPTS = 2
 
 
@@ -215,29 +215,40 @@ class Pipeline:
         self._reset_tree()
         return failure, False
 
+    def _acceptance_file_problem(self, rel: str, text: str) -> str:
+        """Acceptance tests must be valid and exercise the product, not test themselves."""
+        if rel.endswith(".py"):
+            try:
+                compile(text, rel, "exec")
+            except SyntaxError as exc:
+                return f"{rel} is not valid Python: {exc}"
+            if self.state.package not in text:
+                return (f"{rel} never references the package `{self.state.package}`: acceptance tests "
+                        "must exercise the product through its public interface")
+            return ""
+        if "from '../" not in text and 'from "../' not in text:
+            return f"{rel} never imports product code (relative import such as '../App')"
+        return ""
+
     async def _acheck_acceptance(self, story: Story, answer: str) -> tuple[str, list, bool]:
         try:
-            tests = plan.parse_qa(answer, story)
+            tests = plan.parse_qa(answer, story, profile=self.state.profile)
         except plan.PlanError as exc:
             return f"invalid answer: {exc}", [], False
-        own_file = plan.acceptance_file(story.id)
-        outside = [p for p in verify.changed_paths(self.ws) if p != own_file]
+        own_files = plan.acceptance_files(story.id, self.state.profile)
+        outside = [p for p in verify.changed_paths(self.ws) if p not in own_files]
         if outside:
             verify.discard_changes(self.ws, outside)
-            return f"you changed files outside {own_file} (reverted): {', '.join(outside)}", [], False
+            return (f"you changed files outside {', '.join(own_files)} (reverted): "
+                    f"{', '.join(outside)}"), [], False
         files = sorted({n.split("::", 1)[0] for t in tests for n in t.nodeids})
         for rel in files:
             source = self.ws / rel
             if not source.is_file():
                 return f"test file {rel} does not exist", [], False
-            text = source.read_text(encoding="utf-8")
-            try:
-                compile(text, rel, "exec")
-            except SyntaxError as exc:
-                return f"{rel} is not valid Python: {exc}", [], False
-            if self.state.package not in text:
-                return (f"{rel} never references the package `{self.state.package}`: acceptance tests "
-                        "must exercise the product through its public interface"), [], False
+            problem = self._acceptance_file_problem(rel, source.read_text(encoding="utf-8"))
+            if problem:
+                return problem, [], False
         suite = await verify.arun_suite(self.ws, select=files, clean=False,
                                         timeout_s=self.settings.suite_timeout_s)
         if suite.env_error:
@@ -261,7 +272,7 @@ class Pipeline:
             story.attempts += 1
             self._save()
             if feedback and story.dev_session_id:
-                prompt, resume = prompts.dev_retry(feedback), story.dev_session_id
+                prompt, resume = prompts.dev_retry(feedback, profile=self.state.profile), story.dev_session_id
             else:
                 prompt, resume = prompts.dev_story(story, package=self.state.package, profile=self.state.profile,
                                                    repo_tree=verify.repo_tree(self.ws)), None
@@ -296,7 +307,7 @@ class Pipeline:
     async def _averify_story(self, story: Story) -> str:
         # conftest.py hooks or pytest options could rewrite acceptance outcomes.
         touched = [p for p in verify.changed_paths(self.ws)
-                   if p.startswith(ACCEPTANCE_DIR) or p.rsplit("/", 1)[-1] == "conftest.py"]
+                   if p.startswith(ACCEPTANCE_DIRS) or p.rsplit("/", 1)[-1] == "conftest.py"]
         if touched:
             verify.discard_changes(self.ws, touched)
             return (f"you modified acceptance tests or a conftest.py, which is forbidden; they were "

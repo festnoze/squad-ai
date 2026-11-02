@@ -8,6 +8,7 @@ from autospec.core.models import AcceptanceCriterion, Profile, Story, StoryStatu
 from autospec.core.plan import (
     PlanError,
     acceptance_file,
+    acceptance_files,
     next_ready,
     parse_brief,
     parse_dev,
@@ -47,6 +48,24 @@ def test_story_number_and_acceptance_file():
     for bad in ("US-0", "us-1", "US1", "STORY-1", "US-01", ""):
         with pytest.raises(PlanError):
             story_number(bad)
+
+
+@pytest.mark.parametrize("profile", [None, Profile.LIB, Profile.CLI, Profile.API, "api"])
+def test_acceptance_files_python_profiles(profile):
+    assert acceptance_files("US-3", profile) == ["tests/acceptance/test_us_3.py"]
+
+
+@pytest.mark.parametrize("profile", [Profile.FULLSTACK, "fullstack"])
+def test_acceptance_files_fullstack_adds_the_vitest_file(profile):
+    assert acceptance_files("US-12", profile) == ["tests/acceptance/test_us_12.py",
+                                                  "frontend/src/acceptance/us_12.test.tsx"]
+
+
+def test_acceptance_files_validates_its_arguments():
+    with pytest.raises(PlanError):
+        acceptance_files("US1", Profile.FULLSTACK)
+    with pytest.raises(ValueError):
+        acceptance_files("US-1", "desktop")
 
 
 # --------------------------------------------------------------------------- parse_brief
@@ -346,6 +365,82 @@ def test_parse_qa_rejects_malformed_nodeids_and_entries():
 def test_parse_qa_without_json():
     with pytest.raises(PlanError, match="JSON"):
         parse_qa("The tests are written.", _story())
+
+
+# --------------------------------------------------------------------------- parse_qa, fullstack
+
+
+V1 = "frontend/src/acceptance/us_1.test.tsx"
+
+
+def test_parse_qa_fullstack_accepts_python_and_vitest_nodeids():
+    text = _qa({"ac_id": "US-1.AC-1", "nodeids": [f"{F1}::test_ac1_api", f"{V1}::counter > ac1 shows 0"]},
+               {"ac_id": "US-1.AC-2", "nodeids": [f"./{V1}::app > buttons > ac2 increments",
+                                                  f"{V1}::ac2 without describe"]})
+    tests = parse_qa(text, _story(), profile=Profile.FULLSTACK)
+    assert [(t.ac_id, t.nodeids) for t in tests] == [
+        ("US-1.AC-1", [f"{F1}::test_ac1_api", f"{V1}::counter > ac1 shows 0"]),
+        ("US-1.AC-2", [f"{V1}::app > buttons > ac2 increments", f"{V1}::ac2 without describe"]),
+    ]
+    assert parse_qa(text, _story(), profile="fullstack") == tests
+
+
+def test_parse_qa_fullstack_python_only_answer_is_valid():
+    """A story whose criteria are all API ones needs no frontend test."""
+    tests = parse_qa(_qa({"ac_id": "US-1.AC-1", "nodeids": [f"{F1}::test_ac1_a"]}), _story(n=1),
+                     profile=Profile.FULLSTACK)
+    assert tests[0].nodeids == [f"{F1}::test_ac1_a"]
+
+
+def test_parse_qa_fullstack_still_requires_every_criterion():
+    text = _qa({"ac_id": "US-1.AC-1", "nodeids": [f"{V1}::counter > ac1 shows 0"]})
+    with pytest.raises(PlanError, match=r"criteria without any test: US-1\.AC-2"):
+        parse_qa(text, _story(), profile=Profile.FULLSTACK)
+
+
+@pytest.mark.parametrize("profile", [None, Profile.LIB, Profile.CLI, Profile.API])
+def test_parse_qa_rejects_frontend_nodeids_outside_fullstack(profile):
+    text = _qa({"ac_id": "US-1.AC-1", "nodeids": [f"{V1}::counter > ac1 shows 0"]})
+    with pytest.raises(PlanError) as info:
+        parse_qa(text, _story(n=1), profile=profile)
+    assert "only in the fullstack profile" in str(info.value) and F1 in str(info.value)
+
+
+def test_parse_qa_default_profile_is_python_only():
+    text = _qa({"ac_id": "US-1.AC-1", "nodeids": [f"{V1}::counter > ac1 shows 0"]})
+    with pytest.raises(PlanError, match="fullstack"):
+        parse_qa(text, _story(n=1))
+
+
+@pytest.mark.parametrize("nodeid,reason", [
+    ("frontend/src/acceptance/us_2.test.tsx::ac1 x", f"must be in {F1} or {V1}"),
+    ("src/acceptance/us_1.test.tsx::ac1 x", f"must be in {F1} or {V1}"),
+    ("frontend/src/App.test.tsx::ac1 x", f"must be in {F1} or {V1}"),
+    ("frontend/src/acceptance/us_1.test.ts::ac1 x", f"must be in {F1} or {V1}"),
+    ("tests/acceptance/test_us_2.py::test_ac1", f"must be in {F1} or {V1}"),
+    ("frontend\\src\\acceptance\\us_1.test.tsx::ac1 x", "POSIX"),
+    (V1, "must look like"),
+    (f"{V1}::", "must look like"),
+])
+def test_parse_qa_fullstack_rejects_other_files(nodeid, reason):
+    with pytest.raises(PlanError) as info:
+        parse_qa(_qa({"ac_id": "US-1.AC-1", "nodeids": [nodeid]}), _story(n=1), profile=Profile.FULLSTACK)
+    assert reason in str(info.value)
+
+
+def test_parse_qa_fullstack_shape_hint_names_the_vitest_form():
+    with pytest.raises(PlanError) as info:
+        parse_qa(_qa({"ac_id": "US-1.AC-1", "nodeids": [V1]}), _story(n=1), profile=Profile.FULLSTACK)
+    assert f"{F1}::test_name or {V1}::<describe and test titles joined by" in str(info.value)
+
+
+def test_parse_qa_fullstack_story_ten_does_not_accept_story_one_file():
+    story = _story("US-10", n=1)
+    v10 = "frontend/src/acceptance/us_10.test.tsx"
+    assert parse_qa(_qa({"ac_id": "US-10.AC-1", "nodeids": [f"{v10}::t"]}), story,
+                    profile=Profile.FULLSTACK)[0].nodeids == [f"{v10}::t"]
+    with pytest.raises(PlanError, match=r"us_10\.test\.tsx"):
+        parse_qa(_qa({"ac_id": "US-10.AC-1", "nodeids": [f"{V1}::t"]}), story, profile=Profile.FULLSTACK)
 
 
 # --------------------------------------------------------------------------- parse_dev
