@@ -237,14 +237,17 @@ def judge(project_id: str, workspace: Path, package: str, profile: str) -> dict:
     """Run M5, M6 and M7 on a workspace. Returns a JSON-serializable report."""
     started = time.monotonic()
     module = importlib.import_module(f"bench.oracles.{project_id}")
-    with tempfile.TemporaryDirectory(prefix="bench-oracle-", ignore_cleanup_errors=True) as tmp:
-        product = prepare(Path(workspace), package, Path(tmp))
+    with tempfile.TemporaryDirectory(prefix="bench-oracle-", ignore_cleanup_errors=True) as raw_tmp:
+        # Windows hands out 8.3 short temp paths (E6FB4~1.MIL) on which Vite/Vitest fail to
+        # resolve modules: always work on the long form.
+        tmp = Path(raw_tmp).resolve()
+        product = prepare(Path(workspace), package, tmp)
         suite = product_suite(product)
         smoke_ok, smoke_detail = smoke(product, profile, getattr(module, "HEALTH_PATH", "/health"))
         checks: list[Check] = []
         if product.sync_ok:
             try:
-                checks = module.checks(product, Path(tmp))
+                checks = module.checks(product, tmp)
             except Exception as exc:  # an oracle crash must not hide the other metrics
                 checks = [Check("oracle_crash", False, f"{type(exc).__name__}: {exc}")]
     passed = sum(c.passed for c in checks)

@@ -149,8 +149,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--date", default=date.today().isoformat())
     parser.add_argument("--oracle-only", action="store_true")
     parser.add_argument("--workspace", type=Path)
+    parser.add_argument("--rejudge", type=Path, help="re-run the oracle of an existing result JSON")
+    parser.add_argument("--note", default="")
     args = parser.parse_args(argv)
     brief = load_brief(args.project)
+
+    if args.rejudge:
+        result = json.loads(args.rejudge.read_text(encoding="utf-8"))
+        workspace = Path(result["factory"]["workspace"])
+        result["oracle"] = judge(brief.id, workspace, brief.package, brief.profile)
+        result["rejudged"] = {"git_sha": _git_sha(), "note": args.note}
+        args.rejudge.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+        oracle = result["oracle"]
+        print(json.dumps({"m5": oracle["m5_suite"]["green"], "m6": oracle["m6_oracle"]["rate"],
+                          "m7": oracle["m7_smoke"]["ok"]}))
+        return 0
 
     if args.oracle_only:
         factory = {"completed": None, "workspace": str(args.workspace.resolve())}
