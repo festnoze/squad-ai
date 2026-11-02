@@ -25,3 +25,6 @@ Généré par `python -m bench.report` depuis les JSON de ce dossier. Métriques
 | B3 | C v2 | sonnet | oui | 12.9 min | 0.74 $ | 11 | 43/43 vert | 15/15 | oui | 04e85264 |
 | B3 | C v2 | sonnet | oui | 20.1 min | 0.89 $ | 14 | 58/58 vert | 15/15 | oui | 836de199 |
 | B3 | C v2 | sonnet | oui | 2.9 min | 0.26 $ | 3 | 17/17 vert | 15/15 | oui | 85c7e437 |
+| B4 | B harness nu | sonnet | oui | 1.8 min | 0.11 $ | 1 | 8/8 vert | 8/8 | oui | 964d808a |
+| B4 | C v2 | sonnet | oui | 8.2 min | 0.32 $ | 3 | 20/20 vert | 8/8 | oui | 964d808a |
+| B5 | B harness nu | sonnet | oui | 16.3 min | 2.29 $ | 1 | 165/165 vert | 33/57 (22 NOT_AUTOMATED) | oui | 964d808a |

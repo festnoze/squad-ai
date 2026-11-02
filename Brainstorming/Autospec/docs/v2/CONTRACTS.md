@@ -241,3 +241,52 @@ nodeid (treated as not passed, like a Python collection error).
 Acceptance directories become `tests/acceptance/` and `frontend/src/acceptance/`; the QA may
 only write `plan.acceptance_files(story)`; the package-reference check applies to the Python
 file; a frontend acceptance file must import product code through a relative import.
+
+## 9. Wave A (2026-11-02, evening): API, UI, robustness, sizing, docs, bench UX
+
+Ownership (disjoint files; T1 and T2 work in isolated git worktrees and commit there):
+
+| Track | Files |
+|---|---|
+| T1 procs (worktree) | `core/procs.py`, `core/agent.py`, `core/verify.py` (+ optional new `core/frontend.py`), `bench/proc.py`, `tests_v2/test_procs.py`, `tests_v2/test_agent.py`, `tests_v2/test_verify.py` |
+| T2 api (worktree) | new `core/api.py`, `core/__main__.py`, `core/pipeline.py`, `core/models.py`, new `tests_v2/test_api.py`, `tests_v2/test_pipeline.py` |
+| T3 ui | new `frontend_v2/**` |
+| T5 sizing | `core/prompts.py`, `core/profiles.py`, `tests_v2/test_prompts.py`, `tests_v2/test_profiles.py` |
+| T6 docs | `README.md`, `docs/archive/**`, moves of superseded documents (never `docs/REFONTE_V2.md`, `docs/STATE.md`, `docs/v2/`, `docs/bench/`, `docs/validation/support-client/01_specification.md`, `02_requirements_verification.md`) |
+| T7 bench UX | `backend/bench/**` |
+
+### 9.1 HTTP API v2 (`core/api.py`, FastAPI, served by `python -m autospec.core serve [--port 8400] [--fake]`)
+
+| Method and path | Result |
+|---|---|
+| `GET /api/v2/health` | 200 `{"status": "ok"}` |
+| `GET /api/v2/projects` | 200 `[ProjectSummary]` newest first |
+| `POST /api/v2/projects` | body `{"name", "package"?, "profile"?, "brief"?, "goal"?, "model"?}` (brief or goal required) -> 201 `ProjectSummary`; the build starts at once |
+| `GET /api/v2/projects/{id}` | 200 full `ProjectState` JSON plus `"running": bool`; 404 unknown |
+| `POST /api/v2/projects/{id}/resume` | 202 `{"ok": true}`; 409 if running or phase done |
+| `POST /api/v2/projects/{id}/stop` | 202 `{"ok": true}`: cancels the run (phase becomes `stopped`, child processes killed); 409 if not running |
+| `DELETE /api/v2/projects/{id}` | 204; 409 if running |
+| `GET /api/v2/projects/{id}/events?after=N` | 200 `{"events": [...], "next": M}` (index-based polling of events.jsonl) |
+| `GET /api/v2/projects/{id}/stream` | `text/event-stream`, one `data: <event json>` per event, `id:` = index, honours `Last-Event-ID`, heartbeat comment every 15 s |
+| `GET /api/v2/projects/{id}/files` | 200 `{"files": [posix paths]}` (repo_tree, no .autospec, node_modules, dist) |
+| `GET /api/v2/projects/{id}/files/raw?path=P` | 200 `{"path", "content", "truncated"}`; 400 path traversal; 404 missing |
+| `GET /api/v2/projects/{id}/stories/{sid}/diff` | 200 `{"available": bool, "diff": str}` from the `"<sid> done"` commit |
+
+`ProjectSummary` = `{"id", "name", "profile", "phase", "running", "stories_done", "stories_total",
+"cost_usd", "updated_at", "error", "resume_at"}`. Workspaces live under `settings.workspace_root`.
+The server serves `frontend_v2/dist` at `/` when built. Projects are discovered from the
+workspace root at startup (a project found in a working phase is shown as not running).
+
+Automatic resume: when a run parks on a provider `limit` or `network` error, the pipeline
+stores `state.resume_at` (epoch seconds: the reset time parsed from the limit message, else
+now + 30 min for limit, now + 5 min for network); the server re-arms a timer per project at
+startup and resumes it then. `resume` and `stop` clear `resume_at`.
+
+### 9.2 Frontend v2 (`frontend_v2/`, React + Vite + TypeScript, French UI)
+
+Dev server on 5400 proxying `/api` to 8400. Screens: project list (phase badge, progress
+`done/total`, cost) with a creation form (name, profile select, brief textarea or goal);
+project view: phase, cost, error, `resume_at` banner, buttons resume / stop / delete, stories
+table (id, title, status, attempts, criteria with their acceptance nodeids), live events log
+(SSE with polling fallback), file tree with a read-only viewer, per-story diff. Vitest +
+Testing Library tests with mocked fetch; `npm run build` passes; no em dash.
