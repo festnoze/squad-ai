@@ -109,6 +109,29 @@ async def test_acceptance_tests_that_already_pass_are_rejected(ws, settings):
     assert qa_calls[1].resume_session_id is not None
 
 
+async def test_a_test_already_green_thanks_to_earlier_code_is_kept(ws, settings):
+    def partly_green(call):
+        answer = demo_qa(PKG)(call)
+        write(call, {"tests/acceptance/test_us_1.py": textwrap.dedent(f"""
+            def test_ac1_greets_by_name():
+                from {PKG}.greet import greet
+                assert greet('Ada') == 'Hello, Ada!'
+
+
+            def test_ac2_empty_name_greets_the_world():
+                assert 1 + 1 == 2
+            """)})
+        return answer
+
+    runner = _runner(qa=[partly_green, demo_qa(PKG)])
+    state = await Pipeline(_state(), ws, runner, settings).arun()
+
+    assert state.phase == Phase.DONE, state.error
+    assert [c.role for c in runner.calls].count("qa") == 2, "no QA retry for US-1"
+    green = [e for e in Store(ws).events() if e["type"] == "already_green"]
+    assert green and green[0]["nodeids"] == ["tests/acceptance/test_us_1.py::test_ac2_empty_name_greets_the_world"]
+
+
 async def test_qa_writing_product_code_is_reverted(ws, settings):
     def sneaky(call):
         write(call, {f"{PKG}/greet.py": "def greet(name):\n    return 'Hello, Ada!'\n"})

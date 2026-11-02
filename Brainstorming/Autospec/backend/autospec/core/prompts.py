@@ -169,9 +169,9 @@ Rules:
 - Self-contained: tmp_path for files and databases, no network, no other test file; \
 only pytest and httpx exist.
 - Assert the exact names, outputs, messages and exit codes of the criteria.
-- Run `uv run pytest {path}`: every test must FAIL now for the right reason (ImportError, \
-AttributeError or a failed assertion), never an error in the test itself (SyntaxError, \
-NameError, fixture). A test that passes now is rejected.
+- Run `uv run pytest {path}`: tests must FAIL now for the right reason (ImportError, \
+AttributeError, failed assertion), never from a SyntaxError or NameError in the test. Only \
+behaviour from earlier stories may pass; never bend a test.
 - Write only `{path}`: no product code, nothing outside tests/acceptance/.
 {_tool_hint(_QA_BASH)}
 

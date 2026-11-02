@@ -237,10 +237,14 @@ class Pipeline:
         unknown = [n for n in nodeids if n not in suite.outcomes and not suite.collection_errors]
         if unknown:
             return f"these nodeids were not collected by pytest: {', '.join(unknown)}", []
+        # A criterion may already hold thanks to earlier stories: such tests are kept as
+        # regression guards. A story whose tests ALL pass drives no code: vacuous tests.
         passing = verify.red_check(suite, nodeids)
+        if passing and len(set(passing)) == len(set(nodeids)):
+            return ("every test already passes although the story is not implemented, so they "
+                    f"drive no code: {', '.join(passing)}. At least one test must fail now."), []
         if passing:
-            return ("these tests already pass although the story is not implemented, so they "
-                    f"verify nothing: {', '.join(passing)}"), []
+            self._emit("already_green", id=story.id, nodeids=passing)
         return "", tests
 
     # -- Dev: native TDD session, then independent verification ---------------
