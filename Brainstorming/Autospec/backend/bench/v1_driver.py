@@ -19,6 +19,23 @@ MODEL_VARS = ("CLAUDE_MODEL", "MODEL_BOSS", "MODEL_WORKER", "MODEL_CHECKER", "CO
               "MODEL_LADDER", "ANTHROPIC_MODEL")
 
 
+def _last_failure(ws: Path) -> str:
+    """v1 often parks with an empty error: the reason is the last failure line of its monitor."""
+    monitor = ws / "build-monitor.jsonl"
+    if not monitor.is_file():
+        return ""
+    reason = ""
+    for line in monitor.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        text = str(event.get("line", ""))
+        if "❌" in text or "ERROR" in text or "FAIL" in text:
+            reason = text
+    return reason[-1500:]
+
+
 async def _arun(args) -> dict:
     from autospec.config import settings
 
@@ -45,10 +62,11 @@ async def _arun(args) -> dict:
     except asyncio.TimeoutError:
         timed_out = True
         await pipeline.adispose()
+    ws = workspace_dir(state.id)
     return {
         "completed": state.phase.value == "done" and not timed_out,
-        "phase": state.phase.value, "error": str(state.error or "")[-1500:], "timed_out": timed_out,
-        "workspace": str(workspace_dir(state.id)), "duration_s": round(time.monotonic() - started, 1),
+        "phase": state.phase.value, "error": str(state.error or "")[-1500:] or _last_failure(ws),
+        "timed_out": timed_out, "workspace": str(ws), "duration_s": round(time.monotonic() - started, 1),
         "cost_usd": round(state.usage.cost_usd, 4), "agent_calls": state.usage.agent_calls,
         "stories": [{"id": s.id, "status": s.status.value, "attempts": s.attempts} for s in state.stories],
     }

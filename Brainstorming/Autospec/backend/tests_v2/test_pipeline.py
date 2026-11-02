@@ -8,7 +8,7 @@ from dataclasses import replace
 
 import pytest
 
-from autospec.core import profiles
+from autospec.core import fake, profiles
 from autospec.core.fake import FakeRunner, demo_dev, demo_plan, demo_qa, write
 from autospec.core.models import Phase, ProjectState, Profile, StoryStatus
 from autospec.core.pipeline import Pipeline
@@ -93,10 +93,16 @@ async def test_invalid_plan_gets_one_correction_in_the_same_session(ws, settings
     assert "rejected" in po_calls[1].prompt
 
 
-async def test_acceptance_tests_that_already_pass_are_rejected(ws, settings):
+async def test_acceptance_tests_that_never_touch_the_product_are_rejected(ws, settings):
     def vacuous(call):
-        write(call, {"tests/acceptance/test_us_1.py": "def test_ac1_x():\n    assert True\n\n\n"
-                                                      "def test_ac2_y():\n    assert True\n"})
+        write(call, {"tests/acceptance/test_us_1.py": textwrap.dedent("""
+            def test_ac1_x():
+                assert True
+
+
+            def test_ac2_y():
+                assert True
+            """)})
         return json.dumps({"tests": [{"ac_id": "US-1.AC-1", "nodeids": ["tests/acceptance/test_us_1.py::test_ac1_x"]},
                                      {"ac_id": "US-1.AC-2", "nodeids": ["tests/acceptance/test_us_1.py::test_ac2_y"]}]})
 
@@ -105,8 +111,22 @@ async def test_acceptance_tests_that_already_pass_are_rejected(ws, settings):
 
     assert state.phase == Phase.DONE, state.error
     qa_calls = [c for c in runner.calls if c.role == "qa"]
-    assert "already pass" in qa_calls[1].prompt
+    assert "never references the package" in qa_calls[1].prompt
     assert qa_calls[1].resume_session_id is not None
+
+
+async def test_a_story_already_delivered_by_earlier_ones_skips_the_dev(ws, settings):
+    def dev_does_both(call):
+        write(call, {f"{PKG}/greet.py": fake._CODE["US-2"]})
+        return json.dumps({"summary": "greet and shout"})
+
+    runner = _runner(dev=dev_does_both)
+    state = await Pipeline(_state(), ws, runner, settings).arun()
+
+    assert state.phase == Phase.DONE, state.error
+    assert runner.roles() == ["po", "qa", "dev", "qa"], "no dev session for US-2"
+    assert state.story("US-2").status == StoryStatus.DONE and state.story("US-2").attempts == 0
+    assert "US-2: acceptance tests" in _git_log(ws)
 
 
 async def test_a_test_already_green_thanks_to_earlier_code_is_kept(ws, settings):

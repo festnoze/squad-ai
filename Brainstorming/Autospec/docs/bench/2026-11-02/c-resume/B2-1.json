@@ -1,0 +1,92 @@
+{
+  "date": "2026-11-02",
+  "config": "c-resume",
+  "project": "B2",
+  "model": "sonnet",
+  "git_sha": "bd600f04",
+  "brief_sha256": "2d1f19a5bb72e486712a41b6f0aee281cb0e8d75b9dd47ca7f703c4e8fce0d18",
+  "bench_version": 1,
+  "m1_completed": null,
+  "m2_duration_s": null,
+  "m3_cost_usd": null,
+  "m4_agent_calls": null,
+  "m8_interventions": 1,
+  "factory": {
+    "completed": null,
+    "workspace": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\c\\B2-132947\\todo-cli-5f23649b"
+  },
+  "oracle": {
+    "lock_present": true,
+    "env_built": true,
+    "env_detail": "",
+    "m5_suite": {
+      "green": true,
+      "passed": 34,
+      "failed": 0,
+      "detail": "..................................                                       [100%]\r\n34 passed in 5.48s\r\n"
+    },
+    "m6_oracle": {
+      "passed": 10,
+      "total": 10,
+      "rate": 1.0,
+      "checks": [
+        {
+          "id": "help_exits_zero",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "add_prints_ids_from_one",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "list_format_and_done",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "remove_and_ids_never_reused",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "title_is_trimmed",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "empty_title_exit_2",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "unknown_id_exit_1_unchanged",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "list_missing_file_is_empty",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "db_is_valid_json",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "default_db_in_cwd",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": "usage: todo_cli [-h] [--db DB] {add,list,done,remove} ...\r\n\r\nTodo CLI\r\n\r\npositional arguments:\r\n  {add,list,done,remove}\r\n    add                 ajouter une tâche\r\n    list                lister les tâches\r\n    done                marquer une tâche comme faite\r\n    remove              supprimer une tâche\r\n\r\noptions:\r\n  -h, --help            show this help message and exit\r\n  --db DB               chemin du fichier JSON\r\n"
+    },
+    "duration_s": 10.1
+  },
+  "note": "resume of c/B2-1 after the already-satisfied fix (bd600f04+); total cost 0.65 USD"
+}

@@ -167,10 +167,14 @@ class Pipeline:
     async def _abuild_story(self, story: Story) -> None:
         self._story_status(story, StoryStatus.IN_PROGRESS)
         if not story.acceptance_tests:
-            failure = await self._aqa(story)
+            failure, satisfied = await self._aqa(story)
             if failure:
                 story.last_error = failure
                 self._story_status(story, StoryStatus.FAILED, reason="qa")
+                return
+            if satisfied:
+                # Earlier stories already deliver every criterion: the tests stay as guards.
+                self._story_status(story, StoryStatus.DONE, reason="already_satisfied")
                 return
         await self._adev(story)
 
@@ -179,8 +183,8 @@ class Pipeline:
     def _reset_tree(self) -> None:
         verify.discard_changes(self.ws)
 
-    async def _aqa(self, story: Story) -> str:
-        """Returns "" once valid red acceptance tests are committed, else the last failure."""
+    async def _aqa(self, story: Story) -> tuple[str, bool]:
+        """Commit valid acceptance tests: ("", already_satisfied) or (last failure, False)."""
         if verify.changed_paths(self.ws):
             self._reset_tree()  # leftovers of an interrupted session are unverified work
         prompt = prompts.qa_tests(story, package=self.state.package, profile=self.state.profile,
@@ -195,40 +199,45 @@ class Pipeline:
                                           repo_tree=verify.repo_tree(self.ws))
                 continue
             session = result.session_id
-            failure, tests = await self._acheck_acceptance(story, result.text)
+            failure, tests, satisfied = await self._acheck_acceptance(story, result.text)
             if not failure:
                 story.acceptance_tests = tests
                 files = sorted({n.split("::", 1)[0] for t in tests for n in t.nodeids})
                 story.test_fingerprint = verify.fingerprint(self.ws, files)
                 verify.git_commit(self.ws, f"{story.id}: acceptance tests")
                 self._save()
-                self._emit("acceptance_tests", id=story.id, nodeids=sum(len(t.nodeids) for t in tests))
-                return ""
+                self._emit("acceptance_tests", id=story.id, nodeids=sum(len(t.nodeids) for t in tests),
+                           already_satisfied=satisfied)
+                return "", satisfied
             self._emit("qa_rejected", id=story.id, reason=failure[:500])
             prompt = (f"The factory rejected your acceptance tests: {failure}\n"
                       "Fix them, then answer again with the final JSON only.")
         self._reset_tree()
-        return failure
+        return failure, False
 
-    async def _acheck_acceptance(self, story: Story, answer: str) -> tuple[str, list]:
+    async def _acheck_acceptance(self, story: Story, answer: str) -> tuple[str, list, bool]:
         try:
             tests = plan.parse_qa(answer, story)
         except plan.PlanError as exc:
-            return f"invalid answer: {exc}", []
+            return f"invalid answer: {exc}", [], False
         own_file = plan.acceptance_file(story.id)
         outside = [p for p in verify.changed_paths(self.ws) if p != own_file]
         if outside:
             verify.discard_changes(self.ws, outside)
-            return f"you changed files outside {own_file} (reverted): {', '.join(outside)}", []
+            return f"you changed files outside {own_file} (reverted): {', '.join(outside)}", [], False
         files = sorted({n.split("::", 1)[0] for t in tests for n in t.nodeids})
         for rel in files:
             source = self.ws / rel
             if not source.is_file():
-                return f"test file {rel} does not exist", []
+                return f"test file {rel} does not exist", [], False
+            text = source.read_text(encoding="utf-8")
             try:
-                compile(source.read_text(encoding="utf-8"), rel, "exec")
+                compile(text, rel, "exec")
             except SyntaxError as exc:
-                return f"{rel} is not valid Python: {exc}", []
+                return f"{rel} is not valid Python: {exc}", [], False
+            if self.state.package not in text:
+                return (f"{rel} never references the package `{self.state.package}`: acceptance tests "
+                        "must exercise the product through its public interface"), [], False
         suite = await verify.arun_suite(self.ws, select=files, clean=False,
                                         timeout_s=self.settings.suite_timeout_s)
         if suite.env_error:
@@ -236,16 +245,13 @@ class Pipeline:
         nodeids = [n for t in tests for n in t.nodeids]
         unknown = [n for n in nodeids if n not in suite.outcomes and not suite.collection_errors]
         if unknown:
-            return f"these nodeids were not collected by pytest: {', '.join(unknown)}", []
+            return f"these nodeids were not collected by pytest: {', '.join(unknown)}", [], False
         # A criterion may already hold thanks to earlier stories: such tests are kept as
-        # regression guards. A story whose tests ALL pass drives no code: vacuous tests.
+        # regression guards. When ALL pass, the story is already delivered.
         passing = verify.red_check(suite, nodeids)
-        if passing and len(set(passing)) == len(set(nodeids)):
-            return ("every test already passes although the story is not implemented, so they "
-                    f"drive no code: {', '.join(passing)}. At least one test must fail now."), []
         if passing:
             self._emit("already_green", id=story.id, nodeids=passing)
-        return "", tests
+        return "", tests, bool(passing) and len(set(passing)) == len(set(nodeids))
 
     # -- Dev: native TDD session, then independent verification ---------------
 
