@@ -1,8 +1,9 @@
 """Independent verification of a product workspace: the factory never trusts the dev agent.
 
-Clean environment rebuilt from manifest + lock, full suite, QA test fingerprints, criteria
-traceability, product smoke, and the git operations the pipeline needs. Every child process
-has an explicit timeout; only processes started here are ever killed.
+Clean environment rebuilt from manifest + lock, full suite (pytest, plus the npm build and
+vitest for a fullstack workspace), QA test fingerprints, criteria traceability, product
+smoke, and the git operations the pipeline needs. Every child process has an explicit
+timeout; only processes started here are ever killed.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ import asyncio
 import hashlib
 import http.client
 import json
+import os
+import re
 import shutil
 import socket
 import subprocess
@@ -23,21 +26,31 @@ from pathlib import Path, PurePosixPath
 
 from autospec.core.models import Profile, Story
 from autospec.core.procs import ProcResult, kill_tree, popen, run_capped
-from autospec.core.profiles import FACTORY_DIR, VERIFY_VENV, run_git, uv_env
+from autospec.core.profiles import (
+    FRONTEND_DIR,
+    UNTRACKED_DIRS,
+    VERIFY_VENV,
+    npm_command,
+    npm_env,
+    run_git,
+    uv_env,
+)
 
 TAIL_CHARS = 4000
-_EXCLUDE_FACTORY = f":(exclude){FACTORY_DIR}"
+_EXCLUDE_UNTRACKED = [f":(exclude){path}" for path in UNTRACKED_DIRS]
 _OUTCOME_ALIASES = {"xfailed": "skipped", "xpassed": "passed"}
+_NPM_BUILD_TIMEOUT_S = 600.0  # building frontend/dist for a smoke, apart from the server timeout
+_SCRIPT_SRC = re.compile(r'<script\b[^>]*\bsrc="(/[^"]*)"')
 
 
 @dataclass
 class SuiteResult:
-    ok: bool  # env built, suite exit code 0 (or 5: nothing collected), no collection error
-    returncode: int | None
+    ok: bool  # env built, every part green (pytest exit 0 or 5, npm build, vitest), no collection error
+    returncode: int | None  # of the first failing part, else pytest's (vitest's for a frontend-only run)
     outcomes: dict[str, str]  # nodeid -> "passed" | "failed" | "error" | "skipped"
-    collection_errors: list[str]  # files that failed to collect
-    output_tail: str  # last ~4000 chars, the useful part for a retry prompt
-    env_error: str = ""  # `uv sync --locked` failed: lock out of date, unresolvable dep
+    collection_errors: list[str]  # files that failed to collect (or to load, for vitest)
+    output_tail: str  # last ~4000 chars of the failing part(s), the useful part for a retry prompt
+    env_error: str = ""  # `uv sync --locked` or `npm ci` failed: lock out of date, unresolvable dep
     duration_s: float = 0.0
 
 
@@ -67,46 +80,89 @@ def _output(proc: ProcResult, timeout_s: float) -> str:
     return tail(text)
 
 
+def _remaining(deadline: float) -> float:
+    return max(deadline - time.monotonic(), 1.0)
+
+
+def _env_failure(message: str) -> SuiteResult:
+    return SuiteResult(ok=False, returncode=None, outcomes={}, collection_errors=[],
+                       output_tail=message, env_error=message)
+
+
 async def arun_suite(ws: Path, *, select: list[str] | None = None, clean: bool = True,
                      timeout_s: float = 600) -> SuiteResult:
-    """Run the product suite in the verify-venv, rebuilt from scratch when ``clean``.
+    """Run the product suite: pytest in the verify-venv (rebuilt from scratch when
+    ``clean``), plus, when ``frontend/package.json`` exists, ``npm ci`` (when ``clean`` or
+    node_modules is missing) and ``npm run build`` BEFORE pytest (a Python test may GET /
+    through TestClient, which needs frontend/dist), then vitest after it.
 
-    A dependency missing from pyproject therefore fails here even when the dev venv has
-    it. ``select`` restricts the run to nodeids or paths (None or [] = the whole suite).
+    A dependency missing from pyproject or package.json therefore fails here even when the
+    dev environment has it. ``select`` restricts the run to nodeids or paths (None or [] =
+    the whole suite); ``frontend/...`` entries go to vitest (a nodeid selects its whole
+    file), the others to pytest; npm and vitest run only when the frontend is selected.
     """
     return await asyncio.to_thread(_run_suite, Path(ws), list(select or []), clean, timeout_s)
 
 
 def _run_suite(ws: Path, select: list[str], clean: bool, timeout_s: float) -> SuiteResult:
     started = time.monotonic()
+    deadline = started + timeout_s
+    has_frontend = (ws / FRONTEND_DIR / "package.json").is_file()
+    front = [item for item in select if has_frontend and _is_frontend_path(item)]
+    python = [item for item in select if item not in front]
+    run_front = bool(front) or (has_frontend and not select)
+    build = _frontend_build(ws, clean, deadline) if run_front else None
+    runs: list[SuiteResult] = []  # the test runners, in order: pytest, vitest
+    if build is None or not build.env_error:
+        if python or not select:
+            runs.append(_python_suite(ws, python, clean, deadline))
+        if run_front and not (runs and runs[0].env_error):
+            runs.append(_vitest_suite(ws, front, deadline))
+    parts = ([build] if build else []) + runs
+    failed = [part for part in parts if not part.ok]
+    outcomes: dict[str, str] = {}
+    for part in runs:
+        outcomes.update(part.outcomes)
+    return SuiteResult(
+        ok=not failed, returncode=(failed or runs)[0].returncode, outcomes=outcomes,
+        collection_errors=[error for part in runs for error in part.collection_errors],
+        output_tail=_join_tails([part.output_tail for part in failed or runs]),
+        env_error="\n".join(part.env_error for part in parts if part.env_error),
+        duration_s=round(time.monotonic() - started, 3))
+
+
+def _join_tails(texts: list[str]) -> str:
+    """Several outputs within TAIL_CHARS: each keeps its own end."""
+    texts = [text for text in texts if text]
+    if len(texts) <= 1:
+        return "".join(texts)
+    return "\n".join(tail(text, TAIL_CHARS // len(texts) - 1) for text in texts)
+
+
+def _python_suite(ws: Path, select: list[str], clean: bool, deadline: float) -> SuiteResult:
     env = uv_env(ws)
-
-    def env_failure(message: str) -> SuiteResult:
-        return SuiteResult(ok=False, returncode=None, outcomes={}, collection_errors=[],
-                           output_tail=message, env_error=message,
-                           duration_s=round(time.monotonic() - started, 3))
-
     if clean and not _remove_tree(ws / VERIFY_VENV):
-        return env_failure(f"cannot delete {VERIFY_VENV.as_posix()}: a process still holds it")
-    sync = _run(["uv", "sync", "--locked"], ws, env, timeout_s)
+        return _env_failure(f"cannot delete {VERIFY_VENV.as_posix()}: a process still holds it")
+    timeout = _remaining(deadline)
+    sync = _run(["uv", "sync", "--locked"], ws, env, timeout)
     if sync.returncode != 0:
-        return env_failure(tail(f"`uv sync --locked` failed\n{_output(sync, timeout_s)}"))
-    remaining = max(timeout_s - (time.monotonic() - started), 1.0)
+        return _env_failure(tail(f"`uv sync --locked` failed\n{_output(sync, timeout)}"))
+    timeout = _remaining(deadline)
     with tempfile.TemporaryDirectory(prefix="autospec-report-") as tmp:
         report_file = Path(tmp) / "report.json"
         # `python -m pytest`, not `pytest`: a pytest missing from the verify-venv must fail,
         # never fall back to another one found on PATH.
         argv = ["uv", "run", "--locked", "python", "-m", "pytest", "-q", "--json-report",
                 f"--json-report-file={report_file}", *select]
-        proc = _run(argv, ws, env, remaining)
+        proc = _run(argv, ws, env, timeout)
         report = _load_report(report_file)
-    output = _output(proc, remaining)
+    output = _output(proc, timeout)
     if report is None:
         output = tail(output + "\n[autospec] no readable pytest-json-report")
     outcomes, errors = _parse_report(report or {})
     ok = report is not None and not errors and proc.returncode in (0, 5)
     return SuiteResult(ok=ok, returncode=proc.returncode, outcomes=outcomes, collection_errors=errors,
-                       output_tail=output, duration_s=round(time.monotonic() - started, 3))
+                       output_tail=output)
 
 
 def _remove_tree(path: Path) -> bool:
@@ -138,6 +194,142 @@ def _parse_report(report: dict) -> tuple[dict[str, str], list[str]]:
     return outcomes, errors
 
 
+# --------------------------------------------------------------------------- _frontend
+
+
+def _is_frontend_path(item: str) -> bool:
+    path = item.replace("\\", "/").split("::", 1)[0]
+    return path == FRONTEND_DIR or path.startswith(FRONTEND_DIR + "/")
+
+
+def _frontend_build(ws: Path, clean: bool, deadline: float) -> SuiteResult:
+    """``npm ci`` (an env error when it fails) then ``npm run build`` in frontend/. A failed
+    build fails the suite, yet the test runners still run: their outcomes stay traceable."""
+    front, env, npm = _frontend(ws), npm_env(), npm_command()
+    if clean or not (front / "node_modules").is_dir():
+        timeout = _remaining(deadline)
+        install = _run([npm, "ci"], front, env, timeout)
+        if install.returncode != 0:
+            return _env_failure(tail(f"`npm ci` failed in {FRONTEND_DIR}/ (package-lock.json out of "
+                                     f"date with package.json?)\n{_output(install, timeout)}"))
+    timeout = _remaining(deadline)
+    build = _run([npm, "run", "build"], front, env, timeout)
+    ok = build.returncode == 0
+    return SuiteResult(ok=ok, returncode=build.returncode, outcomes={}, collection_errors=[],
+                       output_tail="" if ok else tail(f"`npm run build` failed in {FRONTEND_DIR}/\n"
+                                                      f"{_output(build, timeout)}"))
+
+
+def _vitest_suite(ws: Path, select: list[str], deadline: float) -> SuiteResult:
+    front, timeout = _frontend(ws), _remaining(deadline)
+    with tempfile.TemporaryDirectory(prefix="autospec-vitest-") as tmp:
+        report_file = Path(tmp) / "vitest.json"
+        argv = _vitest_argv(front, report_file, _vitest_filters(select))
+        proc = _run(argv, front, npm_env(), timeout) if argv else ProcResult(
+            returncode=127, stdout="", stderr=f"vitest is not installed in {FRONTEND_DIR}/node_modules",
+            timed_out=False, duration_s=0.0)
+        report = _load_report(report_file)
+    output = _output(proc, timeout)
+    if report is None:
+        output = tail(output + "\n[autospec] no readable vitest JSON report")
+    outcomes, errors = _parse_vitest(report or {}, front)
+    return SuiteResult(ok=report is not None and not errors and proc.returncode == 0,
+                       returncode=proc.returncode, outcomes=outcomes, collection_errors=errors,
+                       output_tail=output)
+
+
+def _frontend(ws: Path) -> Path:
+    """frontend/, resolved: Vite cannot load modules under a Windows 8.3 short-name cwd."""
+    return (ws / FRONTEND_DIR).resolve()
+
+
+def _vitest_filters(select: list[str]) -> list[str]:
+    """Vitest file filters (substrings of paths relative to frontend/); [] = every test file."""
+    filters: list[str] = []
+    for item in select:
+        path = _posix(item.split("::", 1)[0])
+        if path == FRONTEND_DIR:
+            return []
+        filters.append(path[len(FRONTEND_DIR) + 1:])
+    return list(dict.fromkeys(filters))
+
+
+def _vitest_argv(front: Path, report: Path, filters: list[str]) -> list[str] | None:
+    """Node on vitest's own entry point: no npm.cmd, so no cmd.exe parsing the arguments."""
+    package = front / "node_modules" / "vitest"
+    try:
+        bins = json.loads((package / "package.json").read_text(encoding="utf-8")).get("bin")
+    except (OSError, ValueError, AttributeError):
+        return None
+    entry = bins.get("vitest") if isinstance(bins, dict) else bins
+    if not isinstance(entry, str):
+        return None
+    return [shutil.which("node") or "node", str(package / entry), "run", "--reporter=default",
+            "--reporter=json", f"--outputFile.json={report}", "--passWithNoTests", *filters]
+
+
+def _parse_vitest(report: dict, front: Path) -> tuple[dict[str, str], list[str]]:
+    """Outcomes keyed ``frontend/<file>::<describe titles > test title>`` (CONTRACTS.md 8.2);
+    a file that failed to load (no test result at all) is a collection error."""
+    outcomes: dict[str, str] = {}
+    errors: list[str] = []
+    root = os.path.realpath(front)
+    for file in report.get("testResults") or []:
+        if not isinstance(file, dict) or not isinstance(file.get("name"), str):
+            continue
+        path = _vitest_path(file["name"], root)
+        tests = [test for test in file.get("assertionResults") or [] if isinstance(test, dict)]
+        if file.get("status") == "failed" and not tests:
+            errors.append(path)
+        for test in tests:
+            titles = [*(test.get("ancestorTitles") or []), test.get("title", "")]
+            nodeid = f"{path}::{' > '.join(map(str, titles))}"
+            outcome = {"passed": "passed", "failed": "failed"}.get(test.get("status"), "skipped")
+            if outcomes.get(nodeid, "passed") == "passed":  # a duplicate title never hides a failure
+                outcomes[nodeid] = outcome
+    return outcomes, errors
+
+
+def _vitest_path(name: str, root: str) -> str:
+    """Vitest's absolute file path as ``frontend/<relative POSIX path>`` (both sides resolved:
+    8.3 short names and case differences must not leak into nodeids)."""
+    real = os.path.realpath(name)
+    if os.path.normcase(real).startswith(os.path.normcase(root) + os.sep):
+        return f"{FRONTEND_DIR}/{_posix(real[len(root) + 1:])}"
+    return _posix(name)
+
+
+def _build_dist(ws: Path) -> str:
+    """Build frontend/dist when absent (installing node_modules first when missing).
+    Returns "" when the build is there, else what went wrong."""
+    front = _frontend(ws)
+    if (front / "dist" / "index.html").is_file():
+        return ""
+    steps = ([] if (front / "node_modules").is_dir() else [["ci"]]) + [["run", "build"]]
+    for args in steps:
+        proc = _run([npm_command(), *args], front, npm_env(), _NPM_BUILD_TIMEOUT_S)
+        if proc.returncode != 0:
+            return f"`npm {' '.join(args)}` failed in {FRONTEND_DIR}/\n{_output(proc, _NPM_BUILD_TIMEOUT_S)}"
+    return ""
+
+
+def _check_frontend(base: str) -> tuple[bool, str]:
+    """GET / must serve the built index.html, and the script it loads must be served too."""
+    opener = _opener()
+    status, body = _http_get(opener, base + "/")
+    if status != 200 or '<div id="root">' not in body:
+        return False, f'GET / -> {status}, expected 200 with the built index.html (<div id="root">)'
+    script = _SCRIPT_SRC.search(body)
+    if script:
+        status, _ = _http_get(opener, base + script.group(1))
+        if status != 200:
+            return False, f"GET {script.group(1)} (loaded by index.html) -> {status}"
+    return True, 'GET / -> 200 with <div id="root">'
+
+
+# --------------------------------------------------------------------------- traceability
+
+
 def red_check(result: SuiteResult, nodeids: list[str]) -> list[str]:
     """Nodeids that PASSED (the caller wants []); an absent nodeid did not pass."""
     return [nodeid for nodeid in nodeids if result.outcomes.get(nodeid) == "passed"]
@@ -152,11 +344,16 @@ def missing_criteria(story: Story, result: SuiteResult) -> list[str]:
     return [ac_id for ac_id in dict.fromkeys(ids) if ac_id not in covered]
 
 
+# --------------------------------------------------------------------------- smoke
+
+
 async def asmoke(ws: Path, *, package: str, profile: Profile, timeout_s: float = 60) -> SmokeResult:
     """Start the product the way a user would, in the verify-venv (not rebuilt here).
 
     lib: import the package; cli: ``python -m <package> --help`` exits 0 with stdout;
-    api: ``python -m <package>`` on a free $PORT answers ``GET /health`` with 200.
+    api: ``python -m <package>`` on a free $PORT answers ``GET /health`` with 200;
+    fullstack: frontend/dist built when absent (outside ``timeout_s``), then the api check
+    plus ``GET /`` 200 with ``<div id="root">`` and the script it loads served.
     """
     ws = Path(ws)
     if not all(part.isidentifier() for part in package.split(".")):
@@ -173,8 +370,12 @@ async def asmoke(ws: Path, *, package: str, profile: Profile, timeout_s: float =
         if verdict.ok and not proc.stdout.strip():
             return SmokeResult(False, f"{label}: exit 0 but nothing on stdout\n{_output(proc, timeout_s)}")
         return verdict
-    if profile is Profile.API:
-        return await _asmoke_api(ws, env, [*python, "-m", package], timeout_s)
+    if profile in (Profile.API, Profile.FULLSTACK):
+        frontend = profile is Profile.FULLSTACK
+        problem = await asyncio.to_thread(_build_dist, ws) if frontend else ""
+        if problem:
+            return SmokeResult(False, problem)
+        return await _asmoke_api(ws, env, [*python, "-m", package], timeout_s, frontend=frontend)
     raise NotImplementedError(f"smoke for profile {profile.value!r} is not available yet")
 
 
@@ -185,11 +386,12 @@ def _exit_verdict(proc: ProcResult, label: str, timeout_s: float) -> SmokeResult
     return SmokeResult(False, f"{label}: {status}\n{_output(proc, timeout_s)}")
 
 
-async def _asmoke_api(ws: Path, env: dict[str, str], argv: list[str], timeout_s: float) -> SmokeResult:
+async def _asmoke_api(ws: Path, env: dict[str, str], argv: list[str], timeout_s: float, *,
+                      frontend: bool = False) -> SmokeResult:
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
-    url = f"http://127.0.0.1:{port}/health"
+    base = f"http://127.0.0.1:{port}"
     started = time.monotonic()
     with tempfile.TemporaryFile() as log:
         try:
@@ -198,7 +400,10 @@ async def _asmoke_api(ws: Path, env: dict[str, str], argv: list[str], timeout_s:
         except OSError as exc:
             return SmokeResult(False, f"cannot start {argv[0]}: {exc}")
         try:
-            ok, detail = await _apoll_health(proc, url, started, timeout_s)
+            ok, detail = await _apoll_health(proc, base + "/health", started, timeout_s)
+            if ok and frontend:
+                ok, page = await asyncio.to_thread(_check_frontend, base)
+                detail = f"{detail}\n{page}"
         finally:
             kill_tree(proc)  # uv is a wrapper: the real server is a grandchild
         if not ok:
@@ -209,30 +414,38 @@ async def _asmoke_api(ws: Path, env: dict[str, str], argv: list[str], timeout_s:
 
 async def _apoll_health(proc: subprocess.Popen, url: str, started: float,
                         timeout_s: float) -> tuple[bool, str]:
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # never via a proxy
+    opener = _opener()
     last: int | str = "no answer"
     while time.monotonic() - started < timeout_s:
         if proc.poll() is not None:
             return False, f"server exited with code {proc.returncode} before GET /health answered"
-        last = await asyncio.to_thread(_http_status, opener, url)
+        last = (await asyncio.to_thread(_http_get, opener, url))[0]
         if last == 200:
             return True, f"GET {url} -> 200 after {time.monotonic() - started:.1f}s"
         await asyncio.sleep(0.25)
     return False, f"GET {url} gave no 200 within {timeout_s:.0f}s (last: {last})"
 
 
-def _http_status(opener: urllib.request.OpenerDirector, url: str) -> int | str:
+def _opener() -> urllib.request.OpenerDirector:
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}))  # never via a proxy
+
+
+def _http_get(opener: urllib.request.OpenerDirector, url: str) -> tuple[int | str, str]:
+    """(status, body) of a GET; (exception name, "") when nothing answered."""
     try:
-        with opener.open(url, timeout=2) as response:
-            return int(response.status)
+        with opener.open(url, timeout=5) as response:
+            return int(response.status), response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
-        return exc.code
+        return exc.code, ""
     except (OSError, http.client.HTTPException, ValueError) as exc:
-        return type(exc).__name__
+        return type(exc).__name__, ""
 
 
-def _is_factory_path(path: str) -> bool:
-    return path == FACTORY_DIR or path.startswith(FACTORY_DIR + "/")
+# --------------------------------------------------------------------------- git
+
+
+def _is_untracked_path(path: str) -> bool:
+    return any(path == top or path.startswith(top + "/") for top in UNTRACKED_DIRS)
 
 
 def _posix(path: str) -> str:
@@ -252,17 +465,19 @@ def fingerprint(ws: Path, paths: list[str]) -> dict[str, str]:
         target = ws / rel
         if target.is_dir():
             for file in sorted(target.rglob("*")):
-                if file.is_file() and "__pycache__" not in file.parts:
-                    result[file.relative_to(ws).as_posix()] = _sha256(file)
+                rel_file = file.relative_to(ws)
+                if (file.is_file() and not {"__pycache__", "node_modules"} & set(rel_file.parts)
+                        and not _is_untracked_path(rel_file.as_posix())):
+                    result[rel_file.as_posix()] = _sha256(file)
         else:
             result[rel] = _sha256(target) if target.is_file() else ""
     return result
 
 
 def changed_paths(ws: Path) -> list[str]:
-    """Modified, deleted and untracked files vs HEAD (POSIX, repo-relative, ignored files
-    and ``.autospec/`` excluded)."""
-    proc = run_git(ws, "status", "--porcelain=v1", "-uall", "-z", "--", ".", _EXCLUDE_FACTORY)
+    """Modified, deleted and untracked files vs HEAD (POSIX, repo-relative, ignored files,
+    ``.autospec/``, ``frontend/node_modules/`` and ``frontend/dist/`` excluded)."""
+    proc = run_git(ws, "status", "--porcelain=v1", "-uall", "-z", "--", ".", *_EXCLUDE_UNTRACKED)
     entries = iter(proc.stdout.split("\0"))
     paths: set[str] = set()
     for entry in entries:
@@ -270,13 +485,13 @@ def changed_paths(ws: Path) -> list[str]:
             paths.add(entry[3:].rstrip("/"))
             if "R" in entry[:2]:  # a rename carries its source in the next entry
                 paths.add(next(entries, ""))
-    return sorted(p for p in paths if p and not _is_factory_path(p))
+    return sorted(p for p in paths if p and not _is_untracked_path(p))
 
 
 def discard_changes(ws: Path, paths: list[str] | None = None) -> None:
     """Restore files or directories (None = everything) to HEAD: tracked files restored,
     files absent from HEAD deleted. Only entries of ``changed_paths`` are touched, so
-    ``.autospec/``, git-ignored files and already clean paths are left alone."""
+    ``.autospec/``, npm's directories, git-ignored files and clean paths are left alone."""
     ws = Path(ws)
     changed = changed_paths(ws)
     if paths is not None:
@@ -303,13 +518,13 @@ def discard_changes(ws: Path, paths: list[str] | None = None) -> None:
 
 
 def git_commit(ws: Path, message: str) -> str:
-    """Stage everything .gitignore allows (never ``.autospec/``), commit and return the sha,
-    or "" when nothing changed."""
+    """Stage everything .gitignore allows (never ``.autospec/`` nor npm's directories),
+    commit and return the sha, or "" when nothing changed."""
     ws = Path(ws)
     run_git(ws, "add", "-A")
-    # Unstage the factory directory whatever .gitignore says. (An exclude pathspec on
-    # `git add` exits 1 as soon as the excluded directory is also git-ignored.)
-    run_git(ws, "reset", "-q", "--", FACTORY_DIR)
+    # Unstage the factory and npm directories whatever .gitignore says. (An exclude
+    # pathspec on `git add` exits 1 as soon as the excluded directory is also git-ignored.)
+    run_git(ws, "reset", "-q", "--", *UNTRACKED_DIRS)
     if run_git(ws, "diff", "--cached", "--quiet", check=False).returncode == 0:
         return ""
     identity: list[str] = []
@@ -320,11 +535,13 @@ def git_commit(ws: Path, message: str) -> str:
 
 
 def repo_tree(ws: Path, limit: int = 200) -> str:
-    """Tracked + untracked non-ignored files, sorted, one per line, for prompts."""
+    """Tracked + untracked non-ignored files, sorted, one per line, for prompts (never
+    ``.autospec/`` nor npm's thousands of files)."""
     ws = Path(ws)
-    proc = run_git(ws, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+    proc = run_git(ws, "ls-files", "--cached", "--others", "--exclude-standard", "-z",
+                   "--", ".", *_EXCLUDE_UNTRACKED)
     files = sorted({p for p in proc.stdout.split("\0")
-                    if p and not _is_factory_path(p) and (ws / p).exists()})
+                    if p and not _is_untracked_path(p) and (ws / p).exists()})
     lines = files[:limit]
     if len(files) > limit:
         lines.append(f"... {len(files) - limit} more")

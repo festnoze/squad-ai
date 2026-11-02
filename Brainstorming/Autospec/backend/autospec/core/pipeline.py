@@ -7,18 +7,21 @@ report and verifies every story itself (docs/REFONTE_V2.md section 4).
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
 
 from . import machine, plan, profiles, prompts, verify
-from .models import Phase, ProjectState, Story, StoryStatus
+from .models import Phase, Profile, ProjectState, Story, StoryStatus
 from .ports import AgentCall, AgentError, AgentResult, AgentRunner, Capability
 from .settings import Settings
 from .store import Store
 
 ACCEPTANCE_DIRS = ("tests/acceptance/", "frontend/src/acceptance/")
+# Vite carries the vitest settings (included files, setup files): changing it could hide tests.
+TEST_CONFIG_FILES = ("frontend/vite.config.", "frontend/vitest.config.", "frontend/vitest.setup.")
 PLAN_MAX_ATTEMPTS = 2
 
 
@@ -249,7 +252,9 @@ class Pipeline:
             problem = self._acceptance_file_problem(rel, source.read_text(encoding="utf-8"))
             if problem:
                 return problem, [], False
-        suite = await verify.arun_suite(self.ws, select=files, clean=False,
+        # Fullstack: the frontend must be built before Python tests of GET / can pass.
+        select = None if self.state.profile == Profile.FULLSTACK else files
+        suite = await verify.arun_suite(self.ws, select=select, clean=False,
                                         timeout_s=self.settings.suite_timeout_s)
         if suite.env_error:
             raise Parked(f"clean environment cannot be built: {suite.env_error[-1000:]}")
@@ -294,31 +299,48 @@ class Pipeline:
             self._emit("verify_failed", id=story.id, attempt=story.attempts, reason=failure[:500])
         self._story_status(story, StoryStatus.FAILED, reason="dev")
 
-    def _pytest_config_changed(self) -> bool:
-        head = profiles.run_git(self.ws, "show", "HEAD:pyproject.toml", check=False)
+    def _section_changed(self, rel: str, load, section) -> bool:
+        """Whether ``section(load(text))`` differs between HEAD and the working tree."""
+        target = self.ws / rel
+        head = profiles.run_git(self.ws, "show", f"HEAD:{rel}", check=False)
+        if head.returncode != 0 and not target.exists():
+            return False
         try:
-            before = tomllib.loads(head.stdout).get("tool", {}).get("pytest")
-            after = tomllib.loads((self.ws / "pyproject.toml").read_text(encoding="utf-8")).get(
-                "tool", {}).get("pytest")
-        except (OSError, tomllib.TOMLDecodeError):
+            before = section(load(head.stdout)) if head.returncode == 0 else None
+            after = section(load(target.read_text(encoding="utf-8"))) if target.exists() else None
+        except (OSError, ValueError):
             return True
         return before != after
 
+    def _test_config_changes(self) -> list[str]:
+        """Test selection settings the dev must not touch: they could hide acceptance tests."""
+        changed = []
+        if self._section_changed("pyproject.toml", tomllib.loads,
+                                 lambda d: d.get("tool", {}).get("pytest")):
+            changed.append("the [tool.pytest] section of pyproject.toml")
+        if self._section_changed("frontend/package.json", json.loads, lambda d: d.get("scripts")):
+            changed.append("the scripts of frontend/package.json")
+        return changed
+
     async def _averify_story(self, story: Story) -> str:
         # conftest.py hooks or pytest options could rewrite acceptance outcomes.
-        touched = [p for p in verify.changed_paths(self.ws)
-                   if p.startswith(ACCEPTANCE_DIRS) or p.rsplit("/", 1)[-1] == "conftest.py"]
+        touched = [p for p in verify.changed_paths(self.ws) if p.startswith(ACCEPTANCE_DIRS)
+                   or p.rsplit("/", 1)[-1] == "conftest.py" or p.startswith(TEST_CONFIG_FILES)]
         if touched:
             verify.discard_changes(self.ws, touched)
-            return (f"you modified acceptance tests or a conftest.py, which is forbidden; they were "
-                    f"restored: {', '.join(touched)}. Make the implementation pass the original tests.")
-        if self._pytest_config_changed():
-            return ("you changed the [tool.pytest] configuration of pyproject.toml, which is forbidden: "
-                    "restore it exactly as it was and make the implementation pass the tests.")
+            return (f"you modified acceptance tests or test configuration files, which is forbidden; "
+                    f"they were restored: {', '.join(touched)}. Make the implementation pass the "
+                    "original tests.")
+        config = self._test_config_changes()
+        if config:
+            return (f"you changed {' and '.join(config)}, which is forbidden: restore it exactly as "
+                    "it was and make the implementation pass the tests.")
         suite = await verify.arun_suite(self.ws, timeout_s=self.settings.suite_timeout_s)
         if suite.env_error:
-            return ("the clean environment could not be built from pyproject.toml + uv.lock "
-                    f"(declare dependencies with `uv add`):\n{suite.env_error[-2000:]}")
+            how = "`uv add`" + (" or `npm --prefix frontend install <pkg>`"
+                                if self.state.profile == Profile.FULLSTACK else "")
+            return ("the clean environment could not be built from the manifests and lock files "
+                    f"(declare dependencies with {how}):\n{suite.env_error[-2000:]}")
         if not suite.ok:
             return f"the full suite is not green in a clean environment:\n{suite.output_tail}"
         missing = verify.missing_criteria(story, suite)

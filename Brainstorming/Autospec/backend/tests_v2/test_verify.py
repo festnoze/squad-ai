@@ -1,7 +1,8 @@
-"""core/verify.py: clean suite, smoke, traceability and git helpers, with real uv and git."""
+"""core/verify.py: clean suite, smoke, traceability and git helpers, with real uv, git and npm."""
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -16,6 +17,8 @@ from autospec.core.profiles import VERIFY_VENV, run_git, scaffold, uv_env
 from autospec.core.verify import (
     SuiteResult,
     _load_report,
+    _parse_vitest,
+    _vitest_filters,
     arun_suite,
     asmoke,
     changed_paths,
@@ -46,6 +49,25 @@ def make_ws(templates: dict, tmp_path: Path):
     def make(profile: Profile = Profile.LIB) -> Path:
         ws = tmp_path / profile.value
         shutil.copytree(templates[profile], ws, ignore=shutil.ignore_patterns(".autospec"))
+        return ws
+    return make
+
+
+@pytest.fixture(scope="module")
+def fullstack_template(tmp_path_factory) -> Path:
+    """Scaffolded once per module: `npm install` is the slow part."""
+    ws = tmp_path_factory.mktemp("fullstack") / "shop"
+    scaffold(ws, project_name="Shop", package="shop", profile=Profile.FULLSTACK)
+    return ws
+
+
+@pytest.fixture
+def make_fullstack(fullstack_template: Path, tmp_path: Path):
+    """A fresh copy of the fullstack scaffold, without node_modules (the suite runs `npm ci`)."""
+    def make() -> Path:
+        ws = tmp_path / "fullstack"
+        shutil.copytree(fullstack_template, ws,
+                        ignore=shutil.ignore_patterns(".autospec", "node_modules", "dist"))
         return ws
     return make
 
@@ -412,3 +434,234 @@ def test_repo_tree(make_ws) -> None:
     assert not any(line.startswith((".autospec", ".venv")) for line in tree)
     short = repo_tree(ws, limit=3).splitlines()
     assert short[:3] == tree[:3] and short[3] == f"... {len(tree) - 3} more"
+
+
+# --------------------------------------------------------------------------- fullstack
+
+APP_TEST = "frontend/src/App.test.tsx::App > renders the title"
+US_1 = "frontend/src/acceptance/us_1.test.tsx"
+
+
+async def test_fullstack_suite_builds_before_pytest_and_merges_vitest_outcomes(make_fullstack) -> None:
+    """A clean copy has neither node_modules nor dist: a Python test of GET / still passes
+    because `npm ci` and `npm run build` run before pytest."""
+    ws = make_fullstack()
+    write(ws, "tests/acceptance/test_us_1.py", """
+        from fastapi.testclient import TestClient
+        from shop.app import create_app
+
+        def test_ac1_page_is_served():
+            page = TestClient(create_app()).get("/")
+            assert page.status_code == 200 and '<div id="root">' in page.text
+    """)
+    write(ws, US_1, """
+        import { render, screen } from "@testing-library/react";
+        import { describe, expect, it } from "vitest";
+        import App from "../App";
+
+        describe("shop page", () => {
+          describe("header", () => {
+            it("shows the title", () => {
+              render(<App />);
+              expect(screen.getByRole("heading").textContent).toBe("Shop");
+            });
+          });
+          it("lists no product yet", () => {
+            render(<App />);
+            expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+          });
+        });
+    """)
+    result = await arun_suite(ws)
+    assert result.ok, result.output_tail
+    assert (result.returncode, result.collection_errors, result.env_error) == (0, [], "")
+    assert result.outcomes == {
+        "tests/acceptance/test_us_1.py::test_ac1_page_is_served": "passed",
+        APP_TEST: "passed",
+        f"{US_1}::shop page > header > shows the title": "passed",
+        f"{US_1}::shop page > lists no product yet": "passed",
+    }
+    assert "1 passed" in result.output_tail and "3 passed" in result.output_tail  # both runners
+    assert changed_paths(ws) == [US_1, "tests/acceptance/test_us_1.py"]  # dist and node_modules unseen
+
+
+async def test_fullstack_suite_reports_failures_and_load_errors(make_fullstack) -> None:
+    ws = make_fullstack()
+    write(ws, US_1, """
+        import { describe, expect, it } from "vitest";
+
+        describe("cart", () => {
+          it("passes", () => { expect(1).toBe(1); });
+          it("fails on purpose", () => { expect("shop").toBe("Shop!"); });
+          it.skip("is skipped", () => {});
+          it.todo("is planned");
+        });
+        it("top level", () => { expect(true).toBe(true); });
+    """)
+    write(ws, "frontend/src/acceptance/us_2.test.tsx", """
+        import { expect, it } from "vitest";
+        import { Cart } from "../Cart";
+
+        it("has a cart", () => { expect(Cart).toBeTruthy(); });
+    """)
+    result = await arun_suite(ws)
+    assert not result.ok and result.returncode == 1 and result.env_error == ""
+    assert result.outcomes == {
+        APP_TEST: "passed",
+        f"{US_1}::cart > passes": "passed",
+        f"{US_1}::cart > fails on purpose": "failed",
+        f"{US_1}::cart > is skipped": "skipped",
+        f"{US_1}::cart > is planned": "skipped",
+        f"{US_1}::top level": "passed",
+    }
+    assert result.collection_errors == ["frontend/src/acceptance/us_2.test.tsx"]
+    assert len(result.output_tail) <= 4000
+    assert '"../Cart"' in result.output_tail and "fails on purpose" in result.output_tail
+    # A test file that cannot even load did not pass: the red check accepts it.
+    assert red_check(result, ["frontend/src/acceptance/us_2.test.tsx::has a cart"]) == []
+
+
+async def test_fullstack_select_runs_only_the_selected_parts(make_fullstack) -> None:
+    ws = make_fullstack()
+    write(ws, "tests/acceptance/test_us_1.py", "def test_ac1():\n    assert False\n")
+    write(ws, US_1, 'import { expect, it } from "vitest";\n\nit("works", () => { expect(1).toBe(1); });\n')
+    result = await arun_suite(ws, select=[US_1])
+    assert result.ok, result.output_tail
+    assert result.outcomes == {f"{US_1}::works": "passed"}  # neither pytest nor App.test.tsx ran
+    assert not (ws / VERIFY_VENV).exists()  # no Python environment was even built
+
+    marker = ws / "frontend" / "node_modules" / "marker.txt"
+    marker.write_text("reused", encoding="utf-8")
+    result = await arun_suite(ws, select=["tests/acceptance/test_us_1.py"], clean=False)
+    assert not result.ok and result.outcomes == {"tests/acceptance/test_us_1.py::test_ac1": "failed"}
+
+    mixed = ["tests/acceptance/test_us_1.py::test_ac1", "frontend\\src\\acceptance\\us_1.test.tsx::works"]
+    result = await arun_suite(ws, select=mixed, clean=False)
+    assert result.outcomes == {"tests/acceptance/test_us_1.py::test_ac1": "failed", f"{US_1}::works": "passed"}
+    assert not result.ok and result.returncode == 1 and "assert False" in result.output_tail
+    assert marker.exists()  # clean=False reuses node_modules
+
+
+async def test_fullstack_broken_build_fails_the_suite_and_the_smoke(make_fullstack) -> None:
+    ws = make_fullstack()
+    write(ws, "frontend/src/App.tsx", """
+        export const count: number = "zero";
+
+        export default function App() {
+          return <h1>{"Shop"}</h1>;
+        }
+    """)
+    result = await arun_suite(ws)
+    assert not result.ok and result.returncode not in (0, None) and result.env_error == ""
+    assert "`npm run build` failed" in result.output_tail and "TS2322" in result.output_tail
+    assert result.outcomes == {APP_TEST: "passed"}  # vitest still ran (it does not type-check)
+    assert not (ws / "frontend" / "dist").exists()
+    smoke = await asmoke(ws, package="shop", profile=Profile.FULLSTACK)
+    assert not smoke.ok and "npm run build" in smoke.detail and "TS2322" in smoke.detail
+
+
+async def test_fullstack_lock_out_of_date_is_an_env_error(make_fullstack) -> None:
+    ws = make_fullstack()
+    package = ws / "frontend" / "package.json"
+    data = json.loads(package.read_text(encoding="utf-8"))
+    data["dependencies"]["left-pad"] = "^1.3.0"  # added without `npm install`
+    package.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    result = await arun_suite(ws)
+    assert not result.ok and result.returncode is None and result.outcomes == {}
+    assert "`npm ci` failed" in result.env_error and "left-pad" in result.env_error
+    assert result.output_tail == result.env_error
+
+
+async def test_smoke_fullstack_requires_the_built_frontend(make_fullstack) -> None:
+    ws = make_fullstack()
+    write(ws, "shop/app.py", """
+        from fastapi import FastAPI
+
+        def create_app():
+            app = FastAPI()
+
+            @app.get("/health")
+            def health():
+                return {"status": "ok"}
+
+            return app
+    """)
+    result = await asmoke(ws, package="shop", profile=Profile.FULLSTACK)
+    assert not result.ok and "GET / -> 404" in result.detail, result.detail
+    assert (ws / "frontend" / "dist" / "index.html").is_file()  # built by the smoke, after `npm ci`
+
+    write(ws, "shop/app.py", """
+        from pathlib import Path
+
+        from fastapi import FastAPI
+        from fastapi.responses import FileResponse
+
+        def create_app():
+            app = FastAPI()
+
+            @app.get("/health")
+            def health():
+                return {"status": "ok"}
+
+            @app.get("/")
+            def index():
+                return FileResponse(Path(__file__).resolve().parent.parent / "frontend/dist/index.html")
+
+            return app
+    """)
+    result = await asmoke(ws, package="shop", profile=Profile.FULLSTACK)
+    assert not result.ok and "(loaded by index.html) -> 404" in result.detail, result.detail
+
+    discard_changes(ws, ["shop/app.py"])
+    result = await asmoke(ws, package="shop", profile=Profile.FULLSTACK)
+    assert result.ok, result.detail
+    assert '<div id="root">' in result.detail and changed_paths(ws) == []
+
+
+def test_git_helpers_ignore_npm_directories(make_fullstack, fullstack_template: Path) -> None:
+    tree = repo_tree(fullstack_template).splitlines()  # its node_modules holds thousands of files
+    assert "frontend/package-lock.json" in tree and "frontend/src/App.tsx" in tree and len(tree) < 30
+    assert not any("node_modules" in line for line in tree)
+
+    ws = make_fullstack()
+    generated = ["frontend/node_modules/react/index.js", "frontend/dist/index.html"]
+    for rel in generated:
+        write(ws, rel, "generated")
+    # Neither .gitignore nor .git/info/exclude ignore them any more: still never seen.
+    write(ws, ".gitignore", ".venv/\n")
+    (ws / ".git" / "info" / "exclude").write_text("", encoding="utf-8")
+    assert changed_paths(ws) == [".gitignore"]
+    assert not any(line.startswith(("frontend/node_modules", "frontend/dist"))
+                   for line in repo_tree(ws).splitlines())
+    prints = fingerprint(ws, ["frontend"])
+    assert "frontend/src/App.tsx" in prints and not set(generated) & set(prints)
+    assert git_commit(ws, "un-ignore")
+    assert not set(generated) & set(run_git(ws, "ls-files").stdout.split())
+    discard_changes(ws)
+    assert all((ws / rel).is_file() for rel in generated)
+
+
+def test_parse_vitest_report(tmp_path: Path) -> None:
+    front = tmp_path / "frontend"
+    (front / "src").mkdir(parents=True)
+    report = {"testResults": [
+        {"name": (front / "src" / "a.test.tsx").as_posix(), "status": "failed", "assertionResults": [
+            {"ancestorTitles": ["a", "b"], "title": "c", "status": "passed"},
+            {"ancestorTitles": [], "title": "dup", "status": "failed"},
+            {"ancestorTitles": [], "title": "dup", "status": "passed"},  # never hides the failure
+            {"ancestorTitles": [], "title": "later", "status": "pending"},
+            "garbage",
+        ]},
+        {"name": str(front / "src" / "broken.test.ts"), "status": "failed", "message": "boom",
+         "assertionResults": []},
+        {"status": "passed"},
+    ]}
+    outcomes, errors = _parse_vitest(report, front)
+    assert outcomes == {"frontend/src/a.test.tsx::a > b > c": "passed",
+                        "frontend/src/a.test.tsx::dup": "failed",
+                        "frontend/src/a.test.tsx::later": "skipped"}
+    assert errors == ["frontend/src/broken.test.ts"]
+    assert _parse_vitest({}, front) == ({}, [])
+    assert _vitest_filters(["frontend/src/a.test.tsx::x > y", "frontend\\src\\b.test.tsx",
+                            "frontend/src/a.test.tsx"]) == ["src/a.test.tsx", "src/b.test.tsx"]
+    assert _vitest_filters(["frontend/src/a.test.tsx", "frontend/"]) == []
