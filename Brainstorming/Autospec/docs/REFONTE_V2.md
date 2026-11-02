@@ -572,3 +572,54 @@ Ajustements du plan qui en découlent :
   rouge-vert du TDD est ainsi contrôlé par l'usine, pas seulement demandé à l'agent.
 - **Pas de `--max-turns`** dans le CLI 2.1.301 : une session est bornée par son timeout et son
   budget (`--max-budget-usd`). Réglages v2 préfixés `AUTOSPEC2_` (`core/settings.py`).
+
+## 11. Premiers résultats du banc (2 novembre 2026)
+
+Tableau complet : `docs/bench/README.md`. Modèle `sonnet` partout, N = 1.
+
+| Projet | A : v1 actuelle | B : harness nu | C : v2 |
+|---|---|---|---|
+| B1 slugify (lib) | ne démarre pas | 0,5 min, 0,04 $, oracle 12/12 | 4,5 min, 0,38 $, oracle 12/12 |
+| B2 todo (cli) | ne démarre pas | 1,0 min, 0,08 $, oracle 10/10 | 7,2 min, 0,62 $, garé sur US-5 puis repris : oracle 10/10 |
+| B3 notes (api) | non joué | 0,8 min, 0,08 $, oracle 15/15 | 12,9 min, 0,74 $, oracle 15/15 |
+
+Lecture :
+
+1. **v1 ne démarre plus sans Docker.** Depuis la remédiation d'octobre, son préflight exige un
+   moteur Docker Linux (`ISOLATION_UNAVAILABLE ... no host fallback`) et se gare avant tout appel
+   d'agent. Référence historique (septembre, avant octobre) : Todo CLI en 38 min pour 17,36 $,
+   Counter webapp arrêtée par timeout à 2 h pour 46,88 $.
+2. **La v2 tient sa promesse de fiabilité** : trois produits corrects (oracle à 100 %, suites vertes
+   en environnement propre, smoke OK), 13 stories sur 13 vertes à la première tentative de dev,
+   25 à 60 fois moins cher que v1 en septembre. Deux défauts du noyau trouvés par les runs réels
+   et corrigés le jour même (règle « tout rouge » trop stricte, story déjà satisfaite par les
+   précédentes).
+3. **Mais le harness nu fait aussi bien, dix fois plus vite et moins cher.** Sur des briefs
+   précis dont l'interface publique est fixée, une seule session Claude Code confinée livre le
+   produit parfait en moins d'une minute. Selon la règle 5.5 de ce plan, le pipeline v2 dans sa
+   forme actuelle ne gagne pas sa place sur B1 à B3 : son coût est un surcoût par story (QA,
+   dev, deux reconstructions d'environnement propre), sans gain de qualité mesurable.
+
+Conséquences pour la direction (à valider avec l'utilisateur) :
+
+- La valeur différenciante n'est pas l'exécution du code (le harness la maîtrise), ni même le
+  découpage en stories sur de petits produits. Elle est probablement dans trois endroits que le
+  banc doit maintenant mesurer :
+  1. **les produits qui dépassent une session** (B4 fullstack, B5 Relais Support et ses 57
+     critères) : c'est là que le harness nu devrait commencer à échouer ;
+  2. **la vérification indépendante** (environnement propre, tests d'acceptance intouchables,
+     oracle hors produit, smoke), qui coûte quelques secondes et peut encadrer n'importe quel
+     harness ;
+  3. **la transformation d'une idée floue en brief précis** : les briefs du banc, écrits avec une
+     interface contractuelle, sont exactement ce qui rend le harness si efficace.
+- Piste de conception à tester : une v2 **adaptative**, où le PO ne découpe que si le produit ne
+  tient pas dans une session ; un petit produit devient une seule story, et le cœur de l'usine
+  devient « brief précis, session native, vérification indépendante ».
+
+Prochaines étapes proposées, dans l'ordre :
+
+1. Phase 3 : profil fullstack (scaffold Vite/React, commandes npm dans la liste blanche,
+   vérification et smoke du frontend), puis B4 en configurations B et C.
+2. B5 dans le banc (brief existant, oracle automatisé tiré du référentiel de 57 critères), en B et C.
+3. Variante « une seule story » de la v2 sur B1 à B3, pour mesurer le coût minimal de la méthode.
+4. N = 2 sur chaque cellule pour connaître la variance avant toute conclusion définitive.
