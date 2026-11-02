@@ -15,3 +15,7 @@ frontend/playwright-report/
 frontend/.cache/
 .playwright/
 backend/.e2e-workspace-streams/
+
+# v2 workspaces (generated products, bench runs)
+workspace_v2/
+workspace_bench/
