@@ -91,6 +91,16 @@ class Pipeline:
                    denials=len(result.denials))
         return result
 
+    async def _asuite(self, purpose: str, story_id: str, *, select: list[str] | None = None,
+                      clean: bool = True) -> verify.SuiteResult:
+        suite = await verify.arun_suite(self.ws, select=select, clean=clean,
+                                        timeout_s=self.settings.suite_timeout_s)
+        outcomes = list(suite.outcomes.values())
+        self._emit("suite", purpose=purpose, id=story_id, ok=suite.ok, duration_s=suite.duration_s,
+                   passed=outcomes.count("passed"), failed=len(outcomes) - outcomes.count("passed"),
+                   env_error=bool(suite.env_error))
+        return suite
+
     # -- run ----------------------------------------------------------------
 
     async def arun(self) -> ProjectState:
@@ -254,8 +264,7 @@ class Pipeline:
                 return problem, [], False
         # Fullstack: the frontend must be built before Python tests of GET / can pass.
         select = None if self.state.profile == Profile.FULLSTACK else files
-        suite = await verify.arun_suite(self.ws, select=select, clean=False,
-                                        timeout_s=self.settings.suite_timeout_s)
+        suite = await self._asuite("red_check", story.id, select=select, clean=False)
         if suite.env_error:
             raise Parked(f"clean environment cannot be built: {suite.env_error[-1000:]}")
         nodeids = [n for t in tests for n in t.nodeids]
@@ -335,7 +344,7 @@ class Pipeline:
         if config:
             return (f"you changed {' and '.join(config)}, which is forbidden: restore it exactly as "
                     "it was and make the implementation pass the tests.")
-        suite = await verify.arun_suite(self.ws, timeout_s=self.settings.suite_timeout_s)
+        suite = await self._asuite("verify", story.id)
         if suite.env_error:
             how = "`uv add`" + (" or `npm --prefix frontend install <pkg>`"
                                 if self.state.profile == Profile.FULLSTACK else "")
@@ -351,7 +360,7 @@ class Pipeline:
     # -- delivery -----------------------------------------------------------
 
     async def _adeliver(self) -> None:
-        suite = await verify.arun_suite(self.ws, timeout_s=self.settings.suite_timeout_s)
+        suite = await self._asuite("deliver", "")
         if not suite.ok:
             raise Parked(f"final suite not green: {(suite.env_error or suite.output_tail)[-1500:]}")
         smoke = await verify.asmoke(self.ws, package=self.state.package, profile=self.state.profile,
