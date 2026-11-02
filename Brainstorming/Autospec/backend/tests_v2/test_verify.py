@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import textwrap
 import time
@@ -221,13 +222,19 @@ def test_corrupt_report_is_unreadable(tmp_path: Path) -> None:
     assert _load_report(tmp_path / "missing.json") is None
 
 
-async def test_clean_rebuilds_the_verify_venv(make_ws) -> None:
+async def test_the_verify_venv_holds_exactly_the_lock(make_ws) -> None:
     ws = make_ws()
     assert (await arun_suite(ws)).ok
-    marker = ws / VERIFY_VENV / "marker.txt"
-    marker.write_text("stale", encoding="utf-8")
-    assert (await arun_suite(ws, clean=False)).ok and marker.exists()
-    assert (await arun_suite(ws, clean=True)).ok and not marker.exists()
+    venv_python = ws / VERIFY_VENV / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
+    sneaked = subprocess.run(["uv", "pip", "install", "--python", str(venv_python), "six"],
+                             cwd=ws, capture_output=True, text=True, env=uv_env(ws), timeout=300)
+    assert sneaked.returncode == 0, sneaked.stderr
+    write(ws, "tests/unit/test_six.py", "def test_six():\n    import six\n    assert six\n")
+
+    result = await arun_suite(ws)
+
+    assert not result.ok, "a package absent from uv.lock must not survive in the verify-venv"
+    assert result.outcomes.get("tests/unit/test_six.py::test_six") == "failed"
 
 
 async def test_suite_timeout(make_ws) -> None:

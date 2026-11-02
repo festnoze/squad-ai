@@ -141,10 +141,14 @@ def _join_tails(texts: list[str]) -> str:
 
 def _python_suite(ws: Path, select: list[str], clean: bool, deadline: float) -> SuiteResult:
     env = uv_env(ws)
-    if clean and not _remove_tree(ws / VERIFY_VENV):
-        return _env_failure(f"cannot delete {VERIFY_VENV.as_posix()}: a process still holds it")
+    # `uv sync` is exact: it removes every package the lock does not declare, so the
+    # verify-venv is clean without being deleted (deleting a fresh venv races with
+    # Windows scanners holding its files). It is rebuilt only when the sync fails.
     timeout = _remaining(deadline)
     sync = _run(["uv", "sync", "--locked"], ws, env, timeout)
+    if sync.returncode != 0 and clean and _remove_tree(ws / VERIFY_VENV):
+        timeout = _remaining(deadline)
+        sync = _run(["uv", "sync", "--locked"], ws, env, timeout)
     if sync.returncode != 0:
         return _env_failure(tail(f"`uv sync --locked` failed\n{_output(sync, timeout)}"))
     timeout = _remaining(deadline)

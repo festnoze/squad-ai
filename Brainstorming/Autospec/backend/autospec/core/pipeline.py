@@ -271,8 +271,9 @@ class Pipeline:
             problem = self._acceptance_file_problem(rel, source.read_text(encoding="utf-8"))
             if problem:
                 return problem, [], False
-        # Fullstack: the frontend must be built before Python tests of GET / can pass.
-        select = None if self.state.profile == Profile.FULLSTACK else files
+        # Fullstack: a frontend path in the selection makes the suite build the frontend first,
+        # which Python tests of GET / need, without running the whole Python suite.
+        select = files + ["frontend/src/acceptance/"] if self.state.profile == Profile.FULLSTACK else files
         suite = await self._asuite("red_check", story.id, select=select, clean=False)
         if suite.env_error:
             raise Parked(f"clean environment cannot be built: {suite.env_error[-1000:]}")
