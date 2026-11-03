@@ -1,1 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="1" time="22.973" timestamp="2026-10-12T11:34:50.893405+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_product_harness" name="test_real_linux_vertical_and_owned_volume_persistence" time="22.848" /></testsuite></testsuites>

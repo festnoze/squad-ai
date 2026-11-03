@@ -1,1 +1,0 @@
-{"contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "instrumented": false, "observed": {"audit_count": 1, "ticket_count": 1, "ticket_id": "bb85eeb3-aa08-41d0-ba59-894b021bb336"}, "passed": true, "snapshot_hash": "b3428407c8b4979af1988ad37edcb77006dba0722adaa9b3da048c894f222c5a", "stage": "db_committed"}

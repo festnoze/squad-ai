@@ -1,1 +1,0 @@
-{"contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "instrumented": false, "observed": {"iterations": 2, "memory_kib": 19456, "parallelism": 1, "type": "ID", "verified": true}, "passed": true, "snapshot_hash": "b3428407c8b4979af1988ad37edcb77006dba0722adaa9b3da048c894f222c5a", "stage": "argon2"}
