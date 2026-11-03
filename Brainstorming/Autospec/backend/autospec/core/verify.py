@@ -2,8 +2,9 @@
 
 Clean environment rebuilt from manifest + lock, full suite (pytest, plus the npm build and
 vitest for a fullstack workspace), QA test fingerprints, criteria traceability, product
-smoke, and the git operations the pipeline needs. Every child process has an explicit
-timeout; only processes started here are ever killed.
+smoke, and the git operations the pipeline needs. Every child process has a wall-clock
+timeout and is killed with its whole tree when the awaiting task is cancelled (an API stop,
+Ctrl-C); only processes started here are ever killed.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
 from autospec.core.models import Profile, Story
-from autospec.core.procs import ProcResult, kill_tree, popen, run_capped
+from autospec.core.procs import ProcResult, arun_capped, kill_tree, popen
 from autospec.core.profiles import (
     FRONTEND_DIR,
     UNTRACKED_DIRS,
@@ -65,9 +66,10 @@ def tail(text: str, limit: int = TAIL_CHARS) -> str:
     return text[-limit:]
 
 
-def _run(argv: list[str], ws: Path, env: dict[str, str], timeout_s: float) -> ProcResult:
+async def _arun(argv: list[str], ws: Path, env: dict[str, str], timeout_s: float) -> ProcResult:
+    """A capped child; cancelling the awaiting task kills its whole tree (procs.arun_capped)."""
     try:
-        return run_capped(argv, cwd=ws, env=env, timeout_s=timeout_s)
+        return await arun_capped(argv, cwd=ws, env=env, timeout_s=timeout_s)
     except OSError as exc:  # executable not found
         return ProcResult(returncode=127, stdout="", stderr=f"{argv[0]}: {exc}",
                           timed_out=False, duration_s=0.0)
@@ -81,7 +83,7 @@ def _output(proc: ProcResult, timeout_s: float) -> str:
 
 
 def _remaining(deadline: float) -> float:
-    return max(deadline - time.monotonic(), 1.0)
+    return max(deadline - time.time(), 1.0)  # wall clock: a machine sleep counts
 
 
 def _env_failure(message: str) -> SuiteResult:
@@ -100,24 +102,22 @@ async def arun_suite(ws: Path, *, select: list[str] | None = None, clean: bool =
     dev environment has it. ``select`` restricts the run to nodeids or paths (None or [] =
     the whole suite); ``frontend/...`` entries go to vitest (a nodeid selects its whole
     file), the others to pytest; npm and vitest run only when the frontend is selected.
+    ``timeout_s`` caps the whole run in wall-clock time.
     """
-    return await asyncio.to_thread(_run_suite, Path(ws), list(select or []), clean, timeout_s)
-
-
-def _run_suite(ws: Path, select: list[str], clean: bool, timeout_s: float) -> SuiteResult:
-    started = time.monotonic()
+    ws, select = Path(ws), list(select or [])
+    started = time.time()
     deadline = started + timeout_s
     has_frontend = (ws / FRONTEND_DIR / "package.json").is_file()
     front = [item for item in select if has_frontend and _is_frontend_path(item)]
     python = [item for item in select if item not in front]
     run_front = bool(front) or (has_frontend and not select)
-    build = _frontend_build(ws, clean, deadline) if run_front else None
+    build = await _afrontend_build(ws, clean, deadline) if run_front else None
     runs: list[SuiteResult] = []  # the test runners, in order: pytest, vitest
     if build is None or not build.env_error:
         if python or not select:
-            runs.append(_python_suite(ws, python, clean, deadline))
+            runs.append(await _apython_suite(ws, python, clean, deadline))
         if run_front and not (runs and runs[0].env_error):
-            runs.append(_vitest_suite(ws, front, deadline))
+            runs.append(await _avitest_suite(ws, front, deadline))
     parts = ([build] if build else []) + runs
     failed = [part for part in parts if not part.ok]
     outcomes: dict[str, str] = {}
@@ -128,7 +128,7 @@ def _run_suite(ws: Path, select: list[str], clean: bool, timeout_s: float) -> Su
         collection_errors=[error for part in runs for error in part.collection_errors],
         output_tail=_join_tails([part.output_tail for part in failed or runs]),
         env_error="\n".join(part.env_error for part in parts if part.env_error),
-        duration_s=round(time.monotonic() - started, 3))
+        duration_s=round(time.time() - started, 3))
 
 
 def _join_tails(texts: list[str]) -> str:
@@ -139,26 +139,27 @@ def _join_tails(texts: list[str]) -> str:
     return "\n".join(tail(text, TAIL_CHARS // len(texts) - 1) for text in texts)
 
 
-def _python_suite(ws: Path, select: list[str], clean: bool, deadline: float) -> SuiteResult:
+async def _apython_suite(ws: Path, select: list[str], clean: bool, deadline: float) -> SuiteResult:
     env = uv_env(ws)
     # `uv sync` is exact: it removes every package the lock does not declare, so the
     # verify-venv is clean without being deleted (deleting a fresh venv races with
     # Windows scanners holding its files). It is rebuilt only when the sync fails.
     timeout = _remaining(deadline)
-    sync = _run(["uv", "sync", "--locked"], ws, env, timeout)
-    if sync.returncode != 0 and clean and _remove_tree(ws / VERIFY_VENV):
+    sync = await _arun(["uv", "sync", "--locked"], ws, env, timeout)
+    if sync.returncode != 0 and clean and await asyncio.to_thread(_remove_tree, ws / VERIFY_VENV):
         timeout = _remaining(deadline)
-        sync = _run(["uv", "sync", "--locked"], ws, env, timeout)
+        sync = await _arun(["uv", "sync", "--locked"], ws, env, timeout)
     if sync.returncode != 0:
         return _env_failure(tail(f"`uv sync --locked` failed\n{_output(sync, timeout)}"))
     timeout = _remaining(deadline)
-    with tempfile.TemporaryDirectory(prefix="autospec-report-") as tmp:
+    # A cancelled run must not trade its CancelledError for a cleanup error on a locked file.
+    with tempfile.TemporaryDirectory(prefix="autospec-report-", ignore_cleanup_errors=True) as tmp:
         report_file = Path(tmp) / "report.json"
         # `python -m pytest`, not `pytest`: a pytest missing from the verify-venv must fail,
         # never fall back to another one found on PATH.
         argv = ["uv", "run", "--locked", "python", "-m", "pytest", "-q", "--json-report",
                 f"--json-report-file={report_file}", *select]
-        proc = _run(argv, ws, env, timeout)
+        proc = await _arun(argv, ws, env, timeout)
         report = _load_report(report_file)
     output = _output(proc, timeout)
     if report is None:
@@ -206,30 +207,30 @@ def _is_frontend_path(item: str) -> bool:
     return path == FRONTEND_DIR or path.startswith(FRONTEND_DIR + "/")
 
 
-def _frontend_build(ws: Path, clean: bool, deadline: float) -> SuiteResult:
+async def _afrontend_build(ws: Path, clean: bool, deadline: float) -> SuiteResult:
     """``npm ci`` (an env error when it fails) then ``npm run build`` in frontend/. A failed
     build fails the suite, yet the test runners still run: their outcomes stay traceable."""
     front, env, npm = _frontend(ws), npm_env(), npm_command()
     if clean or not (front / "node_modules").is_dir():
         timeout = _remaining(deadline)
-        install = _run([npm, "ci"], front, env, timeout)
+        install = await _arun([npm, "ci"], front, env, timeout)
         if install.returncode != 0:
             return _env_failure(tail(f"`npm ci` failed in {FRONTEND_DIR}/ (package-lock.json out of "
                                      f"date with package.json?)\n{_output(install, timeout)}"))
     timeout = _remaining(deadline)
-    build = _run([npm, "run", "build"], front, env, timeout)
+    build = await _arun([npm, "run", "build"], front, env, timeout)
     ok = build.returncode == 0
     return SuiteResult(ok=ok, returncode=build.returncode, outcomes={}, collection_errors=[],
                        output_tail="" if ok else tail(f"`npm run build` failed in {FRONTEND_DIR}/\n"
                                                       f"{_output(build, timeout)}"))
 
 
-def _vitest_suite(ws: Path, select: list[str], deadline: float) -> SuiteResult:
+async def _avitest_suite(ws: Path, select: list[str], deadline: float) -> SuiteResult:
     front, timeout = _frontend(ws), _remaining(deadline)
-    with tempfile.TemporaryDirectory(prefix="autospec-vitest-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="autospec-vitest-", ignore_cleanup_errors=True) as tmp:
         report_file = Path(tmp) / "vitest.json"
         argv = _vitest_argv(front, report_file, _vitest_filters(select))
-        proc = _run(argv, front, npm_env(), timeout) if argv else ProcResult(
+        proc = await _arun(argv, front, npm_env(), timeout) if argv else ProcResult(
             returncode=127, stdout="", stderr=f"vitest is not installed in {FRONTEND_DIR}/node_modules",
             timed_out=False, duration_s=0.0)
         report = _load_report(report_file)
@@ -303,7 +304,7 @@ def _vitest_path(name: str, root: str) -> str:
     return _posix(name)
 
 
-def _build_dist(ws: Path) -> str:
+async def _abuild_dist(ws: Path) -> str:
     """Build frontend/dist when absent (installing node_modules first when missing).
     Returns "" when the build is there, else what went wrong."""
     front = _frontend(ws)
@@ -311,7 +312,7 @@ def _build_dist(ws: Path) -> str:
         return ""
     steps = ([] if (front / "node_modules").is_dir() else [["ci"]]) + [["run", "build"]]
     for args in steps:
-        proc = _run([npm_command(), *args], front, npm_env(), _NPM_BUILD_TIMEOUT_S)
+        proc = await _arun([npm_command(), *args], front, npm_env(), _NPM_BUILD_TIMEOUT_S)
         if proc.returncode != 0:
             return f"`npm {' '.join(args)}` failed in {FRONTEND_DIR}/\n{_output(proc, _NPM_BUILD_TIMEOUT_S)}"
     return ""
@@ -365,18 +366,18 @@ async def asmoke(ws: Path, *, package: str, profile: Profile, timeout_s: float =
     env = uv_env(ws)
     python = ["uv", "run", "--locked", "python"]
     if profile is Profile.LIB:
-        proc = await asyncio.to_thread(_run, [*python, "-c", f"import {package}"], ws, env, timeout_s)
+        proc = await _arun([*python, "-c", f"import {package}"], ws, env, timeout_s)
         return _exit_verdict(proc, f"import {package}", timeout_s)
     if profile is Profile.CLI:
         label = f"python -m {package} --help"
-        proc = await asyncio.to_thread(_run, [*python, "-m", package, "--help"], ws, env, timeout_s)
+        proc = await _arun([*python, "-m", package, "--help"], ws, env, timeout_s)
         verdict = _exit_verdict(proc, label, timeout_s)
         if verdict.ok and not proc.stdout.strip():
             return SmokeResult(False, f"{label}: exit 0 but nothing on stdout\n{_output(proc, timeout_s)}")
         return verdict
     if profile in (Profile.API, Profile.FULLSTACK):
         frontend = profile is Profile.FULLSTACK
-        problem = await asyncio.to_thread(_build_dist, ws) if frontend else ""
+        problem = await _abuild_dist(ws) if frontend else ""
         if problem:
             return SmokeResult(False, problem)
         return await _asmoke_api(ws, env, [*python, "-m", package], timeout_s, frontend=frontend)
@@ -396,7 +397,7 @@ async def _asmoke_api(ws: Path, env: dict[str, str], argv: list[str], timeout_s:
         probe.bind(("127.0.0.1", 0))
         port = probe.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
-    started = time.monotonic()
+    started = time.time()
     with tempfile.TemporaryFile() as log:
         try:
             proc = popen(argv, cwd=ws, env={**env, "PORT": str(port)}, stdout=log,
@@ -409,7 +410,7 @@ async def _asmoke_api(ws: Path, env: dict[str, str], argv: list[str], timeout_s:
                 ok, page = await asyncio.to_thread(_check_frontend, base)
                 detail = f"{detail}\n{page}"
         finally:
-            kill_tree(proc)  # uv is a wrapper: the real server is a grandchild
+            kill_tree(proc)  # also on a cancellation; uv is a wrapper, the server a grandchild
         if not ok:
             log.seek(0)
             detail += "\n" + tail(log.read().decode("utf-8", errors="replace"))
@@ -420,12 +421,12 @@ async def _apoll_health(proc: subprocess.Popen, url: str, started: float,
                         timeout_s: float) -> tuple[bool, str]:
     opener = _opener()
     last: int | str = "no answer"
-    while time.monotonic() - started < timeout_s:
+    while time.time() - started < timeout_s:
         if proc.poll() is not None:
             return False, f"server exited with code {proc.returncode} before GET /health answered"
         last = (await asyncio.to_thread(_http_get, opener, url))[0]
         if last == 200:
-            return True, f"GET {url} -> 200 after {time.monotonic() - started:.1f}s"
+            return True, f"GET {url} -> 200 after {time.time() - started:.1f}s"
         await asyncio.sleep(0.25)
     return False, f"GET {url} gave no 200 within {timeout_s:.0f}s (last: {last})"
 

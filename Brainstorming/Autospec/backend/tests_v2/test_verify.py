@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -98,6 +99,29 @@ def is_alive(pid: int) -> bool:
     except ProcessLookupError:
         return False
     return True
+
+
+async def cancel_once_started(task: asyncio.Task, pid_file: Path, timeout_s: float = 180) -> int:
+    """Wait for the child to write its pid, cancel ``task``, and return that pid once the
+    cancellation went through (it must take seconds, not the run's own timeout)."""
+    deadline = time.monotonic() + timeout_s
+    while not (pid_file.is_file() and pid_file.read_text(encoding="utf-8").strip().isdigit()):
+        assert not task.done(), f"finished before the child started: {task.result()}"
+        assert time.monotonic() < deadline, f"{pid_file.name} never appeared"
+        await asyncio.sleep(0.1)
+    started = time.monotonic()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert time.monotonic() - started < 10
+    return int(pid_file.read_text(encoding="utf-8"))
+
+
+def died_within(pid: int, seconds: float = 10) -> bool:
+    deadline = time.monotonic() + seconds
+    while is_alive(pid) and time.monotonic() < deadline:
+        time.sleep(0.2)
+    return not is_alive(pid)
 
 
 # --------------------------------------------------------------------------- suite
@@ -247,6 +271,23 @@ async def test_suite_timeout(make_ws) -> None:
     assert "timeout" in result.output_tail
 
 
+async def test_cancelling_the_suite_kills_pytest_at_once(make_ws) -> None:
+    """An API stop or Ctrl-C must not leave pytest (a grandchild of uv) running to its timeout."""
+    ws = make_ws()
+    write(ws, "tests/unit/test_slow.py", """
+        import os
+        import time
+        from pathlib import Path
+
+        def test_slow():
+            Path("pytest.pid").write_text(str(os.getpid()))
+            time.sleep(120)
+    """)
+    task = asyncio.create_task(arun_suite(ws, timeout_s=600))
+    pid = await cancel_once_started(task, ws / "pytest.pid")
+    assert died_within(pid), "pytest survived the cancelled suite"
+
+
 def test_uv_env_isolates_the_product(monkeypatch, tmp_path: Path) -> None:
     outer = tmp_path / "outer-venv"
     scripts = outer / ("Scripts" if sys.platform == "win32" else "bin")
@@ -311,10 +352,23 @@ async def test_smoke_api_unhealthy_server_is_killed_with_its_tree(make_ws) -> No
     result = await asmoke(ws, package="shop", profile=Profile.API, timeout_s=15)
     assert not result.ok and "no 200" in result.detail and "last: 500" in result.detail
     pid = int((ws / "server.pid").read_text())
-    deadline = time.monotonic() + 10
-    while is_alive(pid) and time.monotonic() < deadline:
-        time.sleep(0.2)
-    assert not is_alive(pid), "the real server (grandchild of uv) survived the smoke"
+    assert died_within(pid), "the real server (grandchild of uv) survived the smoke"
+
+
+@pytest.mark.parametrize("profile", [Profile.CLI, Profile.API])
+async def test_cancelling_the_smoke_kills_the_product_at_once(make_ws, profile: Profile) -> None:
+    ws = make_ws(profile)
+    write(ws, "shop/__main__.py", """
+        import os
+        import time
+        from pathlib import Path
+
+        Path("product.pid").write_text(str(os.getpid()))
+        time.sleep(120)
+    """)
+    task = asyncio.create_task(asmoke(ws, package="shop", profile=profile, timeout_s=600))
+    pid = await cancel_once_started(task, ws / "product.pid")
+    assert died_within(pid), f"the {profile.value} product survived the cancelled smoke"
 
 
 async def test_smoke_rejects_a_bad_package_name(make_ws) -> None:
