@@ -279,7 +279,8 @@ from fastapi import FastAPI
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title={title})
+    # Keep the OpenAPI document at /openapi.json (FastAPI's default): clients rely on it.
+    app = FastAPI(title={title}, openapi_url="/openapi.json")
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -298,7 +299,10 @@ from {package}.app import create_app
 
 
 def main() -> None:
-    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("PORT", "8000")))
+    # proxy_headers=False: never take the client address from X-Forwarded-For, which anyone
+    # can forge (uvicorn trusts it from 127.0.0.1 by default), e.g. to dodge a rate limit.
+    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("PORT", "8000")),
+                proxy_headers=False)
 
 
 if __name__ == "__main__":
@@ -318,7 +322,8 @@ DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title={title})
+    # Keep the OpenAPI document at /openapi.json (FastAPI's default): clients rely on it.
+    app = FastAPI(title={title}, openapi_url="/openapi.json")
 
     @app.get("/health")
     def health() -> dict[str, str]:

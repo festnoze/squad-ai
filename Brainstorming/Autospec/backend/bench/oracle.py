@@ -59,6 +59,8 @@ class Product:
     frontend: bool = False      # frontend/package.json present
     frontend_ok: bool = False   # `npm ci` and `npm run build` both succeeded
     frontend_detail: str = ""
+    timings: dict[str, float] = field(default_factory=dict)  # seconds per bench step (uv sync, npm ci...)
+    suite: dict = field(default_factory=dict)                 # the M5 report, for oracles judging tests
 
     @property
     def python(self) -> str:
@@ -91,6 +93,7 @@ def prepare(workspace: Path, package: str, work: Path) -> Product:
                       lock_present=(target / "uv.lock").is_file(), sync_ok=False)
     argv = ["uv", "sync", "--locked"] if product.lock_present else ["uv", "sync"]
     result = proc.run(argv, cwd=target, env=product.env(), timeout_s=600)
+    product.timings["uv sync"] = result.duration_s
     product.sync_ok = result.returncode == 0
     product.sync_detail = proc.tail(result.stderr + result.stdout, 1500)
     if (product.frontend_dir / "package.json").is_file():
@@ -104,6 +107,7 @@ def prepare_frontend(product: Product) -> None:
     for args in (["ci", "--no-audit", "--no-fund"], ["run", "build"]):
         result = proc.run([npm_command(), *args], cwd=product.frontend_dir,
                           env=product.env(CI="1", NO_COLOR="1"), timeout_s=900)
+        product.timings[f"npm {args[0] if args[0] == 'ci' else 'run build'}"] = result.duration_s
         if result.returncode != 0:
             output = _ANSI.sub("", result.stderr + "\n" + result.stdout)
             timeout = ", timeout" if result.timed_out else ""
@@ -113,22 +117,31 @@ def prepare_frontend(product: Product) -> None:
     product.frontend_ok = True
 
 
-_SUMMARY = re.compile(r"(\d+) (passed|failed|error|errors|skipped)")
+_SUMMARY = re.compile(r"(\d+) (passed|failed|errors?|skipped|xfailed|xpassed)\b")
 _VITEST_TESTS = re.compile(r"^\s*Tests\s+(.*)$", re.MULTILINE)
-_VITEST_COUNT = re.compile(r"(\d+) (passed|failed)")
+_VITEST_COUNT = re.compile(r"(\d+) (passed|failed|skipped|todo)\b")
 
 
 def product_suite(product: Product) -> dict:
-    """M5: the product's own suite in the clean environment (pytest, plus frontend tests)."""
+    """M5: the product's own suite in the clean environment (pytest, plus frontend tests).
+
+    The top-level counts add both layers; `backend` (and `frontend`) keep each layer's own
+    counts, skipped and xfailed tests included, and the duration of the run.
+    """
     if not product.sync_ok:
         return {"green": False, "passed": 0, "failed": 0, "detail": "environment not built"}
     result = proc.run(["uv", "run", "--locked" if product.lock_present else "--frozen", "pytest", "-q"],
                       cwd=product.dir, env=product.env(), timeout_s=900)
+    product.timings["pytest"] = result.duration_s
     counts = {kind: int(n) for n, kind in _SUMMARY.findall(result.stdout[-3000:])}
     failed = counts.get("failed", 0) + counts.get("error", 0) + counts.get("errors", 0)
     suite = {"green": result.returncode == 0 and counts.get("passed", 0) > 0,
              "passed": counts.get("passed", 0), "failed": failed,
              "detail": proc.tail(result.stdout, 800)}
+    suite["backend"] = {"green": suite["green"], "passed": suite["passed"], "failed": failed,
+                        "skipped": counts.get("skipped", 0),
+                        "xfailed": counts.get("xfailed", 0) + counts.get("xpassed", 0),
+                        "duration_s": result.duration_s}
     if product.frontend:
         front = frontend_suite(product)
         suite["frontend"] = front
@@ -148,16 +161,18 @@ def frontend_suite(product: Product) -> dict:
         return {"green": False, "passed": 0, "failed": 1, "detail": product.frontend_detail}
     result = proc.run([npm_command(), "test"], cwd=product.frontend_dir,
                       env=product.env(CI="1", NO_COLOR="1"), timeout_s=900)
+    product.timings["npm test"] = result.duration_s
     output = _ANSI.sub("", result.stdout + "\n" + result.stderr)
-    passed = failed = 0
+    counts: dict[str, int] = {}
     summary = _VITEST_TESTS.findall(output)
     if summary:
         counts = {kind: int(n) for n, kind in _VITEST_COUNT.findall(summary[-1])}
-        passed, failed = counts.get("passed", 0), counts.get("failed", 0)
+    passed, failed = counts.get("passed", 0), counts.get("failed", 0)
     if result.returncode != 0 and failed == 0:
         failed = 1
     return {"green": result.returncode == 0 and passed > 0 and failed == 0,
-            "passed": passed, "failed": failed, "detail": proc.tail(output, 800)}
+            "passed": passed, "failed": failed, "skipped": counts.get("skipped", 0) + counts.get("todo", 0),
+            "duration_s": result.duration_s, "detail": proc.tail(output, 800)}
 
 
 @dataclass
@@ -242,7 +257,7 @@ def judge(project_id: str, workspace: Path, package: str, profile: str) -> dict:
         # resolve modules: always work on the long form.
         tmp = Path(raw_tmp).resolve()
         product = prepare(Path(workspace), package, tmp)
-        suite = product_suite(product)
+        suite = product.suite = product_suite(product)
         smoke_ok, smoke_detail = smoke(product, profile, getattr(module, "HEALTH_PATH", "/health"))
         checks: list[Check] = []
         if product.sync_ok:
@@ -269,6 +284,7 @@ def judge(project_id: str, workspace: Path, package: str, profile: str) -> dict:
         "m5_suite": suite,
         "m6_oracle": m6,
         "m7_smoke": {"ok": smoke_ok, "detail": smoke_detail},
+        "timings_s": product.timings,
         "duration_s": round(time.monotonic() - started, 1),
     })
     return report

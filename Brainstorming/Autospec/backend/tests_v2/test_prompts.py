@@ -175,21 +175,36 @@ def test_po_plan_content_and_rules():
 
 
 ADAPTIVE_SIZING = (
-    "exactly ONE story (up to 15 criteria) when the whole product fits one focused agent session",
-    "roughly up to 8 source files and 8 public operations",
-    "Only a bigger product is split into small vertical slices of 2 to 5 criteria",
-    "US-1 creating the entry point",
+    # One session built the whole B5 product (about 57 criteria) in 16 min (REFONTE_V2.md 11.2).
+    "ONE story with every criterion when the product fits one focused agent session",
+    "most small and medium products: up to ~30 source files or 25 criteria",
+    # Beyond: a few large stories along the brief's own structure, not 20 thin slices.
+    "AT MOST 7 stories, one per natural feature area of the brief (its sections or lots)",
+    "each up to ~20 criteria", "US-1 creating the entry point",
+    "Never split one resource's CRUD by verb",
+    "`depends_on`: only stories whose code this one truly needs",
 )
+# The pre-recalibration rules that split B5 into 20 stories (3 min of verification each).
+RETIRED_SIZING = ("8 source files", "8 public operations", "2 to 5 criteria", "small vertical slices",
+                  "up to 15 criteria", "1 to 7 stories", "every story whose code")
 
 
 @pytest.mark.parametrize("profile", [None, *ALL_PROFILES])
 def test_po_plan_sizes_adaptively(profile):
-    """docs/REFONTE_V2.md 11 and CONTRACTS.md 8.4: one story unless the product exceeds a session."""
+    """REFONTE_V2.md 11 to 11.2 and CONTRACTS.md 8.4: one story unless the product exceeds a
+    session, then at most 7 feature-area stories with real dependencies only."""
     text = prompts.po_plan("b", package="p", profile=profile)
     for part in ADAPTIVE_SIZING:
         assert part in text
-    assert "1 to 7 stories" not in text
+    for part in RETIRED_SIZING:
+        assert part not in text
     assert "as few user stories as it needs" in prompts.SYSTEM["po"]
+
+
+def test_po_plan_tells_the_po_that_stories_are_built_without_the_brief():
+    """Big stories must carry everything: their criteria are all the QA and dev agents get."""
+    assert "tested and built from its criteria alone: no agent sees the brief" in prompts.po_plan(
+        "b", package="p", profile=Profile.API)
 
 
 def test_po_plan_lets_the_po_choose_the_profile():

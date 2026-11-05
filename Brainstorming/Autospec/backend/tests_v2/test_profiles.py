@@ -125,7 +125,68 @@ def test_scaffold_api_wiring(workspaces: dict) -> None:
         ws = workspaces[profile]
         main = (ws / "todo" / "__main__.py").read_text(encoding="utf-8")
         assert 'os.environ.get("PORT", "8000")' in main and 'host="127.0.0.1"' in main
-        assert "def create_app() -> FastAPI:" in (ws / "todo" / "app.py").read_text(encoding="utf-8")
+        assert "proxy_headers=False" in main
+        app = (ws / "todo" / "app.py").read_text(encoding="utf-8")
+        assert "def create_app() -> FastAPI:" in app and 'openapi_url="/openapi.json"' in app
+
+
+# Serves the scaffold through its own `python -m` entry point (uvicorn.run as generated), with
+# one extra route that echoes the peer address uvicorn hands to the app.
+_SERVED_PROBE = textwrap.dedent("""
+    import os, socket, sys, threading, time
+    sys.path.insert(0, sys.argv[1])
+    import httpx
+    from fastapi import Request
+    import todo.__main__ as entry
+
+    make_app = entry.create_app
+
+    def create_app():
+        app = make_app()
+
+        @app.get("/peer")
+        def peer(request: Request) -> dict:
+            return {"host": request.client.host}
+
+        return app
+
+    entry.create_app = create_app
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    os.environ["PORT"] = str(port)
+    threading.Thread(target=entry.main, daemon=True).start()
+    base = f"http://127.0.0.1:{port}"
+    with httpx.Client(trust_env=False, timeout=10) as client:
+        deadline = time.monotonic() + 60
+        while True:
+            try:
+                peer = client.get(base + "/peer", headers={"X-Forwarded-For": "203.0.113.9"})
+                break
+            except httpx.TransportError:
+                if time.monotonic() > deadline:
+                    raise
+                time.sleep(0.1)
+        schema = client.get(base + "/openapi.json")
+        print("PEER", peer.json()["host"], "OPENAPI", schema.status_code,
+              "/health" in schema.json().get("paths", {}), flush=True)
+    os._exit(0)  # the server thread never returns on its own
+""")
+
+
+@pytest.mark.parametrize("profile", WEB, ids=lambda p: p.value)
+def test_scaffold_server_ignores_forwarded_headers_and_serves_openapi(
+        workspaces: dict, profile: Profile, tmp_path: Path) -> None:
+    """B5 SEC-04: uvicorn trusts X-Forwarded-For from 127.0.0.1 unless proxy_headers=False, so
+    a forged header escaped a per-client login rate limit. B5 ARC-06: the OpenAPI document."""
+    ws = workspaces[profile]
+    probe = tmp_path / "probe.py"
+    probe.write_text(_SERVED_PROBE, encoding="utf-8")
+    proc = run_capped(["uv", "run", "--locked", "python", str(probe), str(ws)], cwd=ws,
+                      env=uv_env(ws), timeout_s=300)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "PEER 127.0.0.1 OPENAPI 200 True" in proc.stdout, proc.stdout + proc.stderr
+    assert changed_paths(ws) == []
 
 
 def test_scaffold_fullstack_frontend(workspaces: dict) -> None:

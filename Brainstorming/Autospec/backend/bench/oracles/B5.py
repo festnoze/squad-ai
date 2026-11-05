@@ -4,11 +4,13 @@ docs/validation/support-client/02_requirements_verification.md.
 Only the part of a criterion that is observable from outside the product is automated,
 through the interface fixed by bench/briefs/B5-relais-support.md (section 7 of the
 specification plus the bench annex: commands, environment variables, JSON names). The
-product is driven over HTTP; the only other contacts are the `create-admin` command of
-the annex and a read-only byte scan (plus one held lock, ARC-03) of the SQLite file the
-annex places at RELAIS_DB. Every criterion that cannot be judged that way is returned
-failed with detail NOT_AUTOMATED, so the rate stays honest. bench/oracles/B5_COVERAGE.md
-says, per criterion, what is checked and what is not.
+product is driven over HTTP; the other contacts are the `create-admin` command of the
+annex, a read-only byte scan (plus one held lock, ARC-03) of the SQLite file the annex
+places at RELAIS_DB, the built UI in a headless browser (UX-01 to UX-07,
+bench/oracles/b5_ui.py), and the product's own suites and schema markers (TST-01, TST-03,
+TST-04, ARC-04, OPS-06, bench/oracles/b5_repo.py). Every criterion that cannot be judged
+that way is returned failed with detail NOT_AUTOMATED, so the rate stays honest.
+bench/oracles/B5_COVERAGE.md says, per criterion, what is checked and what is not.
 
 Order matters: failed logins are rate limited per IP (10 per 60 s window), so the main
 phase makes at most 5 failed logins and SEC-04 (failures, then the rate limit) runs on a
@@ -45,10 +47,9 @@ CRITERIA: list[str] = (
 
 # Why each of these is not automated: bench/oracles/B5_COVERAGE.md.
 NOT_AUTOMATED_IDS = frozenset({
-    "FUN-08", "ARC-01", "ARC-02", "ARC-04", "ARC-05", "ARC-09",
-    "UX-01", "UX-02", "UX-03", "UX-04", "UX-05", "UX-06", "UX-07",
-    "TST-01", "TST-02", "TST-03", "TST-04", "TST-05", "TST-06",
-    "OPS-02", "OPS-05", "OPS-06",
+    "FUN-08", "ARC-01", "ARC-02", "ARC-05", "ARC-09",
+    "TST-02", "TST-05", "TST-06",
+    "OPS-02", "OPS-05",
 })
 
 ADMIN_EMAIL = "admin@relais.test"
@@ -1656,27 +1657,39 @@ PHASE1: list[tuple[str, str, Callable[[World], None]]] = [
 ]
 
 
-def _attempt(fn: Callable[[World], None], w: World) -> str:
-    """Run one check body. Returns "" when it passed, else the failure detail."""
+def attempt(fn: Callable[[World], object], w: World) -> tuple[str, str]:
+    """Run one check body. Returns (failure, note): failure is "" when it passed.
+
+    A body may return a string, kept as the detail of a passed check (what a partial
+    check measured, for instance coverage figures or durations).
+    """
     try:
-        fn(w)
-        return ""
+        note = fn(w)
+        return "", note if isinstance(note, str) else ""
     except Fail as exc:
-        return str(exc) or "failed"
+        return str(exc) or "failed", ""
     except Exception as exc:  # a crash of one check must not stop the others
-        return f"{type(exc).__name__}: {exc}"
+        return f"{type(exc).__name__}: {exc}", ""
+
+
+def _attempt(fn: Callable[[World], object], w: World) -> str:
+    """Run one check body. Returns "" when it passed, else the failure detail."""
+    return attempt(fn, w)[0]
 
 
 def checks(product: Product, tmp: Path) -> list[Check]:
+    from bench.oracles import b5_repo, b5_ui  # both build on this module: imported here, not at the top
+
     work = tmp / "b5"
     work.mkdir(parents=True, exist_ok=True)
     w = World(product, work / "relais.db")
     results: dict[str, Check] = {}
     late: dict[str, list[str]] = defaultdict(list)
+    schema: dict[str, dict] = {}  # ARC-04: version markers of the base, blank, populated, restarted
 
-    def run(cid: str, fn: Callable[[World], None], world: World) -> None:
-        failure = _attempt(fn, world)
-        results[cid] = Check(cid, not failure, failure)
+    def run(cid: str, fn: Callable[[World], object], world: World) -> None:
+        failure, note = attempt(fn, world)
+        results[cid] = Check(cid, not failure, failure or note)
 
     def run_late(cid: str, fn: Callable[[World], None], world: World, label: str) -> None:
         failure = _attempt(fn, world)
@@ -1686,6 +1699,7 @@ def checks(product: Product, tmp: Path) -> list[Check]:
     run("OPS-01", ops_01, w)
     w.facts["bootstrap_no_credentials_rc"] = w.bootstrap(credentials=False).returncode
     w.facts["bootstrap_rc"] = w.bootstrap(credentials=True).returncode
+    schema["blank"] = b5_repo.schema_markers(w.db, work / "schema" / "blank")
     w.facts["bootstrap_again_rc"] = w.bootstrap(credentials=True, admin_email="autre-admin@relais.test").returncode
 
     blocked: dict[str, str] = {}
@@ -1701,10 +1715,13 @@ def checks(product: Product, tmp: Path) -> list[Check]:
                     run(cid, fn, w)
     except RuntimeError as exc:
         blocked["server"] = f"server: {exc}"
+    schema["populated"] = b5_repo.schema_markers(w.db, work / "schema" / "populated")
 
+    restarted = False
     if not blocked.get("server") and not blocked.get("users"):
         try:
             with w.server():  # same database, new process: what was written must still be there
+                restarted = True
                 relogin = _attempt(lambda world: [world.must_login(world.a(n)) for n in ("alice", "camille")], w)
                 if relogin:
                     late["OPS-04"].append(f"after restart: {relogin}")
@@ -1715,6 +1732,7 @@ def checks(product: Product, tmp: Path) -> list[Check]:
         except RuntimeError as exc:
             late["OPS-04"].append(f"restart: {exc}")
             late["FUN-07"].append(f"restart: {exc}")
+        schema["restarted"] = b5_repo.schema_markers(w.db, work / "schema" / "restarted")
 
     fresh = World(product, work / "fresh.db")  # SEC-04 needs a fresh failure counter and database
     rc = fresh.bootstrap(credentials=True).returncode
@@ -1731,6 +1749,21 @@ def checks(product: Product, tmp: Path) -> list[Check]:
                     run("SEC-04", sec_04, fresh)
         except RuntimeError as exc:
             results["SEC-04"] = Check("SEC-04", False, f"not run: fresh server: {exc}")
+
+    results.update(b5_ui.run(product, work))  # a world of its own: database, server, accounts
+
+    run("TST-01", b5_repo.tst_01, w)
+    run("OPS-06", b5_repo.ops_06, w)
+    w.facts["suite_probe"] = b5_repo.probe_suite(product, work)
+    run("TST-03", b5_repo.tst_03, w)
+    run("TST-04", b5_repo.tst_04, w)
+    ops_04 = results.get("OPS-04")
+    persisted = "; ".join(late["OPS-04"])  # "" when the data written before the restart survived it
+    if not restarted:
+        persisted = persisted or "the restart phase did not run"
+    elif not (ops_04 and ops_04.passed):
+        persisted = persisted or (ops_04.detail if ops_04 else "OPS-04 not run")
+    run("ARC-04", lambda world: b5_repo.arc_04(schema, persisted), w)
 
     out: list[Check] = []
     for cid in CRITERIA:

@@ -54,8 +54,8 @@ _KIND = {
     Profile.LIB: "a library: callers `import {pkg}`",
     Profile.CLI: "a command line tool run as `python -m {pkg} ...`",
     Profile.API: "an HTTP API, FastAPI `create_app()` in `{pkg}/app.py` served by `python -m {pkg}`",
-    Profile.FULLSTACK: "a web app, FastAPI `create_app()` in `{pkg}/app.py` (JSON under /api/) "
-                       "serving the React page of frontend/",
+    Profile.FULLSTACK: "FastAPI `create_app()` in `{pkg}/app.py` (JSON under /api/) serving the "
+                       "React page of frontend/",
 }
 
 _API_HOW = ("inside each test, `from {pkg}.app import create_app` and "
@@ -144,28 +144,28 @@ def po_plan(brief: str, *, package: str, profile: Profile | str | None) -> str:
     else:
         value = Profile(profile).value
         kind = f"Profile `{value}` (fixed): {_KIND[Profile(profile)].replace('{pkg}', package)}."
-    return f"""Split this product brief into epics and user stories.
+    return f"""Plan this product brief as epics and user stories.
 <brief>
 {brief.strip()}
 </brief>
 
-The importable package is `{package}`. {kind}
-Each story is then built alone by a QA agent (tests from its criteria) and a dev agent; \
-neither sees the brief.
+Package `{package}`. {kind}
+Each story is then tested and built from its criteria alone: no agent sees the brief.
 
 Rules:
 - The brief's public interface (names, commands, options, routes, JSON fields, messages, exit \
-codes) is a contract: copy it verbatim into the criteria, never rename.
-- Size: exactly ONE story (up to 15 criteria) when the whole product fits one focused agent \
-session, roughly up to 8 source files and 8 public operations. Only a bigger product is split \
-into small vertical slices of 2 to 5 criteria, US-1 creating the entry point.
-- Criteria are observable behaviours testable through the public interface: concrete input, \
-exact expected output, status, message or exit code.
-- `depends_on`: every story whose code this one needs. `priority`: 1 (first) to 5.
+codes) is a contract: copy it verbatim into criteria, never rename.
+- Size: ONE story with every criterion when the product fits one focused agent session (most \
+small and medium products: up to ~30 source files or 25 criteria). Beyond, AT MOST 7 stories, \
+one per natural feature area of the brief (its sections or lots), each up to ~20 criteria, US-1 \
+creating the entry point. Never split one resource's CRUD by verb.
+- Criteria are observable behaviours tested through the public interface: concrete input, \
+exact output, status, message or exit code.
+- `depends_on`: only stories whose code this one truly needs. `priority`: 1 (first) to 5.
 - `gherkin`: one Feature, one Scenario per criterion.
 - User-facing text stays in the brief's language.
 
-End your answer with exactly this JSON object (criteria are plain strings, numbered by the factory):
+End your answer with exactly this JSON object (criteria: plain strings, numbered by the factory):
 {{"profile": "{value}", "epics": [{{"id": "EPIC-1", "title": "...", "description": "..."}}], \
 "stories": [{{"id": "US-1", "epic_id": "EPIC-1", "title": "...", "description": "...", \
 "criteria": ["..."], "gherkin": "Feature: ...", "depends_on": [], "priority": 1}}]}}"""
