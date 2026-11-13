@@ -1,0 +1,96 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 533f33752cde18148ab5fae783871fd0, type: 3}
+  m_Name: ModelCatalog
+  m_EditorClassIdentifier: Meuble.Runtime::Meuble.ModelCatalog
+  entries:
+  - id: kenney.chair
+    prefab: {fileID: 2107409826236812522, guid: 4712022730a83ed4baae237a7c93fa8b, type: 3}
+    nativeSize: {x: 0.2, y: 0.47, z: 0.2}
+    boundsCenter: {x: 0.1, y: 0.235, z: 0.1}
+    yawOffset: 180
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: kenney.sofa
+    prefab: {fileID: 2107409826236812522, guid: 46c580fee62a6f44380b437add90e9bf, type: 3}
+    nativeSize: {x: 0.98, y: 0.45999998, z: 0.41}
+    boundsCenter: {x: 0.49, y: 0.22999999, z: 0.205}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: kenney.rug
+    prefab: {fileID: 2107409826236812522, guid: 39956ee364a7bfa48999e80b0ab5f0fa, type: 3}
+    nativeSize: {x: 1.57, y: 0.01, z: 0.92}
+    boundsCenter: {x: 0.785, y: 0.005, z: 0.46}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: kenney.doormat
+    prefab: {fileID: 2107409826236812522, guid: e83d6e7ffd0fa164086ab9c6b9cfd151, type: 3}
+    nativeSize: {x: 0.9043259, y: 0.01, z: 0.92}
+    boundsCenter: {x: 0.45216295, y: 0.005, z: 0.46}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: kenney.armchair
+    prefab: {fileID: 2107409826236812522, guid: af8fa6763209abe41b0bcf2531027b1d, type: 3}
+    nativeSize: {x: 0.49, y: 0.45999998, z: 0.41}
+    boundsCenter: {x: 0.245, y: 0.22999999, z: 0.205}
+    yawOffset: 180
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: kenney.stool
+    prefab: {fileID: 2107409826236812522, guid: 9283b8f827a83f344a06a6ca7b04b0b9, type: 3}
+    nativeSize: {x: 0.26544, y: 0.435, z: 0.2298778}
+    boundsCenter: {x: 0.13272, y: 0.2175, z: 0.1149389}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: kenney.floorlamp
+    prefab: {fileID: 2107409826236812522, guid: d3a90dca0642da444bf50ea1368d8064, type: 3}
+    nativeSize: {x: 0.15203941, y: 0.86, z: 0.17556}
+    boundsCenter: {x: 0.059999995, y: 0.43, z: 0.06}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+  - id: quaternius.man
+    prefab: {fileID: 2242888416370347441, guid: aa95814197af2064e9276295fe399d46, type: 3}
+    nativeSize: {x: 1.4170315, y: 4.8119526, z: 0.9098803}
+    boundsCenter: {x: -0.0067906976, y: 2.4016817, z: 0.044088632}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.0000148559, y: 0.0021739525, z: 0.003171883}
+    eyeHeight: 4.4460597
+  - id: quaternius.woman
+    prefab: {fileID: 2242888416370347441, guid: 7720401172c91334b89759aec9edac3a, type: 3}
+    nativeSize: {x: 1.407968, y: 4.6362534, z: 0.818936}
+    boundsCenter: {x: -0.011322379, y: 2.293133, z: 0.07693812}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.000014166972, y: 0.0020523828, z: 0.0032527887}
+    eyeHeight: 4.2793927

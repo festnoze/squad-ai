@@ -1,0 +1,70 @@
+        /// <summary>
+        /// Step 33d: the seat check's tolerance is 0.75 m. The chair is put 0.6, 0.7, 0.8, then 0.9 m from its seat home
+        /// at the start of the arrival telegraph (bearing 197 from the sit station: out of the cone through the turn):
+        /// 0.6 and 0.7 m are sat on, 0.8 and 0.9 m are a pratfall. Sat on, the chair's rule pose snaps to the seat home and
+        /// its visual slides there over 0.3 s (CONTRACT_M4 10.7).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step33d_SeatCheckToleranceIs075()
+        {
+            var cases = new[] { (0.6f, SitResult.OnPlayer), (0.7f, SitResult.OnPlayer), (0.8f, SitResult.Pratfall), (0.9f, SitResult.Pratfall) };
+            foreach ((float off, SitResult expected) in cases)
+            {
+                yield return LoadSitLevel();
+                Watcher.Pin(Watcher.Routine.Position, 90f);
+                InhabitantRoutine routine = Sitter.Routine;
+                Vector3 spot = SeatHome + YawMath.Forward(210f) * off;
+                bool moved = false;
+                yield return UntilSat(15f, () =>
+                {
+                    bool atStation = Planar(routine.Position, SitStation) < 0.01f && routine.SitTargetsPlayer;
+                    if (!moved && atStation && routine.LastActivity == RoutineActivity.Telegraph)
+                    {
+                        moved = true;
+                        Furniture.Teleport(spot, 0f);
+                    }
+                    Check(!moved || !Game.Seen, "premise: the moved chair was seen before the moment of sitting");
+                });
+                Assert.IsTrue(moved, "premise: the chair was never moved");
+                Assert.AreEqual(off, Planar(spot, SeatHome), 1e-3f);
+                Assert.AreEqual(expected, routine.LastSitResult, $"a chair {off} m from its seat home");
+                yield return Steps(1);
+                if (expected == SitResult.OnPlayer)
+                {
+                    Assert.IsTrue(Furniture.Pinned, "sat on, not pinned");
+                    Assert.Less(Planar(Furniture.transform.position, SeatHome), 1e-3f, "the sat-on chair's rule pose did not snap to the seat home");
+                    Assert.AreEqual(0, Game.DiscoveryCount);
+                    Assert.IsTrue(Game.SeatSettling, "the chair's visual did not start sliding onto the seat home");
+                    float first = -1f, last = -1f;
+                    M4Watcher w = Watch(() =>
+                    {
+                        float d = Planar(Furniture.Visual.position, SeatHome);
+                        if (first < 0f)
+                        {
+                            first = d;
+                        }
+                        last = d;
+                    });
+                    try
+                    {
+                        yield return Run(StepsFor(GameState.SeatSettleTime + 0.2f), null, 1f);
+                    }
+                    finally
+                    {
+                        Unwatch(w);
+                    }
+                    Debug.Log($"[Step33d] {off} m: the visual starts {first:0.000} m from the seat home and ends {last:0.0000} m from it");
+                    Assert.Greater(first, 0.5f * off, "the chair's visual jumped onto the seat home");
+                    Assert.Less(last, 1e-3f, "the chair's visual never reached the seat home");
+                    Assert.IsFalse(Game.SeatSettling, "the visual slide lasts longer than 0.3 s");
+                }
+                else
+                {
+                    Assert.IsFalse(Furniture.Pinned);
+                    Assert.AreEqual(1, Game.PratfallCount);
+                    Assert.IsFalse(Game.SeatSettling, "a pratfall moved the chair's visual");
+                }
+            }
+            AssertNoErrors();
+        }
+

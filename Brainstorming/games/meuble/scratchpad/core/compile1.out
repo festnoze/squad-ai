@@ -1,0 +1,7 @@
+
+=== Setup du projet et compilation ===
+Assets\Scripts\Runtime\Vision.cs(33,37): error CS1061: 'FurnitureController' does not contain a definition for 'SightRangeFactor' and no accessible extension method 'SightRangeFactor' accepting a first argument of type 'FurnitureController' could be found (are you missing a using directive or an assembly reference?)
+  ROUGE : compilation ou setup (code 6)
+
+=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults) ===
+exit 1

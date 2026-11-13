@@ -1,0 +1,105 @@
+{
+  "id": "level3",
+  "nameKey": "level3.name",
+  "hintKey": "level3.hint",
+  "rooms": [
+    {
+      "id": "salle", "x": -1.75, "z": 0.0, "sizeX": 5.5, "sizeZ": 5.0, "wallHeight": 2.7, "wallThickness": 0.1,
+      "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine", "x": 3.1, "z": 0.0, "sizeX": 4.0, "sizeZ": 5.0, "wallHeight": 2.7, "wallThickness": 0.1,
+      "floor": "hard", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE"
+    }
+  ],
+  "doors": [
+    { "x": 1.05, "z": 1.25, "width": 1.0, "top": 2.1 },
+    { "x": 4.35, "z": -2.55, "width": 1.0, "top": 2.1 }
+  ],
+  "windows": [
+    { "x": -1.75, "z": 2.55, "width": 1.6, "bottom": 0.9, "top": 2.1 }
+  ],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -3.25,
+    "z": -0.25,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "model": "kenney.doormat", "x": 4.35, "z": -2.05, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "rugs": [
+    { "model": "kenney.rug", "x": -1.75, "z": -0.25, "sizeX": 3.4, "sizeZ": 2.6, "yaw": 0.0, "color": "#2E6DB4" }
+  ],
+  "decoys": [
+    { "model": "kenney.chair", "kind": "chair", "x": -2.3, "z": 0.6, "yaw": 180.0, "color": "#8C5A36" },
+    { "model": "kenney.chair", "kind": "chair", "x": -1.2, "z": 0.6, "yaw": 180.0, "color": "#8C5A36" },
+    { "model": "kenney.chair", "kind": "chair", "x": -2.3, "z": -1.1, "yaw": 0.0, "color": "#8C5A36" },
+    { "model": "kenney.chair", "kind": "chair", "x": -1.2, "z": -1.1, "yaw": 0.0, "color": "#8C5A36" },
+    { "model": "kenney.chair", "kind": "chair", "x": 0.75, "z": 0.7, "yaw": 0.0, "color": "#8C5A36" },
+    { "model": "kenney.chair", "kind": "chair", "x": 3.8, "z": -1.25, "yaw": -90.0, "color": "#8C5A36" }
+  ],
+  "props": [
+    {
+      "name": "Table", "kind": "table", "x": -1.75, "z": -0.25, "yaw": 0.0,
+      "sizeX": 2.0, "sizeY": 0.75, "sizeZ": 1.0, "occluder": true,
+      "color": "#F7F4EE", "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Dresser", "kind": "cabinet", "x": 0.75, "z": -1.25, "yaw": 90.0,
+      "sizeX": 1.4, "sizeY": 1.9, "sizeZ": 0.5, "occluder": true,
+      "color": "#6B4226", "accentColor": "#E3B23C"
+    },
+    {
+      "name": "Sideboard", "kind": "counter", "x": -3.75, "z": 2.25, "yaw": 0.0,
+      "sizeX": 1.4, "sizeY": 0.9, "sizeZ": 0.5, "occluder": true,
+      "color": "#6B4226", "accentColor": "#E3B23C"
+    },
+    {
+      "name": "Counter", "kind": "counter", "x": 3.0, "z": 2.2, "yaw": 0.0,
+      "sizeX": 2.4, "sizeY": 0.9, "sizeZ": 0.6, "occluder": true,
+      "color": "#5B93D9", "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "KitchenTable", "kind": "table", "x": 3.05, "z": -1.25, "yaw": 0.0,
+      "sizeX": 1.0, "sizeY": 0.75, "sizeZ": 0.8, "occluder": true,
+      "color": "#E3B23C", "accentColor": "#8C5A36"
+    }
+  ],
+  "designerRoute": [
+    { "x": -3.25, "z": 0.75, "at": 3.5 },
+    { "x": -3.25, "z": 1.25, "at": 4.3 },
+    { "x": -2.25, "z": 1.25, "at": 4.7 },
+    { "x": -1.25, "z": 1.25, "at": 5.5 },
+    { "x": -0.25, "z": 1.25, "at": 6.3 },
+    { "x": 0.75, "z": 1.25, "at": 7.1 },
+    { "x": 1.35, "z": 1.25, "at": 13.4 },
+    { "x": 1.85, "z": 1.25, "at": 13.8 },
+    { "x": 1.85, "z": 0.25, "at": 14.2 },
+    { "x": 1.85, "z": -0.25, "at": 15.0 },
+    { "x": 2.85, "z": -0.25, "at": 15.4 },
+    { "x": 3.85, "z": -0.25, "at": 16.2 },
+    { "x": 4.35, "z": -0.25, "at": 17.0 },
+    { "x": 4.35, "z": -1.25, "at": 17.4 },
+    { "x": 4.35, "z": -1.75, "at": 18.2 },
+    { "x": 4.35, "z": -2.05, "at": 18.2 }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 3,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": -1.75, "z": 1.45, "facing": 180.0, "dwell": 4.0, "glances": [] },
+        { "x": 3.0, "z": 1.55, "facing": 0.0, "dwell": 6.0, "glances": [ { "offset": 2.5, "yaw": -75.0, "hold": 0.8 } ] },
+        { "x": 2.9, "z": 0.2, "facing": -57.0, "dwell": 5.0, "glances": [] },
+        { "x": 4.15, "z": 1.1, "facing": 90.0, "dwell": 7.0, "glances": [] }
+      ]
+    }
+  ]
+}

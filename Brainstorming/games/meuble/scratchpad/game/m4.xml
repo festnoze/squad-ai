@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="UN, DEUX, TROIS, MEUBLE" tests="19" failures="0" errors="0" skipped="0" time="90.623">
+  <testsuite name="Meuble.Tests.ProbeTestsM4Game" tests="19" failures="0" errors="0" skipped="0" time="90.623">
+    <testcase name="Step28_StoolTipsWhenReleasedFastAndIsHeard" classname="Meuble.Tests.ProbeTestsM4Game" time="3.331">
+      <system-out>[Step28] tipped at (-1,01, -2,20), 3,15 m from the listener; fall 14 moving steps, topple on step 14</system-out>
+    </testcase>
+    <testcase name="Step28b_StoolToppleUnheardBeyondItsRadius" classname="Meuble.Tests.ProbeTestsM4Game" time="2.307" />
+    <testcase name="Step28c_CarefulStoolNeverTips" classname="Meuble.Tests.ProbeTestsM4Game" time="3.001">
+      <system-out>[Step28c] careful top speed 1,20 m/s, tell shown False</system-out>
+    </testcase>
+    <testcase name="Step28d_StoolHeadOnWallHitTips" classname="Meuble.Tests.ProbeTestsM4Game" time="6.989" />
+    <testcase name="Step28e_TippedStoolStaysDownUntilAKey" classname="Meuble.Tests.ProbeTestsM4Game" time="4.623" />
+    <testcase name="Step28f_StoolSeenLyingDownIsOutOfPlace" classname="Meuble.Tests.ProbeTestsM4Game" time="2.264" />
+    <testcase name="Step28g_RugSilencesToppleAndClick" classname="Meuble.Tests.ProbeTestsM4Game" time="2.540" />
+    <testcase name="Step30_DarkLampIsSeenOnlyUpClose" classname="Meuble.Tests.ProbeTestsM4Game" time="0.975" />
+    <testcase name="Step30b_LampClickHeardWithinItsRadius" classname="Meuble.Tests.ProbeTestsM4Game" time="1.379" />
+    <testcase name="Step30c_InhabitantWhoSeesTheDarkLampSwitchesItOn" classname="Meuble.Tests.ProbeTestsM4Game" time="2.915">
+      <system-out>[Step30c] switched on at 3,74 s, 0,79 m from the lamp, beat 25 steps, walked 91 steps</system-out>
+    </testcase>
+    <testcase name="Step30d_HudShowsTheHintsOfTheCurrentBody" classname="Meuble.Tests.ProbeTestsM4Game" time="0.438" />
+    <testcase name="Step30e_ToggleInSightIsCaught" classname="Meuble.Tests.ProbeTestsM4Game" time="1.233">
+      <system-out>[Step30e] switching the lit lamp off: Caught (SeenMoving) after 10 action steps
+[Step30e] switching the dark lamp on: Caught (SeenMoving) after 10 action steps</system-out>
+    </testcase>
+    <testcase name="Step30f_OutOfPlaceDarkLamp" classname="Meuble.Tests.ProbeTestsM4Game" time="2.543">
+      <system-out>[Step30f] discovery at step 30, carried 120, put down 264, sent to switch 265, on 290</system-out>
+    </testcase>
+    <testcase name="Step31_SittingOnAPropLowersTheEye" classname="Meuble.Tests.ProbeTestsM4Game" time="8.164">
+      <system-out>[Step31] sat at record 156, stood up at 361 of 387; slide step max 0,030 m; apex drift 0,010 m over 815 sit-down frames (standing offset 0,141 m, 1337 frames); eye 0,000 m off, visual 0,0000, head 0,0 deg over 5236 frames, 745 stand frames</system-out>
+    </testcase>
+    <testcase name="Step32_SatOnFurnitureIsPinnedNotCaughtNotCreaking" classname="Meuble.Tests.ProbeTestsM4Game" time="9.149" />
+    <testcase name="Step33_MissingChairIsAPratfall" classname="Meuble.Tests.ProbeTestsM4Game" time="10.122">
+      <system-out>[Step33] fall 50 steps, look 100 steps, eye within 0,0 deg of the seat, 1 discovery</system-out>
+    </testcase>
+    <testcase name="Step33b_ChairPulledAwayDuringTheBackTurn" classname="Meuble.Tests.ProbeTestsM4Game" time="10.114">
+      <system-out>[Step33] fall 50 steps, look 100 steps, eye within 0,0 deg of the seat, 1 discovery</system-out>
+    </testcase>
+    <testcase name="Step33c_ChairPushedBackInTime" classname="Meuble.Tests.ProbeTestsM4Game" time="3.751" />
+    <testcase name="Step33d_SeatCheckToleranceIs075" classname="Meuble.Tests.ProbeTestsM4Game" time="14.785">
+      <system-out>[Step33d] 0,6 m: the visual starts 0,592 m from the seat home and ends 0,0000 m from it
+[Step33d] 0,7 m: the visual starts 0,690 m from the seat home and ends 0,0000 m from it
+Saving results to: C:/Users/e.millerioux/AppData/LocalLow/Meuble/UN, DEUX, TROIS, MEUBLE\TestResults.xml</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

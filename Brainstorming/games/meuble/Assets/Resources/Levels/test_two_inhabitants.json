@@ -1,0 +1,57 @@
+{
+  "id": "test_two_inhabitants",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 8.0,
+    "sizeZ": 6.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": 2.3, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "kind": "chair",
+    "x": -3.2,
+    "z": -2.2,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 3.5, "z": 2.3, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    {
+      "name": "Bookshelf", "kind": "bookshelf", "x": -1.5, "z": 2.8, "yaw": 0.0,
+      "sizeX": 1.6, "sizeY": 2.0, "sizeZ": 0.35, "occluder": true,
+      "color": "#6B4226", "accentColor": "#E3B23C"
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": 0.0, "z": -2.3, "facing": 180.0, "dwell": 5.0, "glances": [] },
+        { "x": -1.5, "z": 2.2, "facing": 0.0, "dwell": 6.0, "glances": [] }
+      ]
+    },
+    {
+      "name": "Voisine",
+      "startStation": 0,
+      "bodyColor": "#6A4C93",
+      "headColor": "#C68B59",
+      "stations": [
+        { "x": 2.2, "z": -0.7, "facing": 180.0, "dwell": 4.0, "glances": [] },
+        { "x": 1.2, "z": 1.4, "facing": 180.0, "dwell": 3.0, "glances": [] }
+      ]
+    }
+  ]
+}
