@@ -22,12 +22,23 @@ namespace Meuble
     /// M3.1: a panel's default button is selected one frame after the panel opens, so the Enter that opened it
     /// (the end screen's button opens the title) can never also submit the new panel's button; and a lost
     /// selection (a click on nothing) comes back to the default button, so the keyboard always has a target.
+    /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.10, CONTRACT_M5 16.10): the title gains "Niveaux" between Jouer and Quitter,
+    /// which opens the level select (<see cref="LevelSelect"/>), a page of the title screen: <see cref="TitleOpen"/> stays
+    /// true under it, so the game stays paused and a pause press is still ignored; Retour, Escape or gamepad B
+    /// (<see cref="InputReader.BackPressed"/>) come back to the title. Jouer starts the first level that is unlocked but
+    /// not won (<see cref="SaveStore.FirstUnwonLevel"/>). The record line under the win panel (<see cref="RecordLine"/>)
+    /// is built here too; it records every win in the save.
     /// </summary>
     public sealed class Menu : MonoBehaviour
     {
         public bool IsOpen => TitleOpen || PauseOpen;
+
+        /// <summary>The title screen is up: its main page, or the level select (<see cref="LevelSelectOpen"/>).</summary>
         public bool TitleOpen { get; private set; }
         public bool PauseOpen { get; private set; }
+
+        /// <summary>The title's main page (Jouer, Niveaux, Quitter) shows: the title is up and the level select is not.</summary>
+        public bool TitlePageShown => titleCanvas != null && titleCanvas.enabled;
 
         /// <summary>True on the frame a menu closed: its Enter must not also act on the game (GameState reads it).</summary>
         public bool ClosedThisFrame => closedFrame == Time.frameCount;
@@ -47,6 +58,59 @@ namespace Meuble
         public Button RestartButton { get; private set; }
         public Button MainMenuButton { get; private set; }
 
+        // ----- M5 (docs/CONTRACT_M5.md 16.12): the level select and the record line. -----
+
+        /// <summary>"Niveaux" on the title, between Jouer and Quitter.</summary>
+        public Button LevelsButton { get; private set; }
+
+        /// <summary>The level select is open (a page of the title: <see cref="TitleOpen"/> is true as well).</summary>
+        public bool LevelSelectOpen { get; private set; }
+
+        /// <summary>The level select page.</summary>
+        public LevelSelect LevelSelect { get; private set; }
+
+        /// <summary>The record line under the win panel; it records every win in the save.</summary>
+        public RecordLine RecordLine { get; private set; }
+
+        /// <summary>Niveaux: opens the level select over the title (ignored when the title is not up).</summary>
+        public void OpenLevelSelect()
+        {
+            if (!TitleOpen || LevelSelectOpen || LevelSelect == null)
+            {
+                return;
+            }
+            LevelSelectOpen = true;
+            Apply();
+            SelectLater(null);
+        }
+
+        /// <summary>Retour, Escape or gamepad B: from the level select back to the title's main page, on Niveaux.</summary>
+        public void CloseLevelSelect()
+        {
+            if (!LevelSelectOpen)
+            {
+                return;
+            }
+            LevelSelectOpen = false;
+            Apply();
+            SelectLater(LevelsButton);
+        }
+
+        /// <summary>A playable card of the level select: closes the menus and starts that level afresh.</summary>
+        public void PlayLevel(string levelId)
+        {
+            if (!TitleOpen || Game == null || string.IsNullOrEmpty(levelId))
+            {
+                return;
+            }
+            LevelSelectOpen = false;
+            TitleOpen = false;
+            closedFrame = Time.frameCount;
+            Apply();
+            Game.LoadLevel(levelId);
+            CaptureCursor();
+        }
+
         /// <summary>Every menu label by name (tests check the strings).</summary>
         public readonly Dictionary<string, Text> Labels = new Dictionary<string, Text>();
 
@@ -60,6 +124,9 @@ namespace Meuble
         private Font font;
         private int closedFrame = -1;
         private int openedFrame = -1;
+        // M5: the selectable to take the selection after the next panel change instead of the default one (Niveaux
+        // after Retour), or null.
+        private Selectable pendingFocus;
 
         private static readonly Color Cream = new Color(1f, 0.92f, 0.75f, 1f);
 
@@ -83,6 +150,16 @@ namespace Meuble
 
             BuildTitle();
             BuildPause();
+            LevelSelect = LevelSelect.Create(transform, Game, font, Labels, id =>
+            {
+                Click();
+                PlayLevel(id);
+            }, () =>
+            {
+                Click();
+                CloseLevelSelect();
+            });
+            RecordLine = RecordLine.Create(Game, Hud, font, transform);
             if (Hud != null && Hud.EndButton != null)
             {
                 Hud.EndButton.onClick.AddListener(() =>
@@ -101,25 +178,33 @@ namespace Meuble
             // showcase camera frames the red chair in the lower third, under the buttons (OrbitCamera).
             Stretch(NewImage(titleCanvas.transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.22f)).rectTransform);
             Stretch(NewImage(titleCanvas.transform, "Edges", ProceduralArt.Vignette, new Color(0.02f, 0.02f, 0.03f, 0.6f)).rectTransform);
+            // M5: the band grows down by one button row for Niveaux (the chair still shows in the lower third).
             Image band = NewImage(titleCanvas.transform, "Band", ProceduralArt.Rounded, new Color(0.06f, 0.06f, 0.08f, 0.66f));
             band.type = Image.Type.Sliced;
-            Place(band.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 175f), new Vector2(1320f, 530f));
+            Place(band.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(1320f, 620f));
             Image chair = NewImage(titleCanvas.transform, "Emblem", ProceduralArt.Chair, Color.white);
             chair.preserveAspect = true;
-            Place(chair.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 362f), new Vector2(118f, 118f));
+            Place(chair.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 372f), new Vector2(118f, 118f));
             Text title = NewText(titleCanvas.transform, "Title", Strings.Title, 100, Cream);
-            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 232f), new Vector2(1700f, 130f));
+            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 244f), new Vector2(1700f, 130f));
             PlayButton = Hud.MenuButton(titleCanvas.transform, "Play", Strings.TitlePlay, font, Labels);
-            Place((RectTransform)PlayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 82f), new Vector2(480f, 92f));
+            Place((RectTransform)PlayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 104f), new Vector2(480f, 88f));
+            LevelsButton = Hud.MenuButton(titleCanvas.transform, "Levels", Strings.TitleLevels, font, Labels);
+            Place((RectTransform)LevelsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 2f), new Vector2(480f, 88f));
             QuitButton = Hud.MenuButton(titleCanvas.transform, "Quit", Strings.TitleQuit, font, Labels);
-            Place((RectTransform)QuitButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -32f), new Vector2(480f, 92f));
+            Place((RectTransform)QuitButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -100f), new Vector2(480f, 88f));
             Text credits = NewText(titleCanvas.transform, "Credits", Strings.TitleCredits, 28, new Color(1f, 1f, 1f, 0.8f));
             Place(credits.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 36f), new Vector2(1800f, 44f));
-            Chain(PlayButton, QuitButton);
+            Chain(PlayButton, LevelsButton, QuitButton);
             PlayButton.onClick.AddListener(() =>
             {
                 Click();
                 Play();
+            });
+            LevelsButton.onClick.AddListener(() =>
+            {
+                Click();
+                OpenLevelSelect();
             });
             QuitButton.onClick.AddListener(() =>
             {
@@ -178,19 +263,23 @@ namespace Meuble
             }
             PauseOpen = false;
             TitleOpen = true;
+            LevelSelectOpen = false;
             string first = Game.FirstLevelId;
             if (reload || Game.Level == null || Game.LevelId != first)
             {
                 Game.LoadLevel(first);
             }
             Apply();
-            SelectLater();
+            SelectLater(null);
         }
 
-        /// <summary>Opens or closes the pause menu. The title screen keeps the game paused and ignores it.</summary>
+        /// <summary>
+        /// Opens or closes the pause menu. The title screen keeps the game paused and ignores it, and so does its level
+        /// select (Escape closes the select, it never also pauses).
+        /// </summary>
         public void SetPaused(bool paused)
         {
-            if (TitleOpen || PauseOpen == paused)
+            if (TitleOpen || LevelSelectOpen || PauseOpen == paused)
             {
                 return;
             }
@@ -210,19 +299,25 @@ namespace Meuble
             }
         }
 
-        /// <summary>Jouer: closes the title and starts the first level of levels.json afresh.</summary>
+        /// <summary>
+        /// Jouer: closes the title and starts afresh the first level of levels.json that is unlocked but not won (level 1
+        /// on a fresh save, the last level when every one is won). Ignored while the level select is open.
+        /// </summary>
         public void Play()
         {
-            if (!TitleOpen)
+            if (!TitleOpen || LevelSelectOpen)
             {
                 return;
             }
             TitleOpen = false;
             closedFrame = Time.frameCount;
             Apply();
-            Game.LoadLevel(Game.FirstLevelId);
+            Game.LoadLevel(PlayTarget);
             CaptureCursor();
         }
+
+        /// <summary>The level Jouer starts: the first unlocked level not won yet (<see cref="SaveStore.FirstUnwonLevel"/>).</summary>
+        public string PlayTarget => Game == null ? null : SaveStore.FirstUnwonLevel(Game.LevelOrder) ?? Game.FirstLevelId;
 
         /// <summary>Recommencer: resumes and restarts the current level.</summary>
         public void RestartFromPause()
@@ -272,30 +367,45 @@ namespace Meuble
         {
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
-            SelectLater();
+            SelectLater(null);
         }
 
-        /// <summary>Clears the selection now; <see cref="Update"/> selects the open panel's default button next frame.</summary>
-        private void SelectLater()
+        /// <summary>
+        /// Clears the selection now; <see cref="Update"/> selects <paramref name="focus"/> (when shown), else the open
+        /// panel's default button, next frame.
+        /// </summary>
+        private void SelectLater(Selectable focus)
         {
             openedFrame = Time.frameCount;
+            pendingFocus = focus;
             if (EventSystem.current != null)
             {
                 EventSystem.current.SetSelectedGameObject(null);
             }
         }
 
-        /// <summary>The default button of what is open (title, pause, end screen), or null.</summary>
-        public Selectable DefaultButton => TitleOpen ? PlayButton : PauseOpen ? ResumeButton : Hud != null && Hud.EndVisible ? Hud.EndButton : null;
+        /// <summary>
+        /// The default button of what is open (the level select's first unlocked card, title, pause, end screen), or null.
+        /// </summary>
+        public Selectable DefaultButton => LevelSelectOpen && LevelSelect != null ? LevelSelect.DefaultSelectable
+            : TitleOpen ? PlayButton : PauseOpen ? ResumeButton : Hud != null && Hud.EndVisible ? Hud.EndButton : null;
 
         private void Update()
         {
+            // M5: Escape or gamepad B leaves the level select. Read every frame, so a press made elsewhere never waits
+            // for the select to open.
+            if (InputReader.BackPressed() && LevelSelectOpen)
+            {
+                Click();
+                CloseLevelSelect();
+            }
             EventSystem events = EventSystem.current;
-            Selectable wanted = DefaultButton;
+            Selectable wanted = pendingFocus != null && IsShown(pendingFocus.gameObject) ? pendingFocus : DefaultButton;
             if (events == null || wanted == null || Time.frameCount <= openedFrame)
             {
                 return;
             }
+            pendingFocus = null;
             GameObject current = events.currentSelectedGameObject;
             if (current == null || !IsShown(current))
             {
@@ -318,8 +428,16 @@ namespace Meuble
         private void Apply()
         {
             bool open = IsOpen;
-            SetEnabled(titleCanvas, TitleOpen);
+            if (!TitleOpen)
+            {
+                LevelSelectOpen = false;
+            }
+            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen);
             SetEnabled(pauseCanvas, PauseOpen);
+            if (LevelSelect != null && LevelSelect.IsOpen != LevelSelectOpen)
+            {
+                LevelSelect.SetOpen(LevelSelectOpen);
+            }
             if (Game != null)
             {
                 Game.Paused = open;
@@ -472,6 +590,15 @@ namespace Meuble
             }
             yield return new WaitForSecondsRealtime(2f);
             yield return Shoot(dir, "L1_title.png", lines);
+
+            // 1b. M5: the level select (a fresh save: only the first card unlocked), then back to the title.
+            menu.OpenLevelSelect();
+            yield return new WaitForSecondsRealtime(0.5f);
+            lines.Add($"levels: open={menu.LevelSelectOpen} cards={(menu.LevelSelect != null ? menu.LevelSelect.CardCount : 0)}"
+                + $" order={game.LevelOrder.Count} save={SaveStore.FilePath}");
+            yield return Shoot(dir, "L1b_levels.png", lines);
+            menu.CloseLevelSelect();
+            yield return new WaitForSecondsRealtime(0.2f);
 
             // 2. The pause menu over the first level.
             menu.Play();

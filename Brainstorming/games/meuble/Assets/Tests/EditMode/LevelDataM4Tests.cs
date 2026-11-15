@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Meuble.Core;
 using Newtonsoft.Json;
 using NUnit.Framework;
@@ -129,7 +130,8 @@ namespace Meuble.Tests
         [Test]
         public void Fixture_is_valid_for_every_body()
         {
-            CollectionAssert.AreEqual(new[] { "chair", "stool", "armchair", "floor_lamp", "office_chair" }, BodyKinds.All);
+            // M5 wave 5B appends the rocking chair (CONTRACT_M5 5); the M4 bodies keep their order.
+            CollectionAssert.AreEqual(new[] { "chair", "stool", "armchair", "floor_lamp", "office_chair", "rocking_chair" }, BodyKinds.All);
             foreach (string kind in BodyKinds.All)
             {
                 LevelDef l = Fixture(kind);
@@ -472,7 +474,9 @@ namespace Meuble.Tests
         [Test]
         public void Lessons_are_careful_sit_dark_and_glide()
         {
-            CollectionAssert.AreEqual(new[] { "careful", "sit", "dark", "glide" }, LevelDef.Lessons);
+            // M5 appends its lessons after the four of M4 (CONTRACT_M5 16.12); the M4 ones keep their order.
+            CollectionAssert.AreEqual(new[] { "careful", "sit", "dark", "glide" }, System.Linq.Enumerable.Take(LevelDef.Lessons, 4));
+            CollectionAssert.IsSubsetOf(new[] { "door", "pet", "split", "robot", "rock", "load", "final" }, LevelDef.Lessons);
             // Each one is accepted on the body it is about (the fixtures carry them).
             foreach (string kind in new[] { BodyKinds.Stool, BodyKinds.Armchair, BodyKinds.FloorLamp, BodyKinds.OfficeChair })
             {
@@ -599,7 +603,8 @@ namespace Meuble.Tests
                 List<string> issues = LevelValidator.Validate(l);
                 Assert.IsEmpty(issues, id + ": " + string.Join("\n", issues));
             }
-            Assert.AreEqual(new[] { "level1", "level2", "level3", "level4", "level5", "level6", "level7" }, order.ToArray(), "the play order");
+            // M5 (CONTRACT_M5 16.2): the manifest grows after level7; levels 1 to 7 keep the first seven places.
+            Assert.AreEqual(new[] { "level1", "level2", "level3", "level4", "level5", "level6", "level7" }, order.Take(7).ToArray(), "the play order");
         }
 
         [Test]

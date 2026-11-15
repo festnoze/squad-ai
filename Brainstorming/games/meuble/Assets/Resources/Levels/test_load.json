@@ -1,0 +1,110 @@
+{
+  "id": "test_load",
+  "nameKey": "level11.name",
+  "hintKey": "level11.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 3.95,
+      "z": 1.45,
+      "sizeX": 7.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 5.75,
+      "z": 2.95,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 0.75,
+    "z": 2.25,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D",
+    "model": "kenney.chair",
+    "load": "vase"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 5.75,
+    "z": 2.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Meuble1",
+      "kind": "cabinet",
+      "x": 1.75,
+      "z": 2.0,
+      "yaw": 0.0,
+      "sizeX": 0.4,
+      "sizeY": 0.9,
+      "sizeZ": 1.8,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "name": "Meuble2",
+      "kind": "cabinet",
+      "x": 3.25,
+      "z": 0.9,
+      "yaw": 0.0,
+      "sizeX": 0.4,
+      "sizeY": 0.9,
+      "sizeZ": 1.8,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "name": "Meuble3",
+      "kind": "cabinet",
+      "x": 4.75,
+      "z": 2.0,
+      "yaw": 0.0,
+      "sizeX": 0.4,
+      "sizeY": 0.9,
+      "sizeZ": 1.8,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#E3B23C"
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 7.25,
+          "z": 1.25,
+          "facing": 270.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 7.25,
+          "z": 1.25,
+          "facing": 90.0,
+          "dwell": 8.5,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

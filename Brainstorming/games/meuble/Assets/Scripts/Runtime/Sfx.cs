@@ -22,6 +22,13 @@ namespace Meuble
     ///
     /// M4 (docs/CONTRACT_M4.md 2, 3 and amendment 9.12): the stool's topple and its rattle loop (the tell), the lamp
     /// click, the office chair's roll and the pratfall, all synthesized (no AudioLibrary role).
+    ///
+    /// M5 (docs/CONTRACT_M5_v3.md 3 and 4): the door's swing (the latch, then the hinge), the dog's bark and the dog's
+    /// sniff (its telegraph, in place of the human "hm ?"), all synthesized. The swing is a sound, not a noise event.
+    ///
+    /// M5 wave 5B (docs/CONTRACT_M5.md 4, 5 and 6): the robot vacuum's hum, a quiet 3D loop on every robot (an AudioSource
+    /// added to the robot's own GameObject, like the footsteps: no GameObject is created), the fallen load's crash, the
+    /// rocking chair's creak while it rocks and the robot's bump into the furniture, all synthesized.
     /// </summary>
     public sealed class Sfx : MonoBehaviour
     {
@@ -96,6 +103,45 @@ namespace Meuble
         public int RollsPlayed { get; private set; }
         public int PratfallsPlayed { get; private set; }
 
+        // ----- M5 (docs/CONTRACT_M5_v3.md 3 and 4): synthesized only, AudioLibrary unchanged. -----
+
+        /// <summary>A door swings open: the latch clicks, then the hinge squeaks over the 0.6 s swing.</summary>
+        public AudioClip Door { get; private set; }
+
+        /// <summary>The dog barks: two short "wouf", the second lower.</summary>
+        public AudioClip Bark { get; private set; }
+
+        /// <summary>The dog's telegraph: two quick sniffs.</summary>
+        public AudioClip Sniff { get; private set; }
+
+        public int DoorsPlayed { get; private set; }
+        public int BarksPlayed { get; private set; }
+        public int SniffsPlayed { get; private set; }
+
+        /// <summary>The pan of the last bark (tests: it comes from the dog's side).</summary>
+        public float LastBarkPan { get; private set; }
+
+        // ----- M5 wave 5B (docs/CONTRACT_M5.md 4, 5 and 6): synthesized only, AudioLibrary unchanged. -----
+
+        /// <summary>The robot vacuum's hum: a motor drone with its brushes, a seamless one second loop (3D, on the robot).</summary>
+        public AudioClip Hum { get; private set; }
+
+        /// <summary>The fallen load: a dull knock on the floor, then breaking china and scattering shards.</summary>
+        public AudioClip Crash { get; private set; }
+
+        /// <summary>The rocking chair rocks: two soft creaks of its runners, forward and back, over the 0.8 s rock.</summary>
+        public AudioClip RockCreak { get; private set; }
+
+        public int CrashesPlayed { get; private set; }
+        public int RockCreaksPlayed { get; private set; }
+        public int BumpsPlayed { get; private set; }
+
+        /// <summary>The pan of the last crash (tests: it comes from the clue's side).</summary>
+        public float LastCrashPan { get; private set; }
+
+        /// <summary>Hum sources added to robots since startup (one per robot of each built level).</summary>
+        public int HumSourcesAdded { get; private set; }
+
         /// <summary>True while the rattle loop is wanted (the stool's tell); tests read this, never isPlaying.</summary>
         public bool RattleActive { get; private set; }
 
@@ -160,6 +206,18 @@ namespace Meuble
         private const float RollSynthVolume = Tuning.SfxRollSynthVolume * MixScale;
         private const float RattleSynthVolume = Tuning.SfxRattleSynthVolume * MixScale;
         private const float PratfallSynthVolume = Tuning.SfxPratfallSynthVolume * MixScale;
+        // M5 synthesized cues: the door near the thump, the bark as loud as the caught sting (it is the dog's alarm), the
+        // sniff a little under the "hm ?" it replaces.
+        private const float DoorSynthVolume = Tuning.SfxDoorSynthVolume * MixScale;
+        private const float BarkSynthVolume = Tuning.SfxBarkSynthVolume * MixScale;
+        private const float SniffSynthVolume = Tuning.SfxSniffSynthVolume * MixScale;
+        // M5 wave 5B: the hum a quiet bed near the robot, the crash as loud as the caught sting (heard 6 m away), the rock
+        // creak under the creak, the bump under the put-down thump (it reuses the thump, higher).
+        private const float HumVolume = Tuning.SfxHumVolume * MixScale;
+        private const float CrashSynthVolume = Tuning.SfxCrashSynthVolume * MixScale;
+        private const float RockCreakSynthVolume = Tuning.SfxRockCreakSynthVolume * MixScale;
+        private const float BumpSynthVolume = Tuning.SfxBumpSynthVolume * MixScale;
+        private const float BumpPitch = 1.45f;
 
         // Mix levels of the recordings (at most 1, in Tuning), multiplied by each clip's gain to the common -20 dBFS
         // active RMS: the playback volume is exactly gain * mix, below 1 for every clip. Levels, like the
@@ -204,6 +262,12 @@ namespace Meuble
         private AudioSource clickSource;
         private AudioSource rollSource;
         private AudioSource pratfallSource;
+        private AudioSource doorSource;
+        private AudioSource barkSource;
+        private AudioSource sniffSource;
+        private AudioSource crashSource;
+        private AudioSource rockSource;
+        private AudioSource bumpSource;
         private System.Random noise;
         private System.Random choice;
         private bool tensionWasActive;
@@ -235,6 +299,12 @@ namespace Meuble
             Roll = Synthesize("roll", 0.3f, RollSample);
             Rattle = SynthesizeRattle("rattle", RattleLoopSeconds);
             Pratfall = Synthesize("pratfall", 0.95f, PratfallSample);
+            Door = SynthesizeDoor("door", Tuning.DoorOpenTime + 0.15f);
+            Bark = Synthesize("bark", 0.52f, BarkSample);
+            Sniff = Synthesize("sniff", 0.3f, SniffSample);
+            Hum = SynthesizeHum("hum", 1f);
+            Crash = SynthesizeCrash("crash", 0.9f);
+            RockCreak = SynthesizeRockCreak("rock creak", Tuning.RockTime);
             // Two hop sources in turn: a hop's pitch is set on a source whose previous hop has ended, so a
             // recorded tail (up to 0.3 s, hops every 0.22 s) is never re-pitched mid sound.
             hopSources = new[] { NewSource(1f), NewSource(1f) };
@@ -252,6 +322,13 @@ namespace Meuble
             clickSource = NewSource(1f);
             rollSource = NewSource(1f);
             pratfallSource = NewSource(1f);
+            doorSource = NewSource(1f);
+            barkSource = NewSource(1f);
+            sniffSource = NewSource(1f);
+            crashSource = NewSource(1f);
+            rockSource = NewSource(1f);
+            bumpSource = NewSource(1f);
+            bumpSource.pitch = BumpPitch;
             RattleSource = NewSource(0f);
             RattleSource.clip = Rattle;
             RattleSource.loop = true;
@@ -371,7 +448,46 @@ namespace Meuble
                 return;
             }
             EnsureFootsteps(game.Level);
+            EnsureRobotHums(game.Level);
             WatchCarry(game.Furniture);
+        }
+
+        /// <summary>
+        /// M5 wave 5B (CONTRACT_M5 4): adds the hum, a 3D AudioSource looping <see cref="Hum"/>, to every robot of the level
+        /// that lacks one (AddComponent on the robot's own GameObject: no GameObject is created). It runs on every fixed step,
+        /// so the robots of a rebuilt level hum from its first step; it pauses with the AudioListener like every game sound.
+        /// </summary>
+        public void EnsureRobotHums(LevelInstance level)
+        {
+            if (level == null || Hum == null)
+            {
+                return;
+            }
+            foreach (Component robot in level.Robots)
+            {
+                if (robot == null || robot.TryGetComponent<AudioSource>(out _))
+                {
+                    continue;
+                }
+                AudioSource s = robot.gameObject.AddComponent<AudioSource>();
+                s.playOnAwake = false;
+                s.clip = Hum;
+                s.loop = true;
+                s.volume = HumVolume;
+                s.spatialBlend = 1f;
+                s.rolloffMode = AudioRolloffMode.Linear;
+                s.minDistance = Tuning.SfxHumMinDistance;
+                s.maxDistance = Tuning.SfxHumMaxDistance;
+                s.dopplerLevel = 0f;
+                s.Play();
+                HumSourcesAdded++;
+            }
+        }
+
+        /// <summary>The hum source of a robot (its 3D AudioSource), or null before the first fixed step of its level.</summary>
+        public static AudioSource HumOf(Component robot)
+        {
+            return robot != null && robot.TryGetComponent(out AudioSource s) ? s : null;
         }
 
         /// <summary>
@@ -686,6 +802,88 @@ namespace Meuble
             pratfallSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
             Play(pratfallSource, Pratfall, PratfallSynthVolume);
             PratfallsPlayed++;
+        }
+
+        // ----- M5 cues (docs/CONTRACT_M5_v3.md 3 and 4) -----
+
+        /// <summary>A door leaf starts its swing (the player pressed E in reach), panned toward the door.</summary>
+        public void PlayDoor(float pan)
+        {
+            if (doorSource == null)
+            {
+                return;
+            }
+            doorSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
+            doorSource.pitch = 0.96f + (float)noise.NextDouble() * 0.08f;
+            Play(doorSource, Door, DoorSynthVolume);
+            DoorsPlayed++;
+        }
+
+        /// <summary>The dog barks (it saw the furniture move), panned toward the dog.</summary>
+        public void PlayBark(float pan)
+        {
+            if (barkSource == null)
+            {
+                return;
+            }
+            LastBarkPan = Mathf.Clamp(pan, -0.8f, 0.8f);
+            barkSource.panStereo = LastBarkPan;
+            barkSource.pitch = 0.95f + (float)noise.NextDouble() * 0.1f;
+            Play(barkSource, Bark, BarkSynthVolume);
+            BarksPlayed++;
+        }
+
+        /// <summary>The dog's telegraph (a wake or a turn over 30 deg): two quick sniffs, panned toward the dog.</summary>
+        public void PlaySniff(float pan)
+        {
+            if (sniffSource == null)
+            {
+                return;
+            }
+            sniffSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
+            Play(sniffSource, Sniff, SniffSynthVolume);
+            SniffsPlayed++;
+        }
+
+        // ----- M5 wave 5B cues (docs/CONTRACT_M5.md 4, 5 and 6) -----
+
+        /// <summary>The load fell off the furniture: the crash, panned toward where it lies.</summary>
+        public void PlayCrash(float pan)
+        {
+            if (crashSource == null)
+            {
+                return;
+            }
+            LastCrashPan = Mathf.Clamp(pan, -0.8f, 0.8f);
+            crashSource.panStereo = LastCrashPan;
+            crashSource.pitch = 0.96f + (float)noise.NextDouble() * 0.08f;
+            Play(crashSource, Crash, CrashSynthVolume);
+            CrashesPlayed++;
+        }
+
+        /// <summary>The rocking chair starts its rock: the runners creak forward and back, panned toward it.</summary>
+        public void PlayRockCreak(float pan)
+        {
+            if (rockSource == null)
+            {
+                return;
+            }
+            rockSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
+            rockSource.pitch = 0.95f + (float)noise.NextDouble() * 0.1f;
+            Play(rockSource, RockCreak, RockCreakSynthVolume);
+            RockCreaksPlayed++;
+        }
+
+        /// <summary>The robot bumps into the furniture: a soft knock (the put-down thump, higher), panned toward it.</summary>
+        public void PlayBump(float pan)
+        {
+            if (bumpSource == null)
+            {
+                return;
+            }
+            bumpSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
+            Play(bumpSource, Thump, BumpSynthVolume);
+            BumpsPlayed++;
         }
 
         /// <summary>
@@ -1036,6 +1234,260 @@ namespace Meuble
                 s += (body + knock + n) * 0.8f * Mathf.Clamp01(local / 0.003f) * Mathf.Clamp01((d - t) / 0.05f);
             }
             return s;
+        }
+
+        // ----- M5 sounds -----
+
+        /// <summary>
+        /// The door: a latch click at the start, then the hinge, a squeak whose pitch wanders between 600 and 900 Hz as a
+        /// stick and slip pulse train excites it, swelling and fading over the swing, with a soft wooden knock at the end
+        /// as the leaf settles. It needs filter state, so it does not use <see cref="Generator"/>.
+        /// </summary>
+        private AudioClip SynthesizeDoor(string name, float duration)
+        {
+            int count = Mathf.CeilToInt(duration * Rate);
+            var data = new float[count];
+            float y1 = 0f;
+            float y2 = 0f;
+            float phase = 0f;
+            float peak = 1e-6f;
+            float swing = duration - 0.15f;
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)Rate;
+                float s = 0.9f * SwitchSnap(t) * 0.5f;
+                // The hinge: a resonance at a wandering pitch, driven by slips at 40 to 70 per second.
+                float hinge = 0f;
+                if (t > 0.03f && t < swing)
+                {
+                    float x = (t - 0.03f) / (swing - 0.03f);
+                    float rate = 40f + 30f * Mathf.Sin(Mathf.PI * x);
+                    phase += rate / Rate;
+                    float excitation = ((float)noise.NextDouble() * 2f - 1f) * 0.03f;
+                    if (phase >= 1f)
+                    {
+                        phase -= 1f;
+                        excitation += 0.5f + 0.5f * (float)noise.NextDouble();
+                    }
+                    float f = 600f + 300f * Mathf.Sin(Mathf.PI * x * 1.3f);
+                    float w = 2f * Mathf.PI * f / Rate;
+                    const float r = 0.9975f;
+                    float y = 2f * r * Mathf.Cos(w) * y1 - r * r * y2 + excitation;
+                    y2 = y1;
+                    y1 = y;
+                    hinge = y * Mathf.Sin(Mathf.PI * x) * 0.06f;
+                }
+                // The settle: a soft low knock as the leaf comes to rest.
+                float local = t - swing;
+                float knock = local >= 0f
+                    ? (Mathf.Sin(2f * Mathf.PI * 160f * local) * Mathf.Exp(-local * 30f) + Mathf.Sin(2f * Mathf.PI * 420f * local) * Mathf.Exp(-local * 60f) * 0.4f)
+                      * 0.5f * Mathf.Clamp01(local / 0.003f)
+                    : 0f;
+                data[i] = s + hinge + knock;
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+            }
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = Mathf.Clamp(data[i] / peak * 0.85f * Mathf.Clamp01((duration - i / (float)Rate) / 0.02f), -1f, 1f);
+            }
+            AudioClip clip = AudioClip.Create(name, count, 1, Rate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        /// <summary>
+        /// The bark: two "wouf", the second a little lower. Each is a voiced burst whose pitch falls from about 520 to
+        /// 330 Hz through an open vowel (a formant near 900 Hz), with a breathy noise attack.
+        /// </summary>
+        private float BarkSample(float t, float d)
+        {
+            return Wouf(t, 1f) + 0.8f * Wouf(t - 0.27f, 0.88f);
+        }
+
+        private float Wouf(float local, float pitchScale)
+        {
+            const float length = 0.2f;
+            if (local < 0f || local > length)
+            {
+                return 0f;
+            }
+            float x = local / length;
+            float pitch = (520f - 190f * x) * pitchScale;
+            // The phase of a linearly falling pitch, integrated.
+            float phase = 2f * Mathf.PI * (520f * local - 190f * local * local / (2f * length)) * pitchScale;
+            float s = 0f;
+            for (int k = 1; k <= 9; k++)
+            {
+                float f = pitch * k;
+                float formant = Mathf.Exp(-Mathf.Pow((f - 900f) / 420f, 2f)) + 0.4f * Mathf.Exp(-Mathf.Pow((f - 2300f) / 600f, 2f)) + 0.05f;
+                s += Mathf.Sin(phase * k) * formant / Mathf.Sqrt(k);
+            }
+            float breath = ((float)noise.NextDouble() * 2f - 1f) * Mathf.Exp(-local * 60f) * 0.6f;
+            float env = Mathf.Clamp01(local / 0.008f) * Mathf.Pow(1f - x, 1.5f);
+            return (s * 0.45f + breath) * env;
+        }
+
+        /// <summary>The sniff: two quick bursts of airy noise through a nose (a band near 3 kHz), the second shorter.</summary>
+        private float SniffSample(float t, float d)
+        {
+            float s = SniffBurst(t, 0.09f) + 0.8f * SniffBurst(t - 0.14f, 0.07f);
+            return s * Mathf.Clamp01((d - t) / 0.01f);
+        }
+
+        // ----- M5 wave 5B sounds -----
+
+        /// <summary>
+        /// The robot's hum: a motor drone (whole-hertz partials of 110 Hz) under a brush hiss built from many whole-hertz
+        /// sines of fixed random phases, so the one second loop is seamless; the brushes swell gently four times a second.
+        /// </summary>
+        private AudioClip SynthesizeHum(string name, float duration)
+        {
+            int count = Mathf.CeilToInt(duration * Rate);
+            var data = new float[count];
+            var rng = new System.Random(4242);
+            const int brushPartials = 40;
+            var brushFreq = new float[brushPartials];
+            var brushPhase = new float[brushPartials];
+            for (int k = 0; k < brushPartials; k++)
+            {
+                brushFreq[k] = 700 + rng.Next(2600);
+                brushPhase[k] = (float)(rng.NextDouble() * 2.0 * System.Math.PI);
+            }
+            float peak = 1e-6f;
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)Rate;
+                float motor = Mathf.Sin(2f * Mathf.PI * 110f * t) * 0.5f + Mathf.Sin(2f * Mathf.PI * 220f * t) * 0.28f
+                    + Mathf.Sin(2f * Mathf.PI * 330f * t) * 0.14f + Mathf.Sin(2f * Mathf.PI * 550f * t) * 0.06f;
+                float brush = 0f;
+                for (int k = 0; k < brushPartials; k++)
+                {
+                    brush += Mathf.Sin(2f * Mathf.PI * brushFreq[k] * t + brushPhase[k]);
+                }
+                brush *= 0.035f * (0.75f + 0.25f * Mathf.Sin(2f * Mathf.PI * 4f * t));
+                data[i] = motor + brush;
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+            }
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = Mathf.Clamp(data[i] / peak * 0.7f, -1f, 1f);
+            }
+            AudioClip clip = AudioClip.Create(name, count, 1, Rate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        /// <summary>
+        /// The fallen load: a dull knock on the floor, a bright crack, then a scatter of china tinks (high damped partials
+        /// starting over the first 0.35 s) over a short gritty noise tail.
+        /// </summary>
+        private AudioClip SynthesizeCrash(string name, float duration)
+        {
+            int count = Mathf.CeilToInt(duration * Rate);
+            var data = new float[count];
+            var rng = new System.Random(911);
+            const int tinks = 14;
+            var at = new float[tinks];
+            var freq = new float[tinks];
+            var amp = new float[tinks];
+            for (int k = 0; k < tinks; k++)
+            {
+                at[k] = 0.01f + (float)rng.NextDouble() * 0.35f * (k / (float)tinks + 0.2f);
+                freq[k] = 2200f + (float)rng.NextDouble() * 4200f;
+                amp[k] = 0.25f + 0.75f * (float)rng.NextDouble() * (1f - 0.5f * k / tinks);
+            }
+            float peak = 1e-6f;
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)Rate;
+                float knock = Mathf.Sin(2f * Mathf.PI * 120f * (1f - 0.25f * Mathf.Clamp01(t / 0.08f)) * t) * Mathf.Exp(-t * 28f);
+                float crack = ((float)noise.NextDouble() * 2f - 1f) * Mathf.Exp(-t * 90f) * 0.9f;
+                float s = knock + crack;
+                for (int k = 0; k < tinks; k++)
+                {
+                    float local = t - at[k];
+                    if (local < 0f)
+                    {
+                        continue;
+                    }
+                    s += amp[k] * Mathf.Sin(2f * Mathf.PI * freq[k] * local) * Mathf.Exp(-local * (60f + 4f * k)) * Mathf.Clamp01(local / 0.0015f) * 0.6f;
+                }
+                float grit = ((float)noise.NextDouble() * 2f - 1f) * 0.12f * Mathf.Exp(-t * 7f) * Mathf.Clamp01(t / 0.02f);
+                data[i] = (s + grit) * Mathf.Clamp01((duration - t) / 0.05f);
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+            }
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = Mathf.Clamp(data[i] / peak * 0.9f, -1f, 1f);
+            }
+            AudioClip clip = AudioClip.Create(name, count, 1, Rate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        /// <summary>
+        /// The rock: two soft creaks of the runners (a slow stick and slip train exciting two low wood resonances), the second
+        /// weaker, one per swing of the rock. It needs filter state, so it does not use <see cref="Generator"/>.
+        /// </summary>
+        private AudioClip SynthesizeRockCreak(string name, float duration)
+        {
+            int count = Mathf.CeilToInt(duration * Rate);
+            var data = new float[count];
+            float[] freqs = { 240f, 520f };
+            float[] damping = { 0.9968f, 0.9955f };
+            float[] gains = { 1f, 0.45f };
+            var y1 = new float[2];
+            var y2 = new float[2];
+            float phase = 0f;
+            float peak = 1e-6f;
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)Rate;
+                float x = t / duration;
+                // Two swells of slips (forward, then back), the second weaker.
+                float swing = Mathf.Repeat(x * 2f, 1f);
+                float swell = Mathf.Sin(Mathf.PI * swing) * (x < 0.5f ? 1f : 0.6f);
+                phase += (18f + 40f * swell) / Rate;
+                float excitation = 0f;
+                if (phase >= 1f)
+                {
+                    phase -= 1f;
+                    excitation = swell * (0.6f + 0.4f * (float)noise.NextDouble());
+                }
+                float s = 0f;
+                for (int k = 0; k < 2; k++)
+                {
+                    float w = 2f * Mathf.PI * freqs[k] * (1f + 0.04f * swell) / Rate;
+                    float r = damping[k];
+                    float y = 2f * r * Mathf.Cos(w) * y1[k] - r * r * y2[k] + excitation;
+                    y2[k] = y1[k];
+                    y1[k] = y;
+                    s += y * gains[k];
+                }
+                data[i] = s * Mathf.Clamp01(t / 0.02f) * Mathf.Clamp01((duration - t) / 0.08f);
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+            }
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = Mathf.Clamp(data[i] / peak * 0.8f, -1f, 1f);
+            }
+            AudioClip clip = AudioClip.Create(name, count, 1, Rate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private float SniffBurst(float local, float length)
+        {
+            if (local < 0f || local > length)
+            {
+                return 0f;
+            }
+            float x = local / length;
+            // Noise ring-modulated up to the nose band: a breathy hiss, not a tone.
+            float n = (float)noise.NextDouble() * 2f - 1f;
+            float band = Mathf.Sin(2f * Mathf.PI * 2900f * local) * 0.6f + Mathf.Sin(2f * Mathf.PI * 4100f * local) * 0.3f;
+            float env = Mathf.Sin(Mathf.PI * x) * Mathf.Sin(Mathf.PI * x);
+            return n * band * env * 0.9f;
         }
     }
 }

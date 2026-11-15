@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Meuble.Core;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -57,6 +58,7 @@ namespace Meuble.Editor
         public static void Apply()
         {
             EnsureLayers();
+            EnsureNavMeshAreas();
             EnsureAlwaysIncludedShaders();
             EnsureBootScene();
             EnsurePlayerSettings();
@@ -320,6 +322,53 @@ namespace Meuble.Editor
             if (changed)
             {
                 tagManager.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.1): the NavMesh areas of the door leaves, Tuning.DoorAreaBase + leaf index, are named
+        /// "Door0" and "Door1" in ProjectSettings/NavMeshAreas.asset (cost 1, as Walkable). Only the names change: a plan's
+        /// area mask works by index.
+        /// </summary>
+        private static void EnsureNavMeshAreas()
+        {
+            UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/NavMeshAreas.asset");
+            if (assets.Length == 0)
+            {
+                throw new InvalidOperationException("NavMeshAreas.asset not found");
+            }
+            var settings = new SerializedObject(assets[0]);
+            SerializedProperty areas = settings.FindProperty("areas");
+            if (areas == null || !areas.isArray)
+            {
+                throw new InvalidOperationException("NavMeshAreas.asset has no areas array");
+            }
+            bool changed = false;
+            for (int k = 0; k < Tuning.MaxLeavesPerLevel; k++)
+            {
+                int index = Tuning.DoorAreaBase + k;
+                SerializedProperty area = areas.GetArrayElementAtIndex(index);
+                SerializedProperty name = area.FindPropertyRelative("name");
+                SerializedProperty cost = area.FindPropertyRelative("cost");
+                string wanted = "Door" + k;
+                if (name.stringValue != wanted)
+                {
+                    if (!string.IsNullOrEmpty(name.stringValue))
+                    {
+                        Debug.LogWarning($"[ProjectSetup] NavMesh area {index} was '{name.stringValue}', now '{wanted}'.");
+                    }
+                    name.stringValue = wanted;
+                    changed = true;
+                }
+                if (cost != null && Mathf.Abs(cost.floatValue - 1f) > 1e-6f)
+                {
+                    cost.floatValue = 1f;
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                settings.ApplyModifiedPropertiesWithoutUndo();
             }
         }
 

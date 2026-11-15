@@ -32,6 +32,45 @@ namespace Meuble.Core
         public List<DecoyDef> Decoys = new List<DecoyDef>();
         public List<RouteStepDef> DesignerRoute = new List<RouteStepDef>();
 
+        // ----- M5 (docs/CONTRACT_M5.md 16.12, v3 sections 2 and 15.4) -----
+        public List<PlatformDef> Platforms = new List<PlatformDef>();
+        public List<RampDef> Ramps = new List<RampDef>();
+        public List<RobotDef> Robots = new List<RobotDef>();
+
+        // Newtonsoft's ShouldSerialize hooks: a level without platforms, ramps or robots is written as before M5, so a route
+        // rewritten by the audit leaves an M1 to M4 level file unchanged.
+        public bool ShouldSerializePlatforms() => Platforms != null && Platforms.Count > 0;
+        public bool ShouldSerializeRamps() => Ramps != null && Ramps.Count > 0;
+        public bool ShouldSerializeRobots() => Robots != null && Robots.Count > 0;
+
+        private FloorMap floor;
+
+        /// <summary>M5: the level's floor heights (platforms and ramps), built once.</summary>
+        [JsonIgnore] public FloorMap Floor => floor ?? (floor = new FloorMap(this));
+
+        /// <summary>M5: the walkable floor height at a planar point (FloorMap).</summary>
+        public float FloorHeightAt(float x, float z) => Floor.HeightAt(x, z);
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.1): the doors that carry a leaf, in level order. Leaf i of this list uses the
+        /// NavMesh area <see cref="Tuning.DoorAreaBase"/> + i, and bit i of LevelInstance.OpenMask.
+        /// </summary>
+        public List<OpeningDef> LeafDoors()
+        {
+            var leaves = new List<OpeningDef>();
+            if (Doors != null)
+            {
+                foreach (OpeningDef door in Doors)
+                {
+                    if (door != null && door.HasLeaf)
+                    {
+                        leaves.Add(door);
+                    }
+                }
+            }
+            return leaves;
+        }
+
         /// <summary>M4: the level's lesson for the audit's lesson-required check ("careful", "sit", "dark", "glide").</summary>
         public string Lesson;
 
@@ -46,7 +85,17 @@ namespace Meuble.Core
         public const string LessonGlide = "glide";
 
         /// <summary>Every accepted <see cref="Lesson"/> value (null is accepted too: no lesson).</summary>
-        public static readonly string[] Lessons = { LessonCareful, LessonSit, LessonDark, LessonGlide };
+        // ----- M5 lessons (docs/CONTRACT_M5.md 10 and 16) -----
+        public const string LessonDoor = "door";
+        public const string LessonPet = "pet";
+        public const string LessonSplit = "split";
+        public const string LessonRobot = "robot";
+        public const string LessonRock = "rock";
+        public const string LessonLoad = "load";
+        public const string LessonFinal = "final";
+
+        public static readonly string[] Lessons = { LessonCareful, LessonSit, LessonDark, LessonGlide,
+            LessonDoor, LessonPet, LessonSplit, LessonRobot, LessonRock, LessonLoad, LessonFinal };
 
         /// <summary>
         /// M4: resolves <see cref="StationDef.PropSeat"/> for every station whose Sit names a prop of the level (the prop
@@ -336,6 +385,8 @@ namespace Meuble.Core
         public const string ActionToggle = "toggle";
         /// <summary>M4: <see cref="Action"/> that presses a move key to right a tipped stool.</summary>
         public const string ActionRightUp = "rightup";
+        /// <summary>M5: <see cref="Action"/> that presses E to open the closed leaf named by <see cref="Door"/>.</summary>
+        public const string ActionOpen = "open";
 
         public float X;
         public float Z;
@@ -347,6 +398,8 @@ namespace Meuble.Core
         /// <summary>"toggle" (E), "rightup" (a move key to right a tipped stool), or null.</summary>
         public string Action;
         // CONTRACT_M4 10.7: WaitFor is removed (never read); a route step has x, z, at, careful and action only.
+        /// <summary>M5: the leaf id an "open" action opens.</summary>
+        public string Door;
     }
 
     /// <summary>M4: the authored home of the player's seat for a "sit": "player" station.</summary>
@@ -371,9 +424,11 @@ namespace Meuble.Core
         public const string Armchair = "armchair";
         public const string FloorLamp = "floor_lamp";
         public const string OfficeChair = "office_chair";
+        /// <summary>M5 (docs/CONTRACT_M5.md 5): the rocking chair.</summary>
+        public const string RockingChair = "rocking_chair";
 
-        /// <summary>Every body kind, in the order of the contract table.</summary>
-        public static readonly string[] All = { Chair, Stool, Armchair, FloorLamp, OfficeChair };
+        /// <summary>Every body kind, in the order of the contract tables (M4, then M5's rocking chair).</summary>
+        public static readonly string[] All = { Chair, Stool, Armchair, FloorLamp, OfficeChair, RockingChair };
 
         /// <summary>The kind a furniture of <paramref name="kind"/> stands for: null or empty is the chair (M1 data).</summary>
         public static string Of(string kind)
@@ -470,7 +525,30 @@ namespace Meuble.Core
         public float Bottom;
         public float Top = TopDefault;
 
+        // ----- M5 (docs/CONTRACT_M5_v3.md 3 and 15.2), doors only -----
+        /// <summary>null (a doorway), "open" or "closed".</summary>
+        public string Leaf;
+        /// <summary>"start" (default, the lower world coordinate along the wall) or "end".</summary>
+        public string Hinge;
+        /// <summary>The leaf id, unique in the level.</summary>
+        public string Id;
+        /// <summary>The id of the room the leaf swings into.</summary>
+        public string Swing;
+
+        /// <summary>M5: <see cref="Leaf"/> of a leaf standing open, and of a closed one.</summary>
+        public const string LeafOpen = "open";
+        public const string LeafClosed = "closed";
+        /// <summary>M5: <see cref="Hinge"/> values.</summary>
+        public const string HingeStart = "start";
+        public const string HingeEnd = "end";
+
         [JsonIgnore] public bool IsPointForm => Wall == null;
+
+        /// <summary>M5: the door carries a leaf (open or closed).</summary>
+        [JsonIgnore] public bool HasLeaf => !string.IsNullOrEmpty(Leaf);
+
+        /// <summary>M5: the door carries a closed leaf (as authored).</summary>
+        [JsonIgnore] public bool LeafClosedAtStart => Leaf == LeafClosed;
     }
 
     /// <summary>The player furniture: kind, floor position, yaw and bounding box size.</summary>
@@ -487,6 +565,8 @@ namespace Meuble.Core
         public float SizeY;
         public float SizeZ;
         public string Color;
+        /// <summary>M5: a load on top ("vase", "books", "plant") or null (CONTRACT_M5 6, 16.5).</summary>
+        public string Load;
 
         [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
         [JsonIgnore] public Vector3 Size => new Vector3(SizeX, SizeY, SizeZ);
@@ -543,6 +623,17 @@ namespace Meuble.Core
         public string BodyColor;
         public string HeadColor;
         public List<StationDef> Stations = new List<StationDef>();
+
+        // ----- M5 (docs/CONTRACT_M5.md 3, 16.7) -----
+        /// <summary>"human" (null) or "dog".</summary>
+        public string Kind;
+        /// <summary>A PersonalityDef id, or null for default.</summary>
+        public string Personality;
+        /// <summary>"loop" (null), "pingpong" or "wander".</summary>
+        public string Pattern;
+        /// <summary>The wander seed, in [0, 2^31 - 1].</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int Seed;
     }
 
     /// <summary>PRD 5.1: a position, a facing yaw, a dwell time and head glances.</summary>
@@ -572,6 +663,10 @@ namespace Meuble.Core
         /// sitter sits on the sofa instead of hovering at the seat front. Null for any other station.
         /// </summary>
         [JsonIgnore] public FurniturePose? PropSeat;
+
+        /// <summary>M5: a dog station where the dog sleeps (eye closed) for the whole dwell (v3 4).</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Sleep;
     }
 
     /// <summary>A head glance: time offset into the dwell, head yaw relative to the body, hold duration.</summary>

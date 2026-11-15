@@ -80,6 +80,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             Time.timeScale = 1f;
             GamePause.IsPaused = false;
             Application.logMessageReceived -= OnLog;

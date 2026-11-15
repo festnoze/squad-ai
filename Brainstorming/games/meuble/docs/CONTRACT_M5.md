@@ -1,4 +1,4 @@
-# Contract M5 v4 - "La maison": 17 levels that combine mechanics (for critique)
+# Contract M5 v4 + v5 amendments (section 16) - "La maison": 17 levels that combine mechanics
 
 Build contract for milestone M5 of [PRD.md](PRD.md) v1.7. The product owner rewrote M5 after the
 M4 playtest:
@@ -406,3 +406,352 @@ lesson and the combination stay.
 See PRD v1.7: pet bones, the door key, seen opening a door, door memory, the bark, stacked
 floors, the wardrobe, inhabitants opening doors, personalities, a fallen load, the robot's shove,
 house budgets.
+
+---
+
+## 16. v5 amendments (binding; they override sections 1 to 15 and v3 where they conflict)
+
+From the contract critic's review of v4 (5 blockers, 11 majors). Decided by the integrator. The
+machine has 2.9 GB of free RAM, so there is no second Unity editor: one lock, two waves.
+
+### 16.1 Binding text (B4)
+
+- v3 sections 2, 3, 4, 6 and 8 stay binding **as amended by v3 15.x**:
+  - the platform and ramp JSON;
+  - the leaf rules;
+  - the bark, its accumulator, `sleep` stations and the dog eye;
+  - the save format, unlocking, and Play picking the first unwon level;
+  - the moving and still sight tables.
+- v3 sections 1, 5, 7, 9 to 13 and 15.9 are replaced by v4 and v5.
+- **The stub list of 16.12 is binding.** The integrator lands it before any builder starts, with
+  the LevelDef fields first (`LevelJson` rejects unknown members).
+
+### 16.2 Two waves (M10)
+
+- **Wave 5A:**
+  - doors, the dog, the split level, personalities, patterns, the save and the level select;
+  - the audit's performance rework and its extension to these mechanics;
+  - levels 8, 12, 14 and 16.
+  - Gate 5A: verify, critic, fix wave, mutations.
+- **Wave 5B:**
+  - the robot, the rocking chair and the load;
+  - levels 9, 10, 11, 13, 15 and 17;
+  - step 40 over 17 levels.
+  - Gate 5B closes M5.
+- levels.json grows with each wave in play order: wave 5A ships 11 levels (1 to 7, 8, 12, 14,
+  16), renumbered only at the end of 5B.
+  - The level ids keep their final numbers (`level12` stays `level12`); only the manifest order
+    matters.
+  - LevelDataM2Tests' manifest count is 11 after 5A and 17 after 5B.
+
+### 16.3 Audit performance (B1, B2, M1, M2)
+
+- **A dedicated `audit` agent** owns `Editor/LevelAudit.cs`. It starts in wave 5A with
+  **performance first**, on the 7 M4 levels, before any extension.
+- **Out of the gate for levels 8 to 17:** the start-delay sweep and the slack report. Both stay
+  behind `-sweep` and `-slack`, for design use only.
+- **Noise tables.** `Heard[sample, cell]` is precomputed per noise class, with the listener's
+  hearing factor, the robot hum masking and the margin already applied. A move becomes table
+  lookups.
+- **Occlusion cache.**
+  - Key: the quantized eye position (0.01 m, y included) and the door mask.
+  - Value: which ring points are visible, ignoring the cone. Range, angle and yaw then cost a
+    cone test only, so turns and glances hit the cache.
+  - Rays that miss every leaf's swing volume are shared by every mask.
+  - Misses are batched with `RaycastCommand`.
+- **Per-watcher everything:** eye height (sitting, floor), range, half angle, hearing factor, and
+  still-seen tables per tolerance class (at most 3), with `InPlaceRadius` and `ExplainedRadius`
+  derived from each tolerance. A warning is printed when a tidy or watchful level puts a spawn
+  or decoy off the cell grid.
+- **The loop length** is the longest routine's period, or none for wander, in which case there
+  is no sweep.
+- **Deterministic budget.** A cap on nodes expanded and rays cast per level
+  (`Tuning.AuditNodeCap`, `Tuning.AuditRayCap`, set by the audit agent after measuring). Seconds
+  are printed and warned above 240, never enforced.
+- **Variants are table edits, never rebuilt levels.**
+  - `pet`: the dog's tables recomputed with a 1.6 m eye.
+  - `split`: platform and ramp cells barred to the player.
+- **Flags:** `-auditLevels <ids>`, `-fixtures <ids>`, `-skipFixtures`, `-sweep`, `-slack`.
+- **Integrator:**
+  - `verify.sh`'s audit stage timeout becomes 1.3 times the sum of the per-level warnings
+    (computed from the manifest), or the stage runs in batches;
+  - Audit-mode mutations pass `-auditLevels` and `-fixtures`.
+
+### 16.4 Tooling (B2, M11)
+
+- `tools/unity.sh` never takes over a live holder. The holder refreshes the lock's timestamp
+  every 60 s, and a lock is stale only when its process is dead (integrator, done before wave 5A).
+- **Builders run filtered tests only** (`--filter`). The full PlayMode suite, the full audit and
+  the player are run by the integrator.
+
+### 16.5 The load: a kinematic rule (B3, M5), option A
+
+- **The rule.** The load falls when `|v(t) - v(t - Tuning.LoadWindow)| >= Tuning.LoadFallDeltaV`.
+  - v is the furniture's planar velocity, measured each fixed step.
+  - The window is 0.5 s; the threshold is 1.8 m/s.
+- **The load does not change how the furniture drives.**
+  - `LoadAccelFactor` and the doubled glide are dropped.
+  - The M1 instant stop is unchanged: the chair's full stop is a change of 1.5 m/s, so the load
+    holds.
+- **What falls and what holds:**
+  - falls:
+    - a 90 deg turn at full chair speed (2.12);
+    - any full-speed reversal;
+    - the office chair's full start or full glide (2.8);
+    - careful U-turns of the stool (2.4) and of the office chair (2.8);
+  - holds:
+    - the chair's straight starts and stops (1.5);
+    - every careful straight move;
+    - a careful 90 deg chair turn (1.06);
+    - a careful chair reversal (1.5);
+    - the robot shove (0.5).
+- **The visual.** The spring of section 6 drives only the sway of the load's visual; it decides
+  nothing.
+- **The balance gauge** shows `|dv| / LoadFallDeltaV` over the window.
+- **`Core/MotionProfile`** (core): a pure synthesis of the driving rules (acceleration, braking,
+  careful mode, the stool's stages, the glide), the velocity per step for a sequence of wishes.
+  - It feeds the EditMode targets, the samples per cell, the slide samples and the audit's
+    `load` lesson.
+  - Probe step 44 checks it against FurnitureController within 0.05 m/s.
+- **The load is inside the sample box.** With a load, the furniture's sample box grows by the
+  load's height (`Tuning.LoadHeight` 0.25), and so do the audit's rings. A vase seen above a sofa
+  is a furniture seen.
+- **The audit.**
+  - The search state gains the velocity of the last 0.5 s (the last move direction and the
+    samples since).
+  - A schedule that drops the load is invalid.
+  - Lesson `load`: the schedule found with the load rule off drops the load when simulated.
+- **No load on the rocking chair or the floor lamp** (validator).
+- PRD 3.4 is rewritten accordingly (integrator).
+
+### 16.6 The split level (B5)
+
+- **Ramps.** Replace v3 15.4's step-offset rule with a continuity rule: a move is allowed when
+  the floor along it is continuous with a slope of at most `RampMaxSlope`. Only height
+  discontinuities are forbidden.
+- **Lesson `split`:** no schedule when the platform and ramp cells are barred to the player (a
+  cell mask).
+- **Widths.** Ramps and corridors used by the armchair are at least 1.5 m wide, with their axis
+  on the audit's cell grid. Elsewhere, 1.2 m.
+- **The mezzanine must matter** in level 14 and level 17: the `split` check binds. Either the
+  route needs it, or watchers stand on it and the edge hides the floor below from them.
+
+### 16.7 Patterns (M2)
+
+- **The LCG:** `x = (int)((1103515245L * x + 12345L) & 0x7FFFFFFF)`. Advance before each draw.
+  The seed is in [0, 2^31 - 1].
+- **Draws are indexed by visit:**
+  - the k-th station visited is `f(seed, k)`;
+  - resumes and interruptions never advance k, and the station already drawn for the current
+    visit is reused;
+  - pingpong keeps its direction state.
+- **The walk check** (audit) enumerates the reachable ordered pairs: n for a loop, 2(n - 1) for
+  pingpong, n(n - 1) for wander. Every one must avoid closed leaves.
+- **Habits are audit warnings on manifest levels, not validator errors:**
+  - dreamer dwells average 4 s or more;
+  - watchful glances in every dwell of 2 s or more;
+  - granny sits at least once in any 60 s;
+  - hurried dwells average 2 s or less;
+  - teen dwells 3 s or more on average, with glances under 30 deg.
+
+### 16.8 The robot (M3)
+
+- **No collider;** inhabitants may walk across its disc (cosmetic; written back to the PRD).
+- **No shove** during any action (rock, door, toggle, fall, righting, push), while lying, pinned
+  or carried. The robot just reverses.
+- **"Blocked by a wall" reads "blocked by any collider".** The shove's velocity profile is
+  constant over 0.5 s (0.5 m/s), so the load holds.
+- **The audit's contact zone:** `RobotRadius` + the footprint's half diagonal + 0.1 m (replay
+  release) + the robot's travel over the margin. It is checked at every sample along moves, and
+  at the spawn during the start delay. Hum masking in the audit holds only if every sample of
+  the margin window is within `RobotHumRadius` minus that travel.
+- **The validator:**
+  - at most one robot per level;
+  - its loop on floor level (not on a platform or ramp), outside leaf swing sectors;
+  - at least 1 m from the spawn, seat homes and the exit;
+  - `start` is a waypoint index.
+- **Pairing:** the robot is paired with good listeners (default, watchful or tidy), so the hum
+  matters.
+
+### 16.9 The rocking chair (M4)
+
+- **"Comes to rest":** the first step at or below both moving thresholds after a step above
+  them, measured on travel and yaw only. A step inside an action, a shove, a put-down or a pin
+  never counts. Holding a key into a wall therefore does not loop rocks.
+- **No load on it** (16.5).
+- **The audit** searches it at full speed, with 8-sample stops. Careful stops (0.4 s) are a game
+  nicety, not searched.
+
+### 16.10 Levels, revised (M7, M8)
+
+| Level | Name | Body (load) | Rooms | People | Mechanics | Lesson | Wave |
+|---|---|---|---|---|---|---|---|
+| 8 | Les portes | chair | 4 | dreamer (loop) | 2 closed leaves | door | 5A |
+| 9 | Le robot | chair | 4 | watchful (loop) | robot, hard floors and rugs | robot | 5B |
+| 10 | Le fauteuil à bascule | rocking_chair | 4 or 5 | granny (loop, sits) | rocking | rock | 5B |
+| 11 | Le vase | chair (vase) | 4 | tidy (loop) | load | load | 5B |
+| 12 | Le chien | stool | 5 | dreamer (loop), dog (sleeps) | dog, low cover | pet | 5A |
+| 13 | Roulettes et vase | office_chair (vase) | 5 | hurried (pingpong), watchful (loop) | load, glide, office chair decoys | load | 5B |
+| 14 | La mezzanine | armchair | 6 | granny (sits on the player), tidy (wander) | platform and ramp, sitting | split | 5A |
+| 15 | La bascule et le robot | rocking_chair | 6 | teen (wander), watchful (loop) | robot (a shove means a rock), rocking | robot | 5B |
+| 16 | La nuit | floor_lamp | 4 | watchful (loop), hurried (pingpong), dog | dark, dog, 1 closed leaf away from switch-off spots | dark | 5A |
+| 17 | La maison | chair (vase) | 7 at most | granny, teen, tidy, dog | doors, robot, platform, load | final | 5B |
+
+- `person.dog` "Le chien" / "Il voit bas et aboie quand tu bouges." is added for the intro card.
+- `intro.here` "Ici : {0}" takes the names joined by ", ".
+- **Strings changed:**
+  - `level11.hint` "Pas de virage brusque avec le vase. Maj pour aller doucement."
+  - `level15.name` "La bascule et le robot"
+  - `level15.hint` "Près du robot, on n'entend pas tes pas. Une chute s'entend toujours."
+  - `person.hurried.trait` "Il marche vite et entend mal."
+  - `person.tidy.trait` "Le moindre meuble déplacé, elle le remarque."
+  - `person.watchful.trait` "Elle jette souvent un œil autour d'elle."
+- `CameraMaxDistanceHouse` 16 is written back to PRD 3.1. The distance bound scales with the
+  house extent, up to 16 m; levels 1 to 7 keep 2.5 to 6.0.
+
+### 16.11 Budgets and gate (M6, M9)
+
+- **Character palette.** ModelKit uses a fixed palette for characters: 8 shared colours plus one
+  tint per personality. Every human and the dog map onto it, so 3 humans and a dog add at most
+  12 materials.
+- **The material budget counts material slots** (draw calls), not renderers.
+- **Before freezing 160 and 32,** the house agent builds an 8-room mock level
+  (`test_m5_house_mock8.json`) after M4.2, and the integrator measures it in the built player.
+  The numbers are revised then if needed.
+- The Animated Woman (41 bones) stays allowed under the human bone limit only if the watchers
+  agent finds it at 40 or fewer after import; otherwise the 5 staged same-rig Quaternius humans
+  (31 bones) are used.
+- **Step 45** is one test per level, each under its own `[Timeout]`. RouteReplayer caps a run at
+  the route end + 30 s of game time.
+- **"The probe writes the real save"** is killed by an EditMode test of a pure
+  `SaveStore.ChoosePath(bool editor, bool probe, bool look, string persistent, string temp)`.
+- **The player stage timeout** (`verify.sh`, the `timeout 300` on the probe run) becomes 900.
+  60 fps is reported per level; the gate fails only when a level's median frame time is above
+  33 ms (under 30 fps on PC).
+- `PROBE_STEPS` and `EDIT_TESTS` gain every new step and killer test (integrator).
+
+### 16.12 Agents (eight builders)
+
+core, house, watchers, bodies, game, ui-save, **audit** (`Editor/LevelAudit.cs`) and **levels**
+(`Resources/Levels/*`, `RouteReplayer.cs`, `ProbeTestsM5Levels.cs`, the manifest test). The rest
+of section 11 stands. `ProbeTestsM42Rig.cs` (M4.2) goes to watchers.
+
+**Stub list (binding, landed by the integrator; the owner in brackets fills it):**
+- **Core:**
+  - `PersonalityDef` [core]:
+    - `Id, NameKey, TraitKey, Model, Tint`;
+    - `WalkSpeed, ViewRange, HalfAngle, EyeHeight, HearingFactor, SuspicionFactor, Tolerance,
+      CarryFactor`;
+    - `Memory, Hears, CountsForCatch, CountsForExit, Sits, Barks`;
+    - `For(string)`, `ForInhabitant(InhabitantDef)` (a dog's kind wins);
+    - id constants.
+    - An explicit `InhabitantDef.Model`, `BodyColor` or `HeadColor` wins over the personality's.
+  - `RoutinePatterns` [core]: `Loop`, `PingPong`, `Wander` and `int WanderNext(ref int x, int
+    current, int n)`.
+  - `InhabitantRoutine` [core]:
+    - `Personality, Pattern, Seed, VisitIndex, Floor`;
+    - `Asleep, InvestigatePlanner, Seats, SeatOwner`;
+    - `BeginPutAway(Vector3)`, `JustPutAway`.
+  - `RoutineFactory.Create` [core], with the v3 15.6 signature.
+  - `SeatRegistry`, `SaveData`, `RecordResult` [core], as in v3 section 9.
+  - `Hearing` [core]: `NoiseKind.Bark` and `Crash`; `Hears(listener, e, factor)`;
+    `IsMasked(kind, at, robots)`; `RadiusOf` and `RetargetsAlerted` extended.
+  - `FurnitureMemory(float tolerance)` and `Tolerance`; `SuspicionMeter.GainFactor` [core].
+  - `BodyDef.Rocks`, `BodyKinds.RockingChair` and its row [core].
+  - `MotionProfile` [core]: `Synthesize(body, careful, wishes, dt)`, `StopDistance`,
+    `SlideSamples`.
+  - `LoadBalance` [core]: `DeltaV`, `Ratio`, `Fallen`, `Step(dt, velocity)`, `Reset`, plus
+    `SwayTilt` for the visual.
+  - `RobotPath` [core]: a constructor taking a `RobotDef`, `PositionAt(t)`, `HeadingAt(t)`,
+    `Reverse(t)`, `Length`.
+  - `FloorMap` and `DoorGeometry` [house], as in v3 15.2 and 15.4.
+  - `LevelDef` [house]:
+    - `Platforms`, `Ramps`;
+    - `Robots`, each a `RobotDef` with `Name`, `Loop`, `Speed` and `Start`;
+    - `Floor`, `FloorHeightAt`;
+    - `SpawnDef.Load`;
+    - `InhabitantDef.Kind`, `Personality`, `Pattern`, `Seed`;
+    - `StationDef.Sleep`;
+    - `OpeningDef.Leaf`, `Hinge`, `Id`, `Swing`;
+    - `RouteStepDef.Door`, `ActionOpen`;
+    - lesson constants `Door`, `Pet`, `Final`, `Robot`, `Rock`, `Load`, `Split`.
+- **Runtime:**
+  - `FurnitureController` [bodies]:
+    - `BeginExternalAction(float)`;
+    - `bool BeginPush(Vector3 dir, float dist, float time)`;
+    - `BodyAction.Rock`, `Push` and `External`;
+    - `Rocking`, `RockCount`;
+    - `Load` (a `LoadBalance`), `SetLoad(string kind)`, `LoadFallCount`;
+    - `GlideTime`, `StopDistance`.
+  - `InputReader` [bodies]: `BackPressed()`, `InjectBack()`.
+  - `Robot` [watchers draws it, game steps it]: `Robot.Create(RobotDef, Transform parent)`,
+    `Path`, `SetPose(Vector3, float)`.
+  - `LoadView` [watchers]: `LoadView.Create(string kind, Transform furniture, Vector3
+    bodySize)`, `SetTilt(Vector2)`, `SpawnClue(Vector3)`.
+  - `LevelInstance` [house]: `Robots`, `Leaves`, `OpenMask`, `AreaMask()`, `PlannerFor(int)`,
+    `Floor`.
+    - LevelBuilder calls `Robot.Create`; `FurnitureController.SetLoad` creates the LoadView.
+  - `DoorLeaf` [house], as in v3 section 9; `NavPlanner.TryPlan(from, to, corners, areaMask)`
+    [house].
+  - `Inhabitant.Personality` [watchers].
+  - `Vision.Test(eye, fwd, samples, range, halfAngle, visible)` [game].
+  - `Hud` [game]: `HudEye.Dog`, `ShowDoorHint(bool)`, `SetBalance(float ratio, bool visible)`,
+    `ShowPeople(IList<string>)`, `WinPanel`.
+  - `GameState` [game]: `ShoveCount`, `CrashCount`, `ClueActive`, `BarkCount`.
+  - Save and menus [ui-save]:
+    - `SaveStore`: `PathOverride`, `UnlockAll`, `Current`, `Load`, `Save`, `RecordWin`,
+      `Recorded`, `ResetForTests`, `ChoosePath`;
+    - `LevelSelect`, `RecordLine`;
+    - `Menu.LevelsButton`, `Menu.LevelSelectOpen`, `Menu.OpenLevelSelect()`.
+- **Editor:** the flags of 16.3; `Result.RuntimeSeconds`, `Nodes`, `Rays` [audit].
+
+---
+
+## 17. Wave 5A.1 fix wave (binding; from the adversarial result critique of wave 5A)
+
+The critique (six dimensions, an adversarial refuter per dimension) confirmed 1 blocker, 5 majors and
+21 minors. The full list is the integrator's file `scratchpad/integrator/critic5a_synthesis.txt`.
+Decisions:
+
+- **Budgets count draw calls as material slots** (16.11), in the audit, the probe and the tests. The
+  house number stays 160 and 32 for now. The 8-room mock is at 195 slots, so the number is decided in
+  5B against level 17 (7 rooms at most), by cutting slots first (brows, multi-slot props).
+- **The built player measures the frame time** per level (median and p95 over the start view). The
+  gate fails above `Tuning.FrameTimeFailMs` 33 ms; 60 fps is reported.
+- **The dog's cone is cyan** (`Tuning.DogConeColor` 0.25, 0.85, 0.85): yellow and red stay the humans'
+  calm and alarm, deep blue stays the x-ray. Its derived values move to Tuning.
+- **Level 12's cover is a real sofa**, so the hint stays true, and a human hears the dog during the
+  route window. Level 14 starts with the armchair in view and brings Mamie's first sit to about 8 s.
+  Level 16 stays at 24 materials in play, dog cone included.
+- **A leaf is sampled on all 30 steps of its swing** (v3 15.2).
+- **The dark lesson's free-pass check** uses only watchers with memory and each one's own dark range.
+- Deferred to 5B, tracked: audit fidelity items m2, m3, m4 (E action modelling, fixtures for a door
+  seen and tolerance classes, the rest height of the samples), the cone under the mezzanine (m14) and
+  the dog fan superset (m20).
+
+**5A.1 level layout changes** (written back from the levels agent):
+- level 12: the kitchen-salon door is removed, the entree door is at z 5.75, the Banc is replaced by
+  two low sofas (so `level12.hint` "le canapé te cache de lui" is true), and Paul starts at a new salon
+  window station, within earshot of the dog during the route;
+- level 14: the bookshelf is 1.2 m high (the armchair is in view at the start), Mamie starts at
+  station 0 (first sit at 5 s), and Lea's first kitchen dwell is 24 s;
+- level 16: the decor colour #6B4226 is dropped (24 materials in play, dog cone included).
+
+---
+
+## 18. Wave 5B decisions (binding)
+
+- **The rock and the load live in GameState**, as the game agent built them when the bodies agent
+  could not run:
+  - the rock: the 16.9 come-to-rest rule, then `BeginExternalAction` for RockTime (RockCarefulTime
+    when careful), with a pitch visual and a creak;
+  - the load: `GameState.Load` (a LoadBalance fed with the furniture velocity after its step) sways
+    the LoadView, drops the clue, emits the crash, and grows the sample box through Vision.
+  - `FurnitureController.SetLoad`, `Load` and `LoadFallCount` are not needed. The level builder makes
+    the LoadView directly (no reflection, which managed code stripping could break in the player).
+- **The shove** is a real `FurnitureController.BeginPush(direction, distance, time)` with
+  MotionProfile semantics. It replaces the game's stand-in extension method, which GameState calls
+  through the same signature.
+- **The balance gauge** sits to the left of the creak gauge (no room above the controls line). A
+  clue costs one discovery per fall. A stool that tips over keeps its load (only the kinematic rule
+  drops it).

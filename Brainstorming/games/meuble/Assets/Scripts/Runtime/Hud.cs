@@ -22,6 +22,13 @@ namespace Meuble
     /// M4 (docs/CONTRACT_M4.md 2 and 3): the hints of the current body only, in the bottom corners of the controls
     /// line (<see cref="SetBodyHints"/>), and the sat-on line above the band while the furniture is pinned
     /// (<see cref="SetSatOn"/>). M4.1: in the same place, the tipped line while the stool lies (<see cref="SetTipped"/>).
+    /// M5 (docs/CONTRACT_M5_v3.md 4 and 15.5, CONTRACT_M5.md 3 and 16.10): a fourth eye state, <see cref="HudEye.Dog"/> (only
+    /// the dog sees the furniture), drawn with dog ears so it differs by shape; the door hint (hud.door) in the sat-on row
+    /// while a closed leaf is in reach (<see cref="ShowDoorHint"/>); and the people of the level under the intro card's
+    /// hint (<see cref="ShowPeople"/>): "Ici : " and their names, then one line each with the name and the trait.
+    /// M5 wave 5B (docs/CONTRACT_M5.md 6, 16.5): the balance gauge (hud.balance), shown only while the furniture carries a
+    /// load (<see cref="SetBalance"/>): |dv| over the fall threshold, red above <see cref="Tuning.BalanceWarning"/>. It sits in
+    /// the bottom band beside the creak gauge, on its left (the band has no room under the creak gauge: the controls line).
     /// </summary>
     public sealed class Hud : MonoBehaviour
     {
@@ -110,6 +117,10 @@ namespace Meuble
                 {
                     band = Union(band, WorldRect(suspicionRect));
                 }
+                if (balanceOn)
+                {
+                    band = Union(band, WorldRect(balanceRect));
+                }
                 return band;
             }
         }
@@ -127,6 +138,60 @@ namespace Meuble
 
         /// <summary>M4.1: "Renversé : appuie sur une direction pour te relever." shows (the stool lies on its side).</summary>
         public bool TippedVisible => tippedCanvas != null && tippedCanvas.enabled;
+
+        // ----- M5 (docs/CONTRACT_M5_v3.md 4, 15.2 and 15.5, CONTRACT_M5.md 3): the door hint and the people. -----
+
+        /// <summary>"E : ouvrir la porte" shows (a closed leaf is in reach).</summary>
+        public bool DoorHintVisible => doorCanvas != null && doorCanvas.enabled;
+
+        /// <summary>The people block of the intro card shows (the level has people with a name).</summary>
+        public bool PeopleVisible => peopleCanvas != null && peopleCanvas.enabled;
+
+        // ----- M5 wave 5B (docs/CONTRACT_M5.md 6, 16.5): the balance gauge. -----
+
+        /// <summary>The balance gauge shows (the furniture carries a load that has not fallen).</summary>
+        public bool BalanceVisible => balanceCanvas != null && balanceCanvas.enabled;
+
+        /// <summary>The balance shown, 0 to 1: |dv| over the fall threshold (1 is the fall).</summary>
+        public float BalanceShown { get; private set; }
+
+        /// <summary>The balance gauge is red: the ratio is above <see cref="Tuning.BalanceWarning"/> while it shows.</summary>
+        public bool BalanceRed { get; private set; }
+
+        /// <summary>The colour of the balance gauge's fill now (tests).</summary>
+        public Color BalanceFillColor => balanceFillImage != null ? balanceFillImage.color : Color.clear;
+
+        /// <summary>The balance gauge's screen rect in pixels, y up (empty when hidden; tests).</summary>
+        public Rect BalanceScreenRect => BalanceVisible ? WorldRect(balanceRect) : Rect.zero;
+
+        /// <summary>The creak gauge's screen rect in pixels, y up (empty when hidden; tests).</summary>
+        public Rect CreakScreenRect => CreakGaugeVisible ? WorldRect(creakRect) : Rect.zero;
+
+        /// <summary>The lines the people block shows: "Ici : ..." first, then one line per person (tests).</summary>
+        public IReadOnlyList<string> PeopleShown => peopleShown;
+
+        /// <summary>Wave 5A.1 (critique m13): the people plate's screen rect in pixels, y up (empty when hidden; tests).</summary>
+        public Rect PeopleScreenRect => PeopleVisible ? WorldRect(peoplePlate) : Rect.zero;
+
+        /// <summary>The screen scale of the HUD canvas (screen pixels per reference pixel; tests).</summary>
+        public float ScaleFactor => rootCanvas != null ? rootCanvas.scaleFactor : 1f;
+
+        private Canvas balanceCanvas;
+        private RectTransform balanceRect;
+        private RectTransform balanceFill;
+        private Image balanceFillImage;
+        private Image balanceFrame;
+        private bool balanceOn;
+        private Canvas doorCanvas;
+        private Canvas peopleCanvas;
+        private RectTransform peoplePlate;
+        private Text peopleHere;
+        private Text peopleList;
+        private Text peopleList2;
+        private Vector2 peopleLaidFor;
+        private bool doorOn;
+        private bool peopleOn;
+        private readonly List<string> peopleShown = new List<string>();
 
         private Canvas carefulCanvas;
         private Canvas lampCanvas;
@@ -168,12 +233,47 @@ namespace Meuble
         private static readonly Color BackdropClosed = new Color(0.1f, 0.1f, 0.12f, 0.55f);
         private static readonly Color BackdropCalm = new Color(0.16f, 0.3f, 0.42f, 0.85f);
         private static readonly Color BackdropAlarm = new Color(0.78f, 0.12f, 0.14f, 0.9f);
+        // M5: the dog eye's backdrop, the dog's cone colour darker (wave 5A.1, CONTRACT_M5 17: a deep teal under the cyan
+        // cone), never the alarm red nor the calm blue (its green is half again the calm one's).
+        private static readonly Color BackdropDog = new Color(Tuning.DogConeColor.r * 0.55f, Tuning.DogConeColor.g * 0.55f,
+            Tuning.DogConeColor.b * 0.55f, 0.88f);
+        // The intro card's text, from the screen centre (reference pixels): the game title row, the level name, the hint.
+        // The card spans the whole screen (its CanvasGroup fades everything on it) and its text keeps the M1 to M4 places.
+        private const float CardTitleY = 280f;
+        private const float CardNameY = 200f;
+        private const float CardHintY = 100f;
+        // The top of the game title row (CardTitleY plus half its 60 px height): nothing of the people block goes below it.
+        private const float CardTextTop = 310f;
+        // M5: the people block of the intro card: the names line, then one line per person. Wave 5A.1 (critique m13): it
+        // sits in the top band, above the card's text, so it never dims the player's furniture at the centre of the view;
+        // from three people on, the person lines take two columns. At these sizes, shrunk to fit a narrow or short screen.
+        private const float PeopleTop = 16f;
+        private const float PeopleGap = 14f;
+        private const float PeopleMargin = 24f;
+        private const float PeopleHereHeight = 44f;
+        private const float PeopleLineHeight = 36f;
+        private const float PeoplePadding = 12f;
+        private const float PeopleGutter = 56f;
+        private const int PeopleHereSize = 32;
+        private const int PeopleLineSize = 28;
+        private const int PeopleMinSize = 16;
+        private static readonly Color PeoplePlate = new Color(0.08f, 0.07f, 0.1f, 0.6f);
+        private const string PersonNameColor = "#FFD98C";
         private static readonly Color GaugeBack = new Color(0.1f, 0.1f, 0.12f, 0.78f);
         private static readonly Color GaugeRim = new Color(1f, 0.97f, 0.9f, 0.55f);
         private static readonly Color CreakWood = new Color(0.86f, 0.62f, 0.34f, 1f);
         private static readonly Color CreakHot = new Color(1f, 0.28f, 0.18f, 1f);
         private static readonly Color SuspicionLow = new Color(1f, 0.8f, 0.25f, 1f);
         private static readonly Color SuspicionHigh = new Color(0.95f, 0.2f, 0.15f, 1f);
+        // M5 wave 5B: the balance gauge, a calm sea green that is neither the creak's wood nor the suspicion's yellow; red (the
+        // creak's hot red) above the warning, on a dark red frame.
+        private static readonly Color BalanceCalm = new Color(0.45f, 0.85f, 0.7f, 1f);
+        private static readonly Color BalanceHot = new Color(1f, 0.28f, 0.18f, 1f);
+        private static readonly Color BalanceHotFrame = new Color(0.55f, 0.08f, 0.06f, 0.85f);
+        // The balance gauge's width and its gap to the creak gauge (reference pixels): narrower than the 330 of the creak and
+        // suspicion gauges, so the band still fits a 5:4 screen.
+        private const float BalanceWidth = 280f;
+        private const float BalanceGap = 24f;
 
         public void Init()
         {
@@ -208,16 +308,18 @@ namespace Meuble
             titleCard = cardGo.AddComponent<CanvasGroup>();
             titleCard.interactable = false;
             titleCard.blocksRaycasts = false;
-            Place((RectTransform)cardGo.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 190f), new Vector2(1600f, 300f));
+            Stretch((RectTransform)cardGo.transform);
             Text title = NewText(cardGo.transform, "Title", Strings.Title, 40, TextAnchor.MiddleCenter, new Color(1f, 0.92f, 0.75f, 1f));
-            Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(1600f, 60f));
+            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardTitleY), new Vector2(1600f, 60f));
             Text levelName = NewText(cardGo.transform, "LevelName", Strings.Level1Name, 84, TextAnchor.MiddleCenter, Color.white);
-            Place(levelName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 10f), new Vector2(1600f, 110f));
+            Place(levelName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardNameY), new Vector2(1600f, 110f));
             Text hint = NewText(cardGo.transform, "Hint", Strings.Level1Hint, 38, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.95f));
-            Place(hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 30f), new Vector2(1600f, 60f));
+            Place(hint.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardHintY), new Vector2(1600f, 60f));
+            BuildPeople(cardGo.transform);
 
             BuildCreakGauge();
             BuildSuspicionGauge();
+            BuildBalanceGauge();
             BuildBodyHints();
 
             failCanvas = NewPanel("FailPanel", Strings.FailTitle, Strings.FailBody, Strings.FailAction, new Color(0.25f, 0.02f, 0.03f, 0.62f),
@@ -247,6 +349,20 @@ namespace Meuble
             SetCreak(0f, false);
         }
 
+        /// <summary>
+        /// M5 wave 5B (CONTRACT_M5 6, 16.5): the balance gauge, left of the creak gauge in the bottom band: a vase on a plank,
+        /// hud.balance, a bar of |dv| over the fall threshold. Hidden until <see cref="SetBalance"/> shows it (a load).
+        /// </summary>
+        private void BuildBalanceGauge()
+        {
+            balanceCanvas = BuildBar("BalanceGauge", new Vector2(1f, 0f), new Vector2(-128f - 330f - BalanceGap, GaugeY), ProceduralArt.Balance,
+                "BalanceLabel", Strings.HudBalance, BalanceCalm, out balanceFrame, out balanceFill, out balanceFillImage, BalanceWidth);
+            balanceRect = (RectTransform)balanceCanvas.transform;
+            balanceOn = false;
+            SetBalance(0f, false);
+            SetEnabled(balanceCanvas, false);
+        }
+
         /// <summary>Suspicion bar (PRD 4.4), right of the eye: magnifier icon, "Soupçon", the highest suspicion.</summary>
         private void BuildSuspicionGauge()
         {
@@ -270,6 +386,109 @@ namespace Meuble
             satOnCanvas = BuildLine("SatOn", ProceduralArt.SatOn, Strings.HudSatOn, 760f);
             // M4.1 (CONTRACT_M4 10.3): the same row; a stool lying on its side is never sat on.
             tippedCanvas = BuildLine("Tipped", ProceduralArt.Tipped, Strings.HudTipped, 1180f);
+            // M5 (CONTRACT_M5_v3 15.2): the same row again; a pinned or lying furniture opens no door, so they never meet.
+            doorCanvas = BuildLine("DoorHint", ProceduralArt.Door, Strings.HudDoor, 640f);
+        }
+
+        /// <summary>
+        /// M5 (CONTRACT_M5 3, 16.10): the people block of the intro card, in its own Canvas inside the card, so it fades with
+        /// the card: a dark plate, the "Ici : ..." line, then the person lines in one or two columns (labels PeopleList and
+        /// PeopleList2). Wave 5A.1 (critique m13): it hangs from the top edge, centred, above the card's text, never over
+        /// the middle of the view where the player's furniture stands (<see cref="LayoutPeople"/>). Every label always carries
+        /// text (the built player check); only the Canvas and the column labels are switched.
+        /// </summary>
+        private void BuildPeople(Transform card)
+        {
+            var go = new GameObject("People", typeof(RectTransform));
+            go.transform.SetParent(card, false);
+            var rect = (RectTransform)go.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -PeopleTop);
+            rect.sizeDelta = new Vector2(1500f, PeopleHereHeight + PeoplePadding * 2f);
+            peopleCanvas = go.AddComponent<Canvas>();
+            Image plate = NewImage(go.transform, "PeoplePlate", ProceduralArt.Rounded, PeoplePlate);
+            plate.type = Image.Type.Sliced;
+            Stretch(plate.rectTransform);
+            peoplePlate = rect;
+            string none = string.Format(Strings.IntroHere, Strings.SelectNone);
+            peopleHere = NewText(go.transform, "PeopleHere", none, PeopleHereSize, TextAnchor.MiddleCenter, new Color(1f, 0.92f, 0.75f, 1f));
+            peopleList = NewPeopleColumn(go.transform, "PeopleList", none);
+            peopleList2 = NewPeopleColumn(go.transform, "PeopleList2", none);
+            peopleList2.enabled = false;
+            peopleCanvas.enabled = false;
+        }
+
+        private Text NewPeopleColumn(Transform parent, string name, string value)
+        {
+            Text column = NewText(parent, name, value, PeopleLineSize, TextAnchor.UpperLeft, new Color(1f, 1f, 1f, 0.95f));
+            column.supportRichText = true;
+            return column;
+        }
+
+        /// <summary>
+        /// Sizes and places the people block for its current text (wave 5A.1, critique m13): centred on the top edge, as wide
+        /// as its widest line and as tall as its rows, shrunk step by step (down to <see cref="PeopleMinSize"/> pixels) until
+        /// it fits the screen's width and the band above the card's game title row. Canvas units, so it holds at any aspect.
+        /// </summary>
+        private void LayoutPeople()
+        {
+            if (peoplePlate == null || peopleHere == null)
+            {
+                return;
+            }
+            Rect screen = ((RectTransform)transform).rect;
+            float screenWidth = screen.width > 1f ? screen.width : 1920f;
+            float screenHeight = screen.height > 1f ? screen.height : 1080f;
+            peopleLaidFor = new Vector2(screen.width, screen.height);
+            float maxWidth = screenWidth - 2f * PeopleMargin;
+            float maxHeight = Mathf.Max(PeopleHereHeight, screenHeight * 0.5f - CardTextTop - PeopleTop - PeopleGap);
+            int left = PeopleLeftCount;
+            int right = Mathf.Max(0, peopleShown.Count - 1 - left);
+            int rows = Mathf.Max(left, right);
+            for (float scale = 1f; ; scale -= 0.05f)
+            {
+                peopleHere.fontSize = Mathf.Max(PeopleMinSize, Mathf.RoundToInt(PeopleHereSize * scale));
+                int lineSize = Mathf.Max(PeopleMinSize, Mathf.RoundToInt(PeopleLineSize * scale));
+                peopleList.fontSize = lineSize;
+                peopleList2.fontSize = lineSize;
+                float pad = PeoplePadding * scale;
+                float hereHeight = PeopleHereHeight * scale;
+                float lineHeight = PeopleLineHeight * scale;
+                // Each person line advances by lineHeight (the font's own line is about 1.15 em).
+                float spacing = lineHeight / (1.15f * lineSize);
+                peopleList.lineSpacing = spacing;
+                peopleList2.lineSpacing = spacing;
+                float leftWidth = left > 0 ? peopleList.preferredWidth : 0f;
+                float rightWidth = right > 0 ? peopleList2.preferredWidth : 0f;
+                float gutter = right > 0 ? PeopleGutter * scale : 0f;
+                float listWidth = leftWidth + gutter + rightWidth;
+                float width = Mathf.Max(peopleHere.preferredWidth, listWidth) + 2f * pad;
+                float height = 2f * pad + hereHeight + rows * lineHeight;
+                bool smallest = peopleHere.fontSize == PeopleMinSize && lineSize == PeopleMinSize;
+                if ((width <= maxWidth && height <= maxHeight) || smallest || scale < 0.1f)
+                {
+                    peoplePlate.sizeDelta = new Vector2(width, height);
+                    Place(peopleHere.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -pad), new Vector2(width - 2f * pad, hereHeight));
+                    float x = pad + (width - 2f * pad - listWidth) * 0.5f;
+                    float columnHeight = Mathf.Max(rows, 1) * lineHeight;
+                    Place(peopleList.rectTransform, new Vector2(0f, 1f), new Vector2(x, -pad - hereHeight),
+                        new Vector2(Mathf.Max(leftWidth, 1f), columnHeight));
+                    Place(peopleList2.rectTransform, new Vector2(0f, 1f), new Vector2(x + leftWidth + gutter, -pad - hereHeight),
+                        new Vector2(Mathf.Max(rightWidth, 1f), columnHeight));
+                    return;
+                }
+            }
+        }
+
+        /// <summary>The person lines in the left column: all of them up to two people, else the first half (rounded up).</summary>
+        private int PeopleLeftCount
+        {
+            get
+            {
+                int persons = Mathf.Max(0, peopleShown.Count - 1);
+                return persons > 2 ? (persons + 1) / 2 : persons;
+            }
         }
 
         /// <summary>A line on a dark plate above the eye band: an icon and a sentence, in its own Canvas.</summary>
@@ -413,20 +632,27 @@ namespace Meuble
         private Canvas BuildBar(string name, Vector2 pivot, Vector2 offset, Sprite icon, string labelName, string label, Color fillColor,
             out Image back, out RectTransform fill, out Image fillImage)
         {
+            return BuildBar(name, pivot, offset, icon, labelName, label, fillColor, out back, out fill, out fillImage, 330f);
+        }
+
+        /// <summary>M5 wave 5B: the same labelled bar, <paramref name="width"/> reference pixels wide.</summary>
+        private Canvas BuildBar(string name, Vector2 pivot, Vector2 offset, Sprite icon, string labelName, string label, Color fillColor,
+            out Image back, out RectTransform fill, out Image fillImage, float width)
+        {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(transform, false);
             var rect = (RectTransform)go.transform;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
             rect.pivot = pivot;
             rect.anchoredPosition = offset;
-            rect.sizeDelta = new Vector2(330f, 92f);
+            rect.sizeDelta = new Vector2(width, 92f);
             Canvas canvas = go.AddComponent<Canvas>();
             Image iconImage = NewImage(go.transform, name + "Icon", icon, Color.white);
             Place(iconImage.rectTransform, new Vector2(0f, 1f), Vector2.zero, new Vector2(46f, 46f));
             Text text = NewText(go.transform, labelName, label, 32, TextAnchor.MiddleLeft, Color.white);
-            Place(text.rectTransform, new Vector2(0f, 1f), new Vector2(54f, 0f), new Vector2(276f, 46f));
+            Place(text.rectTransform, new Vector2(0f, 1f), new Vector2(54f, 0f), new Vector2(width - 54f, 46f));
             Image rim = NewImage(go.transform, name + "Rim", null, GaugeRim);
-            Place(rim.rectTransform, new Vector2(0f, 0f), Vector2.zero, new Vector2(330f, 36f));
+            Place(rim.rectTransform, new Vector2(0f, 0f), Vector2.zero, new Vector2(width, 36f));
             back = NewImage(rim.transform, name + "Back", null, GaugeBack);
             var backRect = back.rectTransform;
             backRect.anchorMin = Vector2.zero;
@@ -491,6 +717,9 @@ namespace Meuble
             SetEnabled(lampCanvas, Visible && lampOn);
             SetEnabled(satOnCanvas, Visible && satOn && !failOn && !winOn);
             SetEnabled(tippedCanvas, Visible && tippedOn && !satOn && !failOn && !winOn);
+            SetEnabled(doorCanvas, Visible && doorOn && !satOn && !tippedOn && !failOn && !winOn);
+            SetEnabled(peopleCanvas, Visible && peopleOn);
+            SetEnabled(balanceCanvas, Visible && balanceOn);
         }
 
         private static void SetEnabled(Canvas canvas, bool enabled)
@@ -533,6 +762,7 @@ namespace Meuble
         /// Called by GameState at the end of every fixed step, so the eye flips on the step of the test.
         /// M2.1: closed when unseen; open and calm when seen and harmless; open with alert strokes on a red
         /// backdrop when seen and moving, or seen out of place (Suspect). The three differ by shape.
+        /// M5: the dog eye (only the dog sees) is the open eye under two dog ears, on a deep orange backdrop.
         /// </summary>
         public void SetEye(HudEye state, float seenMovingTime)
         {
@@ -541,9 +771,145 @@ namespace Meuble
             seenMoving = seenMovingTime;
             if (eye != null)
             {
-                eye.sprite = state == HudEye.Closed ? ProceduralArt.EyeClosed : state == HudEye.Calm ? ProceduralArt.EyeOpen : ProceduralArt.EyeAlarm;
-                eyeBackdrop.color = state == HudEye.Closed ? BackdropClosed : state == HudEye.Calm ? BackdropCalm : BackdropAlarm;
+                eye.sprite = SpriteOf(state);
+                eyeBackdrop.color = state == HudEye.Closed ? BackdropClosed
+                    : state == HudEye.Calm ? BackdropCalm
+                    : state == HudEye.Dog ? BackdropDog
+                    : BackdropAlarm;
             }
+        }
+
+        /// <summary>The sprite of an eye state: each state has its own shape (closed lid, open eye, alert strokes, dog ears).</summary>
+        public static Sprite SpriteOf(HudEye state)
+        {
+            switch (state)
+            {
+                case HudEye.Closed:
+                    return ProceduralArt.EyeClosed;
+                case HudEye.Calm:
+                    return ProceduralArt.EyeOpen;
+                case HudEye.Dog:
+                    return ProceduralArt.EyeDog;
+                default:
+                    return ProceduralArt.EyeAlarm;
+            }
+        }
+
+        /// <summary>The sprite the eye shows now (tests).</summary>
+        public Sprite EyeSprite => eye != null ? eye.sprite : null;
+
+        // ----- M5 (docs/CONTRACT_M5.md 16.12) -----
+        /// <summary>The win panel's transform, where the record line attaches.</summary>
+        public RectTransform WinPanel => winCanvas != null ? winCanvas.transform as RectTransform : null;
+
+        /// <summary>
+        /// M5 (CONTRACT_M5_v3 15.2): the door hint "E : ouvrir la porte", called by GameState on every fixed step: shown while a
+        /// closed leaf is in reach of a furniture that could open it. It shares the sat-on row (never both at once).
+        /// </summary>
+        public void ShowDoorHint(bool visible)
+        {
+            if (doorOn != visible)
+            {
+                doorOn = visible;
+                ApplyCanvases();
+            }
+        }
+
+        /// <summary>
+        /// M5 wave 5B (CONTRACT_M5 6, 16.5), called by GameState on every fixed step: the balance gauge shows
+        /// <paramref name="ratio"/> (|dv| over the window, divided by the fall threshold; clamped to 0 to 1 on the bar), only
+        /// while <paramref name="visible"/> (a load that has not fallen). Its fill turns red above
+        /// <see cref="Tuning.BalanceWarning"/>.
+        /// </summary>
+        public void SetBalance(float ratio, bool visible)
+        {
+            BalanceShown = Mathf.Clamp01(ratio);
+            BalanceRed = visible && ratio > Tuning.BalanceWarning; // MUTATION:BALANCE_RED
+            if (balanceFill != null)
+            {
+                balanceFill.anchorMax = new Vector2(BalanceShown, 1f);
+                balanceFillImage.color = BalanceRed ? BalanceHot : BalanceCalm;
+                balanceFrame.color = BalanceRed ? BalanceHotFrame : GaugeBack;
+            }
+            if (balanceOn != visible)
+            {
+                balanceOn = visible;
+                ApplyCanvases();
+            }
+        }
+
+        /// <summary>
+        /// The intro card's people (CONTRACT_M5 3, 16.10): <paramref name="lines"/>[0] is the "Ici : ..." line with the names,
+        /// every other line one person (see <see cref="PeopleLines"/>). Null or empty hides the block (levels 1 to 7). It shows
+        /// and fades with the level title; <see cref="ShowLevel"/> hides it, so call this after it.
+        /// </summary>
+        public void ShowPeople(IList<string> lines)
+        {
+            peopleShown.Clear();
+            if (lines != null)
+            {
+                foreach (string line in lines)
+                {
+                    if (!string.IsNullOrEmpty(line))
+                    {
+                        peopleShown.Add(line);
+                    }
+                }
+            }
+            peopleOn = peopleShown.Count > 0;
+            if (peopleOn && peopleHere != null)
+            {
+                peopleHere.text = peopleShown[0];
+                int persons = peopleShown.Count - 1;
+                // Three people or more: two columns, the first half (rounded up) on the left. Each column label always
+                // carries text: an empty column keeps the names line, hidden.
+                int left = PeopleLeftCount;
+                int right = persons - left;
+                peopleList.text = left > 0 ? string.Join("\n", peopleShown.GetRange(1, left)) : peopleShown[0];
+                peopleList.enabled = left > 0;
+                peopleList2.text = right > 0 ? string.Join("\n", peopleShown.GetRange(1 + left, right)) : peopleShown[0];
+                peopleList2.enabled = right > 0;
+                LayoutPeople();
+            }
+            ApplyCanvases();
+        }
+
+        /// <summary>
+        /// M5 (CONTRACT_M5 3, 16.10): the people lines of the intro card for these personalities, in level order: first
+        /// intro.here with the names joined by ", ", then one line each, the name (coloured) and its trait. Personalities with
+        /// no name key (the default one) are not listed; with nobody listed the result is empty.
+        /// </summary>
+        public static List<string> PeopleLines(IEnumerable<PersonalityDef> people)
+        {
+            var names = new List<string>();
+            var lines = new List<string>();
+            if (people != null)
+            {
+                foreach (PersonalityDef p in people)
+                {
+                    if (p == null || string.IsNullOrEmpty(p.NameKey))
+                    {
+                        continue;
+                    }
+                    string name = Strings.Get(p.NameKey);
+                    names.Add(name);
+                    string trait = string.IsNullOrEmpty(p.TraitKey) ? null : Strings.Get(p.TraitKey);
+                    lines.Add(PersonLine(name, trait));
+                }
+            }
+            if (names.Count == 0)
+            {
+                return lines;
+            }
+            lines.Insert(0, string.Format(Strings.IntroHere, string.Join(", ", names)));
+            return lines;
+        }
+
+        /// <summary>One person line: the name in a warm colour (rich text), then the trait, both from Strings.</summary>
+        public static string PersonLine(string name, string trait)
+        {
+            string coloured = "<color=" + PersonNameColor + ">" + name + "</color>";
+            return string.IsNullOrEmpty(trait) ? coloured : coloured + "    " + trait;
         }
 
         public void ShowLevel(LevelDef level)
@@ -567,6 +933,13 @@ namespace Meuble
             SetSuspicion(0f);
             SetSatOn(false);
             SetTipped(false);
+            // M5: a new level lists its own people (ShowPeople, after this) and starts with no door in reach. Wave 5B: and
+            // with no balance gauge until GameState shows it (a load).
+            peopleShown.Clear();
+            peopleOn = false;
+            doorOn = false;
+            SetBalance(0f, false);
+            ApplyCanvases();
         }
 
         public void ShowFail()
@@ -700,6 +1073,15 @@ namespace Meuble
             if (titleCard != null)
             {
                 titleCard.alpha = titleTimer < 4f ? 1f : Mathf.Clamp01(1f - (titleTimer - 4f));
+            }
+            // The people block fits the screen it was laid out for: it is laid out again when the screen changes size.
+            if (peopleOn && titleCard != null && titleCard.alpha > 0f)
+            {
+                Rect screen = ((RectTransform)transform).rect;
+                if (Mathf.Abs(screen.width - peopleLaidFor.x) > 0.5f || Mathf.Abs(screen.height - peopleLaidFor.y) > 0.5f)
+                {
+                    LayoutPeople();
+                }
             }
         }
 
@@ -865,11 +1247,16 @@ namespace Meuble
         }
     }
 
-    /// <summary>The three states of the HUD eye (docs/CONTRACT_M2.md 11.6).</summary>
+    /// <summary>
+    /// The states of the HUD eye (docs/CONTRACT_M2.md 11.6), and since M5 the dog's (CONTRACT_M5_v3 15.5). Precedence:
+    /// Alarm, then Calm (a human sees), then Dog (only the dog sees), then Closed.
+    /// </summary>
     public enum HudEye
     {
         Closed,
         Calm,
         Alarm,
+        /// <summary>M5: only the dog sees the furniture (v3 15.5: Alarm, then Calm, then Dog, then Closed).</summary>
+        Dog,
     }
 }

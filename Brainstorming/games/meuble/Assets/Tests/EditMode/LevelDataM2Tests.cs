@@ -18,6 +18,17 @@ namespace Meuble.Tests
         private static LevelDef Load(string id) => LevelJson.Parse(File.ReadAllText(Folder + id + ".json"));
 
         /// <summary>
+        /// The play order (CONTRACT_M2 4, CONTRACT_M4 9.13, CONTRACT_M5 8 and 16.2): levels 1 to 7, then the wave 5A levels
+        /// with their final ids (level12 stays level12). Wave 5B inserts its levels in play order: 11 levels after wave 5A,
+        /// 17 after wave 5B, level1 to level17 in number order.
+        /// </summary>
+        private static readonly string[] PlayOrder =
+        {
+            "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level10", "level11",
+            "level12", "level13", "level14", "level15", "level16", "level17",
+        };
+
+        /// <summary>
         /// Room a: x in [-4, 0], hard. Room b: x in [0.1, 4.1], soft. Both z in [-2, 2], walls 0.1 thick, so
         /// the shared wall line is x = 0.05. A doorway in it at z = 0, the exit door in b's +x wall.
         /// </summary>
@@ -120,8 +131,10 @@ namespace Meuble.Tests
         public void Manifest_lists_the_levels_in_play_order_and_each_is_valid()
         {
             List<string> ids = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
-            // M4 (CONTRACT_M4 4, amendment 9.13): levels 4 to 7 follow the M2 levels.
-            CollectionAssert.AreEqual(new[] { "level1", "level2", "level3", "level4", "level5", "level6", "level7" }, ids);
+            // M4 (CONTRACT_M4 4, amendment 9.13): levels 4 to 7 follow the M2 levels. M5 (CONTRACT_M5 8 and 16.2): wave 5A
+            // added levels 8, 12, 14 and 16, wave 5B levels 9, 10, 11, 13, 15 and 17, all in number order: 17 levels.
+            Assert.AreEqual(17, ids.Count, "the manifest count after wave 5B: " + string.Join(", ", ids));
+            CollectionAssert.AreEqual(PlayOrder, ids);
             foreach (string id in ids)
             {
                 LevelDef level = Load(id);
@@ -185,15 +198,26 @@ namespace Meuble.Tests
         [Test]
         public void Every_shipped_designer_route_ends_at_its_exit_and_starts_after_the_level()
         {
-            foreach (string id in LevelManifest.Parse(File.ReadAllText(Folder + "levels.json")))
+            // M5 (CONTRACT_M5 8 and 16.2): every level of the play order has its route, levels 8 to 17 included.
+            int checkedRoutes = 0;
+            List<string> order = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
+            foreach (string id in order)
             {
                 LevelDef l = Load(id);
+                checkedRoutes++;
                 Assert.GreaterOrEqual(l.DesignerRoute.Count, 2, id + ": no designer route (LevelAudit with -writeRoutes writes it)");
                 RouteStepDef last = l.DesignerRoute[l.DesignerRoute.Count - 1];
                 Assert.IsTrue(l.Exit.Contains(new Vector3(last.X, 0f, last.Z)), id + ": the route does not end in the exit");
                 // Probe step 20 replays every route 0.2 s early: the first leg must not start before the level.
                 Assert.GreaterOrEqual(l.DesignerRoute[0].At, 0.2f - 1e-4f, id + ": the first leg starts too early to be shifted");
+                if (l.Lesson == LevelDef.LessonDoor)
+                {
+                    // CONTRACT_M5 8: the door lesson's route opens a door (an "open" step the audit wrote, with its door id).
+                    Assert.IsTrue(l.DesignerRoute.Exists(s => s.Action == RouteStepDef.ActionOpen && !string.IsNullOrEmpty(s.Door)),
+                        id + ": the route of a door level opens no door");
+                }
             }
+            Assert.GreaterOrEqual(checkedRoutes, PlayOrder.Length, "premise: the routes of every level of the play order are checked");
         }
 
         [Test]
@@ -212,6 +236,131 @@ namespace Meuble.Tests
                 CollectionAssert.DoesNotContain(order, id, id + " must never be played");
                 Assert.IsEmpty(l.DesignerRoute, id + " has no route: it must have none");
             }
+        }
+
+        // ----- M5 wave 5B: levels 9, 10, 11, 13, 15 and 17 (CONTRACT_M5 16.10) and their audit fixtures -----
+
+        /// <summary>
+        /// One row of the revised level table (CONTRACT_M5 16.10): the body, the load, the room count bounds, the lesson, the
+        /// people as "personality:pattern" (a dog as "dog"), the robots, the closed leaves, whether a platform is required,
+        /// and the decoys of the player's kind the level must have at least.
+        /// </summary>
+        private sealed class WaveBRow
+        {
+            public string Id;
+            public string Body;
+            public string Load;
+            public int MinRooms;
+            public int MaxRooms;
+            public string Lesson;
+            public string[] People;
+            public int Robots;
+            public int ClosedLeaves;
+            public bool Platform;
+            public int Decoys;
+        }
+
+        private static readonly WaveBRow[] WaveB =
+        {
+            new WaveBRow { Id = "level9", Body = BodyKinds.Chair, MinRooms = 4, MaxRooms = 4, Lesson = LevelDef.LessonRobot,
+                People = new[] { "watchful:loop" }, Robots = 1 },
+            new WaveBRow { Id = "level10", Body = BodyKinds.RockingChair, MinRooms = 4, MaxRooms = 5, Lesson = LevelDef.LessonRock,
+                People = new[] { "granny:loop" } },
+            new WaveBRow { Id = "level11", Body = BodyKinds.Chair, Load = "vase", MinRooms = 4, MaxRooms = 4, Lesson = LevelDef.LessonLoad,
+                People = new[] { "tidy:loop" } },
+            new WaveBRow { Id = "level13", Body = BodyKinds.OfficeChair, Load = "vase", MinRooms = 5, MaxRooms = 5, Lesson = LevelDef.LessonLoad,
+                People = new[] { "hurried:pingpong", "watchful:loop" }, Decoys = 2 },
+            new WaveBRow { Id = "level15", Body = BodyKinds.RockingChair, MinRooms = 6, MaxRooms = 6, Lesson = LevelDef.LessonRobot,
+                People = new[] { "teen:wander", "watchful:loop" }, Robots = 1 },
+            new WaveBRow { Id = "level17", Body = BodyKinds.Chair, Load = "vase", MinRooms = 4, MaxRooms = 7, Lesson = LevelDef.LessonFinal,
+                People = new[] { "dog", "granny:loop", "teen:wander", "tidy:loop" }, Robots = 1, ClosedLeaves = 2, Platform = true },
+        };
+
+        /// <summary>The wave 5B audit fixtures (CONTRACT_M5 10): the robot's hum, its contact, the rock and the load.</summary>
+        private static readonly string[] WaveBFixtures = { "test_robot", "test_m5_levels_robotblock", "test_rock", "test_load" };
+
+        private static string PersonOf(InhabitantDef h)
+        {
+            return h.Kind == PersonalityDef.Dog ? PersonalityDef.Dog : (h.Personality ?? PersonalityDef.Default) + ":" + RoutinePatterns.Normalize(h.Pattern);
+        }
+
+        [Test]
+        public void Wave5B_levels_follow_the_revised_level_table()
+        {
+            int checkedLevels = 0;
+            foreach (WaveBRow row in WaveB)
+            {
+                Assert.IsTrue(File.Exists(Folder + row.Id + ".json"), row.Id + " is missing");
+                LevelDef l = Load(row.Id);
+                Assert.AreEqual(row.Id, l.Id, "the id inside the file matches its name");
+                Assert.AreEqual(row.Body, BodyKinds.Of(l.Player.Kind), row.Id + ": the body of CONTRACT_M5 16.10");
+                Assert.AreEqual(row.Load, l.Player.Load, row.Id + ": the load of CONTRACT_M5 16.10");
+                int rooms = l.AllRooms().Count;
+                Assert.IsTrue(rooms >= row.MinRooms && rooms <= row.MaxRooms, $"{row.Id}: {rooms} rooms, the table says {row.MinRooms} to {row.MaxRooms}");
+                Assert.AreEqual(row.Lesson, l.Lesson, row.Id + ": the lesson of CONTRACT_M5 16.10");
+                var people = l.Inhabitants.ConvertAll(PersonOf);
+                people.Sort(System.StringComparer.Ordinal);
+                CollectionAssert.AreEqual(row.People, people, row.Id + ": the people (personality:pattern) of CONTRACT_M5 16.10");
+                Assert.AreEqual(row.Robots, l.Robots.Count, row.Id + ": robots");
+                Assert.AreEqual(row.ClosedLeaves, l.Doors.FindAll(d => d.Leaf == OpeningDef.LeafClosed).Count, row.Id + ": closed leaves");
+                Assert.AreEqual(row.Platform, l.Platforms.Count > 0 && l.Ramps.Count > 0, row.Id + ": a platform and its ramps");
+                int decoys = l.Decoys.FindAll(d => BodyKinds.Of(d.Kind) == row.Body).Count;
+                Assert.GreaterOrEqual(decoys, row.Decoys, row.Id + ": decoys of the player's kind");
+                Assert.GreaterOrEqual(l.DesignerRoute.Count, 2, row.Id + ": no designer route (LevelAudit with -writeRoutes writes it)");
+                foreach (InhabitantDef h in l.Inhabitants)
+                {
+                    if (h.Personality == PersonalityDef.Granny)
+                    {
+                        // CONTRACT_M5 16.10: granny sits (a habit the audit warns about, here a hard fact of the data).
+                        Assert.IsTrue(h.Stations.Exists(s => !string.IsNullOrEmpty(s.Sit)), row.Id + ": granny never sits");
+                    }
+                }
+                checkedLevels++;
+            }
+            // Level 9: "hard floors and rugs".
+            LevelDef nine = Load("level9");
+            Assert.IsTrue(nine.Rugs.Count > 0 && nine.AllRooms().Exists(r => !r.IsSoft), "level9: hard floors and rugs");
+            Assert.AreEqual(6, checkedLevels, "premise: the six wave 5B levels are checked");
+        }
+
+        [Test]
+        public void Wave5B_levels_are_valid_and_played_in_number_order()
+        {
+            // CONTRACT_M5 8 and 16.2: at the end of wave 5B, levels.json plays the six new levels between the wave 5A ones,
+            // each right after the level whose number precedes its own.
+            List<string> order = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
+            foreach (WaveBRow row in WaveB)
+            {
+                LevelDef l = Load(row.Id);
+                List<string> issues = LevelValidator.Validate(l);
+                Assert.IsEmpty(issues, row.Id + ": " + string.Join("\n", issues));
+                int n = int.Parse(row.Id.Substring("level".Length), System.Globalization.CultureInfo.InvariantCulture);
+                int at = order.IndexOf(row.Id);
+                Assert.GreaterOrEqual(at, 1, row.Id + " is not in the play order after level1: " + string.Join(", ", order));
+                Assert.AreEqual("level" + (n - 1), order[at - 1], row.Id + " does not follow level" + (n - 1) + ": " + string.Join(", ", order));
+            }
+        }
+
+        [Test]
+        public void Wave5B_audit_fixtures_are_valid_levels_kept_out_of_the_play_order()
+        {
+            List<string> order = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
+            foreach (string id in WaveBFixtures)
+            {
+                Assert.IsTrue(File.Exists(Folder + id + ".json"), id + " is missing");
+                LevelDef l = Load(id);
+                Assert.AreEqual(id, l.Id);
+                List<string> issues = LevelValidator.Validate(l);
+                Assert.IsEmpty(issues, id + ": " + string.Join("\n", issues));
+                CollectionAssert.DoesNotContain(order, id, id + " must never be played");
+                Assert.IsEmpty(l.DesignerRoute, id + " has no route: it must have none");
+            }
+            // Each fixture has what its rule is about (the audit's premise).
+            Assert.AreEqual(1, Load("test_robot").Robots.Count, "test_robot: one robot, whose hum binds");
+            Assert.AreEqual(1, Load("test_m5_levels_robotblock").Robots.Count, "test_m5_levels_robotblock: one robot, whose contact binds");
+            Assert.IsTrue(Load("test_rock").PlayerBody().Rocks, "test_rock: a body that rocks");
+            Assert.AreEqual("vase", Load("test_load").Player.Load, "test_load: a load on the player");
+            Assert.AreEqual(BodyKinds.Chair, BodyKinds.Of(Load("test_load").Player.Kind), "test_load: the chair (no glide, no tip, no rock)");
         }
 
         [Test]

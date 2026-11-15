@@ -9,6 +9,10 @@ namespace Meuble.Core
     /// 9.5): the fast stage ends at the tell speed (<see cref="Tuning.StoolTellSpeed"/>, 1.0 m/s), then the stool
     /// climbs at <see cref="Tuning.StoolHighAccel"/> (1.2 m/s2) to the tip speed (<see cref="Tuning.StoolTipSpeed"/>,
     /// 1.3 m/s, unchanged): 0.25 s of visible tell before it can tip.
+    ///
+    /// M5 (docs/CONTRACT_M5.md 5 and 16.9): the rocking chair row, and its flag <see cref="Rocks"/>. Rocks is a property,
+    /// not a field, so the M4 field-by-field rows (CoreM4BodyTests) stay exactly the M4 table; CoreM5BBodyTests checks
+    /// every field and every property of all six rows.
     /// </summary>
     public sealed class BodyDef
     {
@@ -28,6 +32,13 @@ namespace Meuble.Core
         public bool HasLight;
         public bool IsSeat;
         public string Model;
+
+        /// <summary>
+        /// M5 (CONTRACT_M5 5, 16.9): the body rocks when it comes to rest after moving, for <see cref="Tuning.RockTime"/>
+        /// (<see cref="Tuning.RockCarefulTime"/> after a careful stop), an action that counts as moving. Only the rocking
+        /// chair. FurnitureController applies it under GameRules.Bodies.
+        /// </summary>
+        public bool Rocks { get; set; }
 
         /// <summary>The body of a kind, a new instance on every call; null or unknown returns the chair.</summary>
         public static BodyDef For(string kind)
@@ -61,6 +72,16 @@ namespace Meuble.Core
                         Kind = "office_chair", Size = new Vector3(0.55f, 1.00f, 0.55f), Radius = 0.30f, MaxSpeed = 2.8f, Accel = 8f,
                         AccelHigh = 8f, StageSpeed = float.PositiveInfinity, TurnRate = 360f, CarryForward = 0.65f,
                         Glides = true, IsSeat = true, Model = null,
+                    };
+                case "rocking_chair":
+                    // M5 (CONTRACT_M5 5): no Kenney rocking chair in the kit yet, so the procedural one (Model null) until
+                    // the watchers agent names a catalog id.
+                    return new BodyDef
+                    {
+                        Kind = "rocking_chair", Size = new Vector3(0.6f, 1.05f, 0.85f), Radius = 0.36f, MaxSpeed = 1.2f, Accel = 6f,
+                        AccelHigh = 6f, StageSpeed = float.PositiveInfinity, TurnRate = 240f, CarryForward = 0.65f,
+                        IsSeat = true, Model = null,
+                        Rocks = true, // MUTATION:ROCKS_ROW
                     };
                 default:
                     return new BodyDef

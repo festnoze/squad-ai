@@ -77,6 +77,21 @@ namespace Meuble.Core
     /// Further rules: the eye never rises without a full telegraph right before (an interrupted stand up is
     /// telegraphed again); a lowered inhabitant (sitting, falling, standing up) looks with the head only and stands
     /// up first, telegraphed, before any walk, turn of the body, pick up or switch on.
+    ///
+    /// M5 (docs/CONTRACT_M5.md 3 and 16.7, CONTRACT_M5_v3 15.1 and 15.4 to 15.6), all inert with the defaults, so a
+    /// routine built as in M4 behaves exactly as in M4:
+    /// - <see cref="Personality"/>: walk speed, carry speed times its carry factor, the standing eye (every reset goes
+    ///   back to it), range and angle; a personality that does not sit never sits, one that does not hear ignores
+    ///   noises, one without memory never investigates, switches on or carries;
+    /// - <see cref="Pattern"/> and <see cref="Seed"/>: the station order, indexed by visit (<see cref="VisitIndex"/>);
+    /// - station walks are frozen per ordered pair with the station planner; every other walk plans with
+    ///   <see cref="InvestigatePlanner"/> (or the station planner when null);
+    /// - <see cref="Floor"/>: the eye and the carry anchor add the floor height;
+    /// - <see cref="Seats"/>: a seat is claimed at the moment of sitting and released on the first stand-up step or a
+    ///   reset; a seat held by someone else makes the visit a standing dwell;
+    /// - <see cref="StationDef.Sleep"/>: <see cref="Asleep"/> for the whole dwell, which ends with a
+    ///   <see cref="Tuning.WakeTelegraph"/> beat, eye still closed;
+    /// - wave 5B: <see cref="BeginPutAway"/>, the walk to a fallen load's clue and its <see cref="Tuning.PutAwayTime"/> beat.
     /// </summary>
     public sealed class InhabitantRoutine
     {
@@ -107,6 +122,8 @@ namespace Meuble.Core
             Fall,             // the pratfall: sat on nothing
             PratfallLook,     // marker: the Alerted look at the empty seat
             SwitchOn,         // the lamp beat (Value seconds), JustSwitchedOn on its last step
+            // M5 (wave 5B).
+            PutAway,          // the clue beat (Value seconds, read as PickingUp), JustPutAway on its last step
         }
 
         /// <summary>The <see cref="StationDef.Sit"/> value of a station whose seat is the player furniture.</summary>
@@ -130,6 +147,7 @@ namespace Meuble.Core
             public float Value2;             // head yaw target of the two component turns
             public int Station;              // DwellStart and DwellEnd
             public int Goal;                 // station this action leads to, -1 outside the station cycle
+            public int Visit;                // M5: the visit index of Goal (meaningful only when Goal >= 0)
             public RoutineActivity Activity; // Walk: Walking or Carrying
             public bool ReachStop;           // Walk: stop within InvestigateReach of the investigation target
             public int Phase;                // turns: start, telegraph, turn
@@ -176,6 +194,21 @@ namespace Meuble.Core
         private float pinBodyYaw;
         private float pinHeadYaw;
 
+        // M5 (docs/CONTRACT_M5.md 3 and 16.7, CONTRACT_M5_v3 15.1, 15.5, 15.6).
+        private PersonalityDef personality = PersonalityDef.For(null);
+        private string pattern = RoutinePatterns.Loop;
+        private int seed;
+        private StationOrder order;      // built on first use from the pattern, the seed and the start station
+        private int stampVisit;          // with stampGoal: the visit the queued actions lead to
+        private int goalVisit;           // the visit of goalStation
+        private int dwellVisit;          // the visit of the last DwellStart
+        private readonly Dictionary<int, Vector3[]> stationWalks = new Dictionary<int, Vector3[]>(); // frozen, per ordered pair
+        private string heldSeat;         // the seat this routine claimed in Seats, until it stands up
+        private bool seatRefused;        // the current visit's seat was taken by someone else: a standing dwell
+        private int seatDecidedVisit = -1; // the visit seatRefused was decided for (at the start of the walk there)
+        private bool wakePending;        // a sleep dwell ended: the eye opens at the start of the next step
+        private FloorMap floor = FloorMap.Flat;
+
         // Turn tracking, measured exactly as the probe analyzer measures it (one record per step).
         private float bodyRun;
         private float headRun;
@@ -203,8 +236,15 @@ namespace Meuble.Core
         public int TelegraphCount { get; private set; }
 
         public float EyeYaw => BodyYaw + HeadYaw;
-        /// <summary>The vision eye: <see cref="EyeHeight"/> above <see cref="Position"/> (1.6 m standing, 1.15 m seated).</summary>
-        public Vector3 EyePosition => Position + new Vector3(0f, EyeHeight, 0f);
+        /// <summary>
+        /// The vision eye: <see cref="EyeHeight"/> above <see cref="Position"/> (1.6 m standing, 1.15 m seated, 0.35 m for
+        /// the dog), plus the floor height under <see cref="Position"/> (M5, <see cref="Floor"/>, CONTRACT_M5_v3 15.4).
+        /// </summary>
+        public Vector3 EyePosition => Position + new Vector3(0f, EyeHeight + FloorHeight, 0f); // MUTATION:FLOOR_EYE
+
+        /// <summary>M5: the floor height under <see cref="Position"/> (0 on a flat level).</summary>
+        public float FloorHeight => floor.HeightAt(Position.x, Position.z);
+
         public Vector3 EyeForward => YawMath.Forward(EyeYaw);
 
         // ----- M2 state (docs/CONTRACT_M2.md 3.4 and 5) -----
@@ -250,6 +290,166 @@ namespace Meuble.Core
         /// </summary>
         public FurniturePose SeatHome { get; private set; }
 
+        // ----- M5 (docs/CONTRACT_M5.md 3, 16.7 and 16.12; CONTRACT_M5_v3 15.1, 15.4 to 15.6) -----
+        // Set these before the first step; RoutineFactory.Create does it for the game, the audit and the tests.
+
+        /// <summary>
+        /// The personality: walk speed, carry factor, eye height, range and angle, roles (CONTRACT_M5 3). Never null:
+        /// setting null gives the default row, which is the M1 to M4 inhabitant exactly. Setting it while standing also
+        /// sets <see cref="EyeHeight"/> to the personality's eye.
+        /// </summary>
+        public PersonalityDef Personality
+        {
+            get => personality;
+            set
+            {
+                personality = value ?? PersonalityDef.For(null);
+                if (!lowered)
+                {
+                    EyeHeight = StandingEye;
+                }
+            }
+        }
+
+        /// <summary>"loop" (default), "pingpong" or "wander" (CONTRACT_M5 3, 16.7); null or unknown is a loop.</summary>
+        public string Pattern
+        {
+            get => pattern;
+            set
+            {
+                pattern = RoutinePatterns.Normalize(value);
+                order = null;
+            }
+        }
+
+        /// <summary>The wander seed, in [0, 2^31 - 1]; ignored by the other patterns.</summary>
+        public int Seed
+        {
+            get => seed;
+            set
+            {
+                seed = value;
+                order = null;
+            }
+        }
+
+        /// <summary>
+        /// The index k of the station visit the routine is at or heading to: 0 is the start station (the level starts in
+        /// its dwell), and k becomes k + 1 when the walk to the next station starts. Draws are indexed by visit
+        /// (CONTRACT_M5 16.7): alerts, investigations, carries and resumes never change it, and a resume goes back to the
+        /// station already drawn for it. <see cref="StationOfVisit"/> gives the station of any visit.
+        /// </summary>
+        public int VisitIndex => goalVisit;
+
+        /// <summary>The station of visit <paramref name="visit"/> of this routine's pattern (the same every time it is asked).</summary>
+        public int StationOfVisit(int visit)
+        {
+            if (stations.Count == 0)
+            {
+                return 0;
+            }
+            if (order == null)
+            {
+                order = new StationOrder(pattern, stations.Count, startStation, seed);
+            }
+            return order.StationOf(visit);
+        }
+
+        /// <summary>The floor heights the eye and the carry anchor add (CONTRACT_M5_v3 15.4); null means flat.</summary>
+        public FloorMap Floor
+        {
+            get => floor;
+            set => floor = value ?? FloorMap.Flat;
+        }
+
+        /// <summary>
+        /// True while the inhabitant sleeps at a <see cref="StationDef.Sleep"/> station (the dog, CONTRACT_M5_v3 4 and
+        /// 15.5): its eye is closed and it sees nothing. From the step its dwell starts to the end of the
+        /// <see cref="Tuning.WakeTelegraph"/> beat that ends the dwell (eye still closed); the eye opens on the next
+        /// step, before the departure turn and its own telegraph.
+        /// </summary>
+        public bool Asleep { get; private set; }
+
+        /// <summary>
+        /// The planner of every walk outside the station cycle (CONTRACT_M5_v3 15.1): investigations, the switch-on, the
+        /// carry, both branches of the resume and the carry's approach yaw. Null means the station planner. In the game it
+        /// plans with the current door mask; station walks never use it (they are frozen, see
+        /// <see cref="FreezeStationWalks"/>).
+        /// </summary>
+        public IPathPlanner InvestigatePlanner { get; set; }
+
+        /// <summary>
+        /// The level's seat registry, shared by every routine of the level (CONTRACT_M5_v3 15.6). Null means every seat is
+        /// free and nothing is claimed (M4, the EditMode tests).
+        /// </summary>
+        public SeatRegistry Seats { get; set; }
+
+        /// <summary>This routine's id in <see cref="Seats"/> (its inhabitant index).</summary>
+        public int SeatOwner { get; set; }
+
+        /// <summary>The area mask the station walks were planned with (information for the audit; -1 is every area).</summary>
+        public int StationAreaMask { get; set; } = -1;
+
+        /// <summary>The personality's view range in metres, before any lamp factor: the one source for Vision and the audit.</summary>
+        public float ViewRange => personality.ViewRange; // MUTATION:PERSONALITY_RANGE
+
+        /// <summary>The personality's cone half angle in degrees.</summary>
+        public float HalfAngle => personality.HalfAngle;
+
+        /// <summary>The personality's noise radius factor (0 when it does not hear): pass it to Hearing.Hears.</summary>
+        public float HearingFactor => personality.Hears ? personality.HearingFactor : 0f;
+
+        /// <summary>
+        /// The geometric sight test of this inhabitant (PRD 4.1, checks 1 and 2): asleep sees nothing; otherwise the
+        /// point is in the cone of <see cref="EyePosition"/> and <see cref="EyeForward"/>, at the personality's range
+        /// times <paramref name="rangeFactor"/> (the lamp) and its half angle. Occlusion stays the caller's.
+        /// </summary>
+        public bool InCone(Vector3 point, float rangeFactor = 1f)
+        {
+            return !Asleep && VisionMath.IsInCone(EyePosition, EyeForward, point, ViewRange * rangeFactor, HalfAngle);
+        }
+
+        /// <summary>The seat this routine holds in <see cref="Seats"/>, or null.</summary>
+        public string HeldSeat => heldSeat;
+
+        /// <summary>
+        /// True for exactly the last step of the put-away beat (CONTRACT_M5 6, wave 5B): GameState removes the clue. False
+        /// again on the next step, when the routine resumes.
+        /// </summary>
+        public bool JustPutAway { get; private set; }
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5.md 6, wave 5B): a fallen load's clue was found. Like <see cref="BeginSwitchOn"/>: accepted in
+        /// Routine and Alerted only, never by a personality without memory (the dog), and the mode is Investigating until
+        /// it resumes. A lowered inhabitant stands up first (telegraphed); it walks to the clue with
+        /// <see cref="InvestigatePlanner"/> (or the station planner when null), stopping within
+        /// <see cref="Tuning.InvestigateReach"/> of it, faces it, picks it up for <see cref="Tuning.PutAwayTime"/>
+        /// (<see cref="RoutineActivity.PickingUp"/>, but never <see cref="JustPickedUp"/> nor <see cref="IsCarrying"/>: it
+        /// carries nothing), raises <see cref="JustPutAway"/> on the beat's last step, and resumes on the next step as after
+        /// an investigation. It never sets <see cref="ReachedTarget"/>. Without a path it walks a straight line.
+        /// </summary>
+        public void BeginPutAway(Vector3 clue)
+        {
+            if (!BeginApproach(clue))
+            {
+                return;
+            }
+            Vector3 here = StandUpFirst();
+            if (!WithinReachFrom(here))
+            {
+                if (!OtherPlanner.TryPlan(here, investigateTarget, corners) || corners.Count == 0)
+                {
+                    Debug.LogWarning($"[InhabitantRoutine] no path to the clue ({investigateTarget.x:0.00}, {investigateTarget.z:0.00}): straight line fallback");
+                    corners.Clear();
+                    corners.Add(investigateTarget);
+                }
+                EnqueuePath(here, WalkSpeed, RoutineActivity.Walking, true);
+            }
+            Enqueue(new Action { Kind = Kind.FaceTarget, Target = investigateTarget });
+            Enqueue(new Action { Kind = Kind.PutAway, Value = Tuning.PutAwayTime });
+            Enqueue(new Action { Kind = Kind.EndInvestigation });
+        }
+
         /// <summary>True for exactly the step of the moment of sitting (whatever the <see cref="LastSitResult"/>).</summary>
         public bool JustSat { get; private set; }
 
@@ -257,11 +457,30 @@ namespace Meuble.Core
         public SitResult LastSitResult { get; private set; }
 
         /// <summary>
-        /// Eye height above the floor: <see cref="Tuning.EyeHeight"/> standing, interpolated down to
-        /// <see cref="Tuning.SitEyeHeight"/> over <see cref="Tuning.SitEyeRiseTime"/> from the moment of sitting
-        /// (or of the pratfall), and back up over the same time during the stand up.
+        /// Eye height above the floor: the personality's eye standing (<see cref="Tuning.EyeHeight"/>, the dog's
+        /// <see cref="Tuning.DogEyeHeight"/>), interpolated down to <see cref="Tuning.SitEyeHeight"/> over
+        /// <see cref="Tuning.SitEyeRiseTime"/> from the moment of sitting (or of the pratfall), and back up over the same
+        /// time during the stand up. Every reset (the stand up, Pin, Startle) goes back to the personality's eye.
         /// </summary>
         public float EyeHeight { get; private set; } = Tuning.EyeHeight;
+
+        /// <summary>M5: the personality's standing eye height (CONTRACT_M5_v3 15.5).</summary>
+        private float StandingEye => personality.EyeHeight; // MUTATION:DOG_EYE
+
+        /// <summary>M5: the walk speed of the station cycle, the investigations and the resumes.</summary>
+        private float WalkSpeed => personality.WalkSpeed;
+
+        /// <summary>M5: the carry speed, times the personality's carry factor.</summary>
+        private float CarrySpeed => Tuning.CarrySpeed * personality.CarryFactor;
+
+        /// <summary>M5: sit stations sit only with sitting on and a personality that sits (never the dog).</summary>
+        private bool CanSit => SittingEnabled && personality.Sits;
+
+        /// <summary>M5 (CONTRACT_M5_v3 15.1): the planner of every walk that is not a station walk.</summary>
+        private IPathPlanner OtherPlanner => InvestigatePlanner ?? planner;
+
+        /// <summary>M5: the planner of the frozen station walks: the station planner, whatever InvestigatePlanner is.</summary>
+        private IPathPlanner StationPlanner => planner; // MUTATION:FROZEN_WALK
 
         /// <summary>
         /// Set by GameState: true when the player's seat body is home at sitting time. Called once, at the moment of
@@ -284,18 +503,25 @@ namespace Meuble.Core
         /// <summary>
         /// The routine is on its way to a "sit": "player" station and has not sat yet: from the start of the walk
         /// there until the moment of sitting, through Alerted interruptions (the seat ghost telegraph, CONTRACT_M4
-        /// section 3). False while investigating, carrying, pinned or startled.
+        /// section 3). False while investigating, carrying, pinned or startled. M5 (CONTRACT_M5_v3 15.6): false while
+        /// another inhabitant holds the "player" seat in <see cref="Seats"/>, and for a visit whose seat was found taken
+        /// (a standing dwell); never true for a personality that does not sit.
         /// </summary>
         public bool SitTargetsPlayer =>
-            SittingEnabled && started && !sitResolved && !IsStartled && !IsFrozen && !IsPinned
+            CanSit && started && !sitResolved && !seatRefused && !IsStartled && !IsFrozen && !IsPinned
             && (mode == InhabitantMode.Routine || mode == InhabitantMode.Alerted)
-            && goalStation >= 0 && goalStation < stations.Count && IsPlayerSeat(stations[goalStation]);
+            && goalStation >= 0 && goalStation < stations.Count && IsPlayerSeat(stations[goalStation])
+            && !TakenByRival(stations[goalStation]);
 
         /// <summary>The body is down: sitting, falling (pratfall) or standing up. Looks are head only.</summary>
         public bool IsLowered => lowered;
 
         public FurniturePose CarryReturnPose { get; private set; }
-        public Vector3 CarryAnchor => Position + YawMath.Forward(BodyYaw) * CarryForward + Vector3.up * Tuning.CarryHeight;
+        /// <summary>
+        /// Where the carried furniture is held: <see cref="CarryForward"/> ahead of the body, <see cref="Tuning.CarryHeight"/>
+        /// above the floor under the inhabitant (M5, <see cref="Floor"/>).
+        /// </summary>
+        public Vector3 CarryAnchor => Position + YawMath.Forward(BodyYaw) * CarryForward + Vector3.up * (Tuning.CarryHeight + FloorHeight);
         public Vector3 AlertSource { get; private set; }
 
         public InhabitantRoutine(List<StationDef> stations, int startStation)
@@ -314,9 +540,11 @@ namespace Meuble.Core
                 StationDef s = this.stations[this.startStation];
                 Position = s.Position;
                 BodyYaw = s.Facing;
+                // M5: a level that starts in a sleep dwell starts asleep.
+                Asleep = s.Sleep;
             }
             StationIndex = this.startStation;
-            SetGoalStation(this.startStation);
+            SetGoal(this.startStation, 0);
         }
 
         // ----- Commands -----
@@ -366,18 +594,19 @@ namespace Meuble.Core
         }
 
         /// <summary>
-        /// A noise was heard (CONTRACT_M2 3.2, 3.4). Accepted in Routine (any kind) and in Alerted, where only a
-        /// Creak retargets: an alerted inhabitant ignores hops.
+        /// A noise was heard (CONTRACT_M2 3.2, 3.4). Accepted in Routine (any kind) and in Alerted, where only the kinds
+        /// of <see cref="Hearing.RetargetsAlerted"/> retarget (a creak, and since M5 a bark or a crash): an alerted
+        /// inhabitant ignores hops. M5: a personality that does not hear (the dog) ignores every noise.
         /// </summary>
         public void Alert(Vector3 source, NoiseKind kind)
         {
-            if (IsStartled || IsFrozen)
+            if (IsStartled || IsFrozen || !personality.Hears)
             {
                 return;
             }
             if (mode == InhabitantMode.Alerted)
             {
-                if (kind != NoiseKind.Creak)
+                if (!Hearing.RetargetsAlerted(kind))
                 {
                     return;
                 }
@@ -438,7 +667,7 @@ namespace Meuble.Core
                 Enqueue(new Action { Kind = Kind.Reached });
                 return;
             }
-            if (!planner.TryPlan(here, investigateTarget, corners))
+            if (!OtherPlanner.TryPlan(here, investigateTarget, corners))
             {
                 if (queue.Count == 0)
                 {
@@ -449,7 +678,7 @@ namespace Meuble.Core
                 Enqueue(new Action { Kind = Kind.Reached });
                 return;
             }
-            EnqueuePath(here, Tuning.WalkSpeed, RoutineActivity.Walking, true);
+            EnqueuePath(here, WalkSpeed, RoutineActivity.Walking, true);
             Enqueue(new Action { Kind = Kind.FaceTarget, Target = investigateTarget });
             Enqueue(new Action { Kind = Kind.Reached });
         }
@@ -471,13 +700,13 @@ namespace Meuble.Core
             Vector3 here = StandUpFirst();
             if (!WithinReachFrom(here))
             {
-                if (!planner.TryPlan(here, investigateTarget, corners) || corners.Count == 0)
+                if (!OtherPlanner.TryPlan(here, investigateTarget, corners) || corners.Count == 0)
                 {
                     Debug.LogWarning($"[InhabitantRoutine] no path to the lamp ({investigateTarget.x:0.00}, {investigateTarget.z:0.00}): straight line fallback");
                     corners.Clear();
                     corners.Add(investigateTarget);
                 }
-                EnqueuePath(here, Tuning.WalkSpeed, RoutineActivity.Walking, true);
+                EnqueuePath(here, WalkSpeed, RoutineActivity.Walking, true);
             }
             Enqueue(new Action { Kind = Kind.FaceTarget, Target = investigateTarget });
             Enqueue(new Action { Kind = Kind.SwitchOn, Value = Tuning.LampSwitchOnTime });
@@ -485,12 +714,13 @@ namespace Meuble.Core
         }
 
         /// <summary>
-        /// The common start of Investigate and BeginSwitchOn: accepted in Routine and Alerted only. Drops the plan
+        /// The common start of Investigate and BeginSwitchOn: accepted in Routine and Alerted only, and never by a
+        /// personality without memory (the dog never investigates nor switches on, CONTRACT_M5_v3 4). Drops the plan
         /// and the saved alert plan, and records where to resume.
         /// </summary>
         private bool BeginApproach(Vector3 target)
         {
-            if (IsStartled || IsFrozen)
+            if (IsStartled || IsFrozen || !personality.Memory)
             {
                 return false;
             }
@@ -508,6 +738,9 @@ namespace Meuble.Core
             InDwell = false;
             savedQueue.Clear();
             savedHasCurrent = false;
+            // M5: the dwell is dropped, so is any sleep.
+            Asleep = false;
+            wakePending = false;
 
             mode = InhabitantMode.Investigating;
             ReachedTarget = false;
@@ -553,14 +786,14 @@ namespace Meuble.Core
             Vector3 home = YawMath.Planar(returnPose.Position);
             // M4: the goal is CarryForward (per body) short of home, so that CarryAnchor lands on home.
             Vector3 goal = home - YawMath.Forward(ApproachYaw(here, home)) * CarryForward;
-            if (!planner.TryPlan(here, goal, corners) || corners.Count == 0)
+            if (!OtherPlanner.TryPlan(here, goal, corners) || corners.Count == 0)
             {
                 Debug.LogWarning($"[InhabitantRoutine] no carry path from ({here.x:0.00}, {here.z:0.00}) to ({goal.x:0.00}, {goal.z:0.00}): straight line fallback");
                 corners.Clear();
                 corners.Add(goal);
             }
             Enqueue(new Action { Kind = Kind.PickUp, Value = Tuning.PickUpDuration });
-            EnqueuePath(here, Tuning.CarrySpeed, RoutineActivity.Carrying, false);
+            EnqueuePath(here, CarrySpeed, RoutineActivity.Carrying, false);
             Enqueue(new Action { Kind = Kind.FaceTarget, Target = home });
             Enqueue(new Action { Kind = Kind.PutDown, Value = Tuning.PutDownDuration });
             Enqueue(new Action { Kind = Kind.EndInvestigation });
@@ -584,6 +817,13 @@ namespace Meuble.Core
             JustPutDown = false;
             JustSat = false;
             JustSwitchedOn = false;
+            JustPutAway = false;
+            if (wakePending)
+            {
+                // The sleep dwell (and its wake telegraph) ended on the previous step: the eye opens now.
+                wakePending = false;
+                Asleep = false;
+            }
             float bodyBefore = BodyYaw;
             float headBefore = HeadYaw;
             StepActions(dt);
@@ -637,9 +877,9 @@ namespace Meuble.Core
                 return;
             }
             started = true;
-            // The level starts in the dwell of the start station, already facing its direction.
-            EnqueueDwell(startStation);
-            EnqueueDeparture(startStation);
+            // The level starts in the dwell of the start station (visit 0), already facing its direction.
+            EnqueueVisit(startStation, 0, false);
+            EnqueueDeparture(startStation, 0);
         }
 
         /// <summary>
@@ -659,11 +899,12 @@ namespace Meuble.Core
                         {
                             return;
                         }
-                        // Refill: every station chunk ends with the walk to the next station.
-                        int next = (StationIndex + 1) % stations.Count;
-                        EnqueueArrival(next);
-                        EnqueueDwell(next);
-                        EnqueueDeparture(next);
+                        // Refill: every station chunk ends with the walk to the next station, the one of the visit
+                        // after the last dwell (M5: the pattern's order, CONTRACT_M5 16.7).
+                        int visit = dwellVisit + 1;
+                        int next = StationOfVisit(visit);
+                        EnqueueVisit(next, visit, true);
+                        EnqueueDeparture(next, visit);
                     }
                     current = queue[0];
                     queue.RemoveAt(0);
@@ -671,7 +912,7 @@ namespace Meuble.Core
                     elapsed = 0f;
                     if (current.Goal >= 0)
                     {
-                        SetGoalStation(current.Goal);
+                        SetGoal(current.Goal, current.Visit);
                     }
                     PrepareTurn(ref current);
                 }
@@ -680,7 +921,14 @@ namespace Meuble.Core
                     case Kind.DwellStart:
                     {
                         StationIndex = current.Station;
+                        dwellVisit = current.Visit;
                         InDwell = true;
+                        if (stations[current.Station].Sleep)
+                        {
+                            // M5: a sleep station closes the eye for the whole dwell (CONTRACT_M5_v3 4).
+                            Asleep = true;
+                            wakePending = false;
+                        }
                         bool replay = skipNextLoopCount;
                         skipNextLoopCount = false;
                         if (current.Station == startStation)
@@ -699,6 +947,12 @@ namespace Meuble.Core
                         InDwell = false;
                         // The next visit to a sit station is a new approach.
                         sitResolved = false;
+                        seatRefused = false;
+                        if (Asleep)
+                        {
+                            // M5: the wake telegraph that ends a sleep dwell is over; the eye opens on the next step.
+                            wakePending = true;
+                        }
                         hasCurrent = false;
                         continue;
                     case Kind.PratfallLook:
@@ -774,12 +1028,7 @@ namespace Meuble.Core
                     return elapsed >= a.Value - 1e-4f;
                 }
                 case Kind.Wait:
-                {
-                    // M4: the waits of a seated dwell read as Sitting.
-                    LastActivity = IsSitting ? RoutineActivity.Sitting : RoutineActivity.Waiting;
-                    elapsed += dt;
-                    return elapsed >= a.Value - 1e-4f;
-                }
+                    return RunWait(ref a, dt);
                 case Kind.SitDown:
                     return RunSitDown(ref a, dt);
                 case Kind.Fall:
@@ -793,6 +1042,18 @@ namespace Meuble.Core
                     if (elapsed >= a.Value - 1e-4f)
                     {
                         JustSwitchedOn = true;
+                        return true;
+                    }
+                    return false;
+                }
+                case Kind.PutAway:
+                {
+                    // M5: bent over the clue, as for a pick up; nothing is carried.
+                    LastActivity = RoutineActivity.PickingUp;
+                    elapsed += dt;
+                    if (elapsed >= a.Value - 1e-4f)
+                    {
+                        JustPutAway = true; // MUTATION:PUT_AWAY
                         return true;
                     }
                     return false;
@@ -868,10 +1129,19 @@ namespace Meuble.Core
             return new FurniturePose(YawMath.Planar(s.Position), s.Facing);
         }
 
-        /// <summary>Records the station the routine is heading to; a sit station also gives the seat home.</summary>
-        private void SetGoalStation(int index)
+        /// <summary>
+        /// Records the station the routine is heading to, and the visit it belongs to (M5); a sit station also gives the
+        /// seat home.
+        /// </summary>
+        private void SetGoal(int index, int visit)
         {
             goalStation = index;
+            goalVisit = visit;
+            if (started && visit != seatDecidedVisit && index >= 0 && index < stations.Count)
+            {
+                // The walk to a new visit starts now.
+                DecideSeat(index, visit);
+            }
             if (index >= 0 && index < stations.Count && IsSitStation(stations[index]))
             {
                 SeatHome = SeatPoseOf(stations[index]);
@@ -885,9 +1155,19 @@ namespace Meuble.Core
         /// </summary>
         private bool RunSitDown(ref Action a, float dt)
         {
-            if (elapsed == 0f && !SitNow(ref a))
+            if (elapsed == 0f)
             {
-                return RunFall(ref a, dt);
+                if (TakenByRival(stations[Mathf.Clamp(a.Station, 0, stations.Count - 1)]))
+                {
+                    // M5: someone else sat there after this visit was planned (during the back turn): the rest of
+                    // the dwell is standing.
+                    RefuseSeat(ref a);
+                    return RunWait(ref a, dt);
+                }
+                if (!SitNow(ref a))
+                {
+                    return RunFall(ref a, dt);
+                }
             }
             LastActivity = RoutineActivity.Sitting;
             elapsed += dt;
@@ -909,7 +1189,7 @@ namespace Meuble.Core
         private void SlideDown(float t)
         {
             t = Mathf.Clamp01(t);
-            EyeHeight = Mathf.Lerp(Tuning.EyeHeight, Tuning.SitEyeHeight, t);
+            EyeHeight = Mathf.Lerp(StandingEye, Tuning.SitEyeHeight, t);
             Position = Vector3.Lerp(standPoint, YawMath.Planar(SeatHome.Position), t);
         }
 
@@ -935,15 +1215,60 @@ namespace Meuble.Core
                 {
                     queue.RemoveAt(0);
                 }
-                queue.Insert(0, new Action { Kind = Kind.PratfallLook, Goal = a.Goal });
-                queue.Insert(0, new Action { Kind = Kind.StandUp, Value = Tuning.SitEyeRiseTime, Goal = a.Goal });
-                queue.Insert(0, new Action { Kind = Kind.Telegraph, Value = Tuning.TelegraphDuration, Goal = a.Goal });
+                queue.Insert(0, new Action { Kind = Kind.PratfallLook, Goal = a.Goal, Visit = a.Visit });
+                queue.Insert(0, new Action { Kind = Kind.StandUp, Value = Tuning.SitEyeRiseTime, Goal = a.Goal, Visit = a.Visit });
+                queue.Insert(0, new Action { Kind = Kind.Telegraph, Value = Tuning.TelegraphDuration, Goal = a.Goal, Visit = a.Visit });
                 return false;
             }
             LastSitResult = onPlayer ? SitResult.OnPlayer : SitResult.OnProp;
             IsSitting = true;
             SittingOnPlayer = onPlayer;
+            // M5 (CONTRACT_M5_v3 15.6): the seat is claimed at the moment of sitting, never by a pratfall.
+            if (Seats != null && Seats.TryClaim(s.Sit, SeatOwner))
+            {
+                heldSeat = s.Sit;
+            }
             return true;
+        }
+
+        // ----- The seat registry (M5, docs/CONTRACT_M5_v3.md 15.6) -----
+
+        /// <summary>True when the seat of a sit station is held in <see cref="Seats"/> by another inhabitant.</summary>
+        private bool TakenByRival(StationDef s)
+        {
+            if (Seats == null || !IsSitStation(s))
+            {
+                return false;
+            }
+            int sitter = Seats.SitterOf(s.Sit);
+            return sitter >= 0 && sitter != SeatOwner;
+        }
+
+        /// <summary>
+        /// The seat was taken between the plan and the moment of sitting: the sit down becomes a plain wait of the same
+        /// length, and the stand-up telegraph and stand up at the end of the dwell are dropped. No claim, no
+        /// <see cref="JustSat"/>, no lowered eye.
+        /// </summary>
+        private void RefuseSeat(ref Action a)
+        {
+            seatRefused = true;
+            sitResolved = true;
+            a.Kind = Kind.Wait;
+            int end = queue.FindIndex(x => x.Kind == Kind.DwellEnd);
+            if (end >= 2 && queue[end - 1].Kind == Kind.StandUp && queue[end - 2].Kind == Kind.Telegraph)
+            {
+                queue.RemoveRange(end - 2, 2);
+            }
+        }
+
+        /// <summary>Frees the seat this routine holds, if any (the first stand-up step, Pin, Startle).</summary>
+        private void ReleaseSeat()
+        {
+            if (heldSeat != null)
+            {
+                Seats?.Release(heldSeat, SeatOwner);
+                heldSeat = null;
+            }
         }
 
         /// <summary>
@@ -972,30 +1297,45 @@ namespace Meuble.Core
                 a.FromEye = EyeHeight;
                 IsSitting = false;
                 SittingOnPlayer = false;
+                // M5: the seat is free from the first stand-up step.
+                ReleaseSeat();
             }
             LastActivity = RoutineActivity.StandingUp;
             elapsed += dt;
             if (elapsed >= a.Value - 1e-4f)
             {
-                EyeHeight = Tuning.EyeHeight;
+                EyeHeight = StandingEye;
                 Position = standPoint;
                 lowered = false;
                 return true;
             }
             float t = elapsed / a.Value;
-            EyeHeight = Mathf.Lerp(a.FromEye, Tuning.EyeHeight, t);
+            EyeHeight = Mathf.Lerp(a.FromEye, StandingEye, t);
             Position = Vector3.Lerp(a.From, standPoint, t);
             return false;
         }
 
-        /// <summary>Back to standing at once (Pin, Startle): no sitting, no pin flag, the standing eye.</summary>
+        /// <summary>
+        /// Back to standing at once (Pin, Startle): no sitting, no pin flag, the seat released, the personality's
+        /// standing eye.
+        /// </summary>
         private void ResetSitting()
         {
             IsSitting = false;
             SittingOnPlayer = false;
             lowered = false;
             sitResolved = false;
-            EyeHeight = Tuning.EyeHeight;
+            seatRefused = false;
+            ReleaseSeat();
+            EyeHeight = StandingEye;
+        }
+
+        private bool RunWait(ref Action a, float dt)
+        {
+            // M4: the waits of a seated dwell read as Sitting.
+            LastActivity = IsSitting ? RoutineActivity.Sitting : RoutineActivity.Waiting;
+            elapsed += dt;
+            return elapsed >= a.Value - 1e-4f;
         }
 
         // ----- Turns and their telegraph -----
@@ -1246,10 +1586,14 @@ namespace Meuble.Core
             IsCarrying = false;
             JustPickedUp = false;
             JustPutDown = false;
+            JustPutAway = false;
             savedQueue.Clear();
             savedHasCurrent = false;
             ClearPlan();
             ResetSitting();
+            // M5: a reset wakes a sleeper at once.
+            Asleep = false;
+            wakePending = false;
         }
 
         /// <summary>The rest of an alert after its look turn: hold, return to the saved pose, resume.</summary>
@@ -1351,13 +1695,13 @@ namespace Meuble.Core
             if (IsPinned)
             {
                 stampGoal = -1;
-                if (!planner.TryPlan(here, pinPosition, corners) || corners.Count == 0)
+                if (!OtherPlanner.TryPlan(here, pinPosition, corners) || corners.Count == 0)
                 {
                     Debug.LogWarning($"[InhabitantRoutine] no path back to the pinned pose ({pinPosition.x:0.00}, {pinPosition.z:0.00}): straight line fallback");
                     corners.Clear();
                     corners.Add(pinPosition);
                 }
-                EnqueuePath(here, Tuning.WalkSpeed, RoutineActivity.Walking, false);
+                EnqueuePath(here, WalkSpeed, RoutineActivity.Walking, false);
                 Enqueue(new Action { Kind = Kind.TurnBoth, Value = pinBodyYaw, Value2 = pinHeadYaw });
                 Enqueue(new Action { Kind = Kind.HoldPin });
                 return;
@@ -1367,13 +1711,18 @@ namespace Meuble.Core
                 return;
             }
             started = true;
+            // M5 (CONTRACT_M5 16.7): back to the station already drawn for the current visit; the visit index does not
+            // move. The walk back is not a station walk: it plans with the investigate planner (CONTRACT_M5_v3 15.1).
             int s = Mathf.Clamp(goalStation, 0, stations.Count - 1);
+            int visit = goalVisit;
             stampGoal = s;
-            PlanStationWalk(here, stations[s].Position, s);
-            EnqueuePath(here, Tuning.WalkSpeed, RoutineActivity.Walking, false);
-            EnqueueArrival(s);
-            EnqueueDwell(s);
-            EnqueueDeparture(s);
+            stampVisit = visit;
+            // The walk back starts now: the seat (if any) is decided again.
+            DecideSeat(s, visit);
+            PlanWalk(OtherPlanner, here, stations[s].Position, s, corners);
+            EnqueuePath(here, WalkSpeed, RoutineActivity.Walking, false);
+            EnqueueVisit(s, visit, true);
+            EnqueueDeparture(s, visit);
         }
 
         private bool WithinReach()
@@ -1390,7 +1739,7 @@ namespace Meuble.Core
         private float ApproachYaw(Vector3 from, Vector3 home)
         {
             Vector3 d = Vector3.zero;
-            if (planner.TryPlan(from, home, corners) && corners.Count > 0)
+            if (OtherPlanner.TryPlan(from, home, corners) && corners.Count > 0)
             {
                 Vector3 previous = corners.Count >= 2 ? corners[corners.Count - 2] : from;
                 d = YawMath.Planar(corners[corners.Count - 1] - previous);
@@ -1411,6 +1760,7 @@ namespace Meuble.Core
         private void Enqueue(Action a)
         {
             a.Goal = stampGoal;
+            a.Visit = stampVisit;
             queue.Add(a);
         }
 
@@ -1424,20 +1774,52 @@ namespace Meuble.Core
             }
         }
 
-        private void EnqueueArrival(int index)
+        /// <summary>
+        /// The visit <paramref name="visit"/> of station <paramref name="index"/>: the arrival turn (when
+        /// <paramref name="arrival"/>), then the dwell. M5 (CONTRACT_M5_v3 15.6): a sit station whose seat another
+        /// inhabitant holds in <see cref="Seats"/> right now is a plain standing dwell, with no back turn, no lowered eye
+        /// and no stand-up telegraph.
+        /// </summary>
+        private void EnqueueVisit(int index, int visit, bool arrival)
         {
             EnsurePlan();
             stampGoal = index;
-            EnqueueBodyTurn(stations[index].Facing);
+            stampVisit = visit;
+            StationDef s = stations[index];
+            if (seatDecidedVisit != visit)
+            {
+                DecideSeat(index, visit);
+            }
+            bool sitStation = CanSit && IsSitStation(s);
+            // Taken at the start of the walk here, or taken now, on arrival.
+            bool taken = sitStation && (seatRefused || TakenByRival(s));
+            seatRefused = taken;
+            if (arrival && !taken)
+            {
+                EnqueueBodyTurn(s.Facing);
+            }
+            EnqueueDwell(index, sitStation && !taken);
         }
 
-        private void EnqueueDwell(int index)
+        /// <summary>
+        /// M5 (CONTRACT_M5_v3 15.6): at the start of the walk to a sit station (or of the walk back to it on a resume),
+        /// a seat held by someone else makes that visit a standing dwell, and no seat ghost shows for it.
+        /// </summary>
+        private void DecideSeat(int index, int visit)
         {
-            EnsurePlan();
-            stampGoal = index;
+            seatDecidedVisit = visit;
             StationDef s = stations[index];
-            // M4 (CONTRACT_M4 section 3, amendment 9.9): with sitting off, a sit station is a plain dwell.
-            bool sit = SittingEnabled && IsSitStation(s);
+            seatRefused = CanSit && IsSitStation(s) && TakenByRival(s);
+        }
+
+        /// <summary>
+        /// The dwell of station <paramref name="index"/>: sit down when <paramref name="sit"/>, the glances, the rest of
+        /// the dwell, then the stand up (telegraphed). M5: a sleep station ends with the
+        /// <see cref="Tuning.WakeTelegraph"/> beat, eye still closed (CONTRACT_M5_v3 15.5).
+        /// </summary>
+        private void EnqueueDwell(int index, bool sit)
+        {
+            StationDef s = stations[index];
             Enqueue(new Action { Kind = Kind.DwellStart, Station = index });
             if (sit)
             {
@@ -1469,52 +1851,94 @@ namespace Meuble.Core
                 Enqueue(new Action { Kind = Kind.Telegraph, Value = Tuning.TelegraphDuration });
                 Enqueue(new Action { Kind = Kind.StandUp, Value = Tuning.SitEyeRiseTime });
             }
+            if (s.Sleep)
+            {
+                // Waking: a full beat with the eye still closed, before the departure and its own telegraph.
+                Enqueue(new Action { Kind = Kind.Telegraph, Value = Tuning.WakeTelegraph }); // MUTATION:WAKE
+            }
             Enqueue(new Action { Kind = Kind.DwellEnd, Station = index });
         }
 
         /// <summary>
-        /// The walk from station <paramref name="index"/> to the next one, along the planner corners: one turn per
-        /// corner (telegraphed when over the threshold), then the segment. With StraightPlanner this is the M1
-        /// straight walk, action for action.
+        /// The walk from station <paramref name="index"/> (visit <paramref name="visit"/>) to the station of the next
+        /// visit, along its frozen corners: one turn per corner (telegraphed when over the threshold), then the segment.
+        /// With StraightPlanner and a loop this is the M1 straight walk, action for action.
         /// </summary>
-        private void EnqueueDeparture(int index)
+        private void EnqueueDeparture(int index, int visit)
         {
             EnsurePlan();
-            int next = (index + 1) % stations.Count;
+            int nextVisit = visit + 1;
+            int next = StationOfVisit(nextVisit);
             stampGoal = next;
-            Vector3 from = stations[index].Position;
-            PlanStationWalk(from, stations[next].Position, next);
-            Vector3 previous = from;
-            foreach (Vector3 corner in corners)
+            stampVisit = nextVisit;
+            Vector3 previous = stations[index].Position;
+            float speed = WalkSpeed;
+            foreach (Vector3 corner in StationWalk(index, next))
             {
                 Vector3 d = corner - previous;
                 if (d.sqrMagnitude > 1e-6f)
                 {
                     EnqueueBodyTurn(YawMath.YawOf(d));
-                    Enqueue(new Action { Kind = Kind.Walk, Target = corner, Value = Tuning.WalkSpeed, Activity = RoutineActivity.Walking });
+                    Enqueue(new Action { Kind = Kind.Walk, Target = corner, Value = speed, Activity = RoutineActivity.Walking });
                     previous = corner;
                 }
             }
         }
 
-        /// <summary>Fills <see cref="corners"/> for a station walk; without a path, a straight line and one error.</summary>
-        private void PlanStationWalk(Vector3 from, Vector3 to, int station)
+        /// <summary>
+        /// The frozen walk from station <paramref name="from"/> to station <paramref name="to"/> (CONTRACT_M5_v3 15.1):
+        /// planned once per ordered pair with the station planner, then reused for the life of the routine. Neither
+        /// <see cref="InvestigatePlanner"/> nor an opened door ever changes it.
+        /// </summary>
+        private Vector3[] StationWalk(int from, int to)
         {
-            if (planner.TryPlan(from, to, corners))
+            int key = from * stations.Count + to;
+            if (!stationWalks.TryGetValue(key, out Vector3[] walk))
             {
-                if (corners.Count == 0)
+                PlanWalk(StationPlanner, stations[from].Position, stations[to].Position, to, corners);
+                walk = corners.ToArray();
+                stationWalks[key] = walk;
+            }
+            return walk;
+        }
+
+        /// <summary>
+        /// Plans every station walk the pattern can produce (<see cref="RoutinePatterns.ReachablePairs"/>), so they are
+        /// all frozen before the first step (CONTRACT_M5 3, CONTRACT_M5_v3 15.1). RoutineFactory calls it once the
+        /// pattern is set. Without it, each walk is frozen the first time it is walked, with the same station planner.
+        /// </summary>
+        public void FreezeStationWalks()
+        {
+            foreach (Vector2Int pair in RoutinePatterns.ReachablePairs(pattern, stations.Count))
+            {
+                StationWalk(pair.x, pair.y);
+            }
+        }
+
+        /// <summary>The number of station walks planned so far (each ordered pair once).</summary>
+        public int FrozenWalkCount => stationWalks.Count;
+
+        /// <summary>
+        /// Fills <paramref name="into"/> with a walk to station <paramref name="station"/> planned by
+        /// <paramref name="with"/>; without a path, a straight line and one error.
+        /// </summary>
+        private static void PlanWalk(IPathPlanner with, Vector3 from, Vector3 to, int station, List<Vector3> into)
+        {
+            if (with.TryPlan(from, to, into))
+            {
+                if (into.Count == 0)
                 {
-                    corners.Add(YawMath.Planar(to));
+                    into.Add(YawMath.Planar(to));
                 }
-                for (int i = 0; i < corners.Count; i++)
+                for (int i = 0; i < into.Count; i++)
                 {
-                    corners[i] = YawMath.Planar(corners[i]);
+                    into[i] = YawMath.Planar(into[i]);
                 }
                 return;
             }
             Debug.LogError($"[InhabitantRoutine] no path from ({from.x:0.00}, {from.z:0.00}) to station {station} ({to.x:0.00}, {to.z:0.00}): straight line fallback");
-            corners.Clear();
-            corners.Add(YawMath.Planar(to));
+            into.Clear();
+            into.Add(YawMath.Planar(to));
         }
 
         /// <summary>

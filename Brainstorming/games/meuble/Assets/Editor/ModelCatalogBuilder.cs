@@ -20,6 +20,15 @@ namespace Meuble.Editor
     ///   and the eye height, averaged over the Idle clip (the pose of a dwelling inhabitant).
     /// Only the yaw offsets of the static models come from the contract table: facing cannot be measured from
     /// bounds (the facing test of probe step 22 checks them against the procedural backrests).
+    ///
+    /// M5 (docs/CONTRACT_M5_v3.md 15.5, CONTRACT_M5 3 and 16.11): every rigged entry has a kind ("human" or "pet") and a
+    /// target eye height (0 for the humans: Tuning.EyeHeight; the dog: Tuning.DogEyeHeight). A pet's eyes are the vertices
+    /// of its "Eyes_*" materials (anywhere on the body: a dog's head is not on top), and its clip map names its Idle and
+    /// Walk exactly (the Shiba stores every clip twice, plain and "AnimalArmature|": the plain set is used). Bones and
+    /// triangles are checked against PRD 7.4 (a pet: Tuning.BudgetPetBones), with a warning when over.
+    ///
+    /// M4.2: it also builds Assets/Resources/TextureLibrary.asset (the detail textures and their measured means) and
+    /// enforces their import settings (<see cref="BuildTextureLibrary()"/>).
     /// </summary>
     public static class ModelCatalogBuilder
     {
@@ -47,6 +56,13 @@ namespace Meuble.Editor
             public string Path;
             public float Yaw;
             public bool Rigged;
+            // M5: the character kind, the target eye height (0: Tuning.EyeHeight), the eye material (a prefix for a pet),
+            // the head region fraction where the eyes are looked for, and a pet's exact Idle and Walk clip names.
+            public string Kind;
+            public float TargetEye;
+            public bool PetEyes;
+            public string IdleClip;
+            public string WalkClip;
 
             public Spec(string id, string path, float yaw, bool rigged)
             {
@@ -54,8 +70,25 @@ namespace Meuble.Editor
                 Path = path;
                 Yaw = yaw;
                 Rigged = rigged;
+                Kind = rigged ? ModelCatalog.KindHuman : null;
+                TargetEye = 0f;
+                PetEyes = false;
+                IdleClip = null;
+                WalkClip = null;
+            }
+
+            /// <summary>A pet: eyes from the "Eyes_*" materials, eyes fitted at <paramref name="targetEye"/>, its clip map.</summary>
+            public static Spec Pet(string id, string path, float targetEye, string idleClip, string walkClip)
+            {
+                return new Spec(id, path, 0f, true)
+                {
+                    Kind = ModelCatalog.KindPet, TargetEye = targetEye, PetEyes = true, IdleClip = idleClip, WalkClip = walkClip,
+                };
             }
         }
+
+        /// <summary>M5: the prefix of a pet's eye materials (the Shiba: Eyes_White, Eyes_Pupil, Eyes_Black).</summary>
+        public const string PetEyeMaterialPrefix = "Eyes_";
 
         // CONTRACT_M3 3: Kenney seats face -Z in glTF (backrest on +Z). The procedural chair's backrest is on -z,
         // so the chair and the armchair turn 180; the procedural sofa's backrest is on +z, so the sofa keeps 0.
@@ -75,6 +108,13 @@ namespace Meuble.Editor
             new Spec(ModelCatalog.KenneyFloorLamp, Kenney + "kenney_lamp_round_floor.glb", 0f, false),
             new Spec(ModelCatalog.QuaterniusMan, Quaternius + "quaternius_man.glb", 0f, true),
             new Spec(ModelCatalog.QuaterniusWoman, Quaternius + "quaternius_woman.glb", 0f, true),
+            // M5: the personalities' humans (the same 31 bone HumanArmature rig and 11 clips) and the dog.
+            new Spec(ModelCatalog.QuaterniusManShorts, Quaternius + "quaternius_man_shorts.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusManSuit, Quaternius + "quaternius_man_suit.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusManTshirt, Quaternius + "quaternius_man_tshirt.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusWomanJacket, Quaternius + "quaternius_woman_jacket.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusWomanDress, Quaternius + "quaternius_woman_dress.glb", 0f, true),
+            Spec.Pet(ModelCatalog.QuaterniusShiba, Quaternius + "quaternius_shiba.glb", Tuning.DogEyeHeight, "Idle", "Walk"),
         };
 
         [MenuItem("Meuble/Build Model Catalog")]
@@ -110,8 +150,148 @@ namespace Meuble.Editor
             {
                 log.Append("  unchanged ").Append(AssetPath).Append('\n');
             }
+            BuildTextureLibrary(log);
             AssetDatabase.SaveAssets();
             Debug.Log(log.ToString());
+        }
+
+        // ----- M4.2 textures -----
+
+        public const string TextureLibraryPath = "Assets/Resources/TextureLibrary.asset";
+        private const string AmbientCg = "Assets/ThirdParty/Textures/ambientCG/";
+
+        /// <summary>Import size of every detail texture: they tile, so 512 is plenty at the game's camera distance.</summary>
+        public const int DetailMaxSize = 512;
+
+        /// <summary>
+        /// The detail of each surface: a 512 x 512 grayscale derivative of an ambientCG CC0 material (docs/LICENSES.md),
+        /// mean 240 / 255, highlights capped at 1.0, seamless.
+        /// </summary>
+        private static readonly (Surface surface, string file, string source)[] Details =
+        {
+            (Surface.Wood, "detail_wood_Wood049.png", "Wood049"),
+            (Surface.Parquet, "detail_parquet_WoodFloor051.png", "WoodFloor051"),
+            (Surface.Plaster, "detail_plaster_Plaster001.png", "Plaster001"),
+            (Surface.Upholstery, "detail_upholstery_Fabric011.png", "Fabric011"),
+            (Surface.Linen, "detail_linen_Fabric036.png", "Fabric036"),
+            (Surface.Carpet, "detail_carpet_Carpet012.png", "Carpet012"),
+        };
+
+        /// <summary>
+        /// Builds Assets/Resources/TextureLibrary.asset (what ships the textures in the player) and enforces the import
+        /// settings of every detail: linear (a texel is a multiplier, not a colour), mipmaps, repeat, trilinear, 512, high
+        /// quality platform compression, not readable. Idempotent: reimports and writes only what changed.
+        /// </summary>
+        [MenuItem("Meuble/Build Texture Library")]
+        public static void BuildTextureLibrary()
+        {
+            var log = new StringBuilder("[ModelCatalogBuilder] texture library:\n");
+            BuildTextureLibrary(log);
+            AssetDatabase.SaveAssets();
+            Debug.Log(log.ToString());
+        }
+
+        private static void BuildTextureLibrary(StringBuilder log)
+        {
+            var entries = new List<TextureLibrary.Entry>();
+            foreach ((Surface surface, string file, string source) in Details)
+            {
+                string path = AmbientCg + file;
+                if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
+                {
+                    Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no texture at {path}; the surface stays flat at run time");
+                    continue;
+                }
+                if (ConfigureDetailImporter(importer))
+                {
+                    importer.SaveAndReimport();
+                    log.Append("  reimported ").Append(path).Append('\n');
+                }
+                var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                float mean = MeanTexel(path);
+                entries.Add(new TextureLibrary.Entry { surface = surface, texture = texture, mean = mean, source = source });
+                log.Append($"  {surface}: {file}, mean {F(mean)}, {(texture != null ? texture.width + " px, " + texture.mipmapCount + " mips, " + texture.graphicsFormat : "not loaded")}\n");
+            }
+
+            var library = AssetDatabase.LoadAssetAtPath<TextureLibrary>(TextureLibraryPath);
+            if (library == null)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(TextureLibraryPath) ?? "Assets/Resources");
+                library = ScriptableObject.CreateInstance<TextureLibrary>();
+                library.entries = entries;
+                AssetDatabase.CreateAsset(library, TextureLibraryPath);
+                log.Append("  created ").Append(TextureLibraryPath).Append('\n');
+            }
+            else if (!SameDetails(library.entries, entries))
+            {
+                library.entries = entries;
+                EditorUtility.SetDirty(library);
+                log.Append("  updated ").Append(TextureLibraryPath).Append('\n');
+            }
+            else
+            {
+                log.Append("  unchanged ").Append(TextureLibraryPath).Append('\n');
+            }
+        }
+
+        /// <summary>Sets the detail import settings; true when anything changed (a reimport is needed).</summary>
+        private static bool ConfigureDetailImporter(TextureImporter t)
+        {
+            bool changed = false;
+            if (t.textureType != TextureImporterType.Default) { t.textureType = TextureImporterType.Default; changed = true; }
+            if (t.textureShape != TextureImporterShape.Texture2D) { t.textureShape = TextureImporterShape.Texture2D; changed = true; }
+            if (t.sRGBTexture) { t.sRGBTexture = false; changed = true; }
+            if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
+            if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
+            if (t.isReadable) { t.isReadable = false; changed = true; }
+            if (t.wrapMode != TextureWrapMode.Repeat) { t.wrapMode = TextureWrapMode.Repeat; changed = true; }
+            if (t.filterMode != FilterMode.Trilinear) { t.filterMode = FilterMode.Trilinear; changed = true; }
+            if (t.anisoLevel != 2) { t.anisoLevel = 2; changed = true; }
+            if (t.maxTextureSize != DetailMaxSize) { t.maxTextureSize = DetailMaxSize; changed = true; }
+            if (t.textureCompression != TextureImporterCompression.CompressedHQ) { t.textureCompression = TextureImporterCompression.CompressedHQ; changed = true; }
+            if (t.npotScale != TextureImporterNPOTScale.ToNearest) { t.npotScale = TextureImporterNPOTScale.ToNearest; changed = true; }
+            return changed;
+        }
+
+        /// <summary>The mean texel (red channel, r = g = b) of the source PNG, read from the file, as a linear multiplier.</summary>
+        private static float MeanTexel(string path)
+        {
+            var image = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+            try
+            {
+                if (!image.LoadImage(File.ReadAllBytes(path)))
+                {
+                    return float.NaN;
+                }
+                Color32[] pixels = image.GetPixels32();
+                double sum = 0;
+                foreach (Color32 p in pixels)
+                {
+                    sum += p.r;
+                }
+                return pixels.Length > 0 ? (float)(sum / pixels.Length / 255.0) : float.NaN;
+            }
+            finally
+            {
+                Object.DestroyImmediate(image);
+            }
+        }
+
+        private static bool SameDetails(List<TextureLibrary.Entry> a, List<TextureLibrary.Entry> b)
+        {
+            if (a == null || a.Count != b.Count)
+            {
+                return false;
+            }
+            for (int i = 0; i < a.Count; i++)
+            {
+                if (a[i] == null || a[i].surface != b[i].surface || a[i].texture != b[i].texture || a[i].source != b[i].source
+                    || Mathf.Abs(a[i].mean - b[i].mean) > 1e-6f)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // ----- Measuring -----
@@ -131,7 +311,11 @@ namespace Meuble.Editor
                 Transform root = probe.transform;
                 root.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
                 root.localScale = Vector3.one;
-                var entry = new ModelCatalog.Entry { id = spec.Id, prefab = prefab, rigged = spec.Rigged };
+                var entry = new ModelCatalog.Entry
+                {
+                    id = spec.Id, prefab = prefab, rigged = spec.Rigged, kind = spec.Kind ?? string.Empty, targetEyeHeight = spec.TargetEye,
+                    idleClip = spec.IdleClip ?? string.Empty, walkClip = spec.WalkClip ?? string.Empty,
+                };
                 log.Append($"  {spec.Id}: prefab root local {Fmt(prefab.transform.localPosition)} {Fmt(prefab.transform.localEulerAngles)} {Fmt(prefab.transform.localScale)}");
                 if (!spec.Rigged)
                 {
@@ -187,18 +371,20 @@ namespace Meuble.Editor
                 Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: skinned mesh or bone '{HeadBoneName}' missing in {spec.Path}");
                 return null;
             }
-            int eyeSlot = -1;
+            // The eye materials: "Eyes" for a human, every "Eyes_*" for a pet (M5).
+            var eyeSlots = new List<int>();
             Material[] slots = skin.sharedMaterials;
-            for (int i = 0; i < slots.Length; i++)
+            for (int i = 0; i < slots.Length && i < skin.sharedMesh.subMeshCount; i++)
             {
-                if (slots[i] != null && slots[i].name == EyeMaterialName)
+                string n = slots[i] != null ? slots[i].name : string.Empty;
+                if (spec.PetEyes ? n.StartsWith(PetEyeMaterialPrefix, System.StringComparison.Ordinal) : n == EyeMaterialName)
                 {
-                    eyeSlot = i;
+                    eyeSlots.Add(i);
                 }
             }
-            if (eyeSlot < 0 || eyeSlot >= skin.sharedMesh.subMeshCount)
+            if (eyeSlots.Count == 0)
             {
-                Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: no '{EyeMaterialName}' material on the skinned mesh");
+                Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: no '{(spec.PetEyes ? PetEyeMaterialPrefix + "*" : EyeMaterialName)}' material on the skinned mesh");
                 return null;
             }
 
@@ -217,14 +403,18 @@ namespace Meuble.Editor
                     bounds.Encapsulate(toRoot.MultiplyPoint3x4(v));
                 }
                 // The "Eyes" material is the near-black of the model: the man's shoes use it too. Only its vertices
-                // in the head region (the top fifth of the body) are eyes.
-                float headRegion = bounds.min.y + (1f - HeadRegion) * bounds.size.y;
+                // in the head region (the top fifth of the body) are eyes. A pet's "Eyes_*" are only eyes (its head is
+                // at the front, not on top): all of their vertices.
+                float headRegion = spec.PetEyes ? float.MinValue : bounds.min.y + (1f - HeadRegion) * bounds.size.y;
                 var eyeVertices = new HashSet<int>();
-                foreach (int i in baked.GetIndices(eyeSlot))
+                foreach (int eyeSlot in eyeSlots)
                 {
-                    if (toRoot.MultiplyPoint3x4(vertices[i]).y >= headRegion)
+                    foreach (int i in baked.GetIndices(eyeSlot))
                     {
-                        eyeVertices.Add(i);
+                        if (toRoot.MultiplyPoint3x4(vertices[i]).y >= headRegion)
+                        {
+                            eyeVertices.Add(i);
+                        }
                     }
                 }
                 if (eyeVertices.Count == 0)
@@ -249,13 +439,14 @@ namespace Meuble.Editor
 
                 // Eye height: mean over the Idle clip when it samples, else the rest pose.
                 float restHeight = eyeRest.y;
-                float idleHeight = IdleEyeHeight(spec.Path, probe, head, entry.eyeLocal, out string clipName);
+                float idleHeight = IdleEyeHeight(spec.Path, probe, head, entry.eyeLocal, spec.IdleClip, out string clipName);
                 entry.eyeHeight = idleHeight > 0f ? idleHeight : restHeight;
                 log.Append($", size {Fmt(bounds.size)}, centre {Fmt(bounds.center)}, head '{head.name}' lossy scale {Fmt(head.lossyScale)}, ")
                     .Append($"head y {F(head.position.y)}, eye {Fmt(eyeRest)} local {Fmt(entry.eyeLocal, "0.#####")} ({eyeVertices.Count} vertices), ")
                     .Append($"facing {Fmt(ahead)} so yaw {entry.yawOffset}, ")
                     .Append($"eye height rest {F(restHeight)} idle {F(idleHeight)} ({clipName ?? "no clip"}), bones {skin.bones.Length}, ")
                     .Append($"triangles {ModelKit.Triangles(skin.sharedMesh)}, slots {slots.Length}\n");
+                CheckBudgets(spec, prefab, skin, log);
                 return entry;
             }
             finally
@@ -269,13 +460,15 @@ namespace Meuble.Editor
         /// InhabitantRig holds it (M3.1 N4: the glTF rest pose tilts the head by 3.5 to 4.8 deg), or 0 when there is
         /// no such clip.
         /// </summary>
-        private static float IdleEyeHeight(string path, GameObject probe, Transform head, Vector3 eyeLocal, out string clipName)
+        private static float IdleEyeHeight(string path, GameObject probe, Transform head, Vector3 eyeLocal, string exactIdle, out string clipName)
         {
             clipName = null;
             AnimationClip idle = null;
             foreach (Object o in AssetDatabase.LoadAllAssetsAtPath(path))
             {
-                if (o is AnimationClip clip && clip.name.EndsWith(IdleSuffix, System.StringComparison.Ordinal))
+                if (o is AnimationClip clip && (string.IsNullOrEmpty(exactIdle)
+                    ? clip.name.EndsWith(IdleSuffix, System.StringComparison.Ordinal)
+                    : clip.name == exactIdle))
                 {
                     idle = clip;
                 }
@@ -286,6 +479,30 @@ namespace Meuble.Editor
             }
             clipName = idle.name;
             return ModelKit.IdleEyeHeight(probe, idle, head, eyeLocal, null, IdleSamples);
+        }
+
+        /// <summary>
+        /// M5: PRD 7.4 on the imported character, at build time: at most Tuning.BudgetInhabitantTriangles triangles, and at
+        /// most 40 bones (a pet: Tuning.BudgetPetBones), counted as the skin's distinct bones. A warning when over; the
+        /// probe and the audit fail on it in the levels (and ModelM5Tests on the catalog).
+        /// </summary>
+        private static void CheckBudgets(Spec spec, GameObject prefab, SkinnedMeshRenderer skin, StringBuilder log)
+        {
+            var bones = new HashSet<Transform>();
+            foreach (Transform b in skin.bones)
+            {
+                if (b != null)
+                {
+                    bones.Add(b);
+                }
+            }
+            long triangles = ModelKit.Triangles(skin.sharedMesh);
+            int boneBudget = spec.Kind == ModelCatalog.KindPet ? Tuning.BudgetPetBones : Tuning.BudgetInhabitantBones;
+            log.Append($"    {spec.Id} ({spec.Kind}): {bones.Count} bones of {boneBudget}, {triangles} triangles of {Tuning.BudgetInhabitantTriangles}\n");
+            if (bones.Count > boneBudget || triangles > Tuning.BudgetInhabitantTriangles)
+            {
+                Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id} ({prefab.name}) is over budget: {bones.Count} bones (max {boneBudget}), {triangles} triangles (max {Tuning.BudgetInhabitantTriangles})");
+            }
         }
 
         private static Transform FindDeep(Transform t, string name)
@@ -319,7 +536,9 @@ namespace Meuble.Editor
                 ModelCatalog.Entry y = b[i];
                 if (x == null || x.id != y.id || x.prefab != y.prefab || x.rigged != y.rigged || x.headBone != y.headBone
                     || !Near(x.nativeSize, y.nativeSize) || !Near(x.boundsCenter, y.boundsCenter) || !Near(x.eyeLocal, y.eyeLocal)
-                    || Mathf.Abs(x.yawOffset - y.yawOffset) > 1e-4f || Mathf.Abs(x.eyeHeight - y.eyeHeight) > 1e-5f)
+                    || Mathf.Abs(x.yawOffset - y.yawOffset) > 1e-4f || Mathf.Abs(x.eyeHeight - y.eyeHeight) > 1e-5f
+                    || (x.kind ?? string.Empty) != (y.kind ?? string.Empty) || Mathf.Abs(x.targetEyeHeight - y.targetEyeHeight) > 1e-6f
+                    || (x.idleClip ?? string.Empty) != (y.idleClip ?? string.Empty) || (x.walkClip ?? string.Empty) != (y.walkClip ?? string.Empty))
                 {
                     return false;
                 }

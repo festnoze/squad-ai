@@ -1,6 +1,6 @@
 # PRD - UN, DEUX, TROIS, MEUBLE
 
-Product requirements document. Version 1.7, 2026-11-13 (1.7 rewrites M5 after the product owner's M4 playtest: 10 new levels that combine mechanics, larger maze houses, several inhabitants with personalities, the robot vacuum, the rocking chair and the balanced load; adds 3.4, 4.8, 5.4 and the 7.4 house budgets). Version 1.6, 2026-11-12 (1.6 adds the M4 notes in section 11, the 3.3 and 4.7 amendments and open questions 11 to 15). Version 1.5, 2026-11-12 (1.5 adds the M3 notes in section 11 and the pause to hud.controls). Version 1.4, 2026-11-11 (1.4 writes back the
+Product requirements document. Version 1.8, 2026-11-13 (1.8 adds the M5 wave 5A notes in section 11). Version 1.7, 2026-11-13 (1.7 rewrites M5 after the product owner's M4 playtest: 10 new levels that combine mechanics, larger maze houses, several inhabitants with personalities, the robot vacuum, the rocking chair and the balanced load; adds 3.4, 4.8, 5.4 and the 7.4 house budgets). Version 1.6, 2026-11-12 (1.6 adds the M4 notes in section 11, the 3.3 and 4.7 amendments and open questions 11 to 15). Version 1.5, 2026-11-12 (1.5 adds the M3 notes in section 11 and the pause to hud.controls). Version 1.4, 2026-11-11 (1.4 writes back the
 M2.1 fixes found by the critique of the M2 result: discovery grace,
 position-only tolerance, decoys, level 1 start station, M2-aware audit; see
 the M2 notes of sections 4.4 and 11). Version 1.3, 2026-11-11 (1.3 writes back the
@@ -519,7 +519,11 @@ not scriptable by agents).
 ### 7.2 Art direction
 
 Flat colors, no textures in M1 and M2. One URP Lit material per color, a warm
-directional light through the window, soft shadows. Palette: warm wood floor,
+directional light through the window, soft shadows. v1.7 (M4.2, the product
+owner's request): soft stylized textures, grayscale detail multiplied by the
+palette color (wood grain, parquet, plaster, upholstery, linen, carpet; CC0,
+ambientCG), set per renderer, so the materials stay one per color and every
+palette color is kept within 1/255 on average. Palette: warm wood floor,
 off white walls, saturated furniture; the player furniture has a color no
 other object uses (M1: red chair) so it is found instantly in any frame.
 
@@ -973,6 +977,67 @@ among others.
   - every level passes the audit, with a lesson-required check per mechanic;
   - a full playthrough of the 17 levels by the probe on the designer routes;
   - one probe step per new rule.
+
+M5 wave 5A notes (v1.8), as built (docs/CONTRACT_M5.md v4 with its v5 and 5A.1 amendments,
+sections 16 and 17):
+
+- **Levels 8, 12, 14 and 16** ship in an 11-level play order (1 to 7, then 8, 12, 14, 16). The ids
+  keep their final numbers; the order becomes 1 to 17 with wave 5B.
+
+  | Level | Body | Rooms | People | Lesson |
+  |---|---|---|---|---|
+  | 8 "Les portes" | chair | 4 | the dreamer | door: two closed leaves |
+  | 12 "Le chien" | stool | 5 | the dreamer and the dog | pet: two low sofas hide the stool from the dog |
+  | 14 "La mezzanine" | armchair | 6 | Mamie (sits on the player) and the tidy one | split: a platform and a ramp |
+  | 16 "La nuit" | floor lamp | 4 | the watchful and the hurried, the dog | dark: the lamp, one closed leaf |
+
+- **Doors.**
+  - E (gamepad X) opens the nearest closed leaf in reach: 0.85 m from the door centre, footprint
+    outside the swing quarter disc. The furniture must be still, upright, not pinned or carried, and
+    in no action.
+  - The opening lasts 0.6 s (30 steps) and counts as moving.
+  - The leaf is sampled on all 30 steps: a leaf seen swinging is a catch after the grace. PRD 4.1:
+    9 rays during a swing.
+  - The open leaf keeps its collider and occludes, against the wall. It fades when it stands
+    between the camera and the furniture.
+  - E near a closed leaf never switches the lamp, even when the opening is refused.
+  - Inhabitants never open doors.
+  - Station walks are planned once with the authored doors. Investigations plan with the doors
+    open now, on one NavMesh where each doorway is its own area.
+- **The dog.**
+  - Eye at 0.35 m, sees 6 m wide (70 deg).
+  - Seen moving by the awake dog for 0.2 s: a bark at the dog (6 m, turns the heads like a creak),
+    then 3 s of cooldown. The bark is heard only through each human's hearing factor.
+  - The dog never catches, has no memory, hears nothing and never opens doors.
+  - It sleeps at sleep stations (eye closed, a "z" mark, cone hidden). It wakes with a 0.6 s
+    telegraph, eye still closed.
+  - Its cone is cyan. The HUD eye has a dog shape when only the dog sees the furniture.
+- **Personalities and patterns** as in 5.4, with:
+  - six distinct Quaternius models and clothes tints;
+  - a shared palette (8 colours plus one tint per personality);
+  - the intro card naming the people with one line each.
+  - Wander draws are indexed by visit; interruptions never draw again.
+  - A taken seat is a standing dwell.
+- **The split level.**
+  - Platforms and ramps are solid; railings stand on every free edge.
+  - The furniture visual follows the ramp slope, while the rules box stays upright.
+  - Eyes, samples and cells add the floor height.
+- **Save, level select, records.**
+  - Save: `meuble_save.json` in the persistent folder, written atomically with a .bak. A missing
+    file is recovered from the .tmp, then the .bak. The editor, `--probe` and `--look` never touch
+    it.
+  - Level select: one card per level with its best time, levels unlocked in order. Play starts the
+    first unwon level.
+  - Records: "Record : x s" and "Nouveau record !".
+- **Budgets** count draw calls as material slots: 120 (24 materials) below 5 rooms, 160 (32) from 5
+  rooms.
+- **Frame time.** The built player measures every level's start view: a median of 3.6 to 6.9 ms on
+  the development PC (above 140 fps). The gate fails above 33 ms.
+- **M4.2.**
+  - Soft stylized textures: grayscale detail times the palette colour, six CC0 ambientCG textures,
+    2 MB.
+  - The feet fix: the idle clip did not animate the feet, so after a walk they stayed mid-stride;
+    every clip now holds the bones it does not animate at rest.
 
 ### M6 - "Finition et mobile" (medium)
 

@@ -179,6 +179,45 @@ namespace Meuble
             injectedNextLevel = false;
             latchedAction = false;
             latchedMove = false;
+            injectedBack = false;
+        }
+
+        // ----- M5 (docs/CONTRACT_M5.md 16.12, v3 15.9): the back command, which closes the level select. -----
+        private static bool injectedBack;
+        // The frame whose back press was already returned: a device press stays "pressed this frame" for every call of
+        // its frame, so only the first call of that frame gets it (two readers never both act on one press).
+        private static int backFrame = -1;
+
+        /// <summary>Tests: one back press, read by the next <see cref="BackPressed"/> exactly as an Escape press.</summary>
+        public static void InjectBack()
+        {
+            injectedBack = true;
+        }
+
+        /// <summary>
+        /// M5: Escape on the keyboard or B (east) on the gamepad pressed this frame, or an injected press
+        /// (<see cref="InjectBack"/>). Each press counts once: an injected press is consumed, and a device press is
+        /// returned by the first call of its frame only. <see cref="PausePressed"/> still reads Escape too: the Menu
+        /// decides which of the two Escape means (Back while the level select is open).
+        /// </summary>
+        public static bool BackPressed()
+        {
+            int frame = Time.frameCount;
+            if (injectedBack)
+            {
+                injectedBack = false;
+                backFrame = frame;
+                return true;
+            }
+            Keyboard k = Keyboard.current;
+            Gamepad g = Gamepad.current;
+            bool device = (k != null && k.escapeKey.wasPressedThisFrame) || (g != null && g.buttonEast.wasPressedThisFrame);
+            if (!device || backFrame == frame)
+            {
+                return false;
+            }
+            backFrame = frame;
+            return true;
         }
 
         private static bool injectedPause;

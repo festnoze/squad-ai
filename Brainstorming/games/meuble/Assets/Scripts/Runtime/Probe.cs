@@ -103,8 +103,19 @@ namespace Meuble
                 yield break;
             }
 
+            if (FeetRequested)
+            {
+                // M4.2 (rig agent): "--feet" runs only the feet scene, never the default flow.
+                yield return Feet(dir, report, shots);
+                Finish(dir, report, shots);
+                yield break;
+            }
+
             string startLevel = Game.LevelId;
             report["startLevel"] = startLevel;
+            // M5 (CONTRACT_M5_v3 15.10): verify.sh checks the probe save sits in the shot folder and the real one is untouched.
+            report["savePath"] = SaveStore.FilePath;
+            report["realSavePath"] = Path.Combine(Application.persistentDataPath, SaveStore.FileName);
             Dictionary<string, object> startBudgets = LevelBudgets(startLevel);
             levels[startLevel] = startBudgets;
             report["audit"] = Audit(startBudgets);
@@ -217,8 +228,11 @@ namespace Meuble
                 yield return StartView(id, budgets);
                 yield return Shoot(dir, $"{shot:00}_{id}.png", shots);
                 shot++;
+                // CONTRACT_M5 9 and 17: the frame time at the start view, once the level card has faded.
+                yield return FrameTimes(id, budgets);
             }
             report["levels"] = levels;
+            report["frameTimeFailMs"] = FrameFailMs;
 
             // M2 inhabitant markers, a world space Canvas each: the "?" while Alerted, the "!" while
             // Investigating. Shot in front of the chair, on the level loaded last.
@@ -244,6 +258,9 @@ namespace Meuble
             shot++;
             inhabitant.Routine.Investigate(chairAt);
             yield return Steps(15);
+            // M4.2: the marker is set in LateUpdate; 15 fixed steps can all run inside one slow (screenshot) frame,
+            // so let one rendered frame pass before reading it.
+            yield return null;
             report["investigateMarker"] = inhabitant.Marker.ToString();
             if (inhabitant.Marker != Inhabitant.MarkerKind.Exclamation)
             {
@@ -251,6 +268,12 @@ namespace Meuble
             }
             yield return Shoot(dir, $"{shot:00}_investigate.png", shots);
             shot++;
+
+            // CONTRACT_M5 17: the start level's frame time, on a fresh load at its start view like every other level
+            // (scene 1 moves straight on to the caught scene). The creak scene below loads the level afresh again.
+            Game.LoadLevel(startLevel);
+            yield return Steps(25);
+            yield return FrameTimes(startLevel, startBudgets);
 
             // M2.1 readability on the start level. The creak warning: a still chair nobody looks at, run at 8x
             // until the warning (game time is unchanged, only faster), then back to 1x for the shot.
@@ -449,7 +472,7 @@ namespace Meuble
                 count.Renderers++;
                 foreach (Material m in r.sharedMaterials)
                 {
-                    count.MaterialSlots++;
+                    count.MaterialSlots++; // MUTATION:DRAW_SLOTS
                     if (m == null || m.shader == null || !m.shader.isSupported || m.shader.name.Contains("InternalError"))
                     {
                         count.SlotsWithoutMaterial++;
@@ -622,7 +645,8 @@ namespace Meuble
                 {
                     SkinnedMeshRenderer skin = h.GetComponentInChildren<SkinnedMeshRenderer>(true);
                     InhabitantRig rig = h.GetComponent<InhabitantRig>();
-                    bool clips = rig != null && rig.IdleState != null && rig.WalkState != null && rig.JumpState != null;
+                    // M5 (CONTRACT_M5_v3 15.5): a human needs Idle, Walk and Jump; a pet (the dog) Idle and Walk.
+                    bool clips = rig != null && rig.IdleState != null && rig.WalkState != null && (rig.IsPet || rig.JumpState != null);
                     rigs.Add($"{h.name}: skin {(skin != null ? skin.sharedMesh.name : "none")}, rig {(rig != null ? "yes" : "no")}, "
                         + $"clips {(rig != null ? $"{rig.IdleClipName} / {rig.WalkClipName} / {rig.JumpClipName}" : "none")}");
                     if (skin == null)
@@ -631,7 +655,7 @@ namespace Meuble
                     }
                     if (!clips)
                     {
-                        failures.Add($"{id}: inhabitant {h.name} has no rig with Idle, Walk and Jump clips");
+                        failures.Add($"{id}: inhabitant {h.name} has no rig with Idle, Walk{(rig != null && rig.IsPet ? "" : " and Jump")} clips");
                     }
                 }
             }
@@ -679,6 +703,79 @@ namespace Meuble
             }
         }
 
+        /// <summary>
+        /// The frame time bound of the gate: Tuning.FrameTimeFailMs, or "--frameFailMs &lt;ms&gt;" on the command line (a
+        /// way to show the gate failing on a real run: a bound under any real frame time fails every level).
+        /// </summary>
+        private static float FrameFailMs
+        {
+            get
+            {
+                string arg = ArgValue("--frameFailMs");
+                return arg != null && float.TryParse(arg, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ms) && ms > 0f
+                    ? ms
+                    : Tuning.FrameTimeFailMs;
+            }
+        }
+
+        /// <summary>
+        /// CONTRACT_M5 9 and 17: the frame time of the level at its start view. The level card (real time) fades first,
+        /// then Tuning.ProbeFrameWarmup frames pass and Tuning.ProbeFrameSamples rendered frames are timed with
+        /// Time.unscaledDeltaTime at Time.timeScale 1. The median and the 95th percentile go under levels[id]; a median
+        /// above Tuning.FrameTimeFailMs fails the probe (60 fps is only reported).
+        /// </summary>
+        private IEnumerator FrameTimes(string id, Dictionary<string, object> audit)
+        {
+            float scale = Time.timeScale;
+            Time.timeScale = 1f;
+            float waited = 0f;
+            while (Hud != null && Hud.TitleCardAlpha > 0f && waited < Tuning.ProbeCardWaitSeconds)
+            {
+                yield return null;
+                waited += Time.unscaledDeltaTime;
+            }
+            if (Hud != null && Hud.TitleCardAlpha > 0f)
+            {
+                warnings.Add($"{id}: the level card still shows after {waited:0.0} s, the frame time is sampled under it");
+            }
+            for (int i = 0; i < Tuning.ProbeFrameWarmup; i++)
+            {
+                yield return null;
+            }
+            var frameMs = new List<float>(Tuning.ProbeFrameSamples);
+            while (frameMs.Count < Tuning.ProbeFrameSamples)
+            {
+                yield return null;
+                frameMs.Add(Time.unscaledDeltaTime * 1000f);
+            }
+            Time.timeScale = scale;
+            FrameStats(frameMs, out float median, out float p95);
+            audit["frameMedianMs"] = Math.Round(median, 2);
+            audit["frameP95Ms"] = Math.Round(p95, 2);
+            audit["frameSamples"] = frameMs.Count;
+            float failMs = FrameFailMs;
+            if (median > failMs)
+            {
+                failures.Add($"{id}: median frame time {median:0.0} ms over Tuning.FrameTimeFailMs ({failMs:0.#} ms)");
+            }
+        }
+
+        /// <summary>The median and the 95th percentile (nearest rank) of a set of frame times; both 0 when it is empty.</summary>
+        public static void FrameStats(IList<float> frameMs, out float median, out float p95)
+        {
+            var sorted = new List<float>(frameMs);
+            sorted.Sort();
+            int n = sorted.Count;
+            if (n == 0)
+            {
+                median = 0f;
+                p95 = 0f;
+                return;
+            }
+            median = n % 2 == 1 ? sorted[n / 2] : 0.5f * (sorted[n / 2 - 1] + sorted[n / 2]);
+            p95 = sorted[Mathf.Clamp(Mathf.CeilToInt(0.95f * n) - 1, 0, n - 1)];
+        }
+
         /// <summary>The distinct bones of every skinned mesh under a root (PRD 7.4: at most 40 per inhabitant).</summary>
         public static int BonesUnder(Transform root)
         {
@@ -709,10 +806,17 @@ namespace Meuble
             audit["furnitureTriangles"] = FurnitureTriangles(id);
             audit["inhabitantTriangles"] = InhabitantTriangles(id);
             audit["inhabitantBones"] = InhabitantBones(id);
-            // PRD 7.4: at most 120 draw calls. The active renderer count bounds them before batching.
-            if (renderers > Tuning.BudgetRenderers)
+            // PRD 7.4: at most 120 draw calls (v1.7: 160 and 32 materials for a house of HouseBudgetRooms rooms or more).
+            // CONTRACT_M5 16.11 and 17: a draw call is a material slot of an active renderer (slots >= renderers), so the
+            // budget reads the slots; the renderers are still reported.
+            bool house = Game != null && Game.Def != null && Game.Def.AllRooms().Count >= Tuning.HouseBudgetRooms;
+            int maxDrawCalls = house ? Tuning.BudgetHouseRenderers : Tuning.BudgetRenderers;
+            int maxMaterials = house ? Tuning.BudgetHouseMaterials : Tuning.BudgetMaterials;
+            audit["house"] = house;
+            audit["drawCallBudget"] = maxDrawCalls;
+            if (count.MaterialSlots > maxDrawCalls)
             {
-                failures.Add($"{id}: {renderers} renderers, over the 120 draw call budget even before batching");
+                failures.Add($"{id}: {count.MaterialSlots} material slots (draw calls), over the {maxDrawCalls} draw call budget ({renderers} renderers)");
             }
             audit["renderersWithoutMaterial"] = withoutMaterial;
             audit["triangles"] = triangles;
@@ -726,9 +830,9 @@ namespace Meuble
             {
                 failures.Add($"{id}: level triangles {triangles} over the 60 000 budget");
             }
-            if (materials.Count > Tuning.BudgetMaterials)
+            if (materials.Count > maxMaterials)
             {
-                failures.Add($"{id}: materials {materials.Count} over the 24 budget");
+                failures.Add($"{id}: materials {materials.Count} over the {maxMaterials} budget");
             }
             audit["nonUrpShaders"] = count.NonUrp;
             foreach (string s in count.NonUrp)
@@ -853,12 +957,110 @@ namespace Meuble
             {
                 int b = BonesUnder(inhabitant.transform);
                 worst = Math.Max(worst, b);
-                if (b > Tuning.BudgetInhabitantBones)
+                // M5 (CONTRACT_M5_v3 15.5): a pet may have Tuning.BudgetPetBones bones; humans keep 40.
+                bool pet = inhabitant.Rig != null && inhabitant.Rig.IsPet;
+                int budget = pet ? Tuning.BudgetPetBones : Tuning.BudgetInhabitantBones;
+                if (b > budget)
                 {
-                    failures.Add($"{id}: inhabitant {inhabitant.name} has {b} bones, over the 40 budget");
+                    failures.Add($"{id}: inhabitant {inhabitant.name} has {b} bones, over the {budget} budget");
                 }
             }
             return worst;
+        }
+
+        /// <summary>M4.2 (rig agent): "--feet" with "--probe" runs the feet scene only (not part of verify.sh player).</summary>
+        public static bool FeetRequested => Array.IndexOf(Environment.GetCommandLineArgs(), "--feet") >= 0;
+
+        // The editor probe's bound on a settled pose (ProbeTestsM42Rig): authored poses stay within 0.007 m.
+        private const float FeetGapMax = 0.02f;
+
+        /// <summary>
+        /// M4.2 (rig agent, "--feet"): the product owner saw the human's feet deform. On the start level the main
+        /// inhabitant walks, then dwells in Idle, the state whose clip keys no foot (its feet stayed mid-stride before
+        /// M4.2). It is pinned there; each foot bone's distance to the tip of its shin is measured in the built player
+        /// (report.json "feet"), and the feet are shot up close from two sides with a clear line of sight.
+        /// </summary>
+        private IEnumerator Feet(string dir, Dictionary<string, object> report, List<Dictionary<string, object>> shots)
+        {
+            Inhabitant h = Game.MainInhabitant;
+            InhabitantRig rig = h != null ? h.Rig : null;
+            var feet = new Dictionary<string, object>();
+            report["feet"] = feet;
+            if (rig == null || rig.FootLeft == null || rig.FootRight == null || rig.ShinTipLeft == null || rig.ShinTipRight == null)
+            {
+                failures.Add("feet: the main inhabitant has no rig with foot bones and shin tips");
+                yield break;
+            }
+            feet["completedProperties"] = rig.CompletedProperties;
+            InhabitantRoutine routine = h.Routine;
+            bool walked = false;
+            float idleSince = -1f;
+            float start = Time.time;
+            Time.timeScale = 4f;
+            while (Time.time - start < 120f)
+            {
+                yield return null;
+                RoutineActivity a = routine.LastActivity;
+                walked |= a == RoutineActivity.Walking;
+                bool idle = walked && rig.CurrentClip == InhabitantRig.Clip.Idle && (a == RoutineActivity.Idle || a == RoutineActivity.Waiting);
+                idleSince = idle ? (idleSince < 0f ? Time.time : idleSince) : -1f;
+                if (idleSince >= 0f && Time.time - idleSince >= 0.5f)
+                {
+                    break;
+                }
+            }
+            Time.timeScale = 1f;
+            feet["walkedThenIdle"] = idleSince >= 0f;
+            if (idleSince < 0f)
+            {
+                failures.Add($"feet: the inhabitant never dwelt in Idle after a walk ({routine.LastActivity})");
+                yield break;
+            }
+            h.Pin(routine.Position, routine.BodyYaw, routine.HeadYaw);
+            yield return Steps(25);
+            float left = 0f, right = 0f;
+            for (int i = 0; i < 10; i++)
+            {
+                yield return null;
+                left = Mathf.Max(left, (rig.ShinTipLeft.position - rig.FootLeft.position).magnitude);
+                right = Mathf.Max(right, (rig.ShinTipRight.position - rig.FootRight.position).magnitude);
+            }
+            feet["gapLeft"] = Math.Round(left, 4);
+            feet["gapRight"] = Math.Round(right, 4);
+            if (Mathf.Max(left, right) > FeetGapMax)
+            {
+                failures.Add($"feet: in Idle after a walk a foot stands {Mathf.Max(left, right):0.000} m off its shin (max {FeetGapMax})");
+            }
+
+            // Close-ups from the first two sides (right, left, front, back of the body) that no wall hides.
+            Vector3 center = 0.5f * (rig.FootLeft.position + rig.FootRight.position) + Vector3.up * 0.15f;
+            Quaternion facing = Quaternion.Euler(0f, routine.BodyYaw, 0f);
+            var go = new GameObject("FeetCamera");
+            Camera cam = go.AddComponent<Camera>();
+            cam.depth = 100f;
+            cam.fieldOfView = 35f;
+            cam.nearClipPlane = 0.05f;
+            int taken = 0;
+            string[] names = { "right", "left", "front", "back" };
+            Vector3[] sides = { Vector3.right, Vector3.left, Vector3.forward, Vector3.back };
+            for (int s = 0; s < sides.Length && taken < 2; s++)
+            {
+                Vector3 eye = center + facing * sides[s] * 1.4f + Vector3.up * 0.25f;
+                if (Physics.Linecast(center, eye, Layers.OccluderMask, QueryTriggerInteraction.Ignore))
+                {
+                    continue;
+                }
+                go.transform.position = eye;
+                go.transform.LookAt(center);
+                yield return Shoot(dir, $"feet_{names[s]}.png", shots);
+                taken++;
+            }
+            Destroy(go);
+            feet["shots"] = taken;
+            if (taken == 0)
+            {
+                warnings.Add("feet: every close-up side is behind a wall, no feet shot");
+            }
         }
 
         private IEnumerator Shoot(string dir, string file, List<Dictionary<string, object>> shots)
@@ -901,6 +1103,9 @@ namespace Meuble
                 failures.Add($"{exceptions} exception(s) and {errors} error(s) logged during the probe");
             }
             report["graphicsDevice"] = SystemInfo.graphicsDeviceType.ToString();
+            // CONTRACT_M5 17 (m21): the shadow distance the build actually renders with (PC_RPAsset, 30 m).
+            var pipeline = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+            report["shadowDistance"] = pipeline != null ? Math.Round(pipeline.shadowDistance, 2) : -1.0;
             report["unityVersion"] = Application.unityVersion;
             report["warnings"] = warnings;
             report["failures"] = failures;

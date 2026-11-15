@@ -19,7 +19,7 @@ namespace Meuble.Tests
     /// procedural visual within 400 triangles, the lamp's LampLight), decoys of every kind at their kind's size, the
     /// "armchair" prop with collider-only parts under its model, and the facing of the new seat models. Each step
     /// asserts its premise first (a model exists, the level changed), so a builder that does nothing cannot pass.
-    /// Phase C adds the designer route replays of levels 4 to 7 (step 35).
+    /// Phase C adds the designer route replays of levels 4 to 7 (step 35), M5: through the shared RouteReplayer.
     /// </summary>
     public sealed class ProbeTestsM4Levels
     {
@@ -51,6 +51,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             ModelKit.Disabled = false;
             Application.logMessageReceived -= OnLog;
             foreach (Object o in scratch)
@@ -177,173 +178,7 @@ namespace Meuble.Tests
             return points.Where(p => p.y >= cut).Average(p => p.z);
         }
 
-        // ----- 35: the designer routes of levels 4 to 7 -----
-
-        private sealed class RouteResult
-        {
-            public PlayState State;
-            public LoseReason Reason;
-            public float Time;
-            public int Discoveries;
-            public int Alerts;
-            public int Creaks;
-            public int Explained;
-            public int Topples;
-            public int Toggles;
-            public int SwitchOns;
-            public int SatOn;
-            public int Pratfalls;
-            public bool Pinned;
-            public float TopSpeed;
-            public int Waypoint;
-            public int Waypoints;
-        }
-
-        private int fixedSteps;
-
-        private void CountStep() => fixedSteps++;
-
-        /// <summary>Runs the game at <paramref name="scale"/> until <paramref name="until"/> or <paramref name="maxSteps"/> fixed steps.</summary>
-        private IEnumerator Run(int maxSteps, Func<bool> until, float scale)
-        {
-            int end = fixedSteps + maxSteps;
-            float realStart = Time.realtimeSinceStartup;
-            Time.timeScale = scale;
-            try
-            {
-                while (fixedSteps < end && !until() && Time.realtimeSinceStartup - realStart < 150f)
-                {
-                    yield return null;
-                }
-            }
-            finally
-            {
-                Time.timeScale = 1f;
-            }
-        }
-
-        /// <summary>
-        /// Replays the level's designerRoute as ProbeTestsM2 step 20 does (at game time "at", drive straight toward
-        /// (x, z) at full input, release within 0.1 m, wait for the next "at"; a passed "at" starts the next leg on the
-        /// same step), with the M4 step fields (CONTRACT_M4 5, amendments 9.3 and 9.8):
-        /// - "careful" holds the careful key for the step (FurnitureController.ScriptedCareful);
-        /// - a gliding body that stops at a waypoint releases at max(0.1, v * 0.2 + 0.1) m, so the glide ends there;
-        /// - "toggle" presses E at "at" (InputReader.InjectAction) and the next step waits for the action to end;
-        ///   "rightup" presses a move key (InputReader.InjectMovePress) and waits for the stool to stand;
-        /// - scripted input is dropped while the furniture is pinned and for one step after.
-        /// The input is decided at the end of each fixed step, so the replay does not depend on timeScale.
-        /// </summary>
-        private IEnumerator ReplayRoute(RouteResult result, float offset)
-        {
-            List<RouteStepDef> route = Game.Def.DesignerRoute;
-            int k = 0;
-            bool driving = false;
-            bool acting = false;
-            int afterPin = 0;
-            int toggles0 = Game.Furniture.ToggleCount;
-            int topples0 = Game.Furniture.ToppleCount;
-            result.Waypoints = route.Count;
-            void Drive()
-            {
-                FurnitureController f = Game.Furniture;
-                if (Game.State != PlayState.Playing)
-                {
-                    f.ScriptedDirection = null;
-                    return;
-                }
-                result.TopSpeed = Mathf.Max(result.TopSpeed, f.PlanarSpeed);
-                result.Pinned |= f.Pinned;
-                if (f.Pinned)
-                {
-                    // Amendment 9.8: no scripted input while sat on, and for one step after.
-                    f.ScriptedDirection = null;
-                    afterPin = 1;
-                    return;
-                }
-                if (afterPin > 0)
-                {
-                    afterPin--;
-                    f.ScriptedDirection = null;
-                    return;
-                }
-                if (acting)
-                {
-                    if (f.ActionActive || f.Tipped)
-                    {
-                        f.ScriptedDirection = null;
-                        return;
-                    }
-                    acting = false;
-                    k++;
-                }
-                while (k < route.Count)
-                {
-                    RouteStepDef w = route[k];
-                    f.ScriptedCareful = w.Careful;
-                    if (!driving)
-                    {
-                        if (Game.Elapsed < Mathf.Max(0f, w.At + offset) - 1e-4f)
-                        {
-                            f.ScriptedDirection = null;
-                            return;
-                        }
-                        driving = true;
-                    }
-                    if (w.Action == RouteStepDef.ActionToggle || w.Action == RouteStepDef.ActionRightUp)
-                    {
-                        f.ScriptedDirection = null;
-                        if (w.Action == RouteStepDef.ActionToggle)
-                        {
-                            InputReader.InjectAction();
-                        }
-                        else
-                        {
-                            InputReader.InjectMovePress();
-                        }
-                        acting = true;
-                        driving = false;
-                        return;
-                    }
-                    Vector3 to = YawMath.Planar(new Vector3(w.X, 0f, w.Z) - f.transform.position);
-                    bool stops = k + 1 >= route.Count || Game.Elapsed < route[k + 1].At + offset - 1e-4f;
-                    float release = f.Body.Glides && stops
-                        ? Mathf.Max(0.1f, f.Velocity.magnitude * Tuning.OfficeChairStopTime * 0.5f + 0.1f)
-                        : 0.1f;
-                    if (to.magnitude > release)
-                    {
-                        f.ScriptedDirection = to.normalized;
-                        return;
-                    }
-                    driving = false;
-                    k++;
-                }
-                f.ScriptedDirection = null;
-            }
-            Game.FixedStepped += Drive;
-            try
-            {
-                yield return Run(Mathf.CeilToInt(150f / Tuning.FixedStep), () => Game.State != PlayState.Playing, 8f);
-            }
-            finally
-            {
-                Game.FixedStepped -= Drive;
-                Game.Furniture.ScriptedDirection = null;
-                Game.Furniture.ScriptedCareful = null;
-            }
-            result.State = Game.State;
-            result.Reason = Game.LoseReason;
-            result.Time = Game.Elapsed;
-            result.Discoveries = Game.DiscoveryCount;
-            result.Alerts = Game.AlertCount;
-            result.Creaks = Game.CreakCount;
-            result.Explained = Game.ExplainedByDecoySteps;
-            result.Topples = Game.Furniture.ToppleCount - topples0;
-            result.Toggles = Game.Furniture.ToggleCount - toggles0;
-            result.SwitchOns = Game.SwitchOnCount;
-            result.SatOn = Game.SatOnPlayerCount;
-            result.Pratfalls = Game.PratfallCount;
-            result.Waypoint = k;
-        }
+        // ----- 35: the designer routes of levels 4 to 7 (RouteReplayer) -----
 
         /// <summary>
         /// Step 35 (CONTRACT_M4 4 and 8, amendment 9.4): every designer route of levels 4 to 7 wins under the M4 rules
@@ -355,79 +190,69 @@ namespace Meuble.Tests
         [Timeout(900000)]
         public IEnumerator Step35_DesignerRoutesOfLevels4To7()
         {
-            Game.FixedStepped += CountStep;
             var failures = new List<string>();
-            try
+            foreach (string level in new[] { "level4", "level5", "level6", "level7" })
             {
-                foreach (string level in new[] { "level4", "level5", "level6", "level7" })
+                foreach (float offset in new[] { -0.2f, 0f, 0.2f })
                 {
-                    foreach (float offset in new[] { -0.2f, 0f, 0.2f })
+                    if (!new List<string>(Game.LevelOrder).Contains(level))
                     {
-                        if (!new List<string>(Game.LevelOrder).Contains(level))
-                        {
-                            failures.Add($"{level}: not listed in levels.json");
+                        failures.Add($"{level}: not listed in levels.json");
+                        break;
+                    }
+                    int errorsBefore = errors.Count;
+                    Game.LoadLevel(level);
+                    Game.Rules = GameRules.M4;
+                    yield return Steps(1);
+                    if (errors.Count != errorsBefore)
+                    {
+                        failures.Add($"{level}: error(s) at boot: {string.Join(" | ", errors.Skip(errorsBefore))}");
+                    }
+                    if (Game.Def.DesignerRoute == null || Game.Def.DesignerRoute.Count < 2)
+                    {
+                        failures.Add($"{level}: no designerRoute");
+                        break;
+                    }
+                    var r = new RouteReplayer.Result();
+                    yield return RouteReplayer.Replay(Game, offset, r, 8f);
+                    string id = r.Label;
+                    Debug.Log("[Step35] " + r);
+                    if (r.State != PlayState.Won)
+                    {
+                        failures.Add($"{id}: the route did not win ({r.State}, {r.Reason}) after {r.Time:0.0} s, waypoint {r.Waypoint}/{r.Waypoints}");
+                    }
+                    if (r.Discoveries != 0 || r.Alerts != 0 || r.Creaks != 0)
+                    {
+                        failures.Add($"{id}: {r.Discoveries} discoveries, {r.Alerts} alerts, {r.Creaks} creaks (all must be 0)");
+                    }
+                    switch (level)
+                    {
+                        case "level4":
+                            if (r.Topples != 0 || r.TopSpeed > Tuning.StoolTipSpeed)
+                            {
+                                failures.Add($"{id}: the careful stool tipped ({r.Topples}) or went {r.TopSpeed:0.00} m/s, above {Tuning.StoolTipSpeed}");
+                            }
                             break;
-                        }
-                        int errorsBefore = errors.Count;
-                        Game.LoadLevel(level);
-                        Game.Rules = GameRules.M4;
-                        yield return Steps(1);
-                        if (errors.Count != errorsBefore)
-                        {
-                            failures.Add($"{level}: error(s) at boot: {string.Join(" | ", errors.Skip(errorsBefore))}");
-                        }
-                        if (Game.Def.DesignerRoute == null || Game.Def.DesignerRoute.Count < 2)
-                        {
-                            failures.Add($"{level}: no designerRoute");
+                        case "level5":
+                            if (r.SatOn == 0 || !r.Pinned || r.Pratfalls != 0)
+                            {
+                                failures.Add($"{id}: sat on {r.SatOn} time(s), pinned {r.Pinned}, {r.Pratfalls} pratfalls (the armchair must be home in time)");
+                            }
                             break;
-                        }
-                        var r = new RouteResult();
-                        yield return ReplayRoute(r, offset);
-                        string id = $"{level} (offset {offset:+0.0;-0.0;0} s)";
-                        Debug.Log($"[Step35] {id}: {r.State} ({r.Reason}) after {r.Time:0.0} s, waypoint {r.Waypoint}/{r.Waypoints}, {r.Discoveries} discoveries, "
-                                  + $"{r.Alerts} alerts, {r.Creaks} creaks, {r.Explained} explained steps, {r.Topples} topples, top speed {r.TopSpeed:0.00} m/s, "
-                                  + $"{r.Toggles} toggles, {r.SwitchOns} switch-ons, sat on {r.SatOn}, {r.Pratfalls} pratfalls");
-                        if (r.State != PlayState.Won)
-                        {
-                            failures.Add($"{id}: the route did not win ({r.State}, {r.Reason}) after {r.Time:0.0} s, waypoint {r.Waypoint}/{r.Waypoints}");
-                        }
-                        if (r.Discoveries != 0 || r.Alerts != 0 || r.Creaks != 0)
-                        {
-                            failures.Add($"{id}: {r.Discoveries} discoveries, {r.Alerts} alerts, {r.Creaks} creaks (all must be 0)");
-                        }
-                        switch (level)
-                        {
-                            case "level4":
-                                if (r.Topples != 0 || r.TopSpeed > Tuning.StoolTipSpeed)
-                                {
-                                    failures.Add($"{id}: the careful stool tipped ({r.Topples}) or went {r.TopSpeed:0.00} m/s, above {Tuning.StoolTipSpeed}");
-                                }
-                                break;
-                            case "level5":
-                                if (r.SatOn == 0 || !r.Pinned || r.Pratfalls != 0)
-                                {
-                                    failures.Add($"{id}: sat on {r.SatOn} time(s), pinned {r.Pinned}, {r.Pratfalls} pratfalls (the armchair must be home in time)");
-                                }
-                                break;
-                            case "level6":
-                                if (r.Toggles == 0 || r.SwitchOns != 0)
-                                {
-                                    failures.Add($"{id}: {r.Toggles} toggles, {r.SwitchOns} switch-ons (the lamp crosses dark, unseen)");
-                                }
-                                break;
-                            case "level7":
-                                if (r.Explained == 0)
-                                {
-                                    failures.Add($"{id}: the route never stopped beside a decoy in sight (no ExplainedByDecoy step)");
-                                }
-                                break;
-                        }
+                        case "level6":
+                            if (r.Toggles == 0 || r.SwitchOns != 0)
+                            {
+                                failures.Add($"{id}: {r.Toggles} toggles, {r.SwitchOns} switch-ons (the lamp crosses dark, unseen)");
+                            }
+                            break;
+                        case "level7":
+                            if (r.Explained == 0)
+                            {
+                                failures.Add($"{id}: the route never stopped beside a decoy in sight (no ExplainedByDecoy step)");
+                            }
+                            break;
                     }
                 }
-            }
-            finally
-            {
-                Game.FixedStepped -= CountStep;
             }
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }
@@ -441,7 +266,6 @@ namespace Meuble.Tests
         [Timeout(300000)]
         public IEnumerator Step35b_Level5RushDoesNotWin()
         {
-            Game.FixedStepped += CountStep;
             Game.LoadLevel("level5");
             Game.Rules = GameRules.M4;
             yield return Steps(1);
@@ -473,12 +297,11 @@ namespace Meuble.Tests
             Game.FixedStepped += Rush;
             try
             {
-                yield return Run(Mathf.CeilToInt(60f / Tuning.FixedStep), () => sat || Game.State != PlayState.Playing, 8f);
+                yield return RouteReplayer.RunFor(Game, 60f, () => sat || Game.State != PlayState.Playing, 8f);
             }
             finally
             {
                 Game.FixedStepped -= Rush;
-                Game.FixedStepped -= CountStep;
                 Game.Furniture.ScriptedDirection = null;
             }
             Debug.Log($"[Step35b] level5 rush: {Game.State} ({Game.LoseReason}) at {Game.Elapsed:0.0} s, sat at {sitAt:0.0} s, travelled {travelled:0.00} m, "
@@ -611,6 +434,7 @@ namespace Meuble.Tests
                 { BodyKinds.Armchair, new Vector2(-3.4f, 1.2f) },
                 { BodyKinds.FloorLamp, new Vector2(-3.6f, -0.6f) },
                 { BodyKinds.OfficeChair, new Vector2(-2.6f, 2.2f) },
+                { BodyKinds.RockingChair, new Vector2(3.3f, 0.6f) }, // M5 5B: east of the walks, clear of the table and the exit
             };
             foreach (string kind in BodyKinds.All)
             {

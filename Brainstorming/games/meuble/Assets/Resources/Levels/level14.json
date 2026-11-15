@@ -1,0 +1,426 @@
+{
+  "id": "level14",
+  "nameKey": "level14.name",
+  "hintKey": "level14.hint",
+  "lesson": "split",
+  "rooms": [
+    {
+      "id": "sejour",
+      "x": 8.95,
+      "z": 4.95,
+      "sizeX": 8.9,
+      "sizeZ": 6.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "chambre",
+      "x": 2.2,
+      "z": 6.7,
+      "sizeX": 4.4,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "salle",
+      "x": 2.2,
+      "z": 3.2,
+      "sizeX": 4.4,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine",
+      "x": 15.7,
+      "z": 6.7,
+      "sizeX": 4.4,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE"
+    },
+    {
+      "id": "couloir",
+      "x": 15.7,
+      "z": 3.95,
+      "sizeX": 4.4,
+      "sizeZ": 1.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "entree",
+      "x": 15.7,
+      "z": 1.45,
+      "sizeX": 4.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.45,
+      "z": 7.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 1.25,
+      "z": 4.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 13.45,
+      "z": 6.75,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 13.45,
+      "z": 3.75,
+      "width": 1.5,
+      "top": 2.1
+    },
+    {
+      "x": 16.25,
+      "z": 4.95,
+      "width": 1.5,
+      "top": 2.1
+    },
+    {
+      "x": 16.75,
+      "z": 2.95,
+      "width": 1.5,
+      "top": 2.1
+    },
+    {
+      "x": 17.95,
+      "z": 1.25,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": 5.25,
+      "z": 8.45,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 11.75,
+      "z": 8.45,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 2.2,
+      "z": 1.45,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "platforms": [
+    {
+      "name": "Mezzanine",
+      "x": 9.0,
+      "z": 4.95,
+      "sizeX": 1.0,
+      "sizeZ": 6.9,
+      "height": 0.6,
+      "color": "#B07A4E"
+    }
+  ],
+  "ramps": [
+    {
+      "x": 7.5,
+      "z": 4.75,
+      "width": 1.5,
+      "length": 2.0,
+      "yaw": 90.0,
+      "platform": "Mezzanine"
+    },
+    {
+      "x": 10.5,
+      "z": 4.75,
+      "width": 1.5,
+      "length": 2.0,
+      "yaw": 270.0,
+      "platform": "Mezzanine"
+    }
+  ],
+  "rugs": [
+    {
+      "model": "kenney.rug",
+      "x": 5.5,
+      "z": 5.75,
+      "sizeX": 1.8,
+      "sizeZ": 2.6,
+      "yaw": 0.0,
+      "color": "#2E6DB4"
+    }
+  ],
+  "player": {
+    "kind": "armchair",
+    "x": 5.75,
+    "z": 6.25,
+    "yaw": 270.0,
+    "sizeX": 0.85,
+    "sizeY": 1.05,
+    "sizeZ": 0.85,
+    "color": "#D7263D",
+    "model": "kenney.armchair"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 17.25,
+    "z": 1.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Canape",
+      "kind": "sofa",
+      "x": 12.25,
+      "z": 2.25,
+      "yaw": 0.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9",
+      "model": "kenney.sofa"
+    },
+    {
+      "name": "Plante",
+      "kind": "plant",
+      "x": 4.85,
+      "z": 1.85,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.3,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Etagere",
+      "kind": "bookshelf",
+      "x": 6.675,
+      "z": 6.8,
+      "yaw": 90.0,
+      "sizeX": 2.4,
+      "sizeY": 1.2,
+      "sizeZ": 0.35,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "name": "FauteuilMamie",
+      "kind": "armchair",
+      "x": 2.25,
+      "z": 7.75,
+      "yaw": 180.0,
+      "sizeX": 0.9,
+      "sizeY": 0.95,
+      "sizeZ": 0.85,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE",
+      "model": "kenney.armchair"
+    },
+    {
+      "name": "Commode",
+      "kind": "cabinet",
+      "x": 0.6,
+      "z": 5.75,
+      "yaw": 90.0,
+      "sizeX": 1.2,
+      "sizeY": 1.0,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "name": "TableSalle",
+      "kind": "table",
+      "x": 1.75,
+      "z": 3.25,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.75,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 15.7,
+      "z": 8.1,
+      "yaw": 0.0,
+      "sizeX": 2.4,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Meuble",
+      "kind": "cabinet",
+      "x": 14.5,
+      "z": 0.25,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 0.9,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#E3B23C"
+    }
+  ],
+  "designerRoute": [
+    { "x": 5.75, "z": 5.25, "at": 1.1 },
+    { "x": 5.25, "z": 5.25, "at": 2.3 },
+    { "x": 5.75, "z": 5.25, "at": 2.9 },
+    { "x": 5.75, "z": 6.25, "at": 3.5 },
+    { "x": 5.75, "z": 5.25, "at": 7.2 },
+    { "x": 5.75, "z": 4.75, "at": 8.4 },
+    { "x": 6.25, "z": 4.75, "at": 9.0 },
+    { "x": 6.75, "z": 4.75, "at": 9.6 },
+    { "x": 7.75, "z": 4.75, "at": 10.2 },
+    { "x": 8.25, "z": 4.75, "at": 11.4 },
+    { "x": 8.75, "z": 4.75, "at": 12.0 },
+    { "x": 9.25, "z": 4.75, "at": 12.6 },
+    { "x": 9.75, "z": 4.75, "at": 13.2 },
+    { "x": 10.75, "z": 4.75, "at": 13.8 },
+    { "x": 11.25, "z": 4.75, "at": 15.0 },
+    { "x": 11.75, "z": 4.75, "at": 15.6 },
+    { "x": 12.25, "z": 4.75, "at": 16.2 },
+    { "x": 12.25, "z": 3.75, "at": 16.8 },
+    { "x": 13.25, "z": 3.75, "at": 18.0 },
+    { "x": 14.25, "z": 3.75, "at": 19.2 },
+    { "x": 15.25, "z": 3.75, "at": 20.4 },
+    { "x": 16.25, "z": 3.75, "at": 21.6 },
+    { "x": 16.75, "z": 3.75, "at": 22.8 },
+    { "x": 16.75, "z": 2.75, "at": 23.4 },
+    { "x": 16.75, "z": 1.75, "at": 24.6 },
+    { "x": 16.75, "z": 1.25, "at": 25.8 },
+    { "x": 17.25, "z": 1.25, "at": 26.4 },
+    { "x": 17.25, "z": 1.25, "at": 26.4 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Mamie",
+      "personality": "granny",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 5.25,
+          "z": 6.25,
+          "facing": 270.0,
+          "dwell": 5.0,
+          "glances": []
+        },
+        {
+          "x": 5.25,
+          "z": 6.25,
+          "facing": 270.0,
+          "dwell": 0.5,
+          "glances": [],
+          "sit": "player",
+          "seat": {
+            "x": 5.75,
+            "z": 6.25,
+            "yaw": 270.0
+          }
+        },
+        {
+          "x": 2.25,
+          "z": 7.0,
+          "facing": 180.0,
+          "dwell": 6.0,
+          "glances": [],
+          "sit": "FauteuilMamie"
+        },
+        {
+          "x": 3.25,
+          "z": 2.25,
+          "facing": 180.0,
+          "dwell": 5.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Lea",
+      "personality": "tidy",
+      "pattern": "wander",
+      "seed": 1234,
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 15.25,
+          "z": 7.25,
+          "facing": 0.0,
+          "dwell": 24.0,
+          "glances": []
+        },
+        {
+          "x": 11.75,
+          "z": 7.25,
+          "facing": 0.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 14.75,
+          "z": 1.25,
+          "facing": 180.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 15.25,
+          "z": 4.25,
+          "facing": 90.0,
+          "dwell": 2.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

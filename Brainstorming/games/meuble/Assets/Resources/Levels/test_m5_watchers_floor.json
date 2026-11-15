@@ -1,0 +1,58 @@
+{
+  "id": "test_m5_watchers_floor",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 6.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "platforms": [
+    {
+      "name": "Estrade",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 1.0,
+      "sizeZ": 6.0,
+      "height": 0.6,
+      "color": "#A0703E"
+    }
+  ],
+  "ramps": [
+    { "x": -1.5, "z": 0.0, "width": 1.5, "length": 2.0, "yaw": 90.0, "platform": "Estrade" },
+    { "x": 1.5, "z": 0.0, "width": 1.5, "length": 2.0, "yaw": 270.0, "platform": "Estrade" }
+  ],
+  "doors": [
+    { "x": 4.05, "z": 0.0, "width": 1.0, "top": 2.1 }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": -3.25,
+    "z": 0.0,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 3.25, "z": 0.0, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "inhabitants": [
+    {
+      "name": "Perche",
+      "model": "quaternius.man",
+      "startStation": 0,
+      "stations": [
+        { "x": 0.0, "z": 2.0, "facing": 270.0, "dwell": 30.0, "glances": [] }
+      ]
+    }
+  ]
+}

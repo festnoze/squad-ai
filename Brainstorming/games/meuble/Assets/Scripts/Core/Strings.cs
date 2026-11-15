@@ -50,6 +50,51 @@ namespace Meuble.Core
         public const string HudLamp = "E : éteindre / allumer";
         public const string HudSatOn = "Quelqu'un est assis sur toi.";
         public const string HudTipped = "Renversé : appuie sur une direction pour te relever.";
+        // M5 (docs/CONTRACT_M5.md 14 and 16.10).
+        public const string Level8Name = "Les portes";
+        public const string Level8Hint = "Une porte fermée cache tout. Ouvre-la (E) quand personne ne regarde.";
+        public const string Level9Name = "Le robot";
+        public const string Level9Hint = "Le robot pousse ce qu'il touche, mais son bruit couvre le tien.";
+        public const string Level10Name = "Le fauteuil à bascule";
+        public const string Level10Hint = "Il se balance après chaque arrêt : arrête-toi tôt.";
+        public const string Level11Name = "Le vase";
+        public const string Level11Hint = "Pas de virage brusque avec le vase. Maj pour aller doucement.";
+        public const string Level12Name = "Le chien";
+        public const string Level12Hint = "Le chien voit bas : le canapé te cache de lui. S'il te voit bouger, il aboie.";
+        public const string Level13Name = "Roulettes et vase";
+        public const string Level13Hint = "Chaque arrêt glisse, et le vase penche.";
+        public const string Level14Name = "La mezzanine";
+        public const string Level14Hint = "Monte par la rampe. Mamie s'assoit souvent : sois à ta place.";
+        public const string Level15Name = "La bascule et le robot";
+        public const string Level15Hint = "Près du robot, on n'entend pas tes pas. Une chute s'entend toujours.";
+        public const string Level16Name = "La nuit";
+        public const string Level16Hint = "Éteins-toi quand personne ne regarde. Le chien veille.";
+        public const string Level17Name = "La maison";
+        public const string Level17Hint = "Tout ce que tu as appris, dans une grande maison.";
+        public const string PersonDreamer = "Le rêveur";
+        public const string PersonDreamerTrait = "Il traîne et regarde peu autour de lui.";
+        public const string PersonWatchful = "La méfiante";
+        public const string PersonWatchfulTrait = "Elle jette souvent un œil autour d'elle.";
+        public const string PersonHurried = "Le pressé";
+        public const string PersonHurriedTrait = "Il marche vite et entend mal.";
+        public const string PersonGranny = "Mamie";
+        public const string PersonGrannyTrait = "Elle voit mal de loin et s'assoit souvent.";
+        public const string PersonTeen = "L'ado";
+        public const string PersonTeenTrait = "Le nez sur son téléphone : il voit peu, et de près.";
+        public const string PersonTidy = "La maniaque";
+        public const string PersonTidyTrait = "Le moindre meuble déplacé, elle le remarque.";
+        public const string PersonDog = "Le chien";
+        public const string PersonDogTrait = "Il voit bas et aboie quand tu bouges.";
+        public const string IntroHere = "Ici : {0}";
+        public const string HudBalance = "Équilibre";
+        public const string HudDoor = "E : ouvrir la porte";
+        public const string TitleLevels = "Niveaux";
+        public const string SelectLocked = "Verrouillé";
+        public const string SelectBack = "Retour";
+        public const string SelectBest = "{0} s";
+        public const string SelectNone = "-";
+        public const string WinBest = "Record : {0} s";
+        public const string WinNewBest = "Nouveau record !";
 
         private static readonly Dictionary<string, string> ByKey = new Dictionary<string, string>
         {
@@ -93,6 +138,50 @@ namespace Meuble.Core
             { "hud.lamp", HudLamp },
             { "hud.satOn", HudSatOn },
             { "hud.tipped", HudTipped },
+            { "level8.name", Level8Name },
+            { "level8.hint", Level8Hint },
+            { "level9.name", Level9Name },
+            { "level9.hint", Level9Hint },
+            { "level10.name", Level10Name },
+            { "level10.hint", Level10Hint },
+            { "level11.name", Level11Name },
+            { "level11.hint", Level11Hint },
+            { "level12.name", Level12Name },
+            { "level12.hint", Level12Hint },
+            { "level13.name", Level13Name },
+            { "level13.hint", Level13Hint },
+            { "level14.name", Level14Name },
+            { "level14.hint", Level14Hint },
+            { "level15.name", Level15Name },
+            { "level15.hint", Level15Hint },
+            { "level16.name", Level16Name },
+            { "level16.hint", Level16Hint },
+            { "level17.name", Level17Name },
+            { "level17.hint", Level17Hint },
+            { "person.dreamer", PersonDreamer },
+            { "person.dreamer.trait", PersonDreamerTrait },
+            { "person.watchful", PersonWatchful },
+            { "person.watchful.trait", PersonWatchfulTrait },
+            { "person.hurried", PersonHurried },
+            { "person.hurried.trait", PersonHurriedTrait },
+            { "person.granny", PersonGranny },
+            { "person.granny.trait", PersonGrannyTrait },
+            { "person.teen", PersonTeen },
+            { "person.teen.trait", PersonTeenTrait },
+            { "person.tidy", PersonTidy },
+            { "person.tidy.trait", PersonTidyTrait },
+            { "person.dog", PersonDog },
+            { "person.dog.trait", PersonDogTrait },
+            { "intro.here", IntroHere },
+            { "hud.balance", HudBalance },
+            { "hud.door", HudDoor },
+            { "title.levels", TitleLevels },
+            { "select.locked", SelectLocked },
+            { "select.back", SelectBack },
+            { "select.best", SelectBest },
+            { "select.none", SelectNone },
+            { "win.best", WinBest },
+            { "win.newBest", WinNewBest },
         };
 
         /// <summary>Looks a string up by its PRD key. An unknown key returns the key itself, visibly.</summary>

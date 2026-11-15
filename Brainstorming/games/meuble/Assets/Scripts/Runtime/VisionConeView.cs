@@ -142,6 +142,17 @@ namespace Meuble
     /// than the furniture never shortens the fan: the top corners of the chair are seen over it, which is
     /// exactly what the vision test does. The wedge is a superset of where the chair can be seen, never a
     /// subset: the fan may warn about a spot that is safe, it never hides a spot that is not.
+    /// M5B (CONTRACT_M5 17, critique m20): an eye BELOW the furniture top (the dog's 0.35 m, a human's 1.6 m under the floor
+    /// lamp's top) looks up at it, so the far top is the hardest to see and a nearer one may show over a cover the far ray
+    /// hits. Such a ray goes on past the hit (<see cref="RayReach"/>): a cover lower than the top lets the top be seen up to
+    /// hit x (top - eye) / (cover - eye) away (the sight line clears the cover's near edge), and the ray is cast again toward
+    /// that nearer top, up to <see cref="Tuning.ConeSupersetPasses"/> times. A cover at least as high as the top ends the ray
+    /// at the hit, as before. An eye at or above the top keeps the M1 ray exactly.
+    /// M5B (critique m14): on a level with a platform or a ramp each ray is cut in <see cref="Radial"/> samples, every
+    /// <see cref="Tuning.ConeRadialStep"/> (about) from the eye and the last on the rim (a ray cut short repeats its rim), each
+    /// on the floor under it, and a sample near a higher one (<see cref="DrapedHeight"/>) is raised to it: the fan drapes
+    /// over a platform edge and lies on the platform top, never inside it (where the x-ray pass would draw it as hidden). The
+    /// outline is the M1 fan's. On a flat floor a ray is one sample: the M1 fan.
     /// M3: the cone lives on the <see cref="XRay.ConeLayerName"/> layer, so where an Occluder hides it the
     /// x-ray draws it again (<see cref="XRay"/>).
     /// M3.1: a facing chevron stands in front of the inhabitant's face and points where it looks, in the cone's
@@ -149,6 +160,12 @@ namespace Meuble
     /// inhabitant's gaze always shows. A CanvasRenderer, it adds no renderer and no material to the budgets.
     /// M4 (docs/CONTRACT_M4.md 2.3): while the player lamp is off, the fan reaches only the scaled range the vision
     /// test uses for it (<see cref="RangeFactor"/>), in a dimmer color.
+    /// M5 (docs/CONTRACT_M5.md 3, CONTRACT_M5_v3.md 15.4 and 15.5): each fan uses its watcher's own range and half angle
+    /// (the personality's, times the lamp factor) from its own eye (the dog's 0.35 m); every vertex lies on the floor
+    /// under it (<see cref="FloorMap"/>), and each ray aims at the furniture top above the floor where it lands. The dog's
+    /// fan and chevron are cyan (CONTRACT_M5 17): <see cref="Tuning.DogConeColor"/> while calm,
+    /// <see cref="Tuning.DogConeAlarmColor"/> while it sees the furniture. A sleeping watcher's fan and chevron are hidden
+    /// (its eye is closed; the inhabitant shows a "z" instead).
     /// </summary>
     [DefaultExecutionOrder(100)]
     public sealed class VisionConeView : MonoBehaviour
@@ -167,8 +184,17 @@ namespace Meuble
         private static readonly Color AlarmDark = new Color(0.85f, 0.32f, 0.26f, 0.22f);
 
         // The chevron: its fill in the cone's hue, nearly opaque, over a dark outline.
-        private static readonly Color FacingCalm = new Color(1f, 0.86f, 0.3f, 0.95f);
-        private static readonly Color FacingAlarm = new Color(1f, 0.3f, 0.2f, 0.95f);
+        private const float FacingAlpha = 0.95f;
+        private static readonly Color FacingCalm = new Color(1f, 0.86f, 0.3f, FacingAlpha);
+        private static readonly Color FacingAlarm = new Color(1f, 0.3f, 0.2f, FacingAlpha);
+        // M5 (CONTRACT_M5 17): the dog's chevron, a deep teal while calm (its cone's cyan, shaded), the vivid alarm cyan while
+        // it sees the furniture.
+        private static readonly Color FacingDog = Shade(Tuning.DogConeColor, Tuning.DogChevronCalmShade, FacingAlpha);
+        private static readonly Color FacingDogAlarm = Shade(Tuning.DogConeAlarmColor, 1f, FacingAlpha);
+        // M5: the fan floats this far above the floor under each vertex (as M1's 0.015 above y = 0).
+        private const float FloorLift = 0.015f;
+        // M5B m20: a recast past a cover aims this much nearer than the exact clearance over its edge (metres).
+        private const float ClearMargin = 0.01f;
         private const float FacingSize = 0.42f;
         // Ahead of the eyes along the gaze and a little below them, so the arrow never covers the face.
         private const float FacingAhead = 0.6f;
@@ -178,10 +204,21 @@ namespace Meuble
         public RectTransform Facing { get; private set; }
 
         private Image facingImage;
+        private Canvas facingCanvas;
         private Mesh mesh;
         private MeshRenderer meshRenderer;
+        // The apex and the rim (one vertex per ray), as last rebuilt: the public outline of the fan.
         private Vector3[] vertices;
-        private int[] triangles;
+        // M5B: the mesh itself, the apex then Radial samples per ray (the rim last), the floor height under each sample and
+        // its planar distance from the eye; the spacing of the samples along a ray and the angle between two rays (radians).
+        private Vector3[] meshVertices;
+        private float[] rawHeights;
+        private float[] sampleDistances;
+        private int radial;
+        private float spacing;
+        private float rayStep;
+        // M5B m14: a sample is raised to the floor of any other sample this many spacings away (diagonal neighbours included).
+        private const float DrapeReach = 1.5f;
 
         public void Init()
         {
@@ -191,24 +228,8 @@ namespace Meuble
             }
             mesh = new Mesh { name = "VisionCone" };
             mesh.MarkDynamic();
-            int n = Tuning.ConeRayCount;
-            vertices = new Vector3[n + 1];
-            triangles = new int[(n - 1) * 3];
-            for (int i = 0; i < n - 1; i++)
-            {
-                // Clockwise seen from above: the fan faces up.
-                triangles[i * 3] = 0;
-                triangles[i * 3 + 1] = i + 1;
-                triangles[i * 3 + 2] = i + 2;
-            }
-            var normals = new Vector3[n + 1];
-            for (int i = 0; i < normals.Length; i++)
-            {
-                normals[i] = Vector3.up;
-            }
-            mesh.vertices = vertices;
-            mesh.normals = normals;
-            mesh.triangles = triangles;
+            vertices = new Vector3[Tuning.ConeRayCount + 1];
+            EnsureTopology(1);
             gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
             meshRenderer = gameObject.AddComponent<MeshRenderer>();
             meshRenderer.sharedMaterial = PrimitiveKit.UnlitTransparent(Calm);
@@ -232,6 +253,7 @@ namespace Meuble
             Canvas canvas = go.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             canvas.sortingOrder = 4;
+            facingCanvas = canvas;
             var imageGo = new GameObject("Chevron", typeof(RectTransform)) { layer = layer };
             imageGo.transform.SetParent(go.transform, false);
             var rect = (RectTransform)imageGo.transform;
@@ -251,14 +273,129 @@ namespace Meuble
             {
                 return;
             }
+            // M5: a sleeping watcher sees nothing: no fan, no chevron (its "z" shows instead).
+            Hidden = Owner.Routine.Asleep;
+            meshRenderer.enabled = !Hidden;
+            if (facingCanvas != null)
+            {
+                facingCanvas.enabled = !Hidden;
+            }
+            if (Hidden)
+            {
+                return;
+            }
             Rebuild();
             bool alarm = Vision != null && Vision.SeesPlayer;
             bool dark = RangeFactor < 1f;
-            meshRenderer.sharedMaterial = PrimitiveKit.UnlitTransparent(dark ? (alarm ? AlarmDark : CalmDark) : (alarm ? Alarm : Calm));
+            bool dog = Owner.IsDog;
+            Color = ConeColor(dog, alarm, dark);
+            meshRenderer.sharedMaterial = PrimitiveKit.UnlitTransparent(Color);
             if (facingImage != null)
             {
-                facingImage.color = alarm ? FacingAlarm : FacingCalm;
+                facingImage.color = FacingColor(dog, alarm);
             }
+        }
+
+        /// <summary>
+        /// The chevron's fill: a human's yellow, red while it sees the furniture; M5: the dog's deep teal, the vivid
+        /// <see cref="Tuning.DogConeAlarmColor"/> while it sees the furniture.
+        /// </summary>
+        public static Color FacingColor(bool dog, bool alarm) => dog ? (alarm ? FacingDogAlarm : FacingDog) : (alarm ? FacingAlarm : FacingCalm);
+
+        /// <summary>M5: the chevron's fill on the last frame (tests).</summary>
+        public Color FacingFill => facingImage != null ? facingImage.color : Color.clear;
+
+        /// <summary>A colour times <paramref name="k"/> (its RGB), at <paramref name="alpha"/>.</summary>
+        private static Color Shade(Color c, float k, float alpha) => new Color(c.r * k, c.g * k, c.b * k, alpha);
+
+        /// <summary>M5: the fan's vertices (the apex, then one per ray), world space, as last rebuilt (tests).</summary>
+        public Vector3[] Vertices => vertices;
+
+        /// <summary>
+        /// M5B: the samples per ray of the mesh (1 on a flat floor; the watcher's range over Tuning.ConeRadialStep on a level
+        /// with a platform or a ramp).
+        /// </summary>
+        public int Radial => radial;
+
+        /// <summary>M5B: the fan's mesh (world space: the cone's transform is the identity), for tests.</summary>
+        public Mesh FanMesh => mesh;
+
+        /// <summary>M5B: the mesh index of sample <paramref name="sample"/> (1 to <see cref="Radial"/>) of ray <paramref name="ray"/>.</summary>
+        public int MeshIndex(int ray, int sample) => 1 + ray * radial + (sample - 1);
+
+        /// <summary>
+        /// M5B: the mesh of <paramref name="samples"/> samples per ray: the apex fan between the first samples, then two
+        /// triangles per pair of neighbour samples, each wound clockwise seen from above (it faces up). The topology changes
+        /// only when the samples per ray do.
+        /// </summary>
+        private void EnsureTopology(int samples)
+        {
+            samples = Mathf.Max(1, samples);
+            if (samples == radial && meshVertices != null)
+            {
+                return;
+            }
+            radial = samples;
+            int n = Tuning.ConeRayCount;
+            int count = 1 + n * radial;
+            meshVertices = new Vector3[count];
+            rawHeights = new float[count];
+            sampleDistances = new float[count];
+            var triangles = new List<int>((n - 1) * (2 * radial - 1) * 3);
+            for (int i = 0; i < n - 1; i++)
+            {
+                triangles.Add(0);
+                triangles.Add(MeshIndex(i, 1));
+                triangles.Add(MeshIndex(i + 1, 1));
+                for (int s = 1; s < radial; s++)
+                {
+                    int a = MeshIndex(i, s);
+                    int b = MeshIndex(i, s + 1);
+                    int c = MeshIndex(i + 1, s + 1);
+                    int d = MeshIndex(i + 1, s);
+                    triangles.Add(a);
+                    triangles.Add(b);
+                    triangles.Add(c);
+                    triangles.Add(a);
+                    triangles.Add(c);
+                    triangles.Add(d);
+                }
+            }
+            var normals = new Vector3[count];
+            for (int i = 0; i < count; i++)
+            {
+                normals[i] = Vector3.up;
+            }
+            mesh.Clear();
+            mesh.indexFormat = count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
+            mesh.vertices = meshVertices;
+            mesh.normals = normals;
+            mesh.SetTriangles(triangles, 0);
+        }
+
+        /// <summary>M5: true while the watcher sleeps: the fan and the chevron are hidden.</summary>
+        public bool Hidden { get; private set; }
+
+        /// <summary>M5: the colour of the fan on the last frame (<see cref="ConeColor"/>).</summary>
+        public Color Color { get; private set; } = Calm;
+
+        /// <summary>
+        /// The fan's colour: a human's warm yellow, red while it sees the furniture, both dimmer while a lamp is dark (M4);
+        /// M5 (CONTRACT_M5 17): the dog's cyan <see cref="Tuning.DogConeColor"/>, the vivid, more opaque
+        /// <see cref="Tuning.DogConeAlarmColor"/> while it sees the furniture, both shaded while a lamp is dark.
+        /// </summary>
+        public static Color ConeColor(bool dog, bool alarm, bool dark)
+        {
+            if (!dog)
+            {
+                return dark ? (alarm ? AlarmDark : CalmDark) : (alarm ? Alarm : Calm);
+            }
+            Color c = alarm ? Tuning.DogConeAlarmColor : Tuning.DogConeColor; // MUTATION:DOG_ALARM_HUE
+            if (dark)
+            {
+                return Shade(c, Tuning.DogConeDarkShade, alarm ? Tuning.DogConeDarkAlarmAlpha : Tuning.DogConeDarkAlpha);
+            }
+            return Shade(c, 1f, alarm ? Tuning.DogConeAlarmAlpha : Tuning.DogConeCalmAlpha);
         }
 
         /// <summary>
@@ -267,8 +404,14 @@ namespace Meuble
         /// </summary>
         public float RangeFactor => Vision != null ? Vision.RangeFactor : 1f;
 
-        /// <summary>M4: the fan's reach without occluders, in meters (tests).</summary>
-        public float Range => Tuning.ViewRange * RangeFactor;
+        /// <summary>
+        /// M4: the fan's reach without occluders, in meters (tests). M5: the watcher's own range (the personality's, the
+        /// teen's 6 m, the dog's 6 m) times the lamp factor.
+        /// </summary>
+        public float Range => (Owner != null && Owner.Routine != null ? Owner.Routine.ViewRange : Tuning.ViewRange) * RangeFactor; // MUTATION:CONE_RANGE
+
+        /// <summary>M5: the fan's half angle, the watcher's own (the personality's).</summary>
+        public float HalfAngle => Owner != null && Owner.Routine != null ? Owner.Routine.HalfAngle : Tuning.ViewHalfAngle;
 
         public void Rebuild()
         {
@@ -278,30 +421,149 @@ namespace Meuble
             }
             Vector3 eye = Owner.VisualEyePosition;
             float yaw = Owner.VisualEyeYaw;
-            const float floorY = 0.015f;
-            vertices[0] = new Vector3(eye.x, floorY, eye.z);
+            FloorMap floor = Owner.Routine.Floor ?? FloorMap.Flat;
+            // M5B m14: a level with a platform or a ramp cuts each ray every ConeRadialStep of the watcher's own range.
+            int samples = floor.IsFlat ? 1 : Mathf.CeilToInt(Owner.Routine.ViewRange / Tuning.ConeRadialStep); // MUTATION:CONE_RADIAL
+            EnsureTopology(samples);
+            var origin = new Vector3(eye.x, 0f, eye.z);
+            rawHeights[0] = floor.HeightAt(eye.x, eye.z);
+            meshVertices[0] = new Vector3(eye.x, rawHeights[0] + FloorLift, eye.z);
             int n = Tuning.ConeRayCount;
             float range = Range;
+            float half = HalfAngle;
+            // The samples sit at the same distances on every ray (a ray cut short repeats its rim), so the samples of two
+            // neighbour rays with the same index are neighbours on the floor too.
+            spacing = Owner.Routine.ViewRange / radial;
+            rayStep = 2f * half / (n - 1) * Mathf.Deg2Rad;
             for (int i = 0; i < n; i++)
             {
-                float a = yaw - Tuning.ViewHalfAngle + 2f * Tuning.ViewHalfAngle * i / (n - 1);
+                float a = yaw - half + 2f * half * i / (n - 1);
                 Vector3 h = YawMath.Forward(a);
-                Vector3 target = new Vector3(eye.x, TargetHeight, eye.z) + h * range;
-                Vector3 d = target - eye;
-                float reach = range;
-                if (Physics.Raycast(eye, d.normalized, out RaycastHit hit, d.magnitude, Layers.OccluderMask, QueryTriggerInteraction.Ignore))
+                float reach = RayReach(eye, h, range, floor);
+                for (int s = 1; s <= radial; s++)
                 {
-                    reach = YawMath.Planar(hit.point - eye).magnitude;
+                    float d = s == radial ? reach : Mathf.Min(s * spacing, reach);
+                    Vector3 p = origin + h * d;
+                    int k = MeshIndex(i, s);
+                    rawHeights[k] = floor.HeightAt(p.x, p.z);
+                    sampleDistances[k] = d;
+                    meshVertices[k] = p;
                 }
-                Vector3 p = new Vector3(eye.x, floorY, eye.z) + h * reach;
-                vertices[i + 1] = p;
             }
-            mesh.vertices = vertices;
+            bool flat = floor.IsFlat;
+            for (int i = 0; i < n; i++)
+            {
+                for (int s = 1; s <= radial; s++)
+                {
+                    int k = MeshIndex(i, s);
+                    meshVertices[k].y = (flat ? rawHeights[k] : DrapedHeight(i, s)) + FloorLift;
+                }
+                vertices[i + 1] = meshVertices[MeshIndex(i, radial)];
+            }
+            vertices[0] = meshVertices[0];
+            mesh.vertices = meshVertices;
             mesh.RecalculateBounds();
             if (Facing != null)
             {
                 PlaceFacing(eye, YawMath.Forward(yaw));
             }
+        }
+
+        /// <summary>
+        /// M5B m14: the height a sample is drawn at: the highest floor under any sample of its ray or of the two rays beside
+        /// it (the apex included) within <see cref="DrapeReach"/> times the local spacing (the larger of the spacing along a
+        /// ray and the gap between two rays there). The corners of a triangle of the fan between two whole rays lie within
+        /// that reach of each other, so a triangle touching a platform sample lies at the platform's height or above, never
+        /// inside it, and only the samples near a height change are raised. Samples on the same spot (a repeated rim) get the
+        /// same height. The one exception is a triangle that joins the end of a ray cut short (by a wall or a cover) to the
+        /// longer ray beside it: where that end meets a height change it may dip a few centimetres (probe step 37w bounds it).
+        /// </summary>
+        private float DrapedHeight(int ray, int sample)
+        {
+            int n = Tuning.ConeRayCount;
+            int k = MeshIndex(ray, sample);
+            float d = sampleDistances[k];
+            Vector3 p = meshVertices[k];
+            float reach = DrapeReach * Mathf.Max(spacing, d * rayStep);
+            float reachSqr = reach * reach;
+            float height = rawHeights[k];
+            if (d <= reach)
+            {
+                height = Mathf.Max(height, rawHeights[0]);
+            }
+            int low = Mathf.Max(1, Mathf.FloorToInt((d - reach) / spacing));
+            int high = Mathf.Min(radial, Mathf.CeilToInt((d + reach) / spacing));
+            for (int i = Mathf.Max(0, ray - 1); i <= Mathf.Min(n - 1, ray + 1); i++)
+            {
+                for (int s = low; s <= high; s++)
+                {
+                    int j = MeshIndex(i, s);
+                    Vector3 q = meshVertices[j];
+                    float dx = q.x - p.x;
+                    float dz = q.z - p.z;
+                    if (dx * dx + dz * dz <= reachSqr)
+                    {
+                        height = Mathf.Max(height, rawHeights[j]);
+                    }
+                }
+            }
+            return height;
+        }
+
+        /// <summary>M5B m14: the planar distance from the eye of each mesh vertex (tests).</summary>
+        public float SampleDistance(int index) => sampleDistances != null && index >= 0 && index < sampleDistances.Length ? sampleDistances[index] : 0f;
+
+        /// <summary>M5B m14: the spacing of the samples along a ray, metres (the watcher's range over <see cref="Radial"/>).</summary>
+        public float Spacing => spacing;
+
+        /// <summary>M5B m14: the angle between two neighbour rays, radians.</summary>
+        public float RayStep => rayStep;
+
+        /// <summary>
+        /// The planar reach of the ray along <paramref name="h"/> (a unit planar direction) from <paramref name="eye"/>: the
+        /// farthest distance, up to <paramref name="range"/>, at which the furniture top could be seen along it. The ray aims
+        /// at the furniture top above the floor at the far end; with the eye at or above that top, the first occluder it hits
+        /// ends it (M1: every nearer top lies on a lower sight line). M5B m20: with the eye below the top, a cover lower than
+        /// the top hides the far top but not a nearer one: the top is seen over the cover's near edge up to
+        /// hit x (top - eye) / (cover top - eye), so the ray is cast again toward that top (a superset: the fan never ends
+        /// short of a top the eye sees).
+        /// </summary>
+        public float RayReach(Vector3 eye, Vector3 h, float range, FloorMap floor)
+        {
+            floor = floor ?? FloorMap.Flat;
+            var origin = new Vector3(eye.x, 0f, eye.z);
+            float d = range;
+            int passes = Mathf.Max(1, Tuning.ConeSupersetPasses);
+            for (int pass = 0; pass < passes; pass++)
+            {
+                // The furniture top above the floor at the far end of the ray (M5: a platform there raises it).
+                Vector3 far = origin + h * d;
+                float top = floor.HeightAt(far.x, far.z) + TargetHeight;
+                Vector3 to = new Vector3(far.x, top, far.z) - eye;
+                float length = to.magnitude;
+                if (length < 1e-4f
+                    || !Physics.Raycast(eye, to / length, out RaycastHit hit, length, Layers.OccluderMask, QueryTriggerInteraction.Ignore))
+                {
+                    return d;
+                }
+                float atHit = YawMath.Planar(hit.point - eye).magnitude;
+                bool lookingUp = eye.y < top; // MUTATION:FAN_SUPERSET
+                float cover = hit.collider != null ? hit.collider.bounds.max.y : float.MaxValue;
+                if (!lookingUp || cover >= top - 1e-4f || cover <= eye.y + 1e-4f)
+                {
+                    return atHit;
+                }
+                float clear = atHit * (top - eye.y) / (cover - eye.y);
+                if (clear >= d - 1e-3f)
+                {
+                    // A hit the sight line should clear (not met at a cover's near edge): keep the longer reach.
+                    return d;
+                }
+                // Aimed a hair nearer than the exact clearance, so the next cast passes over the cover's edge and finds
+                // what lies beyond it.
+                d = clear - ClearMargin;
+            }
+            return d;
         }
 
         /// <summary>

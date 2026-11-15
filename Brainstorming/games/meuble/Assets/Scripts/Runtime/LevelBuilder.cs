@@ -30,6 +30,104 @@ namespace Meuble
         /// <summary>Every element whose data names a model but got the procedural visual: "what (id)". The probe fails on any.</summary>
         public readonly List<string> ModelFallbacks = new List<string>();
 
+        // ----- M5 (docs/CONTRACT_M5.md 16.12, CONTRACT_M5_v3.md 9 and 15.1) -----
+        /// <summary>The door leaves, in level order (LevelDef.LeafDoors): leaf k has OpenMask bit k and area DoorAreaBase + k.</summary>
+        public readonly List<DoorLeaf> Leaves = new List<DoorLeaf>();
+
+        /// <summary>
+        /// Wave 5B (CONTRACT_M5 4, 16.8 and 16.12): the robots, robot i built from <c>Def.Robots[i]</c> by
+        /// <see cref="Robot.Create"/>: each carries its <see cref="RobotPath"/> (<see cref="Robot.Path"/>) and stands where
+        /// that path starts (time 0) until the game steps it. Empty on a level without a robot.
+        /// </summary>
+        public readonly List<Robot> Robots = new List<Robot>();
+
+        /// <summary>
+        /// Wave 5B (CONTRACT_M5 6, 16.5 and 18): the view of the player's load (the builder makes it, on
+        /// the furniture's Visual), or null on a level whose player carries none. It stays after a fall: it hides its
+        /// carried object and owns the clue (<see cref="LoadView.SpawnClue"/>, <see cref="LoadView.ClearClue"/>).
+        /// </summary>
+        public LoadView LoadView;
+
+        /// <summary>
+        /// The one seat registry the level's routines share (CONTRACT_M5_v3 15.6): inhabitant i claims as owner i. Built with
+        /// the level, so a restart starts with every seat free.
+        /// </summary>
+        public readonly SeatRegistry Seats = new SeatRegistry();
+
+        /// <summary>The level's floor heights (LevelDef.Floor; flat without a level).</summary>
+        public FloorMap Floor => Def != null ? Def.Floor : FloorMap.Flat;
+
+        /// <summary>Bit k set when leaf k is open (or opening). Authored open leaves are open from the start.</summary>
+        public int OpenMask
+        {
+            get
+            {
+                int mask = 0;
+                for (int k = 0; k < Leaves.Count; k++)
+                {
+                    if (Leaves[k] != null && Leaves[k].Open)
+                    {
+                        mask |= 1 << k;
+                    }
+                }
+                return mask;
+            }
+        }
+
+        /// <summary>The OpenMask of the level as authored (the mask the frozen station walks are planned with).</summary>
+        public int AuthoredOpenMask { get; internal set; }
+
+        /// <summary>
+        /// The NavMesh areas of the frozen station walks: every area but the doorways of the leaves authored closed
+        /// (RoutineFactory.AllAreas on a level without a closed leaf).
+        /// </summary>
+        public int StationAreaMask => AreaMaskFor(AuthoredOpenMask);
+
+        /// <summary>The NavMesh areas a plan may use now: every area but the doorways of the closed leaves.</summary>
+        public int AreaMask() => AreaMaskFor(OpenMask);
+
+        /// <summary>The NavMesh areas of an open-leaf mask: every area but area DoorAreaBase + k of each leaf k not in it.</summary>
+        public int AreaMaskFor(int openMask)
+        {
+            int mask = RoutineFactory.AllAreas;
+            for (int k = 0; k < Leaves.Count; k++)
+            {
+                if ((openMask & (1 << k)) == 0)
+                {
+                    mask &= ~(1 << (Tuning.DoorAreaBase + k));
+                }
+            }
+            return mask;
+        }
+
+        /// <summary>A planner over the level's one NavMesh restricted to the areas of an open-leaf mask.</summary>
+        public IAreaMaskPlanner PlannerFor(int openMask)
+        {
+            return new MaskedPlanner(Planner as IAreaMaskPlanner, AreaMaskFor(openMask));
+        }
+
+        /// <summary>
+        /// The frozen station walks' planner as one plain planner: the level's NavMesh with the authored leaves
+        /// (<see cref="StationAreaMask"/>, CONTRACT_M5_v3 15.1); <see cref="Planner"/> itself on a level without a closed
+        /// leaf. The builder hands RoutineFactory <see cref="Planner"/> and <see cref="StationAreaMask"/>, which plan the same.
+        /// </summary>
+        public IPathPlanner StationPlanner
+        {
+            get
+            {
+                int mask = StationAreaMask;
+                return mask == RoutineFactory.AllAreas || !(Planner is IAreaMaskPlanner masked) ? Planner : new MaskedPlanner(masked, mask);
+            }
+        }
+
+        /// <summary>
+        /// The planner of every other walk (investigate, switch-on, carry, resume): the level's NavMesh with the leaves as
+        /// they are when the walk is planned (<see cref="AreaMask"/> at each call).
+        /// </summary>
+        public IPathPlanner InvestigatePlanner => investigatePlanner ?? (investigatePlanner = new LiveMaskPlanner(this));
+
+        private IPathPlanner investigatePlanner;
+
         public void Clear()
         {
             Root = null;
@@ -40,6 +138,31 @@ namespace Meuble
             Decoys.Clear();
             ModelVisuals.Clear();
             ModelFallbacks.Clear();
+            Leaves.Clear();
+            Robots.Clear();
+            LoadView = null;
+            Seats.Clear();
+        }
+
+        /// <summary>Plans with the level's current <see cref="AreaMask"/> (the leaves opened so far).</summary>
+        private sealed class LiveMaskPlanner : IAreaMaskPlanner
+        {
+            private readonly LevelInstance level;
+
+            public LiveMaskPlanner(LevelInstance level)
+            {
+                this.level = level;
+            }
+
+            public bool TryPlan(Vector3 from, Vector3 to, List<Vector3> corners)
+            {
+                return TryPlan(from, to, corners, level.AreaMask());
+            }
+
+            public bool TryPlan(Vector3 from, Vector3 to, List<Vector3> corners, int areaMask)
+            {
+                return level.Planner is IAreaMaskPlanner masked ? masked.TryPlan(from, to, corners, areaMask) : level.Planner.TryPlan(from, to, corners);
+            }
         }
     }
 
@@ -49,9 +172,47 @@ namespace Meuble
     ///
     /// Build order: rooms (floors, walls, doors, windows), exit, rugs, props, decoys, the player, then
     /// Physics.SyncTransforms, the runtime NavMesh, and only then the inhabitants, which plan with it.
+    ///
+    /// M4.2 textures: hard floors and thresholds show parquet, soft ones and rugs carpet, wall faces and caps plaster,
+    /// door frames, leaves, baseboards and window frames (painted) wood; the procedural inhabitant's clothes linen.
+    /// The garden and the window pane stay plain. Quads and boxes use the sized meshes (UVs in metres).
+    ///
+    /// M5 (docs/CONTRACT_M5_v3.md 15.1 to 15.4 and 15.8, CONTRACT_M5.md 16.6):
+    /// <list type="bullet">
+    /// <item>the split level: platforms (solid walkable occluders), ramps (convex wedge MeshColliders flush at both ends)
+    /// and railings (not occluders, on the Furniture layer) on every platform edge and both ramp sides, except at the ramp
+    /// foot and head and where an edge lies on a wall; props, decoys, rugs, the doormat and the spawn stand at the floor
+    /// height (the furniture's Floor is set before its Teleport);</item>
+    /// <item>the doors: one <see cref="DoorLeaf"/> per leaf door, built after the NavMesh (no leaf is a NavMesh source);
+    /// the one NavMesh gets a door area box per leaf doorway and a Not Walkable box per open leaf pose;</item>
+    /// <item>the inhabitants wear their personality's model and are built through RoutineFactory (Inhabitant.Init): their
+    /// station walks frozen with the authored leaves (<see cref="LevelInstance.StationAreaMask"/>), every other walk planned
+    /// with the current ones, the level's shared seat registry (<see cref="LevelInstance.Seats"/>), and their eyes on the
+    /// level's floor;</item>
+    /// <item>the budgets: static decor renderers are combined at level build (<see cref="CombineRenderers"/>) per key
+    /// (material, layer, fade plane), with the surface and the shadow mode they carry: the faces and the door frames of a
+    /// shared wall per fade plane (one WallFader entry each), every part that never fades (outer wall faces, outer door
+    /// frames, window strips, outer baseboards) per material across the house, floors, thresholds, platforms, ramps and
+    /// railings per material. A wall line's caps become one cap under its wall (same plane, same fade). Colliders never
+    /// change.</item>
+    /// <item>wave 5B (CONTRACT_M5 16.11 and 17, draw calls counted as material slots): a shared wall's faces and baseboards
+    /// fade with its centre plane, as its door frames and its cap, so both sides of a line combine per material; the window
+    /// panes combine across the house; a bookshelf combines its parts per material (FurnitureKit).</item>
+    /// <item>wave 5B (CONTRACT_M5 4 to 6, 16.5, 16.8 and 16.12): one <see cref="Robot"/> per <see cref="RobotDef"/>, built
+    /// after the NavMesh (no collider, Default layer: never a NavMesh source, an occluder or an obstacle) and listed in
+    /// <see cref="LevelInstance.Robots"/>; the player's load view (the rule is GameState's, CONTRACT_M5 18) in
+    /// <see cref="LevelInstance.LoadView"/>; the cones aim at the load's top (the sample box grows by
+    /// <see cref="Tuning.LoadHeight"/>); the rocking chair body shows its procedural visual (no Kenney model).</item>
+    /// </list>
     /// </summary>
     public static class LevelBuilder
     {
+        /// <summary>
+        /// M5 (CONTRACT_M5_v3 15.8): combine the static decor renderers at level build. Off builds every part as its own
+        /// renderer, exactly as M4.2 did (the budget test measures both).
+        /// </summary>
+        public static bool CombineRenderers = true;
+
         private static readonly Color Outside = new Color32(0x5E, 0x7D, 0x4A, 0xFF);
         private static readonly Color WindowPane = new Color32(0xBF, 0xE3, 0xF5, 0xFF);
         private static readonly Color Trim = new Color32(0xF7, 0xF4, 0xEE, 0xFF);
@@ -86,22 +247,25 @@ namespace Meuble
             var level = new LevelInstance { Def = def, Root = new GameObject("Level " + def.Id) };
             Transform root = level.Root.transform;
             var fader = level.Root.AddComponent<WallFader>();
-            BuildFloors(def, root);
-            BuildWalls(def, root, fader);
+            var batch = new Batch(CombineRenderers, root);
+            FloorMap floorMap = def.Floor;
+            BuildFloors(def, root, batch);
+            BuildWalls(def, root, fader, batch);
+            BuildSplitLevel(def, root, batch);
             BuildExit(level, def, root);
             BuildExitBlocker(def, root);
             for (int i = 0; i < def.Rugs.Count; i++)
             {
-                BuildRug(level, def.Rugs[i], i, root);
+                BuildRug(level, def, def.Rugs[i], i, root);
             }
             foreach (PropDef prop in def.Props)
             {
-                GameObject go = PrimitiveKit.Group(root, prop.Name, prop.Position, prop.Yaw);
+                GameObject go = PrimitiveKit.Group(root, prop.Name, floorMap.OnFloor(prop.Position), prop.Yaw);
                 go.layer = prop.Occluder ? Layers.Occluder : 0;
                 // M3: a model is a visual only. The procedural parts keep exactly their colliders, collider-only.
                 GameObject model = Model(level, prop.Model, "prop " + prop.Name, go.transform, prop.Size, ModelFit.Box,
                     new ModelPaint { Red = FurnitureKit.AccentOf(prop) });
-                FurnitureKit.Build(prop, go.transform, go.layer, model == null);
+                FurnitureKit.Build(prop, go.transform, go.layer, model == null, CombineRenderers);
             }
             Color playerColor = LevelJson.ParseColor(def.Player.Color, Color.red);
             for (int i = 0; i < def.Decoys.Count; i++)
@@ -109,25 +273,34 @@ namespace Meuble
                 level.Decoys.Add(BuildDecoy(level, def, def.Decoys[i], i + 1, playerColor, root));
             }
             BodyDef body = def.PlayerBody();
-            level.Furniture = BuildPlayer(level, def.Player, body, root);
+            level.Furniture = BuildPlayer(level, def, def.Player, body, root);
             fader.Target = level.Furniture.transform;
+            fader.Furniture = level.Furniture;
+            batch.Flush(root, fader);
 
             Physics.SyncTransforms();
             Rect interior = def.InteriorBounds();
             var bounds = new Bounds(
                 new Vector3(interior.center.x, (NavBoundsBottom + NavBoundsTop) * 0.5f, interior.center.y),
                 new Vector3(interior.width, NavBoundsTop - NavBoundsBottom, interior.height));
-            // The level data is the cache key: a restart of the same level reuses its NavMesh.
-            NavPlanner planner = NavPlanner.Build(root, bounds, LevelJson.Serialize(def));
+            // The level data is the cache key: a restart of the same level reuses its NavMesh. M5: the leaf doorways and
+            // the open leaf poses are extra sources of that one NavMesh, never rebuilt for a door.
+            NavPlanner planner = NavPlanner.Build(root, bounds, LevelJson.Serialize(def), LeafNavSources(def));
+            planner.Floor = floorMap;
             if (!planner.HasData || !planner.Covers(def.Player.Position))
             {
                 Debug.LogError($"[LevelBuilder] level {def.Id}: the runtime NavMesh is missing or does not reach the spawn ({planner.SourceCount} sources)");
             }
             level.Planner = planner;
+            BuildLeaves(level, def, root, fader);
+            level.AuthoredOpenMask = level.OpenMask;
+            BuildRobots(level, def, root);
+            float coneTop = ConeTargetHeight(def, body);
 
-            foreach (InhabitantDef inhabitantDef in def.Inhabitants)
+            for (int index = 0; index < def.Inhabitants.Count; index++)
             {
-                Inhabitant inhabitant = BuildInhabitant(level, inhabitantDef, root, level.Planner);
+                InhabitantDef inhabitantDef = def.Inhabitants[index];
+                Inhabitant inhabitant = BuildInhabitant(level, inhabitantDef, index, root);
                 level.Inhabitants.Add(inhabitant);
                 Vision vision = inhabitant.gameObject.AddComponent<Vision>();
                 vision.Owner = inhabitant;
@@ -137,7 +310,7 @@ namespace Meuble
                 VisionConeView cone = coneGo.AddComponent<VisionConeView>();
                 cone.Owner = inhabitant;
                 cone.Vision = vision;
-                cone.TargetHeight = body.Size.y - Tuning.SampleInset;
+                cone.TargetHeight = coneTop;
                 cone.Init();
                 level.Cones.Add(cone);
             }
@@ -164,7 +337,7 @@ namespace Meuble
 
         // ----- Floors -----
 
-        private static void BuildFloors(LevelDef def, Transform root)
+        private static void BuildFloors(LevelDef def, Transform root, Batch batch)
         {
             int floor = Layers.Floor;
             List<RoomDef> rooms = def.AllRooms();
@@ -178,17 +351,17 @@ namespace Meuble
                 if (room.IsSoft)
                 {
                     // Carpet look: matte, a darker border and the field inset by a band.
-                    FloorQuad(root, name, center, new Vector2(room.SizeX, room.SizeZ), PrimitiveKit.Lit(color * 0.82f, 0f), floor);
+                    FloorQuad(batch, root, name, center, new Vector2(room.SizeX, room.SizeZ), PrimitiveKit.Lit(color * 0.82f, 0f), floor, Surface.Carpet);
                     const float band = 0.3f;
                     if (room.SizeX > 2f * band && room.SizeZ > 2f * band)
                     {
-                        FloorQuad(root, name + " Field", center + Vector3.up * 0.002f, new Vector2(room.SizeX - 2f * band, room.SizeZ - 2f * band),
-                            PrimitiveKit.Lit(color, 0f), floor);
+                        FloorQuad(batch, root, name + " Field", center + Vector3.up * 0.002f, new Vector2(room.SizeX - 2f * band, room.SizeZ - 2f * band),
+                            PrimitiveKit.Lit(color, 0f), floor, Surface.Carpet);
                     }
                 }
                 else
                 {
-                    FloorQuad(root, name, center, new Vector2(room.SizeX, room.SizeZ), PrimitiveKit.Lit(color, 0.35f), floor);
+                    FloorQuad(batch, root, name, center, new Vector2(room.SizeX, room.SizeZ), PrimitiveKit.Lit(color, 0.35f), floor, Surface.Parquet);
                 }
                 // The room floor feeds the NavMesh (the ground slab does not).
                 var slab = new GameObject(name + " Collider") { layer = floor };
@@ -211,15 +384,414 @@ namespace Meuble
             box.size = new Vector3(size, 0.2f, size);
         }
 
-        private static GameObject FloorQuad(Transform parent, string name, Vector3 center, Vector2 size, Material material, int layer)
+        private static void FloorQuad(Batch batch, Transform parent, string name, Vector3 center, Vector2 size, Material material, int layer,
+            Surface surface)
         {
-            GameObject go = PrimitiveKit.Part(parent, name, PrimitiveKit.QuadMesh, center, Quaternion.Euler(90f, 0f, 0f),
-                new Vector3(size.x, size.y, 1f), material, layer);
-            go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            return go;
+            batch.Add(parent, name, PrimitiveKit.QuadMeshSized(size), center, Quaternion.Euler(90f, 0f, 0f), new Vector3(size.x, size.y, 1f),
+                material, layer, surface, ShadowCastingMode.Off, FloorScope, FloorName);
         }
 
+        // The combine scopes and names of the static decor (CONTRACT_M5_v3 15.8). The key is (material, layer, fade plane), with
+        // the surface and the shadow mode a renderer carries: parts that never fade combine across the house, parts that
+        // fade combine per fade plane (one WallFader entry each).
+        private const string FloorScope = "Floor";
+        private const string FloorName = "Floor";
+        private const string FaceScope = "Face";
+        private const string DoorFrameScope = "DoorFrame";
+        private const string TrimScope = "Trim";
+        private const string BaseboardScope = "Baseboards";
+        private const string PaneScope = "WindowPane";
+
         private static string RoomName(RoomDef room, int index) => room.Id ?? "Room " + (index + 1);
+
+        // ----- M5: the split level (docs/CONTRACT_M5_v3.md 2 and 15.4, CONTRACT_M5.md 16.6) -----
+
+        /// <summary>
+        /// Platforms (solid boxes on the Occluder layer: walkable, NavMesh sources, their sides hide what is below their
+        /// edge), ramps (convex wedge MeshColliders from y = 0 at the foot to the platform top at the head, occluders too) and
+        /// railings (box colliders on the Furniture layer: they stop the player and the NavMesh, never a sight ray).
+        /// </summary>
+        private static void BuildSplitLevel(LevelDef def, Transform root, Batch batch)
+        {
+            if (def.Floor.IsFlat)
+            {
+                return;
+            }
+            int occluder = Layers.Occluder;
+            var railings = new List<Railing>();
+            for (int i = 0; i < def.Platforms.Count; i++)
+            {
+                PlatformDef p = def.Platforms[i];
+                if (p == null || p.SizeX <= 0f || p.SizeZ <= 0f || p.Height <= 0f)
+                {
+                    continue;
+                }
+                var size = new Vector3(p.SizeX, p.Height, p.SizeZ);
+                var go = new GameObject("Platform " + (p.Name ?? (i + 1).ToString())) { layer = occluder };
+                go.transform.SetParent(root, false);
+                go.transform.localPosition = new Vector3(p.X, p.Height * 0.5f, p.Z);
+                go.AddComponent<BoxCollider>().size = size;
+                batch.Add(go.transform, "Visual", PrimitiveKit.BoxMeshSized(size), Vector3.zero, Quaternion.identity, size,
+                    RaisedMaterial(def, p.Color, p.X, p.Z), occluder, Surface.Parquet, ShadowCastingMode.On, RaisedScope, RaisedScope);
+                PlatformRailings(def, p, railings);
+            }
+            for (int i = 0; i < def.Ramps.Count; i++)
+            {
+                RampDef r = def.Ramps[i];
+                PlatformDef p = FloorMap.PlatformOf(def, r);
+                if (r == null || p == null || p.Height <= 0f || r.Length <= 0f || r.Width <= 0f)
+                {
+                    continue;
+                }
+                Mesh wedge = PrimitiveKit.WedgeMesh(r.Width, r.Length, p.Height);
+                var go = new GameObject("Ramp " + (i + 1)) { layer = occluder };
+                go.transform.SetParent(root, false);
+                go.transform.SetLocalPositionAndRotation(new Vector3(r.X, 0f, r.Z), Quaternion.Euler(0f, r.Yaw, 0f));
+                var collider = go.AddComponent<MeshCollider>();
+                collider.sharedMesh = wedge;
+                collider.convex = true;
+                batch.Add(go.transform, "Visual", wedge, Vector3.zero, Quaternion.identity, Vector3.one,
+                    RaisedMaterial(def, p.Color, p.X, p.Z), occluder, Surface.Parquet, ShadowCastingMode.On, RaisedScope, RaisedScope);
+                RampRailings(def, r, p.Height, railings);
+            }
+            Material trim = PrimitiveKit.Lit(Trim, 0.3f);
+            int furniture = Layers.Furniture;
+            for (int k = 0; k < railings.Count; k++)
+            {
+                Railing rail = railings[k];
+                var go = new GameObject("Railing " + (k + 1)) { layer = furniture };
+                go.transform.SetParent(root, false);
+                go.transform.SetLocalPositionAndRotation(rail.Center, rail.Rotation);
+                go.AddComponent<BoxCollider>().size = rail.Size;
+                batch.Add(go.transform, "Visual", PrimitiveKit.BoxMeshSized(rail.Size), Vector3.zero, Quaternion.identity, rail.Size, trim, 0,
+                    Surface.Wood, ShadowCastingMode.On, RailingScope, RailingScope);
+            }
+        }
+
+        private const string RaisedScope = "Raised";
+        private const string RailingScope = "Railing";
+
+        /// <summary>One railing box: its centre, rotation and size (along the edge on local z or x as built).</summary>
+        private struct Railing
+        {
+            public Vector3 Center;
+            public Quaternion Rotation;
+            public Vector3 Size;
+        }
+
+        /// <summary>The material of a platform or ramp: its own colour, else the floor colour of the room it stands in.</summary>
+        private static Material RaisedMaterial(LevelDef def, string color, float x, float z)
+        {
+            RoomDef room = def.RoomAt(new Vector3(x, 0f, z));
+            Color floorColor = LevelJson.ParseColor(room?.FloorColor, Color.gray);
+            return PrimitiveKit.Lit(LevelJson.ParseColor(color, floorColor), 0.35f);
+        }
+
+        /// <summary>True when a line (x = c for a z-running line, z = c for an x-running line) is a wall face of the room.</summary>
+        private static bool OnWall(RoomDef room, bool alongX, float c)
+        {
+            const float eps = 1e-3f;
+            if (room == null)
+            {
+                return false;
+            }
+            return alongX
+                ? Mathf.Abs(c - room.MinZ) < eps || Mathf.Abs(c - room.MaxZ) < eps
+                : Mathf.Abs(c - room.MinX) < eps || Mathf.Abs(c - room.MaxX) < eps;
+        }
+
+        /// <summary>
+        /// A railing on every edge of a platform, standing on its top just inside the edge, except an edge on a wall of its
+        /// room and the span where a ramp head meets the edge.
+        /// </summary>
+        private static void PlatformRailings(LevelDef def, PlatformDef p, List<Railing> railings)
+        {
+            float t = Tuning.RailingThickness;
+            float height = Tuning.RailingHeight;
+            RoomDef room = def.RoomAt(new Vector3(p.X, 0f, p.Z));
+            float minX = p.X - p.SizeX * 0.5f;
+            float maxX = p.X + p.SizeX * 0.5f;
+            float minZ = p.Z - p.SizeZ * 0.5f;
+            float maxZ = p.Z + p.SizeZ * 0.5f;
+            // (runs along x, the edge line, the span along it, the inward direction across it)
+            var edges = new (bool alongX, float line, float from, float to, float inward)[]
+            {
+                (true, minZ, minX, maxX, 1f), (true, maxZ, minX, maxX, -1f), (false, minX, minZ, maxZ, 1f), (false, maxX, minZ, maxZ, -1f),
+            };
+            foreach ((bool alongX, float line, float from, float to, float inward) in edges)
+            {
+                if (OnWall(room, alongX, line))
+                {
+                    continue;
+                }
+                var spans = new List<Vector2> { new Vector2(from, to) };
+                foreach (RampDef r in def.Ramps)
+                {
+                    if (r == null || r.Platform != p.Name)
+                    {
+                        continue;
+                    }
+                    Vector3 head = new Vector3(r.X, 0f, r.Z) + YawMath.Forward(r.Yaw) * (r.Length * 0.5f);
+                    bool headAlongX = Mathf.Abs(YawMath.Forward(r.Yaw).z) > 0.5f; // uphill along z: the head edge runs along x
+                    float headLine = headAlongX ? head.z : head.x;
+                    if (headAlongX != alongX || Mathf.Abs(headLine - line) > 1e-3f)
+                    {
+                        continue;
+                    }
+                    float c = headAlongX ? head.x : head.z;
+                    spans = Subtract(spans, c - r.Width * 0.5f, c + r.Width * 0.5f);
+                }
+                foreach (Vector2 span in spans)
+                {
+                    float length = span.y - span.x;
+                    if (length < 1e-3f)
+                    {
+                        continue;
+                    }
+                    float mid = (span.x + span.y) * 0.5f;
+                    float across = line + inward * t * 0.5f;
+                    railings.Add(new Railing
+                    {
+                        Center = alongX ? new Vector3(mid, p.Height + height * 0.5f, across) : new Vector3(across, p.Height + height * 0.5f, mid),
+                        Rotation = Quaternion.identity,
+                        Size = alongX ? new Vector3(length, height, t) : new Vector3(t, height, length),
+                    });
+                }
+            }
+        }
+
+        /// <summary>The spans less one interval.</summary>
+        private static List<Vector2> Subtract(List<Vector2> spans, float from, float to)
+        {
+            var result = new List<Vector2>();
+            foreach (Vector2 s in spans)
+            {
+                if (to <= s.x || from >= s.y)
+                {
+                    result.Add(s);
+                    continue;
+                }
+                if (from > s.x)
+                {
+                    result.Add(new Vector2(s.x, from));
+                }
+                if (to < s.y)
+                {
+                    result.Add(new Vector2(to, s.y));
+                }
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// A railing along both sides of a ramp, standing on the slope just inside its side, from the foot to the head (the
+        /// foot and the head stay open), except a side on a wall of its room.
+        /// </summary>
+        private static void RampRailings(LevelDef def, RampDef r, float headHeight, List<Railing> railings)
+        {
+            float t = Tuning.RailingThickness;
+            float height = Tuning.RailingHeight;
+            RoomDef room = def.RoomAt(new Vector3(r.X, 0f, r.Z));
+            Quaternion yaw = Quaternion.Euler(0f, r.Yaw, 0f);
+            float slopeRad = Mathf.Atan2(headHeight, r.Length);
+            float slope = slopeRad * Mathf.Rad2Deg;
+            Quaternion pitch = Quaternion.Euler(-slope, 0f, 0f);
+            Vector3 up = pitch * Vector3.up;
+            // The rail's ends are perpendicular to the slope: it starts up the slope where its top end stands over the foot,
+            // so nothing overhangs the floor in front of the ramp (an overhang there would cut the NavMesh at the foot).
+            float full = Mathf.Sqrt(r.Length * r.Length + headHeight * headHeight);
+            float start = Mathf.Min(full * 0.5f, height * Mathf.Tan(slopeRad));
+            float run = full - start;
+            float mid = (start + full) * 0.5f;
+            Vector3 right = YawMath.Rotate(Vector3.right, r.Yaw);
+            bool sideAlongX = Mathf.Abs(right.z) > 0.5f; // the side line runs along x when the ramp's right points along z
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Vector3 sideLine = new Vector3(r.X, 0f, r.Z) + right * (side * r.Width * 0.5f);
+                if (OnWall(room, sideAlongX, sideAlongX ? sideLine.z : sideLine.x))
+                {
+                    continue;
+                }
+                // The middle of the rail's bottom edge on the slope, mid along it, then half its height up from the slope.
+                var onSlope = new Vector3(side * (r.Width * 0.5f - t * 0.5f), mid * Mathf.Sin(slopeRad), -r.Length * 0.5f + mid * Mathf.Cos(slopeRad));
+                Vector3 local = onSlope + up * (height * 0.5f);
+                railings.Add(new Railing
+                {
+                    Center = new Vector3(r.X, 0f, r.Z) + yaw * local,
+                    Rotation = yaw * pitch,
+                    Size = new Vector3(t, height, run),
+                });
+            }
+        }
+
+        // ----- M5: the door leaves (docs/CONTRACT_M5_v3.md 3, 15.1 and 15.2) -----
+
+        /// <summary>One <see cref="DoorLeaf"/> per leaf door, in level order, after the NavMesh: no leaf is a NavMesh source.</summary>
+        private static void BuildLeaves(LevelInstance level, LevelDef def, Transform root, WallFader fader)
+        {
+            List<OpeningDef> doors = def.LeafDoors();
+            if (doors.Count == 0)
+            {
+                return;
+            }
+            Material wood = PrimitiveKit.Lit(DoorWood, 0.35f);
+            for (int i = 0; i < doors.Count; i++)
+            {
+                level.Leaves.Add(DoorLeaf.Create(def, doors[i], i, root, wood, fader));
+            }
+        }
+
+        /// <summary>
+        /// The NavMesh boxes of the leaves (CONTRACT_M5_v3 15.1): each leaf doorway gets the area Tuning.DoorAreaBase + its
+        /// index through the wall thickness, and each leaf's open pose a Not Walkable box (no path crosses an open leaf).
+        /// Null on a level without a leaf.
+        /// </summary>
+        public static List<NavMeshBuildSource> LeafNavSources(LevelDef def)
+        {
+            List<OpeningDef> doors = def.LeafDoors();
+            if (doors.Count == 0)
+            {
+                return null;
+            }
+            var sources = new List<NavMeshBuildSource>();
+            for (int i = 0; i < doors.Count; i++)
+            {
+                var geometry = new DoorGeometry(def, doors[i]);
+                if (!geometry.Valid)
+                {
+                    continue;
+                }
+                geometry.DoorwayBox(out Vector3 center, out Quaternion rotation, out Vector3 size);
+                sources.Add(new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.ModifierBox,
+                    size = size,
+                    transform = Matrix4x4.TRS(center, rotation, Vector3.one),
+                    area = Tuning.DoorAreaBase + i,
+                });
+                geometry.OpenLeafBox(out center, out rotation, out size);
+                sources.Add(new NavMeshBuildSource
+                {
+                    shape = NavMeshBuildSourceShape.ModifierBox,
+                    size = size,
+                    transform = Matrix4x4.TRS(center, rotation, Vector3.one),
+                    area = NotWalkableArea,
+                });
+            }
+            return sources;
+        }
+
+        /// <summary>Unity's built-in "Not Walkable" NavMesh area.</summary>
+        private const int NotWalkableArea = 1;
+
+        // ----- M5: combining the static decor (docs/CONTRACT_M5_v3.md 15.8) -----
+
+        /// <summary>
+        /// The renderer combiner of one level build. Every static decor part goes through <see cref="Add"/>: off, it is built
+        /// as its own renderer, as in M4.2; on, it joins the group of its key (material, layer, surface, shadow mode, scope
+        /// and fade plane), and <see cref="Flush"/> draws each group as one renderer under the level root, registered once
+        /// with the wall fader when its parts fade. Colliders never go through it.
+        /// </summary>
+        private sealed class Batch
+        {
+            private sealed class Group
+            {
+                public Material Material;
+                public int Layer;
+                public Surface Surface;
+                public ShadowCastingMode Shadow;
+                public string Name;
+                public WallFader Fader;
+                public Vector3 Point;
+                public Vector3 Normal;
+                public readonly List<PrimitiveKit.CombinePart> Parts = new List<PrimitiveKit.CombinePart>();
+            }
+
+            private readonly bool enabled;
+            private readonly Transform root;
+            private readonly List<Group> groups = new List<Group>();
+            private readonly Dictionary<string, Group> byKey = new Dictionary<string, Group>();
+
+            public Batch(bool enabled, Transform root)
+            {
+                this.enabled = enabled;
+                this.root = root;
+            }
+
+            /// <summary>
+            /// One part: <paramref name="mesh"/> at a local pose under <paramref name="parent"/>. With a <paramref name="fader"/>
+            /// it hides when the plane (<paramref name="point"/>, <paramref name="normal"/>) separates the camera from the player.
+            /// </summary>
+            public void Add(Transform parent, string name, Mesh mesh, Vector3 localPosition, Quaternion localRotation, Vector3 localScale,
+                Material material, int layer, Surface surface, ShadowCastingMode shadow, string scope, string combinedName,
+                WallFader fader = null, Vector3 point = default, Vector3 normal = default)
+            {
+                if (!enabled)
+                {
+                    GameObject go = PrimitiveKit.Part(parent, name, mesh, localPosition, localRotation, localScale, material, layer, surface);
+                    MeshRenderer renderer = go.GetComponent<MeshRenderer>();
+                    renderer.shadowCastingMode = shadow;
+                    if (fader != null)
+                    {
+                        fader.Add(renderer, point, normal);
+                    }
+                    return;
+                }
+                string key = Key(material, layer, surface, shadow, scope, fader != null, point, normal);
+                if (!byKey.TryGetValue(key, out Group group))
+                {
+                    group = new Group
+                    {
+                        Material = material,
+                        Layer = layer,
+                        Surface = surface,
+                        Shadow = shadow,
+                        Name = combinedName,
+                        Fader = fader,
+                        Point = point,
+                        Normal = normal,
+                    };
+                    byKey[key] = group;
+                    groups.Add(group);
+                }
+                Matrix4x4 local = root.worldToLocalMatrix * parent.localToWorldMatrix * Matrix4x4.TRS(localPosition, localRotation, localScale);
+                group.Parts.Add(new PrimitiveKit.CombinePart { Mesh = mesh, Matrix = local });
+            }
+
+            private static string Key(Material material, int layer, Surface surface, ShadowCastingMode shadow, string scope, bool fades,
+                Vector3 point, Vector3 normal)
+            {
+                string key = material.GetInstanceID() + "|" + layer + "|" + surface + "|" + shadow + "|" + scope;
+                if (!fades)
+                {
+                    return key;
+                }
+                // The fade plane: its unit normal and its distance from the origin, rounded (parts of one plane give the
+                // same key whatever point of the plane they name).
+                Vector3 n = normal.normalized;
+                System.Globalization.CultureInfo c = System.Globalization.CultureInfo.InvariantCulture;
+                return key + "|fade " + n.x.ToString("0.###", c) + "," + n.y.ToString("0.###", c) + "," + n.z.ToString("0.###", c) + ","
+                    + Vector3.Dot(n, point).ToString("0.###", c);
+            }
+
+            /// <summary>Draws every group as one renderer under the level root (nothing when the batch is off).</summary>
+            public void Flush(Transform parent, WallFader fader)
+            {
+                foreach (Group g in groups)
+                {
+                    Mesh mesh = PrimitiveKit.CombinedMesh(g.Parts);
+                    GameObject go = PrimitiveKit.Part(parent, g.Name, mesh, Vector3.zero, Quaternion.identity, Vector3.one, g.Material, g.Layer, g.Surface);
+                    MeshRenderer renderer = go.GetComponent<MeshRenderer>();
+                    renderer.shadowCastingMode = g.Shadow;
+                    if (g.Fader != null)
+                    {
+                        g.Fader.Add(renderer, g.Point, g.Normal);
+                    }
+                }
+                groups.Clear();
+                byKey.Clear();
+            }
+        }
 
         // ----- Walls -----
 
@@ -259,7 +831,7 @@ namespace Meuble
             return null;
         }
 
-        private static void BuildWalls(LevelDef def, Transform root, WallFader fader)
+        private static void BuildWalls(LevelDef def, Transform root, WallFader fader, Batch batch)
         {
             List<RoomDef> rooms = def.AllRooms();
             bool single = rooms.Count == 1;
@@ -300,7 +872,7 @@ namespace Meuble
 
             foreach (WallLine line in lines)
             {
-                BuildWallLine(def, rooms, line, single, t, occluder, root, fader);
+                BuildWallLine(def, rooms, line, single, t, occluder, root, fader, batch);
             }
         }
 
@@ -310,7 +882,7 @@ namespace Meuble
         /// level 1 builds as before. A shared line takes the frame of a +x or +z wall and gets two faces.
         /// </summary>
         private static void BuildWallLine(LevelDef def, List<RoomDef> rooms, WallLine line, bool single, float t, int occluder,
-            Transform root, WallFader fader)
+            Transform root, WallFader fader, Batch batch)
         {
             bool shared = line.HasBothFacings;
             float outward = shared ? 1f : line.Sides[0].Outward;
@@ -360,6 +932,7 @@ namespace Meuble
             Material cap = PrimitiveKit.Lit(LevelJson.ParseColor(rooms[line.Sides[0].Room].WallColor, Color.white) * 0.72f, 0.1f);
 
             var boards = new List<Board>();
+            var caps = new List<PrimitiveKit.CombinePart>();
             var gaps = new List<(float from, float to, OpeningDef door, bool interior)>();
             foreach ((float from, float to, OpeningDef door, bool interior) g in line.Gaps)
             {
@@ -382,36 +955,61 @@ namespace Meuble
                     {
                         continue;
                     }
-                    WallSegment(wt, cursor, from, 0f, h, t, faces, occluder, fader, wallRoot.transform, normal, boards);
-                    WallSegment(wt, from, to, door.Top, h, t, faces, occluder, fader, wallRoot.transform, normal, boards);
-                    // The face toward the outside of an outer door decides where its leaf opens.
-                    float leafSide = interior ? 0f : -FaceSideAt(faces, (from + to) * 0.5f);
-                    DoorDecor(wt, from, to, door, t, leafSide, interior && shared ? fader : null, normal);
+                    WallSegment(wt, cursor, from, 0f, h, t, faces, occluder, fader, wallRoot.transform, normal, boards, batch, name);
+                    WallSegment(wt, from, to, door.Top, h, t, faces, occluder, fader, wallRoot.transform, normal, boards, batch, name);
+                    // The face toward the outside of an outer door decides where its decorative leaf opens; a door with a
+                    // real leaf (M5) has none.
+                    float leafSide = interior || door.HasLeaf ? 0f : -FaceSideAt(faces, (from + to) * 0.5f);
+                    DoorDecor(wt, from, to, door, t, leafSide, interior && shared ? fader : null, normal, batch, name);
                     if (interior)
                     {
-                        Threshold(wt, from, to, t, rooms[line.Sides[0].Room]);
+                        Threshold(wt, from, to, t, rooms[line.Sides[0].Room], batch);
                     }
                     cursor = to;
                 }
-                WallSegment(wt, cursor, runTo, 0f, h, t, faces, occluder, fader, wallRoot.transform, normal, boards);
+                WallSegment(wt, cursor, runTo, 0f, h, t, faces, occluder, fader, wallRoot.transform, normal, boards, batch, name);
 
                 // Top cap: a thin strip that gives the dollhouse walls a readable thickness from above.
-                GameObject top = PrimitiveKit.Part(wt, "Cap", PrimitiveKit.QuadMesh, new Vector3((runFrom + runTo) * 0.5f, h, 0f),
-                    Quaternion.Euler(90f, 0f, 0f), new Vector3(runTo - runFrom, t, 1f), cap, occluder);
-                MeshRenderer capRenderer = top.GetComponent<MeshRenderer>();
-                capRenderer.shadowCastingMode = ShadowCastingMode.Off;
-                // M3.1 B1: EVERY cap fades with the wall plane, outer walls too. The camera sees through the back of
-                // an outer wall's inward face, but its cap faces up: drawn, it would lie across the frame between the
-                // camera and the chair (and mark the x-ray stencil). Renderer only: the collider stays.
-                fader.Add(capRenderer, wt.position, normal);
+                Mesh capMesh = PrimitiveKit.QuadMeshSized(new Vector2(runTo - runFrom, t));
+                var capPosition = new Vector3((runFrom + runTo) * 0.5f, h, 0f);
+                var capScale = new Vector3(runTo - runFrom, t, 1f);
+                if (CombineRenderers)
+                {
+                    caps.Add(new PrimitiveKit.CombinePart { Mesh = capMesh, Matrix = Matrix4x4.TRS(capPosition, Quaternion.Euler(90f, 0f, 0f), capScale) });
+                }
+                else
+                {
+                    Cap(wt, capMesh, capPosition, Quaternion.Euler(90f, 0f, 0f), capScale, cap, occluder, fader, normal);
+                }
             }
-            Baseboards(wt, boards, t, fader);
-
-            foreach ((float alongWorld, OpeningDef window, RoomSide side) in line.Windows)
+            // M5 (CONTRACT_M5_v3 15.8): the caps of one wall line share its plane and its material: one renderer, still
+            // under the wall root and named "Cap", still fading with the wall plane (step 22b reads both).
+            if (caps.Count > 0)
             {
-                float local = (alongWorld - mid) * sign;
-                WindowDecor(wt, local, window, t, FaceSideAt(faces, local));
+                Cap(wt, PrimitiveKit.CombinedMesh(caps), Vector3.zero, Quaternion.identity, Vector3.one, cap, occluder, fader, normal);
             }
+            Baseboards(wt, boards, t, fader, batch);
+
+            for (int w = 0; w < line.Windows.Count; w++)
+            {
+                (float alongWorld, OpeningDef window, RoomSide _) = line.Windows[w];
+                float local = (alongWorld - mid) * sign;
+                WindowDecor(wt, local, window, t, FaceSideAt(faces, local), batch, TrimScope);
+            }
+        }
+
+        /// <summary>
+        /// A wall cap: M3.1 B1: EVERY cap fades with the wall plane, outer walls too. The camera sees through the back of an
+        /// outer wall's inward face, but its cap faces up: drawn, it would lie across the frame between the camera and the
+        /// chair (and mark the x-ray stencil). Renderer only: the collider stays.
+        /// </summary>
+        private static void Cap(Transform wall, Mesh mesh, Vector3 localPosition, Quaternion rotation, Vector3 localScale, Material material,
+            int layer, WallFader fader, Vector3 normal)
+        {
+            GameObject top = PrimitiveKit.Part(wall, "Cap", mesh, localPosition, rotation, localScale, material, layer, Surface.Plaster);
+            MeshRenderer capRenderer = top.GetComponent<MeshRenderer>();
+            capRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            fader.Add(capRenderer, wall.position, normal);
         }
 
         private struct Face
@@ -488,7 +1086,7 @@ namespace Meuble
         /// Occluder layer, and a single sided quad on each face that covers it (PRD 3.1 dollhouse walls).
         /// </summary>
         private static void WallSegment(Transform wall, float from, float to, float bottom, float top, float thickness,
-            List<Face> faces, int layer, WallFader fader, Transform frame, Vector3 normal, List<Board> boards)
+            List<Face> faces, int layer, WallFader fader, Transform frame, Vector3 normal, List<Board> boards, Batch batch, string wallName)
         {
             if (to - from < 1e-3f || top - bottom < 1e-3f)
             {
@@ -509,18 +1107,14 @@ namespace Meuble
                     continue;
                 }
                 Quaternion rotation = f.Side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
-                GameObject face = PrimitiveKit.Part(wall, "Face", PrimitiveKit.QuadMesh,
-                    new Vector3((vFrom + vTo) * 0.5f, (bottom + top) * 0.5f, f.Side * thickness * 0.5f), rotation,
-                    new Vector3(vTo - vFrom, top - bottom, 1f), f.Material, layer);
-                MeshRenderer renderer = face.GetComponent<MeshRenderer>();
-                // A single sided quad casts shadows from both sides only when asked to.
-                renderer.shadowCastingMode = ShadowCastingMode.TwoSided;
-                Vector3 faceNormal = frame.TransformDirection(new Vector3(0f, 0f, f.Side));
-                if (f.Shared)
-                {
-                    // The face plane, its normal pointing into the room the face looks at.
-                    fader.Add(renderer, face.transform.position, faceNormal);
-                }
+                var faceCenter = new Vector3((vFrom + vTo) * 0.5f, (bottom + top) * 0.5f, f.Side * thickness * 0.5f);
+                // A single sided quad casts shadows from both sides only when asked to. A shared face fades with its wall line's
+                // centre plane (wave 5B, CONTRACT_M5 17): the faces of one material on both sides of a line combine
+                // (CONTRACT_M5_v3 15.8). The face plane and the centre plane separate the camera from the furniture alike: the
+                // furniture never stands in the wall, and a camera within the wall sees a face's back, which is culled.
+                batch.Add(wall, "Face", PrimitiveKit.QuadMeshSized(new Vector2(vTo - vFrom, top - bottom)), faceCenter, rotation,
+                    new Vector3(vTo - vFrom, top - bottom, 1f), f.Material, layer, Surface.Plaster, ShadowCastingMode.TwoSided,
+                    FaceScope, "Face", f.Shared ? fader : null, frame.position, normal); // MUTATION:FACE_PLANE
                 if (bottom < 1e-3f)
                 {
                     boards.Add(new Board
@@ -545,9 +1139,10 @@ namespace Meuble
         /// <summary>
         /// M3 baseboards, standing on the floor against the faces, in the trim material. Decor only: no collider,
         /// layer Default, no shadow. M3.1 N5: one renderer per wall and face side (every stretch of the side in one
-        /// mesh, cached by geometry); the side of a shared wall fades with its face plane.
+        /// mesh, cached by geometry); the side of a shared wall fades with its face plane. Wave 5B (CONTRACT_M5 17): combined,
+        /// a shared wall's baseboards fade with its centre plane, as its faces, so both sides of a line are one renderer.
         /// </summary>
-        private static void Baseboards(Transform wall, List<Board> boards, float thickness, WallFader fader)
+        private static void Baseboards(Transform wall, List<Board> boards, float thickness, WallFader fader, Batch batch)
         {
             foreach (float side in new[] { -1f, 1f })
             {
@@ -565,15 +1160,17 @@ namespace Meuble
                     {
                         continue;
                     }
-                    GameObject go = PrimitiveKit.Part(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity,
-                        Vector3.one, PrimitiveKit.Lit(Trim, 0.3f), 0);
-                    MeshRenderer renderer = go.GetComponent<MeshRenderer>();
-                    renderer.shadowCastingMode = ShadowCastingMode.Off;
-                    if (shared)
+                    if (!shared)
                     {
-                        fader.Add(renderer, wall.TransformPoint(new Vector3(0f, 0f, side * thickness * 0.5f)),
-                            wall.TransformDirection(new Vector3(0f, 0f, side)));
+                        // M5 (CONTRACT_M5_v3 15.8): a baseboard that never fades combines with the other trim decor; a shared
+                        // wall's baseboards combine per wall line, fading with its centre plane (wave 5B).
+                        batch.Add(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity, Vector3.one,
+                            PrimitiveKit.Lit(Trim, 0.3f), 0, Surface.Wood, ShadowCastingMode.Off, TrimScope, "Trim");
+                        continue;
                     }
+                    batch.Add(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity, Vector3.one,
+                        PrimitiveKit.Lit(Trim, 0.3f), 0, Surface.Wood, ShadowCastingMode.Off, BaseboardScope, "Baseboards", fader, wall.position,
+                        wall.forward);
                 }
             }
         }
@@ -582,40 +1179,39 @@ namespace Meuble
         /// Door frame decor: two posts and a head. An outer door also gets its leaf, standing open toward the
         /// outside (<paramref name="leafSide"/> is the local z side of the outside), hinged on the far post.
         /// </summary>
-        private static void DoorDecor(Transform wall, float from, float to, OpeningDef door, float t, float leafSide, WallFader fader, Vector3 normal)
+        private static void DoorDecor(Transform wall, float from, float to, OpeningDef door, float t, float leafSide, WallFader fader, Vector3 normal,
+            Batch batch, string wallName)
         {
             Material trim = PrimitiveKit.Lit(Trim, 0.3f);
             const float post = 0.06f;
-            var parts = new List<GameObject>
+            // The frame of a shared doorway goes with its wall: hidden when the wall center plane stands between the camera
+            // and the player. The frames of one wall line combine (CONTRACT_M5_v3 15.8).
+            string scope = DoorFrameScope;
+            void Frame(string name, Vector3 center, Vector3 size)
             {
-                PrimitiveKit.Box(wall, "DoorPostA", new Vector3(from + post * 0.5f, door.Top * 0.5f, 0f), new Vector3(post, door.Top, t + 0.03f), trim, 0, false),
-                PrimitiveKit.Box(wall, "DoorPostB", new Vector3(to - post * 0.5f, door.Top * 0.5f, 0f), new Vector3(post, door.Top, t + 0.03f), trim, 0, false),
-                PrimitiveKit.Box(wall, "DoorHead", new Vector3((from + to) * 0.5f, door.Top + post * 0.5f, 0f), new Vector3(to - from, post, t + 0.03f), trim, 0, false),
-            };
+                batch.Add(wall, name, PrimitiveKit.BoxMeshSized(size), center, Quaternion.identity, size, trim, 0, Surface.Wood,
+                    ShadowCastingMode.On, scope, "DoorFrame", fader, wall.position, normal);
+            }
+            Frame("DoorPostA", new Vector3(from + post * 0.5f, door.Top * 0.5f, 0f), new Vector3(post, door.Top, t + 0.03f));
+            Frame("DoorPostB", new Vector3(to - post * 0.5f, door.Top * 0.5f, 0f), new Vector3(post, door.Top, t + 0.03f));
+            Frame("DoorHead", new Vector3((from + to) * 0.5f, door.Top + post * 0.5f, 0f), new Vector3(to - from, post, t + 0.03f));
             if (leafSide != 0f)
             {
                 float width = to - from - 2f * post;
-                PrimitiveKit.Box(wall, "DoorLeaf", new Vector3(to - post - 0.025f, (door.Top - 0.02f) * 0.5f, leafSide * (t * 0.5f + width * 0.5f)),
-                    new Vector3(0.05f, door.Top - 0.02f, width), PrimitiveKit.Lit(DoorWood, 0.35f), 0, false);
-            }
-            if (fader != null)
-            {
-                // The frame of a shared doorway goes with its wall: hidden when the wall center plane
-                // stands between the camera and the player.
-                foreach (GameObject part in parts)
-                {
-                    fader.Add(part.GetComponent<MeshRenderer>(), wall.position, normal);
-                }
+                var size = new Vector3(0.05f, door.Top - 0.02f, width);
+                batch.Add(wall, "DoorLeaf", PrimitiveKit.BoxMeshSized(size),
+                    new Vector3(to - post - 0.025f, (door.Top - 0.02f) * 0.5f, leafSide * (t * 0.5f + width * 0.5f)), Quaternion.identity, size,
+                    PrimitiveKit.Lit(DoorWood, 0.35f), 0, Surface.Wood, ShadowCastingMode.On, scope, "DoorLeaf");
             }
         }
 
         /// <summary>The floor of a doorway between two rooms, so no grass shows in the wall band.</summary>
-        private static void Threshold(Transform wall, float from, float to, float t, RoomDef room)
+        private static void Threshold(Transform wall, float from, float to, float t, RoomDef room, Batch batch)
         {
-            GameObject go = PrimitiveKit.Part(wall, "Threshold", PrimitiveKit.QuadMesh, new Vector3((from + to) * 0.5f, 0.001f, 0f),
-                Quaternion.Euler(90f, 0f, 0f), new Vector3(to - from, t + 0.02f, 1f),
-                PrimitiveKit.Lit(LevelJson.ParseColor(room.FloorColor, Color.gray) * (room.IsSoft ? 0.82f : 1f), room.IsSoft ? 0f : 0.35f), Layers.Floor);
-            go.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            batch.Add(wall, "Threshold", PrimitiveKit.QuadMeshSized(new Vector2(to - from, t + 0.02f)),
+                new Vector3((from + to) * 0.5f, 0.001f, 0f), Quaternion.Euler(90f, 0f, 0f), new Vector3(to - from, t + 0.02f, 1f),
+                PrimitiveKit.Lit(LevelJson.ParseColor(room.FloorColor, Color.gray) * (room.IsSoft ? 0.82f : 1f), room.IsSoft ? 0f : 0.35f), Layers.Floor,
+                room.IsSoft ? Surface.Carpet : Surface.Parquet, ShadowCastingMode.Off, FloorScope, FloorName);
             // The doorway floor joins the NavMesh of the two rooms.
             var slab = new GameObject("ThresholdCollider") { layer = Layers.Floor };
             slab.transform.SetParent(wall, false);
@@ -629,32 +1225,35 @@ namespace Meuble
         /// made of single sided strips facing the room, like the wall itself: from outside the dollhouse the
         /// wall disappears and so does its window, instead of leaving a frame floating.
         /// </summary>
-        private static void WindowDecor(Transform wall, float center, OpeningDef window, float t, float side)
+        private static void WindowDecor(Transform wall, float center, OpeningDef window, float t, float side, Batch batch, string scope)
         {
             float w = window.Width;
             float hgt = window.Top - window.Bottom;
             float y = (window.Top + window.Bottom) * 0.5f;
             Quaternion rotation = side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
             float z = side * (t * 0.5f + 0.004f);
-            GameObject pane = PrimitiveKit.Part(wall, "WindowPane", PrimitiveKit.QuadMesh, new Vector3(center, y, z), rotation,
-                new Vector3(w, hgt, 1f), PrimitiveKit.Emissive(WindowPane, WindowPaneEmission), 0);
-            pane.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            // Wave 5B (CONTRACT_M5 17): the panes never fade and share one material: combined, every pane of the house is one
+            // renderer.
+            batch.Add(wall, "WindowPane", PrimitiveKit.QuadMeshSized(new Vector2(w, hgt)), new Vector3(center, y, z), rotation,
+                new Vector3(w, hgt, 1f), PrimitiveKit.Emissive(WindowPane, WindowPaneEmission), 0, Surface.Plain, ShadowCastingMode.Off, PaneScope,
+                "WindowPane");
             Material trim = PrimitiveKit.Lit(Trim, 0.3f);
             const float f = 0.08f;
             float fz = side * (t * 0.5f + 0.008f);
-            Strip(wall, "FrameTop", new Vector3(center, window.Top, fz), new Vector2(w + f, f), trim, rotation);
-            Strip(wall, "FrameSill", new Vector3(center, window.Bottom, fz), new Vector2(w + 2.5f * f, f * 1.3f), trim, rotation);
-            Strip(wall, "FrameL", new Vector3(center - w * 0.5f, y, fz), new Vector2(f, hgt), trim, rotation);
-            Strip(wall, "FrameR", new Vector3(center + w * 0.5f, y, fz), new Vector2(f, hgt), trim, rotation);
-            Strip(wall, "Mullion", new Vector3(center, y, fz), new Vector2(0.045f, hgt), trim, rotation);
-            Strip(wall, "Transom", new Vector3(center, y + hgt * 0.15f, fz), new Vector2(w, 0.045f), trim, rotation);
+            Strip(batch, scope, wall, "FrameTop", new Vector3(center, window.Top, fz), new Vector2(w + f, f), trim, rotation);
+            Strip(batch, scope, wall, "FrameSill", new Vector3(center, window.Bottom, fz), new Vector2(w + 2.5f * f, f * 1.3f), trim, rotation);
+            Strip(batch, scope, wall, "FrameL", new Vector3(center - w * 0.5f, y, fz), new Vector2(f, hgt), trim, rotation);
+            Strip(batch, scope, wall, "FrameR", new Vector3(center + w * 0.5f, y, fz), new Vector2(f, hgt), trim, rotation);
+            Strip(batch, scope, wall, "Mullion", new Vector3(center, y, fz), new Vector2(0.045f, hgt), trim, rotation);
+            Strip(batch, scope, wall, "Transom", new Vector3(center, y + hgt * 0.15f, fz), new Vector2(w, 0.045f), trim, rotation);
         }
 
-        private static void Strip(Transform wall, string name, Vector3 localCenter, Vector2 size, Material material, Quaternion rotation)
+        /// <summary>A window frame strip; the strips of one window combine (CONTRACT_M5_v3 15.8).</summary>
+        private static void Strip(Batch batch, string scope, Transform wall, string name, Vector3 localCenter, Vector2 size, Material material,
+            Quaternion rotation)
         {
-            GameObject strip = PrimitiveKit.Part(wall, name, PrimitiveKit.QuadMesh, localCenter, rotation,
-                new Vector3(size.x, size.y, 1f), material, 0);
-            strip.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            batch.Add(wall, name, PrimitiveKit.QuadMeshSized(size), localCenter, rotation, new Vector3(size.x, size.y, 1f), material, 0, Surface.Wood,
+                ShadowCastingMode.Off, scope, "Trim");
         }
 
         // ----- Exit -----
@@ -666,7 +1265,7 @@ namespace Meuble
             if (!string.IsNullOrEmpty(e.Model))
             {
                 // M3: the doormat model, its red carpet in the exit colour. No collider, as the procedural one.
-                GameObject group = PrimitiveKit.Group(root, "Doormat", new Vector3(e.X, 0f, e.Z));
+                GameObject group = PrimitiveKit.Group(root, "Doormat", new Vector3(e.X, def.FloorHeightAt(e.X, e.Z), e.Z));
                 group.layer = 0;
                 if (Model(level, e.Model, "exit doormat", group.transform, new Vector3(e.SizeX, DoormatHeight, e.SizeZ), ModelFit.Box,
                         new ModelPaint { Red = color }) != null)
@@ -675,8 +1274,9 @@ namespace Meuble
                 }
                 Object.DestroyImmediate(group);
             }
-            GameObject mat = PrimitiveKit.Box(root, "Doormat", new Vector3(e.X, DoormatHeight * 0.5f, e.Z), new Vector3(e.SizeX, DoormatHeight, e.SizeZ),
-                PrimitiveKit.Lit(color, 0.05f), 0, false);
+            GameObject mat = PrimitiveKit.Box(root, "Doormat", new Vector3(e.X, def.FloorHeightAt(e.X, e.Z) + DoormatHeight * 0.5f, e.Z),
+                new Vector3(e.SizeX, DoormatHeight, e.SizeZ),
+                PrimitiveKit.Lit(color, 0.05f), 0, false, Surface.Carpet);
             mat.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
         }
 
@@ -770,9 +1370,9 @@ namespace Meuble
         // ----- Rugs and decoys -----
 
         /// <summary>A flat rug, no collider (it is a silent floor, not an obstacle): a border and a field.</summary>
-        private static void BuildRug(LevelInstance level, RugDef rug, int index, Transform root)
+        private static void BuildRug(LevelInstance level, LevelDef def, RugDef rug, int index, Transform root)
         {
-            GameObject go = PrimitiveKit.Group(root, "Rug " + (index + 1), rug.Position, rug.Yaw);
+            GameObject go = PrimitiveKit.Group(root, "Rug " + (index + 1), def.Floor.OnFloor(rug.Position), rug.Yaw);
             go.layer = 0;
             Color color = LevelJson.ParseColor(rug.Color, new Color32(0x5B, 0x93, 0xD9, 0xFF));
             // M3: the rug model, its red carpet in the rug colour. A rug has no collider either way.
@@ -782,13 +1382,14 @@ namespace Meuble
                 return;
             }
             GameObject border = PrimitiveKit.Box(go.transform, "Border", new Vector3(0f, RugHeight * 0.5f, 0f),
-                new Vector3(rug.SizeX, RugHeight, rug.SizeZ), PrimitiveKit.Lit(color * 0.8f, 0f), 0, false);
+                new Vector3(rug.SizeX, RugHeight, rug.SizeZ), PrimitiveKit.Lit(color * 0.8f, 0f), 0, false, Surface.Carpet);
             border.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             const float band = 0.1f;
             if (rug.SizeX > 2f * band && rug.SizeZ > 2f * band)
             {
-                GameObject field = PrimitiveKit.Part(go.transform, "Field", PrimitiveKit.QuadMesh, new Vector3(0f, RugHeight + 0.001f, 0f),
-                    Quaternion.Euler(90f, 0f, 0f), new Vector3(rug.SizeX - 2f * band, rug.SizeZ - 2f * band, 1f), PrimitiveKit.Lit(color, 0f), 0);
+                var fieldSize = new Vector2(rug.SizeX - 2f * band, rug.SizeZ - 2f * band);
+                GameObject field = PrimitiveKit.Part(go.transform, "Field", PrimitiveKit.QuadMeshSized(fieldSize), new Vector3(0f, RugHeight + 0.001f, 0f),
+                    Quaternion.Euler(90f, 0f, 0f), new Vector3(fieldSize.x, fieldSize.y, 1f), PrimitiveKit.Lit(color, 0f), 0, Surface.Carpet);
                 field.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             }
         }
@@ -804,7 +1405,7 @@ namespace Meuble
             Vector3 size = def.DecoySize(d);
             var go = new GameObject("Decoy " + id) { layer = layer };
             go.transform.SetParent(root, false);
-            go.transform.SetPositionAndRotation(d.Position, Quaternion.Euler(0f, d.Yaw, 0f));
+            go.transform.SetPositionAndRotation(def.Floor.OnFloor(d.Position), Quaternion.Euler(0f, d.Yaw, 0f));
             var box = go.AddComponent<BoxCollider>();
             box.center = new Vector3(0f, size.y * 0.5f, 0f);
             box.size = size;
@@ -823,7 +1424,7 @@ namespace Meuble
             GameObject model = Model(level, modelId, "decoy " + id, visual.transform, size, ModelFit.Box, new ModelPaint { Main = color, Red = color });
             if (model == null && !FurnitureKit.Body(kind, visual.transform, size, color, layer))
             {
-                PrimitiveKit.Box(visual.transform, "Body", new Vector3(0f, size.y * 0.5f, 0f), size, PrimitiveKit.Lit(color, 0.35f), layer, false);
+                PrimitiveKit.Box(visual.transform, "Body", new Vector3(0f, size.y * 0.5f, 0f), size, PrimitiveKit.Lit(color, 0.35f), layer, false, Surface.Wood);
             }
             var decoy = go.AddComponent<Decoy>();
             decoy.Id = id;
@@ -855,12 +1456,12 @@ namespace Meuble
         /// to the body's size, and only then <see cref="FurnitureController.SetBody"/> runs: SetBody finds a visual
         /// already built for its current Size. A lamp body gets its <see cref="LampLight"/>.
         /// </summary>
-        private static FurnitureController BuildPlayer(LevelInstance level, SpawnDef spawn, BodyDef body, Transform root)
+        private static FurnitureController BuildPlayer(LevelInstance level, LevelDef def, SpawnDef spawn, BodyDef body, Transform root)
         {
             int layer = Layers.Player;
             var go = new GameObject(PlayerObjectName(body)) { layer = layer };
             go.transform.SetParent(root, false);
-            go.transform.SetPositionAndRotation(spawn.Position, Quaternion.Euler(0f, spawn.Yaw, 0f));
+            go.transform.SetPositionAndRotation(def.Floor.OnFloor(spawn.Position), Quaternion.Euler(0f, spawn.Yaw, 0f));
             var cc = go.AddComponent<CharacterController>();
             cc.radius = body.Radius;
             cc.height = body.Size.y;
@@ -880,6 +1481,8 @@ namespace Meuble
                 FurnitureKit.Body(body.Kind, visual.transform, body.Size, color, layer);
             }
             var furniture = go.AddComponent<FurnitureController>();
+            // M5 (CONTRACT_M5_v3 15.4): the floor first, so Teleport (and every later Release) stands on it.
+            furniture.Floor = def.Floor;
             furniture.Visual = visual.transform;
             furniture.Size = body.Size;
             furniture.Kind = body.Kind;
@@ -889,36 +1492,103 @@ namespace Meuble
             }
             furniture.SetBody(body);
             furniture.Teleport(spawn.Position, spawn.Yaw);
+            level.LoadView = ApplyLoad(furniture, spawn.Load); // MUTATION:LOAD_BUILD
             return furniture;
         }
 
-        private static Inhabitant BuildInhabitant(LevelInstance level, InhabitantDef def, Transform root, IPathPlanner planner)
+        // ----- Wave 5B: the robot and the load (CONTRACT_M5 4, 6, 16.5, 16.8 and 16.12) -----
+
+        /// <summary>
+        /// One <see cref="Robot"/> per <see cref="RobotDef"/> of the level, in its order, under the level root (torn down
+        /// with it). <see cref="Robot.Create"/> builds its <see cref="RobotPath"/> and poses it where the path starts: the
+        /// validator keeps every loop on floor level (never on a platform or a ramp), so time 0 stands on the floor. It is
+        /// built after the NavMesh, has no collider and sits on the Default layer: no NavMesh source, no occluder, nothing an
+        /// inhabitant or the furniture bumps into (16.8). The game steps it (GameState), the builder never does.
+        /// </summary>
+        private static void BuildRobots(LevelInstance level, LevelDef def, Transform root)
+        {
+            if (def.Robots == null)
+            {
+                return;
+            }
+            foreach (RobotDef robotDef in def.Robots)
+            {
+                if (robotDef == null)
+                {
+                    continue;
+                }
+                level.Robots.Add(Robot.Create(robotDef, root)); // MUTATION:ROBOT_BUILD
+            }
+        }
+
+        /// <summary>
+        /// The height above the floor the floor cones aim at (VisionConeView.TargetHeight): the top of the player's sample
+        /// box, which grows by <see cref="Tuning.LoadHeight"/> with a load (16.5: a vase seen above a sofa is a furniture
+        /// seen). It keeps that height after a fall, which still draws a superset of what is seen.
+        /// </summary>
+        public static float ConeTargetHeight(LevelDef def, BodyDef body)
+        {
+            float load = def.Player != null && !string.IsNullOrEmpty(def.Player.Load) ? Tuning.LoadHeight : 0f;
+            return body.Size.y - Tuning.SampleInset + load; // MUTATION:LOAD_TARGET
+        }
+
+        /// <summary>
+        /// The player's load view (CONTRACT_M5 6, and 18: the load rule lives in GameState, which sways this view, drops the
+        /// clue and emits the crash). Returns the view, or null without a load. Called once the body is set and the
+        /// furniture stands at its spawn.
+        /// </summary>
+        private static LoadView ApplyLoad(FurnitureController furniture, string kind)
+        {
+            if (furniture == null || string.IsNullOrEmpty(kind))
+            {
+                return null;
+            }
+            Transform visual = furniture.Visual != null ? furniture.Visual : furniture.transform;
+            return LoadView.Create(kind, visual, furniture.Size);
+        }
+
+        /// <summary>
+        /// One inhabitant, <paramref name="index"/> of the level's list (its seat owner id). M5 (CONTRACT_M5 3 and 16.12,
+        /// CONTRACT_M5_v3 15.1, 15.4 and 15.6): it shows its personality's model (<see cref="Inhabitant.ModelIdOf"/>: an
+        /// explicit model wins, a dog shows the dog), the rig tints its clothes; its routine comes from RoutineFactory
+        /// through the full <see cref="Inhabitant.Init(InhabitantDef, LevelDef, IPathPlanner, IPathPlanner, SeatRegistry, int, int)"/>:
+        /// the level's floor, its station walks frozen on the level's NavMesh with the authored leaves
+        /// (<see cref="LevelInstance.StationAreaMask"/>), every other walk planned with the leaves as they are (on a level
+        /// with leaves), and the level's shared seat registry. A dog's capsule is dog sized.
+        /// </summary>
+        private static Inhabitant BuildInhabitant(LevelInstance level, InhabitantDef def, int index, Transform root)
         {
             int layer = Layers.Inhabitant;
             var go = new GameObject(def.Name) { layer = layer };
             go.transform.SetParent(root, false);
+            bool dog = PersonalityDef.ForInhabitant(def).Id == PersonalityDef.Dog;
+            float capsuleRadius = dog ? Tuning.DogCapsuleRadius : Tuning.InhabitantRadius;
+            float capsuleHeight = dog ? Tuning.DogCapsuleHeight : Tuning.InhabitantHeight;
             var capsule = go.AddComponent<CapsuleCollider>();
-            capsule.radius = Tuning.InhabitantRadius;
-            capsule.height = Tuning.InhabitantHeight;
-            capsule.center = new Vector3(0f, Tuning.InhabitantHeight * 0.5f, 0f);
+            capsule.radius = capsuleRadius;
+            capsule.height = capsuleHeight;
+            capsule.center = new Vector3(0f, capsuleHeight * 0.5f, 0f);
+            IPathPlanner investigate = level.Leaves.Count > 0 ? level.InvestigatePlanner : null;
+            void InitRoutine(Inhabitant h) => h.Init(def, level.Def, level.Planner, investigate, level.Seats, index, level.StationAreaMask);
 
             // M3 (docs/CONTRACT_M3.md 5): the rigged model, its eyes at Tuning.EyeHeight, driven by InhabitantRig.
             // It replaces the whole procedural body; the capsule collider above stays.
-            if (!string.IsNullOrEmpty(def.Model))
+            string modelId = Inhabitant.ModelIdOf(def);
+            if (!string.IsNullOrEmpty(modelId))
             {
                 var modelVisual = new GameObject("Visual") { layer = layer };
                 modelVisual.transform.SetParent(go.transform, false);
                 var box = new Vector3(2f * Tuning.InhabitantRadius, Tuning.InhabitantHeight, 2f * Tuning.InhabitantRadius);
-                GameObject model = Model(level, def.Model, "inhabitant " + def.Name, modelVisual.transform, box, ModelFit.Uniform, default);
+                GameObject model = Model(level, modelId, "inhabitant " + def.Name, modelVisual.transform, box, ModelFit.Uniform, default);
                 if (model != null)
                 {
                     var rigged = go.AddComponent<Inhabitant>();
                     rigged.Visual = modelVisual.transform;
-                    rigged.Init(def, planner);
+                    InitRoutine(rigged);
                     InhabitantRig rig = null;
                     try
                     {
-                        rig = InhabitantRig.Attach(rigged, model, ModelCatalog.Lookup(def.Model));
+                        rig = InhabitantRig.Attach(rigged, model, ModelCatalog.Lookup(modelId));
                     }
                     catch (System.Exception e)
                     {
@@ -930,9 +1600,9 @@ namespace Meuble
                     }
                     // An undriven model would stand frozen in its import pose: fall back to the procedural body
                     // (integrator fix after the M3 rig report). M3.1 S3: the gate sees it, a fallback like any other.
-                    Debug.LogWarning($"[LevelBuilder] no rig for {def.Name}: procedural body instead of {def.Model}");
+                    Debug.LogWarning($"[LevelBuilder] no rig for {def.Name}: procedural body instead of {modelId}");
                     level.ModelVisuals.Remove(model);
-                    level.ModelFallbacks.Add($"inhabitant {def.Name} ({def.Model}): no rig");
+                    level.ModelFallbacks.Add($"inhabitant {def.Name} ({modelId}): no rig");
                     InhabitantRig leftover = go.GetComponent<InhabitantRig>();
                     if (leftover != null)
                     {
@@ -943,7 +1613,8 @@ namespace Meuble
                 Object.DestroyImmediate(modelVisual);
             }
 
-            Color bodyColor = LevelJson.ParseColor(def.BodyColor, Color.blue);
+            // M5: without a body colour, a personality's procedural body wears its clothes tint (default: blue, as before).
+            Color bodyColor = LevelJson.ParseColor(def.BodyColor, Inhabitant.TintOf(def) ?? Color.blue);
             Color skin = LevelJson.ParseColor(def.HeadColor, new Color(0.9f, 0.75f, 0.6f));
             Material body = PrimitiveKit.Lit(bodyColor, 0.2f);
             Material head = PrimitiveKit.Lit(skin, 0.3f);
@@ -956,13 +1627,13 @@ namespace Meuble
             visual.transform.SetParent(go.transform, false);
             Transform v = visual.transform;
             GameObject torso = PrimitiveKit.Part(v, "Body", PrimitiveKit.CapsuleMesh(0.22f, 1.45f, 12, 3), Vector3.zero, Quaternion.identity,
-                Vector3.one, body, layer);
+                Vector3.one, body, layer, Surface.Linen);
 
             Transform armL = PrimitiveKit.Group(v, "ArmL", new Vector3(-0.27f, 1.3f, 0f)).transform;
             Transform armR = PrimitiveKit.Group(v, "ArmR", new Vector3(0.27f, 1.3f, 0f)).transform;
             Mesh armMesh = PrimitiveKit.CapsuleMesh(0.06f, 0.62f, 8, 2);
-            PrimitiveKit.Part(armL, "Mesh", armMesh, new Vector3(0f, -0.62f, 0f), Quaternion.identity, Vector3.one, body, layer);
-            PrimitiveKit.Part(armR, "Mesh", armMesh, new Vector3(0f, -0.62f, 0f), Quaternion.identity, Vector3.one, body, layer);
+            PrimitiveKit.Part(armL, "Mesh", armMesh, new Vector3(0f, -0.62f, 0f), Quaternion.identity, Vector3.one, body, layer, Surface.Linen);
+            PrimitiveKit.Part(armR, "Mesh", armMesh, new Vector3(0f, -0.62f, 0f), Quaternion.identity, Vector3.one, body, layer, Surface.Linen);
 
             Transform headPivot = PrimitiveKit.Group(v, "Head", new Vector3(0f, Tuning.EyeHeight, 0f)).transform;
             PrimitiveKit.Part(headPivot, "Skull", PrimitiveKit.SphereMesh(14, 10), Vector3.zero, Quaternion.identity,
@@ -987,7 +1658,7 @@ namespace Meuble
             inhabitant.ArmLeft = armL;
             inhabitant.ArmRight = armR;
             inhabitant.Eyes = eyes;
-            inhabitant.Init(def, planner);
+            InitRoutine(inhabitant);
             return inhabitant;
         }
     }

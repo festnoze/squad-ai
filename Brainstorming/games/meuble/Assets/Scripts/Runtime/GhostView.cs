@@ -22,6 +22,11 @@ namespace Meuble
     /// warm amber material, so "someone will sit here" never reads as the cyan "this is where it belongs"; the stop
     /// ring keeps the cyan material. The seat ghost shows only during a sit-on-player approach, so its material counts
     /// in the budgets of PRD 7.4 only then.
+    ///
+    /// M5 (docs/CONTRACT_M5_v3.md 15.4): the memory ghost, the seat ghost, the stop ring and the decoy rings stand on
+    /// the floor height at their planar position (<see cref="Floor"/>), so they sit on a platform or a ramp. M5 wave 5B: on a
+    /// ramp the memory ghost and the seat ghost also lie on the slope, as the furniture visual does
+    /// (<see cref="FurnitureController.RampFrame"/>); the stop ring and the decoy rings stay level.
     /// </summary>
     public sealed class GhostView : MonoBehaviour
     {
@@ -42,6 +47,12 @@ namespace Meuble
         public int RingCount { get; private set; }
 
         public FurniturePose Pose { get; private set; }
+
+        /// <summary>
+        /// M5: the floor heights everything here stands on. Null (the default) reads the player furniture's
+        /// <see cref="FurnitureController.Floor"/> (set by the level builder), or a flat floor without a player.
+        /// </summary>
+        public FloorMap Floor;
 
         private Mesh mesh;
         private MeshRenderer meshRenderer;
@@ -125,7 +136,7 @@ namespace Meuble
                 Rebuild(size);
             }
             Pose = pose;
-            transform.SetPositionAndRotation(YawMath.Planar(pose.Position), Quaternion.Euler(0f, pose.Yaw, 0f));
+            PlaceOnFloor(transform, pose, size);
             if (!meshRenderer.enabled)
             {
                 meshRenderer.enabled = true;
@@ -149,7 +160,7 @@ namespace Meuble
             var triangles = new List<int>();
             foreach (Vector3 c in centers)
             {
-                AddRing(YawMath.Planar(c), vertices, normals, triangles);
+                AddRing(OnFloor(c), vertices, normals, triangles);
             }
             RingCount = centers.Count;
             ringsMesh.Clear();
@@ -340,8 +351,48 @@ namespace Meuble
         /// </summary>
         public void ShowSeat(FurniturePose? seat)
         {
-            FurnitureController player = Main.Instance != null && Main.Instance.Game != null ? Main.Instance.Game.Furniture : null;
+            FurnitureController player = PlayerFurniture();
             ShowSeat(seat, player != null ? player.Size : DefaultSeatSize);
+        }
+
+        private static FurnitureController PlayerFurniture()
+        {
+            return Main.Instance != null && Main.Instance.Game != null ? Main.Instance.Game.Furniture : null;
+        }
+
+        /// <summary>M5: <see cref="Floor"/>, else the player furniture's, else a flat floor.</summary>
+        private FloorMap CurrentFloor()
+        {
+            if (Floor != null)
+            {
+                return Floor;
+            }
+            FurnitureController player = PlayerFurniture();
+            return player != null ? player.Floor : FloorMap.Flat;
+        }
+
+        /// <summary>M5: the planar point <paramref name="p"/> raised to the floor height there (its own y is ignored).</summary>
+        private Vector3 OnFloor(Vector3 p)
+        {
+            return new Vector3(p.x, CurrentFloor().HeightAt(p.x, p.z), p.z); // MUTATION:GHOST_FLOOR
+        }
+
+        /// <summary>
+        /// M5 wave 5B (the 5A.1 m16 follow-up): a ghost of a furniture of <paramref name="size"/> at <paramref name="pose"/>
+        /// stands on the floor height there, and on a ramp it lies on the slope like the furniture visual: the same frame
+        /// (<see cref="FurnitureController.RampFrame"/>, fitted to its footprint about its centre), so the memory ghost and the
+        /// seat ghost never stand upright half buried in a ramp. Off every ramp the frame is the yaw alone, as before.
+        /// </summary>
+        private void PlaceOnFloor(Transform target, FurniturePose pose, Vector3 size)
+        {
+            Vector3 at = OnFloor(pose.Position);
+            Quaternion frame = Quaternion.Euler(0f, pose.Yaw, 0f);
+            float lift = 0f;
+            if (FurnitureController.RampFrame(CurrentFloor(), at, pose.Yaw, size, ref frame, ref lift)) // MUTATION:GHOST_SLOPE
+            {
+                at += Vector3.up * lift;
+            }
+            target.SetPositionAndRotation(at, frame);
         }
 
         /// <summary>Seat ghost of a furniture of <paramref name="size"/>, inside a SeatHomeTolerance ring; null hides it.</summary>
@@ -363,7 +414,7 @@ namespace Meuble
             }
             FurniturePose pose = seat.Value;
             SeatPose = pose;
-            seatTransform.SetPositionAndRotation(YawMath.Planar(pose.Position), Quaternion.Euler(0f, pose.Yaw, 0f));
+            PlaceOnFloor(seatTransform, pose, size);
             if (!seatRenderer.enabled)
             {
                 seatRenderer.enabled = true;
@@ -382,7 +433,7 @@ namespace Meuble
                 }
                 return;
             }
-            StopRingPosition = YawMath.Planar(point.Value);
+            StopRingPosition = OnFloor(point.Value);
             stopTransform.SetPositionAndRotation(StopRingPosition, Quaternion.identity);
             if (!stopRenderer.enabled)
             {

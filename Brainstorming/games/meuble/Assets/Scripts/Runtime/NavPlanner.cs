@@ -12,8 +12,15 @@ namespace Meuble
     ///
     /// The NavMesh data of the last level built is cached by a key (the level data itself): a restart of
     /// the same level adds the cached data again instead of rebuilding it.
+    ///
+    /// M5 (docs/CONTRACT_M5_v3.md 15.1 and 15.4): one NavMeshData per level, never rebuilt for a door. The level builder
+    /// adds a NavMesh area box per leaf doorway (area Tuning.DoorAreaBase + leaf index) and a Not Walkable box per open
+    /// leaf pose as extra sources; a plan restricted to an area mask leaves the closed leaves' doorways out
+    /// (<see cref="IAreaMaskPlanner"/>). On a level with platforms or ramps, the ends of a plan are sampled from
+    /// <see cref="Floor"/>'s height + 0.5 m, so a point on a platform snaps to the platform top and never to the floor
+    /// under it; a flat level samples from the given points exactly as in M2 to M4.
     /// </summary>
-    public sealed class NavPlanner : IPathPlanner
+    public sealed class NavPlanner : IAreaMaskPlanner
     {
         private const int AgentTypeId = 0;
 
@@ -35,12 +42,34 @@ namespace Meuble
         /// <summary>True when this planner reused the cached data of an identical level.</summary>
         public bool FromCache { get; private set; }
 
+        /// <summary>M5: the level's floor heights (the level builder sets it); flat by default.</summary>
+        public FloorMap Floor
+        {
+            get => floor;
+            set => floor = value ?? FloorMap.Flat;
+        }
+
+        private FloorMap floor = FloorMap.Flat;
+
+        /// <summary>M5: how far above the floor a plan's ends are sampled on a level with platforms or ramps.</summary>
+        public const float SampleLift = 0.5f;
+
         /// <summary>
         /// Builds the NavMesh of a level from the physics colliders under <paramref name="root"/> on the
         /// Occluder, Floor and Furniture layers, clipped to <paramref name="bounds"/>, and adds it. With a
         /// <paramref name="cacheKey"/> equal to the previous build's, the previous data is reused.
         /// </summary>
         public static NavPlanner Build(Transform root, Bounds bounds, string cacheKey = null)
+        {
+            return Build(root, bounds, cacheKey, null);
+        }
+
+        /// <summary>
+        /// M5: <see cref="Build(Transform, Bounds, string)"/> with <paramref name="extraSources"/> added to the collected
+        /// colliders (the leaves' NavMesh area and Not Walkable boxes). They are part of the level data, so the cache key
+        /// (the level data) still decides alone whether the cached NavMesh is reused.
+        /// </summary>
+        public static NavPlanner Build(Transform root, Bounds bounds, string cacheKey, IList<NavMeshBuildSource> extraSources)
         {
             var planner = new NavPlanner();
             if (cacheKey != null && cacheKey == cachedKey && cachedData != null)
@@ -64,6 +93,10 @@ namespace Meuble
             var sources = new List<NavMeshBuildSource>();
             NavMeshBuilder.CollectSources(root, Layers.NavMeshSourceMask, NavMeshCollectGeometry.PhysicsColliders, 0,
                 new List<NavMeshBuildMarkup>(), sources);
+            if (extraSources != null)
+            {
+                sources.AddRange(extraSources);
+            }
             planner.SourceCount = sources.Count;
             planner.data = NavMeshBuilder.BuildNavMeshData(settings, sources, bounds, Vector3.zero, Quaternion.identity);
             if (planner.data == null)
@@ -121,13 +154,21 @@ namespace Meuble
 
         public bool TryPlan(Vector3 from, Vector3 to, List<Vector3> corners)
         {
+            return TryPlan(from, to, corners, NavMesh.AllAreas);
+        }
+
+        /// <summary>M5 (docs/CONTRACT_M5_v3.md 15.1): a plan restricted to an area mask (closed leaves excluded).</summary>
+        public bool TryPlan(Vector3 from, Vector3 to, List<Vector3> corners, int areaMask)
+        {
             corners.Clear();
-            if (!NavMesh.SamplePosition(from, out NavMeshHit start, Tuning.NavSnapDistance, filter)
-                || !NavMesh.SamplePosition(to, out NavMeshHit end, Tuning.NavSnapDistance, filter))
+            NavMeshQueryFilter masked = filter;
+            masked.areaMask = areaMask;
+            if (!NavMesh.SamplePosition(Lift(from), out NavMeshHit start, Tuning.NavSnapDistance, masked)
+                || !NavMesh.SamplePosition(Lift(to), out NavMeshHit end, Tuning.NavSnapDistance, masked))
             {
                 return false;
             }
-            if (!NavMesh.CalculatePath(start.position, end.position, filter, path) || path.status != NavMeshPathStatus.PathComplete)
+            if (!NavMesh.CalculatePath(start.position, end.position, masked, path) || path.status != NavMeshPathStatus.PathComplete)
             {
                 return false;
             }
@@ -157,7 +198,55 @@ namespace Meuble
         /// <summary>True when a point of the floor lies on (or within the snap distance of) the NavMesh.</summary>
         public bool Covers(Vector3 point)
         {
-            return NavMesh.SamplePosition(point, out _, Tuning.NavSnapDistance, filter);
+            return NavMesh.SamplePosition(Lift(point), out _, Tuning.NavSnapDistance, filter);
+        }
+
+        /// <summary>M5: <see cref="Covers(Vector3)"/> restricted to an area mask.</summary>
+        public bool Covers(Vector3 point, int areaMask)
+        {
+            NavMeshQueryFilter masked = filter;
+            masked.areaMask = areaMask;
+            return NavMesh.SamplePosition(Lift(point), out _, Tuning.NavSnapDistance, masked);
+        }
+
+        /// <summary>
+        /// M5 (CONTRACT_M5_v3 15.4): where a plan end is sampled from: the point itself on a flat level (M2 to M4 exactly),
+        /// else its planar position at the floor height + <see cref="SampleLift"/>.
+        /// </summary>
+        public Vector3 Lift(Vector3 point)
+        {
+            return floor.IsFlat ? point : new Vector3(point.x, floor.HeightAt(point.x, point.z) + SampleLift, point.z);
+        }
+    }
+
+    /// <summary>
+    /// M5 (docs/CONTRACT_M5_v3.md 15.1): a planner bound to one NavMesh area mask over the level's one NavMesh
+    /// (LevelInstance.PlannerFor). Its plain TryPlan uses that mask; the masked overload passes the given mask through.
+    /// Without an inner masked planner (a torn down level) it plans straight lines.
+    /// </summary>
+    public sealed class MaskedPlanner : IAreaMaskPlanner
+    {
+        public IAreaMaskPlanner Inner { get; }
+        public int AreaMask { get; }
+
+        public MaskedPlanner(IAreaMaskPlanner inner, int areaMask)
+        {
+            Inner = inner;
+            AreaMask = areaMask;
+        }
+
+        public bool TryPlan(Vector3 from, Vector3 to, List<Vector3> corners)
+        {
+            return TryPlan(from, to, corners, AreaMask);
+        }
+
+        public bool TryPlan(Vector3 from, Vector3 to, List<Vector3> corners, int areaMask)
+        {
+            if (Inner == null)
+            {
+                return StraightPlanner.Instance.TryPlan(from, to, corners);
+            }
+            return Inner.TryPlan(from, to, corners, areaMask);
         }
     }
 }

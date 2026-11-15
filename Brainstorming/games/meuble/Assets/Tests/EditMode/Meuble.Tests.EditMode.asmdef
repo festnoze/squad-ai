@@ -3,6 +3,7 @@
     "rootNamespace": "Meuble.Tests",
     "references": [
         "Meuble.Core",
+        "Meuble.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

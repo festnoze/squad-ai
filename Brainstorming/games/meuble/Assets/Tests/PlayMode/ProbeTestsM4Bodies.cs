@@ -66,6 +66,7 @@ namespace Meuble.Tests
             Application.logMessageReceived += OnLog;
             Time.timeScale = 1f;
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             yield return SceneManager.LoadSceneAsync("Boot", LoadSceneMode.Single);
             int guard = 0;
             while ((Main.Instance == null || Main.Instance.Game == null || Main.Instance.Game.Level == null) && guard++ < 200)
@@ -86,6 +87,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             Time.timeScale = 1f;
             Application.logMessageReceived -= OnLog;
             if (main != null && main.Game != null)
@@ -586,6 +588,7 @@ namespace Meuble.Tests
             // ResetInjections drops a pending press; GameRules.Lamp off makes E do nothing.
             InputReader.InjectAction();
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             yield return Steps(2);
             Assert.AreEqual(toggles + 2, Chair.ToggleCount, "ResetInjections left a press");
             GameRules noLamp = GameRules.M4;

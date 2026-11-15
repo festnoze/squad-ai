@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 103c46fcb1515e24e946734679f6153a, type: 3}
+  m_Name: TextureLibrary
+  m_EditorClassIdentifier: Meuble.Runtime::Meuble.TextureLibrary
+  entries:
+  - surface: 1
+    texture: {fileID: 2800000, guid: 6523e710bb11ae4418c54ee04506d867, type: 3}
+    mean: 0.9411798
+    source: Wood049
+  - surface: 2
+    texture: {fileID: 2800000, guid: 93d3dacfa2f03f94aa62ead78c57686e, type: 3}
+    mean: 0.9411789
+    source: WoodFloor051
+  - surface: 3
+    texture: {fileID: 2800000, guid: 7f37289af2e402b4d8139620164cb2fe, type: 3}
+    mean: 0.941176
+    source: Plaster001
+  - surface: 4
+    texture: {fileID: 2800000, guid: 5507ee543d597c241a27f6d2090ff93c, type: 3}
+    mean: 0.94117445
+    source: Fabric011
+  - surface: 5
+    texture: {fileID: 2800000, guid: a76a06022100af64ea220e6e0704c5dd, type: 3}
+    mean: 0.94117993
+    source: Fabric036
+  - surface: 6
+    texture: {fileID: 2800000, guid: 54e27dbe72815d74b92c121bd4ae151c, type: 3}
+    mean: 0.9411796
+    source: Carpet012

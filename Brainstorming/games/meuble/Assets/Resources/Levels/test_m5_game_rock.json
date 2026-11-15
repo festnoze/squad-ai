@@ -1,0 +1,51 @@
+{
+  "id": "test_m5_game_rock",
+  "nameKey": "level10.name",
+  "hintKey": "level10.hint",
+  "room": {
+    "sizeX": 10.0,
+    "sizeZ": 8.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+z", "center": 4.0, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "kind": "rocking_chair",
+    "x": 0.0,
+    "z": -2.0,
+    "yaw": 0.0,
+    "sizeX": 0.6,
+    "sizeY": 1.05,
+    "sizeZ": 0.85,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 4.0, "z": 3.45, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [],
+  "inhabitants": [
+    {
+      "name": "Mamie",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": -3.5, "z": -3.0, "facing": 90.0, "dwell": 1.0, "glances": [] },
+        { "x": 0.0, "z": -1.35, "facing": 0.0, "dwell": 4.0, "glances": [], "sit": "player", "seat": { "x": 0.0, "z": -2.0, "yaw": 0.0 } }
+      ]
+    },
+    {
+      "name": "Temoin",
+      "startStation": 0,
+      "bodyColor": "#6A4C93",
+      "headColor": "#C68B59",
+      "stations": [
+        { "x": 3.5, "z": 3.0, "facing": 0.0, "dwell": 60.0, "glances": [] },
+        { "x": 3.5, "z": 2.5, "facing": 0.0, "dwell": 60.0, "glances": [] }
+      ]
+    }
+  ]
+}

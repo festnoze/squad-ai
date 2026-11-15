@@ -15,6 +15,16 @@ namespace Meuble
     /// the office chair glide and careful mode, <see cref="GameRules.Lamp"/> gates the lamp switch and its dark
     /// range. An action (a stool falling or righting itself, a lamp switch) counts as moving
     /// (<see cref="MotionRule.IsMoving(float, float, bool)"/>), and the body does not travel during it.
+    ///
+    /// M5 (docs/CONTRACT_M5_v3.md 15.2 and 15.4, CONTRACT_M5 16.12): an action started from outside
+    /// (<see cref="BeginExternalAction"/>, the door opening), the E key claimed by the game before the body action
+    /// (<see cref="ActionKeyClaimed"/>), and the floor height (<see cref="Floor"/>) that <see cref="Teleport"/> and
+    /// <see cref="Release"/> put the furniture on. 5A.1 m16: on a ramp the visual lies on the slope (its pitch along the
+    /// facing, its roll across it, about the footprint centre); the sample box stays upright.
+    ///
+    /// M5 wave 5B (docs/CONTRACT_M5.md 4, 16.8 and 18): the robot's shove, <see cref="BeginPush"/>, an action that travels
+    /// at a constant velocity (MotionProfile.BeginPush semantics) until any collider stops it; and <see cref="RampFrame"/>,
+    /// the visual's ramp frame for any footprint, which GhostView shares.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public sealed class FurnitureController : MonoBehaviour
@@ -55,7 +65,101 @@ namespace Meuble
             Right,
             /// <summary>The lamp is switched on or off (LampToggleTime).</summary>
             Toggle,
+            /// <summary>M5: an action started from outside with no input, such as opening a door (DoorOpenTime).</summary>
+            External,
+            /// <summary>
+            /// M5 wave 5B (CONTRACT_M5 4, 16.8, 18): the robot's shove (<see cref="BeginPush"/>, RobotPushTime): the only
+            /// action that travels, at a constant velocity, until a collider stops it.
+            /// </summary>
+            Push,
         }
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.2, CONTRACT_M5 16.12): starts an action that counts as moving
+        /// (<see cref="ActionActive"/>), with no input, for round(<paramref name="duration"/> / dt) steps: the door
+        /// opening, DoorOpenTime (30 steps). True when it starts. It is refused (false, and nothing changes) unless the
+        /// furniture is still (not moving on its last step, not gliding, no tip pending), upright, not pinned, not
+        /// carried and in no other action, or when the duration is not positive.
+        ///
+        /// Called between two fixed steps, the action covers the next round(duration / dt) steps. Called from
+        /// <see cref="ActionKeyClaimed"/> (inside <see cref="Step"/>), the step of the E press is its first step, as for
+        /// the lamp switch. Input and presses are ignored during it, as for every action; when it ends, a held key drives
+        /// again on the next step (no neutral step, unlike the pin). A pin or a carry ends it at once.
+        /// </summary>
+        public bool BeginExternalAction(float duration)
+        {
+            Init();
+            bool still = !IsMoving && !Gliding && !pendingTip; // MUTATION:EXTERNAL_STILL
+            bool free = !Tipped && !Pinned && !Carried && !ActionActive;
+            if (!(duration > 0f) || !still || !free)
+            {
+                return false;
+            }
+            Velocity = Vector3.zero;
+            ClearMotionState();
+            StartAction(BodyAction.External, duration, lastDt);
+            return true;
+        }
+
+        /// <summary>
+        /// M5 wave 5B (docs/CONTRACT_M5.md 4, 16.8 and 18): the robot's shove, with the semantics of
+        /// <see cref="MotionProfile.BeginPush"/>. The furniture travels at a constant velocity of
+        /// <paramref name="distance"/> / <paramref name="time"/> along the planar <paramref name="direction"/> for the next
+        /// round(<paramref name="time"/> / dt) steps (a 0.25 m shove in 0.5 s is 25 steps of 0.01 m), with its yaw unchanged.
+        /// It is an action (<see cref="ActionActive"/>, <see cref="BodyAction.Push"/>): it counts as moving, input and presses
+        /// are ignored, and it neither hops nor rolls (the robot slides it). True when it starts.
+        ///
+        /// It may start while the furniture drives or glides: the drive and any glide end at once. It is refused (false, and
+        /// nothing changes) during any action (a fall, a righting, a switch, an external action such as the rock or a door,
+        /// another push), while the stool is tipped, pinned or carried, and for a zero direction, distance or time.
+        ///
+        /// Any collider stops it (CONTRACT_M5 16.8, "blocked by any collider"): from the step a wall, a prop or anything solid
+        /// stands against the push direction, the furniture stays where that collider stopped it, and the action runs on to
+        /// its end, still moving. When the push ends the furniture is still: a held key drives again from rest on the next
+        /// step (no neutral step), and an office chair does not glide. A pin or a carry ends it at once.
+        /// </summary>
+        public bool BeginPush(Vector3 direction, float distance, float time)
+        {
+            Init();
+            Vector3 d = YawMath.Planar(direction);
+            bool free = !ActionActive && !Tipped && !Pinned && !Carried; // MUTATION:PUSH_FREE
+            if (!free || !(time > 0f) || !(distance > 0f) || d.sqrMagnitude < 1e-8f)
+            {
+                return false;
+            }
+            pushVelocity = d.normalized * (distance / time);
+            ClearMotionState();
+            StartAction(BodyAction.Push, time, lastDt);
+            return true;
+        }
+
+        /// <summary>M5 wave 5B: true on every step of a push (<see cref="BeginPush"/>), as <see cref="ActionActive"/> counts them.</summary>
+        public bool Pushing => ActionActive && Action == BodyAction.Push;
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.2: a door in reach takes E before the body action), set by GameState. Called
+        /// once for each action press (E, gamepad X) consumed by a step that takes input, while the furniture is upright
+        /// and in no action (moving or not: the hook decides). True means the press goes to the game (a door): the body
+        /// action (the lamp switch) does not happen. The press is consumed either way, so it never fires later. The hook
+        /// may call <see cref="BeginExternalAction"/>: the step of the press is then the first step of that action, and
+        /// the body does not travel on it. Null: every press is the body's.
+        /// </summary>
+        public Func<bool> ActionKeyClaimed;
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.4): the level's floor heights, set by the level builder; FloorMap.Flat (0
+        /// everywhere) by default, and null reads as Flat. <see cref="Teleport"/> and <see cref="Release"/> put the
+        /// furniture at <c>Floor.HeightAt(x, z)</c>; the CharacterController then keeps it on a platform or a ramp. The
+        /// sample points, the camera center and the visual follow the transform, so they stand on that floor too.
+        /// GhostView reads it for the memory ghost, the seat ghost, the stop ring and the decoy rings.
+        /// </summary>
+        public FloorMap Floor
+        {
+            get => floor;
+            set => floor = value ?? FloorMap.Flat;
+        }
+
+        private FloorMap floor = FloorMap.Flat;
 
         public BodyDef Body { get; private set; } = BodyDef.For("chair");
 
@@ -72,8 +176,9 @@ namespace Meuble
         public bool Pinned { get; private set; }
 
         /// <summary>
-        /// True on every step of an action (fall, righting, switch), from the step it starts for its whole duration
-        /// (round(duration / dt) steps: a 0.3 s switch is 15). It turns false at the start of the step after the last one.
+        /// True on every step of an action (fall, righting, switch, M5 external action, M5 wave 5B push), from the step it starts for its
+        /// whole duration (round(duration / dt) steps: a 0.3 s switch is 15). It turns false at the start of the step
+        /// after the last one.
         /// </summary>
         public bool ActionActive { get; private set; }
 
@@ -107,7 +212,8 @@ namespace Meuble
 
         /// <summary>
         /// Office chair, while it moves: where it comes to rest if the input is released now (or where the glide in
-        /// progress ends), walls aside. Null otherwise. Drawn by GhostView.ShowStopRing.
+        /// progress ends), walls aside. Null otherwise. Planar (y 0), as every rule position; drawn by
+        /// GhostView.ShowStopRing, which puts the ring on the floor height there (M5).
         /// </summary>
         public Vector3? PredictedStop { get; private set; }
 
@@ -279,7 +385,7 @@ namespace Meuble
         /// Put down: the furniture stands on the floor at <paramref name="pose"/>, controller enabled. M2.1
         /// (docs/CONTRACT_M2.md 11.5): the move input is then ignored until it has been neutral for one fixed
         /// step, so a key held through the carry never moves the chair right after the put down. M4: the carrier
-        /// puts a tipped stool down upright.
+        /// puts a tipped stool down upright. M5: on the floor height of <see cref="Floor"/> at the pose (its y is ignored).
         /// </summary>
         public void Release(FurniturePose pose)
         {
@@ -303,6 +409,9 @@ namespace Meuble
         // How fast the tell lean follows TellStrength (per second, visual smoothing only; the strength itself rises
         // from 0 to 1 over the 0.25 s of the warning band).
         private const float LeanResponse = 14f;
+        // M5 (5A.1 m16), presentation only: below this rise per metre (or ramp length, or head height) the floor under the
+        // footprint counts as flat and the visual stays upright.
+        private const float SlopeEpsilon = 1e-4f;
 
         private CharacterController controller;
         private Vector3 previousPose;
@@ -327,6 +436,12 @@ namespace Meuble
         private int actionStepsDone;
         private float leanBlend;
         private bool stopRingShown;
+        // M5: the dt of the last Step, so an action begun from outside counts the same steps as one begun inside.
+        private float lastDt = Tuning.FixedStep;
+        // M5 wave 5B: the push's planar velocity (zero once a collider stopped it), and whether a collider stood against
+        // the push during the current Move (OnControllerColliderHit).
+        private Vector3 pushVelocity;
+        private bool pushBlocked;
 
         /// <summary>Center of the bounds, at the fixed step pose.</summary>
         public Vector3 Center => transform.position + new Vector3(0f, Size.y * 0.5f, 0f);
@@ -356,11 +471,14 @@ namespace Meuble
 
         /// <summary>
         /// Places the furniture (probe, tests, put down). The motion stops; a tipped stool stays tipped (only
-        /// <see cref="Release"/> rights it) and an action in progress goes on.
+        /// <see cref="Release"/> rights it) and an action in progress goes on. M5 (docs/CONTRACT_M5_v3.md 15.4): the
+        /// furniture stands on the floor, at <c>Floor.HeightAt(x, z)</c>; the y of <paramref name="position"/> is ignored.
         /// </summary>
         public void Teleport(Vector3 position, float yaw)
         {
             Init();
+            float y = Floor.HeightAt(position.x, position.z); // MUTATION:FLOOR_Y
+            position = new Vector3(position.x, y, position.z);
             controller.enabled = false;
             transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
             controller.enabled = true;
@@ -380,6 +498,10 @@ namespace Meuble
         public void Step(float dt, bool allowInput)
         {
             Init();
+            if (dt > 0f)
+            {
+                lastDt = dt;
+            }
             bool bodies = Rules != null && Rules.Bodies;
             bool lampRule = Rules != null && Rules.Lamp;
             wallHitInto = 0f;
@@ -432,8 +554,9 @@ namespace Meuble
 
             if (ActionActive)
             {
-                // Falling, righting or switching: the body does not travel, and input and presses are ignored.
-                Velocity = Vector3.zero;
+                // Falling, righting, switching or an external action: the body does not travel, and input and presses
+                // are ignored. M5 wave 5B: a push travels at its constant velocity, until a collider stops it.
+                Velocity = Action == BodyAction.Push ? pushVelocity : Vector3.zero; // MUTATION:PUSH_SLIDE
                 pendingTip = false;
             }
             else if (Tipped)
@@ -443,6 +566,20 @@ namespace Meuble
                 if (movePress || wishEdge)
                 {
                     StartAction(BodyAction.Right, Tuning.StoolRightTime, dt);
+                }
+            }
+            else if (actionPress && ActionKeyClaimedByGame())
+            {
+                // M5 (v3 15.2): the press went to the game (a door in reach), not to the body. When the hook began an
+                // action (BeginExternalAction), this step is its first one: the body does not travel.
+                if (ActionActive)
+                {
+                    Velocity = Vector3.zero;
+                    pendingTip = false;
+                }
+                else
+                {
+                    Drive(wish, wishActive, allowInput, bodies, dt);
                 }
             }
             else if (actionPress && Body.HasLight && lampRule && Lamp != null)
@@ -466,10 +603,34 @@ namespace Meuble
             if (Velocity.sqrMagnitude > 0f)
             {
                 moveVelocity = Velocity;
+                pushBlocked = false;
+                Vector3 moveFrom = transform.position;
                 controller.Move(Velocity * dt + Vector3.down * (2f * dt));
+                if (Pushing && pushBlocked)
+                {
+                    StopPushAtCollider(moveFrom, dt);
+                }
             }
             transform.rotation = Quaternion.Euler(0f, Yaw, 0f);
             EndStep(dt, startPosition, startYaw, bodies);
+        }
+
+        /// <summary>
+        /// M5 wave 5B (CONTRACT_M5 16.8): a collider stood against the push during this step's Move. The furniture keeps the
+        /// travel it made up to it (this step's velocity is what it really travelled) and travels no more for the rest of the
+        /// push, which still runs to its end: a shove blocked by any collider stops there, it never slides along it.
+        /// </summary>
+        private void StopPushAtCollider(Vector3 moveFrom, float dt)
+        {
+            pushVelocity = Vector3.zero;
+            Velocity = dt > 0f ? YawMath.Planar(transform.position - moveFrom) / dt : Vector3.zero;
+        }
+
+        /// <summary>M5: asks <see cref="ActionKeyClaimed"/> whether this action press goes to the game (once per press).</summary>
+        private bool ActionKeyClaimedByGame()
+        {
+            bool claimed = ActionKeyClaimed != null && ActionKeyClaimed(); // MUTATION:E_CLAIM
+            return claimed;
         }
 
         /// <summary>Travel: the stool tip on release, the office chair glide, or plain driving (M1).</summary>
@@ -573,8 +734,9 @@ namespace Meuble
 
             // Hops (and their sound) only while the body really travels or turns: an action is not a hop. Under
             // GameRules.Bodies the office chair rolls: a roll tick every RollNoiseInterval of rolling instead of hops.
+            // M5 wave 5B: a push travels, but the robot slides the furniture: no hop and no roll tick on its steps.
             bool rolls = bodies && Body.Glides;
-            hopping = !rolls && MotionRule.IsMoving(PlanarSpeed, YawRate);
+            hopping = !rolls && !ActionActive && MotionRule.IsMoving(PlanarSpeed, YawRate); // MUTATION:PUSH_HOP
             if (hopping)
             {
                 float before = hopTime;
@@ -588,7 +750,7 @@ namespace Meuble
             {
                 hopTime = 0f;
             }
-            if (rolls && PlanarSpeed > Tuning.MovingSpeedThreshold)
+            if (rolls && !ActionActive && PlanarSpeed > Tuning.MovingSpeedThreshold)
             {
                 float before = rollTime;
                 rollTime += dt;
@@ -617,10 +779,13 @@ namespace Meuble
             currentYaw = Yaw;
         }
 
-        /// <summary>Where the office chair comes to rest from now, with the same steps as the glide itself.</summary>
+        /// <summary>
+        /// Where the office chair comes to rest from now, with the same steps as the glide itself. None during an action: M5
+        /// wave 5B, a push ends still, it never glides.
+        /// </summary>
         private Vector3? PredictStop(bool bodies, float dt)
         {
-            if (!bodies || !Body.Glides || Pinned || Carried || PlanarSpeed <= Tuning.MovingSpeedThreshold)
+            if (!bodies || !Body.Glides || Pinned || Carried || ActionActive || PlanarSpeed <= Tuning.MovingSpeedThreshold)
             {
                 return null;
             }
@@ -709,6 +874,10 @@ namespace Meuble
                 case BodyAction.Right:
                     Tipped = false;
                     break;
+                case BodyAction.Push:
+                    // M5 wave 5B (MotionProfile.BeginPush): the push ends still, so the next step starts from rest.
+                    Velocity = Vector3.zero; // MUTATION:PUSH_STILL
+                    break;
             }
             Action = BodyAction.None;
             ActionActive = false;
@@ -729,7 +898,9 @@ namespace Meuble
         /// <summary>
         /// The stool's head-on hit: the velocity against the hit normal, kept at its largest over the move, for hits
         /// within StoolHeadOnDegrees of head-on only (CONTRACT_M4 10.3). The hit normal points out of the wall, toward
-        /// the stool: the wall's inward normal.
+        /// the stool: the wall's inward normal. M5 wave 5B: during a push, a side hit whose face stands against the push
+        /// direction (more than <see cref="Tuning.PushBlockedDot"/>) stops the push (<see cref="StopPushAtCollider"/>); the
+        /// floor, a ramp (a normal within 30 degrees of up) and a wall the push only runs along never do.
         /// </summary>
         private void OnControllerColliderHit(ControllerColliderHit hit)
         {
@@ -739,6 +910,10 @@ namespace Meuble
             if (n.sqrMagnitude < 0.25f || speed < 1e-4f)
             {
                 return;
+            }
+            if (Pushing && -Vector3.Dot(v / speed, n.normalized) > Tuning.PushBlockedDot) // MUTATION:PUSH_BLOCK
+            {
+                pushBlocked = true;
             }
             float into = -Vector3.Dot(v, n.normalized);
             bool headOn = into >= speed * Mathf.Cos(Tuning.StoolHeadOnDegrees * Mathf.Deg2Rad);
@@ -767,7 +942,11 @@ namespace Meuble
 
         /// <summary>
         /// Fills a length 5 array with the sample points of PRD 4.1, at the fixed step pose, from <see cref="SampleSize"/>
-        /// (the lying box while the stool lies on its side).
+        /// (the lying box while the stool lies on its side). M5: the base is the transform, which stands on the floor
+        /// height of <see cref="Floor"/> (Teleport and Release put it there, the CharacterController keeps it there on a
+        /// platform or a ramp), so the samples add the floor height of the furniture's planar position. The box is
+        /// rigid and upright: one floor height for all five points. 5A.1 m16: on a ramp only the visual lies on the slope
+        /// (<see cref="LateUpdate"/>); the box stays upright, so the rules are the same on a ramp as before.
         /// </summary>
         public void GetSamplePoints(Vector3[] output)
         {
@@ -796,11 +975,15 @@ namespace Meuble
             if (GamePause.IsPaused)
             {
                 // CONTRACT_M3 6: paused, the visual holds the last fixed step pose (alpha 1), with no hop and no
-                // tremble: real time goes on, so anything read from it would keep moving the chair.
+                // tremble: real time goes on, so anything read from it would keep moving the chair. M5 (5A.1 m16): on
+                // its ramp slope, as when it runs.
                 interpolatedPosition = currentPose;
                 float heldTip = TipAngle(1f);
-                Quaternion heldYaw = Quaternion.Euler(0f, currentYaw, 0f);
-                Visual.SetPositionAndRotation(currentPose + heldYaw * TipOffset(heldTip), heldYaw * Quaternion.Euler(0f, 0f, -heldTip));
+                Quaternion heldFrame = Quaternion.Euler(0f, currentYaw, 0f);
+                float heldLift = 0f;
+                GroundFrame(currentPose, currentYaw, ref heldFrame, ref heldLift);
+                Vector3 heldBase = currentPose + Vector3.up * heldLift;
+                Visual.SetPositionAndRotation(heldBase + heldFrame * TipOffset(heldTip), heldFrame * Quaternion.Euler(0f, 0f, -heldTip));
                 return;
             }
             float alpha = Mathf.Clamp01((Time.time - Time.fixedTime) / Time.fixedDeltaTime);
@@ -836,12 +1019,106 @@ namespace Meuble
 
             float tip = TipAngle(alpha);
             Quaternion rotation = Quaternion.Euler(pitch, yaw, rock);
+            // M5 (5A.1 m16): on a ramp the visual lies on the slope, turned about its footprint centre (the hop, the
+            // creak and the tell then rock it in that frame). Off every ramp the frame is the yaw alone, as before.
+            Quaternion ground = Quaternion.Euler(0f, yaw, 0f);
+            float lift = 0f;
+            if (GroundFrame(position, yaw, ref ground, ref lift)) // MUTATION:VISUAL_SLOPE
+            {
+                rotation = ground * Quaternion.Euler(pitch, 0f, rock);
+                position += Vector3.up * lift;
+            }
             if (tip > 0f)
             {
                 rotation *= Quaternion.Euler(0f, 0f, -tip);
-                position += Quaternion.Euler(0f, yaw, 0f) * TipOffset(tip);
+                position += ground * TipOffset(tip);
             }
             Visual.SetPositionAndRotation(position + jitter + Vector3.up * hop, rotation);
+        }
+
+        /// <summary>
+        /// M5 (5A.1 m16, CONTRACT_M5_v3 15.4): the frame the visual stands in at the base point <paramref name="basePoint"/>
+        /// and <paramref name="yaw"/>. On a ramp of <see cref="Floor"/> it is the floor plane under the footprint
+        /// (<see cref="SampleSize"/>): its pitch is the slope along the facing, its roll the slope across it, its heading
+        /// stays <paramref name="yaw"/>, and it turns about the footprint centre. True then, with
+        /// <paramref name="frame"/> and <paramref name="lift"/> set; false (both untouched) on a flat floor, off every
+        /// ramp and while carried (held upright).
+        /// <para>The plane is fitted to the footprint's four corners on the ramp's surface carried flat past its foot (0)
+        /// and its head (its platform's height): the frame tips smoothly as the furniture rolls over the foot or the head,
+        /// and only a ramp the base point stands on (between its two sides) tilts it, so a platform edge or the floor
+        /// beside a ramp never does. <paramref name="lift"/> raises the base to the corners' mean height where it is
+        /// higher (the foot of a ramp: front on the slope, back on the floor); on the slope itself the base already
+        /// stands there and the lift is 0.</para>
+        /// The rules never read this: the sample box, the center and the camera stay upright on the transform.
+        /// </summary>
+        private bool GroundFrame(Vector3 basePoint, float yaw, ref Quaternion frame, ref float lift)
+        {
+            if (Carried)
+            {
+                return false;
+            }
+            return RampFrame(floor, basePoint, yaw, SampleSize, ref frame, ref lift);
+        }
+
+        /// <summary>
+        /// M5 wave 5B (the 5A.1 m16 follow-up): the frame of the furniture visual on a ramp (<see cref="GroundFrame"/>) for
+        /// any footprint, so GhostView lays the memory ghost and the seat ghost on the slope the same way. On a ramp of
+        /// <paramref name="floor"/> under the base point <paramref name="basePoint"/>, the plane fitted to the four corners
+        /// of the footprint (<paramref name="footprint"/> x and z, turned by <paramref name="yaw"/>) on the ramp's surface
+        /// carried flat past its foot and its head: true, with <paramref name="frame"/> (its heading stays the yaw, its
+        /// pitch and roll follow the slope) and <paramref name="lift"/> (how far the base rises to the corners' mean height
+        /// where that is above <paramref name="basePoint"/>.y). False, with both untouched, on a null or flat floor, off
+        /// every ramp, and where the whole footprint lies before the foot or past the head.
+        /// </summary>
+        public static bool RampFrame(FloorMap floor, Vector3 basePoint, float yaw, Vector3 footprint, ref Quaternion frame, ref float lift)
+        {
+            if (floor == null || floor.IsFlat || floor.Level.Ramps == null)
+            {
+                return false;
+            }
+            Vector3 forward = YawMath.Forward(yaw);
+            Vector3 right = YawMath.Forward(yaw + 90f);
+            float halfDepth = Mathf.Max(footprint.z * 0.5f, 0.01f);
+            float halfWidth = Mathf.Max(footprint.x * 0.5f, 0.01f);
+            foreach (RampDef r in floor.Level.Ramps)
+            {
+                if (r == null || r.Length <= SlopeEpsilon)
+                {
+                    continue;
+                }
+                float head = floor.HeadHeight(r);
+                Vector3 local = YawMath.Rotate(new Vector3(basePoint.x - r.X, 0f, basePoint.z - r.Z), -r.Yaw);
+                if (Mathf.Abs(head) <= SlopeEpsilon || Mathf.Abs(local.x) > r.Width * 0.5f + SlopeEpsilon)
+                {
+                    continue;
+                }
+                // The plane through the four footprint corners (exact on the slope, the corners' best fit over a kink).
+                Vector3 toFront = forward * halfDepth;
+                Vector3 toRight = right * halfWidth;
+                float frontRight = RampSurface(r, head, basePoint + toFront + toRight);
+                float frontLeft = RampSurface(r, head, basePoint + toFront - toRight);
+                float backRight = RampSurface(r, head, basePoint - toFront + toRight);
+                float backLeft = RampSurface(r, head, basePoint - toFront - toRight);
+                float along = (frontRight + frontLeft - backRight - backLeft) / (4f * halfDepth);
+                float across = (frontRight + backRight - frontLeft - backLeft) / (4f * halfWidth);
+                if (Mathf.Abs(along) <= SlopeEpsilon && Mathf.Abs(across) <= SlopeEpsilon)
+                {
+                    // The footprint lies wholly before the foot or past the head: flat there.
+                    continue;
+                }
+                Vector3 up = Vector3.up - forward * along - right * across;
+                frame = Quaternion.LookRotation(forward + Vector3.up * along, up);
+                lift = Mathf.Max(0f, (frontRight + frontLeft + backRight + backLeft) * 0.25f - basePoint.y);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>The height of a ramp's surface at a planar point, carried flat past its foot (0) and its head.</summary>
+        private static float RampSurface(RampDef r, float head, Vector3 p)
+        {
+            Vector3 local = YawMath.Rotate(new Vector3(p.x - r.X, 0f, p.z - r.Z), -r.Yaw);
+            return head * Mathf.Clamp01((local.z + r.Length * 0.5f) / r.Length);
         }
 
         /// <summary>The stool's visual tip angle in degrees (0 upright, 90 on its side) at <paramref name="alpha"/> of the step.</summary>

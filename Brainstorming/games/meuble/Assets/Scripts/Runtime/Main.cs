@@ -53,6 +53,8 @@ namespace Meuble
             GamePause.IsPaused = false;
             AudioListener.pause = false;
             Run("time", () => Time.fixedDeltaTime = Tuning.FixedStep);
+            // M5 (CONTRACT_M5_v3 15.7): the editor, --probe and --look use a test save deleted here; then the load.
+            Run("save", SaveStore.Boot);
             Run("layers", Layers.Resolve);
             // The chair and the inhabitant never push each other: a still chair must never be displaced
             // (PRD 3.2 M1 note) and a chair leaving an overlap must not jump. Vision uses Occluder only.

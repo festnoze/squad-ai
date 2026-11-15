@@ -60,6 +60,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             ModelKit.Disabled = false;
             Application.logMessageReceived -= OnLog;
             foreach (Object o in scratch)
@@ -215,17 +216,22 @@ namespace Meuble.Tests
                 Assert.IsNotNull(e.prefab, id + ": no prefab");
                 Assert.IsTrue(ModelMath.IsValidSize(e.nativeSize), $"{id}: native size {e.nativeSize}");
                 Assert.IsTrue(ModelMath.IsRightAngle(e.yawOffset), $"{id}: yaw offset {e.yawOffset} is not a multiple of 90");
-                bool human = id.StartsWith("quaternius.", StringComparison.Ordinal);
-                Assert.AreEqual(human, e.rigged, id + ": rigged");
-                if (human)
+                // M5 (CONTRACT_M5_v3 15.5): every Quaternius model is a rigged character, a human or a pet (the dog); the
+                // human checks (the "_Idle" clip, the eyes at Tuning.EyeHeight) apply to humans, a pet's eyes stand at its
+                // own target and its Idle is named by its clip map.
+                bool character = id.StartsWith("quaternius.", StringComparison.Ordinal);
+                bool human = character && e.kind == ModelCatalog.KindHuman;
+                Assert.AreEqual(character, e.rigged, id + ": rigged");
+                Assert.AreEqual(character, e.IsHuman || e.IsPet, id + ": a character is a human or a pet, a static model neither");
+                if (character)
                 {
                     Assert.IsFalse(string.IsNullOrEmpty(e.headBone), id + ": no head bone");
                     Assert.Greater(e.eyeHeight, 0f, id + ": eye height");
                 }
                 Transform parent = Scratch("Catalog " + id);
-                GameObject model = ModelKit.Instantiate(id, parent, new Vector3(0.6f, 0.9f, 0.5f), human ? ModelFit.Uniform : ModelFit.Box);
+                GameObject model = ModelKit.Instantiate(id, parent, new Vector3(0.6f, 0.9f, 0.5f), character ? ModelFit.Uniform : ModelFit.Box);
                 Assert.IsNotNull(model, id + " does not instantiate");
-                if (human)
+                if (character)
                 {
                     Transform head = model.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == e.headBone);
                     Assert.IsNotNull(head, $"{id}: head bone '{e.headBone}' missing in the instance");
@@ -237,7 +243,7 @@ namespace Meuble.Tests
                     AnimationClip idle = null;
                     foreach (AnimationState state in anim)
                     {
-                        if (state.name.EndsWith("_Idle", StringComparison.Ordinal))
+                        if (human ? state.name.EndsWith("_Idle", StringComparison.Ordinal) : state.name == e.idleClip)
                         {
                             idle = state.clip;
                         }
@@ -245,7 +251,8 @@ namespace Meuble.Tests
                     Assert.IsNotNull(idle, id + ": no Idle clip");
                     Assert.IsTrue(ModelKit.TryBindRotation(model.GetComponentInChildren<SkinnedMeshRenderer>(true), head, out _), id + ": head not in the bind poses");
                     float eyeY = ModelKit.IdleEyeHeight(model, idle, head, e.eyeLocal, parent, 24);
-                    Assert.That(eyeY, Is.EqualTo(Tuning.EyeHeight).Within(EyeTolerance), $"{id}: the eyes stand at {eyeY:0.###} m, the routine's eye at {Tuning.EyeHeight}");
+                    float wantEye = human ? Tuning.EyeHeight : e.TargetEye;
+                    Assert.That(eyeY, Is.EqualTo(wantEye).Within(EyeTolerance), $"{id}: the eyes stand at {eyeY:0.###} m, the routine's eye at {wantEye}");
                 }
                 else
                 {
@@ -560,7 +567,9 @@ namespace Meuble.Tests
                     Assert.GreaterOrEqual(t, ModelKit.Triangles(skin.sharedMesh), $"{level}: the skinned triangles of {h.name} are not counted");
                     Assert.Greater(bones, 0, $"{level}: premise: the bones of {h.name} are counted");
                     Assert.LessOrEqual(t, Tuning.BudgetInhabitantTriangles, $"{level}: inhabitant {h.name} has {t} triangles");
-                    Assert.LessOrEqual(bones, Tuning.BudgetInhabitantBones, $"{level}: inhabitant {h.name} has {bones} bones");
+                    // M5: a pet (the dog) may have Tuning.BudgetPetBones bones; humans keep 40.
+                    int boneBudget = h.Rig != null && h.Rig.IsPet ? Tuning.BudgetPetBones : Tuning.BudgetInhabitantBones;
+                    Assert.LessOrEqual(bones, boneBudget, $"{level}: inhabitant {h.name} has {bones} bones");
                     worstInhabitant = Math.Max(worstInhabitant, t);
                     worstBones = Math.Max(worstBones, bones);
                 }
@@ -568,8 +577,10 @@ namespace Meuble.Tests
                 Debug.Log($"[Step25] {level}: {count.Renderers} renderers, {count.Materials.Count} materials ({count.MaterialSlots} slots), "
                     + $"{count.Triangles} triangles, worst furniture {worstFurniture}, inhabitant {worstInhabitant} triangles / {worstBones} bones, "
                     + $"{Game.Level.ModelVisuals.Count} model visuals");
-                Assert.LessOrEqual(count.Renderers, Tuning.BudgetRenderers, level + ": renderers");
-                Assert.LessOrEqual(count.Materials.Count, Tuning.BudgetMaterials,
+                // CONTRACT_M5 16.11 and 17: draw calls are material slots; a house of HouseBudgetRooms rooms has the house budget.
+                bool house = Game.Def.AllRooms().Count >= Tuning.HouseBudgetRooms;
+                Assert.LessOrEqual(count.MaterialSlots, house ? Tuning.BudgetHouseRenderers : Tuning.BudgetRenderers, level + ": draw calls (material slots)");
+                Assert.LessOrEqual(count.Materials.Count, house ? Tuning.BudgetHouseMaterials : Tuning.BudgetMaterials,
                     $"{level}: materials: {string.Join(", ", count.Materials.Select(m => m.name).OrderBy(n => n))}");
                 Assert.LessOrEqual(count.Triangles, Tuning.BudgetLevelTriangles, level + ": level triangles");
                 Assert.AreEqual(0, count.SlotsWithoutMaterial, level + ": empty material slots");

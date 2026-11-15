@@ -50,6 +50,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             Time.timeScale = 1f;
             Application.logMessageReceived -= OnLog;
             yield return null;

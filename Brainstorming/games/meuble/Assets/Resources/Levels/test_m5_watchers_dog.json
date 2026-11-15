@@ -1,0 +1,41 @@
+{
+  "id": "test_m5_watchers_dog",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 8.0,
+    "sizeZ": 6.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": -2.3, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "kind": "chair",
+    "x": 0.0,
+    "z": -1.5,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 3.5, "z": -2.3, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [],
+  "inhabitants": [
+    {
+      "name": "Chien",
+      "kind": "dog",
+      "model": "quaternius.shiba",
+      "startStation": 0,
+      "stations": [
+        { "x": 0.0, "z": 1.5, "facing": 180.0, "dwell": 2.0, "glances": [], "sleep": true },
+        { "x": 2.0, "z": 1.5, "facing": 180.0, "dwell": 30.0, "glances": [] }
+      ]
+    }
+  ]
+}

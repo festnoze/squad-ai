@@ -1,0 +1,90 @@
+{
+  "id": "test_m5_audit_cross",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 6.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.05,
+      "z": -2.25,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": -3.25,
+    "z": -2.25,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 3.25,
+    "z": -2.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -2.5,
+          "z": 0.25,
+          "facing": 90.0,
+          "dwell": 2.0,
+          "glances": []
+        },
+        {
+          "x": 2.5,
+          "z": 0.25,
+          "facing": 270.0,
+          "dwell": 2.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Voisine",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 2.5,
+          "z": -0.25,
+          "facing": 270.0,
+          "dwell": 2.0,
+          "glances": []
+        },
+        {
+          "x": -2.5,
+          "z": -0.25,
+          "facing": 90.0,
+          "dwell": 2.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

@@ -42,7 +42,8 @@ namespace Meuble.Core
     /// <summary>
     /// Displacement memory of one inhabitant (PRD 4.4, docs/CONTRACT_M2.md 3.1 as amended by 11). One slot per
     /// piece of furniture: the player slot P, seeded at the spawn pose, and one fixed slot per decoy. A sighting
-    /// never creates a slot, and a decoy slot never moves. The tolerance is position only.
+    /// never creates a slot, and a decoy slot never moves. The tolerance is position only, and per inhabitant since M5
+    /// (<see cref="Tolerance"/>).
     /// <para>
     /// An incident is a run of consecutive observed steps in which the chair is seen out of place. It ends on a
     /// step where the chair is not seen, seen in place, or explained by a decoy, and on <see cref="ResetGrace"/>
@@ -72,6 +73,14 @@ namespace Meuble.Core
         /// <summary>The last pose at which this inhabitant saw the player furniture in place, and the carry back target.</summary>
         public FurniturePose PlayerSlot { get; private set; }
 
+        /// <summary>
+        /// M5 (CONTRACT_M5 3, PersonalityDef.Tolerance): the displacement tolerance of this inhabitant's memory, in metres,
+        /// default <see cref="Tuning.DisplacementTolerance"/> (0.75); the tidy one notices 0.4 m and the watchful one 0.5 m.
+        /// <see cref="Observe(bool, FurniturePose, float)"/> uses it for the player slot and for the decoys of the
+        /// player's kind alike. Set it before the first observation.
+        /// </summary>
+        public float Tolerance { get; set; } = Tuning.DisplacementTolerance;
+
         /// <param name="playerSpawn">The pose where the household knows the player furniture belongs.</param>
         /// <param name="decoys">Decoy poses, fixed for the whole level. Null means no decoy.</param>
         /// <param name="decoyKinds">Kind of each decoy, parallel to <paramref name="decoys"/>.</param>
@@ -92,6 +101,20 @@ namespace Meuble.Core
                 this.decoys[i] = decoys[i];
                 decoyOfPlayerKind[i] = string.Equals(decoyKinds[i], playerKind, StringComparison.OrdinalIgnoreCase);
             }
+        }
+
+        /// <summary>M5: the memory of an inhabitant whose personality has its own <paramref name="tolerance"/> (CONTRACT_M5 3).</summary>
+        public FurnitureMemory(FurniturePose playerSpawn, IReadOnlyList<FurniturePose> decoys, IReadOnlyList<string> decoyKinds,
+            string playerKind, float tolerance)
+            : this(playerSpawn, decoys, decoyKinds, playerKind)
+        {
+            Tolerance = tolerance;
+        }
+
+        /// <summary>M5: <see cref="WithinTolerance(FurniturePose, FurniturePose)"/> with an explicit tolerance.</summary>
+        public static bool WithinTolerance(FurniturePose a, FurniturePose b, float tolerance)
+        {
+            return YawMath.Planar(a.Position - b.Position).magnitude <= tolerance + DistanceEpsilon;
         }
 
         /// <summary>
@@ -136,7 +159,7 @@ namespace Meuble.Core
                 ResetGrace(); // grace reset: not seen
                 return Observation.NotSeen;
             }
-            if (WithinTolerance(player, PlayerSlot))
+            if (WithinTolerance(player, PlayerSlot, Tolerance)) // MUTATION:TIDY_TOLERANCE
             {
                 PlayerSlot = player;
                 ResetGrace(); // grace reset: in place
@@ -145,7 +168,7 @@ namespace Meuble.Core
             for (int i = 0; i < decoys.Length; i++)
             {
                 // Seen or not, a chair of the same kind belongs there: "one chair among several".
-                if (decoyOfPlayerKind[i] && WithinTolerance(player, decoys[i]))
+                if (decoyOfPlayerKind[i] && WithinTolerance(player, decoys[i], Tolerance))
                 {
                     ResetGrace(); // grace reset: explained
                     return Observation.ExplainedByDecoy;

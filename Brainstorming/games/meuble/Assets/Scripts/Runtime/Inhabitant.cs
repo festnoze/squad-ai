@@ -19,6 +19,17 @@ namespace Meuble
     /// float above its head bone, and the frown is the rig's two brow boxes on the head bone (M3.1), driven by the
     /// same blend as <see cref="Frowning"/>. <see cref="FootstepCount"/> counts foot contacts
     /// of the fixed step gait. While <see cref="GamePause.IsPaused"/> the visuals hold the last fixed step pose.
+    ///
+    /// M5 (docs/CONTRACT_M5.md 3, CONTRACT_M5_v3.md 15.4 to 15.6):
+    /// - the routine is built by <see cref="RoutineFactory.Create(InhabitantDef, LevelDef, IPathPlanner, IPathPlanner, SeatRegistry, int, int)"/>
+    ///   (the personality, the pattern, the frozen station walks, the investigate planner, the shared seats, the floor), and
+    ///   <see cref="Personality"/> is its personality (a dog kind wins);
+    /// - the transform stands on the floor under the routine (<see cref="InhabitantRoutine.FloorHeight"/>), and the visual
+    ///   eye is the routine's eye (the personality's height, the dog's 0.35 m, plus the floor);
+    /// - the identity: the personality's model (<see cref="ModelIdOf"/>, resolved by the level builder) wears its clothes
+    ///   tint (<see cref="TintOf"/>, applied to the rig's model here);
+    /// - a sleeping watcher shows a "z" (<see cref="MarkerKind.Sleeping"/>), and the wake telegraph that ends its sleep, eye
+    ///   still closed, a blinking "z" (<see cref="MarkerKind.Waking"/>) with the head's telegraph tilt.
     /// </summary>
     public sealed class Inhabitant : MonoBehaviour
     {
@@ -31,6 +42,30 @@ namespace Meuble
 
         public InhabitantRoutine Routine { get; private set; }
 
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5.md 3, 16.12): the personality (or the dog), set at Init: the routine's own instance, so its
+        /// range, angle, eye, hearing and roles are the ones the routine uses.
+        /// </summary>
+        public PersonalityDef Personality { get; set; }
+
+        /// <summary>M5: the data this inhabitant was built from (null before Init).</summary>
+        public InhabitantDef Def { get; private set; }
+
+        /// <summary>M5: the dog (CONTRACT_M5_v3 4): its personality is the dog row.</summary>
+        public bool IsDog => Personality != null && Personality.Id == PersonalityDef.Dog;
+
+        /// <summary>M5: the clothes tint this inhabitant wears (<see cref="TintOf"/>), or null (a default inhabitant).</summary>
+        public Color? Tint { get; private set; }
+
+        /// <summary>M5: the clothes slots of the model that took <see cref="Tint"/> (0 without a model or a tint).</summary>
+        public int TintedSlots { get; private set; }
+
+        /// <summary>
+        /// M5B (CONTRACT_M5 17): the material slots the tinted model saved by merging its slots of one material and one
+        /// detail (<see cref="ModelKit.MergeSlots"/>; 0 when <see cref="ModelKit.MergeCharacterSlots"/> is off).
+        /// </summary>
+        public int MergedSlots { get; private set; }
+
         /// <summary>M3: the rigged model driving the visuals, or null for the procedural body (docs/CONTRACT_M3.md 5).</summary>
         public InhabitantRig Rig { get; private set; }
 
@@ -39,8 +74,11 @@ namespace Meuble
         /// <summary>M2: the routine mode (Routine, Alerted, Investigating, Carrying, Startled).</summary>
         public InhabitantMode Mode => Routine != null ? Routine.Mode : InhabitantMode.Routine;
 
-        /// <summary>Which marker the head shows: none, "?" or "!" (probe and tests).</summary>
-        public enum MarkerKind { None, Question, Exclamation }
+        /// <summary>
+        /// Which marker the head shows: none, "?" or "!" (probe and tests). M5: <see cref="Sleeping"/> a "z" over a sleeping
+        /// watcher (its eye closed, its cone hidden), <see cref="Waking"/> the same "z" blinking during the wake telegraph.
+        /// </summary>
+        public enum MarkerKind { None, Question, Exclamation, Sleeping, Waking }
 
         public MarkerKind Marker { get; private set; }
         public bool Frowning => frownBlend > 0.5f;
@@ -115,13 +153,65 @@ namespace Meuble
             Init(def, StraightPlanner.Instance);
         }
 
-        /// <summary>M2: the routine plans its walks with <paramref name="planner"/> (docs/CONTRACT_M2.md 5).</summary>
+        /// <summary>
+        /// M2: the routine plans its walks with <paramref name="planner"/> (docs/CONTRACT_M2.md 5). M5: through
+        /// <see cref="RoutineFactory"/> with no level (a flat floor), no seat registry and every NavMesh area, so the
+        /// personality and the pattern of <paramref name="def"/> still apply.
+        /// </summary>
         public void Init(InhabitantDef def, IPathPlanner planner)
         {
-            Routine = new InhabitantRoutine(def.Stations, def.StartStation, planner ?? StraightPlanner.Instance);
+            Init(def, null, planner, null, null, 0, RoutineFactory.AllAreas);
+        }
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.6): the routine of <paramref name="def"/> from
+        /// <see cref="RoutineFactory.Create(InhabitantDef, LevelDef, IPathPlanner, IPathPlanner, SeatRegistry, int, int)"/>,
+        /// with the level (its floor), the station planner (frozen station walks, restricted to
+        /// <paramref name="stationAreaMask"/>: the authored leaves), the planner of every other walk (null: the station
+        /// planner; the game passes one that plans with the current door mask), the level's shared seat registry and this
+        /// inhabitant's index in it. Then the personality, the identity tint and the pose.
+        /// </summary>
+        public void Init(InhabitantDef def, LevelDef level, IPathPlanner stationPlanner, IPathPlanner investigatePlanner,
+            SeatRegistry seats, int owner, int stationAreaMask)
+        {
+            Def = def;
+            Routine = RoutineFactory.Create(def, level, stationPlanner ?? StraightPlanner.Instance, investigatePlanner, seats, owner,
+                stationAreaMask);
+            Personality = Routine.Personality;
+            Tint = TintOf(def);
             BuildExpressions();
             ResetFootContact();
             SnapToRoutine();
+            ApplyIdentity();
+        }
+
+        /// <summary>
+        /// M5: the catalog model an inhabitant shows: its personality's (CONTRACT_M5 3; the dog's Shiba), an explicit
+        /// <see cref="InhabitantDef.Model"/> winning. Null for a default inhabitant that names none (the procedural body).
+        /// The level builder instantiates it.
+        /// </summary>
+        public static string ModelIdOf(InhabitantDef def)
+        {
+            return def != null ? PersonalityDef.ForInhabitant(def).Model : null;
+        }
+
+        /// <summary>
+        /// M5: the clothes tint of an inhabitant: its personality's <see cref="PersonalityDef.Tint"/>, an explicit
+        /// <see cref="InhabitantDef.BodyColor"/> winning. Null for the default personality: the inhabitants of levels 1 to 7
+        /// keep the clothes of their model (their body colour paints the procedural body only, as in M3 and M4).
+        /// </summary>
+        public static Color? TintOf(InhabitantDef def)
+        {
+            if (def == null)
+            {
+                return null;
+            }
+            PersonalityDef p = PersonalityDef.ForInhabitant(def);
+            if (p.Id == PersonalityDef.Default || string.IsNullOrEmpty(p.Tint) || !ColorUtility.TryParseHtmlString(p.Tint, out Color c))
+            {
+                return null;
+            }
+            return new Color(c.r, c.g, c.b, 1f);
         }
 
         /// <summary>Called by <see cref="InhabitantRig.Attach"/>: the model replaces the procedural body.</summary>
@@ -133,7 +223,21 @@ namespace Meuble
             {
                 SnapToRoutine();
             }
+            ApplyIdentity();
         }
+
+        /// <summary>
+        /// M5: the model's clothes take the personality's tint (whichever of Init and the rig comes last). M5B: then its slots
+        /// of one material and one detail merge (every colour is final once the tint is on).
+        /// </summary>
+        private void ApplyIdentity()
+        {
+            TintedSlots = Rig != null && Tint.HasValue ? ModelKit.TintClothes(Rig.Model, Rig.Entry, Tint.Value) : 0;
+            MergedSlots += Rig != null && Tint.HasValue ? ModelKit.MergeSlots(Rig.Model, Rig.Entry) : 0;
+        }
+
+        /// <summary>M5: where the body stands: the routine's planar position on the floor under it (CONTRACT_M5_v3 15.4).</summary>
+        private Vector3 GroundedPosition => Routine.Position + Vector3.up * Routine.FloorHeight; // MUTATION:VISUAL_FLOOR
 
         /// <summary>Foot contacts: on the clip's contacts with a model, at the bob minima of the procedural body.</summary>
         private float FootContactPhase => Rig != null ? Rig.FootContactPhase : 0f;
@@ -145,12 +249,12 @@ namespace Meuble
 
         private void SnapToRoutine()
         {
-            currentPosition = previousPosition = Routine.Position;
+            currentPosition = previousPosition = GroundedPosition;
             currentBodyYaw = previousBodyYaw = Routine.BodyYaw;
             currentHeadYaw = previousHeadYaw = Routine.HeadYaw;
             currentEyeHeight = previousEyeHeight = Routine.EyeHeight;
             previousGaitCycles = gaitCycles;
-            transform.SetPositionAndRotation(Routine.Position, Quaternion.Euler(0f, Routine.BodyYaw, 0f));
+            transform.SetPositionAndRotation(currentPosition, Quaternion.Euler(0f, Routine.BodyYaw, 0f));
             VisualEyePosition = Routine.EyePosition;
             VisualEyeYaw = Routine.EyeYaw;
             ApplyVisual(1f);
@@ -186,7 +290,7 @@ namespace Meuble
             previousBodyYaw = currentBodyYaw;
             previousHeadYaw = currentHeadYaw;
             previousEyeHeight = currentEyeHeight;
-            currentPosition = Routine.Position;
+            currentPosition = GroundedPosition;
             currentBodyYaw = Routine.BodyYaw;
             currentHeadYaw = Routine.HeadYaw;
             currentEyeHeight = Routine.EyeHeight;
@@ -234,7 +338,8 @@ namespace Meuble
             Vector3 position = Vector3.Lerp(previousPosition, currentPosition, alpha);
             float bodyYaw = Mathf.LerpAngle(previousBodyYaw, currentBodyYaw, alpha);
             float headYaw = Mathf.Lerp(previousHeadYaw, currentHeadYaw, alpha);
-            // M4: the eye height follows the routine (seated 1.15 m), interpolated like the pose.
+            // M4: the eye height follows the routine (seated 1.15 m), interpolated like the pose. M5: the position stands on
+            // the floor, so the visual eye is the routine's eye (EyePosition adds the same floor height).
             float eyeHeight = Mathf.Lerp(previousEyeHeight, currentEyeHeight, alpha);
             VisualEyeHeight = eyeHeight;
             VisualEyePosition = position + new Vector3(0f, eyeHeight, 0f);
@@ -401,7 +506,12 @@ namespace Meuble
             }
             InhabitantMode mode = Routine.Mode;
             MarkerKind kind = MarkerKind.None;
-            if (mode == InhabitantMode.Alerted)
+            if (Routine.Asleep)
+            {
+                // M5: asleep, its eye is closed; the wake telegraph that ends the sleep keeps it closed and blinks the "z".
+                kind = Routine.IsTelegraphing ? MarkerKind.Waking : MarkerKind.Sleeping;
+            }
+            else if (mode == InhabitantMode.Alerted)
             {
                 kind = MarkerKind.Question;
             }
@@ -409,28 +519,37 @@ namespace Meuble
             {
                 kind = MarkerKind.Exclamation;
             }
+            bool sleepMarker = kind == MarkerKind.Sleeping || kind == MarkerKind.Waking;
             if (kind != Marker)
             {
                 Marker = kind;
                 markerCanvas.enabled = kind != MarkerKind.None;
                 if (kind != MarkerKind.None)
                 {
-                    markerImage.sprite = kind == MarkerKind.Question ? ProceduralArt.Question : ProceduralArt.Exclamation;
+                    markerImage.sprite = sleepMarker ? SleepGlyph
+                        : kind == MarkerKind.Question ? ProceduralArt.Question : ProceduralArt.Exclamation;
+                    markerRoot.localScale = Vector3.one * ((sleepMarker ? Tuning.SleepMarkerSize : MarkerSize) / 100f);
                 }
             }
             if (kind == MarkerKind.None)
             {
                 return;
             }
+            // M5: the wake telegraph blinks the "z" (held while paused, like the float).
+            bool blinkOff = kind == MarkerKind.Waking && Mathf.Repeat(visualClock * Tuning.WakeMarkerBlinkRate, 1f) >= 0.5f;
+            markerImage.color = new Color(1f, 1f, 1f, blinkOff ? 0.25f : 1f);
             // Billboard toward the camera, with a gentle float (held while paused).
-            float height = MarkerHeight + 0.04f * Mathf.Sin(visualClock * 3.2f);
+            float bob = 0.04f * Mathf.Sin(visualClock * 3.2f);
             if (Rig != null && Rig.Head != null)
             {
-                markerRoot.position = Rig.MarkerPosition(height);
+                // M5: above the head of a lower watcher (the dog): the height follows the personality's standing eye.
+                float standingEye = Personality != null && Personality.EyeHeight > 0f ? Personality.EyeHeight : Tuning.EyeHeight;
+                markerRoot.position = Rig.MarkerPosition(MarkerHeight - Tuning.EyeHeight + standingEye + bob);
             }
             else
             {
-                markerRoot.localPosition = new Vector3(0f, height, 0f);
+                // The procedural body already sinks by its eye's drop below Tuning.EyeHeight (seated, or a low watcher).
+                markerRoot.localPosition = new Vector3(0f, MarkerHeight + bob, 0f);
             }
             Camera cam = Camera.main;
             if (cam != null)
@@ -441,6 +560,73 @@ namespace Meuble
                     markerRoot.rotation = Quaternion.LookRotation(toCamera, Vector3.up);
                 }
             }
+        }
+
+        /// <summary>M5: the marker's world position (tests: above the head of the watcher that wears it).</summary>
+        public Vector3 MarkerPosition => markerRoot != null ? markerRoot.position : transform.position;
+
+        /// <summary>M5: true while the marker canvas draws (tests).</summary>
+        public bool MarkerShown => markerCanvas != null && markerCanvas.enabled;
+
+        // ----- M5: the sleep "z" (drawn here: a glyph of the watchers' own marker, no new material) -----
+
+        private static Sprite sleepGlyph;
+
+        /// <summary>A big "Z" and a small one above it, pale blue with a dark outline (the style of the "?" and "!").</summary>
+        public static Sprite SleepGlyph => sleepGlyph != null ? sleepGlyph : sleepGlyph = DrawSleepGlyph();
+
+        private static Sprite DrawSleepGlyph()
+        {
+            const int size = 96;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = "SleepZ",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+            };
+            var pixels = new Color[size * size];
+            float pixel = 2f / size;
+            var fill = new Color(0.74f, 0.88f, 1f, 1f);
+            var ink = new Color(0.08f, 0.08f, 0.1f, 1f);
+            const float outline = 0.07f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    var p = new Vector2((x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f);
+                    float d = Mathf.Min(ZDistance(p, new Vector2(-0.78f, -0.78f), 0.95f) - 0.11f,
+                        ZDistance(p, new Vector2(0.3f, 0.3f), 0.5f) - 0.075f);
+                    float inked = Mathf.Clamp01(0.5f - (d - outline) / pixel);
+                    float filled = Mathf.Clamp01(0.5f - d / pixel);
+                    Color c = Color.Lerp(ink, fill, filled);
+                    c.a = inked;
+                    pixels[y * size + x] = c;
+                }
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+            sprite.name = "SleepZ";
+            sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            return sprite;
+        }
+
+        /// <summary>Distance to a "Z" of side <paramref name="side"/> whose bottom left corner is <paramref name="corner"/>.</summary>
+        private static float ZDistance(Vector2 p, Vector2 corner, float side)
+        {
+            var bottomLeft = corner;
+            var bottomRight = corner + new Vector2(side, 0f);
+            var topLeft = corner + new Vector2(0f, side);
+            var topRight = corner + new Vector2(side, side);
+            return Mathf.Min(Segment(p, topLeft, topRight), Mathf.Min(Segment(p, topRight, bottomLeft), Segment(p, bottomLeft, bottomRight)));
+        }
+
+        private static float Segment(Vector2 p, Vector2 a, Vector2 b)
+        {
+            Vector2 ab = b - a;
+            float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
+            return (p - (a + ab * t)).magnitude;
         }
     }
 }

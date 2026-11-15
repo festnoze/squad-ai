@@ -1,0 +1,5 @@
+@echo off
+rem Plays UN, DEUX, TROIS, MEUBLE without debugging: the release build in Build\Play, built once if missing.
+rem Options: -Windowed. To rebuild after a change: play.cmd. To debug: play.cmd -Dev.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0tools\play.ps1" -Run %*
+if errorlevel 1 pause

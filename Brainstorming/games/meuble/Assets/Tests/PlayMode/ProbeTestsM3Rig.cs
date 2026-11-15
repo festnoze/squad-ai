@@ -75,6 +75,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             Time.timeScale = 1f;
             GamePause.IsPaused = false;
             Application.logMessageReceived -= OnLog;
@@ -227,13 +228,24 @@ namespace Meuble.Tests
                     Animation anim = rig.Animation;
                     Assert.IsFalse(anim.playAutomatically, $"{where}: playAutomatically is still on");
                     Assert.AreEqual(AnimationCullingType.AlwaysAnimate, anim.cullingType, $"{where}: culling type");
-                    Assert.IsNotNull(rig.IdleState, $"{where}: no clip ending with _Idle");
-                    Assert.IsNotNull(rig.WalkState, $"{where}: no clip ending with _Walk");
-                    Assert.IsNotNull(rig.JumpState, $"{where}: no clip ending with _Jump");
-                    StringAssert.EndsWith("_Jump", rig.JumpClipName, $"{where}: Jump matched another clip");
+                    // M5 (CONTRACT_M5_v3 15.5): a human has Idle, Walk and Jump; a pet (the dog) Idle and Walk from its
+                    // clip map, and no Jump (startled, it plays Idle).
+                    if (rig.IsPet)
+                    {
+                        Assert.IsNotNull(rig.IdleState, $"{where}: the pet has no Idle '{rig.Entry.idleClip}'");
+                        Assert.IsNotNull(rig.WalkState, $"{where}: the pet has no Walk '{rig.Entry.walkClip}'");
+                        Assert.IsNull(rig.JumpState, $"{where}: a pet has no Jump");
+                    }
+                    else
+                    {
+                        Assert.IsNotNull(rig.IdleState, $"{where}: no clip ending with _Idle");
+                        Assert.IsNotNull(rig.WalkState, $"{where}: no clip ending with _Walk");
+                        Assert.IsNotNull(rig.JumpState, $"{where}: no clip ending with _Jump");
+                        StringAssert.EndsWith("_Jump", rig.JumpClipName, $"{where}: Jump matched another clip");
+                        Assert.AreEqual(WrapMode.ClampForever, rig.JumpState.wrapMode, $"{where}: Jump must play once and hold");
+                    }
                     Assert.AreEqual(WrapMode.Loop, rig.IdleState.wrapMode, $"{where}: Idle must loop");
                     Assert.AreEqual(WrapMode.Loop, rig.WalkState.wrapMode, $"{where}: Walk must loop");
-                    Assert.AreEqual(WrapMode.ClampForever, rig.JumpState.wrapMode, $"{where}: Jump must play once and hold");
                     Assert.AreEqual(Layers.Inhabitant, rig.Skin.gameObject.layer, $"{where}: the skinned mesh is not on the Inhabitant layer (x-ray)");
                 }
             }

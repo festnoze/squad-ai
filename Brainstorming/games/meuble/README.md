@@ -6,7 +6,18 @@ strings shown to the player are in French.
 
 ## Play
 
-- Built game: `Build/Windows/Meuble.exe` (produced by `./verify.sh player`).
+- **Play without debugging: `run.cmd`** (double-click): launches the release build in `Build/Play/`, and builds it
+  first only if it does not exist yet.
+- **Build and play: `play.cmd`** (double-click, or from a terminal). It builds the Windows player into
+  `Build/Play/` through `tools/unity.sh` (it waits if verify.sh or an agent holds Unity), then launches it.
+  Options: `-NoBuild` (play the last build), `-Windowed`, `-Dev` (a Development Build in `Build/PlayDev/` that
+  Visual Studio can attach to), `-WaitForDebugger` (with `-Dev`, the game waits for the debugger at startup). The Unity Editor must
+  not have the project open while it builds.
+- The probe's build: `Build/Windows/Meuble.exe` (produced by `./verify.sh player`).
+- Debugging in Visual Studio 2022: install the "Game development with Unity" workload (Visual Studio Installer;
+  the project's `.vsconfig` lists it), set Unity's Preferences > External Tools > External Script Editor to
+  Visual Studio 2022, open `meuble.sln`, then Debug > Attach Unity Debugger: the Editor in Play mode (switch the
+  Editor to Debug mode with the bug icon in its status bar) or a player built with `play.cmd -Dev`.
 - In the editor: open the project with Unity 6000.3.23f1, open `Assets/Scenes/Boot.unity`, press Play.
 - Controls: ZQSD or the arrow keys move (camera relative, keys read by physical position), the
   mouse orbits the camera (click to capture the cursor), the wheel zooms, R restarts, Escape
@@ -30,6 +41,41 @@ The harness refuses three kinds of false green: a JUnit report with zero tests, 
 and an expected probe step missing from the report. All waits in the probe are counted in fixed
 steps or in game time, never in rendered frames. The built player writes
 `TestResults/shots/report.json` and three screenshots. These screenshots are meant to be looked at.
+
+### M5 wave 5A gate (2026-11-13)
+
+The product owner rewrote M5 after the M4 playtest (PRD v1.7):
+- 10 new levels that combine mechanics;
+- larger maze-like houses;
+- several inhabitants with personalities;
+- the robot vacuum, the rocking chair and a balanced load.
+
+M5 is built in two waves. Wave 5A ships doors, the dog, the mezzanine, personalities and patterns,
+the save, the level select and the records, and levels 8, 12, 14 and 16 (an 11-level play order).
+
+| Stage | Result |
+|---|---|
+| EditMode | 370 tests, 0 failures |
+| PlayMode probe | 169 tests, 0 failures. M5 steps: 36 (doors: leaf poses, E rules, a leaf seen swinging is caught, walks frozen, investigations through an opened door, an open leaf faded), 37 (personalities in the rules and on screen, patterns in play), 38 (the dog: low eye, bark, cooldown, sleeping sees nothing), 39 (split level: floor heights, ramp, railings, visuals on the slope), 40 (full playthrough of the manifest at x8 with the save), 41 (save and level select), 45 (designer routes of levels 8 to 16 at three offsets, counter-routes) |
+| Level audit | 11 levels with no defect, 13 self-test fixtures, 2 to 15 s per level after a 20x speed-up |
+| Built player | 98 MB, 0 exceptions, frame time 3.6 to 6.9 ms median per level on the development PC, the probe save in the shot folder, the real save untouched |
+| Mutations | 58, all killed, run on a mirror of the project while wave 5B was being built |
+
+**How it was built:**
+- **Workflows.** Wave 5A ran as a workflow of eight builders: core, ui-save, bodies, audit, house,
+  watchers, game and levels.
+- **Critique.** An adversarial critique followed, with six critics and a refuter per dimension. It
+  confirmed 1 blocker (level 14's armchair hidden at the start) and 5 majors: no frame-time
+  measurement, budgets counted on renderers, a sleeping dog's sight untested, dead time on level 14,
+  and a level 12 dog that nobody heard.
+- **Fixes.** The 5A.1 fix wave (CONTRACT_M5 section 17) fixed them.
+
+**For the product owner's playtest (5A):**
+- the doors (E, only unseen);
+- the dog's bark and its cyan cone;
+- the people on the intro card;
+- Mamie sitting on the armchair at the mezzanine;
+- the night level with the dog.
 
 ### M4 gate (2026-11-13)
 
@@ -146,8 +192,9 @@ because a project can be open in only one editor.
 | `Meuble.Editor` | `ProjectSetup`, `Builder`, `LevelAudit` |
 | `Meuble.Tests.EditMode` / `.PlayMode` | unit tests of Core, and the probe |
 
-Levels are data in `Assets/Resources/Levels/*.json`, played in the order of `levels.json`. Everything visible is generated in C#: meshes,
-materials, HUD sprites and sounds. The project ships no binary asset.
+Levels are data in `Assets/Resources/Levels/*.json`, played in the order of `levels.json`. Meshes, materials, HUD sprites and part of
+the sounds are generated in C#. Since M3 the project also ships CC0 models (Kenney, Quaternius) and recordings, and since M4.2 six CC0
+detail textures (ambientCG, derived to grayscale by `tools/assets/derive_textures.py`); every one is listed in `docs/LICENSES.md`.
 
 ## Deviations from the PRD, and why
 

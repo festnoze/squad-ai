@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Meuble.Core;
 using UnityEngine;
 
@@ -26,7 +27,8 @@ namespace Meuble
     ///   target pose built from the Idle pose, blended with the M2 visual weights, never added on top of the clip.
     /// - <b>Unkeyed bones.</b> Legacy Animation only writes the bones a clip keys, and no clip of this family keys
     ///   the spine (Abdomen), nor Idle the head. So every bone the rig drives is put back to its rest local rotation
-    ///   in Update, before the animation: an override never outlives its frame.
+    ///   in Update, before the animation: an override never outlives its frame. (Since M4.2 the completed clips key
+    ///   them all; the reset stays for a model whose clips key none of them.)
     /// - <b>Brows</b> (M3.1). Two small boxes on the head bone frown while investigating or carrying (pillar 4's comic
     ///   beat), with the model's own near-black material: no new material.
     /// - <b>Pause.</b> While <see cref="GamePause.IsPaused"/> every clip runs at speed 0.
@@ -35,6 +37,20 @@ namespace Meuble
     ///   high perch (eyes at 1.31 m, hips 0.26 m back), so a seat fit moves the whole visual until the head bone stands
     ///   where the standing head would be, at the routine's eye height: the eyes are at 1.15 m on a seat and the
     ///   hips land over the seat. A pratfall sits on nothing, then drops to the floor tilting back.
+    /// - <b>Feet</b> (M4.2). The family's rig is an IK rig baked to FK: Foot.L and Foot.R hang under the root bone, not
+    ///   under the shins, and each clip puts them where its shins end. The clips key different bones ("_Idle" keys no foot,
+    ///   nor Body's rotation, the Torso, the Head or the fingers; the woman's not even the Neck or the right arm), and
+    ///   Legacy Animation leaves an unkeyed bone where the last clip put it: after a walk, Idle bent the legs back to
+    ///   its stance while the feet stayed mid-stride, and the ankles (skinned to both the shin and the foot) tore by
+    ///   0.2 to 0.46 m. So Attach replaces every clip the rig plays by a copy that also holds, as a constant at the
+    ///   model's rest pose, every bone property another of them keys (<see cref="CompleteClips"/>): every state writes
+    ///   the same bones, every cross fade blends them. While the Jump plays, the feet are also put on the shin tips: at
+    ///   the top of the hop the clip's legs fall 0.06 m short of its feet.
+    ///
+    /// - <b>Pets</b> (M5, docs/CONTRACT_M5_v3.md 15.5). A catalog entry of kind "pet" (the Shiba) names its Idle and Walk
+    ///   clips exactly; it has no Jump (Startled plays Idle), no sitting, no carry pose, no brows, no seat fit. Its head bone
+    ///   follows the eye yaw like a human's, its stride is <see cref="Tuning.DogWalkCycleMeters"/>, and
+    ///   <see cref="CompleteClips"/> completes its two clips too (its IK feet hang under the armature like the humans').
     ///
     /// Everything is driven by <see cref="Inhabitant"/>'s LateUpdate (one call per frame, after the body is placed),
     /// so the order of the two components never matters. The component lives on the inhabitant root: no Transform
@@ -80,6 +96,16 @@ namespace Meuble
         public const string LowerArmLeftName = "LowerArm.L";
         public const string UpperArmRightName = "UpperArm.R";
         public const string LowerArmRightName = "LowerArm.R";
+
+        /// <summary>M4.2: the foot bones (children of the root bone in this IK rig) and the tips of the shins they belong on.</summary>
+        public const string FootLeftName = "Foot.L";
+        public const string FootRightName = "Foot.R";
+        public const string ShinTipLeftName = "LowerLeg.L_end";
+        public const string ShinTipRightName = "LowerLeg.R_end";
+
+        // M4.2: a pose no clip keys a bone to, for finding which properties a clip keys (CompleteClips).
+        private static readonly Vector3 SentinelPosition = new Vector3(-917.3f, 433.1f, 271.9f);
+        private static readonly Quaternion SentinelRotation = Quaternion.Euler(41.7f, -133.9f, 77.3f);
 
         public enum Clip
         {
@@ -148,6 +174,18 @@ namespace Meuble
         /// <summary>The clip the rig last cross faded to.</summary>
         public Clip CurrentClip { get; private set; }
 
+        /// <summary>
+        /// M4.2: how many bone properties (a bone's position or its rotation, in one clip) Attach added to the played clips
+        /// so they all key the same ones. 0 means the clips already did.
+        /// </summary>
+        public int CompletedProperties { get; private set; }
+
+        /// <summary>M4.2: the foot bones and the shin tips (null when the model lacks them).</summary>
+        public Transform FootLeft { get; private set; }
+        public Transform FootRight { get; private set; }
+        public Transform ShinTipLeft { get; private set; }
+        public Transform ShinTipRight { get; private set; }
+
         /// <summary>The weight (0 to 1) of the telegraph roll applied to the head this frame.</summary>
         public float Tilt { get; private set; }
 
@@ -157,11 +195,14 @@ namespace Meuble
         /// <summary>Height of the head bone above the feet in the Idle pose (m), measured once at Attach.</summary>
         public float HeadRestHeight { get; private set; }
 
-        /// <summary>Meters walked per Walk clip cycle: the gait phase advances by distance / this.</summary>
-        public float WalkCycleDistance => WalkCycleMeters;
+        /// <summary>Meters walked per Walk clip cycle: the gait phase advances by distance / this. M5: a pet's own stride.</summary>
+        public float WalkCycleDistance => IsPet ? Tuning.DogWalkCycleMeters : WalkCycleMeters;
 
         /// <summary>Normalized clip time of the first foot contact; the second one is half a cycle later.</summary>
-        public float FootContactPhase => FootContactCycle;
+        public float FootContactPhase => IsPet ? Tuning.DogFootContactCycle : FootContactCycle;
+
+        /// <summary>M5: the model is a pet (its catalog entry's kind): Idle and Walk only, no brows, no seat fit.</summary>
+        public bool IsPet => Entry != null && Entry.IsPet;
 
         /// <summary>The face direction of the head bone: the bone axis that pointed forward in the bind pose.</summary>
         public Vector3 HeadForward => Head != null ? Head.rotation * headLocalForward : Vector3.forward;
@@ -179,6 +220,8 @@ namespace Meuble
         // Rest local rotations of every driven bone (same order as Driven()), restored before each animation pass.
         private Transform[] driven = new Transform[0];
         private Quaternion[] drivenLocalRest = new Quaternion[0];
+        // M4.2: the clip copies CompleteClips made, destroyed with the rig.
+        private readonly List<AnimationClip> completedClips = new List<AnimationClip>();
 
         /// <summary>
         /// Binds a model instantiated under the inhabitant's Visual (docs/CONTRACT_M3.md 5). Returns null, with one
@@ -224,6 +267,10 @@ namespace Meuble
             LowerArmLeft = FindBone(LowerArmLeftName);
             UpperArmRight = FindBone(UpperArmRightName);
             LowerArmRight = FindBone(LowerArmRightName);
+            FootLeft = FindBone(FootLeftName);
+            FootRight = FindBone(FootRightName);
+            ShinTipLeft = FindBone(ShinTipLeftName);
+            ShinTipRight = FindBone(ShinTipRightName);
 
             // The body frame the model is authored in: the inhabitant's Visual (its parent).
             if (inhabitant.Visual == null && modelRoot.transform.parent != null && modelRoot.transform.parent != inhabitant.transform)
@@ -248,6 +295,7 @@ namespace Meuble
             upperRightRest = UpperArmRight != null ? toFacing * UpperArmRight.rotation : Quaternion.identity;
             lowerRightRest = LowerArmRight != null ? toFacing * LowerArmRight.rotation : Quaternion.identity;
             HeadRestHeight = Head.position.y - frame.position.y;
+            // M5: a pet never sits, and has no face for brows.
             // M4 seat fit: where the head bone stands in Idle, and the eyes above it with the head held as Apply holds it.
             Hips = FindBone(HipsBoneName);
             HeadRestLocal = toFacing * (Head.position - frame.position);
@@ -255,7 +303,10 @@ namespace Meuble
             Head.rotation = facing * headCalibration;
             EyeAboveHead = EyePosition.y - Head.position.y;
             Head.rotation = idleHead;
-            BuildBrows();
+            if (!IsPet)
+            {
+                BuildBrows();
+            }
             var bones = new System.Collections.Generic.List<Transform>();
             foreach (Transform t in new[] { Spine, UpperArmLeft, LowerArmLeft, UpperArmRight, LowerArmRight, Head })
             {
@@ -381,9 +432,23 @@ namespace Meuble
             Animation.playAutomatically = false;
             Animation.cullingType = AnimationCullingType.AlwaysAnimate;
             Animation.Stop();
+            bool pet = IsPet;
             foreach (AnimationState state in Animation)
             {
                 string n = state.name;
+                if (pet)
+                {
+                    // M5: a pet's clip map names its clips exactly (the Shiba also stores "AnimalArmature|Idle" and so on).
+                    if (IdleClipName == null && n == Entry.idleClip)
+                    {
+                        IdleClipName = n;
+                    }
+                    else if (WalkClipName == null && n == Entry.walkClip)
+                    {
+                        WalkClipName = n;
+                    }
+                    continue;
+                }
                 if (IdleClipName == null && n.EndsWith(IdleSuffix, StringComparison.Ordinal))
                 {
                     IdleClipName = n;
@@ -405,6 +470,8 @@ namespace Meuble
                     StandClipName = n;
                 }
             }
+            // M4.2: before any state is configured or sampled (the copies replace the states).
+            CompleteClips(); // MUTATION:FEET
             // M4: sitting down and standing up each play once, then hold their last pose.
             if (SitState != null)
             {
@@ -414,7 +481,7 @@ namespace Meuble
             {
                 StandState.wrapMode = WrapMode.ClampForever;
             }
-            if (IdleClipName == null || WalkClipName == null || JumpClipName == null)
+            if (IdleClipName == null || WalkClipName == null || (JumpClipName == null && !pet))
             {
                 Debug.LogWarning($"[InhabitantRig] model '{Entry?.id}' misses a clip (Idle {IdleClipName}, Walk {WalkClipName}, Jump {JumpClipName}).");
             }
@@ -439,6 +506,184 @@ namespace Meuble
                 idle.time = 0f;
                 Animation.Sample();
                 CurrentClip = Clip.Idle;
+            }
+        }
+
+        /// <summary>
+        /// M4.2: makes every clip the rig plays (Idle, Walk, Jump, Sitting, Standing) key the same bone properties. Legacy
+        /// Animation writes only what a clip keys, so a property one clip keys and another does not keeps, under the
+        /// second, the value the first left: the feet of this IK rig stayed mid-stride under Idle (see the class summary).
+        ///
+        /// Which properties a clip keys is read from the clip itself: every bone is put in a sentinel pose, the clip is
+        /// sampled, and what moved off the sentinel is keyed. A clip that misses a property another one keys is replaced
+        /// (same state name) by a copy holding it as a constant at the model's rest pose: the prefab's local values, the
+        /// pose the clips were authored over (with them, Idle stands each foot on its shin tip within 7 mm). Legacy clips
+        /// accept new curves at run time, in a player too. The copies die with the rig.
+        /// </summary>
+        private void CompleteClips()
+        {
+            CompletedProperties = 0;
+            if (Animation == null || Skin == null || Model == null)
+            {
+                return;
+            }
+            var names = new List<string>();
+            foreach (string n in new[] { IdleClipName, WalkClipName, JumpClipName, SitClipName, StandClipName })
+            {
+                if (n != null && !names.Contains(n) && StateOf(n) != null && StateOf(n).clip != null)
+                {
+                    names.Add(n);
+                }
+            }
+            Transform animationRoot = Animation.transform;
+            var bones = new List<Transform>();
+            var paths = new List<string>();
+            foreach (Transform bone in Skin.bones)
+            {
+                string path = bone != null ? PathFrom(animationRoot, bone) : null;
+                if (!string.IsNullOrEmpty(path) && !bones.Contains(bone))
+                {
+                    bones.Add(bone);
+                    paths.Add(path);
+                }
+            }
+            if (names.Count < 2 || bones.Count == 0)
+            {
+                return;
+            }
+
+            // The rest pose: the prefab's local values (a rebind may find the live bones posed), else the live ones.
+            Transform prefabRoot = Entry != null && Entry.prefab != null ? Entry.prefab.transform : null;
+            var restPosition = new Vector3[bones.Count];
+            var restRotation = new Quaternion[bones.Count];
+            for (int b = 0; b < bones.Count; b++)
+            {
+                string modelPath = PathFrom(Model.transform, bones[b]);
+                Transform source = prefabRoot != null && !string.IsNullOrEmpty(modelPath) ? prefabRoot.Find(modelPath) : null;
+                if (source == null)
+                {
+                    source = bones[b];
+                }
+                restPosition[b] = source.localPosition;
+                restRotation[b] = source.localRotation;
+            }
+
+            // What each clip keys: sampling writes only its keyed properties over the sentinel pose.
+            var keyedPosition = new bool[names.Count, bones.Count];
+            var keyedRotation = new bool[names.Count, bones.Count];
+            var anyPosition = new bool[bones.Count];
+            var anyRotation = new bool[bones.Count];
+            for (int c = 0; c < names.Count; c++)
+            {
+                foreach (Transform bone in bones)
+                {
+                    bone.localPosition = SentinelPosition;
+                    bone.localRotation = SentinelRotation;
+                }
+                StateOf(names[c]).clip.SampleAnimation(Animation.gameObject, 0f);
+                for (int b = 0; b < bones.Count; b++)
+                {
+                    keyedPosition[c, b] = (bones[b].localPosition - SentinelPosition).sqrMagnitude > 1e-6f;
+                    keyedRotation[c, b] = Quaternion.Angle(bones[b].localRotation, SentinelRotation) > 0.01f;
+                    anyPosition[b] |= keyedPosition[c, b];
+                    anyRotation[b] |= keyedRotation[c, b];
+                }
+            }
+            for (int b = 0; b < bones.Count; b++)
+            {
+                bones[b].localPosition = restPosition[b];
+                bones[b].localRotation = restRotation[b];
+            }
+
+            // A copy of each clip that misses a property, holding it at rest.
+            for (int c = 0; c < names.Count; c++)
+            {
+                AnimationClip source = StateOf(names[c]).clip;
+                AnimationClip copy = null;
+                float end = Mathf.Max(source.length, 1e-3f);
+                for (int b = 0; b < bones.Count; b++)
+                {
+                    bool position = anyPosition[b] && !keyedPosition[c, b];
+                    bool rotation = anyRotation[b] && !keyedRotation[c, b];
+                    if (!position && !rotation)
+                    {
+                        continue;
+                    }
+                    if (copy == null)
+                    {
+                        copy = Instantiate(source);
+                        copy.name = source.name;
+                    }
+                    if (position)
+                    {
+                        Vector3 p = restPosition[b];
+                        copy.SetCurve(paths[b], typeof(Transform), "localPosition.x", AnimationCurve.Constant(0f, end, p.x));
+                        copy.SetCurve(paths[b], typeof(Transform), "localPosition.y", AnimationCurve.Constant(0f, end, p.y));
+                        copy.SetCurve(paths[b], typeof(Transform), "localPosition.z", AnimationCurve.Constant(0f, end, p.z));
+                        CompletedProperties++;
+                    }
+                    if (rotation)
+                    {
+                        Quaternion q = restRotation[b];
+                        copy.SetCurve(paths[b], typeof(Transform), "localRotation.x", AnimationCurve.Constant(0f, end, q.x));
+                        copy.SetCurve(paths[b], typeof(Transform), "localRotation.y", AnimationCurve.Constant(0f, end, q.y));
+                        copy.SetCurve(paths[b], typeof(Transform), "localRotation.z", AnimationCurve.Constant(0f, end, q.z));
+                        copy.SetCurve(paths[b], typeof(Transform), "localRotation.w", AnimationCurve.Constant(0f, end, q.w));
+                        CompletedProperties++;
+                    }
+                }
+                if (copy != null)
+                {
+                    copy.EnsureQuaternionContinuity();
+                    Animation.RemoveClip(names[c]);
+                    Animation.AddClip(copy, names[c]);
+                    completedClips.Add(copy);
+                }
+            }
+        }
+
+        /// <summary>The path of <paramref name="t"/> under <paramref name="root"/> ("" for the root, null when not under it).</summary>
+        private static string PathFrom(Transform root, Transform t)
+        {
+            var parts = new List<string>();
+            for (Transform c = t; c != null; c = c.parent)
+            {
+                if (c == root)
+                {
+                    parts.Reverse();
+                    return string.Join("/", parts);
+                }
+                parts.Add(c.name);
+            }
+            return null;
+        }
+
+        private void OnDestroy()
+        {
+            foreach (AnimationClip clip in completedClips)
+            {
+                if (clip == null)
+                {
+                    continue;
+                }
+                if (Application.isPlaying)
+                {
+                    Destroy(clip);
+                }
+                else
+                {
+                    DestroyImmediate(clip);
+                }
+            }
+            completedClips.Clear();
+        }
+
+        /// <summary>M4.2: puts a foot bone on the tip of its shin (both in world space; the foot hangs under the root bone).</summary>
+        private static void PinFoot(Transform foot, Transform shinTip)
+        {
+            if (foot != null && shinTip != null)
+            {
+                foot.position = shinTip.position;
             }
         }
 
@@ -470,6 +715,13 @@ namespace Meuble
             UpdateClip(activity, seatedPose, gaitCycles, isPaused);
             Quaternion facing = Quaternion.Euler(0f, bodyYaw, 0f);
             FitSeat(facing, seatedPose, eyeHeight, pratfall);
+            if (CurrentClip == Clip.Jump)
+            {
+                // M4.2: at the top of the hop the Jump's legs fall 0.06 m short of its feet. Every clip keys the feet, so
+                // the next animation pass puts them back where the clip wants them: the pin never outlives its frame.
+                PinFoot(FootLeft, ShinTipLeft);
+                PinFoot(FootRight, ShinTipRight);
+            }
 
             // Parents first: the spine moves the arms and the head.
             if (Spine != null && bend > 0f)
@@ -510,8 +762,10 @@ namespace Meuble
             SeatOffset = Vector3.zero;
             Transform frame = Owner != null && Owner.Visual != null ? Owner.Visual : null;
             bool standClipRunning = CurrentClip == Clip.Stand && StandState != null && StandState.time < StandState.length;
-            SeatFitActive = frame != null
-                && (seatedPose || CurrentClip == Clip.Sit || standClipRunning || eyeHeight < Tuning.EyeHeight - 1e-3f);
+            // M5: the eye is "still low" against the model's own standing eye (a human's 1.6 m); a pet never sits.
+            float standingEye = Entry != null ? Entry.TargetEye : Tuning.EyeHeight;
+            SeatFitActive = frame != null && !IsPet
+                && (seatedPose || CurrentClip == Clip.Sit || standClipRunning || eyeHeight < standingEye - 1e-3f);
             if (!SeatFitActive)
             {
                 return;
@@ -613,9 +867,12 @@ namespace Meuble
             float walkSpeed = 0f;
             if (walk != null && walk.length > 0f)
             {
-                // Clip cycles per second = meters per second / meters per cycle.
-                float metersPerSecond = activity == RoutineActivity.Carrying ? Tuning.CarrySpeed : Tuning.WalkSpeed;
-                walkSpeed = metersPerSecond / WalkCycleMeters * walk.length;
+                // Clip cycles per second = meters per second / meters per cycle. M5: the personality's own pace (the
+                // default one is the M1 1.2 m/s); the stride itself stays slaved to the gait phase below.
+                PersonalityDef personality = Owner != null && Owner.Routine != null ? Owner.Routine.Personality : null;
+                float pace = personality != null && personality.WalkSpeed > 0f ? personality.WalkSpeed : Tuning.WalkSpeed;
+                float metersPerSecond = activity == RoutineActivity.Carrying ? Tuning.CarrySpeed : pace;
+                walkSpeed = metersPerSecond / WalkCycleDistance * walk.length;
             }
             foreach (AnimationState state in Animation)
             {

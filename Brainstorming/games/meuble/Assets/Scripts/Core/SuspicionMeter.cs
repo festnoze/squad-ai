@@ -15,6 +15,9 @@ namespace Meuble.Core
 
         public float Value { get; private set; }
 
+        /// <summary>M5: the personality's suspicion factor (CONTRACT_M5 3); every discovery adds 0.34 times it.</summary>
+        public float GainFactor { get; set; } = 1f;
+
         /// <summary>Latched: once lost, the meter is frozen until <see cref="Reset"/>.</summary>
         public bool Lost { get; private set; }
 
@@ -24,7 +27,7 @@ namespace Meuble.Core
             {
                 return;
             }
-            Value += Tuning.SuspicionPerDiscovery;
+            Value += Tuning.SuspicionPerDiscovery * GainFactor;
             if (Value >= Tuning.SuspicionLose - Epsilon)
             {
                 Lost = true;

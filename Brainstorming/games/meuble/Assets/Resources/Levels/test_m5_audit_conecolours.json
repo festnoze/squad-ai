@@ -1,0 +1,85 @@
+{
+  "id": "test_m5_audit_conecolours",
+  "nameKey": "level6.name",
+  "hintKey": "level6.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": -1.75,
+      "z": 1.55,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.floorlamp",
+    "kind": "floor_lamp",
+    "x": -3.75,
+    "z": -0.75,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 1.8,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": -1.75,
+    "z": 1.05,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [],
+  "inhabitants": [
+    {
+      "name": "Mamie",
+      "personality": "granny",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 1.75,
+          "z": 0.25,
+          "facing": 90.0,
+          "dwell": 6.0,
+          "glances": []
+        },
+        {
+          "x": 1.75,
+          "z": -0.25,
+          "facing": 90.0,
+          "dwell": 6.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Rex",
+      "kind": "dog",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": -2.75,
+          "z": -1.0,
+          "facing": 180.0,
+          "dwell": 120.0,
+          "glances": [],
+          "sleep": true
+        }
+      ]
+    }
+  ]
+}

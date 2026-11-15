@@ -84,6 +84,67 @@ namespace Meuble
         /// <summary>M4.1: a stool on its side under a curved arrow (get back up), the icon of the tipped line (hud.tipped).</summary>
         public static Sprite Tipped => tipped != null ? tipped : tipped = Draw(96, 96, TippedGlyph, "Tipped");
 
+        // ----- M5 HUD icons (docs/CONTRACT_M5_v3.md 4 and 15.5) -----
+
+        private static Sprite eyeDog;
+        private static Sprite door;
+
+        /// <summary>
+        /// M5: the dog eye (only the dog sees the furniture, HudEye.Dog). The open eye, smaller and lower, under two pointed
+        /// dog ears: it differs from the calm and the alarm eyes by shape (the ears), not only by the backdrop colour.
+        /// </summary>
+        public static Sprite EyeDog => eyeDog != null ? eyeDog : eyeDog = Draw(192, 112, DogEye, "EyeDog");
+
+        /// <summary>M5: a door ajar in its frame, with its knob, the icon of the door hint (hud.door).</summary>
+        public static Sprite Door => door != null ? door : door = Draw(96, 96, DoorGlyph, "Door");
+
+        private static Sprite balance;
+
+        /// <summary>
+        /// M5 wave 5B (CONTRACT_M5 6, 16.5): a vase leaning on a tilted plank over its fulcrum, the icon of the balance gauge
+        /// (hud.balance).
+        /// </summary>
+        public static Sprite Balance => balance != null ? balance : balance = Draw(64, 64, BalanceGlyph, "Balance");
+
+        /// <summary>
+        /// Tests (the sprite textures are not readable once drawn): the alpha of an eye state's drawing on a
+        /// <paramref name="width"/> x <paramref name="height"/> grid, row by row, with the same function and the same
+        /// coordinates as its sprite. Two states differ by shape when their coverages differ, colour aside.
+        /// </summary>
+        public static float[] EyeCoverage(HudEye state, int width, int height)
+        {
+            PixelFn shader;
+            switch (state)
+            {
+                case HudEye.Closed:
+                    shader = ClosedEye;
+                    break;
+                case HudEye.Calm:
+                    shader = OpenEye;
+                    break;
+                case HudEye.Dog:
+                    shader = DogEye;
+                    break;
+                default:
+                    shader = AlarmEye;
+                    break;
+            }
+            var alpha = new float[width * height];
+            // The eye sprites are 192 x 112: the same aspect, so the same shapes at any resolution.
+            float aspect = 192f / 112f;
+            float pixel = 2f / height;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float u = ((x + 0.5f) / width * 2f - 1f) * aspect;
+                    float v = (y + 0.5f) / height * 2f - 1f;
+                    alpha[y * width + x] = shader(u, v, pixel).a;
+                }
+            }
+            return alpha;
+        }
+
         private delegate Color PixelFn(float u, float v, float pixel);
 
         private static Sprite Draw(int width, int height, PixelFn shader, string name)
@@ -423,6 +484,105 @@ namespace Meuble
             float head = (p - tipAt).magnitude - 0.17f;
             Color arrow = Glyph(Mathf.Min(arc, head), new Color(1f, 0.93f, 0.75f, 1f), pixel);
             return Over(color, arrow, arrow.a);
+        }
+
+        // ----- M5 glyphs -----
+
+        // The dog's ears: two pointed triangles above the eye (sprite units, v up), the outer one leaning out.
+        private static readonly Vector2[] LeftEar =
+        {
+            new Vector2(-1.32f, 0.22f), new Vector2(-1.2f, 0.97f), new Vector2(-0.5f, 0.4f),
+        };
+
+        private static readonly Vector2[] RightEar =
+        {
+            new Vector2(1.32f, 0.22f), new Vector2(0.5f, 0.4f), new Vector2(1.2f, 0.97f),
+        };
+
+        private static readonly Vector2[] LeftInnerEar =
+        {
+            new Vector2(-1.15f, 0.36f), new Vector2(-1.13f, 0.76f), new Vector2(-0.78f, 0.45f),
+        };
+
+        private static readonly Vector2[] RightInnerEar =
+        {
+            new Vector2(1.15f, 0.36f), new Vector2(0.78f, 0.45f), new Vector2(1.13f, 0.76f),
+        };
+
+        /// <summary>The dog eye: two pointed ears (warm orange, pink inside) behind the open eye drawn at 78 %, lower.</summary>
+        private static Color DogEye(float u, float v, float pixel)
+        {
+            var p = new Vector2(u, v);
+            float ears = Mathf.Min(PolygonDistance(p, LeftEar), PolygonDistance(p, RightEar));
+            Color c = Glyph(ears, new Color(0.96f, 0.6f, 0.24f, 1f), pixel);
+            float inner = Mathf.Min(PolygonDistance(p, LeftInnerEar), PolygonDistance(p, RightInnerEar));
+            c = Over(c, new Color(0.98f, 0.78f, 0.72f, 1f), Cover(inner, pixel) * c.a);
+            Color eye = OpenEye(u / 0.78f, (v + 0.2f) / 0.78f, pixel / 0.78f);
+            return Over(c, eye, eye.a);
+        }
+
+        /// <summary>A door ajar: the frame (posts and lintel), the leaf turned toward the viewer, and its knob.</summary>
+        private static Color DoorGlyph(float u, float v, float pixel)
+        {
+            var p = new Vector2(u, v);
+            float frame = Mathf.Min(
+                Mathf.Min(SegmentDistance(p, new Vector2(-0.52f, -0.86f), new Vector2(-0.52f, 0.84f)),
+                    SegmentDistance(p, new Vector2(0.52f, -0.86f), new Vector2(0.52f, 0.84f))),
+                SegmentDistance(p, new Vector2(-0.52f, 0.84f), new Vector2(0.52f, 0.84f))) - 0.07f;
+            Color c = Glyph(frame, new Color(0.93f, 0.9f, 0.84f, 1f), pixel);
+            // The leaf hinged on the left post, swung toward the viewer: its free edge comes out to the right and lower.
+            float leaf = PolygonDistance(p, DoorLeafShape);
+            Color wood = Glyph(leaf, new Color(0.86f, 0.62f, 0.34f, 1f), pixel);
+            c = Over(c, wood, wood.a);
+            float knob = (p - new Vector2(0.38f, -0.06f)).magnitude - 0.08f;
+            return Over(c, GlyphInk, Cover(knob, pixel));
+        }
+
+        private static readonly Vector2[] DoorLeafShape =
+        {
+            new Vector2(-0.45f, -0.8f), new Vector2(-0.45f, 0.78f), new Vector2(0.52f, 0.62f), new Vector2(0.52f, -0.96f),
+        };
+
+        // M5 wave 5B: the balance icon's fulcrum, a triangle under the plank.
+        private static readonly Vector2[] BalanceFulcrum =
+        {
+            new Vector2(0f, -0.38f), new Vector2(-0.26f, -0.86f), new Vector2(0.26f, -0.86f),
+        };
+
+        /// <summary>
+        /// The balance icon: a cream plank tilted up to the right over its fulcrum, and a blue vase (a round body, a neck and a
+        /// lip) leaning to the right on it, as a load about to slide off.
+        /// </summary>
+        private static Color BalanceGlyph(float u, float v, float pixel)
+        {
+            var p = new Vector2(u, v);
+            float plank = SegmentDistance(p, new Vector2(-0.86f, -0.5f), new Vector2(0.86f, -0.22f)) - 0.07f;
+            float fulcrum = PolygonDistance(p, BalanceFulcrum);
+            Color c = Glyph(Mathf.Min(plank, fulcrum), new Color(0.93f, 0.9f, 0.84f, 1f), pixel);
+            // The vase stands on the plank left of the fulcrum, its neck leaning right.
+            float body = (p - new Vector2(-0.12f, -0.02f)).magnitude - 0.27f;
+            float neck = SegmentDistance(p, new Vector2(-0.08f, 0.2f), new Vector2(0.06f, 0.58f)) - 0.08f;
+            float lip = SegmentDistance(p, new Vector2(-0.07f, 0.64f), new Vector2(0.2f, 0.58f)) - 0.06f;
+            Color vase = Glyph(Mathf.Min(body, Mathf.Min(neck, lip)), new Color(0.36f, 0.58f, 0.85f, 1f), pixel);
+            return Over(c, vase, vase.a);
+        }
+
+        /// <summary>The signed distance from a point to a simple polygon (negative inside): even-odd crossings, edge distance.</summary>
+        private static float PolygonDistance(Vector2 p, Vector2[] polygon)
+        {
+            float distance = float.MaxValue;
+            bool inside = false;
+            for (int i = 0, j = polygon.Length - 1; i < polygon.Length; j = i++)
+            {
+                Vector2 a = polygon[i];
+                Vector2 b = polygon[j];
+                distance = Mathf.Min(distance, SegmentDistance(p, a, b));
+                if ((a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x)
+                {
+                    inside = !inside;
+                }
+            }
+            return inside ? -distance : distance;
         }
     }
 }

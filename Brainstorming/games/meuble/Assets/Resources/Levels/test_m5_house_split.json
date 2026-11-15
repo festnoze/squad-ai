@@ -1,0 +1,82 @@
+{
+  "id": "test_m5_house_split",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 6.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "platforms": [
+    {
+      "name": "Mezzanine",
+      "x": -1.5,
+      "z": 1.75,
+      "sizeX": 5.0,
+      "sizeZ": 2.5,
+      "height": 0.8,
+      "color": "#A0703E"
+    }
+  ],
+  "ramps": [
+    {
+      "x": -0.25,
+      "z": -0.7,
+      "width": 1.2,
+      "length": 2.4,
+      "yaw": 0.0,
+      "platform": "Mezzanine"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.05,
+      "z": -1.25,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 2.5,
+    "z": -2.0,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 3.5,
+    "z": -1.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -3.25,
+          "z": 2.25,
+          "facing": -90.0,
+          "dwell": 60.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

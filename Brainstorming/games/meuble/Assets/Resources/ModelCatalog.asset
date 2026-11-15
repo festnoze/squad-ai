@@ -22,6 +22,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: kenney.sofa
     prefab: {fileID: 2107409826236812522, guid: 46c580fee62a6f44380b437add90e9bf, type: 3}
     nativeSize: {x: 0.98, y: 0.45999998, z: 0.41}
@@ -31,6 +35,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: kenney.rug
     prefab: {fileID: 2107409826236812522, guid: 39956ee364a7bfa48999e80b0ab5f0fa, type: 3}
     nativeSize: {x: 1.57, y: 0.01, z: 0.92}
@@ -40,6 +48,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: kenney.doormat
     prefab: {fileID: 2107409826236812522, guid: e83d6e7ffd0fa164086ab9c6b9cfd151, type: 3}
     nativeSize: {x: 0.9043259, y: 0.01, z: 0.92}
@@ -49,6 +61,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: kenney.armchair
     prefab: {fileID: 2107409826236812522, guid: af8fa6763209abe41b0bcf2531027b1d, type: 3}
     nativeSize: {x: 0.49, y: 0.45999998, z: 0.41}
@@ -58,6 +74,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: kenney.stool
     prefab: {fileID: 2107409826236812522, guid: 9283b8f827a83f344a06a6ca7b04b0b9, type: 3}
     nativeSize: {x: 0.26544, y: 0.435, z: 0.2298778}
@@ -67,6 +87,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: kenney.floorlamp
     prefab: {fileID: 2107409826236812522, guid: d3a90dca0642da444bf50ea1368d8064, type: 3}
     nativeSize: {x: 0.15203941, y: 0.86, z: 0.17556}
@@ -76,6 +100,10 @@ MonoBehaviour:
     headBone: 
     eyeLocal: {x: 0, y: 0, z: 0}
     eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: quaternius.man
     prefab: {fileID: 2242888416370347441, guid: aa95814197af2064e9276295fe399d46, type: 3}
     nativeSize: {x: 1.4170315, y: 4.8119526, z: 0.9098803}
@@ -85,6 +113,10 @@ MonoBehaviour:
     headBone: Head
     eyeLocal: {x: -0.0000148559, y: 0.0021739525, z: 0.003171883}
     eyeHeight: 4.4460597
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
   - id: quaternius.woman
     prefab: {fileID: 2242888416370347441, guid: 7720401172c91334b89759aec9edac3a, type: 3}
     nativeSize: {x: 1.407968, y: 4.6362534, z: 0.818936}
@@ -94,3 +126,85 @@ MonoBehaviour:
     headBone: Head
     eyeLocal: {x: -0.000014166972, y: 0.0020523828, z: 0.0032527887}
     eyeHeight: 4.2793927
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: quaternius.man_shorts
+    prefab: {fileID: 2242888416370347441, guid: f625164da931479b9d7cc4980cd50613, type: 3}
+    nativeSize: {x: 1.4263439, y: 4.8267894, z: 0.8228686}
+    boundsCenter: {x: -0.002134502, y: 2.4101646, z: 0.08379105}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.000014855839, y: 0.0021739386, z: 0.0031718826}
+    eyeHeight: 4.446057
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: quaternius.man_suit
+    prefab: {fileID: 2242888416370347441, guid: b2e7337fd09f4e06a16974ddd873cfee, type: 3}
+    nativeSize: {x: 1.4199846, y: 4.8282843, z: 0.9217315}
+    boundsCenter: {x: -0.0053141713, y: 2.4111106, z: 0.025540292}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.000014855839, y: 0.0021739174, z: 0.003171884}
+    eyeHeight: 4.446934
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: quaternius.man_tshirt
+    prefab: {fileID: 2242888416370347441, guid: ae8989c009f240788a59f052ceeaa1d3, type: 3}
+    nativeSize: {x: 1.4280725, y: 4.8432784, z: 0.8219147}
+    boundsCenter: {x: -0.0012702346, y: 2.4186738, z: 0.08331409}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.000014855764, y: 0.0021739344, z: 0.00317188}
+    eyeHeight: 4.446057
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: quaternius.woman_jacket
+    prefab: {fileID: 2242888416370347441, guid: e385902b549e4fcdb5bc56ae52e99934, type: 3}
+    nativeSize: {x: 1.4011832, y: 4.65279, z: 0.81450427}
+    boundsCenter: {x: -0.0147147775, y: 2.3031452, z: 0.079154015}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.000014166584, y: 0.0020523188, z: 0.0032527845}
+    eyeHeight: 4.2793856
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: quaternius.woman_dress
+    prefab: {fileID: 2242888416370347441, guid: 6625eaaa26ab4d79b5b0bc02666bca5d, type: 3}
+    nativeSize: {x: 1.3988769, y: 4.654792, z: 1.2175982}
+    boundsCenter: {x: -0.015867949, y: 2.3014133, z: 0.09146088}
+    yawOffset: 0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: -0.000014167128, y: 0.0020524014, z: 0.0032527873}
+    eyeHeight: 4.2793937
+    kind: human
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: quaternius.shiba
+    prefab: {fileID: 2242888416370347441, guid: 832f8077a2464e9a9060d6c200a2cd29, type: 3}
+    nativeSize: {x: 1.0710188, y: 3.0889392, z: 4.1647615}
+    boundsCenter: {x: 0, y: 1.548895, z: 0.4138553}
+    yawOffset: -0
+    rigged: 1
+    headBone: Head
+    eyeLocal: {x: 0.000025044355, y: 0.0023063184, z: 0.0014951162}
+    eyeHeight: 2.6913111
+    kind: pet
+    targetEyeHeight: 0.35
+    idleClip: Idle
+    walkClip: Walk

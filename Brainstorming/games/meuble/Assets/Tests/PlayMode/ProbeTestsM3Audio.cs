@@ -75,6 +75,7 @@ namespace Meuble.Tests
         public IEnumerator Cleanup()
         {
             InputReader.ResetInjections();
+            SaveStore.ResetForTests();
             Time.timeScale = 1f;
             AudioListener.pause = false;
             GamePause.IsPaused = false;

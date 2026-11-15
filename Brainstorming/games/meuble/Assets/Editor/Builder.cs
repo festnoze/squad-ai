@@ -54,12 +54,16 @@ namespace Meuble.Editor
                 ModelCatalogBuilder.Build();
                 AudioLibraryBuilder.Build();
                 AssetDatabase.SaveAssets();
+                // -development: a Development Build with script debugging, so Visual Studio can attach to the player
+                // (Debug > Attach Unity Debugger). -waitForDebugger also makes the player wait for it at startup.
+                bool development = HasFlag("-development");
+                EditorUserBuildSettings.waitForManagedDebugger = development && HasFlag("-waitForDebugger");
                 var options = new BuildPlayerOptions
                 {
                     scenes = new[] { ProjectSetup.ScenePath },
                     locationPathName = output,
                     target = target,
-                    options = BuildOptions.None,
+                    options = development ? BuildOptions.Development | BuildOptions.AllowDebugging : BuildOptions.None,
                 };
                 BuildReport report = BuildPipeline.BuildPlayer(options);
                 BuildSummary summary = report.summary;
@@ -77,6 +81,11 @@ namespace Meuble.Editor
                 Debug.LogError("[Builder] Build threw: " + e);
                 return 1;
             }
+        }
+
+        private static bool HasFlag(string flag)
+        {
+            return Array.IndexOf(Environment.GetCommandLineArgs(), flag) >= 0;
         }
 
         private static string ArgOr(string flag, string fallback)

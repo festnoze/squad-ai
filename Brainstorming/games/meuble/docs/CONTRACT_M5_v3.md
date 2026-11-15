@@ -752,3 +752,24 @@ From the contract critic's review of v2 (5 blockers, 9 majors). Decided by the i
   - rugs and seat homes neither on a ramp nor straddling heights.
 - **Wording:** "build time" in section 7 means level build. "L or U shapes" means rooms joined by
   a full-width doorway (as supported today).
+
+### 15.7 amendments from wave 5A.1 (binding)
+
+- **Read, a missing save file** is an interrupted write (a process kill between the delete and the
+  move, a move that failed, a File.Replace that set the target aside as .bak but could not move the
+  .tmp in):
+  1. Try the .tmp (always the newer of the two), then the .bak, with the same parse and version
+     checks. Restore the first that parses, with a warning. The .tmp is moved into place as it is
+     (never rewritten: it may be the only copy). The .bak is written back through the normal write
+     and stays as the .bak.
+  2. If the .tmp cannot be moved into place, play the restored data in memory without saving, and
+     keep the .tmp for the next run.
+  3. If neither parses, start fresh and leave both in place (no .bad; the next write overwrites the
+     .tmp).
+  4. A .tmp or .bak that exists but cannot be read is an IO error: in memory, nothing touched.
+  - Load statuses: FromTmp (new), FromBackup (now also a missing file restored from its .bak).
+- **Write.** Once the target is gone (deleted by the fallback, or set aside as .bak by a half-done
+  File.Replace), the .tmp is never deleted, even when the write fails. A Replace try that leaves no
+  target ends the tries and goes straight to the move.
+- **Open for M6:** in the delete-then-move fallback (every Android save takes it), move the target to
+  .bak instead of deleting it, so Android keeps a .bak to recover from.

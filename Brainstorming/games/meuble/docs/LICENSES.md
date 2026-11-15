@@ -25,10 +25,40 @@ page on 2026-11-11. The full evidence is in [M3_ASSETS.md](M3_ASSETS.md) section
 | `Kenney/kenney_doorway.glb` | Doorway | Kenney (Furniture Kit) | https://poly.pizza/m/NjrIKzZLYv | CC0 1.0 |
 | `Quaternius/quaternius_man.glb` | Man in Long Sleeves | Quaternius (Animated Men Pack) | https://poly.pizza/m/DLptRuewTn | CC0 1.0 |
 | `Quaternius/quaternius_woman.glb` | Woman Casual | Quaternius (Animated Women Pack) | https://poly.pizza/m/jpKRgGDxhk | CC0 1.0 |
+| `Quaternius/quaternius_man_shorts.glb` | Man (t-shirt and shorts) | Quaternius (Animated Men Pack) | https://poly.pizza/m/HMnuH5geEG | CC0 1.0 |
+| `Quaternius/quaternius_man_suit.glb` | Man in Suit | Quaternius (Animated Men Pack) | https://poly.pizza/m/mQnGoME1ez | CC0 1.0 |
+| `Quaternius/quaternius_man_tshirt.glb` | Man (t-shirt) | Quaternius (Animated Men Pack) | https://poly.pizza/m/fjHyMd5Wxw | CC0 1.0 |
+| `Quaternius/quaternius_woman_jacket.glb` | Woman (jacket) | Quaternius (Animated Women Pack) | https://poly.pizza/m/AQsd9ngvKU | CC0 1.0 |
+| `Quaternius/quaternius_woman_dress.glb` | Woman in Dress | Quaternius (Animated Women Pack) | https://poly.pizza/m/zMyPlQXBzq | CC0 1.0 |
+| `Quaternius/quaternius_shiba.glb` | Shiba Inu | Quaternius (Animated Animal Pack) | https://poly.pizza/m/y4wdQpg767 | CC0 1.0 |
 
 Packs: Kenney "Furniture Kit" (https://poly.pizza/bundle/Furniture-Kit-NoG1sEUD1z, also
-kenney.nl); Quaternius "Animated Men Pack" (https://poly.pizza/bundle/Animated-Men-Pack-DAC9SDgMQT)
-and "Animated Women Pack" (https://poly.pizza/bundle/Animated-Women-Pack-HHSKxnk1mY).
+kenney.nl); Quaternius "Animated Men Pack" (https://poly.pizza/bundle/Animated-Men-Pack-DAC9SDgMQT),
+"Animated Women Pack" (https://poly.pizza/bundle/Animated-Women-Pack-HHSKxnk1mY) and "Animated Animal
+Pack" (https://poly.pizza/bundle/Animated-Animal-Pack-ILAPXeUYiS). M5: the five extra humans and the dog
+were copied byte for byte from `ThirdParty_staging/poly.pizza` (sha256 checked against its
+`manifest.json`); their licences were read on their own pages on 2026-11-11 (M3_ASSETS.md section 10:
+the "Animated Men Pack", "Animated Women Pack" and "Animated Animal Pack" list every model as CC0 1.0).
+The dog steps are synthesized at run time (`FootstepAudio`): no file.
+
+## Textures (`Assets/ThirdParty/Textures`)
+
+M4.2. Each file is a 512 x 512 grayscale detail derived from the 1K-JPG download of an ambientCG material
+(https://ambientcg.com/get?file=<id>_1K-JPG.zip): the luminance of its Color map (times its AmbientOcclusion
+map for the parquet seams), rotated so the grain or the planks run vertically, high-passed and softened with
+wrap-around filters (still seamless), then remapped to a low contrast with a mean of exactly 240/255 and the
+highlights capped at 1.0. The licence was read on each item's own page (`https://ambientcg.com/a/<id>`) and on
+https://docs.ambientcg.com/license/ on 2026-11-13: "All assets are released under the Creative Commons CC0
+license".
+
+| File | Title | Author | Source | Licence |
+|---|---|---|---|---|
+| `ambientCG/detail_wood_Wood049.png` | Wood 049 (furniture wood grain) | ambientCG | https://ambientcg.com/a/Wood049 | CC0 1.0 |
+| `ambientCG/detail_parquet_WoodFloor051.png` | Wood Floor 051 (parquet of the hard floors) | ambientCG | https://ambientcg.com/a/WoodFloor051 | CC0 1.0 |
+| `ambientCG/detail_plaster_Plaster001.png` | Plaster 001 (walls and caps) | ambientCG | https://ambientcg.com/a/Plaster001 | CC0 1.0 |
+| `ambientCG/detail_upholstery_Fabric011.png` | Fabric 011 (upholstery weave) | ambientCG | https://ambientcg.com/a/Fabric011 | CC0 1.0 |
+| `ambientCG/detail_linen_Fabric036.png` | Fabric 036 (linen: clothes, table cloths, lamp shade) | ambientCG | https://ambientcg.com/a/Fabric036 | CC0 1.0 |
+| `ambientCG/detail_carpet_Carpet012.png` | Carpet 012 (rugs, doormat, soft floors) | ambientCG | https://ambientcg.com/a/Carpet012 | CC0 1.0 |
 
 ## Audio (`Assets/ThirdParty/Audio`)
 
