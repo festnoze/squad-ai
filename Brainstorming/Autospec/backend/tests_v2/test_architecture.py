@@ -6,7 +6,9 @@ from pathlib import Path
 CORE = Path(__file__).resolve().parents[1] / "autospec" / "core"
 V1_MODULES = ("autospec.orchestrator", "autospec.agents", "autospec.config", "autospec.api",
               "autospec.models", "autospec.storage", "autospec.validation")
-CORE_LINE_BUDGET = 2_500 + 300  # plan target for core/ (excluding the API and models) plus margin
+# The plan aimed at 2,500 lines (API and models excluded); fullstack, cancellable process
+# trees and resume scheduling brought it to about 2,850. Raising it again needs a reason.
+CORE_LINE_BUDGET = 2_900
 OUTSIDE_BUDGET = ("api.py", "models.py")  # docs/REFONTE_V2.md 4.7 excludes them
 
 
