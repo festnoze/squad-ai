@@ -1,6 +1,0 @@
-[unity.sh] waiting for the Unity lock held by: 43292 bodies test . --mode PlayMode --report-format junit --output /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults/PlayMode.xml --timeout 1200 (0s)
-[unity.sh] waiting for the Unity lock held by: 43292 bodies test . --mode PlayMode --report-format junit --output /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults/PlayMode.xml --timeout 1200 (60s)
-[unity.sh] waiting for the Unity lock held by: 43292 bodies test . --mode PlayMode --report-format junit --output /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults/PlayMode.xml --timeout 1200 (120s)
-[unity.sh] waiting for the Unity lock held by: 43292 bodies test . --mode PlayMode --report-format junit --output /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults/PlayMode.xml --timeout 1200 (180s)
-[unity.sh] waiting for the Unity lock held by: 18560 game run . --timeout 900 -- -executeMethod Meuble.Editor.Builder.SetupAndCompile -logFile /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults/compile.log (240s)
-test exit 0

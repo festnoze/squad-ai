@@ -162,3 +162,10 @@ _TeamCity*
 # Visual Studio code coverage results
 *.coverage
 *.coveragexml
+
+# Build outputs and generated caches (all projects)
+dist/
+.godot/
+.utmp/
+__pycache__/
+*.pyc

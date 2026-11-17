@@ -2,3 +2,30 @@
 # Agent skills installed via `npx skills add` (reinstallable, not versioned)
 .agents/
 .claude/skills/
+
+# Build output
+dist/
+
+# Unity projects (games/*): caches, builds and generated files
+games/*/[Ll]ibrary/
+games/*/[Tt]emp/
+games/*/[Oo]bj/
+games/*/[Bb]uild/
+games/*/[Bb]uilds/
+games/*/[Ll]ogs/
+games/*/[Uu]ser[Ss]ettings/
+games/*/TestResults/
+games/*/ThirdParty_staging/
+games/*/*.csproj
+games/*/*.sln
+games/*/.unity.lock/
+games/*/.unity.queue/
+games/*/*.unity.queue
+games/*/scratchpad/
+games/*/smoke/
+games/*/.utmp/
+# Generated benchmark projects with their own git repository
+Autospec/workspace_bench/2026-11-02/c/B1-131855/slugify-lib-c5307449/
+Autospec/workspace_bench/2026-11-02/c/B2-132947/todo-cli-5f23649b/
+Autospec/workspace_bench/2026-11-02/c/B3-132950/notes-api-9f9d6997/
+Autospec/workspace_bench/2026-11-02/b/B3-134147/notes-api/

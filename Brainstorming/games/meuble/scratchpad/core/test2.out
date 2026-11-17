@@ -1,3 +1,0 @@
-[unity.sh] waiting for the Unity lock held by: 46544 bodies mutation run (0s)
-Error: Échec des tests : le processus Unity s'est arrêté avec le code 2.
-test exit 8
