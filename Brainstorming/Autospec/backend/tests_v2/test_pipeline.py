@@ -1,9 +1,11 @@
 """End-to-end pipeline tests: real uv, real git, real clean suites, scripted agents."""
 
+import asyncio
 import json
 import shutil
 import subprocess
 import textwrap
+import time
 from dataclasses import replace
 
 import pytest
@@ -271,23 +273,66 @@ async def test_a_provider_outage_parks_the_project_and_refunds_the_attempt(ws, s
     monkeypatch.setattr(Pipeline, "network_retry_delays_s", (0.0,))
     outage = AgentError("Can't reach the API server (ENOTFOUND)", "network")
     runner = _runner(dev=outage)
+    before = time.time()
     state = await Pipeline(_state(), ws, runner, settings).arun()
 
     assert state.phase == Phase.NEEDS_ATTENTION
     assert "ENOTFOUND" in state.error
     assert state.story("US-1").attempts == 0, "an outage must not burn the dev's attempts"
     assert [c.role for c in runner.calls].count("dev") == 2, "one call plus one retry"
+    assert before + 300 <= state.resume_at <= time.time() + 300, "an outage resumes by itself in 5 min"
+    assert Store(ws).load().resume_at == state.resume_at
 
     resumed = await Pipeline(Store(ws).load(), ws, _runner(), settings).arun()
     assert resumed.phase == Phase.DONE, resumed.error
+    assert resumed.resume_at is None and Store(ws).load().resume_at is None
 
 
-async def test_a_usage_limit_parks_at_once(ws, settings):
-    runner = _runner(qa=AgentError("usage limit reached", "limit"))
+async def test_a_usage_limit_parks_at_once_until_its_reset(ws, settings):
+    reset = int(time.time()) + 3600
+    runner = _runner(qa=AgentError(f"Claude AI usage limit reached|{reset}", "limit"))
     state = await Pipeline(_state(), ws, runner, settings).arun()
 
     assert state.phase == Phase.NEEDS_ATTENTION and "usage limit" in state.error
     assert [c.role for c in runner.calls] == ["po", "qa"]
+    assert state.resume_at == reset and Store(ws).load().resume_at == reset
+    end = Store(ws).events()[-1]
+    assert (end["type"], end["resume_at"]) == ("end", reset)
+
+
+async def test_a_park_that_needs_a_human_never_resumes_by_itself(ws, settings):
+    runner = _runner(qa=AgentError("claude not found", "unavailable"))
+    state = await Pipeline(_state(), ws, runner, settings).arun()
+
+    assert state.phase == Phase.NEEDS_ATTENTION and state.resume_at is None
+
+
+@pytest.mark.parametrize("disk_fails", [False, True])
+async def test_a_stop_lands_in_stopped_and_raises_only_the_cancellation(ws, settings, monkeypatch, disk_fails):
+    entered = asyncio.Event()
+
+    class Hanging(FakeRunner):
+        async def arun(self, call):
+            entered.set()
+            await asyncio.Event().wait()  # until cancelled
+
+    state = _state(brief="", goal="greet people")
+    task = asyncio.create_task(Pipeline(state, ws, Hanging({}), settings).arun())
+    await asyncio.wait_for(entered.wait(), 10)
+    if disk_fails:
+        def busy(*_args, **_kwargs):
+            raise PermissionError("the file is used by another process")
+
+        monkeypatch.setattr(Store, "save", busy)
+        monkeypatch.setattr(Store, "append_event", busy)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert (state.phase, state.error, state.resume_at) == (Phase.STOPPED, "interrupted", None)
+    if not disk_fails:
+        assert Store(ws).load().phase == Phase.STOPPED
+        assert Store(ws).events()[-1]["type"] == "end"
 
 
 async def test_project_budget_parks_before_overspending(ws, settings):

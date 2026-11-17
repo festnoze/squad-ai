@@ -7,7 +7,9 @@ report and verifies every story itself (docs/REFONTE_V2.md section 4).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import re
 import time
 import tomllib
 from collections.abc import Callable
@@ -23,10 +25,27 @@ ACCEPTANCE_DIRS = ("tests/acceptance/", "frontend/src/acceptance/")
 # Vite carries the vitest settings (included files, setup files): changing it could hide tests.
 TEST_CONFIG_FILES = ("frontend/vite.config.", "frontend/vitest.config.", "frontend/vitest.setup.")
 PLAN_MAX_ATTEMPTS = 2
+LIMIT_WAIT_S, NETWORK_WAIT_S, MIN_WAIT_S = 1800.0, 300.0, 60.0
+_RESET_EPOCH = re.compile(r"\|\s*(\d{9,14})\b")  # "Claude AI usage limit reached|1718226000"
+
+
+def resume_time(kind: str, message: str, now: float) -> float | None:
+    """When a run parked by the provider resumes by itself, in epoch seconds (None: never).
+    A limit message may carry its reset epoch after "|" (s or ms); a past one waits MIN_WAIT_S."""
+    if kind != "limit":
+        return now + NETWORK_WAIT_S if kind == "network" else None
+    if not (match := _RESET_EPOCH.search(message)):
+        return now + LIMIT_WAIT_S
+    reset = int(match.group(1))
+    return max(reset / 1000 if reset > 10**11 else float(reset), now + MIN_WAIT_S)
 
 
 class Parked(Exception):
     """Stop the run and hand the project to a human (phase NEEDS_ATTENTION)."""
+
+    def __init__(self, message: str, resume_at: float | None = None):
+        super().__init__(message)
+        self.resume_at = resume_at  # set when the run may resume by itself
 
 
 class Pipeline:
@@ -93,7 +112,7 @@ class Pipeline:
                     await asyncio.sleep(delays.pop(0))  # provider blip: the agent did nothing wrong
                     continue
                 if exc.kind in ("budget", "unavailable", "network", "limit"):
-                    raise Parked(f"{role} agent: {exc}") from exc
+                    raise Parked(f"{role} agent: {exc}", resume_time(exc.kind, str(exc), time.time())) from exc
                 raise
         self._account(result)
         self._emit("agent_end", role=role, cost_usd=result.cost_usd, turns=result.num_turns,
@@ -117,6 +136,7 @@ class Pipeline:
             return self.state
         started = time.monotonic()
         machine.prepare_resume(self.state)
+        self.state.resume_at = None
         try:
             start = machine.resume_phase(self.state)
             if start == Phase.BRIEF:
@@ -131,17 +151,20 @@ class Pipeline:
             self._phase(Phase.DELIVER)
             await self._adeliver()
         except Parked as exc:
-            self.state.error = str(exc)
+            self.state.error, self.state.resume_at = str(exc), exc.resume_at
             self._phase(Phase.NEEDS_ATTENTION)
         except (asyncio.CancelledError, KeyboardInterrupt):
-            self.state.error = "interrupted"
-            self._phase(Phase.STOPPED)
+            with contextlib.suppress(OSError, machine.IllegalTransition):  # never mask the stop
+                self.state.error, self.state.resume_at = "interrupted", None
+                self._phase(Phase.STOPPED)
             raise
         except Exception as exc:  # the state must always land somewhere a human can see
             self.state.error = f"{type(exc).__name__}: {exc}"
             self._phase(Phase.ERROR)
-        self._emit("end", phase=self.state.phase.value, duration_s=round(time.monotonic() - started, 1),
-                   cost_usd=self.state.usage.cost_usd)
+        finally:
+            with contextlib.suppress(OSError):
+                self._emit("end", phase=self.state.phase.value, cost_usd=self.state.usage.cost_usd,
+                           duration_s=round(time.monotonic() - started, 1), resume_at=self.state.resume_at)
         return self.state
 
     async def _abrief(self) -> None:
@@ -170,14 +193,20 @@ class Pipeline:
             return
         raise Parked("the PO could not produce a valid plan")
 
-    def _ensure_scaffold(self) -> None:
-        if not (self.ws / "pyproject.toml").exists():
-            profiles.scaffold(self.ws, project_name=self.state.name, package=self.state.package,
-                              profile=self.state.profile)
+    async def _aensure_scaffold(self) -> None:
+        if not (self.ws / "pyproject.toml").exists():  # minutes of uv lock and npm install: a thread
+            state = self.state
+            work = asyncio.ensure_future(asyncio.to_thread(profiles.scaffold, self.ws, project_name=state.name,
+                                                           package=state.package, profile=state.profile))
+            try:
+                await asyncio.shield(work)
+            except asyncio.CancelledError:  # never cut halfway: a resume would trust the workspace
+                await asyncio.gather(work, return_exceptions=True)  # a failed scaffold cleans up
+                raise
             self._emit("scaffold", profile=self.state.profile.value)
 
     async def _abuild(self) -> None:
-        self._ensure_scaffold()
+        await self._aensure_scaffold()
         while (story := plan.next_ready(self.state.stories)) is not None:
             await self._abuild_story(story)
             if story.status == StoryStatus.FAILED:
@@ -302,9 +331,8 @@ class Pipeline:
                                                    repo_tree=verify.repo_tree(self.ws)), None
             try:
                 result = await self._acall("dev", prompt, Capability.DEV, resume=resume)
-            except Parked:
-                story.attempts -= 1  # an infrastructure stop is not a failed attempt
-                self._save()
+            except (Parked, asyncio.CancelledError):
+                story.attempts -= 1  # an infrastructure or human stop is no failed attempt (arun saves)
                 raise
             except AgentError as exc:
                 feedback = story.last_error = f"the dev session ended with an error: {exc}"

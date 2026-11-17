@@ -6,7 +6,8 @@ from pathlib import Path
 CORE = Path(__file__).resolve().parents[1] / "autospec" / "core"
 V1_MODULES = ("autospec.orchestrator", "autospec.agents", "autospec.config", "autospec.api",
               "autospec.models", "autospec.storage", "autospec.validation")
-CORE_LINE_BUDGET = 2_500 + 300  # plan target for core/ (excluding models) plus margin
+CORE_LINE_BUDGET = 2_500 + 300  # plan target for core/ (excluding the API and models) plus margin
+OUTSIDE_BUDGET = ("api.py", "models.py")  # docs/REFONTE_V2.md 4.7 excludes them
 
 
 def _core_files():
@@ -29,9 +30,10 @@ def test_core_never_imports_v1():
 
 def test_core_stays_small():
     total = sum(len(p.read_text(encoding="utf-8").splitlines())
-                for p in _core_files() if p.name != "models.py")
+                for p in _core_files() if p.name not in OUTSIDE_BUDGET)
     assert total <= CORE_LINE_BUDGET, f"core/ is {total} lines, budget {CORE_LINE_BUDGET}"
 
 
 def test_no_em_dash_in_core():
-    assert not [p.name for p in _core_files() if "—" in p.read_text(encoding="utf-8")]
+    em_dash = chr(0x2014)  # spelled by code point so this file holds none either
+    assert not [p.name for p in _core_files() if em_dash in p.read_text(encoding="utf-8")]
