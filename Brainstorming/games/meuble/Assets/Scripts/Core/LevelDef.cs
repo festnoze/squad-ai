@@ -31,6 +31,12 @@ namespace Meuble.Core
         public List<RugDef> Rugs = new List<RugDef>();
         public List<DecoyDef> Decoys = new List<DecoyDef>();
         public List<RouteStepDef> DesignerRoute = new List<RouteStepDef>();
+        /// <summary>
+        /// M7 design (docs/CONTRACT_M7.md 4.1): the route the audit wrote at Difficile ("designerRouteHard", LevelAudit
+        /// -writeRoutes); <see cref="DesignerRoute"/> is the Normal one. Written only when not empty.
+        /// </summary>
+        public List<RouteStepDef> DesignerRouteHard = new List<RouteStepDef>();
+        public bool ShouldSerializeDesignerRouteHard() => DesignerRouteHard != null && DesignerRouteHard.Count > 0;
 
         // ----- M5 (docs/CONTRACT_M5.md 16.12, v3 sections 2 and 15.4) -----
         public List<PlatformDef> Platforms = new List<PlatformDef>();
@@ -42,6 +48,49 @@ namespace Meuble.Core
         public bool ShouldSerializePlatforms() => Platforms != null && Platforms.Count > 0;
         public bool ShouldSerializeRamps() => Ramps != null && Ramps.Count > 0;
         public bool ShouldSerializeRobots() => Robots != null && Robots.Count > 0;
+
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.6) -----
+        /// <summary>
+        /// M6: the household's door memory is on in this level (opt-in, default false: written only when true, so a level
+        /// rewritten by the audit keeps its file unchanged).
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool DoorMemory;
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): bit k set when leaf k of <see cref="LeafDoors"/> carries
+        /// <see cref="OpeningDef.OpenedByInhabitants"/>. 0 on a level without such a door.
+        /// </summary>
+        public int HouseholdLeafMask()
+        {
+            int mask = 0;
+            List<OpeningDef> leaves = LeafDoors();
+            for (int k = 0; k < leaves.Count; k++)
+            {
+                if (leaves[k].OpenedByInhabitants)
+                {
+                    mask |= 1 << k;
+                }
+            }
+            return mask;
+        }
+
+        /// <summary>M6 (CONTRACT_M6 2.5): the wardrobe props, in level order.</summary>
+        public List<PropDef> Wardrobes()
+        {
+            var list = new List<PropDef>();
+            if (Props != null)
+            {
+                foreach (PropDef p in Props)
+                {
+                    if (WardrobeRule.IsWardrobe(p))
+                    {
+                        list.Add(p);
+                    }
+                }
+            }
+            return list;
+        }
 
         private FloorMap floor;
 
@@ -74,6 +123,9 @@ namespace Meuble.Core
         /// <summary>M4: the level's lesson for the audit's lesson-required check ("careful", "sit", "dark", "glide").</summary>
         public string Lesson;
 
+        /// <summary>M6b (CONTRACT_M6 5): the product owner's waiver, a lesson that does not bind is a note, not a defect.</summary>
+        public bool LessonAdvisory;
+
         // ----- M4 lessons (docs/CONTRACT_M4.md amendment 9.11) -----
         /// <summary>The stool: no schedule at full stool speed.</summary>
         public const string LessonCareful = "careful";
@@ -93,9 +145,11 @@ namespace Meuble.Core
         public const string LessonRock = "rock";
         public const string LessonLoad = "load";
         public const string LessonFinal = "final";
+        // ----- M6 lesson (docs/CONTRACT_M6.md 2.5): a wardrobe the player body fits in. -----
+        public const string LessonWardrobe = "wardrobe";
 
         public static readonly string[] Lessons = { LessonCareful, LessonSit, LessonDark, LessonGlide,
-            LessonDoor, LessonPet, LessonSplit, LessonRobot, LessonRock, LessonLoad, LessonFinal };
+            LessonDoor, LessonPet, LessonSplit, LessonRobot, LessonRock, LessonLoad, LessonFinal, LessonWardrobe };
 
         /// <summary>
         /// M4: resolves <see cref="StationDef.PropSeat"/> for every station whose Sit names a prop of the level (the prop
@@ -387,6 +441,10 @@ namespace Meuble.Core
         public const string ActionRightUp = "rightup";
         /// <summary>M5: <see cref="Action"/> that presses E to open the closed leaf named by <see cref="Door"/>.</summary>
         public const string ActionOpen = "open";
+        /// <summary>M6: <see cref="Action"/> that presses E to enter the wardrobe in front of the furniture.</summary>
+        public const string ActionHide = "hide";
+        /// <summary>M6: <see cref="Action"/> that presses E to leave the wardrobe.</summary>
+        public const string ActionLeave = "leave";
 
         public float X;
         public float Z;
@@ -481,6 +539,9 @@ namespace Meuble.Core
         public const string HardFloor = "hard";
         public const string SoftFloor = "soft";
 
+        /// <summary>M7 (docs/CONTRACT_M7.md 1.2): the one <see cref="FloorFinish"/> value, the kitchen and bathroom tile.</summary>
+        public const string TileFinish = "tile";
+
         public string Id;
         public float X;
         public float Z;
@@ -492,12 +553,18 @@ namespace Meuble.Core
         public float WallThickness;
         public string FloorColor;
         public string WallColor;
+        /// <summary>
+        /// M7 (docs/CONTRACT_M7.md 1.2): null (default, plain) or "tile" (kitchen and bathroom floors): visual only,
+        /// a hard floor acoustically either way (<see cref="IsSoft"/> alone still drives PRD 4.5 silence).
+        /// </summary>
+        public string FloorFinish;
 
         [JsonIgnore] public float MinX => X - SizeX * 0.5f;
         [JsonIgnore] public float MaxX => X + SizeX * 0.5f;
         [JsonIgnore] public float MinZ => Z - SizeZ * 0.5f;
         [JsonIgnore] public float MaxZ => Z + SizeZ * 0.5f;
         [JsonIgnore] public bool IsSoft => Floor == SoftFloor;
+        [JsonIgnore] public bool IsTile => FloorFinish == TileFinish;
 
         public bool Contains(Vector3 point)
         {
@@ -534,6 +601,13 @@ namespace Meuble.Core
         public string Id;
         /// <summary>The id of the room the leaf swings into.</summary>
         public string Swing;
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.7): an inhabitant whose walk crosses this closed leaf stops, opens it and leaves it open;
+        /// plans use its doorway. Opt-in, default false (written only when true).
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool OpenedByInhabitants;
 
         /// <summary>M5: <see cref="Leaf"/> of a leaf standing open, and of a closed one.</summary>
         public const string LeafOpen = "open";
@@ -597,7 +671,7 @@ namespace Meuble.Core
         public string Model;
 
         public string Name;
-        /// <summary>"sofa", "bookshelf", "table", "cabinet", "counter", "plant", "armchair" (M4) or "box".</summary>
+        /// <summary>"sofa", "bookshelf", "table", "cabinet", "counter", "plant", "armchair" (M4), "wardrobe" (M6, <see cref="WardrobeRule"/>) or "box".</summary>
         public string Kind;
         public float X;
         public float Z;

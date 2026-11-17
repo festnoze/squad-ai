@@ -1047,7 +1047,8 @@ namespace Meuble.Tests
                 MeshRenderer[] renderers = holder.GetComponentsInChildren<MeshRenderer>(true);
                 Assert.AreEqual(1, renderers.Length, "one renderer, one draw call");
                 Assert.AreEqual(1, renderers[0].sharedMaterials.Length, "one material slot");
-                Assert.AreSame(PrimitiveKit.Lit(color), renderers[0].sharedMaterial, "in its own colour");
+                // M6 (CONTRACT_M6 2.4): this probe colour is the player's own red, so the rocking chair is lacquered.
+                Assert.AreSame(PrimitiveKit.LitSurface(color, Surface.Lacquer), renderers[0].sharedMaterial, "in its own colour");
                 Assert.AreEqual(Layers.Player, renderers[0].gameObject.layer);
                 Assert.AreEqual(0, holder.GetComponentsInChildren<Collider>(true).Length, "a body visual has no collider");
                 Mesh mesh = renderers[0].GetComponent<MeshFilter>().sharedMesh;
@@ -1221,7 +1222,8 @@ namespace Meuble.Tests
                 Transform visual = player.Visual.Find("RockingChair");
                 Assert.IsNotNull(visual, "the player shows the procedural rocking chair");
                 Color red = LevelJson.ParseColor(def.Player.Color, Color.red);
-                Assert.AreSame(PrimitiveKit.Lit(red), visual.GetComponent<MeshRenderer>().sharedMaterial, "in the player colour");
+                // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
+                Assert.AreSame(PrimitiveKit.LitSurface(red, Surface.Lacquer), visual.GetComponent<MeshRenderer>().sharedMaterial, "in the player colour");
                 Assert.AreEqual(Layers.Player, visual.gameObject.layer, "on the player layer");
                 Decoy decoy = Game.Level.Decoys[Game.Level.Decoys.Count - 1];
                 Assert.AreEqual(BodyKinds.RockingChair, decoy.Kind, "the decoy is a rocking chair");

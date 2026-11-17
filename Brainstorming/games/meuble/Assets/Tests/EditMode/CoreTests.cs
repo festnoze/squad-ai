@@ -311,6 +311,33 @@ namespace Meuble.Tests
         {
             Assert.Throws<Newtonsoft.Json.JsonSerializationException>(() => LevelJson.Parse("{\"id\":\"x\",\"typo\":1}"));
         }
+
+        // ----- M7 textures (docs/CONTRACT_M7.md 1.2): the floorFinish field. -----
+
+        [Test]
+        public void Validator_accepts_a_tile_floor_finish_on_a_hard_floor()
+        {
+            LevelDef l = Level1();
+            l.Room.FloorFinish = RoomDef.TileFinish;
+            Assert.IsEmpty(LevelValidator.Validate(l), "a tile finish on a hard floor should be valid");
+        }
+
+        [Test]
+        public void Validator_rejects_an_unknown_floor_finish()
+        {
+            LevelDef l = Level1();
+            l.Room.FloorFinish = "marble";
+            Assert.That(LevelValidator.Validate(l), Has.Some.Contains("floor finish"));
+        }
+
+        [Test]
+        public void Validator_rejects_a_tile_finish_on_a_soft_floor()
+        {
+            LevelDef l = Level1();
+            l.Room.Floor = RoomDef.SoftFloor;
+            l.Room.FloorFinish = RoomDef.TileFinish;
+            Assert.That(LevelValidator.Validate(l), Has.Some.Contains("both soft and tiled"));
+        }
     }
 
     public sealed class StringsTests

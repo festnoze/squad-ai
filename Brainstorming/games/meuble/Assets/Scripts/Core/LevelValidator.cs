@@ -137,6 +137,7 @@ namespace Meuble.Core
             CheckDecoys(level, rooms, issues);
             CheckRugs(level, rooms, issues);
             CheckRoute(level, rooms, body, issues);
+            CheckRoute(level, level.DesignerRouteHard, "hard designer route", rooms, body, issues); // M7 design (CONTRACT_M7 4.1)
             CheckLesson(level, body, issues);
             CheckLeaves(level, rooms, body, issues);
             CheckSplitLevel(level, rooms, body, issues);
@@ -144,6 +145,7 @@ namespace Meuble.Core
             CheckWatchers(level, issues);
             CheckLoad(level, body, issues);
             CheckRobots(level, rooms, issues);
+            CheckM6Gameplay(level, rooms, issues);
 
             if (level.Inhabitants == null || level.Inhabitants.Count == 0)
             {
@@ -377,6 +379,12 @@ namespace Meuble.Core
             {
                 issues.Add("lesson load needs a load on the player");
             }
+            // M6 (CONTRACT_M6 2.5): the wardrobe lesson needs a wardrobe the player body fits in.
+            else if (lesson == LevelDef.LessonWardrobe
+                && (level.Wardrobes().Count == 0 || !WardrobeRule.Fits(body.Size, string.IsNullOrEmpty(level.Player?.Load) ? 0f : Tuning.LoadHeight)))
+            {
+                issues.Add($"lesson wardrobe needs a wardrobe and a body that fits in it (the stool or the floor lamp), not the {body.Kind}");
+            }
             else if (lesson == LevelDef.LessonFinal)
             {
                 List<string> mechanics = MechanicsOf(level);
@@ -428,6 +436,16 @@ namespace Meuble.Core
                 if (r.Floor != null && r.Floor != RoomDef.HardFloor && r.Floor != RoomDef.SoftFloor)
                 {
                     issues.Add($"room {Name(r, i)} floor '{r.Floor}' is neither hard nor soft");
+                }
+                // M7 (CONTRACT_M7 1.2): floorFinish is visual only, and only meaningful on a hard floor (a soft one
+                // is already a distinct carpet look; tile and carpet together would be two floor treatments at once).
+                if (!string.IsNullOrEmpty(r.FloorFinish) && r.FloorFinish != RoomDef.TileFinish)
+                {
+                    issues.Add($"room {Name(r, i)} floor finish '{r.FloorFinish}' is not 'tile'"); // MUTATION:FLOOR_FINISH_VALUE
+                }
+                else if (r.IsTile && r.IsSoft) // MUTATION:FLOOR_FINISH_SOFT_TILE
+                {
+                    issues.Add($"room {Name(r, i)} is both soft and tiled: a tile finish needs a hard floor");
                 }
                 if (Mathf.Abs(r.WallThickness - t) > Eps)
                 {
@@ -603,44 +621,51 @@ namespace Meuble.Core
 
         private static void CheckRoute(LevelDef level, List<RoomDef> rooms, BodyDef body, List<string> issues)
         {
+            CheckRoute(level, level.DesignerRoute, "designer route", rooms, body, issues);
+        }
+
+        /// <summary>M7 design: the checks of one route, <paramref name="route"/> (designerRoute or designerRouteHard).</summary>
+        private static void CheckRoute(LevelDef level, List<RouteStepDef> route, string name, List<RoomDef> rooms, BodyDef body, List<string> issues)
+        {
+            route = route ?? new List<RouteStepDef>();
             float previous = 0f;
-            for (int i = 0; i < level.DesignerRoute.Count; i++)
+            for (int i = 0; i < route.Count; i++)
             {
-                RouteStepDef s = level.DesignerRoute[i];
+                RouteStepDef s = route[i];
                 if (!InsideRoom(rooms, s.X, s.Z, 0f, 0f))
                 {
-                    issues.Add($"designer route waypoint {i + 1} ({s.X}, {s.Z}) is not inside a room");
+                    issues.Add($"{name} waypoint {i + 1} ({s.X}, {s.Z}) is not inside a room");
                 }
                 if (s.At < previous - Eps)
                 {
-                    issues.Add($"designer route waypoint {i + 1} time {s.At} is before the previous one ({previous})");
+                    issues.Add($"{name} waypoint {i + 1} time {s.At} is before the previous one ({previous})");
                 }
                 previous = Mathf.Max(previous, s.At);
                 // M4 (CONTRACT_M4 5, amendment 9.3): the action is one the level's body can do; the wait is not negative.
                 // M5 (CONTRACT_M5_v3 5, 15.10): "open" presses E at a closed leaf the step names by its id.
                 if (s.Action != null && s.Action != RouteStepDef.ActionToggle && s.Action != RouteStepDef.ActionRightUp
-                    && s.Action != RouteStepDef.ActionOpen)
+                    && s.Action != RouteStepDef.ActionOpen && s.Action != RouteStepDef.ActionHide && s.Action != RouteStepDef.ActionLeave)
                 {
-                    issues.Add($"designer route waypoint {i + 1} action '{s.Action}' is neither {RouteStepDef.ActionToggle} nor {RouteStepDef.ActionRightUp} nor {RouteStepDef.ActionOpen}");
+                    issues.Add($"{name} waypoint {i + 1} action '{s.Action}' is neither {RouteStepDef.ActionToggle} nor {RouteStepDef.ActionRightUp} nor {RouteStepDef.ActionOpen} nor {RouteStepDef.ActionHide} nor {RouteStepDef.ActionLeave}");
                 }
                 else if (s.Action == RouteStepDef.ActionOpen)
                 {
                     if (string.IsNullOrEmpty(s.Door) || !level.Doors.Exists(d => d != null && d.HasLeaf && d.Id == s.Door))
                     {
-                        issues.Add($"designer route waypoint {i + 1} opens door '{s.Door}', which is not a leaf of the level");
+                        issues.Add($"{name} waypoint {i + 1} opens door '{s.Door}', which is not a leaf of the level");
                     }
                 }
                 else if (s.Action == RouteStepDef.ActionToggle && !body.HasLight)
                 {
-                    issues.Add($"designer route waypoint {i + 1} toggles a light, but the {body.Kind} body has none");
+                    issues.Add($"{name} waypoint {i + 1} toggles a light, but the {body.Kind} body has none");
                 }
                 else if (s.Action == RouteStepDef.ActionRightUp && !body.Tips)
                 {
-                    issues.Add($"designer route waypoint {i + 1} rights the furniture up, but the {body.Kind} body never tips");
+                    issues.Add($"{name} waypoint {i + 1} rights the furniture up, but the {body.Kind} body never tips");
                 }
                 if (s.Door != null && s.Action != RouteStepDef.ActionOpen)
                 {
-                    issues.Add($"designer route waypoint {i + 1} names door '{s.Door}' but its action is not {RouteStepDef.ActionOpen}");
+                    issues.Add($"{name} waypoint {i + 1} names door '{s.Door}' but its action is not {RouteStepDef.ActionOpen}");
                 }
             }
         }
@@ -1243,6 +1268,75 @@ namespace Meuble.Core
                 mechanics.Add(LevelDef.LessonLoad);
             }
             return mechanics;
+        }
+
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5 to 2.7) -----
+
+        /// <summary>
+        /// M6: every wardrobe prop is Tuning.WardrobeSize* (1.0 x 2.0 x 0.6, within 1 mm), an occluder, and its entry zone (the
+        /// strip WardrobeReach deep along its whole front face, WardrobeRule.EntryCenter) lies inside a room and clear of every
+        /// other prop and decoy. "openedByInhabitants" is only on a door with a leaf (never a window, never a doorway); a level
+        /// with "doorMemory" has at least one leaf.
+        /// </summary>
+        private static void CheckM6Gameplay(LevelDef level, List<RoomDef> rooms, List<string> issues)
+        {
+            const float sizeEps = 1e-3f;
+            foreach (PropDef w in level.Wardrobes())
+            {
+                string label = $"wardrobe {w.Name}";
+                if (Mathf.Abs(w.SizeX - Tuning.WardrobeSizeX) > sizeEps || Mathf.Abs(w.SizeY - Tuning.WardrobeSizeY) > sizeEps
+                    || Mathf.Abs(w.SizeZ - Tuning.WardrobeSizeZ) > sizeEps)
+                {
+                    issues.Add($"{label} is ({w.SizeX}, {w.SizeY}, {w.SizeZ}): a wardrobe is ({Tuning.WardrobeSizeX}, {Tuning.WardrobeSizeY}, {Tuning.WardrobeSizeZ})");
+                    continue;
+                }
+                if (!w.Occluder)
+                {
+                    issues.Add($"{label} is not an occluder");
+                }
+                Vector3 entry = WardrobeRule.EntryCenter(w);
+                if (!FootprintInsideRoom(rooms, entry.x, entry.z, w.SizeX, Tuning.WardrobeReach, w.Yaw))
+                {
+                    issues.Add($"{label}: its front (entry zone at ({entry.x:0.###}, {entry.z:0.###})) is not inside a room");
+                }
+                var half = new Vector2(w.SizeX, Tuning.WardrobeReach) * 0.5f;
+                foreach (PropDef other in level.Props)
+                {
+                    if (other != w && RectsOverlap(new Vector2(entry.x, entry.z), half, w.Yaw,
+                            new Vector2(other.X, other.Z), new Vector2(other.SizeX, other.SizeZ) * 0.5f, other.Yaw))
+                    {
+                        issues.Add($"{label}: prop {other.Name} stands in its front");
+                    }
+                }
+                for (int d = 0; d < level.Decoys.Count; d++)
+                {
+                    DecoyDef decoy = level.Decoys[d];
+                    Vector3 ds = level.DecoySize(decoy);
+                    if (RectsOverlap(new Vector2(entry.x, entry.z), half, w.Yaw, new Vector2(decoy.X, decoy.Z), new Vector2(ds.x, ds.z) * 0.5f, decoy.Yaw))
+                    {
+                        issues.Add($"{label}: decoy {d + 1} stands in its front");
+                    }
+                }
+            }
+            for (int k = 0; k < level.Windows.Count; k++)
+            {
+                if (level.Windows[k] != null && level.Windows[k].OpenedByInhabitants)
+                {
+                    issues.Add($"window {k + 1} is openedByInhabitants: only a door with a leaf is");
+                }
+            }
+            for (int k = 0; k < level.Doors.Count; k++)
+            {
+                OpeningDef d = level.Doors[k];
+                if (d != null && d.OpenedByInhabitants && !d.HasLeaf)
+                {
+                    issues.Add($"door {k + 1} is openedByInhabitants but has no leaf");
+                }
+            }
+            if (level.DoorMemory && level.LeafDoors().Count == 0)
+            {
+                issues.Add("doorMemory needs at least one door leaf");
+            }
         }
 
         // ----- M5 wave 5B: the robot (docs/CONTRACT_M5.md 4, 16.8) -----

@@ -13,8 +13,8 @@ namespace Meuble.Tests
 {
     /// <summary>
     /// M5B watchers probe (docs/CONTRACT_M5.md 4, 6, 16.5, 16.8, 16.11, 16.12 and 17): the robot vacuum's visual (step 42w),
-    /// the load's visual and its clue (step 44w), and the deferred 5A items: the floor cone on a split level (m14, step 37w),
-    /// the dog's fan as a superset of what it sees (m20, step 38w) and the merged character slots (step 37w).
+    /// the load's visual and its clue (step 44w; on a split level, step 44x), and the deferred 5A items: the floor cone on a split level (m14, step 37w),
+    /// the dog's fan as a superset of what it sees (m20, step 38w) and the unmerged character slots (CONTRACT_M5 19, step 37x).
     ///
     /// Fixtures: test_m5_watchers_floor (a 0.6 m platform with two ramps), test_m5_watchers_cover (an awake dog and a watchful
     /// human behind a 0.5 m low wall and a 1.8 m wardrobe), test_m5_watchers_people (three humans and a dog). Every scenario
@@ -50,7 +50,6 @@ namespace Meuble.Tests
             logged.Clear();
             fixedSteps = 0;
             ModelKit.Disabled = false;
-            ModelKit.MergeCharacterSlots = Tuning.CharacterSlotMerge;
             GamePause.IsPaused = false;
             Application.logMessageReceived += OnLog;
             Time.timeScale = 1f;
@@ -74,7 +73,6 @@ namespace Meuble.Tests
         {
             InputReader.ResetInjections();
             SaveStore.ResetForTests();
-            ModelKit.MergeCharacterSlots = Tuning.CharacterSlotMerge;
             Time.timeScale = 1f;
             GamePause.IsPaused = false;
             Application.logMessageReceived -= OnLog;
@@ -144,6 +142,19 @@ namespace Meuble.Tests
 
         private static float Planar(Vector3 a, Vector3 b) => YawMath.Planar(a - b).magnitude;
 
+        /// <summary>m15: lets frames pass until the robot's drawn body stands on its rule pose (bounded by 3 s of real time).</summary>
+        private static IEnumerator SettleBody(Robot robot, string label)
+        {
+            float realStart = Time.realtimeSinceStartup;
+            while ((Planar(robot.Body.position, robot.Position) > 1e-4f || Mathf.Abs(Mathf.DeltaAngle(robot.VisualYaw, robot.Yaw)) > 0.01f)
+                && Time.realtimeSinceStartup - realStart < 3f)
+            {
+                yield return null;
+            }
+            Assert.Less(Planar(robot.Body.position, robot.Position), 1e-4f, label + ": the drawn body never reached the pose");
+            Assert.AreEqual(0f, Mathf.DeltaAngle(robot.VisualYaw, robot.Yaw), 0.01f, label + ": the drawn body never turned to the heading");
+        }
+
         // ----- 42w: the robot vacuum's visual -----
 
         /// <summary>
@@ -212,8 +223,11 @@ namespace Meuble.Tests
             Assert.That(top, Is.EqualTo(Tuning.RobotHeight).Within(0.003f), "the robot is not RobotHeight tall");
             Assert.GreaterOrEqual(bottom, -1e-4f, "the robot sinks into the floor");
 
-            // It follows SetPose along its path: the shell on the position, the light ahead along the heading.
+            // It follows SetPose along its path: the root (the rule pose) at once; the drawn shell on the position and the
+            // light ahead along the heading once the body has caught up (m15: it turns at a capped rate).
             Renderer shell = renderers.First(r => r.name == "Shell");
+            Assert.IsNotNull(robot.Body, "the robot has no drawn body");
+            Assert.IsTrue(shell.transform.IsChildOf(robot.Body) && robot.StatusLight.IsChildOf(robot.Body), "the shell and the light are not on the body");
             int poses = robot.PoseCount;
             foreach (float t in new[] { 0f, 1.3f, 4.2f, 7.5f, 11f })
             {
@@ -221,6 +235,8 @@ namespace Meuble.Tests
                 float heading = robot.Path.HeadingAt(t);
                 robot.SetPose(at, heading);
                 Assert.Less(Planar(robot.transform.position, at), 1e-4f, $"t {t}: the robot is not at its pose");
+                Assert.AreEqual(0f, Mathf.DeltaAngle(heading, robot.transform.eulerAngles.y), 0.01f, $"t {t}: the root is not along its heading");
+                yield return SettleBody(robot, $"t {t}");
                 Assert.Less(Planar(shell.bounds.center, at), 1e-3f, $"t {t}: the shell is not drawn at the pose");
                 Vector3 ahead = YawMath.Planar(robot.StatusLight.position - robot.Position).normalized;
                 Assert.Greater(Vector3.Dot(ahead, robot.Path.ForwardAt(t)), 0.999f, $"t {t}: the robot's front is not along its path");
@@ -229,11 +245,72 @@ namespace Meuble.Tests
             robot.SetPose(new Vector3(1.5f, 0f, -0.7f), 135f);
             Assert.Less(Planar(robot.Position, new Vector3(1.5f, 0f, -0.7f)), 1e-4f, "an arbitrary pose");
             Assert.AreEqual(135f, robot.Yaw, 1e-4f);
+            yield return SettleBody(robot, "an arbitrary pose");
             Assert.Greater(Vector3.Dot(YawMath.Planar(robot.StatusLight.position - robot.Position).normalized, YawMath.Forward(135f)), 0.999f,
                 "the light is not at the front of an arbitrary pose");
             Physics.SyncTransforms();
             Assert.IsEmpty(Physics.OverlapSphere(robot.Position + Vector3.up * 0.05f, Tuning.RobotRadius)
                 .Where(c => c.transform.IsChildOf(robot.transform)), "a collider stands where the robot is");
+
+            // m15: posed once per fixed step as GameState does, along +x then reversed at a loop end. The drawn body never
+            // turns faster than RobotTurnRate (the 180 degree reversal is seen mid-turn), stays within one step's travel of
+            // the rule pose, on its line, and settles on the new heading.
+            var start = new Vector3(-1f, 0f, 3f);
+            robot.SetPose(start, 90f);
+            yield return SettleBody(robot, "the drive's start");
+            float speed = Tuning.RobotSpeed;
+            float flipAt = 0.6f;
+            int driven = 0;
+            System.Action drive = () =>
+            {
+                driven++;
+                float time = driven * Dt;
+                float x = time < flipAt ? speed * time : speed * flipAt - speed * (time - flipAt);
+                robot.SetPose(start + Vector3.right * x, time < flipAt ? 90f : 270f);
+            };
+            Game.FixedStepped += drive;
+            float turnCap = Tuning.RobotTurnRate;
+            float lastYaw = robot.VisualYaw;
+            float lastDt = -1f;
+            float worstTurn = 0f;
+            int midTurn = 0;
+            int readings = 0;
+            float driveStart = Time.realtimeSinceStartup;
+            try
+            {
+                while (driven * Dt < flipAt + 1.2f && Time.realtimeSinceStartup - driveStart < 20f)
+                {
+                    yield return null;
+                    readings++;
+                    float yawNow = robot.VisualYaw;
+                    float bodyYaw = robot.Body.eulerAngles.y;
+                    Assert.AreEqual(0f, Mathf.DeltaAngle(yawNow, bodyYaw), 0.01f, "the body is not drawn at its visual yaw");
+                    // The change since the last reading is the last frame's LateUpdate, which turned by its own deltaTime.
+                    if (lastDt >= 0f)
+                    {
+                        float turn = Mathf.Abs(Mathf.DeltaAngle(lastYaw, yawNow));
+                        worstTurn = Mathf.Max(worstTurn, turn - turnCap * lastDt);
+                        Assert.LessOrEqual(turn, turnCap * lastDt + 0.5f, $"the body turned {turn:0.0} deg in a frame of {lastDt:0.000} s");
+                    }
+                    float off = Mathf.Abs(Mathf.DeltaAngle(yawNow, robot.Yaw));
+                    midTurn += off > 10f && off < 170f ? 1 : 0;
+                    // Drawn last frame one step behind; this frame's fixed steps may have moved the root since.
+                    Assert.LessOrEqual(Planar(robot.Body.position, robot.Position), speed * (2f * Dt + Time.deltaTime) + 1e-4f,
+                        "the body lags the rule pose by more than its interpolation");
+                    Assert.AreEqual(start.z, robot.Body.position.z, 1e-4f, "the body leaves its line");
+                    lastYaw = yawNow;
+                    lastDt = Time.deltaTime;
+                }
+            }
+            finally
+            {
+                Game.FixedStepped -= drive;
+            }
+            Debug.Log($"[Step42w] the drive: {driven} poses, {readings} frames, {midTurn} seen mid-turn, worst turn over the cap {worstTurn:0.00} deg");
+            Assert.GreaterOrEqual(driven * Dt, flipAt + 1.2f, "premise: the drive did not run past the reversal (game time stalled)");
+            Assert.AreEqual(270f, robot.Yaw, 1e-4f, "premise: the rule pose reversed");
+            Assert.Greater(midTurn, 0, "the body flipped 180 degrees within one frame at the reversal");
+            Assert.AreEqual(0f, Mathf.DeltaAngle(robot.VisualYaw, 270f), 0.5f, "the body never settled on the reversed heading");
 
             // The light pulses while the game runs (visual only).
             Vector3 scale = robot.StatusLight.localScale;
@@ -374,6 +451,88 @@ namespace Meuble.Tests
             logged.RemoveAll(l => l.Contains("[LoadView] no load 'piano'"));
             chair.Teleport(home, yaw);
             yield return Steps(1);
+            CollectionAssert.IsEmpty(logged, "no error logged");
+        }
+
+        // ----- 44x: the clue on a split level (m15) -----
+
+        /// <summary>
+        /// Critique m15 (CONTRACT_M5 19): on the floor fixture (a 0.6 m platform 1 m wide, two 2 m ramps), the vase's clue lies
+        /// on one floor surface. Dropped at the platform's edge it stays on the platform; dropped beside the platform it stays
+        /// on the floor, out of the platform's side; dropped on a ramp it lies on the slope (tilted by the slope, not moved).
+        /// Every vertex of every piece lies on or just above the floor under it, never inside it nor floating past an edge.
+        /// Each case asserts its premise: a clue laid flat at the caller's point would cross the edge, or the slope there.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step44x_ClueLiesOnTheRampAndStaysOnThePlatform()
+        {
+            yield return Load(FloorLevel);
+            FurnitureController chair = Game.Furniture;
+            Assert.IsNotNull(chair, "premise: no player furniture");
+            FloorMap floor = Game.Def.Floor;
+            Assert.IsFalse(floor.IsFlat, "premise: the fixture has a platform");
+            Assert.AreSame(floor.Level, chair.Floor.Level, "premise: the furniture stands on the fixture's floor");
+            LoadView view = LoadView.Create(LoadView.Vase, chair.Visual, chair.Size);
+            Assert.IsNotNull(view, "premise: no vase");
+            scratch.Add(view.gameObject);
+            float slope = Mathf.Atan2(PlatformHeight, 2f) * Mathf.Rad2Deg;
+            var cases = new[]
+            {
+                (name: "the platform's edge", at: new Vector3(PlatformHalfX - 0.05f, PlatformHeight, -2.2f), height: PlatformHeight, ramp: false),
+                (name: "beside the platform", at: new Vector3(-PlatformHalfX - 0.05f, 0f, -2.2f), height: 0f, ramp: false),
+                (name: "the ramp", at: new Vector3(-1.5f, PlatformHeight * 0.5f, 0f), height: PlatformHeight * 0.5f, ramp: true),
+            };
+            foreach (var c in cases)
+            {
+                Assert.AreEqual(c.height, floor.HeightAt(c.at), 1e-4f, $"{c.name}: premise: the floor height there");
+                GameObject clue = view.SpawnClue(c.at);
+                Assert.IsNotNull(clue, c.name + ": no clue");
+                float spread = 0f;
+                float low = float.MaxValue;
+                float high = float.MinValue;
+                int vertices = 0;
+                foreach (MeshFilter f in clue.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    Matrix4x4 m = f.transform.localToWorldMatrix;
+                    foreach (Vector3 v in f.sharedMesh.vertices)
+                    {
+                        Vector3 p = m.MultiplyPoint3x4(v);
+                        float above = p.y - floor.HeightAt(p);
+                        low = Mathf.Min(low, above);
+                        high = Mathf.Max(high, above);
+                        spread = Mathf.Max(spread, Planar(p, clue.transform.position));
+                        vertices++;
+                    }
+                }
+                Vector3 rest = clue.transform.position;
+                float tilt = Vector3.Angle(Vector3.up, clue.transform.up);
+                Debug.Log($"[Step44x] {c.name}: dropped at {c.at}, rests at {rest} ({Planar(rest, c.at):0.000} m away), tilt {tilt:0.0} deg, "
+                    + $"spread {spread:0.000} m, vertices from {low:0.000} to {high:0.000} m over the floor");
+                Assert.Greater(vertices, 20, c.name + ": premise: the clue's pieces");
+                Assert.Greater(spread, 0.2f, c.name + ": premise: the clue is scattered");
+                if (c.ramp)
+                {
+                    // Premise: laid flat there, the uphill pieces would sink into the slope by about spread * tan(slope).
+                    Assert.Greater(spread * Mathf.Tan(slope * Mathf.Deg2Rad), 0.05f, c.name + ": premise: the slope under the spread");
+                    Assert.Less(Planar(rest, c.at), 1e-3f, c.name + ": the clue moved off a slope it fits on");
+                    Assert.AreEqual(slope, tilt, 0.5f, c.name + ": the clue does not lie in the slope's frame");
+                }
+                else
+                {
+                    // Premise: laid flat at the caller's point, its spread would cross the platform's edge (x = +-0.5).
+                    float edge = c.at.x > 0f ? PlatformHalfX : -PlatformHalfX;
+                    Assert.Less(Mathf.Abs(c.at.x - edge), spread, c.name + ": premise: the spread crosses the edge");
+                    Assert.AreEqual(c.height, floor.HeightAt(rest), 1e-4f, c.name + ": the clue left the surface it fell on");
+                    Assert.AreEqual(c.height, rest.y, 1e-3f, c.name + ": the clue does not rest on that surface");
+                    Assert.LessOrEqual(Planar(rest, c.at), Tuning.ClueSearchRadius + 1e-4f, c.name + ": the clue moved too far");
+                    Assert.Less(tilt, 0.1f, c.name + ": a clue on a level surface is tilted");
+                }
+                Assert.GreaterOrEqual(low, -0.005f, c.name + ": a piece sinks into the floor");
+                Assert.Less(high, 0.2f, c.name + ": a piece floats over the floor (past an edge)");
+                view.ClearClue();
+                view.Restore();
+                yield return null;
+            }
             CollectionAssert.IsEmpty(logged, "no error logged");
         }
 
@@ -706,122 +865,64 @@ namespace Meuble.Tests
             return (p - (a + ab * t)).magnitude;
         }
 
-        // ----- 37w: merged character slots (CONTRACT_M5 17) -----
+        // ----- 37x: unmerged character slots (CONTRACT_M5 17 and 19) -----
 
         /// <summary>
-        /// CONTRACT_M5 17 (a draw call is a material slot): the people fixture with the three humans of the most slots
-        /// (watchful, teen, tidy) and the dog, built without and then with ModelKit.MergeCharacterSlots. Merged, every
-        /// character draws fewer slots, and the level fewer draw calls, by exactly what the inhabitants report; and the look
-        /// is unchanged: every source material of every model draws the same material with the same detail, the clothes
-        /// keep the tint alone, no triangle is lost, and one merged mesh is shared per model.
+        /// CONTRACT_M5 19 (m4: the character slot merge is removed): the people fixture with the three humans of the most slots
+        /// (watchful, teen, tidy) and the dog. Every character draws its catalog prefab's own skinned mesh with exactly the
+        /// prefab's slots (none merged, none dropped), the clothes take the tint alone, and the level still holds its draw call
+        /// budget (material slots), counted here independently of the probe.
         /// </summary>
         [UnityTest]
-        public IEnumerator Step37w_MergedSlotsKeepTheLookAndCountFewerDrawCalls()
+        public IEnumerator Step37x_CharacterSlotsAreTheCatalogSlotsWithinTheBudget()
         {
             string[] worst = { PersonalityDef.Watchful, PersonalityDef.Teen, PersonalityDef.Tidy };
-            var before = new Dictionary<string, Dictionary<string, (Material material, Texture detail)>>();
-            var slotsBefore = new Dictionary<string, int>();
-            var slotsAfter = new Dictionary<string, int>();
-            int levelBefore = 0;
-            int levelAfter = 0;
-            int saved = 0;
-            foreach (bool merge in new[] { false, true })
+            yield return Load(PeopleLevel);
+            List<InhabitantDef> humans = Game.Def.Inhabitants.Where(d => d.Kind != PersonalityDef.Dog).ToList();
+            Assert.AreEqual(3, humans.Count, "premise: three humans");
+            for (int i = 0; i < humans.Count; i++)
             {
-                ModelKit.MergeCharacterSlots = merge;
-                yield return Load(PeopleLevel);
-                List<InhabitantDef> humans = Game.Def.Inhabitants.Where(d => d.Kind != PersonalityDef.Dog).ToList();
-                Assert.AreEqual(3, humans.Count, "premise: three humans");
-                for (int i = 0; i < humans.Count; i++)
-                {
-                    humans[i].Personality = worst[i];
-                }
-                Game.Restart();
-                Game.Rules = GameRules.M1;
-                yield return Steps(2);
-                yield return null;
-                int level = Probe.CountRenderers(Game.Level.Root.GetComponentsInChildren<Renderer>(false)).MaterialSlots;
-                foreach (Inhabitant h in Game.Level.Inhabitants)
-                {
-                    Assert.IsNotNull(h.Rig, $"premise: {h.name} shows no model");
-                    Assert.IsTrue(h.Tint.HasValue, $"premise: {h.name} has no tint");
-                    string who = h.Personality.Id;
-                    GameObject model = h.Rig.Model;
-                    int slots = ModelKit.SlotsUnder(h.transform);
-                    var looks = new Dictionary<string, (Material, Texture)>();
-                    var block = new MaterialPropertyBlock();
-                    foreach ((Renderer r, int slot, string sourceName) in ModelKit.SourceSlots(model, h.Rig.Entry))
-                    {
-                        r.GetPropertyBlock(block, slot);
-                        looks[sourceName] = (r.sharedMaterials[slot], block.isEmpty ? null : block.GetTexture("_BaseMap"));
-                    }
-                    Assert.Greater(looks.Count, 2, $"premise: {h.name}'s source slots");
-                    SkinnedMeshRenderer skin = h.Rig.Skin;
-                    Mesh source = ModelKit.SourceMeshOf(skin.sharedMesh);
-                    if (!merge)
-                    {
-                        Assert.AreEqual(0, h.MergedSlots, $"{h.name}: slots merged with the switch off");
-                        Assert.IsFalse(ModelKit.IsMerged(skin.sharedMesh), $"{h.name}: a merged mesh with the switch off");
-                        before[who] = looks;
-                        slotsBefore[who] = slots;
-                        continue;
-                    }
-                    Assert.IsTrue(ModelKit.IsMerged(skin.sharedMesh), $"{h.name}: its slots were not merged");
-                    Assert.AreSame(h.Rig.Entry.prefab.GetComponentInChildren<SkinnedMeshRenderer>(true).sharedMesh, source,
-                        $"{h.name}: the merged mesh is not cut from the catalog's own mesh");
-                    Assert.AreEqual(ModelKit.Triangles(source), ModelKit.Triangles(skin.sharedMesh), $"{h.name}: triangles lost in the merge");
-                    Assert.AreEqual(source.vertexCount, skin.sharedMesh.vertexCount, $"{h.name}: vertices changed in the merge");
-                    Assert.AreEqual(skin.sharedMaterials.Length, skin.sharedMesh.subMeshCount, $"{h.name}: slots and submeshes differ");
-                    Assert.Greater(h.MergedSlots, 0, $"{h.name}: no slot saved");
-                    slotsAfter[who] = slots;
-                    Assert.AreEqual(slotsBefore[who] - h.MergedSlots, slots, $"{h.name}: the slots saved are not counted");
-                    saved += h.MergedSlots;
-                    CollectionAssert.AreEquivalent(before[who].Keys, looks.Keys, $"{h.name}: a source material went missing");
-                    foreach (KeyValuePair<string, (Material material, Texture detail)> pair in looks)
-                    {
-                        Assert.AreSame(before[who][pair.Key].material, pair.Value.material, $"{h.name}: {pair.Key} changed material");
-                        Assert.AreSame(before[who][pair.Key].detail, pair.Value.detail, $"{h.name}: {pair.Key} changed detail");
-                    }
-                    // Two merged slots never share a material and a detail; the tint is on the clothes alone.
-                    var keys = new HashSet<(Material, Texture)>();
-                    for (int s = 0; s < skin.sharedMaterials.Length; s++)
-                    {
-                        skin.GetPropertyBlock(block, s);
-                        Assert.IsTrue(keys.Add((skin.sharedMaterials[s], block.isEmpty ? null : block.GetTexture("_BaseMap"))),
-                            $"{h.name}: slot {s} draws what another slot draws");
-                    }
-                    Material tint = PrimitiveKit.Lit(h.Tint.Value);
-                    foreach ((Renderer r, int slot, string name) in ModelKit.SourceSlots(model, h.Rig.Entry))
-                    {
-                        bool clothes = ModelKit.PartOf(name, h.Rig.Entry.IsPet) == ModelKit.CharacterPart.Clothes;
-                        Assert.AreEqual(clothes, r.sharedMaterials[slot] == tint, $"{h.name}: {name} and the tint");
-                    }
-                }
-                if (merge)
-                {
-                    levelAfter = level;
-                    // The same model again shares its merged mesh.
-                    Inhabitant first = Game.Level.Inhabitants.First(h => !h.IsDog);
-                    Mesh shared = first.Rig.Skin.sharedMesh;
-                    string firstName = first.name;
-                    Game.Restart();
-                    yield return Steps(2);
-                    Inhabitant again = Game.Level.Inhabitants.First(h => h.name == firstName);
-                    Assert.AreSame(shared, again.Rig.Skin.sharedMesh, "a rebuilt level does not reuse the merged mesh");
-                }
-                else
-                {
-                    levelBefore = level;
-                }
+                humans[i].Personality = worst[i];
             }
-            int charactersBefore = slotsBefore.Values.Sum();
-            int charactersAfter = slotsAfter.Values.Sum();
-            Debug.Log($"[Step37w] watchful, teen, tidy and the dog: {charactersBefore} character slots unmerged "
-                + $"({string.Join(", ", slotsBefore.Select(p => p.Key + " " + p.Value))}), {charactersAfter} merged "
-                + $"({string.Join(", ", slotsAfter.Select(p => p.Key + " " + p.Value))}); level draw calls {levelBefore} -> {levelAfter}");
-            Assert.AreEqual(4, slotsAfter.Count, "premise: three humans and the dog merged");
-            Assert.AreEqual(charactersBefore - saved, charactersAfter, "the character slots saved");
-            Assert.AreEqual(levelBefore - saved, levelAfter, "the level's draw calls do not drop by the slots saved");
-            Assert.GreaterOrEqual(saved, 10, "the merge saves few slots on the worst three humans and the dog");
+            Game.Restart();
+            Game.Rules = GameRules.M1;
+            yield return Steps(2);
+            yield return null;
+            Assert.AreEqual(4, Game.Level.Inhabitants.Count, "premise: three humans and the dog");
+            var perCharacter = new List<string>();
+            int characterSlots = 0;
+            foreach (Inhabitant h in Game.Level.Inhabitants)
+            {
+                Assert.IsNotNull(h.Rig, $"premise: {h.name} shows no model");
+                Assert.IsTrue(h.Tint.HasValue, $"premise: {h.name} has no tint");
+                SkinnedMeshRenderer skin = h.Rig.Skin;
+                SkinnedMeshRenderer prefab = h.Rig.Entry.prefab.GetComponentInChildren<SkinnedMeshRenderer>(true);
+                Assert.IsNotNull(skin, $"premise: {h.name} is not skinned");
+                Assert.IsNotNull(prefab, $"premise: {h.name}'s catalog prefab is not skinned");
+                Assert.AreSame(prefab.sharedMesh, skin.sharedMesh, $"{h.name} does not draw the catalog prefab's own mesh");
+                Assert.AreEqual(prefab.sharedMaterials.Length, skin.sharedMaterials.Length, $"{h.name}: slots merged or dropped");
+                Assert.AreEqual(skin.sharedMesh.subMeshCount, skin.sharedMaterials.Length, $"{h.name}: slots and submeshes differ");
+                Material tint = PrimitiveKit.Lit(h.Tint.Value);
+                int clothes = 0;
+                foreach ((Renderer r, int slot, string name) in ModelKit.SourceSlots(h.Rig.Model, h.Rig.Entry))
+                {
+                    bool isClothes = ModelKit.PartOf(name, h.Rig.Entry.IsPet) == ModelKit.CharacterPart.Clothes;
+                    clothes += isClothes ? 1 : 0;
+                    Assert.AreEqual(isClothes, r.sharedMaterials[slot] == tint, $"{h.name}: {name} and the tint");
+                }
+                Assert.Greater(clothes, 0, $"premise: {h.name} has a clothes slot");
+                int slots = ModelKit.SlotsUnder(h.transform);
+                characterSlots += slots;
+                perCharacter.Add(h.Personality.Id + " " + slots);
+            }
+            Renderer[] drawn = Game.Level.Root.GetComponentsInChildren<Renderer>(false);
+            int slotsHere = drawn.Where(r => r.enabled && r.gameObject.activeInHierarchy).Sum(r => r.sharedMaterials.Length);
+            bool house = Game.Def.AllRooms().Count >= Tuning.HouseBudgetRooms;
+            int budget = house ? Tuning.BudgetHouseRenderers : Tuning.BudgetRenderers;
+            Debug.Log($"[Step37x] watchful, teen, tidy and the dog: {characterSlots} character slots ({string.Join(", ", perCharacter)}); "
+                + $"level draw calls {slotsHere} of {budget}");
+            Assert.AreEqual(slotsHere, Probe.CountRenderers(drawn).MaterialSlots, "Probe.CountRenderers does not count every slot");
+            Assert.LessOrEqual(slotsHere, budget, "the level's draw calls (material slots) exceed the budget");
             CollectionAssert.IsEmpty(logged, "no error logged");
         }
     }

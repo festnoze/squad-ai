@@ -165,16 +165,27 @@ namespace Meuble.Editor
 
         /// <summary>
         /// The detail of each surface: a 512 x 512 grayscale derivative of an ambientCG CC0 material (docs/LICENSES.md),
-        /// mean 240 / 255, highlights capped at 1.0, seamless.
+        /// mean 240 / 255, highlights capped at 1.0, seamless. M7 (CONTRACT_M7 1.2): <c>normalFile</c> is the matching
+        /// 512 tangent space normal map derived from the same material's NormalGL map, or null where the surface is
+        /// not in the 1.2 list (Plastic, Foliage, Soil stay bump-free).
         /// </summary>
-        private static readonly (Surface surface, string file, string source)[] Details =
+        private static readonly (Surface surface, string file, string source, string normalFile)[] Details =
         {
-            (Surface.Wood, "detail_wood_Wood049.png", "Wood049"),
-            (Surface.Parquet, "detail_parquet_WoodFloor051.png", "WoodFloor051"),
-            (Surface.Plaster, "detail_plaster_Plaster001.png", "Plaster001"),
-            (Surface.Upholstery, "detail_upholstery_Fabric011.png", "Fabric011"),
-            (Surface.Linen, "detail_linen_Fabric036.png", "Fabric036"),
-            (Surface.Carpet, "detail_carpet_Carpet012.png", "Carpet012"),
+            (Surface.Wood, "detail_wood_Wood049.png", "Wood049", "normal_wood_Wood049.png"),
+            (Surface.Parquet, "detail_parquet_WoodFloor051.png", "WoodFloor051", "normal_parquet_WoodFloor051.png"),
+            (Surface.Plaster, "detail_plaster_Plaster001.png", "Plaster001", "normal_plaster_Plaster001.png"),
+            (Surface.Upholstery, "detail_upholstery_Fabric011.png", "Fabric011", "normal_upholstery_Fabric011.png"),
+            (Surface.Linen, "detail_linen_Fabric036.png", "Fabric036", "normal_linen_Fabric036.png"),
+            (Surface.Carpet, "detail_carpet_Carpet012.png", "Carpet012", "normal_carpet_Carpet012.png"),
+            // M6 texture pass 2 (CONTRACT_M6 2.4, docs/M6_TEXTURES_RESEARCH.md).
+            (Surface.Grass, "detail_grass_Grass001.png", "Grass001", "normal_grass_Grass001.png"),
+            (Surface.Lacquer, "detail_lacquer_PaintedWood006C.png", "PaintedWood006C", "normal_lacquer_PaintedWood006C.png"),
+            (Surface.Metal, "detail_metal_Metal009.png", "Metal009", "normal_metal_Metal009.png"),
+            (Surface.Plastic, "detail_plastic_Plastic006.png", "Plastic006", null),
+            (Surface.Foliage, "detail_foliage_Moss002.png", "Moss002", null),
+            (Surface.Soil, "detail_soil_Ground104.png", "Ground104", null),
+            // M7 textures (CONTRACT_M7 1.2): the kitchen and bathroom floor tiles.
+            (Surface.Tile, "detail_tile_Tiles049.png", "Tiles049", "normal_tile_Tiles049.png"),
         };
 
         /// <summary>
@@ -194,7 +205,7 @@ namespace Meuble.Editor
         private static void BuildTextureLibrary(StringBuilder log)
         {
             var entries = new List<TextureLibrary.Entry>();
-            foreach ((Surface surface, string file, string source) in Details)
+            foreach ((Surface surface, string file, string source, string normalFile) in Details)
             {
                 string path = AmbientCg + file;
                 if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
@@ -209,8 +220,28 @@ namespace Meuble.Editor
                 }
                 var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
                 float mean = MeanTexel(path);
-                entries.Add(new TextureLibrary.Entry { surface = surface, texture = texture, mean = mean, source = source });
-                log.Append($"  {surface}: {file}, mean {F(mean)}, {(texture != null ? texture.width + " px, " + texture.mipmapCount + " mips, " + texture.graphicsFormat : "not loaded")}\n");
+                // M7 textures (CONTRACT_M7 1.2): the matching normal map, imported as Unity's Normal map type.
+                Texture2D normal = null;
+                if (!string.IsNullOrEmpty(normalFile))
+                {
+                    string normalPath = AmbientCg + normalFile;
+                    if (AssetImporter.GetAtPath(normalPath) is TextureImporter normalImporter)
+                    {
+                        if (ConfigureNormalImporter(normalImporter))
+                        {
+                            normalImporter.SaveAndReimport();
+                            log.Append("  reimported ").Append(normalPath).Append('\n');
+                        }
+                        normal = AssetDatabase.LoadAssetAtPath<Texture2D>(normalPath);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no normal map at {normalPath}; the surface stays bump-free at run time");
+                    }
+                }
+                entries.Add(new TextureLibrary.Entry { surface = surface, texture = texture, mean = mean, source = source, normal = normal });
+                log.Append($"  {surface}: {file}, mean {F(mean)}, {(texture != null ? texture.width + " px, " + texture.mipmapCount + " mips, " + texture.graphicsFormat : "not loaded")}" +
+                    $"{(normal != null ? ", normal " + normalFile : "")}\n");
             }
 
             var library = AssetDatabase.LoadAssetAtPath<TextureLibrary>(TextureLibraryPath);
@@ -241,6 +272,29 @@ namespace Meuble.Editor
             if (t.textureType != TextureImporterType.Default) { t.textureType = TextureImporterType.Default; changed = true; }
             if (t.textureShape != TextureImporterShape.Texture2D) { t.textureShape = TextureImporterShape.Texture2D; changed = true; }
             if (t.sRGBTexture) { t.sRGBTexture = false; changed = true; }
+            if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
+            if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
+            if (t.isReadable) { t.isReadable = false; changed = true; }
+            if (t.wrapMode != TextureWrapMode.Repeat) { t.wrapMode = TextureWrapMode.Repeat; changed = true; }
+            if (t.filterMode != FilterMode.Trilinear) { t.filterMode = FilterMode.Trilinear; changed = true; }
+            if (t.anisoLevel != 2) { t.anisoLevel = 2; changed = true; }
+            if (t.maxTextureSize != DetailMaxSize) { t.maxTextureSize = DetailMaxSize; changed = true; }
+            if (t.textureCompression != TextureImporterCompression.CompressedHQ) { t.textureCompression = TextureImporterCompression.CompressedHQ; changed = true; }
+            if (t.npotScale != TextureImporterNPOTScale.ToNearest) { t.npotScale = TextureImporterNPOTScale.ToNearest; changed = true; }
+            return changed;
+        }
+
+        /// <summary>
+        /// M7 (CONTRACT_M7 1.2): sets a normal map's import settings (Unity's Normal map type, so the platform
+        /// compressor and the shader's UnpackNormal pick the right encoding whatever the target); true when anything
+        /// changed (a reimport is needed). The source PNG already encodes a tangent space normal (derived from the
+        /// ambientCG NormalGL map): "create from grayscale" stays off.
+        /// </summary>
+        private static bool ConfigureNormalImporter(TextureImporter t)
+        {
+            bool changed = false;
+            if (t.textureType != TextureImporterType.NormalMap) { t.textureType = TextureImporterType.NormalMap; changed = true; }
+            if (t.textureShape != TextureImporterShape.Texture2D) { t.textureShape = TextureImporterShape.Texture2D; changed = true; }
             if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
             if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
             if (t.isReadable) { t.isReadable = false; changed = true; }
@@ -286,7 +340,7 @@ namespace Meuble.Editor
             for (int i = 0; i < a.Count; i++)
             {
                 if (a[i] == null || a[i].surface != b[i].surface || a[i].texture != b[i].texture || a[i].source != b[i].source
-                    || Mathf.Abs(a[i].mean - b[i].mean) > 1e-6f)
+                    || a[i].normal != b[i].normal || Mathf.Abs(a[i].mean - b[i].mean) > 1e-6f)
                 {
                     return false;
                 }

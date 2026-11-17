@@ -39,8 +39,20 @@ namespace Meuble
         /// <summary>The NavMesh area of the leaf's doorway: <see cref="Tuning.DoorAreaBase"/> + <see cref="Index"/>.</summary>
         public int Area => Tuning.DoorAreaBase + Index;
 
-        /// <summary>True from <see cref="BeginOpen"/> on (opening or open), or when authored open. A leaf never closes again.</summary>
+        /// <summary>
+        /// True from <see cref="BeginOpen()"/> on (opening or open), or when authored open. M6: false again from
+        /// <see cref="BeginClose"/> on (a door the household puts back); before M6 a leaf never closed again.
+        /// </summary>
         public bool Open { get; private set; }
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.6 and 2.7): the current or last swing was made by an inhabitant (opened on its walk, or
+        /// put back): such a swing has no samples, so it is never the furniture seen moving nor a bark.
+        /// </summary>
+        public bool SwungByHousehold { get; private set; }
+
+        /// <summary>M6: the current swing closes the leaf (<see cref="BeginClose"/>), from the open angle back to 0.</summary>
+        public bool Closing { get; private set; }
 
         /// <summary>
         /// True during the swing: from <see cref="BeginOpen"/> through the last of its 30 steps, until the start of the next
@@ -81,7 +93,10 @@ namespace Meuble
             leaf.Collider = solid.AddComponent<BoxCollider>();
             leaf.Collider.size = size;
 
-            GameObject visual = PrimitiveKit.Box(go.transform, "Leaf", Vector3.zero, size, material, occluder, false, Surface.Wood);
+            // M7 (CONTRACT_M7 1.2): painted wood, not bare wood grain; reuses the lacquer detail (PaintedWood006C,
+            // docs/LICENSES.md) at this leaf's own matte material (never through LitSurface, so it keeps its caller's
+            // smoothness instead of Lacquer's glossy fixed finish) and now its normal map too.
+            GameObject visual = PrimitiveKit.Box(go.transform, "Leaf", Vector3.zero, size, material, occluder, false, Surface.Lacquer);
             leaf.Renderer = visual.GetComponent<MeshRenderer>();
             leaf.Renderer.shadowCastingMode = ShadowCastingMode.On;
             if (fader != null)
@@ -103,7 +118,7 @@ namespace Meuble
         /// <summary>A closed leaf the furniture can open from where it stands (DoorGeometry.InReach; no facing condition).</summary>
         public bool InReach(FurnitureController furniture)
         {
-            if (furniture == null || Open || Geometry == null)
+            if (furniture == null || Open || Swinging || Geometry == null)
             {
                 return false;
             }
@@ -113,13 +128,49 @@ namespace Meuble
         /// <summary>Starts the swing of a closed leaf (nothing when it is already open or opening).</summary>
         public void BeginOpen()
         {
-            if (Open)
+            if (Open || Swinging)
             {
                 return;
             }
             Open = true;
             Swinging = true;
             SwingProgress = 0f;
+            SwingSteps = 0;
+            SwungByHousehold = false;
+            Closing = false;
+            UpdateSamples();
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.6 and 2.7): <see cref="BeginOpen()"/>, made by an inhabitant when <paramref name="byHousehold"/>:
+        /// the same 30 step swing, without samples.
+        /// </summary>
+        public void BeginOpen(bool byHousehold)
+        {
+            if (Open || Swinging)
+            {
+                return;
+            }
+            BeginOpen();
+            SwungByHousehold = byHousehold;
+            UpdateSamples();
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.6): an inhabitant puts an open leaf back: it is closed (<see cref="Open"/> false, out of the open
+        /// mask) from this call, and swings from the open angle to 0 over the next 30 fixed steps, without samples; its
+        /// collider moves with it. Nothing happens unless the leaf is open and at rest.
+        /// </summary>
+        public void BeginClose()
+        {
+            if (!Open || Swinging)
+            {
+                return;
+            }
+            Open = false;
+            Swinging = true;
+            Closing = true;
+            SwungByHousehold = true;
             SwingSteps = 0;
             UpdateSamples();
         }
@@ -133,6 +184,11 @@ namespace Meuble
         {
             if (!Swinging)
             {
+                return;
+            }
+            if (Closing)
+            {
+                StepClosing(dt);
                 return;
             }
             if (SwingProgress >= 1f)
@@ -173,9 +229,31 @@ namespace Meuble
             Physics.SyncTransforms();
         }
 
+        /// <summary>M6: one step of a closing swing, the mirror of an opening one; the step after the one that reaches 0 ends it.</summary>
+        private void StepClosing(float dt)
+        {
+            if (SwingProgress <= 0f)
+            {
+                Swinging = false;
+                Closing = false;
+                UpdateSamples();
+                return;
+            }
+            SwingSteps++;
+            SwingProgress = Mathf.Max(0f, SwingProgress - dt / Tuning.DoorOpenTime);
+            if (SwingProgress <= 1e-3f)
+            {
+                SwingProgress = 0f;
+            }
+            PoseAt(Angle);
+            UpdateSamples();
+        }
+
         private void UpdateSamples()
         {
             bool sampled = Swinging; // MUTATION:LEAF_SAMPLES
+            // M6: a swing made by an inhabitant is never sampled (CONTRACT_M6 2.6 and 2.7).
+            sampled &= !SwungByHousehold;
             Samples = sampled && Geometry != null ? Geometry.Samples(Angle) : None;
         }
     }

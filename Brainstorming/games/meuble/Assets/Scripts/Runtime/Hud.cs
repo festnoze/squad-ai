@@ -41,6 +41,12 @@ namespace Meuble
         public bool WinVisible => winCanvas != null && winCanvas.enabled;
         public Font Font { get; private set; }
 
+        /// <summary>M6 (CONTRACT_M6 2.3): the dashed/striped pattern over the pulse is showing now (tests).</summary>
+        public bool PulsePatternVisible => pulsePattern != null && pulsePattern.color.a > 0f;
+
+        /// <summary>M6 (CONTRACT_M6 2.2): the controls line shows the gamepad names now (tests).</summary>
+        public bool ControlsShowGamepad => controlsGamepad;
+
         /// <summary>Every label by name, for the built player check (labels must carry text).</summary>
         public readonly Dictionary<string, Text> Labels = new Dictionary<string, Text>();
 
@@ -50,6 +56,11 @@ namespace Meuble
         private Image eye;
         private Image eyeBackdrop;
         private Image pulse;
+        // M6 (docs/CONTRACT_M6.md 2.3): the pattern over the pulse, and 2.2's controls line (gamepad names swap in).
+        private Image pulsePattern;
+        private Text controls;
+        private bool controlsGamepad;
+        private bool controlsTouch;
         private CanvasGroup titleCard;
         private Text winBody;
         private float seenMoving;
@@ -257,7 +268,9 @@ namespace Meuble
         private const int PeopleHereSize = 32;
         private const int PeopleLineSize = 28;
         private const int PeopleMinSize = 16;
-        private static readonly Color PeoplePlate = new Color(0.08f, 0.07f, 0.1f, 0.6f);
+        // M6: opaque enough that an inhabitant's world marker ("?", "!", "z"), drawn behind every screen space overlay,
+        // never bleeds through the plate during the intro card (CONTRACT_M6 polish); same dark tone as before.
+        private static readonly Color PeoplePlate = new Color(0.08f, 0.07f, 0.1f, 0.95f);
         private const string PersonNameColor = "#FFD98C";
         private static readonly Color GaugeBack = new Color(0.1f, 0.1f, 0.12f, 0.78f);
         private static readonly Color GaugeRim = new Color(1f, 0.97f, 0.9f, 0.55f);
@@ -266,14 +279,18 @@ namespace Meuble
         private static readonly Color SuspicionLow = new Color(1f, 0.8f, 0.25f, 1f);
         private static readonly Color SuspicionHigh = new Color(0.95f, 0.2f, 0.15f, 1f);
         // M5 wave 5B: the balance gauge, a calm sea green that is neither the creak's wood nor the suspicion's yellow; red (the
-        // creak's hot red) above the warning, on a dark red frame.
+        // creak's hot red, CreakHot) above the warning, on a dark red frame.
         private static readonly Color BalanceCalm = new Color(0.45f, 0.85f, 0.7f, 1f);
-        private static readonly Color BalanceHot = new Color(1f, 0.28f, 0.18f, 1f);
         private static readonly Color BalanceHotFrame = new Color(0.55f, 0.08f, 0.06f, 0.85f);
         // The balance gauge's width and its gap to the creak gauge (reference pixels): narrower than the 330 of the creak and
         // suspicion gauges, so the band still fits a 5:4 screen.
         private const float BalanceWidth = 280f;
         private const float BalanceGap = 24f;
+        // The creak and suspicion gauges: their inner edge this far from the screen centre, on either side of the eye, and
+        // their width (reference pixels). The balance gauge is placed from these, so it moves with the creak gauge.
+        private const float GaugeOffsetX = 128f;
+        private const float GaugeWidth = 330f;
+        private const float BalanceOffsetX = GaugeOffsetX + GaugeWidth + BalanceGap;
 
         public void Init()
         {
@@ -294,13 +311,17 @@ namespace Meuble
             // Red edge pulse first, so everything else draws over it.
             pulse = NewImage(transform, "SeenPulse", ProceduralArt.Vignette, new Color(0.9f, 0.05f, 0.05f, 0f));
             Stretch(pulse.rectTransform);
+            // M6 (docs/CONTRACT_M6.md 2.3): a dashed/striped pattern over the pulse, shown only while seen moving (never
+            // in the calm or suspicious states, which show no pulse at all), so the warning is never colour alone.
+            pulsePattern = NewImage(transform, "SeenPulsePattern", ProceduralArt.PulsePattern, new Color(1f, 1f, 1f, 0f));
+            Stretch(pulsePattern.rectTransform);
 
             eyeBackdrop = NewImage(transform, "EyeBackdrop", ProceduralArt.Disc, BackdropClosed);
             Place(eyeBackdrop.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, EyeY), new Vector2(210f, 128f));
             eye = NewImage(eyeBackdrop.transform, "Eye", ProceduralArt.EyeClosed, Color.white);
             Place(eye.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(170f, 99f));
 
-            Text controls = NewText(transform, "Controls", Strings.HudControls, 30, TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.92f));
+            controls = NewText(transform, "Controls", Strings.HudControls, 30, TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.92f));
             Place(controls.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, ControlsY), new Vector2(1600f, 50f));
 
             var cardGo = new GameObject("TitleCard", typeof(RectTransform));
@@ -343,7 +364,7 @@ namespace Meuble
         /// <summary>Creak gauge (PRD 4.6), left of the eye: crack icon, "Grincement", a bar filling to the right.</summary>
         private void BuildCreakGauge()
         {
-            creakCanvas = BuildBar("CreakGauge", new Vector2(1f, 0f), new Vector2(-128f, GaugeY), ProceduralArt.Creak, "CreakLabel",
+            creakCanvas = BuildBar("CreakGauge", new Vector2(1f, 0f), new Vector2(-GaugeOffsetX, GaugeY), ProceduralArt.Creak, "CreakLabel",
                 Strings.HudCreak, CreakWood, out creakFrame, out creakFill, out creakFillImage);
             creakRect = (RectTransform)creakCanvas.transform;
             SetCreak(0f, false);
@@ -355,7 +376,7 @@ namespace Meuble
         /// </summary>
         private void BuildBalanceGauge()
         {
-            balanceCanvas = BuildBar("BalanceGauge", new Vector2(1f, 0f), new Vector2(-128f - 330f - BalanceGap, GaugeY), ProceduralArt.Balance,
+            balanceCanvas = BuildBar("BalanceGauge", new Vector2(1f, 0f), new Vector2(-BalanceOffsetX, GaugeY), ProceduralArt.Balance,
                 "BalanceLabel", Strings.HudBalance, BalanceCalm, out balanceFrame, out balanceFill, out balanceFillImage, BalanceWidth);
             balanceRect = (RectTransform)balanceCanvas.transform;
             balanceOn = false;
@@ -366,7 +387,7 @@ namespace Meuble
         /// <summary>Suspicion bar (PRD 4.4), right of the eye: magnifier icon, "Soupçon", the highest suspicion.</summary>
         private void BuildSuspicionGauge()
         {
-            suspicionCanvas = BuildBar("SuspicionGauge", new Vector2(0f, 0f), new Vector2(128f, GaugeY), ProceduralArt.Magnifier,
+            suspicionCanvas = BuildBar("SuspicionGauge", new Vector2(0f, 0f), new Vector2(GaugeOffsetX, GaugeY), ProceduralArt.Magnifier,
                 "SuspicionLabel", Strings.HudSuspicion, SuspicionLow, out _, out suspicionFill, out suspicionFillImage);
             suspicionRect = (RectTransform)suspicionCanvas.transform;
             SetSuspicion(0f);
@@ -632,7 +653,7 @@ namespace Meuble
         private Canvas BuildBar(string name, Vector2 pivot, Vector2 offset, Sprite icon, string labelName, string label, Color fillColor,
             out Image back, out RectTransform fill, out Image fillImage)
         {
-            return BuildBar(name, pivot, offset, icon, labelName, label, fillColor, out back, out fill, out fillImage, 330f);
+            return BuildBar(name, pivot, offset, icon, labelName, label, fillColor, out back, out fill, out fillImage, GaugeWidth);
         }
 
         /// <summary>M5 wave 5B: the same labelled bar, <paramref name="width"/> reference pixels wide.</summary>
@@ -815,6 +836,33 @@ namespace Meuble
             }
         }
 
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5): the wardrobe prompt, on the sat-on row (built on first use). -----
+        private Canvas hideCanvas;
+
+        /// <summary>M6: the wardrobe prompt shows ("E : se cacher" or "E : sortir", label HideHintLine).</summary>
+        public bool HideHintVisible => hideCanvas != null && hideCanvas.enabled;
+
+        /// <summary>
+        /// M6, called by GameState on every fixed step: the wardrobe prompt with <paramref name="sentence"/>, while
+        /// <paramref name="visible"/> and no panel, sat-on, tipped or door line shows.
+        /// </summary>
+        public void ShowHideHint(bool visible, string sentence)
+        {
+            if (visible && hideCanvas == null)
+            {
+                hideCanvas = BuildLine("HideHint", ProceduralArt.Door, sentence, 520f);
+            }
+            if (hideCanvas == null)
+            {
+                return;
+            }
+            if (visible && Labels.TryGetValue("HideHintLine", out Text line) && line.text != sentence)
+            {
+                line.text = sentence;
+            }
+            SetEnabled(hideCanvas, Visible && visible && !satOn && !tippedOn && !doorOn && !failOn && !winOn);
+        }
+
         /// <summary>
         /// M5 wave 5B (CONTRACT_M5 6, 16.5), called by GameState on every fixed step: the balance gauge shows
         /// <paramref name="ratio"/> (|dv| over the window, divided by the fall threshold; clamped to 0 to 1 on the bar), only
@@ -828,7 +876,7 @@ namespace Meuble
             if (balanceFill != null)
             {
                 balanceFill.anchorMax = new Vector2(BalanceShown, 1f);
-                balanceFillImage.color = BalanceRed ? BalanceHot : BalanceCalm;
+                balanceFillImage.color = BalanceRed ? CreakHot : BalanceCalm;
                 balanceFrame.color = BalanceRed ? BalanceHotFrame : GaugeBack;
             }
             if (balanceOn != visible)
@@ -1068,6 +1116,29 @@ namespace Meuble
                 c.a = a;
             }
             pulse.color = c;
+            if (pulsePattern != null)
+            {
+                // CONTRACT_M6 2.3: the pattern matches the pulse exactly, and only while seen moving.
+                Color pc = pulsePattern.color;
+                pc.a = seenMoving > 0f ? a : 0f; // MUTATION:PULSE_PATTERN_GATE
+                pulsePattern.color = pc;
+            }
+
+            // M6 (CONTRACT_M6 2.2): the controls line's device names (InputReader has no other per frame poll point).
+            InputReader.PollLastDevice();
+            bool gamepad = InputReader.LastInputWasGamepad;
+            // M7 (CONTRACT_M7 1.5): the touch names while the touch controls show.
+            bool touch = InputReader.TouchUIActive;
+            if (gamepad != controlsGamepad || touch != controlsTouch)
+            {
+                controlsGamepad = gamepad;
+                controlsTouch = touch;
+                if (controls != null)
+                {
+                    controls.text = gamepad ? Strings.HudControlsGamepad : Strings.HudControls; // MUTATION:CONTROLS_GAMEPAD_TEXT
+                    controls.text = touch ? Strings.HudControlsTouch : controls.text;
+                }
+            }
 
             titleTimer += Time.unscaledDeltaTime;
             if (titleCard != null)

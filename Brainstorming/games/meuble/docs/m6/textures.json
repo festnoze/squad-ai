@@ -1,0 +1,58 @@
+{
+  "summary": "M6 texture pass 2 (CONTRACT_M6 2.4) implemented: 6 new ambientCG-derived detail textures (Grass001, PaintedWood006C, Metal009, Plastic006, Moss002, Ground104), 6 new Surface values, PrimitiveKit.Lit gained a metallic argument, and a new PrimitiveKit.LitSurface(color, surface) gives Grass/Lacquer/Metal/Plastic/Foliage/Soil their own fixed, never-silently-shared finish (TextureLibrary.FinishOf) so they do not collide with unrelated uses of the same colour (this is what keeps the PRD 7.4 material caps holding). Applied: garden (Grass), player furniture (Lacquer, red-detected, both the procedural path and the Kenney-model path), office chair frame + lamp pole/base + robot shell (Metal), robot bumper (Plastic), potted-plant leaves and the fallen load's leaves/soil (Foliage/Soil), window pane (smoothness 0.95, no texture). Probe Step50a_/Step50b_ added; fixed 4 pre-existing PlayMode tests (ProbeTestsM42Look, ProbeTestsM3Models, ProbeTestsM4Levels, ProbeTestsM5House) whose hardcoded expectations the lacquer change invalidated. Full EditMode suite 448/448 green; full PlayMode suite 209/213 green, the 4 remaining failures are in ProbeTestsM5Levels (level10/level17 authored-route replays), a file and levels owned by the levels/audit agents who are concurrently reworking exactly those two levels per CONTRACT_M6 item 8 (git already showed level10.json/level17.json modified before I started); unrelated to materials/textures.",
+  "blocked": false,
+  "files_changed": [
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\TextureLibrary.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\PrimitiveKit.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\FurnitureKit.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\Robot.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\LoadView.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\ModelKit.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Runtime\\LevelBuilder.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Scripts\\Core\\Tuning.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Editor\\ModelCatalogBuilder.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\ThirdParty\\Textures\\ambientCG\\detail_grass_Grass001.png",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\ThirdParty\\Textures\\ambientCG\\detail_lacquer_PaintedWood006C.png",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\ThirdParty\\Textures\\ambientCG\\detail_metal_Metal009.png",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\ThirdParty\\Textures\\ambientCG\\detail_plastic_Plastic006.png",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\ThirdParty\\Textures\\ambientCG\\detail_foliage_Moss002.png",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\ThirdParty\\Textures\\ambientCG\\detail_soil_Ground104.png",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\docs\\LICENSES.md",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Tests\\PlayMode\\ProbeTestsM6Textures.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Tests\\PlayMode\\ProbeTestsM42Look.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Tests\\PlayMode\\ProbeTestsM3Models.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Tests\\PlayMode\\ProbeTestsM4Levels.cs",
+    "C:\\Dev\\squad-ai\\Brainstorming\\games\\meuble\\Assets\\Tests\\PlayMode\\ProbeTestsM5House.cs"
+  ],
+  "tests": "EditMode full suite: 448/448 green (tools/unity.sh test . --mode EditMode). PlayMode full suite: 209/213 green; the 4 failures (Step40_FullPlaythrough, Step45j_Level10Routes, Step45n_Level17Routes, Step45p_Level10RouteWithoutTheRockIsSeenRocking, all in ProbeTestsM5Levels.cs) are about level10/level17 authored routes getting caught or missing lesson mechanics -- nothing about materials or rendering, and level10.json/level17.json were already modified (git status) before this run by the levels/audit agents reworking exactly those two levels per CONTRACT_M6 item 8. My own new tests (ProbeTestsM6Textures: Step50a_NewSurfacesShowTheirDetailAndFinish, Step50b_FallenLoadPlantShowsSoilAndFoliage) pass, re-run 3x for stability. LicenseTests (EditMode) passes with the 6 new files added.",
+  "markers": [
+    {
+      "id": "LACQUER_RED",
+      "file": "Assets/Scripts/Runtime/FurnitureKit.cs",
+      "marked": "private static Surface MainSurface(Color color, Surface normal) => ModelMath.IsRed(color) ? Surface.Lacquer : normal; // MUTATION:LACQUER_RED",
+      "replacement": "private static Surface MainSurface(Color color, Surface normal) => normal; // MUTATION:LACQUER_RED",
+      "mode": "PlayMode",
+      "killers": "Step50a_"
+    },
+    {
+      "id": "LIT_SURFACE_KEY",
+      "file": "Assets/Scripts/Runtime/PrimitiveKit.cs",
+      "marked": "var key = (color32, surface); // MUTATION:LIT_SURFACE_KEY",
+      "replacement": "var key = (color32, Surface.Plain); // MUTATION:LIT_SURFACE_KEY",
+      "mode": "PlayMode",
+      "killers": "Step50a_ Step50b_"
+    }
+  ],
+  "removed_markers": [],
+  "probe_steps": ["Step50a_NewSurfacesShowTheirDetailAndFinish", "Step50b_FallenLoadPlantShowsSoilAndFoliage"],
+  "edit_tests": [
+    "Assets/Tests/PlayMode/ProbeTestsM6Textures.cs (new)",
+    "Assets/Tests/PlayMode/ProbeTestsM42Look.cs (BodySurface -> Lacquer, red material via LitSurface, model-slot lacquer override accepted, MaxDetailGain 1.6->2.0 for the bolder lacquer grain, Garden excluded from the metric-mesh tiling shortcut, Soil excluded from the every-surface-seen premise)",
+    "Assets/Tests/PlayMode/ProbeTestsM3Models.cs (player-colour material now LitSurface(.., Lacquer))",
+    "Assets/Tests/PlayMode/ProbeTestsM4Levels.cs (player-colour material now LitSurface(.., Lacquer))",
+    "Assets/Tests/PlayMode/ProbeTestsM5House.cs (player-colour material now LitSurface(.., Lacquer), twice)"
+  ],
+  "needs": [
+    "Not a blocker, FYI only: ProbeTestsM5Levels (levels agent) currently fails Step40_FullPlaythrough, Step45j_Level10Routes, Step45n_Level17Routes, Step45p_Level10RouteWithoutTheRockIsSeenRocking on level10/level17 (caught, or missing mechanics) -- looks like in-progress work on CONTRACT_M6 item 8 (the audit wait-rule fix for levels 10/13/17), not something I touched."
+  ]
+}

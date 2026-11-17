@@ -25,7 +25,8 @@ namespace Meuble.Editor
     ///    The schedule is never seen while moving, never seen still out of place (unless a decoy of the
     ///    player's kind explains the chair), never moves on a hard floor within earshot of an inhabitant,
     ///    keeps the creak gauge below 1, and never spends more than <see cref="Tuning.AuditMaxWait"/> within
-    ///    1 m of where a wait began, spawn included (M2.2: a step out and back does not restart the clock).
+    ///    1 m of where a wait began, spawn included (M2.2: a step out and back does not restart the clock). M5 5B.1: nor
+    ///    more than that within Tuning.AuditLoiterRadius of any of its own points (<see cref="LongestLoiter"/>).
     ///    Sight and hearing are dilated by a margin in time, so the schedule survives a global shift; the
     ///    audit prints the shift it really survives (its slack). A level with decoys must have a schedule
     ///    explained by a decoy at least once, and none at all with the decoys switched off (M2.2).
@@ -97,6 +98,37 @@ namespace Meuble.Editor
     ///   computed without the rock is seen rocking), load (the schedule computed without the load rule drops it) and final (at
     ///   least three of the six mechanic checks bind), with the fixtures test_robot, test_rock, test_load and
     ///   test_m5_levels_robotblock (the contact zone).
+    ///
+    /// M5 wave 5B.1 (CONTRACT_M5 19, the fix wave):
+    /// - M2, the wait rule measures loitering, not hops: the found schedule fails when, in one stay within
+    ///   Tuning.AuditLoiterRadius (1.5 m) of one of its own points, it spends more than Tuning.AuditMaxWait not moving
+    ///   (<see cref="LongestLoiter"/>), so a schedule that
+    ///   waits by 1.12 m L-hops, which restart the search's 1 m wait anchor, fails (fixture test_m5_audit_fidget). The
+    ///   search keeps its anchor (a 2 m anchor multiplies the states of the heavy levels past the node cap); every lesson
+    ///   counterfactual runs with the wait cap off (a player's wait is not capped);
+    /// - M6, the rocking body's plan stays with the body: the search state carries its lag behind the plan, in
+    ///   1/<see cref="DeficitUnits"/> of a sample, from the real cell costs of <see cref="RockPlan"/> (the replay driven
+    ///   through MotionProfile); a cell is one sample longer whenever the lag would reach one sample; a reversal in motion is
+    ///   refused; a stop rocks 9 samples (the rest step plus 40 steps); the found route is replayed (<see cref="RockTimingGuard"/>)
+    ///   and a cell reached more than a sample late is a defect;
+    /// - M7 minimum, a fidelity replay of the found schedule with the game's own sight points (<see cref="FidelityReplay"/>),
+    ///   whose first sighting is a defect (fixture test_m5_audit_fidelity, level 15 before its glance patch);
+    /// - m9, the load is refused at Tuning.AuditLoadDeltaV (under the game's 1.8 m/s) and the margin is printed; m6, the sample
+    ///   steps come from Tuning, the load epsilon from LoadBalance, the load history is derived (<see cref="DeriveLoadHistory"/>).
+    ///
+    /// M6 (CONTRACT_M6 2.8; levels without these features keep their M5 results):
+    /// - the wardrobe is a hiding cell (<see cref="SetUpHiding"/>): from a cell in its entry zone (WardrobeRule.InFront at every
+    ///   release offset), a body that fits (WardrobeRule.Fits, no load) enters with a 0.5 s action seen as moving, is then hidden
+    ///   (a state bit: no sight, no noise, no move; the gauge fills and the wait cap holds), and leaves where it entered with the
+    ///   same action. Hidden, a human seeing the remembered spot empty (<see cref="SetUpSpot"/>) or a sitter forcing the player is
+    ///   refused; a creak is muffled (half radius) and allowed only when nobody hears it over its whole window. Routes say
+    ///   "hide" and "leave" (fixture test_m6_audit_wardrobe);
+    /// - doors opened by inhabitants: GameState.StepHouseholdDoors is replayed on the stepped walks (<see cref="StepHouseholdDoors"/>),
+    ///   the leaf swings at the time the frozen walk reaches it, sight takes both poses during the swing and the open pose after
+    ///   (<see cref="MergeInhabitantDoors"/>), the body keeps out of the leaf's reach while it swings, the player never opens such
+    ///   a leaf (fixture test_m6_audit_inhabdoor);
+    /// - door memory ("doorMemory"), conservatively: a leaf the player opened is never seen standing open by a human, who
+    ///   remembers it closed (<see cref="DoorsUnseen"/>, fixture test_m6_audit_doormemory); the put back is not modelled.
     /// </summary>
     public static class LevelAudit
     {
@@ -109,8 +141,8 @@ namespace Meuble.Editor
         private const int BudgetFurnitureTriangles = Tuning.BudgetFurnitureTriangles;
 
         // Schedule search (amendment 11.7). Wanted in Tuning.cs under these names with an Audit prefix.
-        // One sample is 5 fixed steps (0.1 s).
-        private const int SampleSteps = 5;
+        // One sample is Tuning.MotionSampleSteps fixed steps (0.1 s; M5 5B.1 m6: read from Tuning, never copied).
+        private const int SampleSteps = Tuning.MotionSampleSteps;
         private const float SampleSeconds = SampleSteps * Tuning.FixedStep;
         // 180 s horizon for levels 1 to 7 and the M2/M4 fixtures (World.Horizon; CONTRACT_M5 10: 300 s for the others).
         private const int HorizonSamples = 1800;
@@ -160,7 +192,8 @@ namespace Meuble.Editor
         // Largest shift tried when measuring the slack (3 s).
         private const int SlackProbe = 30;
         // The wait rule counts the time spent within this distance of where the wait began (M2.2): a 0.5 m
-        // step out and back does not restart the clock; only leaving this radius does.
+        // step out and back does not restart the clock; only leaving this radius does. M5 5B.1 (CONTRACT_M5 19, M2): a 1.12 m
+        // L-hop does, so the found schedule is also held to the loitering rule (LongestLoiter, Tuning.AuditLoiterRadius).
         private const float WaitAnchorRadius = 1f;
         // Start delay sweep (M2.2): the player starts acting every this many samples (1 s) over one loop. CONTRACT_M5
         // 10: every Tuning.AuditSweepStep (3 s) on the other levels.
@@ -189,10 +222,27 @@ namespace Meuble.Editor
         // M5 wave 5B (CONTRACT_M5 16.5): the load rule's window in fixed steps (Tuning.LoadWindow over the fixed step, 25).
         private static readonly int LoadWindowSteps = Mathf.RoundToInt(Tuning.LoadWindow / Tuning.FixedStep);
         // The wish samples the load model keeps: the window (5 samples), a glide (at most 4) and the time to top speed (at most
-        // 4), so re-simulating them from rest gives the exact velocities of the last window.
-        private const int LoadHistorySamples = 13;
-        // LoadBalance's own rounding margin: a change of exactly the threshold falls.
-        private const float LoadEpsilon = 1e-4f;
+        // 4), so re-simulating them from rest gives the exact velocities of the last window. M5 5B.1 (m6): derived from the
+        // bodies that may carry a load (DeriveLoadHistory), never hand-summed; it is 13 with the 5B tuning.
+        private static readonly int LoadHistorySamples = DeriveLoadHistory();
+        // M5 5B.1 (M6): the rocking body's lag behind its plan is counted in this many units a sample (RockPlan).
+        private const int DeficitUnits = 6;
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): the designerRoute actions of the wardrobe: "hide" presses E at a hide cell (the furniture still,
+        /// upright, no closed leaf in reach), "leave" presses E again while hidden; the furniture comes out where it went in.
+        /// </summary>
+        public const string RouteHide = "hide";
+        public const string RouteLeave = "leave";
+        // M6 (CONTRACT_M6 2.5): the wardrobe's entry and exit actions, in samples (0.5 s, rounded up).
+        private static readonly int HideSamples = Mathf.CeilToInt(Tuning.WardrobeActionTime / SampleSeconds - 1e-3f);
+        // M6 (CONTRACT_M6 2.5): a creak while hidden happens somewhere in this many samples after the plan's gauge reaches the
+        // cap (the replay's gauge runs up to 1 - GaugeCap ahead of the plan's): 30 samples.
+        // M7 (CONTRACT_M7 4.1): of the run's difficulty's fill time.
+        private static int CreakSlackSamples => Mathf.CeilToInt((1f - GaugeCap) * DifficultyDef.Current.CreakFillTime / SampleSeconds - 1e-3f);
+        // M6 (CONTRACT_M6 2.7): an inhabitant within this of a doorway (beyond half its width) may be opening its leaf.
+        private const float DoorApproach = 1f;
+        // M6 (CONTRACT_M6 2.7): an inhabitant within this of the wall line (beyond half its thickness) is in the doorway.
+        private const float DoorwayBand = 0.15f;
 
         public sealed class Result
         {
@@ -238,6 +288,11 @@ namespace Meuble.Editor
         public const string SlackFlag = "-slack";
         /// <summary>Design aid: "-skipSweep" skips the start delay sweep even on levels 1 to 7 (a warning only).</summary>
         public const string SkipSweepFlag = "-skipSweep";
+        /// <summary>
+        /// M7 (CONTRACT_M7 4.1): "-difficulty normal,difficile" audits the levels at these difficulties (ids of DifficultyDef);
+        /// without it, every level runs at Normal then at Difficile. The fixtures always run at Normal.
+        /// </summary>
+        public const string DifficultyFlag = "-difficulty";
         /// <summary>Design aid: "-debugSamples 20,40" prints what is seen at these samples.</summary>
         public const string DebugSamplesFlag = "-debugSamples";
         /// <summary>Design aid: "-checkSight" recomputes the sight tables ray by ray (no cache, no batch) and prints the
@@ -258,6 +313,8 @@ namespace Meuble.Editor
             public bool CheckSight;
             public bool WriteRoutes;
             public List<int> DebugSamples = new List<int>();
+            /// <summary>M7: the difficulties the levels run at, in order (Normal then Difficile by default).</summary>
+            public List<string> Difficulties = new List<string> { DifficultyDef.Normal, DifficultyDef.Difficile };
 
             public static RunOptions Parse(string[] args)
             {
@@ -293,6 +350,11 @@ namespace Meuble.Editor
                     CheckSight = Has(CheckSightFlag),
                     WriteRoutes = Has(WriteRoutesFlag),
                 };
+                List<string> difficulties = Ids(DifficultyFlag);
+                if (difficulties != null && difficulties.Count > 0)
+                {
+                    o.Difficulties = difficulties.ConvertAll(d => DifficultyDef.Normalize(d.ToLowerInvariant()));
+                }
                 foreach (string part in Ids(DebugSamplesFlag) ?? new List<string>())
                 {
                     o.DebugSamples.Add(int.Parse(part, CultureInfo.InvariantCulture));
@@ -337,27 +399,36 @@ namespace Meuble.Editor
                     Debug.LogError($"[LevelAudit] no level listed in {LevelsFolder}/{LevelManifest.FileName}.json");
                     code = 1;
                 }
-                foreach (string id in ids)
+                // M7 (CONTRACT_M7 4.1): every level at each difficulty of the run; Normal writes designerRoute, Difficile
+                // designerRouteHard. A Difficile result is named "levelN@difficile" (the record key's form).
+                foreach (string difficulty in options.Difficulties)
                 {
-                    string file = Path.Combine(LevelsFolder, id + ".json");
-                    if (!File.Exists(file))
+                    DifficultyDef.Current = DifficultyDef.For(difficulty);
+                    foreach (string id in ids)
                     {
-                        Debug.LogError($"[LevelAudit] Niveau {id} : fichier {file} absent");
-                        code = 1;
-                        continue;
-                    }
-                    Result r = Run(LevelJson.Parse(File.ReadAllText(file)));
-                    if (options.WriteRoutes && r.Pass && r.Route != null)
-                    {
-                        WriteRoute(file, r.Route);
-                        r.Notes.Add($"designerRoute ecrite dans {file} ({r.Route.Count} points)");
-                    }
-                    Debug.Log(Format(r));
-                    if (!r.Pass)
-                    {
-                        code = 1;
+                        string file = Path.Combine(LevelsFolder, id + ".json");
+                        if (!File.Exists(file))
+                        {
+                            Debug.LogError($"[LevelAudit] Niveau {id} : fichier {file} absent");
+                            code = 1;
+                            continue;
+                        }
+                        Result r = Run(LevelJson.Parse(File.ReadAllText(file)));
+                        r.LevelId = DifficultyDef.RecordKey(r.LevelId, difficulty);
+                        string key = RouteKey(difficulty);
+                        if (options.WriteRoutes && r.Pass && r.Route != null && key != null)
+                        {
+                            WriteRoute(file, r.Route, key);
+                            r.Notes.Add($"{key} ecrite dans {file} ({r.Route.Count} points)");
+                        }
+                        Debug.Log(Format(r));
+                        if (!r.Pass)
+                        {
+                            code = 1;
+                        }
                     }
                 }
+                DifficultyDef.Current = DifficultyDef.For(DifficultyDef.Normal);
             }
             catch (Exception e)
             {
@@ -377,6 +448,29 @@ namespace Meuble.Editor
                 code = 1;
             }
             return code;
+        }
+
+        /// <summary>
+        /// M7 (CONTRACT_M7 4.1): the level file key of the route a difficulty's audit writes: designerRoute (Normal),
+        /// designerRouteHard (Difficile); null for Facile (no route of its own: the Normal one is easier there).
+        /// </summary>
+        public static string RouteKey(string difficulty)
+        {
+            switch (DifficultyDef.Normalize(difficulty))
+            {
+                case DifficultyDef.Difficile:
+                    return "designerRouteHard";
+                case DifficultyDef.Normal:
+                    return "designerRoute";
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>M7: the route of the level file a run at the current difficulty compares its schedule with.</summary>
+        private static List<RouteStepDef> FileRoute(LevelDef def)
+        {
+            return DifficultyDef.Current.Id == DifficultyDef.Difficile ? def.DesignerRouteHard : def.DesignerRoute;
         }
 
         [MenuItem("Meuble/Audit Levels")]
@@ -973,8 +1067,15 @@ namespace Meuble.Editor
             public float ContactBase;
             /// <summary>The spawn, planar: the furniture stands there until the start delay ends.</summary>
             public Vector3 Spawn;
-            /// <summary>The samples a stop costs a rocking body (MotionProfile.RockSteps in samples, 8), else 0.</summary>
+            /// <summary>
+            /// The samples a stop costs a rocking body, else 0: M5 5B.1 (CONTRACT_M5 19, M6) GameState rocks on the rest step plus
+            /// MotionProfile.RockSteps (41 steps), so 9 samples.
+            /// </summary>
             public int RockSamples;
+            /// <summary>M5 5B.1 (M6): a rocking body's real cell costs as the replay drives it (<see cref="RockPlan"/>), else null.</summary>
+            public RockPlan Rock;
+            /// <summary>M5 5B.1 (M7): the built level, whose leaves the fidelity replay poses (<see cref="FidelityReplay"/>).</summary>
+            public LevelInstance Level;
             /// <summary>The player carries a load (CONTRACT_M5 6, 16.5): the load rule and the grown sample box apply.</summary>
             public bool HasLoad;
 
@@ -1009,6 +1110,53 @@ namespace Meuble.Editor
             public bool[] Sits;
             /// <summary>[cell]: the bits of the closed leaves the player can open from that cell (null without closed leaves).</summary>
             public int[] ReachBits;
+
+            // ----- M6 (CONTRACT_M6 2.5 to 2.8): the wardrobe, the inhabitants' doors, door memory -----
+            /// <summary>[cell]: the player may hide in a wardrobe from this cell (null: no wardrobe, or the body does not fit).</summary>
+            public bool[] HideFrom;
+            /// <summary>[cell]: the closed leaves that may be in reach of a hide cell: while one is closed, E opens it, never hides.</summary>
+            public int[] HideBlockers;
+            /// <summary>[cell]: the center of the wardrobe of a hide cell (the muffled creak's source).</summary>
+            public Vector3[] HideCenter;
+            /// <summary>[sample * Masks + mask]: a human sees the player's remembered spot (its slot's in place cells).</summary>
+            public bool[] SpotSeen, SpotSeenWide;
+            /// <summary>The bits of the closed leaves an inhabitant's frozen walk opens (the player never opens them).</summary>
+            public int AutoBits;
+            /// <summary>
+            /// [closed leaf]: the window in samples in which an inhabitant may be opening it (from its approach to its crossing),
+            /// and the inhabitant who does; int.MaxValue when no walk crosses it.
+            /// </summary>
+            public int[] AutoFrom, AutoTo, AutoOpener;
+            /// <summary>[sample]: the bits of the leaves surely open by then (OR'd into every node's mask), or null.</summary>
+            public int[] AutoOpen;
+            /// <summary>[closed leaf][cell]: the body there could meet the leaf while an inhabitant swings it, or null.</summary>
+            public bool[][] SwingCells;
+            /// <summary>The level's doors are remembered (LevelDef doorMemory, CONTRACT_M6 2.6).</summary>
+            public bool DoorMemory;
+            /// <summary>[sample * Masks + mask]: a leaf the player opened is seen standing open by a human, or null.</summary>
+            public bool[] DoorSeen, DoorSeenWide;
+            /// <summary>
+            /// [closed leaf]: the fixed step at which an inhabitant's walk reached the leaf and held (GameState.StepHouseholdDoors
+            /// replayed), and who; -1 when no walk reached it.
+            /// </summary>
+            public int[] HoldStep, HoldBy;
+
+            /// <summary>M6: the body at cell k on sample s could meet a leaf an inhabitant is swinging (the window and the margin).</summary>
+            public bool Swinging(int s, int k)
+            {
+                if (SwingCells == null)
+                {
+                    return false;
+                }
+                for (int l = 0; l < SwingCells.Length; l++)
+                {
+                    if (SwingCells[l] != null && SwingCells[l][k] && s >= AutoFrom[l] - Margin && s <= AutoTo[l] + Margin)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
 
             /// <summary>A shallow copy for a lesson variant: it shares every table it does not replace.</summary>
             public World Clone()
@@ -1610,6 +1758,10 @@ namespace Meuble.Editor
             Toggle,
             /// <summary>M5: the player opens a closed leaf (E, CONTRACT_M5_v3 15.3).</summary>
             Open,
+            /// <summary>M6: the player enters the wardrobe (E, CONTRACT_M6 2.5).</summary>
+            Hide,
+            /// <summary>M6: the player leaves the wardrobe (E again).</summary>
+            Leave,
         }
 
         /// <summary>
@@ -1640,7 +1792,8 @@ namespace Meuble.Editor
             public int Anchor { get => anchor; set => anchor = (ushort)value; }
             /// <summary>
             /// M5 wave 5B: with a load, the <see cref="LoadModel"/> state (the recent wish history, 0 at rest); for a rocking body
-            /// in motion, 1 plus the direction it arrived in (0 otherwise). Always 0 on the other levels.
+            /// in motion, its plan state (<see cref="RockStep"/>: the direction it arrived in, the turn that led there and its lag;
+            /// 0 otherwise). Always 0 on the other levels.
             /// </summary>
             public int Load { get => load; set => load = (ushort)value; }
             /// <summary>The schedule was explained by a decoy at least once.</summary>
@@ -1653,6 +1806,8 @@ namespace Meuble.Editor
             public bool Lying { get => (bits & 8) != 0; set => SetBit(8, value); }
             /// <summary>M5 wave 5B: arrived by a careful leg (the careful key held: the stool's, or a load's careful leg).</summary>
             public bool Careful { get => (bits & 16) != 0; set => SetBit(16, value); }
+            /// <summary>M6: hidden in a wardrobe (unseen, silent, still; CONTRACT_M6 2.5). Its cell is the one it entered from.</summary>
+            public bool Hidden { get => (bits & 32) != 0; set => SetBit(32, value); }
             public bool Move => Act == Act.Move;
 
             private void SetBit(int bit, bool value)
@@ -1697,6 +1852,7 @@ namespace Meuble.Editor
             }
             DescribeWatchers(w, result);
             CheckLeaves(w, result);
+            DescribeM6(w, result);
             result.Failures.AddRange(CheckSeparation(w, Separation, result.Notes));
             ToleranceWarnings(w, result);
             HabitWarnings(w, result);
@@ -1718,6 +1874,15 @@ namespace Meuble.Editor
                 Describe(w, strict, path, result);
                 DescribeMechanicsOnPath(w, path, result);
                 result.Route = Route(w, path);
+                // M5 5B.1 (CONTRACT_M5 19, M6 and M7): the rocking body's route replayed through MotionProfile, then the schedule
+                // replayed against the game's own sight test.
+                RockTimingGuard(w, path, result.Route, result);
+                string sighting = FidelityReplay(w, path, out string fidelity);
+                result.Notes.Add(fidelity);
+                if (sighting != null)
+                {
+                    result.Failures.Add(sighting);
+                }
                 if (w.Closed.Count > 0)
                 {
                     // CONTRACT_M5 8: the "open" steps the designerRoute gets (-writeRoutes).
@@ -1731,9 +1896,9 @@ namespace Meuble.Editor
                     }
                     result.Notes.Add($"route : {result.Route.Count} points, ouvertures : {(opens.Count > 0 ? string.Join(" ; ", opens) : "aucune")}");
                 }
-                if (!SameRoute(def.DesignerRoute, result.Route))
+                if (!SameRoute(FileRoute(def), result.Route))
                 {
-                    result.Notes.Add($"la designerRoute du fichier differe de cet horaire (elle reste valable si la sonde 20 la gagne) ; {WriteRoutesFlag} la remplace");
+                    result.Notes.Add($"la {RouteKey(DifficultyDef.Current.Id) ?? "designerRoute"} du fichier differe de cet horaire (elle reste valable si la sonde la gagne) ; {WriteRoutesFlag} la remplace");
                 }
             }
             if (w.NeedDecoy)
@@ -1781,7 +1946,7 @@ namespace Meuble.Editor
                 case null:
                     return;
                 case LevelDef.LessonCareful:
-                    NodeList fullNodes = Search(w, new SearchOptions { FullSpeed = true }, out int fullSpeed);
+                    NodeList fullNodes = Search(w, new SearchOptions { FullSpeed = true, MaxRun = UnlimitedRun }, out int fullSpeed);
                     if (fullSpeed >= 0)
                     {
                         result.Failures.Add("lecon careful : un horaire existe aussi a pleine vitesse, sans le mode prudent : la lecon n'est pas requise ("
@@ -1794,7 +1959,7 @@ namespace Meuble.Editor
                     return;
                 case LevelDef.LessonDark:
                 {
-                    NodeList litNodes = Search(w, new SearchOptions { Toggles = false }, out int lit);
+                    NodeList litNodes = Search(w, new SearchOptions { Toggles = false, MaxRun = UnlimitedRun }, out int lit);
                     if (lit >= 0)
                     {
                         result.Failures.Add("lecon dark : un horaire existe aussi la lampe toujours allumee : la lecon n'est pas requise ("
@@ -1821,7 +1986,7 @@ namespace Meuble.Editor
                 }
                 case LevelDef.LessonGlide:
                 {
-                    NodeList naiveNodes = Search(w, new SearchOptions { StopSamples = 0, NeedDecoy = w.NeedDecoy }, out int naive);
+                    NodeList naiveNodes = Search(w, new SearchOptions { StopSamples = 0, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int naive);
                     if (naive < 0)
                     {
                         result.Failures.Add("lecon glide : aucun horaire meme en ignorant la glissade");
@@ -1856,7 +2021,7 @@ namespace Meuble.Editor
                     // CONTRACT_M4 10.1: the lesson cannot be skipped: with sitting disabled, no schedule reaches the exit
                     // before the first sitting.
                     World free = BuildWorld(def, level, false);
-                    NodeList freeNodes = Search(free, new SearchOptions { NeedDecoy = free.NeedDecoy }, out int freeGoal);
+                    NodeList freeNodes = Search(free, new SearchOptions { NeedDecoy = free.NeedDecoy, MaxRun = UnlimitedRun }, out int freeGoal);
                     float sitAt = w.FirstSit * SampleSeconds;
                     string earliest = freeGoal >= 0
                         ? string.Format(CultureInfo.InvariantCulture, "{0:0.0} s", freeNodes[freeGoal].T * SampleSeconds)
@@ -1881,6 +2046,10 @@ namespace Meuble.Editor
                     if (binds)
                     {
                         result.Notes.Add(text);
+                    }
+                    else if (def.LessonAdvisory)
+                    {
+                        result.Notes.Add("AVERTISSEMENT lecon indicative (derogation) : " + text);
                     }
                     else
                     {
@@ -1922,9 +2091,28 @@ namespace Meuble.Editor
                     {
                         result.Notes.Add(text);
                     }
+                    else if (def.LessonAdvisory)
+                    {
+                        result.Notes.Add("AVERTISSEMENT lecon indicative (derogation) : " + text);
+                    }
                     else
                     {
                         result.Failures.Add(text);
+                    }
+                    return;
+                }
+                case LevelDef.LessonWardrobe:
+                {
+                    // M6 (CONTRACT_M6 2.5): the wardrobe is required: without hiding (and without the wait cap), no schedule.
+                    NodeList hideless = Search(w, new SearchOptions { Hide = false, MaxRun = UnlimitedRun }, out int hidelessGoal);
+                    if (hidelessGoal >= 0)
+                    {
+                        result.Failures.Add("lecon wardrobe : un horaire existe aussi sans se cacher dans l'armoire : la lecon n'est pas requise ("
+                            + Summary(w, PathTo(hideless, hidelessGoal)) + ")");
+                    }
+                    else
+                    {
+                        result.Notes.Add("lecon wardrobe : sans se cacher dans l'armoire, aucun horaire : l'armoire est requise");
                     }
                     return;
                 }
@@ -2148,16 +2336,21 @@ namespace Meuble.Editor
             {
                 longest = Mathf.Max(longest, n.Run);
             }
-            sb.Append(string.Format(CultureInfo.InvariantCulture, "sortie a {0:0.0} s, attente max {1:0.0} s", path[path.Count - 1].T * SampleSeconds, longest * SampleSeconds));
+            // M5 5B.1 (M2): a counterfactual runs without the wait cap (no run tracked): its loitering is printed instead.
+            int loiter = LongestLoiter(w, path, out _, out _, out _);
+            sb.Append(string.Format(CultureInfo.InvariantCulture, "sortie a {0:0.0} s, attente max {1:0.0} s, flanerie max {2:0.0} s",
+                path[path.Count - 1].T * SampleSeconds, longest * SampleSeconds, loiter * SampleSeconds));
             for (int i = 1; i < path.Count; i++)
             {
                 Node n = path[i];
-                bool stopHere = n.Act == Act.Stop || n.Act == Act.Toggle || n.Act == Act.Open || (n.Act == Act.Still && path[i - 1].Act == Act.Move);
+                bool stopHere = n.Act == Act.Stop || n.Act == Act.Toggle || n.Act == Act.Open || n.Act == Act.Hide || n.Act == Act.Leave
+                    || (n.Act == Act.Still && path[i - 1].Act == Act.Move);
                 if (stopHere)
                 {
                     Vector3 c = w.Center[n.Cell];
                     sb.Append(string.Format(CultureInfo.InvariantCulture, " ; {0} ({1:0.##}, {2:0.##}) a {3:0.0} s",
-                        n.Act == Act.Toggle ? "interrupteur" : n.Act == Act.Open ? "porte" : "arret", c.x, c.z, path[i - 1].T * SampleSeconds));
+                        n.Act == Act.Toggle ? "interrupteur" : n.Act == Act.Open ? "porte" : n.Act == Act.Hide ? "cachette" : n.Act == Act.Leave ? "sortie de l'armoire" : "arret",
+                        c.x, c.z, path[i - 1].T * SampleSeconds));
                 }
             }
             return sb.ToString();
@@ -2459,7 +2652,8 @@ namespace Meuble.Editor
         {
             premise = true;
             World world = w;
-            var options = new SearchOptions { NeedDecoy = w.NeedDecoy };
+            // M5 5B.1 (M2): a lesson's counterfactual runs with the wait cap off (a player's wait is not capped).
+            var options = new SearchOptions { NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun };
             string relaxed;
             string why;
             switch (lesson)
@@ -2535,14 +2729,14 @@ namespace Meuble.Editor
                 text = "lecon robot : le niveau n'a pas la mecanique (aucun robot)";
                 return false;
             }
-            NodeList quietNodes = Search(w, new SearchOptions { Hum = false, NeedDecoy = w.NeedDecoy }, out int quiet);
+            NodeList quietNodes = Search(w, new SearchOptions { Hum = false, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int quiet);
             if (quiet < 0)
             {
                 text = "lecon robot : ronronnement coupe, aucun horaire : le ronronnement est requis (le robot contraint par son bruit)";
                 return true;
             }
             string quietSummary = Summary(w, PathTo(quietNodes, quiet));
-            NodeList freeNodes = Search(w, new SearchOptions { Robots = false, NeedDecoy = w.NeedDecoy }, out int free);
+            NodeList freeNodes = Search(w, new SearchOptions { Robots = false, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int free);
             if (free < 0)
             {
                 text = "lecon robot : un horaire existe ronronnement coupe (" + quietSummary + ") mais aucun sans le robot (incoherence de l'audit)";
@@ -2575,7 +2769,7 @@ namespace Meuble.Editor
                 text = "lecon rock : le niveau n'a pas la mecanique (le meuble ne bascule pas)";
                 return false;
             }
-            NodeList naiveNodes = Search(w, new SearchOptions { Rock = false, NeedDecoy = w.NeedDecoy }, out int naive);
+            NodeList naiveNodes = Search(w, new SearchOptions { Rock = false, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int naive);
             if (naive < 0)
             {
                 text = "lecon rock : aucun horaire meme sans la bascule";
@@ -2606,7 +2800,7 @@ namespace Meuble.Editor
                 text = "lecon load : le niveau n'a pas la mecanique (aucune charge)";
                 return false;
             }
-            NodeList naiveNodes = Search(w, new SearchOptions { LoadRule = false, NeedDecoy = w.NeedDecoy }, out int naive);
+            NodeList naiveNodes = Search(w, new SearchOptions { LoadRule = false, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int naive);
             if (naive < 0)
             {
                 text = "lecon load : aucun horaire meme sans la regle de la charge";
@@ -2780,18 +2974,22 @@ namespace Meuble.Editor
             if (w.RockSamples > 0)
             {
                 result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
-                    "bascule : chaque arret coute {0} echantillons vus en mouvement (pleine vitesse) ; {1} echantillons par case au depart et dans un virage, {2} en continuant tout droit ; la designerRoute enchaine les points d'une meme course",
-                    w.RockSamples, w.Body.MoveSamples, w.Body.ContinueSamples));
+                    "bascule : chaque arret coute {0} echantillons vus en mouvement (le pas de repos et la bascule) ; {1} echantillons par case au depart et dans un virage, {2} en continuant tout droit, {3} quand le meuble prendrait plus d'un echantillon de retard sur le plan (cout reel : depart {4:0.00}, tout droit {5:0.00} a {6:0.00}, virage {7:0.00} a {8:0.00} echantillons) ; demi-tour en mouvement interdit ; la designerRoute enchaine les points d'une meme course",
+                    w.RockSamples, w.Body.MoveSamples, w.Body.ContinueSamples, w.Body.MoveSamples + 1, w.Rock.Start / (float)DeficitUnits,
+                    Mathf.Min(w.Rock.Cost[0, 0], Mathf.Min(w.Rock.Cost[1, 0], w.Rock.Cost[2, 0])) / (float)DeficitUnits,
+                    Mathf.Max(w.Rock.Cost[0, 0], Mathf.Max(w.Rock.Cost[1, 0], w.Rock.Cost[2, 0])) / (float)DeficitUnits,
+                    Mathf.Min(Mathf.Min(w.Rock.Cost[0, 1], w.Rock.Cost[0, 2]), Mathf.Min(Mathf.Min(w.Rock.Cost[1, 1], w.Rock.Cost[1, 2]), Mathf.Min(w.Rock.Cost[2, 1], w.Rock.Cost[2, 2]))) / (float)DeficitUnits,
+                    Mathf.Max(Mathf.Max(w.Rock.Cost[0, 1], w.Rock.Cost[0, 2]), Mathf.Max(Mathf.Max(w.Rock.Cost[1, 1], w.Rock.Cost[1, 2]), Mathf.Max(w.Rock.Cost[2, 1], w.Rock.Cost[2, 2]))) / (float)DeficitUnits));
             }
             if (w.HasLoad)
             {
                 result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
-                    "charge {0} : tombe quand la vitesse change de {1:0.0} m/s en {2:0.0} s (MotionProfile et LoadBalance sur l'historique des {3} derniers echantillons) ; jambes prudentes {4}({5} echantillons par case){6} ; boite de vue plus haute de {7:0.00} m",
+                    "charge {0} : tombe quand la vitesse change de {1:0.0} m/s en {2:0.0} s, l'audit refuse des {8:0.0} m/s (MotionProfile et LoadBalance sur l'historique des {3} derniers echantillons) ; jambes prudentes {4}({5} echantillons par case){6} ; boite de vue plus haute de {7:0.00} m",
                     w.Def.Player.Load, Tuning.LoadFallDeltaV, Tuning.LoadWindow, LoadHistorySamples,
                     w.Body.Tips || w.Body.FullStartDropsLoad ? "seulement " : "permises ",
                     w.Body.Tips ? w.Body.MoveSamples : w.Body.CarefulMoveSamples,
                     w.Body.Tips ? "" : w.Body.FullStartDropsLoad ? ", un depart a pleine vitesse la fait tomber" : $", pleine vitesse {w.Body.MoveSamples}",
-                    w.Body.LoadHeight));
+                    w.Body.LoadHeight, Tuning.AuditLoadDeltaV));
             }
         }
 
@@ -2848,10 +3046,783 @@ namespace Meuble.Editor
                 else
                 {
                     result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
-                        "charge : tenue sur tout l'horaire (ecart de vitesse au plus {0:0.00} m/s sur {1:0.0} s, sous {2:0.0}), {3} deplacement(s) de case prudent(s)",
-                        peak, Tuning.LoadWindow, Tuning.LoadFallDeltaV, careful));
+                        "charge : tenue sur tout l'horaire (ecart de vitesse au plus {0:0.00} m/s sur {1:0.0} s, sous {2:0.0}), {3} deplacement(s) de case prudent(s) ; marge {4:0.00} m/s avant la chute ({5:0.0}), {6:0.00} m/s sous le refus de l'audit ({7:0.0})",
+                        peak, Tuning.LoadWindow, Tuning.LoadFallDeltaV, careful, Tuning.LoadFallDeltaV - peak, Tuning.LoadFallDeltaV,
+                        Tuning.AuditLoadDeltaV - peak, Tuning.AuditLoadDeltaV));
                 }
             }
+        }
+
+        // ----- M5 5B.1 (CONTRACT_M5 19): the rocking body's plan (M6), the fidelity replay (M7), the loitering measure (M2) -----
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M6): what a rocking body's run really costs, cell by cell, as the replay drives it
+        /// (<see cref="KinematicReplay"/>: MotionProfile, steering toward each waypoint, the 0.1 m release, chained waypoints),
+        /// in 1/<see cref="DeficitUnits"/> of a sample, rounded up. A cell is reached when the body crosses its center along
+        /// the move, or, at a waypoint, at the release plus the rest of the way at its speed (<see cref="Passings"/>). The
+        /// costs are the largest over every turn sequence of <see cref="ScenarioMoves"/> moves from rest: the first cell from
+        /// rest, then by the turn that led to the cell before (straight, one side, the other) and the turn of this one. The
+        /// search keeps the plan's lag behind the body (<see cref="RockStep"/>) within one sample with them.
+        /// </summary>
+        private sealed class RockPlan
+        {
+            public const int Straight = 0;
+            /// <summary>Turn sequences enumerated: every sequence of this many moves (the first from rest, straight).</summary>
+            private const int ScenarioMoves = 6;
+            /// <summary>Straight moves appended to each sequence, so its last turns are measured with a run after them.</summary>
+            private const int ScenarioTail = 3;
+            /// <summary>
+            /// Float error allowed when a cost is rounded up to whole units (a steady straight cell is exactly 25/6 of a sample
+            /// at the rocking chair's 1.2 m/s, and must not round up to 26 on a few millionths of a second).
+            /// </summary>
+            private const float CostTolerance = 0.02f;
+            /// <summary>The cost of the first cell from rest, in units.</summary>
+            public int Start;
+            /// <summary>[turn that led to the previous cell, turn of this cell]: the cost of a cell in motion, in units.</summary>
+            public readonly int[,] Cost = new int[3, 3];
+
+            /// <summary>Straight (0), one side (1), the other (2), or -1 for a reversal, from cell direction a to b.</summary>
+            public static int TurnOf(int a, int b)
+            {
+                Vector2 u = LoadModel.DirVector(a);
+                Vector2 v = LoadModel.DirVector(b);
+                float dot = Vector2.Dot(u, v);
+                if (dot > 0.5f)
+                {
+                    return Straight;
+                }
+                if (dot < -0.5f)
+                {
+                    return -1;
+                }
+                return u.x * v.y - u.y * v.x > 0f ? 1 : 2;
+            }
+
+            public static RockPlan For(BodyDef body)
+            {
+                var plan = new RockPlan();
+                int combos = 1;
+                for (int i = 1; i < ScenarioMoves; i++)
+                {
+                    combos *= 3;
+                }
+                int n = ScenarioMoves + ScenarioTail;
+                var types = new int[n];
+                var dirs = new int[n];
+                for (int c = 0; c < combos; c++)
+                {
+                    int code = c;
+                    for (int i = 0; i < n; i++)
+                    {
+                        types[i] = i == 0 || i >= ScenarioMoves ? Straight : code % 3;
+                        if (i > 0 && i < ScenarioMoves)
+                        {
+                            code /= 3;
+                        }
+                        dirs[i] = i == 0 ? 0 : Turned(dirs[i - 1], types[i]);
+                    }
+                    var cells = new List<Vector3> { Vector3.zero };
+                    for (int i = 0; i < n; i++)
+                    {
+                        Vector2 d = LoadModel.DirVector(dirs[i]);
+                        cells.Add(cells[cells.Count - 1] + new Vector3(d.x, 0f, d.y) * Tuning.AuditCellSize);
+                    }
+                    // The waypoints as Route writes them: one per run of at most RouteStride straight moves, all chained.
+                    const float at = 1f;
+                    var route = new List<RouteStepDef>();
+                    var waypoint = new bool[n];
+                    int m = 0;
+                    while (m < n)
+                    {
+                        int j = m + 1;
+                        while (j < n && j - m < RouteStride && dirs[j] == dirs[m])
+                        {
+                            j++;
+                        }
+                        waypoint[j - 1] = true;
+                        route.Add(new RouteStepDef { X = cells[j].x, Z = cells[j].z, At = at });
+                        m = j;
+                    }
+                    var targets = new List<(Vector3 center, Vector3 dir, bool waypoint)>();
+                    for (int i = 0; i < n; i++)
+                    {
+                        Vector2 d = LoadModel.DirVector(dirs[i]);
+                        targets.Add((cells[i + 1], new Vector3(d.x, 0f, d.y), waypoint[i]));
+                    }
+                    List<Vector3> positions = KinematicReplay(body, Vector3.zero, 90f, route, Mathf.RoundToInt((at + n * 1.5f) / Tuning.FixedStep));
+                    float[] passed = Passings(positions, targets);
+                    float previous = at;
+                    for (int i = 0; i < n; i++)
+                    {
+                        if (float.IsNaN(passed[i]))
+                        {
+                            throw new InvalidOperationException($"rock plan: the replay of turn sequence {c} never reached move {i}");
+                        }
+                        int units = Mathf.CeilToInt((passed[i] - previous) / SampleSeconds * DeficitUnits - CostTolerance);
+                        previous = passed[i];
+                        if (i == 0)
+                        {
+                            plan.Start = Mathf.Max(plan.Start, units);
+                        }
+                        else
+                        {
+                            plan.Cost[types[i - 1], types[i]] = Mathf.Max(plan.Cost[types[i - 1], types[i]], units);
+                        }
+                    }
+                }
+                return plan;
+            }
+
+            /// <summary>The cell direction a turn of <paramref name="type"/> leads to from <paramref name="dir"/>.</summary>
+            private static int Turned(int dir, int type)
+            {
+                for (int d = 0; d < 4; d++)
+                {
+                    if (TurnOf(dir, d) == type)
+                    {
+                        return d;
+                    }
+                }
+                return dir;
+            }
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M6): a rocking body's next leg toward cell direction <paramref name="dir"/>, from a node whose
+        /// rock state is <paramref name="arrived"/> (0 at rest; else 1 + the direction it arrived in + 4 * (the turn that led
+        /// there + 3 * (its lag + <see cref="DeficitUnits"/>))). The lag is how far the body runs behind the plan, in units: a
+        /// cell costs the plan its leg (the body's from rest and in a turn, the faster one going on straight) and the body its
+        /// <see cref="RockPlan"/> cost; a cell is one sample longer whenever the lag would reach one sample, one shorter whenever
+        /// the body would lead by one. False for a reversal in motion (refused: the body would pass through rest, about 7
+        /// samples) or a cell time none of the legs has.
+        /// </summary>
+        private static bool RockStep(World w, int arrived, int dir, int travel, int altTravel, int extraTravel, out int leg, out int state)
+        {
+            leg = -1;
+            state = 0;
+            int lag = 0;
+            int type = RockPlan.Straight;
+            int cost;
+            int samples;
+            if (arrived <= 0)
+            {
+                cost = w.Rock.Start;
+                samples = travel;
+            }
+            else
+            {
+                int code = arrived - 1;
+                int from = code & 3;
+                int rest = code >> 2;
+                int before = rest % 3;
+                lag = rest / 3 - DeficitUnits;
+                type = RockPlan.TurnOf(from, dir);
+                if (type < 0)
+                {
+                    return false; // a reversal in motion
+                }
+                cost = w.Rock.Cost[before, type];
+                samples = type == RockPlan.Straight ? altTravel : travel;
+            }
+            int next = lag + cost - samples * DeficitUnits;
+            while (next >= DeficitUnits)
+            {
+                samples++;
+                next -= DeficitUnits;
+            }
+            while (next <= -DeficitUnits && samples > 1)
+            {
+                samples--;
+                next += DeficitUnits;
+            }
+            leg = samples == travel ? 0 : samples == altTravel ? 1 : samples == extraTravel ? 2 : -1;
+            if (leg < 0)
+            {
+                return false;
+            }
+            state = 1 + dir + 4 * (type + 3 * (next + DeficitUnits));
+            return true;
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M6): drives <paramref name="body"/> along a designerRoute as RouteReplayer drives it, without
+        /// walls: from <paramref name="spawn"/> at rest, at game time "at" (a passed "at" starts the next leg on the same step)
+        /// toward each waypoint at full input, released within 0.1 m; an "open" waits for the furniture to be still, then the
+        /// opening (an action of Tuning.DoorOpenTime). The input is decided at the end of each fixed step, as the replay does,
+        /// and a rocking body rocks as GameState.StepRock rocks it (a rest step after a moving one, then RockTime, input
+        /// ignored). Returns the planar position after every fixed step (index 0 is time 0).
+        /// </summary>
+        private static List<Vector3> KinematicReplay(BodyDef body, Vector3 spawn, float yaw, List<RouteStepDef> route, int steps)
+        {
+            float dt = Tuning.FixedStep;
+            var profile = new MotionProfile(body, dt, true, yaw);
+            Vector3 position = YawMath.Planar(spawn);
+            var positions = new List<Vector3>(steps + 1) { position };
+            int k = 0;
+            bool driving = false;
+            bool acting = false;
+            bool armed = false;
+            float elapsed = 0f;
+            bool careful = false;
+            var wish = MotionWish.None();
+            for (int step = 1; step <= steps; step++)
+            {
+                Vector2 v = profile.Step(wish);
+                position += new Vector3(v.x, 0f, v.y) * dt;
+                positions.Add(position);
+                bool travelled = MotionRule.IsMoving(v.magnitude, profile.YawRate);
+                bool rests = armed && !travelled && !profile.ActionActive;
+                armed = travelled;
+                if (rests && body.Rocks)
+                {
+                    profile.BeginAction(careful ? Tuning.RockCarefulTime : Tuning.RockTime);
+                }
+                elapsed += dt;
+                // RouteReplayer.Drive, at the end of the step.
+                wish = MotionWish.None(careful);
+                bool still = !profile.IsMoving && !profile.Gliding && !profile.ActionActive && !profile.Tipped;
+                if (acting)
+                {
+                    if (profile.ActionActive)
+                    {
+                        continue;
+                    }
+                    acting = false;
+                    k++;
+                }
+                while (k < route.Count)
+                {
+                    RouteStepDef r = route[k];
+                    careful = r.Careful;
+                    if (!driving)
+                    {
+                        if (elapsed < Mathf.Max(0f, r.At) - 1e-4f)
+                        {
+                            break;
+                        }
+                        driving = true;
+                    }
+                    if (r.Action == RouteStepDef.ActionOpen)
+                    {
+                        if (still && profile.BeginAction(Tuning.DoorOpenTime))
+                        {
+                            acting = true;
+                            driving = false;
+                        }
+                        break;
+                    }
+                    if (r.Action != null)
+                    {
+                        driving = false;
+                        k++;
+                        continue; // a toggle or a righting: not a rocking body's
+                    }
+                    Vector3 to = YawMath.Planar(new Vector3(r.X, 0f, r.Z) - position);
+                    if (to.magnitude > ReleaseTolerance)
+                    {
+                        wish = new MotionWish(new Vector2(to.x, to.z).normalized, careful);
+                        break;
+                    }
+                    driving = false;
+                    k++;
+                }
+            }
+            return positions;
+        }
+
+        /// <summary>
+        /// M5 5B.1 (M6): the game time (s) at which the replayed positions reach each target cell in order (NaN if never): the
+        /// crossing of the cell's center along the move direction, interpolated within the step, or at a waypoint the release
+        /// (within 0.1 m) plus the rest of the way at the speed of that step.
+        /// </summary>
+        private static float[] Passings(List<Vector3> positions, List<(Vector3 center, Vector3 dir, bool waypoint)> targets)
+        {
+            float dt = Tuning.FixedStep;
+            var times = new float[targets.Count];
+            for (int i = 0; i < times.Length; i++)
+            {
+                times[i] = float.NaN;
+            }
+            int next = 0;
+            for (int s = 1; s < positions.Count && next < targets.Count; s++)
+            {
+                Vector3 p = positions[s];
+                Vector3 q = positions[s - 1];
+                while (next < targets.Count)
+                {
+                    (Vector3 c, Vector3 d, bool waypoint) = targets[next];
+                    Vector3 center = YawMath.Planar(c);
+                    float distance = (center - p).magnitude;
+                    if (waypoint && distance <= ReleaseTolerance + 1e-4f)
+                    {
+                        float speed = (p - q).magnitude / dt;
+                        times[next++] = s * dt + (speed > 1e-4f ? distance / speed : 0f);
+                        continue;
+                    }
+                    float f = Vector3.Dot(p - center, d);
+                    if (f >= 0f)
+                    {
+                        float f0 = Vector3.Dot(q - center, d);
+                        times[next++] = (s - 1 + (f0 < 0f ? -f0 / (f - f0) : 0f)) * dt;
+                        continue;
+                    }
+                    break;
+                }
+            }
+            return times;
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M6): the found schedule of a rocking body replayed through <see cref="KinematicReplay"/>
+        /// along its own designerRoute: every cell must be reached no later than planned plus one sample. Prints the largest
+        /// lag and lead; a later cell is a defect (the plan ran ahead of the furniture).
+        /// </summary>
+        private static void RockTimingGuard(World w, List<Node> path, List<RouteStepDef> route, Result result)
+        {
+            if (w.RockSamples <= 0 || route == null || path.Count < 2)
+            {
+                return;
+            }
+            var targets = new List<(Vector3 center, Vector3 dir, bool waypoint)>();
+            var planned = new List<int>();
+            int r = 0;
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node a = path[i - 1];
+                Node b = path[i];
+                if (!b.Move)
+                {
+                    continue;
+                }
+                while (r < route.Count && route[r].Action != null)
+                {
+                    r++;
+                }
+                bool waypoint = r < route.Count && Mathf.Abs(route[r].X - w.Center[b.Cell].x) < 0.01f && Mathf.Abs(route[r].Z - w.Center[b.Cell].z) < 0.01f;
+                if (waypoint)
+                {
+                    r++;
+                }
+                targets.Add((w.Center[b.Cell], YawMath.Planar(w.Center[b.Cell] - w.Center[a.Cell]).normalized, waypoint));
+                planned.Add(b.T);
+            }
+            if (targets.Count == 0)
+            {
+                return;
+            }
+            int steps = Mathf.RoundToInt(((planned[planned.Count - 1] + 30) * SampleSeconds) / Tuning.FixedStep);
+            float[] passed = Passings(KinematicReplay(w.Body.Body, w.Spawn, w.Def.Player.Yaw, route, steps), targets);
+            float lag = float.MinValue;
+            float lead = 0f;
+            int worst = -1;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                float late = float.IsNaN(passed[i]) ? float.PositiveInfinity : passed[i] - planned[i] * SampleSeconds;
+                if (late > lag)
+                {
+                    lag = late;
+                    worst = i;
+                }
+                lead = Mathf.Max(lead, -late);
+            }
+            result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
+                "bascule, rejeu cinematique de la route (MotionProfile, relache 0.1 m) : {0} cases, retard au plus {1:0.00} s, avance au plus {2:0.00} s sur l'horaire (tolere : {3:0.0} s de retard)",
+                targets.Count, Mathf.Max(0f, lag), lead, SampleSeconds));
+            if (lag > SampleSeconds + 1e-3f)
+            {
+                result.Failures.Add(string.Format(CultureInfo.InvariantCulture,
+                    "la route rejouee atteint ({0:0.##}, {1:0.##}) {2:0.00} s apres l'horaire ({3:0.0} s) : le plan de la bascule devance le meuble de plus d'un echantillon",
+                    targets[worst].center.x, targets[worst].center.z, lag, planned[worst] * SampleSeconds));
+            }
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M2): how long a schedule loiters. A stay is a longest stretch of consecutive samples in
+        /// which the planned position (interpolated along the moves, spawn included) stays within Tuning.AuditLoiterRadius of
+        /// one of the schedule's own cells; its loitering is the samples of the stay the furniture spends not moving (still,
+        /// sat on, stopped, gliding, rocking, switching or opening), so a hop out and back inside the stay does not restart
+        /// anything, and driving through the disc costs nothing. Returns the loitering of the worst stay, in samples, with its
+        /// cell, its first sample and its length in samples.
+        /// </summary>
+        private static int LongestLoiter(World w, List<Node> path, out int center, out int from, out int span)
+        {
+            center = -1;
+            from = -1;
+            span = 0;
+            if (path.Count == 0)
+            {
+                return 0;
+            }
+            var at = new List<Vector3>();
+            var waiting = new List<bool>();
+            int first = path[0].T;
+            at.Add(YawMath.Planar(w.Center[path[0].Cell]));
+            waiting.Add(false);
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node a = path[i - 1];
+                Node b = path[i];
+                int length = b.T - a.T;
+                for (int q = 1; q <= length; q++)
+                {
+                    at.Add(YawMath.Planar(b.Move ? Vector3.Lerp(w.Center[a.Cell], w.Center[b.Cell], q / (float)length) : w.Center[b.Cell]));
+                    waiting.Add(!b.Move);
+                }
+            }
+            int best = -1;
+            var seen = new HashSet<int>();
+            foreach (Node n in path)
+            {
+                if (!seen.Add(n.Cell))
+                {
+                    continue;
+                }
+                Vector3 p = YawMath.Planar(w.Center[n.Cell]);
+                int run = 0;
+                int idle = 0;
+                for (int s = 0; s < at.Count; s++)
+                {
+                    bool inside = (at[s] - p).magnitude <= Tuning.AuditLoiterRadius + 1e-3f;
+                    run = inside ? run + 1 : 0;
+                    idle = inside ? idle + (waiting[s] ? 1 : 0) : 0;
+                    if (inside && (idle > best || (idle == best && run > span)))
+                    {
+                        best = idle;
+                        span = run;
+                        center = n.Cell;
+                        from = first + s - run + 1;
+                    }
+                }
+            }
+            span = Mathf.Max(0, span - 1);
+            return Mathf.Max(0, best);
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M2): the loitering rule on a found schedule: more than Tuning.AuditMaxWait of loitering in
+        /// one stay (<see cref="LongestLoiter"/>) is a defect, whatever hops the search's wait anchor saw. Returns the failure or
+        /// null; <paramref name="note"/> prints the worst stay, where and when.
+        /// </summary>
+        private static string LoiterFailure(World w, List<Node> path, out string note)
+        {
+            int loiter = LongestLoiter(w, path, out int cell, out int from, out int span);
+            Vector3 c = cell >= 0 ? w.Center[cell] : Vector3.zero;
+            string where = string.Format(CultureInfo.InvariantCulture,
+                "{0:0.0} s sans bouger sur un sejour de {1:0.0} s a moins de {2:0.0} m de ({3:0.##}, {4:0.##}), de {5:0.0} s a {6:0.0} s",
+                loiter * SampleSeconds, span * SampleSeconds, Tuning.AuditLoiterRadius, c.x, c.z, from * SampleSeconds, (from + span) * SampleSeconds);
+            note = "flanerie la plus longue : " + where + string.Format(CultureInfo.InvariantCulture, " (max {0:0} s)", Tuning.AuditMaxWait);
+            bool loiters = loiter * SampleSeconds > Tuning.AuditMaxWait + 1e-3f; // MUTATION:AUDIT_LOITER
+            return loiters ? "l'horaire trouve flane " + where + string.Format(CultureInfo.InvariantCulture,
+                ", plus de {0:0} s : attendre sur place, meme en sautillant d'une case a l'autre, n'est pas un horaire", Tuning.AuditMaxWait) : null;
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M7 minimum): the found schedule replayed against the game's own sight test, so the audit's
+        /// sampler (a center and a ring of 8 at the cell center) can no longer miss what the game sees. At every sample of the
+        /// schedule, the furniture's five points of Vision (VisionMath.SamplePoints of its box, the load's height included) are
+        /// tested with VisionMath.IsInCone and Vision.Occluded, from every watcher's eye of the margin window (as the search's
+        /// tables are dilated), the leaves posed as the schedule's mask has them: still, stopped, rocking, switching or opening
+        /// at every release offset (the center and two rings of 8, at half the release and at the release); moving at every
+        /// intermediate position along the move every Tuning.AuditFidelityStep, at the move's yaw and the yaw it turns from. A
+        /// moving furniture seen by any awake watcher, or a still one seen by a human where it is out of place and not
+        /// explained, is a sighting: the replay fails with the first one. <paramref name="note"/> says what was tested.
+        /// </summary>
+        private static string FidelityReplay(World w, List<Node> path, out string note)
+        {
+            note = null;
+            if (path.Count < 2)
+            {
+                return null;
+            }
+            var items = new List<FidelityItem>();
+            float yaw = w.Def.Player.Yaw;
+            Vector3 lastDir = YawMath.Forward(yaw);
+            int margin = w.Margin;
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node a = path[i - 1];
+                Node b = path[i];
+                Vector3 here = w.Center[a.Cell];
+                switch (b.Act)
+                {
+                    case Act.Move:
+                    {
+                        int right = a.Lying ? RightSamples : 0;
+                        if (right > 0)
+                        {
+                            items.Add(FidelityItem.At(w, here, yaw, true, a.Off, a.Cell, a.T + 1 - margin, a.T + right + margin, b.Mask, true, a.T));
+                        }
+                        Vector3 delta = YawMath.Planar(w.Center[b.Cell] - here);
+                        float moveYaw = delta.sqrMagnitude > 1e-6f ? YawMath.YawOf(delta) : yaw;
+                        var item = new FidelityItem
+                        {
+                            Moving = true, Dark = b.Off, Cell = b.Cell, From = a.T + right + 1 - margin, To = b.T + margin, Mask = b.Mask, Sample = b.T,
+                            Size = FidelityItem.SizeOf(w, false),
+                        };
+                        int parts = Mathf.Max(1, Mathf.CeilToInt(delta.magnitude / Tuning.AuditFidelityStep - 1e-3f));
+                        for (int q = 0; q <= parts; q++)
+                        {
+                            Vector3 p = Vector3.Lerp(here, w.Center[b.Cell], q / (float)parts);
+                            item.Add(w, p, moveYaw);
+                            if (Mathf.Abs(Mathf.DeltaAngle(yaw, moveYaw)) > 1f)
+                            {
+                                item.Add(w, p, yaw);
+                            }
+                        }
+                        items.Add(item);
+                        if (delta.sqrMagnitude > 1e-6f)
+                        {
+                            lastDir = delta.normalized;
+                        }
+                        yaw = moveYaw;
+                        continue;
+                    }
+                    case Act.Stop:
+                    {
+                        FidelityItem item = FidelityItem.At(w, here, yaw, false, b.Off, b.Cell, a.T + 1 - margin, b.T + margin, b.Mask, true, b.T);
+                        if (w.Body.Glides)
+                        {
+                            // The glide ends at the cell: the furniture slides in along its last move (the replay's early release).
+                            float slide = MotionProfile.StopDistance(w.Body.Body, a.Careful) + ReleaseTolerance;
+                            int parts = Mathf.Max(1, Mathf.CeilToInt(slide / Tuning.AuditFidelityStep - 1e-3f));
+                            for (int q = 0; q < parts; q++)
+                            {
+                                item.Add(w, here - lastDir * (slide * (1f - q / (float)parts)), yaw);
+                            }
+                        }
+                        items.Add(item);
+                        continue;
+                    }
+                    case Act.Toggle:
+                        // The rules use the lit range until the switch ends.
+                        items.Add(FidelityItem.At(w, here, yaw, a.Lying, false, b.Cell, a.T + 1 - margin, b.T + margin, b.Mask, true, b.T));
+                        continue;
+                    case Act.Open:
+                    case Act.Hide:
+                    case Act.Leave:
+                        // M6: entering and leaving the wardrobe are seen as moving, at the cell, as an opening.
+                        items.Add(FidelityItem.At(w, here, yaw, false, b.Off, b.Cell, a.T + 1 - margin, b.T + margin, b.Mask, true, b.T));
+                        continue;
+                    case Act.Still:
+                        if (b.Hidden)
+                        {
+                            continue; // M6: hidden, no vision sample
+                        }
+                        items.Add(FidelityItem.At(w, w.Center[b.Cell], yaw, b.Lying, b.Off, b.Cell, b.T - margin, b.T + margin, b.Mask, false, b.T));
+                        continue;
+                }
+            }
+            // M6 (CONTRACT_M6 2.7): around the time an inhabitant may be opening a leaf, a step is tested with that leaf in both poses.
+            for (int l = 0; l < w.Closed.Count && w.AutoBits != 0; l++)
+            {
+                int bit = w.Closed[l].Bit;
+                if ((w.AutoBits & bit) == 0)
+                {
+                    continue;
+                }
+                int count = items.Count;
+                for (int i = 0; i < count; i++)
+                {
+                    if (items[i].To >= w.AutoFrom[l] - margin && items[i].From <= w.AutoTo[l] + margin)
+                    {
+                        FidelityItem other = items[i].Copy();
+                        other.Mask = items[i].Mask ^ bit;
+                        items.Add(other);
+                    }
+                }
+            }
+            // Group by door mask, so the leaves are posed once per mask.
+            items.Sort((x, y) => x.Mask.CompareTo(y.Mask));
+            var cache = new Dictionary<(Vector3Int, Vector3Int), bool>();
+            var points = new Vector3[Tuning.SampleCount];
+            long rays = 0;
+            long tests = 0;
+            int sightings = 0;
+            string first = null;
+            int firstAt = int.MaxValue;
+            int posed = -1;
+            int h = w.Inhabitants;
+            try
+            {
+                foreach (FidelityItem item in items)
+                {
+                    if (item.Mask != posed && w.Leaves.Count > 0 && w.Level != null)
+                    {
+                        PoseLeaves(w, w.Level, item.Mask, -1);
+                        Physics.SyncTransforms();
+                        cache.Clear();
+                    }
+                    posed = item.Mask;
+                    bool sighted = false;
+                    for (int s = Mathf.Max(0, item.From); s <= Mathf.Min(w.Samples - 1, item.To) && !sighted; s++)
+                    {
+                        for (int i = 0; i < h && !sighted; i++)
+                        {
+                            Watcher watcher = w.Watchers[i];
+                            if (w.Asleep[s * h + i] || (!item.Moving && !watcher.Human))
+                            {
+                                continue;
+                            }
+                            Vector3 eye = w.Eye[s * h + i];
+                            Vector3 forward = w.Forward[s * h + i];
+                            float range = watcher.Range * (w.Body.Lamp && item.Dark ? Tuning.LampOffLight : 1f);
+                            for (int p = 0; p < item.Bases.Count && !sighted; p++)
+                            {
+                                if ((item.Bases[p] - eye).magnitude > range + 2f)
+                                {
+                                    continue;
+                                }
+                                VisionMath.SamplePoints(item.Bases[p], item.Yaws[p], item.Size, Tuning.SampleInset, points);
+                                tests++;
+                                bool seen = false;
+                                foreach (Vector3 point in points)
+                                {
+                                    if (!VisionMath.IsInCone(eye, forward, point, range, watcher.HalfAngle))
+                                    {
+                                        continue;
+                                    }
+                                    var key = (Vector3Int.RoundToInt(eye * 1000f), Vector3Int.RoundToInt(point * 1000f));
+                                    if (!cache.TryGetValue(key, out bool hidden))
+                                    {
+                                        hidden = Vision.Occluded(eye, point);
+                                        cache[key] = hidden;
+                                        rays++;
+                                    }
+                                    if (!hidden)
+                                    {
+                                        seen = true;
+                                        break;
+                                    }
+                                }
+                                if (!seen)
+                                {
+                                    continue;
+                                }
+                                // A still furniture seen by a human is a sighting only out of place and unexplained (StillOk).
+                                bool allowed = !item.Moving && !item.Lying && !(w.Body.Lamp && item.Dark)
+                                    && (w.InPlaceAt(w.Classes[watcher.Class], item.Cell, item.Sample) || w.Classes[watcher.Class].Explained[item.Cell]);
+                                sighted = seen && !allowed; // MUTATION:AUDIT_FIDELITY
+                                if (sighted && item.Sample < firstAt)
+                                {
+                                    firstAt = item.Sample;
+                                    first = string.Format(CultureInfo.InvariantCulture,
+                                        "{0} par {1} (oeil a {2:0.0} s) a l'echantillon de {3:0.0} s, le meuble en ({4:0.00}, {5:0.00}) cap {6:0}",
+                                        item.Moving ? "vu en mouvement" : "vu deplace", watcher.Name, s * SampleSeconds, item.Sample * SampleSeconds,
+                                        item.Bases[p].x, item.Bases[p].z, item.Yaws[p]);
+                                }
+                            }
+                        }
+                    }
+                    sightings += sighted ? 1 : 0;
+                }
+            }
+            finally
+            {
+                if (posed > 0 && w.Leaves.Count > 0 && w.Level != null)
+                {
+                    PoseLeaves(w, w.Level, 0, -1);
+                    Physics.SyncTransforms();
+                }
+            }
+            note = string.Format(CultureInfo.InvariantCulture,
+                "fidelite de la vue (les 5 points du jeu, relache {0:0.0} m, positions intermediaires tous les {1:0.0} m, fenetre de marge) : {2} pas de l'horaire, {3} poses testees, {4} rayons, {5} observation(s)",
+                ReleaseTolerance, Tuning.AuditFidelityStep, items.Count, tests, rays, sightings);
+            return first == null ? null : string.Format(CultureInfo.InvariantCulture,
+                "fidelite de la vue : l'horaire trouve est {0} ({1} pas vus) : l'echantillonnage de l'audit le croyait cache", first, sightings);
+        }
+
+        /// <summary>M5 5B.1 (M7): one step of a schedule for <see cref="FidelityReplay"/>: the poses it may take and when.</summary>
+        private sealed class FidelityItem
+        {
+            public bool Moving;
+            public bool Dark;
+            public bool Lying;
+            /// <summary>The cell and the schedule's sample, for the still rules (in place, explained).</summary>
+            public int Cell;
+            public int Sample;
+            /// <summary>The eye samples to test, inclusive (the step's samples widened by the margin).</summary>
+            public int From;
+            public int To;
+            public int Mask;
+            public Vector3 Size;
+            public readonly List<Vector3> Bases = new List<Vector3>();
+            public readonly List<float> Yaws = new List<float>();
+
+            /// <summary>A pose of the furniture: its base on the floor at planar position <paramref name="p"/>, its yaw.</summary>
+            public void Add(World w, Vector3 p, float yaw)
+            {
+                Bases.Add(new Vector3(p.x, w.Def.FloorHeightAt(p.x, p.z), p.z));
+                Yaws.Add(yaw);
+            }
+
+            /// <summary>A step at one cell: every release offset around <paramref name="center"/>.</summary>
+            public static FidelityItem At(World w, Vector3 center, float yaw, bool lying, bool dark, int cell, int from, int to, int mask, bool moving, int sample)
+            {
+                var item = new FidelityItem
+                {
+                    Moving = moving, Dark = dark, Lying = lying, Cell = cell, From = from, To = to, Mask = mask, Sample = sample,
+                };
+                item.Size = SizeOf(w, lying);
+                item.Add(w, center, yaw);
+                foreach (float radius in new[] { ReleaseTolerance * 0.5f, ReleaseTolerance })
+                {
+                    for (int a = 0; a < RingCount; a++)
+                    {
+                        item.Add(w, center + YawMath.Forward(a * 360f / RingCount) * radius, yaw);
+                    }
+                }
+                return item;
+            }
+
+            /// <summary>M6: a copy sharing the poses (they are never changed after the step is built).</summary>
+            public FidelityItem Copy()
+            {
+                return (FidelityItem)MemberwiseClone();
+            }
+
+            /// <summary>The sample box of the player's body as Vision sees it: lying, and grown by the load's height.</summary>
+            public static Vector3 SizeOf(World w, bool lying)
+            {
+                Vector3 size = w.Body.Body.Size;
+                if (lying)
+                {
+                    size = new Vector3(size.y, size.x, size.z);
+                }
+                return size + Vector3.up * w.Body.LoadHeight;
+            }
+        }
+
+        /// <summary>
+        /// M5 5B.1 (m6): the wish samples the load model must keep so that re-simulating them from rest gives the exact
+        /// velocities of the last load window: the window, the longest glide and the longest time to top speed, over the bodies
+        /// that may carry a load (never the rocking chair nor the floor lamp), each in the mode the search drives it (a stool
+        /// careful).
+        /// </summary>
+        private static int DeriveLoadHistory()
+        {
+            int window = (LoadWindowSteps + SampleSteps - 1) / SampleSteps;
+            int glide = 0;
+            int top = 0;
+            foreach (string kind in BodyKinds.All)
+            {
+                BodyDef body = BodyDef.For(kind);
+                if (body.Rocks || body.HasLight)
+                {
+                    continue;
+                }
+                glide = Mathf.Max(glide, MotionProfile.SlideSamples(body, false));
+                var profile = new MotionProfile(body);
+                var go = new MotionWish(Vector2.up, body.Tips);
+                float speed = MotionProfile.MaxSpeedOf(body, body.Tips);
+                int steps = 0;
+                while (profile.Speed < speed - 1e-4f && steps < 100000)
+                {
+                    profile.Step(go);
+                    steps++;
+                }
+                top = Mathf.Max(top, (steps + SampleSteps - 1) / SampleSteps);
+            }
+            return window + glide + top;
         }
 
         /// <summary>
@@ -3036,7 +4007,109 @@ namespace Meuble.Editor
                 StrictOptions = () => new SearchOptions(), RelaxedOptions = () => new SearchOptions { Robots = false },
                 Premise = l => l.Robots != null && l.Robots.Count > 0 ? null : "aucun robot",
             },
+            // ----- M5 5B.1 (CONTRACT_M5 19): the audit agent's fixtures of the fix wave -----
+            new FixtureRule
+            {
+                // M2: the only schedule waits in a hidden nook longer than the cap, hopping 1.12 m L-hops to restart the 1 m clock.
+                Rule = "fidget", Id = "test_m5_audit_fidget",
+                Strict = "la flanerie de l'horaire trouve, a moins de 1.5 m d'un meme point", Relaxed = "la seule ancre d'attente de 1 m (un saut en L la relance)",
+                Check = FidgetCheck,
+            },
+            new FixtureRule
+            {
+                // M7: level 15 before its glance patch (Claire's first glance at -45 deg): the 5B schedule stops and rocks in a
+                // sliver of her cone through the bureau doorway that the audit's ring misses and the game's five points do not.
+                Rule = "fidelity", Id = "test_m5_audit_fidelity",
+                Strict = "l'horaire rejoue avec les 5 points du jeu", Relaxed = "les seuls echantillons de l'audit (centre et anneau de 8)",
+                Check = FidelityCheck,
+                Premise = l => l.PlayerBody().Rocks ? null : "le corps du joueur ne bascule pas",
+            },
+            // ----- M6 (CONTRACT_M6 2.8): the audit agent's fixtures, one per new mechanic -----
+            new FixtureRule
+            {
+                // The only way passes a spot a watcher looks at for a while: the stool hides in the wardrobe meanwhile.
+                Rule = "wardrobe", Id = "test_m6_audit_wardrobe",
+                Strict = "l'armoire n'est qu'un meuble", Relaxed = "on peut se cacher dans l'armoire",
+                StrictOptions = () => new SearchOptions { Hide = false }, RelaxedOptions = () => new SearchOptions(),
+                Premise = l => l.Wardrobes().Count == 0 ? "aucune armoire"
+                    : !WardrobeFits(l.PlayerBody().Size) ? "le corps du joueur ne tient pas dans l'armoire" : null,
+            },
+            new FixtureRule
+            {
+                // The hidden way runs behind a closed door that an inhabitant opens on its walk, which then shows the way.
+                Rule = "inhabdoor", Id = "test_m6_audit_inhabdoor",
+                Strict = "la porte s'ouvre quand la marche figee de l'habitant l'atteint", Relaxed = "la porte reste fermee",
+                Check = InhabitantDoorCheck,
+                Premise = l => l.Doors.Exists(d => d.Leaf == OpeningDef.LeafClosed && d.OpenedByInhabitants) ? null : "aucune porte ouverte par les habitants",
+            },
+            new FixtureRule
+            {
+                // The only way opens a door that a human then sees standing open before the exit.
+                Rule = "doormemory", Id = "test_m6_audit_doormemory",
+                Strict = "les humains se souviennent des portes fermees", Relaxed = "sans memoire des portes",
+                StrictOptions = () => new SearchOptions(), RelaxedOptions = () => new SearchOptions { DoorMemory = false },
+                Premise = l => l.DoorMemory ? null : "la memoire des portes n'est pas activee",
+            },
         };
+
+        /// <summary>
+        /// The test_m6_audit_inhabdoor fixture (CONTRACT_M6 2.7, 2.8): strict, the world where the leaf opens when the frozen walk
+        /// reaches it must have no schedule; relaxed, the world where the audit ignores the opening (the leaf stays closed) must.
+        /// </summary>
+        private static List<string> InhabitantDoorCheck(World w, bool strict)
+        {
+            World world = strict ? w : BuildWorld(w.Def, w.Level, true, false);
+            Search(world, new SearchOptions { NeedDecoy = world.NeedDecoy }, out int goal);
+            if (strict)
+            {
+                return goal >= 0 ? new List<string>() : new List<string> { "aucun horaire : la porte ouverte par l'habitant montre le chemin" };
+            }
+            return goal >= 0 ? new List<string>() : new List<string> { "aucun horaire meme la porte fermee" };
+        }
+
+        /// <summary>
+        /// The test_m5_audit_fidget fixture (CONTRACT_M5 19, M2): the schedule the search finds (its 1 m wait anchor, which every
+        /// 1.12 m L-hop restarts) held to the loitering rule (<see cref="LoiterFailure"/>): strict, it fails; relaxed (the anchor
+        /// alone), nothing. No schedule is a failure under both.
+        /// </summary>
+        private static List<string> FidgetCheck(World w, bool strict)
+        {
+            NodeList nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy }, out int goal);
+            if (goal < 0)
+            {
+                return new List<string> { "aucun horaire meme avec la seule ancre d'attente" };
+            }
+            string failure = strict ? LoiterFailure(w, PathTo(nodes, goal), out _) : null;
+            return failure != null ? new List<string> { failure } : new List<string>();
+        }
+
+        private static World fidelityWorld;
+        private static List<Node> fidelityPath;
+
+        /// <summary>
+        /// The test_m5_audit_fidelity fixture (CONTRACT_M5 19, M7): the schedule the search finds on level 15 before its glance
+        /// patch, replayed with the game's own sight points (<see cref="FidelityReplay"/>): strict, it is
+        /// seen; relaxed (the audit's own samples, which found it), nothing. No schedule is a failure under both.
+        /// </summary>
+        private static List<string> FidelityCheck(World w, bool strict)
+        {
+            if (fidelityWorld != w)
+            {
+                fidelityWorld = w;
+                NodeList nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy }, out int goal);
+                fidelityPath = goal >= 0 ? PathTo(nodes, goal) : null;
+            }
+            if (fidelityPath == null)
+            {
+                return new List<string> { "aucun horaire" };
+            }
+            if (!strict)
+            {
+                return new List<string>();
+            }
+            string sighting = FidelityReplay(w, fidelityPath, out _);
+            return sighting != null ? new List<string> { sighting } : new List<string>();
+        }
 
         /// <summary>
         /// The test_m5_audit_darkpass fixture (CONTRACT_M5 17, m1): the dark lesson's free pass check on the fixture's
@@ -3081,6 +4154,8 @@ namespace Meuble.Editor
         /// <summary>The self-test restricted to <paramref name="only"/> (fixture ids; null runs every fixture).</summary>
         private static bool RunFixtures(List<string> only)
         {
+            // M7 (CONTRACT_M7 4.1): the fixtures are calibrated at Normal, whatever difficulty the levels ran at.
+            DifficultyDef.Current = DifficultyDef.For(DifficultyDef.Normal);
             bool ok = true;
             var sb = new StringBuilder();
             var selected = new List<FixtureRule>();
@@ -3211,7 +4286,7 @@ namespace Meuble.Editor
             return ok;
         }
 
-        private static World BuildWorld(LevelDef def, LevelInstance level, bool sitting)
+        private static World BuildWorld(LevelDef def, LevelInstance level, bool sitting, bool inhabitantDoors = true)
         {
             float cell = Tuning.AuditCellSize;
             var w = new World { Def = def, Rooms = def.AllRooms(), Index = new Dictionary<(int, int, int), int>(), Sitting = sitting };
@@ -3222,7 +4297,10 @@ namespace Meuble.Editor
             w.HasLoad = def.Player != null && !string.IsNullOrEmpty(def.Player.Load) && LoadView.IsKind(def.Player.Load)
                 && !playerBody.Rocks && !playerBody.HasLight;
             w.Body.LoadHeight = w.HasLoad ? Tuning.LoadHeight : 0f;
-            w.RockSamples = playerBody.Rocks ? (MotionProfile.RockSteps(playerBody, false) + SampleSteps - 1) / SampleSteps : 0;
+            // M5 5B.1 (M6): the rest step GameState rocks on counts too (the rest step plus RockSteps, 41 steps: 9 samples).
+            w.RockSamples = playerBody.Rocks ? (MotionProfile.RockSteps(playerBody, false) + 1 + SampleSteps - 1) / SampleSteps : 0;
+            w.Rock = playerBody.Rocks ? RockPlan.For(playerBody) : null;
+            w.Level = level;
             w.Spawn = YawMath.Planar(def.Player.Position);
             // CONTRACT_M5 10: 300 s and a 3 s sweep step for every level but 1 to 7 and the M2/M4 fixtures.
             bool legacy = LegacyLevels.Contains(def.Id) || LegacyFixtures.Contains(def.Id);
@@ -3279,7 +4357,8 @@ namespace Meuble.Editor
             w.Watchers = new Watcher[h];
             for (int i = 0; i < h; i++)
             {
-                PersonalityDef p = PersonalityDef.ForInhabitant(def.Inhabitants[i]);
+                // M7 (CONTRACT_M7 4.1): the row under the run's difficulty, as RoutineFactory gives it to the routine.
+                PersonalityDef p = RoutineFactory.PersonalityOf(def.Inhabitants[i]);
                 w.Watchers[i] = new Watcher { Name = def.Inhabitants[i].Name, Personality = p, Human = p.CountsForCatch };
                 if (w.Watchers[i].Human)
                 {
@@ -3501,6 +4580,15 @@ namespace Meuble.Editor
                 period[i] = -1;
             }
             int slot = 0;
+            // M6 (CONTRACT_M6 2.7): the walks hold at the doors of the household, as GameState makes them.
+            w.HoldStep = new int[w.Closed.Count];
+            w.HoldBy = new int[w.Closed.Count];
+            for (int l = 0; l < w.Closed.Count; l++)
+            {
+                w.HoldStep[l] = -1;
+                w.HoldBy[l] = -1;
+            }
+            bool household = w.Closed.Exists(l => l.Door.OpenedByInhabitants);
             for (int s = 0; s < samples; s++)
             {
                 bool forced = false;
@@ -3536,6 +4624,10 @@ namespace Meuble.Editor
                         foreach (InhabitantRoutine r in routines)
                         {
                             r.Step(Tuning.FixedStep);
+                        }
+                        if (household)
+                        {
+                            StepHouseholdDoors(w, routines, (s - 1) * SampleSteps + step + 1);
                         }
                         Watch();
                     }
@@ -3574,9 +4666,16 @@ namespace Meuble.Editor
                     w.LoopSamples = i == 0 ? (period[i] < 0 ? w.Horizon : period[i]) : Mathf.Max(w.LoopSamples, period[i] < 0 ? w.Horizon : period[i]);
                 }
             }
+            // M6 (CONTRACT_M6 2.5 to 2.8): the hide cells and the inhabitants' doors, then the sight tables merged over those
+            // leaves, door memory and the remembered spot.
+            SetUpHiding(w, def);
+            SetUpInhabitantDoors(w, inhabitantDoors);
             ShareStillTables(w);
             ComputeSight(w, level, false);
             ComputeLeafSight(w, level);
+            MergeInhabitantDoors(w, false);
+            SetUpDoorMemory(w, level);
+            SetUpSpot(w);
             SetMargin(w, MarginSamples);
             return w;
         }
@@ -3639,6 +4738,444 @@ namespace Meuble.Editor
             {
                 c.Seen = shared ? w.MoveSeen : Tables();
                 c.SeenDark = shared ? w.MoveDark : lamp ? Tables() : c.Seen;
+            }
+        }
+
+        // ----- M6 (CONTRACT_M6 2.5 to 2.8): the wardrobe, the inhabitants' doors, door memory -----
+
+        /// <summary>M6 (CONTRACT_M6 2.5): a body of this size, without a load, fits the wardrobe (WardrobeRule.Fits).</summary>
+        private static bool WardrobeFits(Vector3 size)
+        {
+            return WardrobeRule.Fits(size, 0f);
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): the hide cells. A body that fits (<see cref="WardrobeFits"/>), and carries no load (the audit
+        /// never hides a load), hides from a walkable cell whose center and every point within the replay's release of it stand
+        /// in a wardrobe's entry zone (WardrobeRule.InFront: no facing condition); the furniture leaves where it entered
+        /// (FurnitureController.SetHidden never moves it). A closed leaf that may be in reach takes E first (GameState
+        /// ClaimActionKey): such a cell hides only once that leaf is open (<see cref="World.HideBlockers"/>).
+        /// </summary>
+        private static void SetUpHiding(World w, LevelDef def)
+        {
+            if (w.HasLoad || !WardrobeFits(w.Body.Body.Size))
+            {
+                return;
+            }
+            foreach (PropDef prop in def.Wardrobes())
+            {
+                for (int k = 0; k < w.Count; k++)
+                {
+                    bool inFront = w.Walkable[k];
+                    foreach (Vector3 offset in ReleaseOffsets)
+                    {
+                        inFront &= WardrobeRule.InFront(prop, YawMath.Planar(w.Center[k] + offset));
+                    }
+                    if (!inFront || (w.HideFrom != null && w.HideFrom[k]))
+                    {
+                        continue;
+                    }
+                    if (w.HideFrom == null)
+                    {
+                        w.HideFrom = new bool[w.Count];
+                        w.HideBlockers = new int[w.Count];
+                        w.HideCenter = new Vector3[w.Count];
+                    }
+                    w.HideFrom[k] = true; // MUTATION:AUDIT_HIDE
+                    w.HideCenter[k] = YawMath.Planar(prop.Position);
+                    foreach (Leaf leaf in w.Closed)
+                    {
+                        foreach (Vector3 offset in ReleaseOffsets)
+                        {
+                            for (int yaw = 0; yaw < 360; yaw += 45)
+                            {
+                                if (leaf.Geometry.Valid && leaf.Geometry.InReach(w.Center[k] + offset, w.Body.Body.Size, yaw))
+                                {
+                                    w.HideBlockers[k] |= leaf.Bit;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): replays GameState.StepHouseholdDoors after the inhabitants' fixed step <paramref name="step"/>:
+        /// a routine walking (not holding) whose walk's remaining corners reach a closed leaf that carries openedByInhabitants
+        /// and that no walk reached yet (GameState.WalkReachesLeaf, the game's own rule) holds Tuning.InhabitantDoorStop, and
+        /// the leaf swings open from the next step. Inhabitants and leaves in level order, one leaf an inhabitant a step.
+        /// </summary>
+        private static readonly List<Vector3> HouseholdCorners = new List<Vector3>();
+
+        private static void StepHouseholdDoors(World w, List<InhabitantRoutine> routines, int step)
+        {
+            for (int i = 0; i < routines.Count; i++)
+            {
+                InhabitantRoutine r = routines[i];
+                if (r.Holding || r.WalkCorners(HouseholdCorners) == 0)
+                {
+                    continue;
+                }
+                for (int l = 0; l < w.Closed.Count; l++)
+                {
+                    Leaf leaf = w.Closed[l];
+                    if (!leaf.Door.OpenedByInhabitants || w.HoldStep[l] >= 0 || !GameState.WalkReachesLeaf(leaf.Geometry, r.Position, HouseholdCorners))
+                    {
+                        continue;
+                    }
+                    r.Hold(Tuning.InhabitantDoorStop);
+                    w.HoldStep[l] = step;
+                    w.HoldBy[l] = i;
+                    break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): the leaves an inhabitant's frozen walk opens, timed by the replayed holds
+        /// (<see cref="StepHouseholdDoors"/>): the leaf swings from the step after the hold for Tuning.DoorOpenTime, so it may be
+        /// moving from the hold's sample (<see cref="World.AutoFrom"/>) and is open from the sample its swing ends
+        /// (<see cref="World.AutoTo"/>). In that window sight takes both poses (<see cref="MergeInhabitantDoors"/>) and the body
+        /// keeps out of the leaf's reach (<see cref="World.Swinging"/>); after it the leaf is open for good (every door memory
+        /// remembers it open, GameState.RememberDoor), in every node's mask (<see cref="World.AutoOpen"/>). The player never opens
+        /// such a leaf (its own opening would change the walk's hold); one that no walk reaches stays an ordinary closed leaf.
+        /// <paramref name="inhabitantDoors"/> false: the walks still hold, the leaves stay closed (the fixture's relaxed world).
+        /// </summary>
+        private static void SetUpInhabitantDoors(World w, bool inhabitantDoors)
+        {
+            int c = w.Closed.Count;
+            w.AutoFrom = new int[c];
+            w.AutoTo = new int[c];
+            w.AutoOpener = new int[c];
+            int swingSteps = Mathf.RoundToInt(Tuning.DoorOpenTime / Tuning.FixedStep);
+            float halfDiagonal = new Vector2(w.Body.Body.Size.x, w.Body.Body.Size.z).magnitude * 0.5f;
+            for (int l = 0; l < c; l++)
+            {
+                w.AutoFrom[l] = w.AutoTo[l] = int.MaxValue;
+                w.AutoOpener[l] = -1;
+                Leaf leaf = w.Closed[l];
+                bool opens = inhabitantDoors && w.HoldStep[l] >= 0; // MUTATION:AUDIT_INHAB_DOOR
+                if (!opens)
+                {
+                    continue;
+                }
+                w.AutoFrom[l] = w.HoldStep[l] / SampleSteps;
+                w.AutoTo[l] = (w.HoldStep[l] + swingSteps + SampleSteps - 1) / SampleSteps;
+                w.AutoOpener[l] = w.HoldBy[l];
+                w.AutoBits += leaf.Bit;
+                w.SwingCells = w.SwingCells ?? new bool[c][];
+                w.SwingCells[l] = new bool[w.Count];
+                float reach = leaf.Geometry.Width + halfDiagonal + ReleaseTolerance;
+                for (int k = 0; k < w.Count; k++)
+                {
+                    w.SwingCells[l][k] = YawMath.Planar(w.Center[k] - leaf.Geometry.Hinge).magnitude <= reach;
+                }
+            }
+            // The player never opens a leaf a walk reaches: opened first, it would cancel that walk's hold (GameState skips an open leaf).
+            for (int l = 0; l < c && w.ReachBits != null; l++)
+            {
+                if (w.Closed[l].Door.OpenedByInhabitants && w.HoldStep[l] >= 0)
+                {
+                    for (int k = 0; k < w.Count; k++)
+                    {
+                        w.ReachBits[k] &= ~w.Closed[l].Bit;
+                    }
+                }
+            }
+            if (w.AutoBits == 0)
+            {
+                return;
+            }
+            w.AutoOpen = new int[w.Samples];
+            for (int s = 0; s < w.Samples; s++)
+            {
+                for (int l = 0; l < c; l++)
+                {
+                    if ((w.AutoBits & w.Closed[l].Bit) != 0 && s >= w.AutoTo[l])
+                    {
+                        w.AutoOpen[s] |= w.Closed[l].Bit;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): every per mask sight table made independent of the inhabitants' leaves: before a leaf's window
+        /// its row is the closed pose's, in the window both poses' (seen if seen in either), after it the open pose's. The state's
+        /// mask may then carry such a bit or not: the tables answer the same. <paramref name="moveOnly"/>: the still tables are
+        /// shared with a world already merged.
+        /// </summary>
+        private static void MergeInhabitantDoors(World w, bool moveOnly)
+        {
+            if (w.AutoBits == 0)
+            {
+                return;
+            }
+            for (int l = 0; l < w.Closed.Count; l++)
+            {
+                int bit = w.Closed[l].Bit;
+                if ((w.AutoBits & bit) == 0)
+                {
+                    continue;
+                }
+                var done = new HashSet<bool[][]>();
+                void Merge(bool[][] table)
+                {
+                    if (table != null && done.Add(table))
+                    {
+                        for (int m = 0; m < w.Masks; m++)
+                        {
+                            if ((m & bit) == 0)
+                            {
+                                MergeRows(table[m], table[m | bit], w.Samples, w.Count, w.AutoFrom[l], w.AutoTo[l]);
+                            }
+                        }
+                    }
+                }
+                Merge(w.MoveSeen);
+                Merge(w.MoveDark);
+                if (!moveOnly)
+                {
+                    foreach (ToleranceClass c in w.Classes)
+                    {
+                        Merge(c.Seen);
+                        Merge(c.SeenDark);
+                    }
+                }
+                if (w.LeafSeen != null)
+                {
+                    foreach (bool[][] perLeaf in w.LeafSeen)
+                    {
+                        foreach (bool[] table in perLeaf)
+                        {
+                            MergeMasks(w, table, bit, w.AutoFrom[l], w.AutoTo[l]);
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>M6: rows [s * n + k] of the closed pose and the open pose of one leaf, merged as <see cref="MergeInhabitantDoors"/> says.</summary>
+        private static void MergeRows(bool[] closed, bool[] open, int samples, int n, int from, int to)
+        {
+            for (int s = 0; s < samples; s++)
+            {
+                for (int k = s * n, end = k + n; k < end; k++)
+                {
+                    bool v = s < from ? closed[k] : s < to ? closed[k] || open[k] : open[k];
+                    closed[k] = v;
+                    open[k] = v;
+                }
+            }
+        }
+
+        /// <summary>M6: a [sample * Masks + mask] table merged over one leaf's bit as <see cref="MergeInhabitantDoors"/> says.</summary>
+        private static void MergeMasks(World w, bool[] table, int bit, int from, int to)
+        {
+            for (int s = 0; s < w.Samples; s++)
+            {
+                for (int m = 0; m < w.Masks; m++)
+                {
+                    if ((m & bit) != 0)
+                    {
+                        continue;
+                    }
+                    int a = s * w.Masks + m;
+                    int b = s * w.Masks + (m | bit);
+                    bool v = s < from ? table[a] : s < to ? table[a] || table[b] : table[b];
+                    table[a] = v;
+                    table[b] = v;
+                }
+            }
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.6, 2.8): [sample * Masks + mask] a sample of closed leaf l standing open (its last swing angle) is in
+        /// the cone of a human with memory (every one, or only <paramref name="watcher"/>) and not occluded in that mask (masks
+        /// with the leaf's bit; the leaf left out of its own samples), as <see cref="ComputeLeafSight"/> casts.
+        /// </summary>
+        private static bool[] LeafOpenSeen(World w, LevelInstance level, int l, int watcher)
+        {
+            int h = w.Inhabitants;
+            SightCache cache = CacheFor(w, level);
+            Leaf leaf = w.Closed[l];
+            int point = w.Count * cache.Ring;
+            for (int i = 0; i < l; i++)
+            {
+                foreach (Vector3[] points in w.Closed[i].Samples)
+                {
+                    point += points.Length;
+                }
+            }
+            for (int q = 0; q < OpenSamples - 1; q++)
+            {
+                point += leaf.Samples[q].Length;
+            }
+            int count = leaf.Samples[OpenSamples - 1].Length;
+            var seen = new bool[w.Samples * w.Masks];
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int mask = 0; mask < w.Masks; mask++)
+                {
+                    if ((mask & leaf.Bit) == 0)
+                    {
+                        continue;
+                    }
+                    for (int s = 0; s < w.Samples; s++)
+                    {
+                        for (int i = 0; i < h; i++)
+                        {
+                            int at = s * h + i;
+                            Watcher x = w.Watchers[i];
+                            if (w.Asleep[at] || !x.Human || !x.Personality.Memory || (watcher >= 0 && i != watcher))
+                            {
+                                continue;
+                            }
+                            Vector3 eye = w.Eye[at];
+                            int e = cache.Entry(eye, mask);
+                            for (int j = 0; j < count; j++)
+                            {
+                                if (!VisionMath.IsInCone(eye, w.Forward[at], cache.Points[point + j], x.Range, x.HalfAngle))
+                                {
+                                    continue;
+                                }
+                                if (pass == 0)
+                                {
+                                    cache.Need(e, point + j);
+                                }
+                                else if (cache.Visible(e, point + j))
+                                {
+                                    seen[s * w.Masks + mask] = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if (pass == 0 && !cache.Flush())
+                {
+                    return seen;
+                }
+            }
+            return seen;
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.6 and 2.8), on a level with "doorMemory": every human remembers each leaf as authored (DoorMemory
+        /// starts at the authored states), and a leaf seen in another state is a Suspect and a put back the audit does not model.
+        /// The search keeps the leaves the player opened unseen by every human with memory while they stand open (after the
+        /// opening: all of them, the swing samples already unseen by <see cref="CheckOpen"/>; <see cref="World.DoorSeen"/>,
+        /// <see cref="DoorsUnseen"/>). A leaf the household opens is remembered open by every memory (GameState.RememberDoor):
+        /// nothing to check.
+        /// </summary>
+        private static void SetUpDoorMemory(World w, LevelInstance level)
+        {
+            w.DoorMemory = w.Def.DoorMemory;
+            if (!w.DoorMemory || w.Closed.Count == 0)
+            {
+                return;
+            }
+            for (int l = 0; l < w.Closed.Count; l++)
+            {
+                if ((w.AutoBits & w.Closed[l].Bit) != 0)
+                {
+                    continue;
+                }
+                bool[] seen = LeafOpenSeen(w, level, l, -1);
+                w.DoorSeen = w.DoorSeen ?? new bool[w.Samples * w.Masks];
+                for (int i = 0; i < seen.Length; i++)
+                {
+                    w.DoorSeen[i] |= seen[i];
+                }
+            }
+            for (int l = 0; l < w.Closed.Count && w.DoorSeen != null; l++)
+            {
+                if ((w.AutoBits & w.Closed[l].Bit) != 0)
+                {
+                    MergeMasks(w, w.DoorSeen, w.Closed[l].Bit, w.AutoFrom[l], w.AutoTo[l]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): [sample * Masks + mask] a human sees the player's remembered spot: a furniture standing on one of
+        /// the in place cells of the slot of that sample would be seen still by its class. Hidden, that is a Suspect.
+        /// </summary>
+        private static void SetUpSpot(World w)
+        {
+            if (w.HideFrom == null)
+            {
+                return;
+            }
+            var spots = new List<int>[w.SlotHomes.Count];
+            for (int slot = 0; slot < spots.Length; slot++)
+            {
+                spots[slot] = new List<int>();
+                for (int k = 0; k < w.Count; k++)
+                {
+                    if (w.Classes.Exists(c => slot < c.InPlaceBySlot.Count && c.InPlaceBySlot[slot][k]))
+                    {
+                        spots[slot].Add(k);
+                    }
+                }
+            }
+            w.SpotSeen = new bool[w.Samples * w.Masks];
+            for (int s = 0; s < w.Samples; s++)
+            {
+                List<int> cells = spots[w.Slot[s]];
+                for (int m = 0; m < w.Masks; m++)
+                {
+                    bool seen = false;
+                    for (int c = 0; c < w.Classes.Count && !seen; c++)
+                    {
+                        foreach (int k in cells)
+                        {
+                            if (w.Classes[c].Seen[m][s * w.Count + k])
+                            {
+                                seen = true;
+                                break;
+                            }
+                        }
+                    }
+                    w.SpotSeen[s * w.Masks + m] = seen;
+                }
+            }
+        }
+
+        /// <summary>M6: what the audit makes of the wardrobe, the inhabitants' doors and door memory on this level (notes).</summary>
+        private static void DescribeM6(World w, Result result)
+        {
+            if (w.HideFrom != null)
+            {
+                var cells = new List<string>();
+                for (int k = 0; k < w.Count; k++)
+                {
+                    if (w.HideFrom[k])
+                    {
+                        cells.Add(string.Format(CultureInfo.InvariantCulture, "({0:0.##}, {1:0.##})", w.Center[k].x, w.Center[k].z));
+                    }
+                }
+                result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
+                    "armoire : cachette depuis {0} (entree et sortie {1:0.0} s vues en mouvement, cache : ni vu ni entendu, grincement etouffe a {2:0.0} m, place memorisee vue vide interdite)",
+                    string.Join(" ", cells), HideSamples * SampleSeconds, Tuning.CreakRadius * Tuning.WardrobeCreakFactor));
+            }
+            for (int l = 0; l < w.Closed.Count; l++)
+            {
+                if ((w.AutoBits & w.Closed[l].Bit) != 0)
+                {
+                    result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
+                        "porte {0} ouverte par {1} : peut-etre en train de s'ouvrir de {2:0.0} s a {3:0.0} s, ouverte ensuite",
+                        w.Closed[l].Door.Id, w.Watchers[w.AutoOpener[l]].Name, w.AutoFrom[l] * SampleSeconds, w.AutoTo[l] * SampleSeconds));
+                }
+                else if (w.Closed[l].Door.OpenedByInhabitants)
+                {
+                    result.Notes.Add($"porte {w.Closed[l].Door.Id} : ouverte par les habitants, mais aucune marche figee ne la traverse (porte fermee ordinaire)");
+                }
+            }
+            if (w.DoorMemory)
+            {
+                result.Notes.Add("memoire des portes : chaque humain se souvient des portes fermees ; une porte ouverte par le joueur ne doit jamais etre vue ouverte par un humain");
             }
         }
 
@@ -3805,7 +5342,11 @@ namespace Meuble.Editor
             int mask = RoutineFactory.AllAreas;
             foreach (Leaf leaf in w.Closed)
             {
-                mask &= ~(1 << leaf.Area);
+                // M6 (CONTRACT_M6 2.7): a leaf the inhabitants open is on their plans.
+                if (!leaf.Door.OpenedByInhabitants)
+                {
+                    mask &= ~(1 << leaf.Area);
+                }
             }
             return mask;
         }
@@ -3819,7 +5360,12 @@ namespace Meuble.Editor
             {
                 if (!string.IsNullOrEmpty(door.Leaf))
                 {
-                    mask &= ~(1 << (Tuning.DoorAreaBase + leaves++));
+                    // M6 (CONTRACT_M6 2.7): a leaf the inhabitants open is on their plans.
+                    if (!door.OpenedByInhabitants)
+                    {
+                        mask &= ~(1 << (Tuning.DoorAreaBase + leaves));
+                    }
+                    leaves++;
                 }
             }
             return mask;
@@ -4145,6 +5691,7 @@ namespace Meuble.Editor
             }
             ComputeSight(v, level, true);
             ComputeLeafSight(v, level);
+            MergeInhabitantDoors(v, true);
             SetMargin(v, w.Margin);
             return v;
         }
@@ -4259,6 +5806,9 @@ namespace Meuble.Editor
             {
                 table.Widen(w);
             }
+            // M6: the remembered spot and the leaves the player opened, dilated as every sight table.
+            w.SpotSeenWide = w.SpotSeen != null ? Dilate(w.SpotSeen, samples, w.Masks, margin) : null;
+            w.DoorSeenWide = w.DoorSeen != null ? Dilate(w.DoorSeen, samples, w.Masks, margin) : null;
             w.ForcedWide = new bool[samples];
             w.ForcedSeatWide = new int[samples];
             for (int s = 0; s < samples; s++)
@@ -4379,6 +5929,10 @@ namespace Meuble.Editor
             {
                 return false;
             }
+            if (w.Swinging(s, k))
+            {
+                return false; // M6: an inhabitant's leaf may swing into it
+            }
             // M5 (CONTRACT_M5 16.3): every human class that sees it still must find it in place or explained by its own
             // tolerance; the dog's sighting of a still chair is free.
             int index = s * w.Count + k;
@@ -4435,7 +5989,84 @@ namespace Meuble.Editor
         /// </summary>
         private static bool MovingOk(World w, bool dark, int s, int a, int b, bool wide, int mask)
         {
-            return s >= 0 && s < w.Samples && !w.MovingSeen(dark, mask, s, a, wide) && !w.MovingSeen(dark, mask, s, b, wide) && !w.ForcedAt(s, wide);
+            return s >= 0 && s < w.Samples && !w.MovingSeen(dark, mask, s, a, wide) && !w.MovingSeen(dark, mask, s, b, wide) && !w.ForcedAt(s, wide)
+                && !w.Swinging(s, a) && !w.Swinging(s, b);
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): hidden in a wardrobe on sample s: no vision sample, no noise, no robot, but a sitter forcing the
+        /// player onto its seat finds it gone, and a human who sees its remembered spot empty gets a Suspect.
+        /// </summary>
+        private static bool HiddenOk(World w, int s, int mask, bool wide)
+        {
+            return s >= 0 && s < w.Samples && !w.ForcedAt(s, wide) && !(wide ? w.SpotSeenWide : w.SpotSeen)[s * w.Masks + mask];
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): entering or leaving the wardrobe from cell k, leaving at sample t (plus <paramref name="shift"/>):
+        /// a <see cref="HideSamples"/> action seen as moving at the cell (like a door: no noise event), out of every robot's
+        /// contact zone and where no sitter forces the player (the furniture is visible during both: GameState hides it after the
+        /// entry and shows it at the start of the exit).
+        /// </summary>
+        private static bool CheckHide(World w, SearchOptions o, Node from, int k, int t, int shift, bool wide)
+        {
+            for (int q = 1; q <= HideSamples; q++)
+            {
+                int s = t + q + shift;
+                if (!MovingOk(w, from.Off, s, k, k, wide, from.Mask) || !RobotFree(w, o, s, w.Center[k], w.Center[k], wide))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): the muffled creak of a furniture hidden at the wardrobe of cell k, emitted somewhere on samples
+        /// from..to, reaches nobody: every listener stays farther than half the creak radius times its hearing factor plus the
+        /// hearing margin, over that window and, when <paramref name="wide"/>, the margin around it.
+        /// </summary>
+        private static bool MuffledSilent(World w, int k, int from, int to, bool wide)
+        {
+            float radius = Tuning.CreakRadius * Tuning.WardrobeCreakFactor;
+            Vector3 p = YawMath.Planar(w.HideCenter[k]);
+            int lo = Mathf.Max(0, from - (wide ? w.Margin : 0));
+            int hi = Mathf.Min(w.Samples - 1, to + (wide ? w.Margin : 0));
+            for (int r = lo; r <= hi; r++)
+            {
+                for (int i = 0; i < w.Inhabitants; i++)
+                {
+                    float factor = w.HearingFactor[i];
+                    if (factor > 0f && YawMath.Planar(w.Position[r, i] - p).magnitude <= radius * factor + NoiseMargin)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return to < w.Samples;
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.6 and 2.8, conservative): on samples from..to the leaves the player opened (the bits of
+        /// <paramref name="mask"/> no inhabitant opens) stay unseen by every human, who remembers each leaf closed as authored:
+        /// a leaf seen changed is a Suspect and a put back the audit does not model.
+        /// </summary>
+        private static bool DoorsUnseen(World w, SearchOptions o, int mask, int from, int to, bool wide)
+        {
+            bool remembered = w.DoorMemory; // MUTATION:AUDIT_DOOR_MEMORY
+            if (!remembered || w.DoorSeen == null || !o.DoorMemory || (mask & ~w.AutoBits) == 0)
+            {
+                return true;
+            }
+            bool[] seen = wide ? w.DoorSeenWide : w.DoorSeen;
+            for (int s = Mathf.Max(0, from); s <= to && s < w.Samples; s++)
+            {
+                if (seen[s * w.Masks + mask])
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -4514,6 +6145,11 @@ namespace Meuble.Editor
             /// body going on straight in motion; null when the search has only one.
             /// </summary>
             public NoiseTable Alt;
+            /// <summary>M5 5B.1 (M6): the travel points of a rocking body's long leg (<see cref="ExtraTravel"/>), or null.</summary>
+            public NoiseTable Extra;
+
+            /// <summary>The travel table of leg 0 (the body's), 1 (<see cref="AltTravel"/>) or 2 (<see cref="ExtraTravel"/>).</summary>
+            public NoiseTable Leg(int leg) => leg == 0 ? Move : leg == 1 ? Alt : Extra;
 
             public static Ears For(World w, SearchOptions o, int travel, int stopCost, bool toggles, int altTravel)
             {
@@ -4528,6 +6164,10 @@ namespace Meuble.Editor
                 if (altTravel > 0)
                 {
                     ears.Alt = NoiseFor(w, w.Body.MoveNoiseKind, altTravel, hum);
+                }
+                if (ExtraTravel(w, o) > 0)
+                {
+                    ears.Extra = NoiseFor(w, w.Body.MoveNoiseKind, ExtraTravel(w, o), hum);
                 }
                 if (stopCost > 0)
                 {
@@ -4594,6 +6234,21 @@ namespace Meuble.Editor
         private static bool RockDirections(World w, SearchOptions o)
         {
             return w.RockSamples > 0 && !w.Body.Glides && !w.Body.Tips && !LoadRuleOn(w, o);
+        }
+
+        /// <summary>
+        /// M5 5B.1 (CONTRACT_M5 19, M6): a rocking body's third leg length, one sample longer than its own: a cell its plan
+        /// slows down on so that it never runs ahead of the furniture (<see cref="RockStep"/>); 0 for every other search.
+        /// </summary>
+        private static int ExtraTravel(World w, SearchOptions o)
+        {
+            return RockDirections(w, o) ? w.Body.MoveSamples + 1 : 0;
+        }
+
+        /// <summary>The samples of leg 0 (the body's), 1 (<see cref="AltTravel"/>) or 2 (<see cref="ExtraTravel"/>).</summary>
+        private static int LegTravel(int leg, int travel, int altTravel, int extraTravel)
+        {
+            return leg == 0 ? travel : leg == 1 ? altTravel : extraTravel;
         }
 
         /// <summary>
@@ -4734,6 +6389,10 @@ namespace Meuble.Editor
             /// sample box stays.
             /// </summary>
             public bool LoadRule = true;
+            /// <summary>M6: the player may hide in a wardrobe (false: the wardrobe is a plain prop, the wardrobe fixture).</summary>
+            public bool Hide = true;
+            /// <summary>M6: a leaf the player opened must stay unseen by the humans (false: no door memory, its fixture).</summary>
+            public bool DoorMemory = true;
         }
 
         /// <summary>
@@ -4936,7 +6595,8 @@ namespace Meuble.Editor
                     }
                 }
                 Vector2[] v = Simulate(samples, out _);
-                float threshold = Tuning.LoadFallDeltaV - LoadEpsilon; // MUTATION:AUDIT_LOAD
+                // M5 5B.1 (m9): refused at Tuning.AuditLoadDeltaV, under the game's LoadFallDeltaV, with LoadBalance's own epsilon.
+                float threshold = Tuning.AuditLoadDeltaV - LoadBalance.Epsilon; // MUTATION:AUDIT_LOAD
                 for (int i = first * SampleSteps; i < v.Length; i++)
                 {
                     Vector2 before = i >= LoadWindowSteps ? v[i - LoadWindowSteps] : Vector2.zero;
@@ -5166,7 +6826,7 @@ namespace Meuble.Editor
                 return nodes;
             }
             int creakDelay = Mathf.RoundToInt(Tuning.CreakStartDelay / SampleSeconds);
-            float fill = SampleSeconds / Tuning.CreakFillTime;
+            float fill = SampleSeconds / DifficultyDef.Current.CreakFillTime; // M7: the run's difficulty (CONTRACT_M7 4.1)
             float drain = SampleSeconds / Tuning.CreakDrainTime;
             int stopCost = StopCost(w, options);
             bool tracksMotion = stopCost > 0;
@@ -5181,7 +6841,12 @@ namespace Meuble.Editor
             LoadModel load = LoadRuleOn(w, options) ? LoadModelFor(w, travel, carefulBase, altTravel, stopCost) : null;
             // The rocking body's direction is part of the state; the load state is not: it enters the dominance instead.
             bool descriptors = rockDirections;
-            int legs = altTravel > 0 ? 2 : 1;
+            // M5 5B.1 (M6): a rocking body has a third leg length, the cell its plan slows down on (RockStep).
+            int extraTravel = ExtraTravel(w, options);
+            int legs = extraTravel > 0 ? 3 : altTravel > 0 ? 2 : 1;
+            // M5 5B.1 (M2): without a wait cap neither the run nor the anchor is tracked (a lesson counterfactual, the relaxed
+            // fixtures): fewer states, and the same schedules exist.
+            bool waits = options.MaxRun < UnlimitedRun;
             Ears ears = Ears.For(w, options, travel, stopCost, toggles, altTravel);
             // CONTRACT_M5 16.8: the furniture stands at the spawn until the start delay ends, out of every robot's contact zone.
             for (int s = 0; s <= start && w.Robots > 0; s++)
@@ -5215,14 +6880,23 @@ namespace Meuble.Editor
             bool doors = options.Doors && w.Closed.Count > 0;
             long BaseKey(Node n) => ((((((long)n.Cell * w.Count + n.Anchor) * 2 + (n.Flag ? 1 : 0)) * 2 + (n.Off ? 1 : 0)) * 2 + (n.Motion ? 1 : 0)) * 2 + (n.Lying ? 1 : 0))
                 * masks + n.Mask;
+            // M6 (CONTRACT_M6 2.5): the player may hide in a wardrobe (never with a load); hidden is part of the state.
+            bool hides = options.Hide && w.HideFrom != null && load == null;
             // M5 wave 5B: a rocking body's direction in motion is part of the state; the other levels keep the M4 key exactly.
-            long Key(Node n) => descriptors ? BaseKey(n) * 65536L + n.Load : BaseKey(n);
+            long Key(Node n) => (descriptors ? BaseKey(n) * 65536L + n.Load : BaseKey(n)) * (hides ? 2 : 1) + (n.Hidden ? 1 : 0);
             // M5 wave 5B: with a load, a node dominates another of its state only if its load state is at least as free.
             bool Freer(Node a, Node b) => load == null || load.Dominates(a.Load, b.Load);
 
             // Keeps n unless a node of its state dominates or equals it; drops the nodes it dominates or equals, in order.
             void Offer(Node n)
             {
+                // M6 (CONTRACT_M6 2.7): the leaves an inhabitant opened by then are open; (2.6) the leaves the player opened stay
+                // unseen by the humans over the act that led here.
+                n.Mask = (byte)(n.Mask | (w.AutoOpen != null ? w.AutoOpen[n.T] : 0));
+                if (!DoorsUnseen(w, options, n.Mask, n.Parent >= 0 ? nodes[n.Parent].T + 1 : n.T, n.T, true))
+                {
+                    return;
+                }
                 Layer layer = layers[n.T] ?? (layers[n.T] = RentLayer());
                 int slot = layer.Slot(Key(n));
                 for (int i = layer.Head[slot]; i >= 0; i = nodes.Next(i))
@@ -5277,7 +6951,54 @@ namespace Meuble.Editor
                 layer.Tail[slot] = idx;
             }
 
-            Offer(new Node { Cell = w.Start, Anchor = w.Start, T = start, Parent = -1, Gauge = gauge0, Act = Act.Start });
+            // M6 (CONTRACT_M6 2.5): a hidden furniture stays hidden (unseen and silent; the gauge fills, and once it reaches the cap
+            // the muffled creak must reach nobody over the samples it may happen on, hidden all along), or leaves the wardrobe in
+            // front of it (seen as moving). Hiding is waiting: the wait cap holds.
+            void ExpandHidden(Node n, int idx, int t)
+            {
+                int k = n.Cell;
+                float filled = n.Gauge + (t + 1 >= creakDelay && !w.Pinned[t + 1] ? fill : 0f);
+                if (n.Run + 1 <= options.MaxRun && HiddenOk(w, t + 1, n.Mask, true))
+                {
+                    if (filled < options.GaugeCap)
+                    {
+                        Offer(new Node
+                        {
+                            Cell = k, T = t + 1, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + 1 : 0, Anchor = n.Anchor,
+                            Gauge = filled, Flag = n.Flag, Act = Act.Still, Off = n.Off, Mask = n.Mask, Hidden = true,
+                        });
+                    }
+                    else
+                    {
+                        int end = t + 1 + CreakSlackSamples;
+                        bool creaks = end <= horizon && n.Run + 1 + CreakSlackSamples <= options.MaxRun && MuffledSilent(w, k, t + 1, end, true);
+                        for (int s = t + 2; creaks && s <= end; s++)
+                        {
+                            creaks = HiddenOk(w, s, n.Mask, true);
+                        }
+                        if (creaks)
+                        {
+                            Offer(new Node
+                            {
+                                Cell = k, T = end, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + 1 + CreakSlackSamples : 0, Anchor = n.Anchor,
+                                Gauge = 0f, Flag = n.Flag, Act = Act.Still, Off = n.Off, Mask = n.Mask, Hidden = true,
+                            });
+                        }
+                    }
+                }
+                float left = n.Gauge + HideSamples * fill;
+                if (t >= start + w.Margin && t + HideSamples <= horizon && n.Run + HideSamples <= options.MaxRun && left < options.GaugeCap
+                    && CheckHide(w, options, n, k, t, 0, true))
+                {
+                    Offer(new Node
+                    {
+                        Cell = k, T = t + HideSamples, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + HideSamples : 0, Anchor = n.Anchor,
+                        Gauge = left, Flag = n.Flag, Act = Act.Leave, Off = n.Off, Mask = n.Mask,
+                    });
+                }
+            }
+
+            Offer(new Node { Cell = w.Start, Anchor = waits ? w.Start : 0, T = start, Parent = -1, Gauge = gauge0, Act = Act.Start });
             try
             {
                 for (int t = start; t < horizon && goal < 0; t++)
@@ -5295,7 +7016,7 @@ namespace Meuble.Editor
                             for (int idx = current.Head[slot]; idx >= 0; idx = nodes.Next(idx))
                             {
                                 Node n = nodes[idx];
-                                if (t > start && w.InExit[n.Cell] && !w.HumanSeen(n.Off, n.Mask, t, n.Cell, true) && (n.Flag || !options.NeedDecoy)
+                                if (t > start && w.InExit[n.Cell] && !n.Hidden && !w.HumanSeen(n.Off, n.Mask, t, n.Cell, true) && (n.Flag || !options.NeedDecoy)
                                     && (goal < 0 || n.Moves < nodes[goal].Moves || (n.Moves == nodes[goal].Moves && n.Gauge < nodes[goal].Gauge)))
                                 {
                                     goal = idx;
@@ -5317,6 +7038,11 @@ namespace Meuble.Editor
                                 }
                                 Node n = nodes[idx];
                                 int k = n.Cell;
+                                if (n.Hidden)
+                                {
+                                    ExpandHidden(n, idx, t);
+                                    continue;
+                                }
                                 // Still (a furniture still in motion must stop first). Sat on, the creak gauge pauses.
                                 if (!n.Motion)
                                 {
@@ -5334,7 +7060,7 @@ namespace Meuble.Editor
                                         bool explained = options.Decoys && !n.Lying && !(w.Body.Lamp && n.Off) && w.ExplainedAt(n.Mask, k, t + 1);
                                         Offer(new Node
                                         {
-                                            Cell = k, T = t + 1, Parent = idx, Moves = n.Moves, Run = n.Run + 1, Anchor = n.Anchor,
+                                            Cell = k, T = t + 1, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + 1 : 0, Anchor = n.Anchor,
                                             Gauge = filled, Flag = n.Flag || explained, Act = Act.Still, Off = n.Off, Lying = n.Lying, Mask = n.Mask,
                                             Load = stillLoad,
                                         });
@@ -5352,7 +7078,7 @@ namespace Meuble.Editor
                                     {
                                         Offer(new Node
                                         {
-                                            Cell = k, T = t + stopCost, Parent = idx, Moves = n.Moves, Run = n.Run + stopCost, Anchor = n.Anchor,
+                                            Cell = k, T = t + stopCost, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + stopCost : 0, Anchor = n.Anchor,
                                             Gauge = Mathf.Max(0f, n.Gauge - stopCost * drain), Flag = n.Flag, Act = Act.Stop, Off = n.Off,
                                             Lying = w.Body.Tips, Mask = n.Mask, Load = stopLoad,
                                         });
@@ -5363,7 +7089,7 @@ namespace Meuble.Editor
                                 {
                                     Offer(new Node
                                     {
-                                        Cell = k, T = t + ToggleSamples, Parent = idx, Moves = n.Moves, Run = n.Run + ToggleSamples, Anchor = n.Anchor,
+                                        Cell = k, T = t + ToggleSamples, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + ToggleSamples : 0, Anchor = n.Anchor,
                                         Gauge = Mathf.Max(0f, n.Gauge - ToggleSamples * drain), Flag = n.Flag, Act = Act.Toggle, Off = !n.Off, Lying = n.Lying,
                                         Mask = n.Mask, Load = n.Load,
                                     });
@@ -5385,9 +7111,23 @@ namespace Meuble.Editor
                                         }
                                         Offer(new Node
                                         {
-                                            Cell = k, T = t + OpenSamples, Parent = idx, Moves = n.Moves, Run = n.Run + OpenSamples, Anchor = n.Anchor,
+                                            Cell = k, T = t + OpenSamples, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + OpenSamples : 0, Anchor = n.Anchor,
                                             Gauge = Mathf.Max(0f, n.Gauge - OpenSamples * drain), Flag = n.Flag, Act = Act.Open, Off = n.Off,
                                             Mask = (byte)(n.Mask | bit), Load = openLoad,
+                                        });
+                                    }
+                                }
+                                // M6 (CONTRACT_M6 2.5): enter the wardrobe from a hide cell, upright and still, no closed leaf taking E.
+                                if (hides && w.HideFrom[k] && !n.Motion && !n.Lying && (w.HideBlockers[k] & ~n.Mask) == 0
+                                    && t + HideSamples <= horizon && n.Run + HideSamples <= options.MaxRun)
+                                {
+                                    float entered = n.Gauge + HideSamples * fill;
+                                    if (entered < options.GaugeCap && CheckHide(w, options, n, k, t, 0, true))
+                                    {
+                                        Offer(new Node
+                                        {
+                                            Cell = k, T = t + HideSamples, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + HideSamples : 0, Anchor = n.Anchor,
+                                            Gauge = entered, Flag = n.Flag, Act = Act.Hide, Off = n.Off, Mask = n.Mask, Hidden = true,
                                         });
                                     }
                                 }
@@ -5397,16 +7137,22 @@ namespace Meuble.Editor
                                     int o = around[j];
                                     int edge = w.EdgeStart[k] + j;
                                     int dir = descriptors || load != null ? DirIndex(w, k, o) : 0;
-                                    // A rocking body that arrived by a move and goes on straight takes the faster leg (leg 1), else
-                                    // the body's (leg 0). Only a node reached by a move carries a direction.
-                                    bool straight = rockDirections && n.Act == Act.Move && n.Load == dir + 1;
+                                    // M5 5B.1 (M6): a rocking body's leg is decided by its plan (RockStep): the body's leg from rest
+                                    // or in a turn, the faster one going on straight, the long one when the plan would run ahead;
+                                    // a reversal in motion is refused. Only a node reached by a move carries a direction.
+                                    int rockLeg = -1;
+                                    int rockLoad = 0;
+                                    if (rockDirections && !RockStep(w, n.Act == Act.Move ? n.Load : 0, dir, travel, altTravel, extraTravel, out rockLeg, out rockLoad))
+                                    {
+                                        continue;
+                                    }
                                     for (int leg = 0; leg < legs; leg++)
                                     {
-                                        if (rockDirections && (leg == 1) != straight)
+                                        if (rockDirections && leg != rockLeg)
                                         {
                                             continue;
                                         }
-                                        int legTravel = leg == 0 ? travel : altTravel;
+                                        int legTravel = LegTravel(leg, travel, altTravel, extraTravel);
                                         int length = legTravel + (n.Lying ? RightSamples : 0);
                                         if (t + length > horizon)
                                         {
@@ -5417,7 +7163,7 @@ namespace Meuble.Editor
                                         {
                                             moveStamp[move] = t + 1;
                                             moveMemo[move] = w.EdgeOpen(n.Mask, edge, k, o) && (options.Barred == null || !options.Barred[o])
-                                                && CheckMove(w, options, leg == 0 ? ears.Move : ears.Alt, n, k, j, o, t, 0, true, legTravel)
+                                                && CheckMove(w, options, ears.Leg(leg), n, k, j, o, t, 0, true, legTravel)
                                                 && (tracksMotion || StillOk(w, options, n.Off, false, o, t + length, true, n.Mask));
                                         }
                                         if (!moveMemo[move])
@@ -5425,21 +7171,21 @@ namespace Meuble.Editor
                                             continue;
                                         }
                                         // M5 wave 5B: the load must hold over the leg; a rocking body remembers where it goes.
-                                        int moveLoad = load != null ? load.Step(n.Load, LoadModel.Move(dir, leg, n.Lying)) : rockDirections ? dir + 1 : 0;
+                                        int moveLoad = load != null ? load.Step(n.Load, LoadModel.Move(dir, leg, n.Lying)) : rockDirections ? rockLoad : 0;
                                         if (moveLoad < 0)
                                         {
                                             continue;
                                         }
                                         // Leaving the anchor's radius ends the wait; moving inside it is still waiting there.
                                         bool away = YawMath.Planar(w.Center[o] - w.Center[n.Anchor]).magnitude > WaitAnchorRadius + 1e-3f;
-                                        int run = away ? 0 : n.Run + length;
+                                        int run = !waits ? 0 : away ? 0 : n.Run + length;
                                         if (run > options.MaxRun)
                                         {
                                             continue;
                                         }
                                         Offer(new Node
                                         {
-                                            Cell = o, T = t + length, Parent = idx, Moves = n.Moves + 1, Run = run, Anchor = away ? o : n.Anchor,
+                                            Cell = o, T = t + length, Parent = idx, Moves = n.Moves + 1, Run = run, Anchor = !waits ? 0 : away ? o : n.Anchor,
                                             Gauge = Mathf.Max(0f, n.Gauge - length * drain), Flag = n.Flag, Act = Act.Move, Off = n.Off, Motion = tracksMotion,
                                             Mask = n.Mask, Load = moveLoad, Careful = carefulBase || (carefulLegs && leg == 1),
                                         });
@@ -5481,24 +7227,32 @@ namespace Meuble.Editor
             int start = options.Delay;
             int horizon = w.Horizon;
             int masks = w.Masks;
-            int states = w.Count * 8 * masks;
+            // M6 (CONTRACT_M6 2.5): hidden in a wardrobe is one more state bit, only on a level where the player may hide.
+            bool hides = options.Hide && w.HideFrom != null && !LoadRuleOn(w, options);
+            int hb = hides ? 2 : 1;
+            int states = w.Count * 8 * hb * masks;
             bool tracksMotion = stopCost > 0;
             bool doors = options.Doors && w.Closed.Count > 0;
             // M5 wave 5B: both leg lengths are tried wherever the search may use them (the load is not tracked: a superset).
             bool rockDirections = RockDirections(w, options);
-            int legs = altTravel > 0 ? 2 : 1;
-            int reach = Math.Max(Math.Max(Math.Max(travel, altTravel) + RightSamples, stopCost), Math.Max(ToggleSamples, OpenSamples)) + 1;
+            int extraTravel = ExtraTravel(w, options);
+            int legs = extraTravel > 0 ? 3 : altTravel > 0 ? 2 : 1;
+            int reach = Math.Max(Math.Max(Math.Max(Math.Max(travel, altTravel), extraTravel) + RightSamples, stopCost), Math.Max(ToggleSamples, OpenSamples)) + 1;
+            reach = Math.Max(reach, HideSamples + 1);
             var ring = new bool[reach + 1][];
             for (int i = 0; i < ring.Length; i++)
             {
                 ring[i] = new bool[states];
             }
-            int State(int k, bool off, bool lying, bool motion, int mask) => (((k * 2 + (off ? 1 : 0)) * 2 + (lying ? 1 : 0)) * 2 + (motion ? 1 : 0)) * masks + mask;
+            int State(int k, bool off, bool lying, bool motion, int mask, bool hidden = false) =>
+                ((((k * 2 + (off ? 1 : 0)) * 2 + (lying ? 1 : 0)) * 2 + (motion ? 1 : 0)) * hb + (hidden ? 1 : 0)) * masks + mask;
             void Mark(int t, int state)
             {
                 if (t <= horizon)
                 {
-                    ring[t % ring.Length][state] = true;
+                    // M6 (CONTRACT_M6 2.7): the leaves an inhabitant opened by then are open.
+                    int m = state % masks;
+                    ring[t % ring.Length][state + ((m | (w.AutoOpen != null ? w.AutoOpen[t] : 0)) - m)] = true;
                 }
             }
             Mark(start, State(w.Start, false, false, false, 0));
@@ -5513,15 +7267,30 @@ namespace Meuble.Editor
                     }
                     int mask = state % masks;
                     int rest = state / masks;
+                    bool hidden = hides && (rest & 1) != 0;
+                    rest /= hb;
                     bool motion = (rest & 1) != 0;
                     bool lying = (rest & 2) != 0;
                     bool off = (rest & 4) != 0;
                     int k = rest >> 3;
-                    if (t > start && w.InExit[k] && !w.HumanSeen(off, mask, t, k, true))
+                    if (t > start && w.InExit[k] && !hidden && !w.HumanSeen(off, mask, t, k, true))
                     {
                         return true;
                     }
                     var n = new Node { Cell = k, T = t, Off = off, Lying = lying, Motion = motion, Mask = (byte)mask };
+                    if (hidden)
+                    {
+                        // M6: hidden, it stays (the gauge is not tracked: a creak's window is still samples, a superset) or leaves.
+                        if (HiddenOk(w, t + 1, mask, true))
+                        {
+                            Mark(t + 1, State(k, off, false, false, mask, true));
+                        }
+                        if (t >= start + w.Margin && t + HideSamples <= horizon && CheckHide(w, options, n, k, t, 0, true))
+                        {
+                            Mark(t + HideSamples, State(k, off, false, false, mask));
+                        }
+                        continue;
+                    }
                     if (!motion && StillOk(w, options, off, lying, k, t + 1, true, mask))
                     {
                         Mark(t + 1, State(k, off, lying, false, mask));
@@ -5552,26 +7321,33 @@ namespace Meuble.Editor
                             }
                         }
                     }
+                    // M6: enter the wardrobe from a hide cell.
+                    if (hides && w.HideFrom[k] && !motion && !lying && (w.HideBlockers[k] & ~mask) == 0 && t + HideSamples <= horizon
+                        && CheckHide(w, options, n, k, t, 0, true))
+                    {
+                        Mark(t + HideSamples, State(k, off, false, false, mask, true));
+                    }
                     List<int> around = w.Neighbors[k];
                     for (int j = 0; j < around.Count; j++)
                     {
                         int o = around[j];
                         for (int leg = 0; leg < legs; leg++)
                         {
-                            // A rocking body goes on straight (leg 1) only after a move: in motion when it rocks, anywhere
-                            // otherwise (the direction and the last act are not tracked here: a superset).
-                            if (leg == 1 && rockDirections && tracksMotion && !motion)
+                            // A rocking body goes on straight (leg 1) or slows down (leg 2, M5 5B.1) only after a move: in motion
+                            // when it rocks, anywhere otherwise (the direction, the plan and the last act are not tracked here: a
+                            // superset).
+                            if (leg >= 1 && rockDirections && tracksMotion && !motion)
                             {
                                 continue;
                             }
-                            int legTravel = leg == 0 ? travel : altTravel;
+                            int legTravel = LegTravel(leg, travel, altTravel, extraTravel);
                             int length = legTravel + (lying ? RightSamples : 0);
                             if (t + length > horizon)
                             {
                                 continue;
                             }
                             if (w.EdgeOpen(mask, w.EdgeStart[k] + j, k, o) && (options.Barred == null || !options.Barred[o])
-                                && CheckMove(w, options, leg == 0 ? ears.Move : ears.Alt, n, k, j, o, t, 0, true, legTravel)
+                                && CheckMove(w, options, ears.Leg(leg), n, k, j, o, t, 0, true, legTravel)
                                 && (tracksMotion || StillOk(w, options, off, false, o, t + length, true, mask)))
                             {
                                 Mark(t + length, State(o, off, false, tracksMotion, mask));
@@ -5613,6 +7389,9 @@ namespace Meuble.Editor
                 {
                     return;
                 }
+                // M6 (CONTRACT_M6 2.7): the leaves an inhabitant opened by then are open.
+                int m = state % masks;
+                state += (m | (w.AutoOpen != null ? w.AutoOpen[t] : 0)) - m;
                 Dictionary<int, List<int>> layer = ring[t % ring.Length];
                 if (!layer.TryGetValue(state, out List<int> held))
                 {
@@ -5741,7 +7520,7 @@ namespace Meuble.Editor
         /// <summary>The closed leaf an opening step opened (the bit its mask gained).</summary>
         private static int OpenedLeaf(World w, Node before, Node after)
         {
-            int bit = after.Mask & ~before.Mask;
+            int bit = after.Mask & ~before.Mask & ~w.AutoBits;
             return w.Closed.FindIndex(l => l.Bit == bit);
         }
 
@@ -5751,8 +7530,20 @@ namespace Meuble.Editor
             {
                 Node a = path[i - 1];
                 Node b = path[i];
+                // M6 (CONTRACT_M6 2.6): the leaves the player opened stay unseen by the humans.
+                if (!DoorsUnseen(w, o, b.Mask, a.T + 1 + shift, b.T + shift, false))
+                {
+                    return false;
+                }
                 switch (b.Act)
                 {
+                    case Act.Hide:
+                    case Act.Leave:
+                        if (!CheckHide(w, o, a, a.Cell, a.T, shift, false))
+                        {
+                            return false;
+                        }
+                        continue;
                     case Act.Move:
                         // The leg's own length (a careful leg, a rocking body going on straight), less a lying stool's righting.
                         if (!CheckMove(w, o, null, a, a.Cell, -1, b.Cell, a.T, shift, false, b.T - a.T - (a.Lying ? RightSamples : 0)))
@@ -5784,6 +7575,22 @@ namespace Meuble.Editor
                 {
                     continue; // still at spawn before the level starts
                 }
+                if (b.Hidden)
+                {
+                    // M6: every sample of a hidden stay (a muffled creak's window included), and a creak's silence.
+                    for (int q = a.T + 1 + shift; q <= s; q++)
+                    {
+                        if (!HiddenOk(w, q, b.Mask, false))
+                        {
+                            return false;
+                        }
+                    }
+                    if (b.T - a.T > 1 && !MuffledSilent(w, b.Cell, a.T + 1 + shift, s, false))
+                    {
+                        return false;
+                    }
+                    continue;
+                }
                 if (s >= w.Samples || !StillOk(w, o, b.Off, b.Lying, b.Cell, s, false, b.Mask))
                 {
                     return false;
@@ -5806,12 +7613,16 @@ namespace Meuble.Editor
             int stops = 0;
             int pinned = 0;
             int opens = 0;
+            int hides = 0;
+            int hidden = 0;
             for (int i = 1; i < path.Count; i++)
             {
                 Node n = path[i];
                 Node prev = path[i - 1];
                 peak = Mathf.Max(peak, n.Gauge);
                 longest = Mathf.Max(longest, n.Run);
+                hides += n.Act == Act.Hide ? 1 : 0;
+                hidden += n.Hidden && n.Act == Act.Still ? n.T - prev.T : 0;
                 toggles += n.Act == Act.Toggle ? 1 : 0;
                 stops += n.Act == Act.Stop ? 1 : 0;
                 opens += n.Act == Act.Open ? 1 : 0;
@@ -5839,6 +7650,13 @@ namespace Meuble.Editor
                 }
             }
             result.LongestWait = longest * SampleSeconds;
+            // M5 5B.1 (CONTRACT_M5 19, M2): the loitering rule, on top of the search's wait anchor.
+            string loitering = LoiterFailure(w, path, out string loiterNote);
+            result.Notes.Add(loiterNote);
+            if (loitering != null)
+            {
+                result.Failures.Add(loitering);
+            }
             int early = 0;
             int late = 0;
             for (int m = 1; m <= SlackProbe && ValidShifted(w, o, path, -m); m++)
@@ -5862,7 +7680,8 @@ namespace Meuble.Editor
                 + (toggles > 0 ? $", {toggles} interrupteur(s)" : "")
                 + (stops > 0 ? (w.RockSamples > 0 && !w.Body.Glides ? $", {stops} bascule(s)" : $", {stops} arret(s) glisse(s)") : "")
                 + (pinned > 0 ? string.Format(CultureInfo.InvariantCulture, ", assis dessus {0:0.0} s", pinned * SampleSeconds) : "")
-                + (opens > 0 ? $", {opens} porte(s) ouverte(s)" : ""));
+                + (opens > 0 ? $", {opens} porte(s) ouverte(s)" : "")
+                + (hides > 0 ? string.Format(CultureInfo.InvariantCulture, ", {0} cachette(s) dans l'armoire ({1:0.0} s cache)", hides, hidden * SampleSeconds) : ""));
         }
 
         /// <summary>
@@ -5888,6 +7707,18 @@ namespace Meuble.Editor
                     {
                         X = Round(here.x, 100f), Z = Round(here.z, 100f), At = Round(path[i].T * SampleSeconds, 10f),
                         Action = RouteStepDef.ActionToggle, Careful = careful,
+                    });
+                    i++;
+                    continue;
+                }
+                if (next.Act == Act.Hide || next.Act == Act.Leave)
+                {
+                    // M6 (CONTRACT_M6 2.5): "hide" presses E at the hide cell, facing the wardrobe; "leave" presses E again.
+                    Vector3 here = w.Center[path[i].Cell];
+                    route.Add(new RouteStepDef
+                    {
+                        X = Round(here.x, 100f), Z = Round(here.z, 100f), At = Round(path[i].T * SampleSeconds, 10f),
+                        Action = next.Act == Act.Hide ? RouteHide : RouteLeave, Careful = careful,
                     });
                     i++;
                     continue;
@@ -5971,16 +7802,25 @@ namespace Meuble.Editor
         /// <summary>Writes the route into the level file, keeping the rest of the file as it is written.</summary>
         public static void WriteRoute(string file, List<RouteStepDef> route)
         {
+            WriteRoute(file, route, "designerRoute");
+        }
+
+        /// <summary>
+        /// M7 (CONTRACT_M7 4.1): writes the route under <paramref name="key"/> (designerRoute or designerRouteHard), in place
+        /// when the key exists, before "inhabitants" otherwise.
+        /// </summary>
+        public static void WriteRoute(string file, List<RouteStepDef> route, string key)
+        {
             string text = File.ReadAllText(file);
             var sb = new StringBuilder();
-            sb.Append("\"designerRoute\": [\n");
+            sb.Append("\"" + key + "\": [\n");
             for (int i = 0; i < route.Count; i++)
             {
                 sb.Append("    " + RouteStepJson(route[i]));
                 sb.Append(i + 1 < route.Count ? ",\n" : "\n");
             }
             sb.Append("  ]");
-            var existing = new Regex("\"designerRoute\"\\s*:\\s*\\[[^\\]]*\\]", RegexOptions.Singleline);
+            var existing = new Regex("\"" + key + "\"\\s*:\\s*\\[[^\\]]*\\]", RegexOptions.Singleline);
             if (existing.IsMatch(text))
             {
                 text = existing.Replace(text, sb.ToString(), 1);
@@ -5996,7 +7836,7 @@ namespace Meuble.Editor
                 text = text.Substring(0, m.Index) + m.Groups[1].Value + sb + ",\n" + text.Substring(m.Index);
             }
             LevelDef check = LevelJson.Parse(text);
-            if (check.DesignerRoute.Count != route.Count)
+            if ((key == "designerRouteHard" ? check.DesignerRouteHard : check.DesignerRoute).Count != route.Count)
             {
                 throw new InvalidOperationException("the written route does not read back in " + file);
             }
@@ -6014,7 +7854,8 @@ namespace Meuble.Editor
             }
             int samples = w.Horizon;
             var sb = new StringBuilder();
-            sb.AppendLine("  carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie");
+            sb.AppendLine("  carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie"
+                + (w.HideFrom != null ? ", A cachette de l'armoire" : ""));
             for (int r = 0; r < w.Rooms.Count; r++)
             {
                 if (w.Rooms.Count > 1)
@@ -6039,6 +7880,10 @@ namespace Meuble.Editor
                         else if (w.InExit[k])
                         {
                             ch = 'E';
+                        }
+                        else if (w.HideFrom != null && w.HideFrom[k])
+                        {
+                            ch = 'A'; // M6: a hide cell of a wardrobe
                         }
                         else if (onPath.Contains(k))
                         {

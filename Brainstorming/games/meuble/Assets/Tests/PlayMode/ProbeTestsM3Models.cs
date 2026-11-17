@@ -293,7 +293,8 @@ namespace Meuble.Tests
                 if (!string.IsNullOrEmpty(def.Player.Model))
                 {
                     Transform model = AssertModelElement(Game.Furniture.transform, level + " player");
-                    Material red = PrimitiveKit.Lit(playerColor);
+                    // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
+                    Material red = PrimitiveKit.LitSurface(playerColor, Surface.Lacquer);
                     Assert.IsTrue(model.GetComponentsInChildren<Renderer>(true).Any(r => r.sharedMaterials.Contains(red)),
                         level + ": the player model is not in the player colour");
                     foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))

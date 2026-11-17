@@ -362,7 +362,8 @@ namespace Meuble.Tests
                     Assert.AreEqual(0, roots.Count, label + ": no model");
                     Assert.Greater(f.GetComponentsInChildren<MeshRenderer>(true).Length, 0, label + ": no procedural visual");
                 }
-                Assert.IsTrue(f.GetComponentsInChildren<Renderer>(true).Any(r => r.sharedMaterials.Contains(PrimitiveKit.Lit(red))),
+                // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
+                Assert.IsTrue(f.GetComponentsInChildren<Renderer>(true).Any(r => r.sharedMaterials.Contains(PrimitiveKit.LitSurface(red, Surface.Lacquer))),
                     label + ": nothing is in the player colour");
                 long triangles = Probe.TrianglesUnder(f.transform);
                 Assert.Greater(triangles, 0, label + ": premise: triangles are counted");

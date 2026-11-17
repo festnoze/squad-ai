@@ -21,6 +21,8 @@ namespace Meuble.Tests
     /// <item>M5 "open" (with "door") waits for the furniture to be still (E acts only then, CONTRACT_M5_v3 15.2), presses
     /// E, and waits for the opening (an External action) to end. A press that starts no action is pressed again, at most
     /// <see cref="MaxOpenPresses"/> times; then the replay goes on and the result counts the failure.</item>
+    /// <item>M6 "hide" and "leave" (LevelAudit.RouteHide and RouteLeave, CONTRACT_M6 2.5) are played like "open": the
+    /// furniture still at (x, z), E is pressed at "at" and the next leg waits for the 0.5 s wardrobe action to end.</item>
     /// </list>
     /// CONTRACT_M4 9.8: no scripted input while the furniture is pinned (sat on), and for one step after.
     /// M5 wave 5B: the rocking chair's rock and the robot's shove are actions that ignore input; the replay keeps steering
@@ -43,6 +45,14 @@ namespace Meuble.Tests
         public const int PressWaitSteps = 2;
         /// <summary>Real seconds after which a run stops even if game time did not reach the cap (a stalled game).</summary>
         public const float RealTimeGuard = 900f;
+        /// <summary>M6: the route action that enters the wardrobe (LevelAudit.RouteHide).</summary>
+        public const string ActionHide = "hide";
+        /// <summary>M6: the route action that leaves the wardrobe (LevelAudit.RouteLeave).</summary>
+        public const string ActionLeave = "leave";
+
+        /// <summary>The route actions that press E and wait for an External action: "open", "hide" and "leave".</summary>
+        public static bool IsPress(string action) =>
+            action == RouteStepDef.ActionOpen || action == ActionHide || action == ActionLeave;
 
         /// <summary>What one replay did. Counters are the differences over the run.</summary>
         public sealed class Result
@@ -104,6 +114,9 @@ namespace Meuble.Tests
             public bool LoadHeld;
             /// <summary>M5 wave 5B: the level gave the player a load (GameState.Load is not null).</summary>
             public bool HasLoad;
+            /// <summary>M6: wardrobe hides completed (GameState.HideCount) and leaves started (GameState.LeaveCount).</summary>
+            public int Hides;
+            public int Leaves;
             /// <summary>The route step reached (the count of steps done) and the route length.</summary>
             public int Waypoint;
             public int Waypoints;
@@ -119,11 +132,11 @@ namespace Meuble.Tests
                     + "{11} explained steps, {12} topples, top speed {13:0.00} m/s, {14} toggles, {15} switch-ons, sat on {16}, {17} pratfalls, "
                     + "{18} barks, {19} opens ({20} presses, {21} failed, {22} doors, first at {23:0.0} s), leaf seen {24}, seen before opening {25}, "
                     + "top floor {26:0.00} m, first sat on at {27:0.0} s, {28} crashes (load {29}), {30} shoves, {31} robot contacts, {32} rocks, "
-                    + "{33} noises masked by the hum",
+                    + "{33} noises masked by the hum, {34} hides, {35} leaves",
                     Label, State, Reason, Time, Cap, TimedOut ? ", timed out" : Stalled ? ", stalled" : "", Waypoint, Waypoints, Discoveries,
                     Alerts, Creaks, Explained, Topples, TopSpeed, Toggles, SwitchOns, SatOn, Pratfalls, Barks, Opens, OpenPresses, OpenFailures,
                     DoorOpens, FirstOpenAt, LeafSeen, SeenBeforeOpen, TopY, FirstSatAt, Crashes,
-                    HasLoad ? (LoadHeld ? "held" : "fell") : "none", Shoves, RobotContacts, Rocks, MaskedNoises);
+                    HasLoad ? (LoadHeld ? "held" : "fell") : "none", Shoves, RobotContacts, Rocks, MaskedNoises, Hides, Leaves);
             }
         }
 
@@ -146,9 +159,11 @@ namespace Meuble.Tests
         /// the level first), at <paramref name="timeScale"/>, every "at" shifted by <paramref name="offset"/> seconds.
         /// Fills <paramref name="result"/>; the caller asserts.
         /// </summary>
-        public static IEnumerator Replay(GameState game, float offset, Result result, float timeScale = Tuning.PlaythroughTimeScale)
+        public static IEnumerator Replay(GameState game, float offset, Result result, float timeScale = Tuning.PlaythroughTimeScale,
+            List<RouteStepDef> routeOverride = null)
         {
-            List<RouteStepDef> route = game.Def.DesignerRoute ?? new List<RouteStepDef>();
+            // M7 design (CONTRACT_M7 4.1): Step64b_ replays the level's designerRouteHard at Difficile through this override.
+            List<RouteStepDef> route = routeOverride ?? game.Def.DesignerRoute ?? new List<RouteStepDef>();
             FurnitureController furniture = game.Furniture;
             result.Level = game.LevelId;
             result.Offset = offset;
@@ -179,6 +194,8 @@ namespace Meuble.Tests
             int contacts0 = game.RobotContactCount;
             int rocks0 = game.RockCount;
             int masked0 = game.MaskedNoiseCount;
+            int hides0 = game.HideCount;
+            int leaves0 = game.LeaveCount;
             int rocksSeen = game.RockCount;
             bool rockedLastStep = false;
             result.TopY = furniture.transform.position.y;
@@ -202,7 +219,9 @@ namespace Meuble.Tests
                 bool rockStarted = rockNow || rockedLastStep;
                 rockedLastStep = rockNow;
                 rocksSeen = game.RockCount;
-                if (external && !wasExternal && !rockStarted)
+                // M6: a wardrobe entry or exit is an External action too, but not an opening.
+                bool wardrobe = game.Wardrobe != GameState.WardrobeStage.None;
+                if (external && !wasExternal && !rockStarted && !wardrobe)
                 {
                     result.Opens++;
                     if (result.FirstOpenAt < 0f)
@@ -247,7 +266,7 @@ namespace Meuble.Tests
                         started = true;
                         return;
                     }
-                    if (!started && k < route.Count && route[k].Action == RouteStepDef.ActionOpen)
+                    if (!started && k < route.Count && IsPress(route[k].Action))
                     {
                         // The press started nothing (refused or not claimed): wait a little, then press again when still.
                         if (++waited < PressWaitSteps)
@@ -283,7 +302,7 @@ namespace Meuble.Tests
                         }
                         driving = true;
                     }
-                    if (w.Action == RouteStepDef.ActionOpen)
+                    if (IsPress(w.Action))
                     {
                         f.ScriptedDirection = null;
                         if (!Still(f))
@@ -369,6 +388,8 @@ namespace Meuble.Tests
             result.RobotContacts = game.RobotContactCount - contacts0;
             result.Rocks = game.RockCount - rocks0;
             result.MaskedNoises = game.MaskedNoiseCount - masked0;
+            result.Hides = game.HideCount - hides0;
+            result.Leaves = game.LeaveCount - leaves0;
             result.HasLoad = game.Load != null;
             result.LoadHeld = game.CarryingLoad;
             result.Waypoint = k;

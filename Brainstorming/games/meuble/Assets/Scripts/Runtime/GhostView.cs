@@ -26,7 +26,9 @@ namespace Meuble
     /// M5 (docs/CONTRACT_M5_v3.md 15.4): the memory ghost, the seat ghost, the stop ring and the decoy rings stand on
     /// the floor height at their planar position (<see cref="Floor"/>), so they sit on a platform or a ramp. M5 wave 5B: on a
     /// ramp the memory ghost and the seat ghost also lie on the slope, as the furniture visual does
-    /// (<see cref="FurnitureController.RampFrame"/>); the stop ring and the decoy rings stay level.
+    /// (<see cref="FurnitureController.RampFrame"/>); the stop ring and the decoy rings stay level. M5 5B.1 (CONTRACT_M5 3):
+    /// the memory ring and the decoy rings take the tolerance of the seer that judges the furniture (tidy 0.4 m, watchful
+    /// 0.5 m, default 0.75 m), passed by GameState to <see cref="Show"/> and <see cref="ShowRings"/>.
     /// </summary>
     public sealed class GhostView : MonoBehaviour
     {
@@ -48,6 +50,12 @@ namespace Meuble
 
         public FurniturePose Pose { get; private set; }
 
+        /// <summary>M5 5B.1: the radius of the memory ghost's ring as last built (the seer's tolerance).</summary>
+        public float RingRadius { get; private set; } = Tuning.DisplacementTolerance;
+
+        /// <summary>M5 5B.1: the radius of the decoy rings as last built (the seer's tolerance).</summary>
+        public float DecoyRingRadius { get; private set; } = Tuning.DisplacementTolerance;
+
         /// <summary>
         /// M5: the floor heights everything here stands on. Null (the default) reads the player furniture's
         /// <see cref="FurnitureController.Floor"/> (set by the level builder), or a flat floor without a player.
@@ -59,6 +67,8 @@ namespace Meuble
         private Mesh ringsMesh;
         private MeshRenderer ringsRenderer;
         private Vector3 builtSize = new Vector3(-1f, -1f, -1f);
+        // The decoys' planar centres of the current level, kept so the rings can be rebuilt at another radius.
+        private readonly List<Vector3> decoyCenters = new List<Vector3>();
 
         // M4: the seat ghost (its own object, so Show and Hide never touch it) and the office chair's stop ring.
         private Mesh seatMesh;
@@ -127,13 +137,16 @@ namespace Meuble
             renderer.enabled = false;
         }
 
-        /// <summary>Shows the ghost of a chair of <paramref name="size"/> at <paramref name="pose"/>.</summary>
-        public void Show(FurniturePose pose, Vector3 size)
+        /// <summary>
+        /// Shows the ghost of a chair of <paramref name="size"/> at <paramref name="pose"/>, inside a ring of
+        /// <paramref name="tolerance"/> (the seer's; DisplacementTolerance by default).
+        /// </summary>
+        public void Show(FurniturePose pose, Vector3 size, float tolerance = Tuning.DisplacementTolerance)
         {
             Init();
-            if ((size - builtSize).sqrMagnitude > 1e-6f)
+            if ((size - builtSize).sqrMagnitude > 1e-6f || Mathf.Abs(tolerance - RingRadius) > 1e-6f)
             {
-                Rebuild(size);
+                Rebuild(size, tolerance);
             }
             Pose = pose;
             PlaceOnFloor(transform, pose, size);
@@ -155,24 +168,25 @@ namespace Meuble
         public void SetDecoyRings(IReadOnlyList<Vector3> centers)
         {
             Init();
-            var vertices = new List<Vector3>();
-            var normals = new List<Vector3>();
-            var triangles = new List<int>();
-            foreach (Vector3 c in centers)
-            {
-                AddRing(OnFloor(c), vertices, normals, triangles);
-            }
+            decoyCenters.Clear();
+            decoyCenters.AddRange(centers);
             RingCount = centers.Count;
-            ringsMesh.Clear();
-            ringsMesh.SetVertices(vertices);
-            ringsMesh.SetNormals(normals);
-            ringsMesh.SetTriangles(triangles, 0);
-            ringsMesh.RecalculateBounds();
+            BuildDecoyRings(DecoyRingRadius);
             ShowRings(false);
         }
 
-        public void ShowRings(bool show)
+        /// <summary>
+        /// Shows or hides the decoy rings; shown, at <paramref name="tolerance"/> (the seer's; DisplacementTolerance by
+        /// default), rebuilt when it changed.
+        /// </summary>
+        public void ShowRings(bool show, float tolerance = Tuning.DisplacementTolerance)
         {
+            // Rebuilt whenever they are asked for, even on a level without decoys, so DecoyRingRadius always names the
+            // seer that judges now.
+            if (show && Mathf.Abs(tolerance - DecoyRingRadius) > 1e-6f)
+            {
+                BuildDecoyRings(tolerance);
+            }
             show &= RingCount > 0;
             if (ringsRenderer != null && ringsRenderer.enabled != show)
             {
@@ -180,11 +194,30 @@ namespace Meuble
             }
         }
 
+        /// <summary>One ring of <paramref name="radius"/> on the floor at every decoy of the level, in one mesh.</summary>
+        private void BuildDecoyRings(float radius)
+        {
+            DecoyRingRadius = radius;
+            var vertices = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var triangles = new List<int>();
+            foreach (Vector3 c in decoyCenters)
+            {
+                AddRing(OnFloor(c), radius, RingWidth, vertices, normals, triangles);
+            }
+            ringsMesh.Clear();
+            ringsMesh.SetVertices(vertices);
+            ringsMesh.SetNormals(normals);
+            ringsMesh.SetTriangles(triangles, 0);
+            ringsMesh.RecalculateBounds();
+        }
+
         /// <summary>The chair of FurnitureKit.Chair (seat, four legs, backrest) and the tolerance ring, in one mesh.</summary>
-        private void Rebuild(Vector3 size)
+        private void Rebuild(Vector3 size, float tolerance)
         {
             builtSize = size;
-            BuildGhost(mesh, size, Tuning.DisplacementTolerance);
+            RingRadius = tolerance;
+            BuildGhost(mesh, size, tolerance);
         }
 
         /// <summary>A ghost chair of <paramref name="size"/> inside a floor ring of <paramref name="ringRadius"/>, into <paramref name="target"/>.</summary>
@@ -235,12 +268,6 @@ namespace Meuble
             target.SetNormals(normals);
             target.SetTriangles(triangles, 0);
             target.RecalculateBounds();
-        }
-
-        /// <summary>A flat band on the floor, centered on DisplacementTolerance (the material is double sided).</summary>
-        private static void AddRing(Vector3 center, List<Vector3> vertices, List<Vector3> normals, List<int> triangles)
-        {
-            AddRing(center, Tuning.DisplacementTolerance, RingWidth, vertices, normals, triangles);
         }
 
         /// <summary>A flat band on the floor of <paramref name="radius"/> and <paramref name="width"/>.</summary>

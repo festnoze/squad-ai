@@ -167,7 +167,8 @@ namespace Meuble
                 card.Button.interactable = playable;
                 card.Best.enabled = playable;
                 card.Locked.enabled = !playable;
-                card.Best.text = SaveStore.TryGetBest(card.LevelId, out float seconds)
+                // M7 design (CONTRACT_M7 4.1): the record of the current difficulty.
+                card.Best.text = SaveStore.TryGetBest(card.LevelId, SaveStore.Options.DifficultyId, out float seconds) // MUTATION:SELECT_DIFFICULTY_RECORD
                     ? string.Format(Strings.SelectBest, Strings.FormatSeconds(seconds))
                     : Strings.SelectNone;
                 card.Number.color = playable ? Color.white : DimInk;

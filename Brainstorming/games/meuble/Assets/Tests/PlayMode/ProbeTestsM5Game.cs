@@ -31,13 +31,14 @@ namespace Meuble.Tests
     /// <item>38g (wave 5A.1, critique M3; the watchers' test_m5_watchers_dog, read only): a sleeping dog sees nothing, the
     /// awake one does.</item>
     /// <item>Wave 5B. 42b to 42f, the robot (test_m5_game_robot: Robi there and back along z = -2, a sitter on the chair, a
-    /// witness): a contact shoves 0.25 m in 0.5 s (moving, input ignored), seen while shoved is caught, the fixed timeline
-    /// then the reversal, no shove while pinned, the hum masks a hop at 2.4 m but not at 2.6 m and never a creak.</item>
-    /// <item>43b, the rocking chair (test_m5_game_rock): 40 rock steps after a stop, 20 after a careful one, seen rocking is
-    /// caught, sat on it never rocks.</item>
-    /// <item>44b to 44f, the load (test_m5_game_load: a vase on the chair, two humans, the dog, a 1.2 m wall): the fall's
-    /// 6 m crash and its clue, the clue's one discovery and its put-away, the dog never finds it, the balance gauge, the
-    /// vase inside the sample box.</item>
+    /// witness): a contact shoves 0.25 m in 0.5 s (moving, input ignored), seen while shoved is caught (and bumps), the
+    /// fixed timeline then the reversal, no shove while pinned, the hum masks a hop at 2.4 m but not at 2.6 m and never a
+    /// creak, and its volume follows the furniture's distance to the robot.</item>
+    /// <item>43b, the rocking chair (test_m5_game_rock): 40 rock steps after a stop, 20 after a careful one, each with a creak
+    /// as long as the rock, seen rocking is caught, sat on it never rocks.</item>
+    /// <item>44b to 44h, the load (test_m5_game_load: a vase on the chair, two humans, the dog, a 1.2 m wall): the fall's
+    /// 6 m crash and its clue, the clue's one discovery and its put-away, the dog never finds it, the balance gauge and the
+    /// vase's sway in the furniture frame, the vase inside the sample box, the clue never in a wall.</item>
     /// </list>
     /// Every wait counts game fixed steps (GameState.FixedStepped) under a real time guard, never rendered frames; every
     /// scenario asserts its premise first, so it cannot pass for the wrong reason.
@@ -823,7 +824,7 @@ namespace Meuble.Tests
         /// <summary>
         /// Step 37e (CONTRACT_M5 3): for each human personality, the rules use its range and half angle (the vision of the
         /// furniture), its hearing factor (a bark heard within 6 m times the factor, not beyond), its suspicion gain and its
-        /// tolerance (confirmed within it, discovered beyond it).
+        /// tolerance (confirmed within it, discovered beyond it, and the ghost's ring and the decoy rings drawn at it).
         /// </summary>
         [UnityTest]
         [Timeout(900000)]
@@ -959,6 +960,14 @@ namespace Meuble.Tests
             {
                 Assert.AreEqual(discoveries + 1, Game.DiscoveryCount, $"{id}: {off:0.00} m off its slot is no discovery with a {p.Tolerance} m tolerance");
                 Assert.AreEqual(Tuning.SuspicionPerDiscovery * p.SuspicionFactor, Game.SuspicionOf(un).Value, 1e-4f, $"{id}: the suspicion gain");
+                // M5 5B.1 (critique m14): the ghost's ring and the decoy rings show the tolerance of the seer that judges.
+                Assert.IsTrue(Game.OutOfPlace, $"{id}: premise: the chair is not out of place");
+                Assert.AreEqual(p.Tolerance, Game.Ghost.DecoyRingRadius, 1e-5f, $"{id}: the decoy rings are not the seer's tolerance");
+                if (!Game.AtDecoy)
+                {
+                    Assert.IsTrue(Game.Ghost.Visible, $"{id}: premise: no ghost out of place");
+                    Assert.AreEqual(p.Tolerance, Game.Ghost.RingRadius, 1e-5f, $"{id}: the ghost's ring is not the seer's tolerance");
+                }
             }
             else
             {
@@ -1782,10 +1791,28 @@ namespace Meuble.Tests
         }
 
         /// <summary>
+        /// A test block (a furniture-layer box: it stops the chair and hides nothing) touching the chair's front along
+        /// <paramref name="heading"/>, so a shove that way cannot move the chair. The caller destroys it.
+        /// </summary>
+        private GameObject BlockAhead(Vector3 heading)
+        {
+            var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            block.name = "TestShoveBlock";
+            block.layer = Layers.Furniture;
+            block.transform.SetPositionAndRotation(
+                YawMath.Planar(Chair.transform.position) + heading * (Chair.Body.Radius + 0.005f + 0.25f) + Vector3.up * 0.5f,
+                Quaternion.LookRotation(heading));
+            block.transform.localScale = new Vector3(1.2f, 1f, 0.5f);
+            Physics.SyncTransforms();
+            return block;
+        }
+
+        /// <summary>
         /// Step 42b (CONTRACT_M5 4, 16.8): the robot runs into the still chair: one contact, one accepted shove. From the next
         /// step, exactly round(RobotPushTime / dt) (25) steps slide the chair 0.01 m each along the robot's heading (0.25 m in
         /// all), every one of them a shove step and moving, a move key held meanwhile changing nothing; on the step after,
-        /// the chair is still. Nobody sees it: no catch.
+        /// the chair is still. Nobody sees it: no catch. Then shoved into a block it cannot move: the 25 shove steps are still
+        /// moving (the shove is moving through the push action, not through travel), and the step after is still.
         /// </summary>
         [UnityTest]
         public IEnumerator Step42b_ContactShovesAQuarterMetreInHalfASecondMoving()
@@ -1846,12 +1873,56 @@ namespace Meuble.Tests
             Assert.Less(Planar(positions[PushSteps + 1], positions[PushSteps]), 1e-4f, "the chair kept sliding after the shove");
             Assert.Less((Game.LastShoveDirection - heading).magnitude, 1e-3f, "the shove is not along the robot's heading");
             Assert.AreEqual(PlayState.Playing, Game.State, "an unseen shove was caught");
+
+            // 2. Shoved into a block: no travel, still moving on every shove step.
+            yield return Restart();
+            robot = TheRobot();
+            PinRobotWatchersAway();
+            yield return Steps(2);
+            heading = robot.Path.ForwardAt(Game.RobotTime);
+            Assert.Greater(heading.x, 0.99f, "premise: the robot heads +x again");
+            start = ChairAheadOf(robot, 0.05f);
+            GameObject block = BlockAhead(heading);
+            var blockedMoving = new List<bool>();
+            var blockedShoving = new List<bool>();
+            var blockedAt = new List<Vector3>();
+            int blockedContact = -1;
+            int blockedStep = 0;
+            void WatchBlocked()
+            {
+                blockedStep++;
+                if (blockedContact < 0 && Game.RobotContactCount > 0)
+                {
+                    blockedContact = blockedStep;
+                }
+                if (blockedContact >= 0)
+                {
+                    blockedMoving.Add(Game.FurnitureMoving);
+                    blockedShoving.Add(Game.Shoving);
+                    blockedAt.Add(Chair.transform.position);
+                }
+            }
+            Game.FixedStepped += WatchBlocked;
+            yield return Until(() => blockedContact >= 0 && blockedStep >= blockedContact + PushSteps + 3, StepsFor(2f));
+            Game.FixedStepped -= WatchBlocked;
+            UnityEngine.Object.Destroy(block);
+            Assert.GreaterOrEqual(blockedContact, 1, "blocked: the robot never touched the chair");
+            Assert.AreEqual(1, Game.ShoveCount, "blocked: the contact did not shove the chair once");
+            Assert.Less(Planar(blockedAt[PushSteps], blockedAt[0]), 0.02f, "premise: the block did not stop the shove");
+            for (int k = 1; k <= PushSteps; k++)
+            {
+                Assert.IsTrue(blockedShoving[k], $"blocked: shove step {k} is not a shove step");
+                Assert.IsTrue(blockedMoving[k], $"blocked: shove step {k} into the block is not moving");
+            }
+            Assert.IsFalse(blockedShoving[PushSteps + 1] || blockedMoving[PushSteps + 1], "blocked: the chair is not still after the shove");
+            Assert.AreEqual(PlayState.Playing, Game.State, "an unseen blocked shove was caught");
             AssertClean();
         }
 
         /// <summary>
-        /// Step 42c (CONTRACT_M5 4, PRD 4.8): being shoved is moving: Temoin watches the still chair (seen, no catch), the robot
-        /// runs into it, and the chair is caught on the grace-th shove step (the 10th), seen on every one of them.
+        /// Step 42c (CONTRACT_M5 4, PRD 4.8, 19): being shoved is moving, even against a block that stops the slide: Temoin
+        /// watches the still chair (seen, no catch), the robot runs into it, and the chair, which cannot move, is caught on the
+        /// grace-th shove step (the 10th), seen on every one of them. The contact plays the bump once.
         /// </summary>
         [UnityTest]
         public IEnumerator Step42c_SeenWhileShovedIsCaught()
@@ -1861,12 +1932,15 @@ namespace Meuble.Tests
             Assis.Pin(new Vector3(-4.0f, 0f, 3.5f), 0f);
             yield return Steps(2);
             Vector3 at = ChairAheadOf(robot, 0.05f);
+            // A block touching the chair's front: the shove cannot move it, so only the push action makes it moving.
+            GameObject block = BlockAhead(robot.Path.ForwardAt(Game.RobotTime));
             var eye = at + new Vector3(0.6f, 0f, 3.0f);
             Temoin.Pin(eye, YawToward(eye, at));
             yield return Steps(1);
             Assert.IsTrue(Game.Seen, "premise: Temoin sees the chair");
             Assert.IsFalse(Game.FurnitureMoving, "premise: the chair is still");
             Assert.AreEqual(0, Game.RobotContactCount, "premise: no contact yet");
+            int bumps = Game.Sfx.BumpsPlayed;
             int shoveSteps = 0;
             bool seenEach = true;
             void Watch()
@@ -1880,11 +1954,15 @@ namespace Meuble.Tests
             Game.FixedStepped += Watch;
             yield return Until(() => Game.State != PlayState.Playing, StepsFor(2f));
             Game.FixedStepped -= Watch;
+            UnityEngine.Object.Destroy(block);
             Assert.AreEqual(1, Game.ShoveCount, "premise: the robot did not shove the chair");
+            Assert.Less(Planar(Chair.transform.position, at), 0.02f, "premise: the block did not stop the shove");
             Assert.IsTrue(seenEach, "premise: Temoin lost sight of the shoved chair");
             Assert.AreEqual(PlayState.Caught, Game.State, "the chair shoved in Temoin's view was not caught");
             Assert.AreEqual(LoseReason.SeenMoving, Game.LoseReason);
             Assert.AreEqual(GraceSteps, shoveSteps, "the catch did not come after the grace of the shove");
+            Assert.AreEqual(1, Game.RobotContactCount, "premise: not one contact");
+            Assert.AreEqual(bumps + 1, Game.Sfx.BumpsPlayed, "the robot's contact did not play the bump once");
             AssertClean();
         }
 
@@ -1983,7 +2061,8 @@ namespace Meuble.Tests
         /// Step 42f (CONTRACT_M5 4, PRD 4.8): the hum. With the robot all but standing still (a test edit of its speed), the
         /// chair's first hop lands about 2.4 m from it: masked (no Hop noise event, a NoiseMasked one, Temoin 1.4 m away hears
         /// nothing); about 2.6 m away it is emitted and heard. A creak 1.4 m from the robot is never masked: it is emitted and
-        /// alerts a listener.
+        /// alerts a listener. Every rebuilt level gives its robot one hum source (looping the hum), whose volume follows the
+        /// furniture's distance to the robot (<see cref="Meuble.Sfx.HumVolumeAt"/>), full near it and silent past the rolloff.
         /// </summary>
         [UnityTest]
         [Timeout(300000)]
@@ -2018,13 +2097,46 @@ namespace Meuble.Tests
             Assert.AreEqual(masked, Game.MaskedNoiseCount, "a noise was masked during the creak");
             Assert.AreEqual(alerts + 1, Game.AlertCount, "the listener did not hear the creak");
             Assert.AreEqual(InhabitantMode.Alerted, Temoin.Routine.Mode, "the creak did not alert the listener");
+
+            // The hum follows the furniture: near the robot, then past the rolloff, then half way (north east of the robot,
+            // behind Temoin and Assis).
+            Vector3 away = new Vector3(1f, 0f, 1f).normalized;
+            foreach (float d in new[] { 0.8f, Tuning.SfxHumMaxDistance + 0.5f, 3.5f })
+            {
+                Chair.Teleport(hum + away * d, 0f);
+                yield return Steps(2);
+                AssertHum(robot);
+            }
+            Assert.AreEqual(PlayState.Playing, Game.State, "premise: the hum checks ended the run");
             AssertClean();
+        }
+
+        /// <summary>The robot's hum source loops the hum at the volume of the furniture's planar distance to the robot.</summary>
+        private void AssertHum(Robot robot)
+        {
+            AudioSource source = Meuble.Sfx.HumOf(robot);
+            Assert.IsNotNull(source, "the robot has no hum source");
+            Assert.AreSame(Game.Sfx.Hum, source.clip, "the robot's source does not play the hum");
+            Assert.IsTrue(source.loop, "the hum does not loop");
+            float d = Planar(robot.Position, Chair.transform.position);
+            float expected = Meuble.Sfx.HumVolumeAt(d);
+            Assert.AreEqual(expected, source.volume, 1e-4f, $"the hum's volume with the furniture {d:0.00} m from the robot");
+            if (d < Tuning.SfxHumMaxDistance - 0.1f)
+            {
+                Assert.Greater(source.volume, 0f, $"the hum is silent with the furniture {d:0.00} m from the robot");
+            }
+            if (d >= Tuning.SfxHumMaxDistance)
+            {
+                Assert.AreEqual(0f, source.volume, 1e-6f, $"the hum is heard with the furniture {d:0.00} m from the robot");
+            }
         }
 
         private IEnumerator HopNearTheRobot(bool near)
         {
+            int humSources = Game.Sfx.HumSourcesAdded;
             yield return Restart();
             Robot robot = TheRobot();
+            Assert.AreEqual(humSources + 1, Game.Sfx.HumSourcesAdded, "the rebuilt level's robot did not get one hum source");
             Assert.Less(robot.Path.Speed, 1e-3f, "premise: the robot stands still");
             Assis.Pin(new Vector3(-4.0f, 0f, 3.5f), 0f);
             Vector3 hum = YawMath.Planar(robot.Position);
@@ -2034,6 +2146,7 @@ namespace Meuble.Tests
             Vector3 listenerAt = hum + new Vector3(startOffset + 0.2f, 0f, 1.4f);
             Temoin.Pin(listenerAt, 0f, 0f, true);
             yield return Steps(2);
+            AssertHum(robot);
             Assert.IsFalse(Game.Seen, "premise: nobody sees the chair");
             Assert.AreEqual(InhabitantMode.Routine, Temoin.Routine.Mode, "premise: the listener is in Routine");
             var masked = new List<NoiseEvent>();
@@ -2081,7 +2194,8 @@ namespace Meuble.Tests
 
         /// <summary>
         /// Step 43b (CONTRACT_M5 5, 16.9): unseen, a stop rocks the rocking chair for round(RockTime / dt) (40) moving steps, a
-        /// careful stop for round(RockCarefulTime / dt) (20), with no travel; seen rocking is caught (on the grace-th rock step,
+        /// careful stop for round(RockCarefulTime / dt) (20), with no travel, each playing the runners' creak once for as long
+        /// as the rock (the careful one its own shorter clip); seen rocking is caught (on the grace-th rock step,
         /// the witness turned toward it on the step it came to rest); sat on, it never rocks in the rules, nor when its sitter
         /// stands up.
         /// </summary>
@@ -2172,10 +2286,14 @@ namespace Meuble.Tests
             AssertClean();
         }
 
-        /// <summary>The chair drives +x for 0.4 s and stops, unseen: it rocks once, for the full or the careful rock, without travel.</summary>
+        /// <summary>
+        /// The chair drives +x for 0.4 s and stops, unseen: it rocks once, for the full or the careful rock, without travel, and
+        /// the runners' creak plays once, the clip as long as that rock.
+        /// </summary>
         private IEnumerator RockAfterAStop(bool careful)
         {
             int rocks = Game.RockCount;
+            int creaks = Game.Sfx.RockCreaksPlayed;
             bool started = false;
             bool ended = false;
             int rockSteps = 0;
@@ -2220,7 +2338,13 @@ namespace Meuble.Tests
             Assert.IsTrue(started, $"{which}: the rocking chair did not rock after its stop");
             Assert.IsTrue(ended, $"{which}: the rock never ended");
             Assert.AreEqual(rocks + 1, Game.RockCount, $"{which}: not one rock");
-            Assert.AreEqual(Mathf.RoundToInt((careful ? Tuning.RockCarefulTime : Tuning.RockTime) / Dt), rockSteps, $"{which}: the rock's steps");
+            float rockTime = careful ? Tuning.RockCarefulTime : Tuning.RockTime;
+            Assert.AreEqual(Mathf.RoundToInt(rockTime / Dt), rockSteps, $"{which}: the rock's steps");
+            Assert.AreEqual(creaks + 1, Game.Sfx.RockCreaksPlayed, $"{which}: the rock did not play its creak once");
+            AudioClip creak = Game.Sfx.LastRockCreak;
+            Assert.IsNotNull(creak, $"{which}: no rock creak clip");
+            Assert.AreSame(careful ? Game.Sfx.RockCreakCareful : Game.Sfx.RockCreak, creak, $"{which}: the rock played the other rock's creak");
+            Assert.AreEqual(rockTime, creak.length, 0.01f, $"{which}: the creak does not last the rock");
             Assert.AreEqual(0, stillSteps, $"{which}: a rock step is not moving");
             Assert.Less(travel, 1e-4f, $"{which}: the rocking chair travelled while it rocked");
             Assert.AreEqual(PlayState.Playing, Game.State);
@@ -2318,6 +2442,9 @@ namespace Meuble.Tests
             Assert.IsFalse(clue.transform.IsChildOf(Chair.transform), "the clue rides on the chair");
             Assert.Less(Planar(clue.transform.position, Game.ClueAt), 1e-3f, "the clue is not where the vase fell");
             Assert.IsFalse(Game.LoadView.Carried.gameObject.activeSelf, "the vase is still on the chair");
+            float spread = ClueVertices(clue).Max(v => Planar(v, clue.transform.position));
+            Assert.Greater(spread, 0.1f, "premise: the clue has no spread");
+            Assert.LessOrEqual(spread, Tuning.ClueSpreadRadius, "the clue spreads farther than ClueSpreadRadius, the wall clearance");
             Assert.AreEqual(crashesPlayed + 1, Game.Sfx.CrashesPlayed, "the crash sound did not play once");
             Assert.LessOrEqual(Planar(nearAt, Game.ClueAt), Tuning.CrashRadius - 1f, "premise: Un is not within the crash");
             Assert.Greater(Planar(farAt, Game.ClueAt), Tuning.CrashRadius + 0.5f, "premise: Deux is within the crash");
@@ -2435,9 +2562,13 @@ namespace Meuble.Tests
         }
 
         /// <summary>
-        /// Step 44e (CONTRACT_M5 6, 16.5): the balance gauge (hud.balance) shows with a load, beside the creak gauge: it shows
-        /// |dv| over the fall threshold on every step, calm through a careful start and stop, red above 0.75 through a
-        /// full-speed straight start and stop (the vase holds), hidden once the vase fell, and on a level without a load.
+        /// Step 44e (CONTRACT_M5 6, 16.5, 18, 19 m13): the balance gauge (hud.balance) shows with a load, to the left of the creak
+        /// gauge: it shows |dv| over the fall threshold on every step and is red exactly above BalanceWarning (0.9): calm
+        /// through a careful start and stop and through a full-speed straight start and stop (0.83: the vase holds), red
+        /// through a 70 deg turn at full speed (0.96: the vase still holds), hidden once the vase fell, and on a level without a
+        /// load. The chair faces +x (yaw 90), so the furniture frame is not the world's: on every carried step the vase's
+        /// visual tilt is LoadBalance.SwayTiltLocal of the chair's yaw (CONTRACT_M5 12, step 44), leaning after the full start,
+        /// and upright once it fell.
         /// </summary>
         [UnityTest]
         public IEnumerator Step44e_TheBalanceGaugeShowsAndTurnsRed()
@@ -2445,18 +2576,26 @@ namespace Meuble.Tests
             yield return LoadTheLoad();
             PinLoadWatchersAway();
             yield return Steps(2);
+            Assert.AreEqual(90f, Mathf.Repeat(Chair.Yaw, 360f), 0.5f, "premise: the chair does not face +x");
             Assert.IsTrue(Hud.BalanceVisible, "no balance gauge with a load");
             Assert.IsTrue(Hud.Labels.TryGetValue("BalanceLabel", out Text label) && label.text == Strings.HudBalance, "the gauge does not carry hud.balance");
             Assert.AreEqual(0f, Hud.BalanceShown, 1e-6f, "the gauge is not empty at rest");
             Assert.IsFalse(Hud.BalanceRed, "the gauge is red at rest");
             Rect balance = Hud.BalanceScreenRect;
-            Assert.IsFalse(balance.Overlaps(Hud.CreakScreenRect), "the balance gauge covers the creak gauge");
+            Rect creakRect = Hud.CreakScreenRect;
+            Assert.Greater(creakRect.width, 0f, "premise: the creak gauge shows");
+            Assert.IsFalse(balance.Overlaps(creakRect), "the balance gauge covers the creak gauge");
+            Assert.LessOrEqual(balance.xMax, creakRect.xMin + 1e-3f, $"the balance gauge {balance} is not left of the creak gauge {creakRect}");
             Assert.IsTrue(balance.xMin >= 0f && balance.yMin >= 0f && balance.xMax <= Screen.width, $"the balance gauge {balance} leaves the screen");
             float mismatch = 0f;
             int redWrong = 0;
             float peak = 0f;
             bool red = false;
             bool redColour = false;
+            float tiltMismatch = 0f;
+            int carriedSteps = 0;
+            float tiltPeak = 0f;
+            float worldGap = 0f;
             void Watch()
             {
                 if (!Game.CarryingLoad)
@@ -2470,8 +2609,15 @@ namespace Meuble.Tests
                 red |= Hud.BalanceRed;
                 Color c = Hud.BalanceFillColor;
                 redColour |= Hud.BalanceRed && c.r > 0.9f && c.g < 0.4f;
+                Vector2 local = Game.Load.SwayTiltLocal(Chair.Yaw);
+                tiltMismatch = Mathf.Max(tiltMismatch, (Game.LoadView.Tilt - local).magnitude);
+                tiltPeak = Mathf.Max(tiltPeak, Game.LoadView.Tilt.magnitude);
+                worldGap = Mathf.Max(worldGap, (Game.Load.SwayTilt - local).magnitude);
+                carriedSteps++;
             }
             Game.FixedStepped += Watch;
+
+            // 1. A careful start and stop: part way, calm.
             Chair.ScriptedCareful = true;
             Chair.ScriptedDirection = Vector3.right;
             yield return Steps(StepsFor(1f));
@@ -2480,24 +2626,106 @@ namespace Meuble.Tests
             Chair.ScriptedCareful = null;
             Assert.That(peak, Is.InRange(0.3f, Tuning.BalanceWarning), "premise: a careful start and stop does not fill the gauge part way");
             Assert.IsFalse(red, "the gauge turned red through a careful start and stop");
+
+            // 2. A full-speed straight start and stop: the vase holds; red only if it passes the warning.
+            Chair.Teleport(Game.Def.Player.Position, Game.Def.Player.Yaw);
+            yield return Steps(StepsFor(0.6f));
+            Assert.IsTrue(Game.CarryingLoad, "premise: the careful run dropped the vase");
+            peak = 0f;
+            tiltPeak = 0f;
             Chair.ScriptedDirection = Vector3.right;
             yield return Steps(StepsFor(1f));
             Chair.ScriptedDirection = null;
             yield return Steps(StepsFor(0.6f));
-            Game.FixedStepped -= Watch;
             Assert.IsTrue(Game.CarryingLoad, "premise: a straight full-speed start and stop dropped the vase");
-            Assert.Greater(peak, Tuning.BalanceWarning, "premise: the full-speed start did not pass the warning");
-            Assert.IsTrue(red, "the gauge never turned red above 0.75");
+            Assert.That(peak, Is.InRange(0.75f, 1f), "premise: the full-speed start and stop does not fill the gauge most of the way");
+            Assert.Greater(tiltPeak, 1f, "the vase never leaned after the full-speed start");
+            float straightPeak = peak;
+
+            // 3. Full speed, then a 70 deg turn: |dv| = 2 x 1.5 x sin 35 deg = 1.72, past the warning, under the fall.
+            Chair.Teleport(Game.Def.Player.Position, Game.Def.Player.Yaw);
+            yield return Steps(StepsFor(0.6f));
+            peak = 0f;
+            red = false;
+            Chair.ScriptedDirection = Vector3.right;
+            yield return Steps(StepsFor(0.8f));
+            Chair.ScriptedDirection = YawMath.Forward(90f - 70f);
+            yield return Steps(StepsFor(0.6f));
+            Chair.ScriptedDirection = null;
+            yield return Steps(StepsFor(0.6f));
+            Game.FixedStepped -= Watch;
+            Assert.IsTrue(Game.CarryingLoad, "premise: the 70 deg turn at full speed dropped the vase");
+            Assert.Greater(peak, Tuning.BalanceWarning, "premise: the 70 deg turn did not pass the warning");
+            Assert.IsTrue(red, $"the gauge never turned red above {Tuning.BalanceWarning}");
             Assert.IsTrue(redColour, "the red gauge is not drawn red");
-            Assert.AreEqual(0, redWrong, "the gauge was red below the warning or calm above it");
+            Assert.AreEqual(0, redWrong, $"the gauge was red below the warning or calm above it (straight start and stop at {straightPeak:0.00})");
             Assert.Less(mismatch, 1e-4f, "the gauge does not show |dv| over the fall threshold");
+            Assert.Greater(carriedSteps, StepsFor(5f), "premise: too few carried steps were watched");
+            Assert.Greater(worldGap, 1f, "premise: at yaw 90 the furniture frame and the world frame gave the same tilt");
+            Assert.Less(tiltMismatch, 1e-4f, "the vase's tilt is not LoadBalance.SwayTiltLocal of the chair's yaw");
             Assert.IsTrue(Hud.BalanceVisible, "the gauge hid while the vase holds");
             yield return DropTheVase(Vector3.left, new List<Vector2>(), new List<Vector3>());
             yield return Steps(1);
+            Assert.IsFalse(Game.CarryingLoad, "premise: the vase did not fall");
+            Assert.AreEqual(Vector2.zero, Game.LoadView.Tilt, "the fallen vase's view still leans");
             Assert.IsFalse(Hud.BalanceVisible, "the gauge still shows once the vase fell");
             yield return Load("level1");
             Assert.IsNull(Game.Load, "premise: level1 has a load");
             Assert.IsFalse(Hud.BalanceVisible, "the gauge shows on a level without a load");
+            AssertClean();
+        }
+
+        /// <summary>The world positions of every vertex of the clue's meshes.</summary>
+        private static List<Vector3> ClueVertices(GameObject clue)
+        {
+            var points = new List<Vector3>();
+            foreach (MeshFilter f in clue.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Assert.IsNotNull(f.sharedMesh, "premise: a clue part has no mesh");
+                Assert.IsTrue(f.sharedMesh.isReadable, "premise: a clue mesh is not readable");
+                foreach (Vector3 v in f.sharedMesh.vertices)
+                {
+                    points.Add(f.transform.TransformPoint(v));
+                }
+            }
+            Assert.Greater(points.Count, 0, "premise: the clue has no vertex");
+            return points;
+        }
+
+        /// <summary>
+        /// Step 44h (CONTRACT_M5 6; critique m15): the clue never lands in a wall. The chair reverses at full speed with the
+        /// east wall just ahead: the throw ahead (the way it was going) is cut short by the wall, so the vase falls behind the
+        /// chair instead, away from the wall, its centre at least <see cref="GameState.ClueClearance"/> (the clue's spread)
+        /// from it and every part of the clue inside the room.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step44h_TheClueFallsAwayFromAWallInTheWay()
+        {
+            yield return LoadTheLoad();
+            PinLoadWatchersAway();
+            Vector3 spawn = Game.Def.Player.Position;
+            Assert.IsTrue(Physics.Raycast(spawn + Vector3.up * Tuning.ClueProbeHeight, Vector3.right, out RaycastHit hit, 12f, Layers.ChairBlockerMask,
+                QueryTriggerInteraction.Ignore), "premise: no east wall");
+            float face = hit.point.x;
+            Assert.Greater(face, 5f, "premise: something stands between the spawn and the east wall");
+            Assert.GreaterOrEqual(GameState.ClueClearance, Tuning.ClueSpreadRadius, "the wall clearance is less than the clue's spread");
+            // 1 s of full speed then the reversal travel about 1.48 m before the fall: it falls about 0.45 m from the face.
+            Chair.Teleport(new Vector3(face - 1.93f, 0f, spawn.z), 90f);
+            yield return Steps(StepsFor(0.6f));
+            var positions = new List<Vector3>();
+            yield return DropTheVase(Vector3.right, new List<Vector2>(), positions);
+            Vector3 fellFrom = positions[positions.Count - 1];
+            float ahead = face - fellFrom.x;
+            Assert.Greater(ahead, 0.24f, "premise: the chair ran into the wall before the fall");
+            Assert.Less(ahead - GameState.ClueClearance, Tuning.ClueThrowDistance, "premise: the wall does not cut the throw ahead short");
+            Vector3 clueAt = Game.ClueAt;
+            Assert.Less(clueAt.x, fellFrom.x - 0.2f, $"the vase did not fall behind the chair, away from the wall (fell from {fellFrom.x:0.00}, lies at {clueAt.x:0.00})");
+            Assert.LessOrEqual(clueAt.x, face - GameState.ClueClearance + 1e-3f, "the clue's centre is nearer the wall than its spread");
+            GameObject clue = Game.LoadView.Clue;
+            Assert.IsNotNull(clue, "no clue object");
+            float reach = ClueVertices(clue).Max(v => v.x);
+            Assert.Less(reach, face, $"the clue pokes into the wall (reaches x {reach:0.000}, face {face:0.000})");
+            Assert.AreEqual(PlayState.Playing, Game.State);
             AssertClean();
         }
 

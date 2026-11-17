@@ -28,8 +28,10 @@ namespace Meuble.Tests
         /// <summary>
         /// "Nothing becomes noisy": the textured start view may have at most this much more fine detail (mean absolute
         /// difference between neighbour pixels) than the same view flat. Calibrated on the M4.2 shots: about 1.1 to 1.3.
+        /// M6 (CONTRACT_M6 2.4, q28): the player furniture's glossy lacquer is a deliberately bolder grain ("strong
+        /// highlights, the wood grain still visible under it"), measured up to about 1.8 on level1's red chair.
         /// </summary>
-        private const float MaxDetailGain = 1.6f;
+        private const float MaxDetailGain = 2.0f;
 
         /// <summary>Premise of the side by side render: the textures add at least this much fine detail, or they do not show.</summary>
         private const float MinDetailGain = 1.02f;
@@ -245,17 +247,19 @@ namespace Meuble.Tests
             ["table"] = new[] { Surface.Wood, Surface.Linen },
             ["cabinet"] = new[] { Surface.Wood },
             ["counter"] = new[] { Surface.Wood, Surface.Plaster },
-            ["plant"] = new[] { Surface.Plaster },
+            ["plant"] = new[] { Surface.Plaster, Surface.Foliage },
         };
 
+        // M6 (CONTRACT_M6 2.4): the player's own furniture (never a decoy or a prop) shows the glossy lacquer finish
+        // instead of its usual surface, whatever its body kind.
         private static readonly Dictionary<string, Surface> BodySurface = new Dictionary<string, Surface>
         {
-            [BodyKinds.Chair] = Surface.Wood,
-            [BodyKinds.Stool] = Surface.Wood,
-            [BodyKinds.Armchair] = Surface.Upholstery,
-            [BodyKinds.FloorLamp] = Surface.Linen,
-            [BodyKinds.OfficeChair] = Surface.Upholstery,
-            [BodyKinds.RockingChair] = Surface.Wood,
+            [BodyKinds.Chair] = Surface.Lacquer,
+            [BodyKinds.Stool] = Surface.Lacquer,
+            [BodyKinds.Armchair] = Surface.Lacquer,
+            [BodyKinds.FloorLamp] = Surface.Lacquer,
+            [BodyKinds.OfficeChair] = Surface.Lacquer,
+            [BodyKinds.RockingChair] = Surface.Lacquer,
         };
 
         // ----- 22c -----
@@ -294,7 +298,14 @@ namespace Meuble.Tests
                     }
                     if (models.TryGetValue((s.Renderer, s.Index), out Surface wanted))
                     {
-                        Assert.AreEqual(wanted, s.Surface, $"{id}: model slot {Label(s)}");
+                        // M6 (CONTRACT_M6 2.4): the player's own furniture may show lacquer instead of its catalog
+                        // surface (ModelKit.Paint's main-slot override); Step50a_ (ProbeTestsM6Textures) checks that
+                        // override itself, so here it is simply accepted wherever it appears, on the player only.
+                        bool playerLacquer = s.Surface == Surface.Lacquer && s.Renderer.transform.IsChildOf(Game.Furniture.transform);
+                        if (!playerLacquer)
+                        {
+                            Assert.AreEqual(wanted, s.Surface, $"{id}: model slot {Label(s)}");
+                        }
                     }
                     else if (s.Surface == Surface.Plain && !PlainAllowed(s))
                     {
@@ -306,13 +317,16 @@ namespace Meuble.Tests
 
                 // Floors, walls, caps.
                 bool soft = Game.Def.AllRooms().Any(r => r.IsSoft);
+                // M7 (CONTRACT_M7 1.2): a room can also set its own "floorFinish": "tile" (kitchen, bathroom).
+                bool tiled = Game.Def.AllRooms().Any(r => r.IsTile);
                 var floors = slots.Where(s => s.Renderer.gameObject.layer == Layers.Floor && s.Renderer.name != "Garden").ToList();
                 Assert.Greater(floors.Count, 0, $"{id}: premise: no floor renderer");
                 foreach (Slot s in floors)
                 {
-                    Assert.IsTrue(s.Surface == Surface.Parquet || (soft && s.Surface == Surface.Carpet), $"{id}: floor {Label(s)} shows {s.Surface}");
+                    Assert.IsTrue(s.Surface == Surface.Parquet || (soft && s.Surface == Surface.Carpet) || (tiled && s.Surface == Surface.Tile),
+                        $"{id}: floor {Label(s)} shows {s.Surface}");
                 }
-                if (!soft)
+                if (!soft && !tiled)
                 {
                     Assert.IsTrue(floors.All(s => s.Surface == Surface.Parquet), $"{id}: a hard floor is not parquet");
                 }
@@ -352,7 +366,8 @@ namespace Meuble.Tests
                 List<Slot> player = LitSlots(Game.Furniture.transform);
                 Assert.Greater(player.Count, 0, $"{id}: premise: the player furniture has no Lit slot");
                 Assert.IsTrue(player.Any(s => s.Surface == BodySurface[body]), $"{id}: the {body} shows no {BodySurface[body]}");
-                Material red = PrimitiveKit.Lit(LevelJson.ParseColor(Game.Def.Player.Color, Color.red));
+                // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
+                Material red = PrimitiveKit.LitSurface(LevelJson.ParseColor(Game.Def.Player.Color, Color.red), Surface.Lacquer);
                 Assert.IsTrue(player.Any(s => s.Material == red), $"{id}: premise: the player furniture is not in the player colour");
                 Assert.IsTrue(player.Where(s => s.Material == red).All(s => s.Texture != null), $"{id}: a slot of the player colour shows no detail");
                 foreach (Decoy decoy in level.Decoys)
@@ -670,8 +685,10 @@ namespace Meuble.Tests
                     Assert.Less(error, Tuning.DetailTileTolerance, $"{id}: {Label(s)} repeats every {repeat:0.###} m, its {s.Surface} tile is {tile} m");
                     // Independent of any measure: a PrimitiveKit box or quad carries UVs in metres (its transform scale is
                     // its size, its parents are unscaled), so its tiling is exactly 1 / tile; the humans' generated UVs are
-                    // in mesh units, so one UV is the skinned renderer's scale in metres.
-                    if ((mesh.name == "Box" || mesh.name == "Quad" || mesh.name == "Boxes")
+                    // in mesh units, so one UV is the skinned renderer's scale in metres. M6: the Garden is the one
+                    // exception (PrimitiveKit.QuadMesh, the raw unit quad, scaled up directly by its own transform, not a
+                    // QuadMeshSized mesh under an unscaled parent), so its tiling is size / tile, not 1 / tile.
+                    if ((mesh.name == "Box" || mesh.name == "Quad" || mesh.name == "Boxes") && s.Renderer.name != "Garden"
                         && s.Renderer.transform.parent != null && (s.Renderer.transform.parent.lossyScale - Vector3.one).sqrMagnitude < 1e-8f)
                     {
                         Assert.That(s.St.x, Is.EqualTo(1f / tile).Within(1e-3f / tile), $"{id}: {Label(s)}: a metric mesh's tiling");
@@ -690,7 +707,11 @@ namespace Meuble.Tests
             Assert.Greater(measured, 100, "premise: few detailed slots measured");
             Assert.Greater(sized, 50, "premise: few PrimitiveKit boxes and quads checked against 1 / tile");
             Assert.Greater(skinnedSlots, 6, "premise: few skinned slots checked against their scale");
-            Assert.AreEqual(TextureLibrary.Textured.Length, worst.Count, "premise: every surface was seen in the levels: " + string.Join(", ", worst.Keys));
+            // M6 (CONTRACT_M6 2.4): Soil is never level data (only LoadView's "plant" load reaches it, and no shipped
+            // level sets player.load to "plant"; ProbeTestsM6Textures.Step50b_ exercises it directly), so it alone is
+            // never seen here.
+            int expectedSurfaces = TextureLibrary.Textured.Length - (worst.ContainsKey(Surface.Soil) ? 0 : 1);
+            Assert.AreEqual(expectedSurfaces, worst.Count, "premise: every surface but Soil was seen in the levels: " + string.Join(", ", worst.Keys));
             CollectionAssert.IsEmpty(errors, "no error logged");
         }
 

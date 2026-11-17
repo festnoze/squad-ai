@@ -82,21 +82,48 @@ MUTATIONS=(
   "audit_dark_memory|Assets/Editor/LevelAudit.cs|if (strict && !w.Watchers[h].Personality.Memory) // MUTATION:AUDIT_DARK_MEMORY|if (false) // MUTATION:AUDIT_DARK_MEMORY|Audit|test_m5_audit_darkpass"
   "audit_dark_range|Assets/Editor/LevelAudit.cs|float darkRange = (strict ? w.Watchers[h].Range : Tuning.ViewRange) * Tuning.LampOffLight; // MUTATION:AUDIT_DARK_RANGE|float darkRange = Tuning.ViewRange * Tuning.LampOffLight; // MUTATION:AUDIT_DARK_RANGE|Audit|test_m5_audit_darkpass"
   "dog_alarm_hue|Assets/Scripts/Runtime/VisionConeView.cs|Color c = alarm ? Tuning.DogConeAlarmColor : Tuning.DogConeColor; // MUTATION:DOG_ALARM_HUE|Color c = Tuning.DogConeColor; // MUTATION:DOG_ALARM_HUE|PlayMode|Step38_DogConeColourWalkPatterAndFeet"
+  # M5 wave 5B.1.
+  "push_moving|Assets/Scripts/Runtime/FurnitureController.cs|IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive); // MUTATION:PUSH_MOVING|IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive && Action != BodyAction.Push); // MUTATION:PUSH_MOVING|PlayMode|Step42b_ Step42c_ Step42g_"
+  # M6.
+  "lacquer_red|Assets/Scripts/Runtime/FurnitureKit.cs|private static Surface MainSurface(Color color, Surface normal) => ModelMath.IsRed(color) ? Surface.Lacquer : normal; // MUTATION:LACQUER_RED|private static Surface MainSurface(Color color, Surface normal) => normal; // MUTATION:LACQUER_RED|PlayMode|Step50a_"
+  "lit_surface_key|Assets/Scripts/Runtime/PrimitiveKit.cs|var key = (color32, surface); // MUTATION:LIT_SURFACE_KEY|var key = (color32, Surface.Plain); // MUTATION:LIT_SURFACE_KEY|PlayMode|Step50a_ Step50b_"
+  "options_step_round|Assets/Scripts/Core/SaveData.cs|float steps = Mathf.Round((clamped - min) / step); // MUTATION:OPTIONS_STEP_ROUND|float steps = Mathf.Floor((clamped - min) / step); // MUTATION:OPTIONS_STEP_ROUND|EditMode|Clamped_RoundsToTheNearestStep"
+  "options_cone_fallback|Assets/Scripts/Core/SaveData.cs|Cone = Cone == ConeNever ? ConeNever : ConeAlways, // MUTATION:OPTIONS_CONE_FALLBACK|Cone = Cone, // MUTATION:OPTIONS_CONE_FALLBACK|EditMode|Clamped_InvalidConeFallsBackToAlways Parse_MalformedOptionsFallsBackFieldByField"
+  "volume_scale|Assets/Scripts/Runtime/SaveStore.cs|AppliedVolume = Mathf.Clamp01(Current.Options.Volume / 100f); // MUTATION:VOLUME_SCALE|AppliedVolume = Mathf.Clamp01(Current.Options.Volume); // MUTATION:VOLUME_SCALE|PlayMode|Step51a_OptionsAppliedAtOnce Step51b_OptionsSurviveRestartAndReload"
+  "camera_sensitivity|Assets/Scripts/Runtime/OrbitCamera.cs|float sens = SaveStore.Options.Sensitivity; // MUTATION:CAMERA_SENSITIVITY|float sens = 1f; // MUTATION:CAMERA_SENSITIVITY|PlayMode|Step51a_OptionsAppliedAtOnce"
+  "cone_hide|Assets/Scripts/Runtime/VisionConeView.cs|bool coneHidden = SaveStore.Options.HidesCone; // MUTATION:CONE_HIDE|bool coneHidden = false; // MUTATION:CONE_HIDE|PlayMode|Step51a_OptionsAppliedAtOnce"
+  "cone_outline_alarm|Assets/Scripts/Runtime/VisionConeView.cs|outline.enabled = !coneHidden && alarm; // MUTATION:CONE_OUTLINE_ALARM|outline.enabled = !coneHidden; // MUTATION:CONE_OUTLINE_ALARM|PlayMode|Step52b_EyeShapesEdgePatternAndConeOutline"
+  "pulse_pattern_gate|Assets/Scripts/Runtime/Hud.cs|pc.a = seenMoving > 0f ? a : 0f; // MUTATION:PULSE_PATTERN_GATE|pc.a = seenMoving <= 0f ? a : 0f; // MUTATION:PULSE_PATTERN_GATE|PlayMode|Step52b_EyeShapesEdgePatternAndConeOutline"
+  "controls_gamepad_text|Assets/Scripts/Runtime/Hud.cs|controls.text = gamepad ? Strings.HudControlsGamepad : Strings.HudControls; // MUTATION:CONTROLS_GAMEPAD_TEXT|controls.text = gamepad ? Strings.HudControls : Strings.HudControlsGamepad; // MUTATION:CONTROLS_GAMEPAD_TEXT|PlayMode|Step52b_EyeShapesEdgePatternAndConeOutline"
+  "door_memory|Assets/Scripts/Core/DoorMemory.cs|if (open[leaf] == isOpen) // MUTATION:DOOR_MEMORY|if (leaf >= 0) // MUTATION:DOOR_MEMORY|EditMode|DoorMemory_remembers_the_authored_leaves_and_a_mismatch_is_one_suspect"
+  "wardrobe_fit|Assets/Scripts/Core/LevelDefM5.cs|bool narrow = size.x <= Tuning.WardrobeFitWidth + Eps && size.z <= Tuning.WardrobeFitWidth + Eps; // MUTATION:WARDROBE_FIT|bool narrow = true; // MUTATION:WARDROBE_FIT|EditMode|Wardrobe_fits_the_stool_and_the_floor_lamp_only Wardrobe_entry_zone_is_the_strip_in_front_of_its_front_face"
+  "empty_spot|Assets/Scripts/Core/FurnitureMemory.cs|if (blind) // MUTATION:EMPTY_SPOT|if (dt >= 0f) // MUTATION:EMPTY_SPOT|EditMode|Empty_spot_is_a_suspect_then_one_discovery_until_the_furniture_is_seen"
+  "hidden_samples|Assets/Scripts/Runtime/Vision.cs|if (furniture.Hidden) // MUTATION:HIDDEN_SAMPLES|if (furniture.Hidden && furniture.Carried) // MUTATION:HIDDEN_SAMPLES|PlayMode|Step53a_"
+  "muffled_creak|Assets/Scripts/Runtime/GameState.cs|float creakRadius = furniture.Hidden ? Tuning.CreakRadius * Tuning.WardrobeCreakFactor : Tuning.CreakRadius; // MUTATION:MUFFLED_CREAK|float creakRadius = Tuning.CreakRadius; // MUTATION:MUFFLED_CREAK|PlayMode|Step53b_"
+  "door_suspect|Assets/Scripts/Runtime/GameState.cs|meters[i].AddDiscovery(); // MUTATION:DOOR_SUSPECT|DoorSuspectCount += 0; // MUTATION:DOOR_SUSPECT|PlayMode|Step54a_"
+  "household_cross|Assets/Scripts/Runtime/GameState.cs|return distance <= DoorStopDistance(g, side); // MUTATION:HOUSEHOLD_CROSS|return distance < 0f; // MUTATION:HOUSEHOLD_CROSS|PlayMode|Step55a_"
+  "door_stop|Assets/Scripts/Runtime/GameState.cs|routine.Hold(Tuning.InhabitantDoorStop); // MUTATION:DOOR_STOP|routine.Hold(0f); // MUTATION:DOOR_STOP|PlayMode|Step55a_"
+  "audit_hide|Assets/Editor/LevelAudit.cs|w.HideFrom[k] = true; // MUTATION:AUDIT_HIDE|w.HideFrom[k] = false; // MUTATION:AUDIT_HIDE|Audit|test_m6_audit_wardrobe"
+  "audit_inhab_door|Assets/Editor/LevelAudit.cs|bool opens = inhabitantDoors && w.HoldStep[l] >= 0; // MUTATION:AUDIT_INHAB_DOOR|bool opens = false; // MUTATION:AUDIT_INHAB_DOOR|Audit|test_m6_audit_inhabdoor"
+  "audit_door_memory|Assets/Editor/LevelAudit.cs|bool remembered = w.DoorMemory; // MUTATION:AUDIT_DOOR_MEMORY|bool remembered = false; // MUTATION:AUDIT_DOOR_MEMORY|Audit|test_m6_audit_doormemory"
+  "load_sway|Assets/Scripts/Runtime/GameState.cs|LoadView.SetTilt(CarryingLoad ? Load.SwayTiltLocal(furniture.Yaw) : Vector2.zero); // MUTATION:LOAD_SWAY|LoadView.SetTilt(CarryingLoad ? Load.SwayTilt : Vector2.zero); // MUTATION:LOAD_SWAY|PlayMode|Step44e_"
+  "load_velocity|Assets/Scripts/Runtime/GameState.cs|Vector2 v = new Vector2(fv.x, fv.z); // MUTATION:LOAD_VELOCITY|Vector2 v = Vector2.zero; // MUTATION:LOAD_VELOCITY|PlayMode|Step44b_ Step44c_ Step44d_ Step44e_"
+  "robot_turn_cap|Assets/Scripts/Runtime/Robot.cs|VisualYaw = Mathf.MoveTowardsAngle(VisualYaw, Yaw, Tuning.RobotTurnRate * dt); // MUTATION:ROBOT_TURN_CAP|VisualYaw = Yaw; // MUTATION:ROBOT_TURN_CAP|PlayMode|Step42w_"
+  "clue_surface|Assets/Scripts/Runtime/LoadView.cs|bool fits = LiesOnOneSurface(floor, c, yaw, spread, out Vector3 rest, out Quaternion f); // MUTATION:CLUE_SURFACE|bool fits = LiesOnOneSurface(floor, c, yaw, spread, out Vector3 rest, out Quaternion f) && false; // MUTATION:CLUE_SURFACE|PlayMode|Step44x_"
   # M5 wave 5B.
-  "hum_none|Assets/Scripts/Core/Hearing.cs|float hum = Tuning.RobotHumRadius; // MUTATION:HUM_NONE|float hum = -1f; // MUTATION:HUM_NONE|EditMode|The_hum_masks_a_hop_a_roll_and_a_click_within_2_5_m_only, Topple_creak_crash_and_bark_are_never_masked CoreM5BHearingTests); later also PlayMode Step42 (game)"
-  "hum_creak|Assets/Scripts/Core/Hearing.cs|return false; // MUTATION:HUM_CREAK|return kind == NoiseKind.Creak; // MUTATION:HUM_CREAK|EditMode|Topple_creak_crash_and_bark_are_never_masked CoreM5BHearingTests); later also PlayMode Step42 (game)"
-  "load_fall|Assets/Scripts/Core/LoadBalance.cs|float threshold = Tuning.LoadFallDeltaV; // MUTATION:LOAD_FALL|float threshold = float.PositiveInfinity; // MUTATION:LOAD_FALL|EditMode|A_90_deg_turn_at_full_chair_speed_drops_the_load, Any_full_speed_reversal_drops_the_load, The_office_chair_full_start_and_full_glide_drop_the_load, Careful_U_turns_of_the_stool_and_the_office_chair_drop_the_load, The_fall_is_at_the_threshold_latched_until_reset_and_ratio_is_the_gauge CoreM5BLoadTests)"
-  "load_window|Assets/Scripts/Core/LoadBalance.cs|double cutoff = time - Tuning.LoadWindow + 0.5 * dt; // MUTATION:LOAD_WINDOW|double cutoff = time - dt + 0.5 * dt; // MUTATION:LOAD_WINDOW|EditMode|DeltaV_compares_with_the_velocity_exactly_one_window_before, A_90_deg_turn_at_full_chair_speed_drops_the_load, Any_full_speed_reversal_drops_the_load CoreM5BLoadTests)"
-  "motion_glide|Assets/Scripts/Core/MotionProfile.cs|bool glides = Bodies && Body.Glides; // MUTATION:MOTION_GLIDE|bool glides = false; // MUTATION:MOTION_GLIDE|EditMode|Stop_distance_and_slide_samples_per_body, Office_chair_glides_when_braked_against_its_motion_then_drives_back, Release_is_the_instant_stop_the_glide_or_the_tip CoreM5BMotionTests)"
-  "motion_careful|Assets/Scripts/Core/MotionProfile.cs|return b.MaxSpeed * (careful && bodies ? Tuning.CarefulFactor : 1f); // MUTATION:MOTION_CAREFUL|return b.MaxSpeed; // MUTATION:MOTION_CAREFUL|EditMode|Straight_start_follows_the_body_table_full_and_careful CoreM5BMotionTests), Every_careful_straight_move_holds CoreM5BLoadTests)"
-  "robot_reverse|Assets/Scripts/Core/RobotPath.cs|legs.Add(new Leg { T0 = at, S0 = ArcOn(leg, at), Dir = -leg.Dir }); // MUTATION:ROBOT_REVERSE|legs.Add(new Leg { T0 = at, S0 = ArcOn(leg, at), Dir = leg.Dir }); // MUTATION:ROBOT_REVERSE|EditMode|Reverse_travels_the_loop_backwards_from_where_it_is CoreM5BRobotTests); later also PlayMode Step42 (the robot reverses)"
-  "put_away|Assets/Scripts/Core/InhabitantRoutine.cs|JustPutAway = true; // MUTATION:PUT_AWAY|JustPutAway = false; // MUTATION:PUT_AWAY|EditMode|Put_away_walks_to_the_clue_faces_it_bends_for_0_6_s_and_resumes, A_clue_within_reach_is_put_away_without_walking CoreM5BPutAwayTests); later also PlayMode Step44 (game: the finder puts it away)"
-  "rocks_row|Assets/Scripts/Core/BodyDef.cs|Rocks = true, // MUTATION:ROCKS_ROW|Rocks = false, // MUTATION:ROCKS_ROW|EditMode|Rocking_chair_row_matches_the_contract_member_by_member, Only_the_rocking_chair_rocks_and_every_kind_is_a_known_body CoreM5BBodyTests)"
+  "hum_none|Assets/Scripts/Core/Hearing.cs|float hum = Tuning.RobotHumRadius; // MUTATION:HUM_NONE|float hum = -1f; // MUTATION:HUM_NONE|EditMode|The_hum_masks_a_hop_a_roll_and_a_click_within_2_5_m_only Topple_creak_crash_and_bark_are_never_masked"
+  "hum_creak|Assets/Scripts/Core/Hearing.cs|return false; // MUTATION:HUM_CREAK|return kind == NoiseKind.Creak; // MUTATION:HUM_CREAK|EditMode|Topple_creak_crash_and_bark_are_never_masked"
+  "load_fall|Assets/Scripts/Core/LoadBalance.cs|float threshold = Tuning.LoadFallDeltaV; // MUTATION:LOAD_FALL|float threshold = float.PositiveInfinity; // MUTATION:LOAD_FALL|EditMode|A_90_deg_turn_at_full_chair_speed_drops_the_load Any_full_speed_reversal_drops_the_load The_office_chair_full_start_and_full_glide_drop_the_load Careful_U_turns_of_the_stool_and_the_office_chair_drop_the_load The_fall_is_at_the_threshold_latched_until_reset_and_ratio_is_the_gauge"
+  "load_window|Assets/Scripts/Core/LoadBalance.cs|double cutoff = time - Tuning.LoadWindow + 0.5 * dt; // MUTATION:LOAD_WINDOW|double cutoff = time - dt + 0.5 * dt; // MUTATION:LOAD_WINDOW|EditMode|DeltaV_compares_with_the_velocity_exactly_one_window_before A_90_deg_turn_at_full_chair_speed_drops_the_load Any_full_speed_reversal_drops_the_load"
+  "motion_glide|Assets/Scripts/Core/MotionProfile.cs|bool glides = Bodies && Body.Glides; // MUTATION:MOTION_GLIDE|bool glides = false; // MUTATION:MOTION_GLIDE|EditMode|Stop_distance_and_slide_samples_per_body Office_chair_glides_when_braked_against_its_motion_then_drives_back Release_is_the_instant_stop_the_glide_or_the_tip"
+  "motion_careful|Assets/Scripts/Core/MotionProfile.cs|return b.MaxSpeed * (careful && bodies ? Tuning.CarefulFactor : 1f); // MUTATION:MOTION_CAREFUL|return b.MaxSpeed; // MUTATION:MOTION_CAREFUL|EditMode|Straight_start_follows_the_body_table_full_and_careful Every_careful_straight_move_holds"
+  "robot_reverse|Assets/Scripts/Core/RobotPath.cs|legs.Add(new Leg { T0 = at, S0 = ArcOn(leg, at), Dir = -leg.Dir }); // MUTATION:ROBOT_REVERSE|legs.Add(new Leg { T0 = at, S0 = ArcOn(leg, at), Dir = leg.Dir }); // MUTATION:ROBOT_REVERSE|EditMode|Reverse_travels_the_loop_backwards_from_where_it_is"
+  "put_away|Assets/Scripts/Core/InhabitantRoutine.cs|JustPutAway = true; // MUTATION:PUT_AWAY|JustPutAway = false; // MUTATION:PUT_AWAY|EditMode|Put_away_walks_to_the_clue_faces_it_bends_for_0_6_s_and_resumes A_clue_within_reach_is_put_away_without_walking"
+  "rocks_row|Assets/Scripts/Core/BodyDef.cs|Rocks = true, // MUTATION:ROCKS_ROW|Rocks = false, // MUTATION:ROCKS_ROW|EditMode|Rocking_chair_row_matches_the_contract_member_by_member Only_the_rocking_chair_rocks_and_every_kind_is_a_known_body"
   "cone_radial|Assets/Scripts/Runtime/VisionConeView.cs|int samples = floor.IsFlat ? 1 : Mathf.CeilToInt(Owner.Routine.ViewRange / Tuning.ConeRadialStep); // MUTATION:CONE_RADIAL|int samples = 1; // MUTATION:CONE_RADIAL|PlayMode|Step37w_ConeFollowsThePlatformTop"
   "fan_superset|Assets/Scripts/Runtime/VisionConeView.cs|bool lookingUp = eye.y < top; // MUTATION:FAN_SUPERSET|bool lookingUp = false; // MUTATION:FAN_SUPERSET|PlayMode|Step38w_DogFanCoversWhatItSees"
   "robot_pose|Assets/Scripts/Runtime/Robot.cs|transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f)); // MUTATION:ROBOT_POSE|transform.rotation = Quaternion.Euler(0f, yaw, 0f); // MUTATION:ROBOT_POSE|PlayMode|Step42w_RobotVisualFollowsSetPoseWithoutCollider"
   "load_hide|Assets/Scripts/Runtime/LoadView.cs|Carried.gameObject.SetActive(false); // MUTATION:LOAD_HIDE|Carried.gameObject.SetActive(true); // MUTATION:LOAD_HIDE|PlayMode|Step44w_LoadSitsOnTopTiltsAndBreaks"
-  "slot_merge_key|Assets/Scripts/Runtime/ModelKit.cs|return drawn[a] == drawn[b] && surfaces[a] == surfaces[b] && clothes[a] == clothes[b]; // MUTATION:SLOT_MERGE_KEY|return drawn[a] == drawn[b]; // MUTATION:SLOT_MERGE_KEY|EditMode|Merged_slots_are_the_distinct_colours_and_details_of_each_character (also PlayMode Step37w_MergedSlotsKeepTheLookAndCountFewerDrawCalls)"
   "robot_count|Assets/Scripts/Core/LevelValidator.cs|issues.Add(\$\"{level.Robots.Count} robots: at most one per level\"); // MUTATION:ROBOT_COUNT|{ } // MUTATION:ROBOT_COUNT|EditMode|At_most_one_robot_per_level"
   "robot_walls|Assets/Scripts/Core/LevelValidator.cs|if (!SegmentCovered(free, a, b)) // MUTATION:ROBOT_WALLS|if (false) // MUTATION:ROBOT_WALLS|EditMode|Robot_loop_runs_into_no_wall_and_never_leaves_the_house House_robot_fixture_crosses_a_doorway_without_a_leaf"
   "robot_floor|Assets/Scripts/Core/LevelValidator.cs|issues.Add(\$\"{segment} leaves the floor level: it touches platform {pf.Name}\"); // MUTATION:ROBOT_FLOOR|{ } // MUTATION:ROBOT_FLOOR|EditMode|Robot_loop_stays_on_the_floor_level"
@@ -111,11 +138,9 @@ MUTATIONS=(
   "load_build|Assets/Scripts/Runtime/LevelBuilder.cs|level.LoadView = ApplyLoad(furniture, spawn.Load); // MUTATION:LOAD_BUILD|level.LoadView = null; // MUTATION:LOAD_BUILD|PlayMode|Step39l_"
   "game_hum_none|Assets/Scripts/Runtime/GameState.cs|bool masked = Hearing.IsMasked(heard, at, robotPositions); // MUTATION:GAME_HUM_NONE|bool masked = false; // MUTATION:GAME_HUM_NONE|PlayMode|Step42f_"
   "game_hum_creak|Assets/Scripts/Runtime/GameState.cs|NoiseKind heard = kind; // MUTATION:GAME_HUM_CREAK|NoiseKind heard = NoiseKind.Hop; // MUTATION:GAME_HUM_CREAK|PlayMode|Step42f_"
-  "shove_moving|Assets/Scripts/Runtime/GameState.cs|bool shoveMoving = Shoving; // MUTATION:SHOVE_MOVING|bool shoveMoving = false; // MUTATION:SHOVE_MOVING|PlayMode|Step42b_ Step42c_"
   "robot_contact|Assets/Scripts/Runtime/GameState.cs|bool touching = RobotPath.Overlaps(at, furniture.Pose, furniture.SampleSize); // MUTATION:ROBOT_CONTACT|bool touching = false; // MUTATION:ROBOT_CONTACT|PlayMode|Step42b_ Step42c_ Step42d_ Step42e_"
   "rock_stop|Assets/Scripts/Runtime/GameState.cs|bool rocks = body != null && body.Rocks; // MUTATION:ROCK_STOP|bool rocks = false; // MUTATION:ROCK_STOP|PlayMode|Step43b_"
   "rock_careful|Assets/Scripts/Runtime/GameState.cs|float time = furniture.Careful ? Tuning.RockCarefulTime : Tuning.RockTime; // MUTATION:ROCK_CAREFUL|float time = Tuning.RockTime; // MUTATION:ROCK_CAREFUL|PlayMode|Step43b_"
-  "load_velocity|Assets/Scripts/Runtime/GameState.cs|Vector2 v = fallbackShove ? shoveVelocity : new Vector2(fv.x, fv.z); // MUTATION:LOAD_VELOCITY|Vector2 v = Vector2.zero; // MUTATION:LOAD_VELOCITY|PlayMode|Step44b_ Step44c_ Step44d_ Step44e_"
   "clue_discovery|Assets/Scripts/Runtime/GameState.cs|meters[i].AddDiscovery(); // MUTATION:CLUE_DISCOVERY|meters[i].Step(0f); // MUTATION:CLUE_DISCOVERY|PlayMode|Step44c_"
   "load_box|Assets/Scripts/Runtime/Vision.cs|Vector3 box = furniture.SampleSize + Vector3.up * ExtraHeight; // MUTATION:LOAD_BOX|Vector3 box = furniture.SampleSize; // MUTATION:LOAD_BOX|PlayMode|Step44f_"
   "balance_red|Assets/Scripts/Runtime/Hud.cs|BalanceRed = visible && ratio > Tuning.BalanceWarning; // MUTATION:BALANCE_RED|BalanceRed = false; // MUTATION:BALANCE_RED|PlayMode|Step44e_"
@@ -135,10 +160,24 @@ MUTATIONS=(
 for row in "${MUTATIONS[@]}"; do
   bars="${row//[^|]/}"
   if [ "${#bars}" -ne 5 ]; then
-    echo "ECHEC ligne de mutation a ${#bars} separateurs '|' au lieu de 5 : $row"
+    echo "ECHEC ligne de mutation ${row%%|*} : ${#bars} separateurs '|' au lieu de 5"
     exit 2
   fi
   IFS='|' read -r id file marked replacement mode expected <<<"$row"
+  # M5 5B.1 (CONTRACT_M5 19 B2): the killer field holds bare test-name prefixes (or audit ids) only, space
+  # separated. Prose, commas or parentheses can never match a red name and would report a false survivor.
+  case "$mode" in EditMode|PlayMode|Audit) ;; *) echo "ECHEC ligne de mutation $id : mode '$mode' inconnu"; exit 2 ;; esac
+  read -r -a killers <<<"$expected"
+  if [ "${#killers[@]}" -eq 0 ]; then
+    echo "ECHEC ligne de mutation $id : aucun nom attendu"
+    exit 2
+  fi
+  for name in "${killers[@]}"; do
+    if ! [[ "$name" =~ ^[A-Za-z0-9_]+$ ]]; then
+      echo "ECHEC ligne de mutation $id : nom attendu '$name' hors de [A-Za-z0-9_]"
+      exit 2
+    fi
+  done
   if MSYS2_ARG_CONV_EXCL="*" python - "$file" "$replacement" <<'PY'
 import sys, io
 sys.exit(0 if sys.argv[2] in io.open(sys.argv[1], encoding="utf-8").read() else 1)

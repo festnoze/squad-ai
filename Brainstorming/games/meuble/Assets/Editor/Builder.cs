@@ -14,6 +14,9 @@ namespace Meuble.Editor
     public static class Builder
     {
         public const string WindowsOutput = "Build/Windows/Meuble.exe";
+        public const string AndroidOutput = "Build/Android/Meuble.apk";
+        /// <summary>CONTRACT_M7 1.3: the APK is at most 150 MB.</summary>
+        public const long AndroidMaxBytes = 150L * 1024 * 1024;
 
         /// <summary>Reached only once the editor compiled every script: runs the setup and exits 0.</summary>
         public static void SetupAndCompile()
@@ -46,10 +49,49 @@ namespace Meuble.Editor
             }
         }
 
+        /// <summary>
+        /// M7 (docs/CONTRACT_M7.md 1.3): the Android APK (the player settings come from ProjectSetup.Apply). The editor
+        /// switches to Android for the build and back to the target it had, so the other command line runs keep theirs.
+        /// Fails when the APK is over <see cref="AndroidMaxBytes"/>.
+        /// </summary>
+        [MenuItem("Meuble/Build Android Player")]
+        public static void BuildAndroid()
+        {
+            string output = ArgOr("-output", AndroidOutput);
+            BuildTarget previous = EditorUserBuildSettings.activeBuildTarget;
+            BuildTargetGroup previousGroup = BuildPipeline.GetBuildTargetGroup(previous);
+            EditorUserBuildSettings.buildAppBundle = false;
+            EditorUserBuildSettings.exportAsGoogleAndroidProject = false;
+            int code = Build(BuildTarget.Android, output);
+            if (code == 0)
+            {
+                long bytes = new FileInfo(output).Length;
+                Debug.Log($"[Builder] APK size {bytes / (1024.0 * 1024.0):0.0} MB (limit {AndroidMaxBytes / (1024 * 1024)} MB)");
+                if (bytes > AndroidMaxBytes)
+                {
+                    Debug.LogError($"[Builder] The APK is over the {AndroidMaxBytes / (1024 * 1024)} MB limit");
+                    code = 1;
+                }
+            }
+            if (EditorUserBuildSettings.activeBuildTarget != previous)
+            {
+                EditorUserBuildSettings.SwitchActiveBuildTarget(previousGroup, previous);
+            }
+            if (Application.isBatchMode)
+            {
+                EditorApplication.Exit(code);
+            }
+        }
+
         private static int Build(BuildTarget target, string output)
         {
             try
             {
+                string folder = Path.GetDirectoryName(output);
+                if (!string.IsNullOrEmpty(folder))
+                {
+                    Directory.CreateDirectory(folder);
+                }
                 ProjectSetup.Apply();
                 ModelCatalogBuilder.Build();
                 AudioLibraryBuilder.Build();

@@ -496,65 +496,6 @@ namespace Meuble.Tests
             Assert.GreaterOrEqual(shared, sources.Count - 1, "premise: all but the man's shirt are shared palette colours");
         }
 
-        // ----- M5B: merged character slots (CONTRACT_M5 17) -----
-
-        /// <summary>
-        /// The slots a tinted character draws once merged (ModelKit.MergeSlots), against a count made from the catalog alone:
-        /// the distinct (palette colour, detail, clothes or not) of its source materials. Every personality's model saves
-        /// slots, and the worst three humans with the dog draw at most 21 slots (from 33).
-        /// </summary>
-        [Test]
-        public void Merged_slots_are_the_distinct_colours_and_details_of_each_character()
-        {
-            bool previous = ModelKit.MergeCharacterSlots;
-            var root = new GameObject("MergeTest");
-            try
-            {
-                ModelKit.MergeCharacterSlots = true;
-                var merged = new Dictionary<string, int>();
-                var unmerged = new Dictionary<string, int>();
-                foreach (string id in People)
-                {
-                    PersonalityDef p = PersonalityDef.For(id);
-                    ModelCatalog.Entry e = Entry(p.Model);
-                    Color tint = Tint(p);
-                    var expected = new HashSet<(Color32, Surface, bool)>();
-                    foreach ((string name, Color source) in Sources(e))
-                    {
-                        expected.Add((ModelKit.CharacterColor(name, source, e.IsPet, tint), ModelKit.SurfaceOf(name, false),
-                            ModelKit.PartOf(name, e.IsPet) == ModelKit.CharacterPart.Clothes));
-                    }
-                    var parent = new GameObject(id);
-                    parent.transform.SetParent(root.transform, false);
-                    GameObject model = ModelKit.Instantiate(p.Model, parent.transform, new Vector3(0.5f, 1.75f, 0.5f), ModelFit.Uniform,
-                        new ModelPaint { Main = tint });
-                    Assert.IsNotNull(model, id + ": premise: the model instantiates");
-                    SkinnedMeshRenderer skin = model.GetComponentInChildren<SkinnedMeshRenderer>(true);
-                    int before = skin.sharedMaterials.Length;
-                    int saved = ModelKit.MergeSlots(model, e);
-                    Assert.AreEqual(expected.Count, skin.sharedMaterials.Length, $"{id}: merged slots");
-                    Assert.AreEqual(before - saved, skin.sharedMaterials.Length, $"{id}: the slots saved");
-                    Assert.Greater(saved, 0, $"{id}: nothing merged");
-                    Assert.AreEqual(skin.sharedMaterials.Length, skin.sharedMesh.subMeshCount, $"{id}: slots and submeshes");
-                    Assert.AreEqual(0, ModelKit.MergeSlots(model, e), $"{id}: a second merge changes something");
-                    merged[id] = skin.sharedMaterials.Length;
-                    unmerged[id] = before;
-                }
-                // The worst three humans and the dog.
-                string[] humans = merged.Keys.Where(k => k != PersonalityDef.Dog).ToArray();
-                int worst = humans.Select(h => merged[h]).OrderByDescending(n => n).Take(3).Sum() + merged[PersonalityDef.Dog];
-                int worstBefore = humans.Select(h => unmerged[h]).OrderByDescending(n => n).Take(3).Sum() + unmerged[PersonalityDef.Dog];
-                Debug.Log($"[ModelM5Tests] merged slots: {string.Join(", ", merged.Select(m => $"{m.Key} {unmerged[m.Key]} -> {m.Value}"))}; "
-                    + $"the worst three humans and the dog: {worstBefore} -> {worst} (brows not counted)");
-                Assert.LessOrEqual(worst, 21, "the worst three humans and the dog draw too many slots");
-            }
-            finally
-            {
-                ModelKit.MergeCharacterSlots = previous;
-                Object.DestroyImmediate(root);
-            }
-        }
-
         // ----- M5B: the robot and the load visuals -----
 
         /// <summary>

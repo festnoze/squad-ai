@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Entraîner un LLM · Les étapes expliquées</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper:      #F7F4EE;
+    --paper-2:    #FFFFFF;
+    --ink:        #17171E;
+    --muted:      #6A6A78;
+    --muted-2:    #9C9CA8;
+    --line:       rgba(23, 23, 30, 0.10);
+    --line-2:     rgba(23, 23, 30, 0.16);
+    --accent:     #C8860D;
+    --accent-2:   #E0583A;
+    --accent-3:   #138C99;
+    --glow:       rgba(245, 184, 61, 0.22);
+    --shadow:     0 1px 2px rgba(23,23,30,0.04), 0 10px 30px -18px rgba(23,23,30,0.25);
+    --sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    --techno: "Chakra Petch", "Space Grotesk", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--sans);
+    background: var(--paper);
+    color: var(--ink);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Ambient background */
+  .bg {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(900px 600px at 18% 12%, var(--glow), transparent 60%),
+      radial-gradient(800px 700px at 88% 88%, rgba(224,88,58,0.08), transparent 60%),
+      radial-gradient(700px 600px at 70% 10%, rgba(19,140,153,0.06), transparent 60%),
+      var(--paper);
+  }
+  .bg::after {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 78%);
+            mask-image: radial-gradient(circle at 50% 50%, #000 30%, transparent 78%);
+    opacity: 0.45;
+  }
+
+  .app { position: relative; z-index: 1; display: flex; height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar {
+    width: 390px; flex: 0 0 390px; height: 100%;
+    border-right: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.65), rgba(255,255,255,0.25));
+    padding: 40px 28px;
+    display: flex; flex-direction: column;
+    backdrop-filter: blur(4px);
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .sidebar::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+  .brand { margin-bottom: 30px; }
+  .brand .kicker {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.28em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .brand .kicker::before {
+    content: ""; width: 22px; height: 1px; background: var(--accent); display: inline-block;
+  }
+  .brand h1 { font-size: 30px; font-weight: 600; line-height: 1.16; letter-spacing: -0.01em; }
+  .brand h1 .hl  { color: var(--accent); }
+  .brand h1 .hl2 { color: var(--accent-2); }
+  .brand h1 .dim { color: var(--muted); }
+  .brand > p { margin-top: 12px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .brand > p em { color: var(--accent); font-style: normal; }
+
+  /* ---------- Search ---------- */
+  .search { position: relative; margin-bottom: 18px; }
+  .search svg {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; pointer-events: none;
+    stroke: var(--muted-2); fill: none; stroke-width: 2; stroke-linecap: round;
+    transition: stroke .3s ease;
+  }
+  .search input {
+    width: 100%; font-family: var(--mono); font-size: 13px; color: var(--ink);
+    background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 11px 40px 11px 38px; outline: none; box-shadow: var(--shadow);
+    transition: border-color .3s ease, box-shadow .3s ease;
+  }
+  .search input::placeholder { color: var(--muted-2); }
+  .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(245,184,61,0.18); }
+  .search input:focus + svg { stroke: var(--accent); }
+  .search .search-key {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-size: 10.5px; color: var(--muted);
+    border: 1px solid var(--line-2); border-radius: 5px; background: var(--paper);
+    padding: 1px 6px; pointer-events: none; transition: opacity .2s ease;
+  }
+  .search input:focus ~ .search-key, .search input:not(:placeholder-shown) ~ .search-key { opacity: 0; }
+
+  .search-results { display: flex; flex-direction: column; gap: 6px; margin-bottom: 22px; }
+  .search-results[hidden] { display: none; }
+  .search-meta {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 2px 4px;
+  }
+  .hit-item {
+    text-align: left; width: 100%; cursor: pointer;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; font-family: var(--sans); color: var(--ink);
+    transition: border-color .3s ease, transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s ease;
+  }
+  .hit-item:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); transform: translateX(3px); }
+  .hit-item.current { border-color: var(--accent); box-shadow: 0 8px 24px -14px rgba(200,134,13,0.55); }
+  .hit-item .ht {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+    font-family: var(--techno); font-weight: 600; font-size: 13px; text-transform: uppercase; color: var(--accent);
+  }
+  .hit-item .ht small { font-family: var(--mono); font-weight: 500; font-size: 11px; color: var(--muted-2); white-space: nowrap; }
+  .hit-item .sn { display: block; font-size: 12.5px; color: var(--muted); line-height: 1.45; margin-top: 4px; }
+  .hit-item mark, mark.hit { background: rgba(245,184,61,0.45); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .search-empty { font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 2px 4px; }
+
+  nav { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+
+  .nav-item {
+    position: relative; overflow: visible;
+    display: flex; align-items: center; gap: 16px;
+    padding: 9px 16px; border-radius: 12px;
+    cursor: pointer; color: var(--muted);
+    border: 2px solid transparent;
+    transition: color .35s ease, border-color .45s ease, font-size .4s cubic-bezier(.22,1,.36,1), box-shadow .45s ease, background .35s ease;
+    text-align: left; width: 100%; background: none;
+    font-family: var(--techno); font-weight: 600;
+    font-size: 16px; letter-spacing: 0.01em; text-transform: uppercase;
+  }
+  .nav-item::before {
+    content: ""; position: absolute; inset: 0; border-radius: 10px; z-index: 0;
+    background: linear-gradient(90deg, rgba(245,184,61,0.22), rgba(245,184,61,0.04) 70%, transparent);
+    transform: scaleX(0); transform-origin: left center;
+    transition: transform .5s cubic-bezier(.22,1,.36,1);
+  }
+  .nav-item::after {
+    content: ""; position: absolute; left: -2px; top: 50%; transform: translateY(-50%) scaleY(0);
+    width: 4px; height: 62%; border-radius: 4px; z-index: 1;
+    background: var(--accent); box-shadow: 0 0 10px rgba(200,134,13,0.5);
+    transition: transform .45s cubic-bezier(.34,1.56,.64,1) .05s;
+  }
+  .nav-item .num, .nav-item .label { position: relative; z-index: 2; }
+  .nav-item .num {
+    font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted-2);
+    width: 26px; flex: 0 0 26px; transition: color .35s ease;
+  }
+  .nav-item .label { letter-spacing: 0; line-height: 1.08; transition: letter-spacing .45s ease; }
+  .nav-item:hover { color: var(--ink); border-color: var(--line); }
+  .nav-item:hover::before { transform: scaleX(0.4); }
+  .nav-item.active {
+    color: var(--accent); background: var(--paper-2);
+    font-size: 20px;
+    border-color: var(--accent);
+    box-shadow: 0 8px 24px -12px rgba(200,134,13,0.55);
+    animation: navPulse .7s ease;
+  }
+  .nav-item.active::before { transform: scaleX(1); }
+  .nav-item.active::after { transform: translateY(-50%) scaleY(1); }
+  .nav-item.active .num { color: var(--accent); }
+  .nav-item.active .label { letter-spacing: 0.012em; }
+
+  @keyframes navPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(200,134,13,0.45); }
+    100% { box-shadow: 0 8px 24px -12px rgba(200,134,13,0.55); }
+  }
+
+  .nav-sub {
+    margin-left: 13px; padding-left: 18px;
+    border-left: 2px solid var(--line);
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .nav-group-label {
+    font-family: var(--techno); font-size: 12px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--muted);
+    margin: 14px 0 8px 16px;
+  }
+  .nav-sub .nav-item { padding: 7px 14px; font-size: 14px; }
+  .nav-sub .nav-item.active { font-size: 17px; }
+
+  .sidebar-foot {
+    margin-top: auto; padding-top: 22px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted-2);
+    letter-spacing: 0.04em; line-height: 1.7;
+  }
+  .sidebar-foot kbd {
+    font-family: var(--mono); color: var(--muted);
+    border: 1px solid var(--line-2); border-radius: 5px; background: var(--paper-2);
+    padding: 1px 6px; font-size: 10.5px;
+  }
+
+  /* ---------- Stage ---------- */
+  .stage { flex: 1; position: relative; overflow: hidden; }
+  .slides { position: absolute; inset: 0; }
+
+  .slide {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; justify-content: flex-start;
+    padding: 12vh 6vw 8vh;
+    opacity: 0; visibility: hidden; transform: translateY(22px);
+    transition: opacity .55s ease, transform .55s cubic-bezier(.22,1,.36,1), visibility .55s;
+    pointer-events: none; overflow-y: auto;
+  }
+  .slide.active { opacity: 1; visibility: visible; transform: none; pointer-events: auto; }
+  .slide.center { justify-content: center; padding-top: 8vh; }
+
+  .ghost {
+    position: absolute; right: 5vw; top: 50%; transform: translateY(-50%);
+    font-family: var(--mono); font-weight: 600;
+    font-size: clamp(200px, 30vw, 420px); line-height: 1;
+    color: var(--accent); opacity: 0.07; z-index: 0;
+    pointer-events: none; user-select: none;
+  }
+  .slide > *:not(.ghost) { position: relative; z-index: 1; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--accent);
+    display: flex; align-items: center; gap: 14px; margin-bottom: 20px;
+  }
+  .eyebrow::before { content: ""; width: 38px; height: 1px; background: var(--accent); }
+
+  .slide h2 {
+    font-size: clamp(34px, 4.6vw, 68px); font-weight: 600;
+    line-height: 1.03; letter-spacing: -0.025em; max-width: 20ch;
+  }
+  .hl  { color: var(--accent); }
+  .hl2 { color: var(--accent-2); }
+  .hl3 { color: var(--accent-3); }
+  .dim { color: var(--muted); }
+
+  .lead {
+    font-size: clamp(16px, 1.5vw, 22px); color: var(--muted);
+    line-height: 1.5; max-width: 62ch; margin-top: 20px; font-weight: 400;
+  }
+  .lead strong { color: var(--ink); font-weight: 600; }
+
+  a { color: var(--accent-3); text-underline-offset: 3px; }
+
+  /* pills */
+  .tools { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; max-width: 1100px; }
+  .tool {
+    font-family: var(--mono); font-size: 14px; color: var(--ink);
+    border: 1px solid var(--line-2); border-radius: 999px;
+    padding: 10px 18px; background: var(--paper-2); box-shadow: var(--shadow);
+  }
+  .tool .dot { color: var(--accent); margin-right: 8px; }
+  .tools .tool:nth-child(3n+2) .dot { color: var(--accent-2); }
+  .tools .tool:nth-child(3n+3) .dot { color: var(--accent-3); }
+  .tools-label {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--muted); margin-top: 34px;
+  }
+  .tools-label + .tools, .tools-label + .ds-grid { margin-top: 12px; }
+
+  /* cards */
+  .cards { display: grid; gap: 18px; margin-top: 34px; }
+  .cards.two   { grid-template-columns: repeat(2, 1fr); max-width: 900px; }
+  .cards.three { grid-template-columns: repeat(3, 1fr); max-width: 1180px; }
+  .cards.four  { grid-template-columns: repeat(4, 1fr); max-width: 1360px; gap: 16px; }
+  .cards.four .card { padding: 22px 18px; }
+  .cards.four .card h3 { font-size: 21px; }
+
+  .card {
+    --c: var(--accent);
+    position: relative; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 16px;
+    padding: 24px 22px; background: var(--paper-2);
+    box-shadow: var(--shadow);
+    transition: transform .4s cubic-bezier(.22,1,.36,1), border-color .4s, background .4s, box-shadow .4s;
+  }
+  .cards .card:nth-child(3n+2) { --c: var(--accent-2); }
+  .cards .card:nth-child(3n+3) { --c: var(--accent-3); }
+  .card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--c); transform: scaleX(0); transform-origin: left center;
+    transition: transform .45s cubic-bezier(.22,1,.36,1);
+  }
+  .card:hover::before { transform: scaleX(1); }
+  .slide.active .card, .slide.active .step, .slide.active .stat, .slide.active .ds, .slide.active .tk { animation: rise .6s cubic-bezier(.22,1,.36,1) both; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(2) { animation-delay: .06s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(3) { animation-delay: .12s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(4) { animation-delay: .18s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(5) { animation-delay: .24s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(6) { animation-delay: .30s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(7) { animation-delay: .36s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(8) { animation-delay: .42s; }
+  .slide.active :is(.card, .step, .stat, .ds, .tk):nth-child(9) { animation-delay: .48s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
+  .card:hover {
+    border-color: color-mix(in srgb, var(--c) 45%, transparent);
+    transform: translateY(-4px);
+    box-shadow: 0 22px 44px -26px color-mix(in srgb, var(--c) 70%, transparent);
+  }
+  .card .idx {
+    font-family: var(--mono); font-size: 12px; color: var(--c);
+    margin-bottom: 12px; letter-spacing: 0.05em;
+  }
+  .card .ico { font-size: 28px; margin-bottom: 12px; line-height: 1; }
+  .card h3 { font-size: 22px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 8px; }
+  .card p { color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .card p strong { color: var(--ink); font-weight: 600; }
+
+  .footnote {
+    margin-top: 30px; font-family: var(--mono); font-size: 13px;
+    color: var(--muted); letter-spacing: 0.02em; max-width: 90ch; line-height: 1.7;
+  }
+  .footnote .accent { color: var(--accent); }
+  .footnote strong { color: var(--ink); }
+  .footnote code, .card code {
+    font-family: var(--mono); font-size: 0.95em;
+    color: var(--accent-3); background: rgba(19,140,153,0.08);
+    padding: 1px 6px; border-radius: 5px;
+  }
+
+  /* ---------- Flow (steps + arrows) ---------- */
+  .flow {
+    display: flex; align-items: stretch; gap: 0; margin-top: 40px; max-width: 1300px;
+    flex-wrap: wrap; row-gap: 18px;
+  }
+  .step {
+    --c: var(--accent);
+    flex: 1 1 0; min-width: 150px;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px 18px; box-shadow: var(--shadow);
+    position: relative;
+  }
+  .flow .step:nth-of-type(3n+2) { --c: var(--accent-2); }
+  .flow .step:nth-of-type(3n+3) { --c: var(--accent-3); }
+  .step .n {
+    font-family: var(--mono); font-size: 12px; color: var(--c); letter-spacing: 0.08em; margin-bottom: 10px;
+  }
+  .step h4 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .step p { color: var(--muted); font-size: 14px; margin-top: 6px; line-height: 1.45; }
+  .flow .arr {
+    flex: 0 0 40px; display: grid; place-items: center;
+    color: var(--muted-2); font-size: 22px; font-family: var(--mono);
+  }
+  .flow.tight .step { min-width: 120px; padding: 16px 14px; }
+  .flow.tight .step h4 { font-size: 16px; }
+  .flow.tight .step p { font-size: 13px; }
+  .flow.tight .arr { flex-basis: 26px; font-size: 18px; }
+
+  /* ---------- Stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 36px; max-width: 1100px; }
+  .stat {
+    --c: var(--accent);
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px;
+    box-shadow: var(--shadow);
+  }
+  .stats .stat:nth-child(3n+2) { --c: var(--accent-2); }
+  .stats .stat:nth-child(3n+3) { --c: var(--accent-3); }
+  .stat .v { font-family: var(--mono); font-size: clamp(36px, 4.2vw, 58px); font-weight: 600; color: var(--c); line-height: 1; letter-spacing: -0.03em; }
+  .stat .k { margin-top: 10px; font-size: 16px; color: var(--ink); font-weight: 500; }
+  .stat .s { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+
+  /* ---------- Big statement ---------- */
+  .statement {
+    font-size: clamp(40px, 5.8vw, 88px); font-weight: 600; line-height: 1.02;
+    letter-spacing: -0.035em; max-width: 16ch;
+  }
+
+  /* ---------- Dataset / resource link cards ---------- */
+  .ds-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 28px; max-width: 1320px; }
+  .ds-grid.two { grid-template-columns: repeat(2, 1fr); max-width: 980px; }
+  a.ds {
+    --c: var(--accent);
+    display: flex; flex-direction: column; gap: 7px;
+    text-decoration: none; color: inherit;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+    transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s, box-shadow .35s;
+  }
+  .ds-grid .ds:nth-child(3n+2) { --c: var(--accent-2); }
+  .ds-grid .ds:nth-child(3n+3) { --c: var(--accent-3); }
+  a.ds:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--c) 55%, transparent);
+    box-shadow: 0 18px 36px -24px color-mix(in srgb, var(--c) 70%, transparent);
+  }
+  .ds .ds-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .ds b { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  .ds .size {
+    font-family: var(--mono); font-size: 11px; color: var(--c); white-space: nowrap;
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); border-radius: 999px; padding: 2px 9px;
+  }
+  .ds p { font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+  .ds .url { font-family: var(--mono); font-size: 11px; color: var(--muted-2); overflow-wrap: anywhere; margin-top: auto; }
+  .ds .url::after { content: " ↗"; color: var(--c); }
+
+  /* ---------- Tokenizer demo ---------- */
+  .toks { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; max-width: 1000px; }
+  .tk {
+    --c: var(--accent);
+    font-family: var(--mono); font-size: clamp(16px, 1.6vw, 22px); color: var(--ink);
+    background: color-mix(in srgb, var(--c) 12%, var(--paper-2));
+    border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+    border-radius: 9px; padding: 8px 12px; white-space: pre;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  .toks .tk:nth-child(3n+2) { --c: var(--accent-2); }
+  .toks .tk:nth-child(3n+3) { --c: var(--accent-3); }
+  .tk small { font-size: 10.5px; color: var(--muted); }
+
+  .toks.col { flex-direction: column; margin-top: 0; }
+  .toks.col .tk { flex-direction: row; justify-content: space-between; gap: 14px; min-width: 150px; }
+
+  /* ---------- Matrices (worked example) ---------- */
+  .mx-eq { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 28px; max-width: 1300px; }
+  .calc + .mx-eq { margin-top: 22px; }
+  .slide.active .mx-eq { animation: rise .6s cubic-bezier(.22,1,.36,1) both; }
+  .mx-eq .op { font-family: var(--mono); font-size: 22px; color: var(--muted-2); white-space: nowrap; }
+  .mx { display: flex; flex-direction: column; gap: 8px; }
+  .mx figcaption { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.03em; }
+  .mx figcaption b { font-family: var(--sans); font-size: 19px; color: var(--ink); margin-right: 8px; letter-spacing: 0; }
+  .mx-grid {
+    display: grid; gap: 3px; width: max-content;
+    background: var(--paper-2); border: 1px solid var(--line-2); border-radius: 10px;
+    padding: 8px; box-shadow: var(--shadow);
+  }
+  .mx-grid i {
+    --cell: var(--accent-3);
+    font-style: normal; font-family: var(--mono); font-size: 13px; text-align: center;
+    padding: 7px 6px; border-radius: 5px; min-width: 50px;
+    background: color-mix(in srgb, var(--cell) calc(var(--a) * 55%), var(--paper-2));
+  }
+  .mx-grid i.neg { --cell: var(--accent-2); }
+  .mx[data-kind="prob"] .mx-grid i { --cell: var(--accent); }
+  .mx-grid i.masked {
+    background: repeating-linear-gradient(45deg, #EFEBE3 0 6px, var(--paper-2) 6px 12px);
+    color: var(--muted-2);
+  }
+  .mx-grid i.hl { outline: 2px solid var(--accent-2); outline-offset: -1px; font-weight: 600; }
+  .mx-grid .rl, .mx-grid .cl { font-family: var(--mono); font-size: 11px; color: var(--muted); align-self: center; white-space: nowrap; }
+  .mx-grid .rl { text-align: right; padding-right: 6px; }
+  .mx-grid .cl { text-align: center; padding-bottom: 2px; }
+
+  .calc {
+    margin-top: 22px; max-width: 820px;
+    font-family: var(--mono); font-size: 14px; line-height: 1.85; color: var(--ink);
+    background: var(--paper-2); border: 1px dashed var(--line-2); border-left: 3px solid var(--accent);
+    border-radius: 10px; padding: 12px 18px;
+  }
+  .calc b { color: var(--accent-2); }
+
+  /* ---------- Word-vector map ---------- */
+  .scatter {
+    flex: 1 1 460px; max-width: 680px; margin-top: 26px;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+    padding: 12px; box-shadow: var(--shadow);
+  }
+  .scatter svg { width: 100%; height: auto; display: block; }
+  .scatter text { font-family: var(--mono); font-size: 13px; fill: var(--ink); }
+  .scatter .grp { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .scatter .note { font-size: 11px; fill: var(--accent-2); }
+  .scatter .zone { stroke-dasharray: 4 4; stroke-width: 1; }
+  .scatter .z1 { fill: rgba(19,140,153,0.06); stroke: var(--accent-3); }
+  .scatter .z2 { fill: rgba(224,88,58,0.06); stroke: var(--accent-2); }
+  .scatter .z3 { fill: rgba(200,134,13,0.07); stroke: var(--accent); }
+  .scatter .g1, .scatter .p1 { fill: var(--accent-3); }
+  .scatter .g2, .scatter .p2 { fill: var(--accent-2); }
+  .scatter .g3, .scatter .p3 { fill: var(--accent); }
+  .scatter .p4 { fill: var(--ink); }
+  .scatter .vec { stroke: var(--accent-2); stroke-width: 2; }
+  .scatter .ah { fill: var(--accent-2); }
+
+  /* ---------- Next-token prediction panel ---------- */
+  .panel {
+    margin-top: 32px; max-width: 900px;
+    border: 1px solid var(--line-2); border-radius: 16px; overflow: hidden;
+    background: var(--paper-2); box-shadow: 0 30px 60px -30px rgba(23,23,30,0.35);
+  }
+  .panel-bar {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    border-bottom: 1px solid var(--line); background: #F1EEE7;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  .panel-bar i { width: 10px; height: 10px; border-radius: 50%; background: #D9D5CC; display: inline-block; }
+  .panel-bar span { margin-left: 10px; }
+  .panel-body { padding: 24px 28px; }
+  .sentence { font-size: clamp(20px, 2vw, 28px); font-weight: 500; margin-bottom: 22px; }
+  .sentence .blank {
+    display: inline-block; min-width: 90px; border-bottom: 3px solid var(--accent);
+    color: var(--accent); text-align: center;
+  }
+  .prob-row { display: grid; grid-template-columns: 120px 1fr 56px; align-items: center; gap: 14px; margin-bottom: 10px; }
+  .prob-row .w { font-family: var(--mono); font-size: 15px; }
+  .prob-row .track { height: 12px; border-radius: 6px; background: #ECE8E0; overflow: hidden; }
+  .prob-row .bar { height: 100%; width: var(--w); border-radius: 6px; background: var(--accent); }
+  .prob-row:nth-child(2) .bar { background: var(--accent-2); }
+  .prob-row:nth-child(3) .bar { background: var(--accent-3); }
+  .prob-row:nth-child(n+4) .bar { background: var(--muted-2); }
+  .prob-row .p { font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: right; }
+
+  /* ---------- Chat comparison ---------- */
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 32px; max-width: 1100px; }
+  .chat {
+    border: 1px solid var(--line-2); border-radius: 16px; background: #FBFAF7;
+    padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow);
+  }
+  .chat-head { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .chat-head.bad { color: var(--accent-2); }
+  .chat-head.good { color: var(--accent-3); }
+  .bubble { font-size: 14.5px; line-height: 1.5; padding: 10px 13px; border-radius: 12px; max-width: 94%; }
+  .bubble.me { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 4px; }
+  .bubble.ai { background: var(--paper-2); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .bubble.ai.win { border-color: var(--accent-3); box-shadow: 0 0 0 3px rgba(19,140,153,0.12); }
+  .bubble.ai.lose { opacity: 0.7; }
+  .verdict { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .verdict b { color: var(--accent-3); }
+
+  /* ---------- Loss curve ---------- */
+  .row { display: flex; gap: 48px; align-items: flex-start; flex-wrap: wrap; }
+  .row > .side { flex: 1 1 320px; max-width: 520px; }
+  .curve {
+    flex: 1 1 380px; max-width: 560px; margin-top: 34px;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 16px;
+    padding: 18px 18px 10px; box-shadow: var(--shadow);
+  }
+  .curve svg { width: 100%; height: auto; display: block; }
+  .curve .cap { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.06em; margin-top: 6px; }
+
+  /* ---------- Glossary ---------- */
+  .gloss { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 40px; margin-top: 30px; max-width: 1200px; }
+  .gloss div { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .gloss dt { font-family: var(--techno); font-weight: 600; font-size: 16px; text-transform: uppercase; color: var(--accent); letter-spacing: 0.02em; }
+  .gloss dd { color: var(--muted); font-size: 14.5px; line-height: 1.5; margin-top: 3px; }
+
+  /* ---------- Counter / arrows ---------- */
+  .counter {
+    position: absolute; bottom: 22px; right: 32px; z-index: 5;
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+  .counter b { color: var(--ink); }
+
+  .nav-arrows { display: flex; gap: 10px; margin-top: 18px; }
+  .arrow {
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--line-2); background: var(--paper-2);
+    color: var(--ink); cursor: pointer; font-size: 18px;
+    display: grid; place-items: center; transition: all .25s ease;
+  }
+  .arrow:hover { border-color: var(--accent); color: var(--accent); }
+  .arrow:disabled { opacity: 0.3; cursor: default; }
+
+  /* ---------- Timeline ---------- */
+  .timeline {
+    position: absolute; left: 56px; right: 56px; top: 22px; z-index: 6;
+    height: 42px;
+    opacity: 0; transform: translateY(-12px);
+    transition: opacity .6s ease, transform .6s cubic-bezier(.22,1,.36,1);
+    pointer-events: none;
+  }
+  .timeline.show { opacity: 1; transform: none; pointer-events: auto; }
+  .timeline .tl-track {
+    position: absolute; left: 0; right: 0; top: 9px; height: 2px;
+    background: rgba(23,23,30,0.10); border-radius: 2px;
+  }
+  .timeline .tl-fill {
+    position: absolute; left: 0; top: 0; height: 100%; width: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2) 60%, var(--accent-3));
+    border-radius: 2px;
+    transition: width .5s cubic-bezier(.22,1,.36,1);
+  }
+  .tl-node {
+    position: absolute; top: 0; transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    cursor: pointer; background: none; border: none; padding: 0;
+  }
+  .tl-node .tl-dot {
+    width: 11px; height: 11px; border-radius: 50%; margin-top: 3.5px;
+    background: var(--paper); border: 2px solid var(--muted-2);
+    transition: background .35s ease, border-color .35s ease, transform .35s ease, box-shadow .35s ease;
+  }
+  .tl-node .tl-date {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    letter-spacing: 0.03em; white-space: nowrap; transition: color .35s ease;
+  }
+  .tl-node:hover .tl-dot { border-color: var(--accent); }
+  .tl-node:hover .tl-date { color: var(--ink); }
+  .tl-node.done .tl-dot { border-color: var(--accent); background: rgba(245,184,61,0.45); }
+  .tl-node.active .tl-dot {
+    background: var(--accent); border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(245,184,61,0.25); transform: scale(1.3);
+  }
+  .tl-node.active .tl-date { color: var(--accent); font-weight: 600; }
+
+  @media (max-width: 1280px) {
+    .cards.four { grid-template-columns: repeat(2, 1fr); }
+    .ds-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 1024px) {
+    body { overflow: auto; }
+    .app { flex-direction: column; height: auto; }
+    .sidebar { width: 100%; flex: none; }
+    .stage { min-height: 100vh; }
+    .timeline { display: none; }
+    .slide { padding: 8vh 16px 10vh; }
+    .cards.two, .cards.three, .cards.four, .stats, .ds-grid, .ds-grid.two, .compare, .gloss { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow .arr { transform: rotate(90deg); height: 30px; }
+    .prob-row { grid-template-columns: 90px 1fr 48px; }
+  }
+
+  /* ---------- Intro / cover ---------- */
+  .intro {
+    position: fixed; inset: 0; z-index: 50; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 9vh 8vw;
+    background:
+      radial-gradient(1000px 720px at 28% 18%, var(--glow), transparent 60%),
+      radial-gradient(900px 820px at 82% 92%, rgba(224,88,58,0.10), transparent 60%),
+      var(--paper);
+    transition: opacity .7s ease, transform .8s cubic-bezier(.22,1,.36,1), filter .7s ease;
+  }
+  .intro.hidden { opacity: 0; transform: scale(1.05); filter: blur(6px); pointer-events: none; }
+  .intro .kicker {
+    font-family: var(--mono); font-size: 13px; letter-spacing: 0.32em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 30px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .intro .kicker::before { content: ""; width: 42px; height: 1px; background: var(--accent); }
+  .intro h1 {
+    font-family: var(--sans); font-weight: 700;
+    font-size: clamp(44px, 7.4vw, 112px); line-height: 0.98;
+    letter-spacing: -0.035em; max-width: 18ch;
+  }
+  .intro .sub {
+    font-size: clamp(17px, 2vw, 27px); color: var(--muted);
+    line-height: 1.45; max-width: 58ch; margin-top: 30px; font-weight: 400;
+  }
+  .intro .sub strong { color: var(--ink); font-weight: 600; }
+  .intro .cta {
+    margin-top: 48px; font-family: var(--mono); font-size: 14px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-2);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .intro .cta .arrow-i { animation: nudge 1.5s ease-in-out infinite; }
+  @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(7px); } }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+
+<!-- INTRO / COVER -->
+<section class="intro" id="intro">
+  <div class="kicker">Comprendre l'IA · Entraîner un LLM</div>
+  <h1><span class="dim">De</span> <span class="hl">l'internet brut</span><br/><span class="dim">à un</span> <span class="hl2">assistant</span> <span class="hl3">qui répond</span></h1>
+  <p class="sub">
+    Toutes les étapes de fabrication d'un modèle de langage, expliquées sans jargon.<br/>
+    <strong>Données, pré-entraînement, mid-training, SFT, RLHF, DPO, RL : la vue d'ensemble.</strong>
+  </p>
+  <div class="cta">Commencer <span class="arrow-i">→</span></div>
+</section>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="kicker">Guide pas à pas</div>
+      <h1><span class="hl">Entraîner</span> <span class="hl2">un LLM</span> <span class="dim">de A à Z</span></h1>
+      <p>Pour comprendre <em>ce qui se passe</em> à chaque étape, sans prérequis</p>
+    </div>
+
+    <div class="search">
+      <input type="search" id="search" placeholder="Rechercher dans la page…" autocomplete="off" spellcheck="false" aria-label="Rechercher dans la page" />
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg>
+      <span class="search-key">/</span>
+    </div>
+    <div class="search-results" id="searchResults" hidden></div>
+
+    <nav id="nav"><!-- injected --></nav>
+
+    <div class="nav-arrows">
+      <button class="arrow" id="prev" aria-label="Précédent">←</button>
+      <button class="arrow" id="next" aria-label="Suivant">→</button>
+    </div>
+
+    <div class="sidebar-foot">
+      Navigation : <kbd>←</kbd> <kbd>→</kbd> · molette · <kbd>1</kbd> à <kbd>9</kbd><br/>
+      Recherche : <kbd>/</kbd> · <kbd>Entrée</kbd> résultat suivant · <kbd>Échap</kbd><br/>
+      Sources vérifiées en novembre 2026
+    </div>
+  </aside>
+
+  <!-- STAGE -->
+  <main class="stage">
+    <div class="slides" id="slides">
+
+      <!-- 01 · L'idée -->
+      <section class="slide center" data-title="L'idée de départ" data-date="Vue" data-t="1">
+        <div class="ghost">01</div>
+        <div class="eyebrow">01 · En une phrase</div>
+        <p class="statement">Un LLM est une machine à <span class="hl">deviner</span> le <span class="hl3">mot suivant</span>.</p>
+        <p class="lead">Tout le reste en découle. On lui fait d'abord <strong>lire des milliards de pages</strong> pour qu'il devine bien la suite d'un texte, puis on lui apprend <strong>à se comporter en assistant</strong> : répondre, suivre une consigne, préférer les bonnes réponses, raisonner.</p>
+      </section>
+
+      <!-- 02 · Les étapes -->
+      <section class="slide" data-title="Les grandes étapes" data-date="Vue" data-t="1">
+        <div class="ghost">02</div>
+        <div class="eyebrow">02 · La chaîne de fabrication</div>
+        <h2>Les <span class="hl">étapes</span>, dans l'ordre</h2>
+        <div class="flow tight">
+          <div class="step"><div class="n">00</div><h4>Données</h4><p>Collecter et nettoyer des téraoctets de texte.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">01</div><h4>Pré-entraînement</h4><p>Lire et deviner la suite. Le plus long, le plus cher.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">02</div><h4>Mid-training</h4><p>Finir sur les meilleures données.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">03</div><h4>SFT</h4><p>Imiter des exemples de bonnes réponses.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">04</div><h4>Préférences</h4><p>RLHF ou DPO : préférer la meilleure réponse.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">05</div><h4>RL vérifiable</h4><p>S'entraîner sur des exercices corrigés.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">06</div><h4>Évaluer &amp; livrer</h4><p>Mesurer, compresser, déployer.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Les étapes 01 et 02 forment le <strong>pré-entraînement</strong> (pre-training). Les étapes 03 à 05 forment le <strong>post-entraînement</strong> (post-training), qu'on appelle aussi « alignement ».</p>
+      </section>
+
+      <!-- 03.1 · Les données -->
+      <section class="slide" data-title="Les données" data-group="Avant d'entraîner" data-date="Préparation" data-t="2">
+        <div class="ghost">03</div>
+        <div class="eyebrow">03.1 · Préparer la bibliothèque</div>
+        <h2>Tout commence par les <span class="hl2">données</span></h2>
+        <p class="lead">Un modèle ne sait que ce qu'il a lu. La première étape consiste donc à constituer une immense bibliothèque, puis à <strong>jeter tout ce qui est mauvais</strong> : spam, doublons, pages cassées, contenu toxique.</p>
+        <div class="flow">
+          <div class="step"><div class="n">COLLECTER</div><h4>Aspirer le web</h4><p>Common Crawl archive des milliards de pages depuis 2008.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">EXTRAIRE</div><h4>Garder le texte</h4><p>Retirer menus, publicités et code HTML.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">TRIER</div><h4>Langue &amp; qualité</h4><p>Un petit modèle note chaque page, on garde les meilleures.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">DÉDOUBLONNER</div><h4>Une seule copie</h4><p>Un texte vu 1 000 fois serait appris par cœur.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">MÉLANGER</div><h4>Le « mix »</h4><p>Web, livres, code, maths, en proportions choisies.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Le constat de 2024-2026 : <strong>la qualité bat la quantité</strong>. Un petit modèle nourri de pages « éducatives » apprend plus vite qu'avec tout le web brut.</p>
+      </section>
+
+      <!-- 03.2 · Le tokenizer -->
+      <section class="slide" data-title="Le tokenizer" data-group="Avant d'entraîner" data-date="Préparation" data-t="2">
+        <div class="ghost">03</div>
+        <div class="eyebrow">03.2 · Découper le texte</div>
+        <h2>Le modèle ne lit pas des mots, mais des <span class="hl3">tokens</span></h2>
+        <p class="lead">Un ordinateur ne manipule que des nombres. Le <strong>tokenizer</strong> découpe le texte en morceaux fréquents (mots, bouts de mots, ponctuation) et donne un numéro à chacun. On l'entraîne une fois, avant tout le reste, sur un échantillon des données.</p>
+        <div class="toks">
+          <span class="tk">Le<small>2 034</small></span>
+          <span class="tk"> chat<small>8 117</small></span>
+          <span class="tk"> dorm<small>31 402</small></span>
+          <span class="tk">ait<small>1 287</small></span>
+          <span class="tk"> sur<small>1 044</small></span>
+          <span class="tk"> le<small>389</small></span>
+          <span class="tk"> can<small>6 551</small></span>
+          <span class="tk">apé<small>19 870</small></span>
+          <span class="tk">.<small>13</small></span>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Méthode la plus courante : <strong>BPE</strong> (Byte Pair Encoding), qui fusionne pas à pas les paires de caractères les plus fréquentes. Un vocabulaire typique compte 32 000 à 128 000 tokens. Les numéros ci-dessus sont illustratifs. En moyenne, 1 token ≈ ¾ de mot en anglais, un peu moins en français.</p>
+      </section>
+
+      <!-- 04.1 · Vue d'ensemble -->
+      <section class="slide" data-title="Vue d'ensemble" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.1 · Ouvrir la boîte</div>
+        <h2>Le trajet d'une phrase dans le <span class="hl">Transformer</span></h2>
+        <p class="lead">Le modèle est un gros calcul : l'architecture <strong>Transformer</strong> (2017). Entre le texte d'entrée et la probabilité du mot suivant, la phrase traverse une chaîne d'opérations. À chaque étape circule <strong>un tableau de nombres, une matrice, avec une ligne par token</strong>.</p>
+        <div class="flow tight">
+          <div class="step"><div class="n">1</div><h4>Embeddings</h4><p>Chaque token devient une ligne de nombres.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">2</div><h4>+ Position</h4><p>On marque l'ordre des mots.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">3</div><h4>Attention</h4><p>Les tokens échangent de l'information (Q, K, V).</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">4</div><h4>MLP</h4><p>Chaque token « réfléchit » seul.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">×N</div><h4>Empiler</h4><p>Les étapes 3 et 4 forment un bloc, répété N fois.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">5</div><h4>Prédire</h4><p>Dernière ligne → probabilité de chaque token.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> <strong>Fil rouge du chapitre</strong> : la phrase « Le chat dort », 3 tokens, avec des vecteurs de 4 nombres au lieu de 768. Les valeurs sont inventées, mais <strong>tous les calculs sont exacts</strong> : vous pouvez les refaire à la main.</p>
+      </section>
+
+      <!-- 04.2 · Embeddings -->
+      <section class="slide" data-title="Embeddings" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.2 · Des tokens aux nombres</div>
+        <h2>Chaque token devient une <span class="hl2">ligne de nombres</span></h2>
+        <p class="lead">Le modèle possède une grande table, la <strong>matrice d'embeddings</strong> : une ligne par token du vocabulaire (50 257 lignes pour GPT-2) et autant de colonnes que la « largeur » du modèle, notée <strong>d</strong> (768 pour GPT-2, 4 ici). Lire un token, c'est simplement <strong>aller chercher sa ligne</strong>.</p>
+        <div class="mx-eq">
+          <div class="toks col">
+            <span class="tk">Le<small>id 2 034</small></span>
+            <span class="tk">chat<small>id 8 117</small></span>
+            <span class="tk">dort<small>id 21 790</small></span>
+          </div>
+          <span class="op">→</span>
+          <figure class="mx" data-rows="Le,chat,dort" data-cols="d1,d2,d3,d4" data-v="[[0.1,0,0.9,0],[0.9,0.1,0,0.3],[0.1,0.9,0,0.2]]">
+            <figcaption><b>E</b>3 × 4 · les 3 lignes extraites de la table</figcaption>
+          </figure>
+        </div>
+        <p class="footnote"><span class="accent">→</span> La phrase entière devient une matrice <strong>n × d</strong> (n tokens, d colonnes). Dans cet exemple jouet, on peut lire d1 comme « être vivant », d2 comme « action », d3 comme « article ». Dans un vrai modèle, aucune colonne n'a de sens isolé : le sens est réparti sur toutes. Ces nombres démarrent au hasard et sont <strong>ajustés pendant l'entraînement</strong>, comme tous les paramètres.</p>
+      </section>
+
+      <!-- 04.3 · Le sens des vecteurs -->
+      <section class="slide" data-title="Le sens des vecteurs" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.3 · Une carte des mots</div>
+        <h2>Des mots proches, des <span class="hl3">vecteurs proches</span></h2>
+        <p class="lead">Un vecteur de d nombres est un point dans un espace à d dimensions. Après l'entraînement, les mots employés dans des contextes semblables se retrouvent <strong>voisins</strong>, et certaines <strong>directions</strong> prennent un sens.</p>
+        <div class="row">
+          <div class="scatter">
+            <svg viewBox="0 0 600 300" role="img" aria-label="Carte en deux dimensions des vecteurs de mots : animaux, verbes et articles regroupés ; roi et reine décalés comme homme et femme">
+              <defs><marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="ah" /></marker></defs>
+              <ellipse cx="120" cy="92" rx="88" ry="58" class="zone z1" />
+              <ellipse cx="390" cy="88" rx="80" ry="50" class="zone z2" />
+              <ellipse cx="118" cy="236" rx="70" ry="40" class="zone z3" />
+              <text x="44" y="30" class="grp g1">animaux</text>
+              <text x="322" y="30" class="grp g2">verbes</text>
+              <text x="58" y="190" class="grp g3">articles</text>
+              <circle cx="96" cy="78" r="5" class="p1" /><text x="106" y="82">chat</text>
+              <circle cx="150" cy="66" r="5" class="p1" /><text x="160" y="70">chien</text>
+              <circle cx="128" cy="118" r="5" class="p1" /><text x="138" y="122">lion</text>
+              <circle cx="66" cy="112" r="5" class="p1" /><text x="22" y="132">souris</text>
+              <circle cx="362" cy="74" r="5" class="p2" /><text x="372" y="78">dort</text>
+              <circle cx="410" cy="96" r="5" class="p2" /><text x="420" y="100">mange</text>
+              <circle cx="366" cy="116" r="5" class="p2" /><text x="376" y="120">court</text>
+              <circle cx="88" cy="228" r="5" class="p3" /><text x="98" y="232">le</text>
+              <circle cx="124" cy="252" r="5" class="p3" /><text x="134" y="256">la</text>
+              <circle cx="150" cy="222" r="5" class="p3" /><text x="160" y="226">un</text>
+              <circle cx="310" cy="262" r="5" class="p4" /><text x="268" y="282">homme</text>
+              <circle cx="410" cy="262" r="5" class="p4" /><text x="398" y="290">femme</text>
+              <circle cx="330" cy="196" r="5" class="p4" /><text x="300" y="186">roi</text>
+              <circle cx="430" cy="196" r="5" class="p4" /><text x="440" y="190">reine</text>
+              <line x1="316" y1="262" x2="400" y2="262" class="vec" marker-end="url(#arrowhead)" />
+              <line x1="336" y1="196" x2="420" y2="196" class="vec" marker-end="url(#arrowhead)" />
+              <text x="452" y="232" class="note">même direction :</text>
+              <text x="452" y="248" class="note">masculin → féminin</text>
+            </svg>
+          </div>
+          <div class="side">
+            <div class="card" style="margin-top:26px"><div class="idx">/ voisinage</div><h3>Les familles se regroupent</h3><p>« chat » est plus proche de « chien » que de « dort ». Le modèle l'a appris seul, en voyant ces mots dans les mêmes phrases.</p></div>
+            <div class="card" style="margin-top:16px"><div class="idx">/ directions</div><h3>roi − homme + femme ≈ reine</h3><p>Le déplacement « masculin → féminin » est à peu près le même partout. On peut faire de l'arithmétique sur le sens.</p></div>
+          </div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Carte simplifiée en 2 dimensions pour l'illustration. Les vrais vecteurs en ont des centaines, et le modèle continue d'affiner ce sens couche après couche, en fonction du contexte.</p>
+      </section>
+
+      <!-- 04.4 · La position -->
+      <section class="slide" data-title="La position" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.4 · L'ordre des mots</div>
+        <h2>Ajouter la <span class="hl">position</span> de chaque token</h2>
+        <p class="lead">L'attention, qu'on va voir, traite les tokens comme un sac : sans indice, « le chat mange la souris » et « la souris mange le chat » seraient identiques. On ajoute donc à chaque ligne <strong>un vecteur qui dépend de sa place</strong> dans la phrase.</p>
+        <div class="mx-eq">
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.1,0,0.9,0],[0.9,0.1,0,0.3],[0.1,0.9,0,0.2]]"><figcaption><b>E</b>sens</figcaption></figure>
+          <span class="op">+</span>
+          <figure class="mx" data-rows="pos 0,pos 1,pos 2" data-v="[[0,0.1,0,0.1],[0.1,0,0.1,0],[0,0.1,0.1,0.1]]"><figcaption><b>P</b>position</figcaption></figure>
+          <span class="op">=</span>
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.1,0.1,0.9,0.1],[1,0.1,0.1,0.3],[0.1,1,0.1,0.3]]" data-hl="*"><figcaption><b>X</b>3 × 4 · l'entrée du premier bloc</figcaption></figure>
+        </div>
+        <p class="footnote"><span class="accent">→</span> L'addition se fait case par case : 0,9 + 0,1 = 1,0 pour « chat », colonne d1. GPT-2 apprend une ligne P par position (1 024 positions). Les modèles récents (Llama, SmolLM) utilisent plutôt <strong>RoPE</strong> : au lieu d'ajouter un vecteur, on fait « tourner » Q et K d'un angle qui dépend de la position. Même but, meilleur sur les textes longs.</p>
+      </section>
+
+      <!-- 04.5 · QKV : l'idée -->
+      <section class="slide" data-title="Q, K, V : l'idée" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.5 · Le cœur du Transformer : l'attention</div>
+        <h2>Query, Key, Value : <span class="hl2">chercher chez les voisins</span></h2>
+        <p class="lead">Pour bien représenter « dort », le modèle doit savoir <strong>qui dort</strong>. L'attention permet à chaque token d'aller chercher de l'information chez les tokens qui le précèdent. Pour cela, chaque token fabrique trois vecteurs :</p>
+        <div class="cards three">
+          <div class="card"><div class="idx">/ Q · query · requête</div><h3>Ce que je cherche</h3><p>« dort » demande : <strong>qui est mon sujet ?</strong> Un être vivant, de préférence.</p></div>
+          <div class="card"><div class="idx">/ K · key · clé</div><h3>Ce que j'annonce</h3><p>« chat » affiche son étiquette : <strong>je suis un nom, un être vivant</strong>.</p></div>
+          <div class="card"><div class="idx">/ V · value · valeur</div><h3>Ce que je transmets</h3><p>Si un token me choisit, voici <strong>l'information que je lui donne</strong>.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> L'analogie du moteur de recherche : votre <strong>requête</strong> (Q) est comparée aux <strong>mots-clés</strong> (K) de chaque document, puis on vous renvoie le <strong>contenu</strong> (V) des documents les plus pertinents. Ici, chaque token est à la fois chercheur et document.</p>
+      </section>
+
+      <!-- 04.6 · Calculer Q, K, V -->
+      <section class="slide" data-title="Calculer Q, K, V" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.6 · Trois multiplications de matrices</div>
+        <h2>Q, K et V sortent de <span class="hl3">X</span></h2>
+        <p class="lead">On multiplie X par trois matrices de poids apprises, <strong>W<sub>Q</sub></strong>, <strong>W<sub>K</sub></strong> et <strong>W<sub>V</sub></strong> (taille d × d<sub>k</sub>, ici 4 × 3). Chaque ligne de X, donc chaque token, est transformée de la même façon et indépendamment des autres.</p>
+        <div class="mx-eq">
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.1,0.1,0.9,0.1],[1,0.1,0.1,0.3],[0.1,1,0.1,0.3]]" data-hl="2,*"><figcaption><b>X</b>3 × 4</figcaption></figure>
+          <span class="op">×</span>
+          <figure class="mx" data-rows="d1,d2,d3,d4" data-v="[[0.2,0,0.5],[2,0.1,0],[0,0.8,0.3],[0.1,0,0.2]]" data-hl="*,0"><figcaption><b>W<sub>Q</sub></b>4 × 3 · appris</figcaption></figure>
+          <span class="op">=</span>
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.23,0.73,0.34],[0.43,0.09,0.59],[2.05,0.18,0.14]]" data-hl="2,0"><figcaption><b>Q</b>3 × 3 · requêtes</figcaption></figure>
+        </div>
+        <div class="calc">Q[dort, 1] = ligne « dort » de X · colonne 1 de W<sub>Q</sub><br/>= 0,1×0,2 + 1,0×<b>2,0</b> + 0,1×0 + 0,3×0,1 = <b>2,05</b></div>
+        <div class="mx-eq">
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.25,0.83,0.16],[2.11,0.13,0.43],[0.49,0.22,0.16]]"><figcaption><b>K</b>= X × W<sub>K</sub> · clés</figcaption></figure>
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.21,0.13,0.84],[1.07,0.19,0.21],[0.17,1.09,0.3]]"><figcaption><b>V</b>= X × W<sub>V</sub> · valeurs</figcaption></figure>
+        </div>
+        <p class="footnote"><span class="accent">→</span> W<sub>Q</sub> a appris à transformer « action » (d2) en « je cherche un être vivant » : d'où le 2,05 de « dort ». Une multiplication de matrices, ce sont des milliers de « multiplier puis additionner » : exactement ce que les <strong>GPU</strong> font très vite, en parallèle.</p>
+      </section>
+
+      <!-- 04.7 · Les scores -->
+      <section class="slide" data-title="Les scores" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.7 · Qui regarde qui</div>
+        <h2>Comparer chaque requête à chaque clé : <span class="hl">Q × Kᵀ</span></h2>
+        <p class="lead">On fait le <strong>produit scalaire</strong> de la requête de chaque token avec la clé de chaque token (multiplier terme à terme, puis additionner). Plus il est grand, plus les deux vecteurs « vont dans le même sens ». On obtient un tableau <strong>n × n</strong> de scores, qu'on divise par √d<sub>k</sub> pour garder des nombres raisonnables.</p>
+        <div class="mx-eq">
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.23,0.73,0.34],[0.43,0.09,0.59],[2.05,0.18,0.14]]" data-hl="2,*"><figcaption><b>Q</b>requêtes</figcaption></figure>
+          <span class="op">×</span>
+          <figure class="mx" data-cols="Le,chat,dort" data-v="[[0.25,2.11,0.49],[0.83,0.13,0.22],[0.16,0.43,0.16]]" data-hl="*,1"><figcaption><b>Kᵀ</b>clés, transposée</figcaption></figure>
+          <span class="op">÷ √3 =</span>
+          <figure class="mx" data-rows="Le,chat,dort" data-cols="Le,chat,dort" data-v="[[0.41,0.42,0.19],[0.16,0.68,0.19],[0.4,2.55,0.62]]" data-hl="2,1"><figcaption><b>S</b>3 × 3 · scores (ligne = qui cherche)</figcaption></figure>
+        </div>
+        <div class="calc">S[dort, chat] = (2,05×2,11 + 0,18×0,13 + 0,14×0,43) ÷ √3<br/>= 4,41 ÷ 1,73 = <b>2,55</b> · le score le plus élevé de la ligne « dort »</div>
+        <p class="footnote"><span class="accent">→</span> « Transposer » K (Kᵀ) consiste à échanger lignes et colonnes, pour que la multiplication compare les bons vecteurs. Ce tableau grandit comme <strong>n²</strong> : 1 000 tokens donnent un million de scores, par tête et par couche. C'est pourquoi les longs contextes coûtent cher.</p>
+      </section>
+
+      <!-- 04.8 · Masque & softmax -->
+      <section class="slide" data-title="Masque &amp; softmax" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.8 · Des scores aux pourcentages</div>
+        <h2>Interdire de lire le futur, puis <span class="hl2">répartir 100 %</span></h2>
+        <div class="cards two">
+          <div class="card"><div class="idx">/ 1 · masque causal</div><h3>Pas de triche</h3><p>Un token ne regarde que lui-même et ceux d'avant. Sinon, à l'entraînement, il lirait le mot qu'il doit deviner. On met <strong>−∞</strong> dans les cases du futur.</p></div>
+          <div class="card"><div class="idx">/ 2 · softmax</div><h3>Des parts de gâteau</h3><p>Chaque ligne devient des <strong>pourcentages positifs qui totalisent 100 %</strong>. Les grands scores prennent la plus grosse part, −∞ donne 0 %.</p></div>
+        </div>
+        <div class="mx-eq">
+          <figure class="mx" data-rows="Le,chat,dort" data-cols="Le,chat,dort" data-v="[[0.41,null,null],[0.16,0.68,null],[0.4,2.55,0.62]]" data-hl="2,*"><figcaption><b>S masqué</b>le futur est caché</figcaption></figure>
+          <span class="op">softmax →</span>
+          <figure class="mx" data-kind="prob" data-rows="Le,chat,dort" data-cols="Le,chat,dort" data-v="[[1,0,0],[0.37,0.63,0],[0.09,0.79,0.12]]" data-hl="2,*"><figcaption><b>A</b>poids d'attention</figcaption></figure>
+        </div>
+        <div class="calc">Ligne « dort » : e<sup>0,40</sup> = 1,49 · e<sup>2,55</sup> = 12,81 · e<sup>0,62</sup> = 1,86 · total = 16,16<br/>→ 1,49 ÷ 16,16 = 9 % · 12,81 ÷ 16,16 = <b>79 %</b> · 1,86 ÷ 16,16 = 12 %</div>
+        <p class="footnote"><span class="accent">→</span> L'exponentielle (e<sup>x</sup>) rend tout positif et creuse les écarts : un score de 2,55 contre 0,40 devient une part près de 9 fois plus grosse. « Le », premier mot, n'a que lui-même à regarder : 100 %.</p>
+      </section>
+
+      <!-- 04.9 · Mélanger les valeurs -->
+      <section class="slide" data-title="Mélanger les valeurs" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.9 · Récupérer l'information</div>
+        <h2>Chaque token reçoit un <span class="hl3">mélange des valeurs</span></h2>
+        <p class="lead">Dernière étape : on multiplie les poids d'attention <strong>A</strong> par les valeurs <strong>V</strong>. La nouvelle ligne de chaque token est une <strong>moyenne pondérée</strong> des valeurs des tokens qu'il regarde.</p>
+        <div class="mx-eq">
+          <figure class="mx" data-kind="prob" data-rows="Le,chat,dort" data-cols="Le,chat,dort" data-v="[[1,0,0],[0.37,0.63,0],[0.09,0.79,0.12]]" data-hl="2,*"><figcaption><b>A</b>poids</figcaption></figure>
+          <span class="op">×</span>
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.21,0.13,0.84],[1.07,0.19,0.21],[0.17,1.09,0.3]]" data-hl="1,*"><figcaption><b>V</b>valeurs</figcaption></figure>
+          <span class="op">=</span>
+          <figure class="mx" data-rows="Le,chat,dort" data-v="[[0.21,0.13,0.84],[0.75,0.17,0.44],[0.88,0.29,0.28]]" data-hl="2,*"><figcaption><b>Sortie</b>3 × 3 · contexte ajouté</figcaption></figure>
+        </div>
+        <div class="calc">Sortie[dort] = 9 % × V[Le] + <b>79 % × V[chat]</b> + 12 % × V[dort]<br/>= [0,019 + 0,845 + 0,020 · 0,012 + 0,150 + 0,131 · 0,076 + 0,166 + 0,036] = <b>[0,88 · 0,29 · 0,28]</b></div>
+        <p class="footnote"><span class="accent">→</span> La ligne de « dort » porte maintenant surtout l'information venue de « chat » : le modèle « sait » qui dort. Toute l'attention tient dans une formule : <strong>Attention(Q, K, V) = softmax(Q·Kᵀ ÷ √d<sub>k</sub>) · V</strong>.</p>
+      </section>
+
+      <!-- 04.10 · Multi-têtes -->
+      <section class="slide" data-title="Multi-têtes" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.10 · Multi-head attention</div>
+        <h2>Plusieurs attentions <span class="hl">en parallèle</span></h2>
+        <p class="lead">Une seule attention ne suit qu'un type de relation à la fois. Le modèle en fait donc tourner plusieurs côte à côte, les <strong>têtes</strong>, chacune avec ses propres W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>. Leurs sorties sont collées bout à bout, puis mélangées par une dernière matrice <strong>W<sub>O</sub></strong> qui ramène à la largeur d.</p>
+        <div class="flow tight">
+          <div class="step"><div class="n">ENTRÉE</div><h4>X</h4><p>n × 768</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">TÊTES</div><h4>12 attentions</h4><p>Chacune produit n × 64.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">CONCATÉNER</div><h4>Coller</h4><p>12 × 64 = 768 colonnes.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">PROJETER</div><h4>× W<sub>O</sub></h4><p>768 × 768, mélange les têtes.</p></div>
+        </div>
+        <div class="cards four">
+          <div class="card"><div class="idx">/ tête A</div><h3>Le sujet</h3><p>Le verbe cherche qui fait l'action.</p></div>
+          <div class="card"><div class="idx">/ tête B</div><h3>Le voisin</h3><p>Regarder simplement le token précédent.</p></div>
+          <div class="card"><div class="idx">/ tête C</div><h3>L'accord</h3><p>Genre et nombre : « les chats » → « dorment ».</p></div>
+          <div class="card"><div class="idx">/ tête D</div><h3>Les renvois</h3><p>« il » pointe vers « le chat » trois phrases plus haut.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Chiffres de GPT-2 small. Personne ne programme ces rôles : la spécialisation <strong>émerge de l'entraînement</strong>, et beaucoup de têtes restent difficiles à interpréter. SmolLM2 partage les K et V entre groupes de têtes (GQA) pour économiser de la mémoire.</p>
+      </section>
+
+      <!-- 04.11 · Le bloc complet -->
+      <section class="slide" data-title="Le bloc complet" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.11 · Un bloc Transformer</div>
+        <h2>Attention, MLP et <span class="hl2">l'autoroute résiduelle</span></h2>
+        <div class="flow tight">
+          <div class="step"><div class="n">IN</div><h4>X</h4><p>n × d</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">NORM</div><h4>Normaliser</h4><p>Remettre à l'échelle.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">ATTN</div><h4>Attention</h4><p>Multi-têtes, puis W<sub>O</sub>.</p></div>
+          <div class="arr">⊕</div>
+          <div class="step"><div class="n">NORM</div><h4>Normaliser</h4><p>Remettre à l'échelle.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">MLP</div><h4>Feed-forward</h4><p>Élargir, activer, recompresser.</p></div>
+          <div class="arr">⊕</div>
+          <div class="step"><div class="n">OUT</div><h4>X'</h4><p>n × d, vers le bloc suivant.</p></div>
+        </div>
+        <div class="cards three">
+          <div class="card"><div class="idx">/ ⊕ résiduel</div><h3>Ajouter, pas remplacer</h3><p>Le résultat de l'attention est <strong>additionné</strong> à X. L'information d'origine circule ainsi sur une « autoroute » à travers toutes les couches, ce qui rend l'entraînement bien plus facile.</p></div>
+          <div class="card"><div class="idx">/ MLP</div><h3>Chaque token réfléchit seul</h3><p>Sur chaque ligne : on élargit le vecteur (768 → 3 072), on applique une fonction non linéaire (GELU, SwiGLU), on recompresse (3 072 → 768). Une grande partie des <strong>connaissances factuelles</strong> se loge ici.</p></div>
+          <div class="card"><div class="idx">/ norm</div><h3>Garder l'équilibre</h3><p>LayerNorm ou RMSNorm ramène chaque ligne à une échelle standard, pour que les nombres n'explosent ni ne s'éteignent au fil des couches.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> En résumé : <strong>l'attention fait communiquer les tokens, le MLP fait réfléchir chaque token</strong>. Ce bloc est empilé N fois (12 pour GPT-2, 30 pour SmolLM2-135M), et la matrice garde sa forme n × d du début à la fin.</p>
+      </section>
+
+      <!-- 04.12 · Prédire le token -->
+      <section class="slide" data-title="Prédire le token" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.12 · La sortie</div>
+        <h2>De la dernière ligne au <span class="hl3">mot suivant</span></h2>
+        <p class="lead">Après le dernier bloc, on prend <strong>la ligne du dernier token</strong> : elle résume tout le contexte. On la multiplie par la matrice de sortie <strong>W<sub>U</sub></strong> pour obtenir un score par token du vocabulaire, puis le softmax en fait des probabilités.</p>
+        <div class="flow tight">
+          <div class="step"><div class="n">LIGNE</div><h4>Dernier token</h4><p>768 nombres.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">× W<sub>U</sub></div><h4>Projeter</h4><p>768 × 50 257.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">LOGITS</div><h4>50 257 scores</h4><p>Un par token possible.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">SOFTMAX</div><h4>Probabilités</h4><p>« canapé » 46 %, « lit » 24 %…</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">TIRAGE</div><h4>Choisir</h4><p>Le token est ajouté, on recommence.</p></div>
+        </div>
+        <div class="cards two">
+          <div class="card"><div class="idx">/ en génération</div><h3>Un token à la fois</h3><p>Le token choisi est ajouté à la phrase et tout repart. Les K et V des tokens passés sont gardés en mémoire (<strong>KV cache</strong>) : seul le nouveau token est calculé.</p></div>
+          <div class="card"><div class="idx">/ en entraînement</div><h3>n exercices d'un coup</h3><p>Grâce au masque, <strong>chaque ligne</strong> prédit son token suivant en même temps : une phrase de n tokens = n exercices. L'erreur remonte (rétropropagation) et ajuste toutes les matrices : E, W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, W<sub>O</sub>, MLP.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> La <strong>température</strong> divise les scores avant le softmax : basse, le modèle choisit presque toujours le plus probable (prudent, répétitif) ; haute, il prend plus de risques (créatif, parfois incohérent). Souvent, W<sub>U</sub> est la même matrice que la table d'embeddings (poids partagés).</p>
+      </section>
+
+      <!-- 04.13 · Les paramètres -->
+      <section class="slide" data-title="Les paramètres" data-group="Dans le Transformer" data-date="Transformer" data-t="3">
+        <div class="ghost">04</div>
+        <div class="eyebrow">04.13 · Faire les comptes</div>
+        <h2>Où sont les <span class="hl">124 millions</span> de paramètres de GPT-2 ?</h2>
+        <p class="lead">Les « paramètres » sont tous les nombres des matrices qu'on vient de croiser. Le compte exact pour GPT-2 small (d = 768, 12 blocs, vocabulaire de 50 257) :</p>
+        <div class="stats">
+          <div class="stat"><div class="v">38,6 M</div><div class="k">Table d'embeddings</div><div class="s">50 257 × 768. Sert aussi de W<sub>U</sub> en sortie.</div></div>
+          <div class="stat"><div class="v">0,8 M</div><div class="k">Positions</div><div class="s">1 024 positions × 768.</div></div>
+          <div class="stat"><div class="v">2,4 M</div><div class="k">Attention, par bloc</div><div class="s">W<sub>Q</sub>, W<sub>K</sub>, W<sub>V</sub>, W<sub>O</sub> : 4 × 768².</div></div>
+          <div class="stat"><div class="v">4,7 M</div><div class="k">MLP, par bloc</div><div class="s">768 × 3 072, deux fois. Le double de l'attention.</div></div>
+          <div class="stat"><div class="v">× 12</div><div class="k">blocs</div><div class="s">7,1 M par bloc, soit 85 M pour la pile.</div></div>
+          <div class="stat"><div class="v">124 M</div><div class="k">au total</div><div class="s">Plus quelques milliers pour les normalisations et les biais.</div></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Pour comparaison, SmolLM2-135M : d = 576, 30 blocs, 9 têtes, vocabulaire de 49 152. Plus étroit mais plus profond que GPT-2, pour un nombre de paramètres voisin. C'est ce « cerveau vide », initialisé au hasard, que le pré-entraînement va remplir.</p>
+      </section>
+
+      <!-- 05.1 · Deviner la suite -->
+      <section class="slide" data-title="Deviner la suite" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.1 · Le seul exercice</div>
+        <h2>Un jeu de <span class="hl">texte à trous</span>, des milliards de fois</h2>
+        <p class="lead">On montre au modèle un extrait de texte et on lui demande le token suivant. Il ne répond pas un mot : il donne <strong>une probabilité pour chacun des tokens du vocabulaire</strong>.</p>
+        <div class="panel">
+          <div class="panel-bar"><i></i><i></i><i></i><span>prédiction du token suivant</span></div>
+          <div class="panel-body">
+            <p class="sentence">Le chat dormait sur le <span class="blank">?</span></p>
+            <div class="prob-row"><span class="w">canapé</span><span class="track"><span class="bar" style="--w:46%"></span></span><span class="p">46 %</span></div>
+            <div class="prob-row"><span class="w">lit</span><span class="track"><span class="bar" style="--w:24%"></span></span><span class="p">24 %</span></div>
+            <div class="prob-row"><span class="w">tapis</span><span class="track"><span class="bar" style="--w:13%"></span></span><span class="p">13 %</span></div>
+            <div class="prob-row"><span class="w">rebord</span><span class="track"><span class="bar" style="--w:6%"></span></span><span class="p">6 %</span></div>
+            <div class="prob-row"><span class="w">…</span><span class="track"><span class="bar" style="--w:11%"></span></span><span class="p">11 %</span></div>
+          </div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Aucun humain n'a besoin d'annoter : <strong>la bonne réponse est déjà dans le texte</strong>. C'est ce qui permet d'utiliser tout le web. On parle d'apprentissage <strong>auto-supervisé</strong>.</p>
+      </section>
+
+      <!-- 05.2 · Apprendre de ses erreurs -->
+      <section class="slide" data-title="Apprendre de ses erreurs" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.2 · La boucle d'apprentissage</div>
+        <h2>Se tromper, <span class="hl2">corriger</span>, recommencer</h2>
+        <div class="row">
+          <div class="side">
+            <div class="flow" style="flex-direction:column; margin-top:34px">
+              <div class="step"><div class="n">1 · PRÉDIRE</div><h4>Le modèle devine</h4><p>Sur un paquet (batch) de quelques millions de tokens à la fois.</p></div>
+              <div class="step" style="margin-top:12px"><div class="n">2 · MESURER</div><h4>La « loss »</h4><p>Un score d'erreur : élevé si le vrai token avait une faible probabilité.</p></div>
+              <div class="step" style="margin-top:12px"><div class="n">3 · AJUSTER</div><h4>Descente de gradient</h4><p>Chaque paramètre est légèrement tourné dans le sens qui réduit l'erreur.</p></div>
+            </div>
+          </div>
+          <div class="curve">
+            <svg viewBox="0 0 400 230" role="img" aria-label="Courbe de loss qui descend au fil de l'entraînement">
+              <line x1="40" y1="200" x2="390" y2="200" style="stroke:var(--line-2)" />
+              <line x1="40" y1="14" x2="40" y2="200" style="stroke:var(--line-2)" />
+              <path d="M40,24 C70,30 80,110 110,130 S180,160 230,168 S330,178 390,181" fill="none" style="stroke:var(--accent); stroke-width:3" />
+              <circle cx="40" cy="24" r="4" style="fill:var(--accent-2)" />
+              <circle cx="390" cy="181" r="4" style="fill:var(--accent-3)" />
+              <text x="50" y="22" style="font: 11px var(--mono); fill:var(--accent-2)">au hasard : charabia</text>
+              <text x="250" y="160" style="font: 11px var(--mono); fill:var(--accent-3)">texte cohérent</text>
+              <text x="40" y="218" style="font: 11px var(--mono); fill:var(--muted)">tokens lus →</text>
+              <text x="8" y="110" transform="rotate(-90 14 110)" style="font: 11px var(--mono); fill:var(--muted)">erreur (loss)</text>
+            </svg>
+            <div class="cap">L'erreur chute vite au début, puis descend lentement pendant des semaines.</div>
+          </div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Le <strong>learning rate</strong> règle la taille de chaque correction : on monte doucement (warm-up), on reste stable, puis on redescend en fin d'entraînement.</p>
+      </section>
+
+      <!-- 05.3 · Combien de données -->
+      <section class="slide" data-title="Combien de données" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.3 · Ordres de grandeur</div>
+        <h2>Beaucoup de <span class="hl3">tokens</span>, même pour un petit modèle</h2>
+        <div class="stats">
+          <div class="stat"><div class="v">×20</div><div class="k">tokens par paramètre</div><div class="s">La règle « Chinchilla » (2022) : le ratio le plus économe en calcul. 135 M paramètres → ~2,7 Md tokens.</div></div>
+          <div class="stat"><div class="v">11 T</div><div class="k">tokens pour SmolLM2 1,7 Md</div><div class="s">Soit plus de 6 000 tokens par paramètre. On « sur-entraîne » exprès pour un modèle petit mais bon.</div></div>
+          <div class="stat"><div class="v">~4 h</div><div class="k">pour un mini ChatGPT</div><div class="s">nanochat (Karpathy) : environ 100 $ sur 8 GPU H100, de zéro jusqu'au chat.</div></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> 1 T = 1 000 milliards de tokens. Pour un premier essai sur un seul GPU, un modèle de quelques millions de paramètres entraîné sur <strong>TinyStories</strong> écrit déjà des histoires cohérentes.</p>
+      </section>
+
+      <!-- 05.4 · Datasets web -->
+      <section class="slide" data-title="Datasets : le web" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.4 · Où trouver les données · 1/3</div>
+        <h2>Les grands corpus <span class="hl">web</span> filtrés</h2>
+        <p class="lead">La base de presque tous les petits modèles ouverts. Tous dérivent de Common Crawl, avec des filtres plus ou moins sévères.</p>
+        <div class="ds-grid">
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu" target="_blank" rel="noopener"><span class="ds-top"><b>FineWeb-Edu</b><span class="size">1,3 T tokens</span></span><p>Les pages jugées « éducatives » par un classifieur. Le choix n°1 pour un petit modèle : il apprend plus vite.</p><span class="url">HuggingFaceFW/fineweb-edu</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceFW/fineweb" target="_blank" rel="noopener"><span class="ds-top"><b>FineWeb</b><span class="size">15 T+ tokens</span></span><p>Le web anglais nettoyé et dédoublonné, 96 instantanés de Common Crawl. Le « tout venant » de qualité.</p><span class="url">HuggingFaceFW/fineweb</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/mlfoundations/dclm-baseline-1.0" target="_blank" rel="noopener"><span class="ds-top"><b>DCLM-Baseline</b><span class="size">~4 T tokens</span></span><p>Filtré par un classifieur fastText entraîné sur des réponses de qualité. Très utilisé en mélange avec FineWeb-Edu.</p><span class="url">mlfoundations/dclm-baseline-1.0</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/allenai/dolma" target="_blank" rel="noopener"><span class="ds-top"><b>Dolma</b><span class="size">~3 T tokens</span></span><p>Le corpus d'AI2 (modèles OLMo) : web, livres, articles scientifiques, code, Wikipédia, Reddit.</p><span class="url">allenai/dolma</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/togethercomputer/RedPajama-Data-V2" target="_blank" rel="noopener"><span class="ds-top"><b>RedPajama-V2</b><span class="size">30 T tokens</span></span><p>Énorme et multilingue (dont le français), livré avec des « signaux de qualité » pour filtrer soi-même.</p><span class="url">togethercomputer/RedPajama-Data-V2</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/karpathy/fineweb-edu-100b-shuffle" target="_blank" rel="noopener"><span class="ds-top"><b>FineWeb-Edu 100B</b><span class="size">100 Md tokens</span></span><p>Extrait mélangé de FineWeb-Edu préparé par Karpathy pour nanochat. Idéal pour un premier projet.</p><span class="url">karpathy/fineweb-edu-100b-shuffle</span></a>
+        </div>
+        <p class="footnote"><span class="accent">→</span> À lire : le <a href="https://huggingface.co/spaces/HuggingFaceFW/blogpost-fineweb-v1" target="_blank" rel="noopener">billet FineWeb</a> de Hugging Face, qui détaille chaque filtre et son effet mesuré.</p>
+      </section>
+
+      <!-- 05.5 · Datasets ciblés -->
+      <section class="slide" data-title="Datasets : ciblés" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.5 · Où trouver les données · 2/3</div>
+        <h2>Code, maths, manuels <span class="hl2">synthétiques</span></h2>
+        <p class="lead">On ajoute au web des sources spécialisées pour donner des compétences précises. Une partie est <strong>générée par d'autres IA</strong> (données synthétiques).</p>
+        <div class="ds-grid">
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceTB/smollm-corpus" target="_blank" rel="noopener"><span class="ds-top"><b>SmolLM-Corpus</b><span class="size">~250 Md tokens</span></span><p>Le kit prêt à l'emploi des modèles SmolLM : FineWeb-Edu dédoublonné + Cosmopedia v2 + Python-Edu.</p><span class="url">HuggingFaceTB/smollm-corpus</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceTB/cosmopedia" target="_blank" rel="noopener"><span class="ds-top"><b>Cosmopedia</b><span class="size">~25 Md tokens</span></span><p>Des millions de manuels, cours et articles de blog écrits par un LLM. Le plus grand corpus synthétique ouvert.</p><span class="url">HuggingFaceTB/cosmopedia</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/roneneldan/TinyStories" target="_blank" rel="noopener"><span class="ds-top"><b>TinyStories</b><span class="size">~2 M histoires</span></span><p>Des histoires pour enfants de 3-4 ans, générées par GPT. Parfait pour un tout premier modèle sur un seul GPU.</p><span class="url">roneneldan/TinyStories</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceTB/stack-edu" target="_blank" rel="noopener"><span class="ds-top"><b>Stack-Edu</b><span class="size">~125 Md tokens</span></span><p>Du code source filtré pour sa valeur pédagogique, extrait de StarCoder2Data (The Stack v2).</p><span class="url">HuggingFaceTB/stack-edu</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceTB/finemath" target="_blank" rel="noopener"><span class="ds-top"><b>FineMath</b><span class="size">~34 Md tokens</span></span><p>Des pages de mathématiques avec raisonnement étape par étape. Créé pour SmolLM2.</p><span class="url">HuggingFaceTB/finemath</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/open-web-math/open-web-math" target="_blank" rel="noopener"><span class="ds-top"><b>OpenWebMath</b><span class="size">~15 Md tokens</span></span><p>Des pages web mathématiques avec formules LaTeX préservées.</p><span class="url">open-web-math/open-web-math</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/bigcode/the-stack-v2" target="_blank" rel="noopener"><span class="ds-top"><b>The Stack v2</b><span class="size">600+ langages</span></span><p>Le grand corpus de code de BigCode (Software Heritage). Accès après acceptation des conditions.</p><span class="url">bigcode/the-stack-v2</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/wikimedia/wikipedia" target="_blank" rel="noopener"><span class="ds-top"><b>Wikipédia</b><span class="size">300+ langues</span></span><p>Le classique : texte encyclopédique propre, une configuration par langue (dont le français).</p><span class="url">wikimedia/wikipedia</span></a>
+          <a class="ds" href="https://huggingface.co/common-pile" target="_blank" rel="noopener"><span class="ds-top"><b>Common Pile</b><span class="size">8 To</span></span><p>Uniquement des textes du domaine public ou sous licence ouverte. Pour un modèle « propre » juridiquement.</p><span class="url">huggingface.co/common-pile</span></a>
+        </div>
+      </section>
+
+      <!-- 05.6 · Datasets français -->
+      <section class="slide" data-title="Datasets : français" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.6 · Où trouver les données · 3/3</div>
+        <h2>Et pour parler <span class="hl3">français</span> ?</h2>
+        <p class="lead">Les corpus ci-dessus sont surtout anglophones. Pour un modèle qui maîtrise le français, il faut ajouter des sources multilingues et viser <strong>une part significative de français</strong> dans le mélange.</p>
+        <div class="ds-grid">
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceFW/fineweb-2" target="_blank" rel="noopener"><span class="ds-top"><b>FineWeb-2</b><span class="size">1 000+ langues</span></span><p>La version multilingue de FineWeb (~20 To). Le sous-ensemble français se nomme <code>fra_Latn</code>.</p><span class="url">HuggingFaceFW/fineweb-2</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/epfml/FineWeb2-HQ" target="_blank" rel="noopener"><span class="ds-top"><b>FineWeb2-HQ</b><span class="size">20 langues</span></span><p>Les meilleurs 10 % de FineWeb-2, sélectionnés par un modèle (EPFL). Français inclus.</p><span class="url">epfml/FineWeb2-HQ</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/OpenLLM-France/Lucie-Training-Dataset" target="_blank" rel="noopener"><span class="ds-top"><b>Lucie Training Dataset</b><span class="size">~⅓ français</span></span><p>Le corpus d'OpenLLM-France pour Lucie-7B : web, livres, presse, débats parlementaires, code.</p><span class="url">OpenLLM-France/Lucie-Training-Dataset</span></a>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Ajouter aussi Wikipédia en français (<code>wikimedia/wikipedia</code>, configuration <code>.fr</code>) et le tokenizer doit être entraîné sur ce mélange, sinon le français sera découpé en trop de petits morceaux.</p>
+      </section>
+
+      <!-- 05.7 · Le modèle de base -->
+      <section class="slide" data-title="Le modèle de base" data-group="Pré-entraînement" data-date="Pré-training" data-t="4">
+        <div class="ghost">05</div>
+        <div class="eyebrow">05.7 · Le résultat</div>
+        <h2>Un « <span class="hl">base model</span> » : cultivé, mais pas serviable</h2>
+        <p class="lead">Après le pré-entraînement, le modèle a absorbé grammaire, faits et styles. Mais il ne sait que <strong>continuer un document</strong>. Posez-lui une question, il risque d'enchaîner sur d'autres questions, comme dans un forum.</p>
+        <div class="compare">
+          <div class="chat">
+            <div class="chat-head bad">Modèle de base</div>
+            <div class="bubble me">Quelle est la capitale de l'Australie ?</div>
+            <div class="bubble ai">Quelle est la capitale du Canada ? Quelle est la capitale du Brésil ? Testez vos connaissances avec notre quiz géographie…</div>
+          </div>
+          <div class="chat">
+            <div class="chat-head good">Après post-entraînement</div>
+            <div class="bubble me">Quelle est la capitale de l'Australie ?</div>
+            <div class="bubble ai">La capitale de l'Australie est <strong>Canberra</strong>, et non Sydney comme on le croit souvent.</div>
+          </div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Le savoir est déjà là. Les étapes suivantes lui apprennent <strong>la forme</strong> : le rôle d'assistant, le ton, les limites.</p>
+      </section>
+
+      <!-- 06 · Mid-training -->
+      <section class="slide" data-title="Mid-training" data-date="Mid-training" data-t="5">
+        <div class="ghost">06</div>
+        <div class="eyebrow">06 · La dernière ligne droite du pré-entraînement</div>
+        <h2>Le <span class="hl2">mid-training</span> : finir sur le meilleur</h2>
+        <p class="lead">Dans les dernières semaines, on change le régime : le learning rate redescend (<strong>annealing</strong>, « recuit ») et on augmente la part des données de très haute qualité. Le modèle retient mieux ce qu'il voit en dernier.</p>
+        <div class="cards three">
+          <div class="card"><div class="idx">/ qualité</div><h3>Données premium</h3><p>Plus de maths, de code, de manuels, d'exemples de raisonnement.</p></div>
+          <div class="card"><div class="idx">/ contexte long</div><h3>Lire plus loin</h3><p>On passe de 2 000 à 32 000 tokens ou plus par extrait, pour gérer de longs documents.</p></div>
+          <div class="card"><div class="idx">/ format</div><h3>Premiers dialogues</h3><p>On glisse des conversations et des QCM pour préparer le passage en assistant.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Exemple nanochat : mid-training sur ~570 000 exemples issus de SmolTalk, MMLU et GSM8K, avant le SFT.</p>
+      </section>
+
+      <!-- 07.1 · SFT -->
+      <section class="slide" data-title="SFT : imiter" data-group="Post-entraînement" data-date="SFT" data-t="6">
+        <div class="ghost">07</div>
+        <div class="eyebrow">07.1 · Supervised Fine-Tuning</div>
+        <h2>Apprendre par <span class="hl">l'exemple</span></h2>
+        <p class="lead">On montre au modèle des dizaines à des centaines de milliers de conversations modèles : une demande, puis <strong>la réponse idéale</strong> écrite par un humain ou un modèle plus fort. Même exercice qu'avant (deviner la suite), mais seulement sur la partie « réponse ».</p>
+        <div class="flow">
+          <div class="step"><div class="n">FORMAT</div><h4>Le « chat template »</h4><p>Des balises marquent qui parle : <code>&lt;user&gt;</code>, <code>&lt;assistant&gt;</code>.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">EXEMPLES</div><h4>Variés</h4><p>Résumer, traduire, coder, refuser poliment, utiliser un outil.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">RÉSULTAT</div><h4>Un modèle « instruct »</h4><p>Il répond aux questions au lieu de les continuer.</p></div>
+        </div>
+        <div class="tools-label">Datasets de SFT</div>
+        <div class="ds-grid">
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceTB/smoltalk" target="_blank" rel="noopener"><span class="ds-top"><b>SmolTalk</b><span class="size">~1 M dialogues</span></span><p>Le mélange utilisé pour les SmolLM2-Instruct.</p><span class="url">HuggingFaceTB/smoltalk</span></a>
+          <a class="ds" href="https://huggingface.co/datasets/allenai/tulu-3-sft-mixture" target="_blank" rel="noopener"><span class="ds-top"><b>Tülu 3 SFT mix</b><span class="size">~940 k exemples</span></span><p>La recette ouverte d'AI2 : maths, code, sécurité, multilingue.</p><span class="url">allenai/tulu-3-sft-mixture</span></a>
+        </div>
+      </section>
+
+      <!-- 07.2 · RLHF -->
+      <section class="slide" data-title="RLHF : préférer" data-group="Post-entraînement" data-date="Préférences" data-t="7">
+        <div class="ghost">07</div>
+        <div class="eyebrow">07.2 · Reinforcement Learning from Human Feedback</div>
+        <h2>Les humains <span class="hl2">comparent</span>, le modèle s'ajuste</h2>
+        <p class="lead">Écrire la réponse parfaite est difficile, mais <strong>dire laquelle de deux réponses est la meilleure</strong> est facile. Le RLHF exploite cette idée en trois temps.</p>
+        <div class="flow">
+          <div class="step"><div class="n">1 · COMPARER</div><h4>Des annotateurs votent</h4><p>Pour une même question, le modèle propose 2 réponses ; un humain choisit la meilleure.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">2 · JUGE</div><h4>Modèle de récompense</h4><p>Un second modèle apprend à imiter ces votes et donne une note à n'importe quelle réponse.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">3 · RENFORCER</div><h4>PPO</h4><p>Le modèle génère, le juge note, on renforce ce qui obtient de bonnes notes.</p></div>
+        </div>
+        <div class="compare">
+          <div class="chat">
+            <div class="chat-head">Réponse A</div>
+            <div class="bubble ai win">Canberra. Elle a été choisie en 1908 comme compromis entre Sydney et Melbourne.</div>
+            <div class="verdict">annotateur : <b>préférée</b></div>
+          </div>
+          <div class="chat">
+            <div class="chat-head">Réponse B</div>
+            <div class="bubble ai lose">Sydney, la plus grande ville du pays.</div>
+            <div class="verdict">annotateur : rejetée</div>
+          </div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Piège connu : le <strong>reward hacking</strong>. Le modèle trouve des astuces pour plaire au juge (réponses très longues, flatterie) sans être meilleur. On le retient avec une pénalité qui l'empêche de trop s'éloigner du modèle SFT.</p>
+      </section>
+
+      <!-- 07.3 · DPO -->
+      <section class="slide" data-title="DPO : le raccourci" data-group="Post-entraînement" data-date="Préférences" data-t="7">
+        <div class="ghost">07</div>
+        <div class="eyebrow">07.3 · Direct Preference Optimization</div>
+        <h2>Le même but, <span class="hl3">sans juge</span></h2>
+        <p class="lead">Le DPO (2023) utilise directement les paires « préférée / rejetée » : on augmente la probabilité de la réponse préférée et on baisse celle de la rejetée. <strong>Pas de modèle de récompense, pas de boucle de renforcement</strong> : plus simple, plus stable, moins cher.</p>
+        <div class="cards three">
+          <div class="card"><div class="idx">/ RLHF + PPO</div><h3>Puissant mais lourd</h3><p>Plusieurs modèles en mémoire en même temps, réglages délicats.</p></div>
+          <div class="card"><div class="idx">/ DPO</div><h3>Le choix par défaut</h3><p>Aussi simple qu'un SFT. C'est ce que font la plupart des petits modèles ouverts.</p></div>
+          <div class="card"><div class="idx">/ variantes</div><h3>ORPO, KTO, SimPO</h3><p>D'autres recettes de la même famille, parfois sans étape SFT séparée.</p></div>
+        </div>
+        <div class="tools-label">Dataset de préférences</div>
+        <div class="ds-grid two">
+          <a class="ds" href="https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized" target="_blank" rel="noopener"><span class="ds-top"><b>UltraFeedback (binarisé)</b><span class="size">~60 k paires</span></span><p>La référence historique pour le DPO : chaque question a une réponse « chosen » et une « rejected ».</p><span class="url">HuggingFaceH4/ultrafeedback_binarized</span></a>
+        </div>
+      </section>
+
+      <!-- 07.4 · RL vérifiable -->
+      <section class="slide" data-title="RL : raisonner" data-group="Post-entraînement" data-date="RL" data-t="8">
+        <div class="ghost">07</div>
+        <div class="eyebrow">07.4 · RL avec récompenses vérifiables</div>
+        <h2>S'entraîner sur des <span class="hl">exercices corrigés</span></h2>
+        <p class="lead">Pour les maths ou le code, pas besoin d'humain : on peut <strong>vérifier automatiquement</strong> si la réponse finale est juste ou si le programme passe les tests. Le modèle tente plusieurs solutions, on récompense celles qui marchent.</p>
+        <div class="flow">
+          <div class="step"><div class="n">ESSAYER</div><h4>8 tentatives</h4><p>Le modèle résout le même problème plusieurs fois, en écrivant son raisonnement.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">VÉRIFIER</div><h4>Juste ou faux</h4><p>Comparaison au résultat attendu, ou exécution des tests.</p></div>
+          <div class="arr">→</div>
+          <div class="step"><div class="n">RENFORCER</div><h4>GRPO</h4><p>Les tentatives meilleures que la moyenne du groupe sont renforcées.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> C'est ainsi que sont nés les <strong>modèles de raisonnement</strong> (DeepSeek-R1, 2025) : à force d'essais, le modèle apprend tout seul à réfléchir plus longtemps et à se relire. Pour s'exercer : <a href="https://huggingface.co/datasets/openai/gsm8k" target="_blank" rel="noopener">GSM8K</a>, 8 500 problèmes de maths avec solution. Tülu 3 appelle cette étape <strong>RLVR</strong>.</p>
+      </section>
+
+      <!-- 08.1 · Évaluer -->
+      <section class="slide" data-title="Évaluer" data-group="Mesurer et livrer" data-date="Évaluation" data-t="9">
+        <div class="ghost">08</div>
+        <div class="eyebrow">08.1 · Savoir si ça marche</div>
+        <h2>Mesurer à <span class="hl2">chaque étape</span></h2>
+        <div class="cards four">
+          <div class="card"><div class="idx">/ pendant le pré-training</div><h3>Loss de validation</h3><p>L'erreur sur des textes jamais vus. Si elle remonte, quelque chose cloche.</p></div>
+          <div class="card"><div class="idx">/ connaissances</div><h3>Benchmarks</h3><p>QCM standardisés : MMLU, ARC, HellaSwag. Maths : GSM8K. Code : HumanEval.</p></div>
+          <div class="card"><div class="idx">/ comportement</div><h3>LLM-juge &amp; humains</h3><p>Un modèle fort ou des humains notent les réponses en conversation.</p></div>
+          <div class="card"><div class="idx">/ piège</div><h3>Contamination</h3><p>Si les questions du test étaient dans les données, le score ment. On les retire avant l'entraînement.</p></div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Les équipes font des <strong>ablations</strong> : de petits entraînements comparatifs pour tester un choix (un filtre, un mélange) avant de payer le grand entraînement.</p>
+      </section>
+
+      <!-- 08.2 · Livrer -->
+      <section class="slide" data-title="Alléger &amp; déployer" data-group="Mesurer et livrer" data-date="Évaluation" data-t="9">
+        <div class="ghost">08</div>
+        <div class="eyebrow">08.2 · De l'entraînement à l'usage</div>
+        <h2>Rendre le modèle <span class="hl3">léger</span> et utilisable</h2>
+        <div class="cards three">
+          <div class="card"><div class="ico">🗜️</div><h3>Quantification</h3><p>Stocker chaque paramètre sur 4 ou 8 bits au lieu de 16 : le modèle pèse 2 à 4 fois moins, avec une perte de qualité limitée.</p></div>
+          <div class="card"><div class="ico">🧑‍🏫</div><h3>Distillation</h3><p>Un grand modèle « professeur » génère des réponses dont le petit « élève » s'inspire. Très utilisé pour les petits modèles.</p></div>
+          <div class="card"><div class="ico">💻</div><h3>Inférence locale</h3><p>Formats GGUF avec llama.cpp ou Ollama : un modèle de 1 à 3 Md tourne sur un portable.</p></div>
+        </div>
+      </section>
+
+      <!-- 09 · Récap -->
+      <section class="slide" data-title="Récapitulatif" data-group="Synthèse" data-date="Synthèse" data-t="10">
+        <div class="ghost">09</div>
+        <div class="eyebrow">09.1 · L'analogie de l'étudiant</div>
+        <h2>Toute la chaîne, <span class="hl">en une image</span></h2>
+        <div class="cards three">
+          <div class="card"><div class="idx">/ pré-entraînement</div><h3>Lire toute la bibliothèque</h3><p>Des années de lecture sans professeur. Il sait beaucoup, mais ne sait pas encore échanger.</p></div>
+          <div class="card"><div class="idx">/ mid-training</div><h3>Réviser les meilleurs manuels</h3><p>Avant l'examen, on relit ce qui compte vraiment.</p></div>
+          <div class="card"><div class="idx">/ SFT</div><h3>Le stage avec un tuteur</h3><p>Il observe des exemples de bon travail et les imite.</p></div>
+          <div class="card"><div class="idx">/ RLHF · DPO</div><h3>Les retours des clients</h3><p>« Celle-ci était mieux que celle-là. » Il ajuste son style et son jugement.</p></div>
+          <div class="card"><div class="idx">/ RL vérifiable</div><h3>Les annales corrigées</h3><p>Des centaines d'exercices, une correction automatique. Il apprend à réfléchir.</p></div>
+          <div class="card"><div class="idx">/ évaluation</div><h3>Le diplôme</h3><p>Des examens qu'il n'a jamais vus, pour vérifier ce qu'il vaut.</p></div>
+        </div>
+      </section>
+
+      <!-- 09.2 · Glossaire -->
+      <section class="slide" data-title="Glossaire" data-group="Synthèse" data-date="Synthèse" data-t="10">
+        <div class="ghost">09</div>
+        <div class="eyebrow">09.2 · Les mots à connaître</div>
+        <h2>Petit <span class="hl2">glossaire</span></h2>
+        <dl class="gloss">
+          <div><dt>Token</dt><dd>Un morceau de texte (mot ou bout de mot) transformé en numéro.</dd></div>
+          <div><dt>Paramètre</dt><dd>Un des nombres réglables du modèle. « 1,7 Md » = 1,7 milliard de paramètres.</dd></div>
+          <div><dt>Loss</dt><dd>Le score d'erreur que l'entraînement cherche à faire baisser.</dd></div>
+          <div><dt>Batch</dt><dd>Le paquet d'exemples traité avant chaque correction des paramètres.</dd></div>
+          <div><dt>Epoch</dt><dd>Un passage complet sur les données. En pré-entraînement, souvent moins d'une seule.</dd></div>
+          <div><dt>Learning rate</dt><dd>La taille des corrections. Trop grand : instable. Trop petit : interminable.</dd></div>
+          <div><dt>GPU</dt><dd>La puce qui fait les calculs en parallèle. H100 et A100 sont les références.</dd></div>
+          <div><dt>Base / Instruct</dt><dd>Modèle brut sorti du pré-entraînement / modèle conversationnel après post-entraînement.</dd></div>
+          <div><dt>Fine-tuning</dt><dd>Continuer l'entraînement d'un modèle existant sur des données ciblées.</dd></div>
+          <div><dt>LoRA</dt><dd>Fine-tuning économe : on n'entraîne que de petites matrices ajoutées, pas tout le modèle.</dd></div>
+        </dl>
+      </section>
+
+      <!-- 10.1 · Ressources vidéo -->
+      <section class="slide" data-title="Vidéos" data-group="Pour aller plus loin" data-date="Ressources" data-t="11">
+        <div class="ghost">10</div>
+        <div class="eyebrow">10.1 · Regarder</div>
+        <h2>Les <span class="hl">vidéos</span> qui expliquent tout</h2>
+        <div class="ds-grid">
+          <a class="ds" href="https://www.youtube.com/watch?v=7xTGNNLPyMI" target="_blank" rel="noopener"><span class="ds-top"><b>Deep Dive into LLMs like ChatGPT</b><span class="size">3 h 30 · EN</span></span><p>Andrej Karpathy. La meilleure vue d'ensemble grand public : données, tokens, pré-training, SFT, RL. À regarder en premier.</p><span class="url">YouTube · Karpathy</span></a>
+          <a class="ds" href="https://www.youtube.com/watch?v=zjkBMFhNj_g" target="_blank" rel="noopener"><span class="ds-top"><b>Intro to Large Language Models</b><span class="size">1 h · EN</span></span><p>Karpathy. Version courte et non technique : ce qu'est un LLM et comment il est fabriqué.</p><span class="url">YouTube · Karpathy</span></a>
+          <a class="ds" href="https://www.youtube.com/watch?v=kCc8FmEb1nY" target="_blank" rel="noopener"><span class="ds-top"><b>Let's build GPT, from scratch</b><span class="size">2 h · code</span></span><p>Karpathy code un petit GPT ligne par ligne en PyTorch. Le pas suivant quand on veut mettre les mains dedans.</p><span class="url">YouTube · Karpathy</span></a>
+          <a class="ds" href="https://www.youtube.com/watch?v=l8pRSuU81PU" target="_blank" rel="noopener"><span class="ds-top"><b>Let's reproduce GPT-2 (124M)</b><span class="size">4 h · code</span></span><p>Un vrai pré-entraînement de bout en bout sur FineWeb-Edu, avec toutes les astuces d'efficacité GPU.</p><span class="url">YouTube · Karpathy</span></a>
+          <a class="ds" href="https://www.youtube.com/watch?v=SQ3fZ1sAqXI" target="_blank" rel="noopener"><span class="ds-top"><b>Stanford CS336</b><span class="size">cours complet</span></span><p>« Language Modeling from Scratch » (Percy Liang). Tokenisation, architecture, GPU, données, alignement, RL.</p><span class="url">YouTube · Stanford Online</span></a>
+          <a class="ds" href="https://www.deeplearning.ai/short-courses/post-training-of-llms/" target="_blank" rel="noopener"><span class="ds-top"><b>Post-training of LLMs</b><span class="size">cours court</span></span><p>DeepLearning.AI : SFT, DPO et RL en ligne, vidéos et notebooks.</p><span class="url">deeplearning.ai</span></a>
+        </div>
+      </section>
+
+      <!-- 10.2 · Ressources écrites -->
+      <section class="slide" data-title="Guides &amp; code" data-group="Pour aller plus loin" data-date="Ressources" data-t="11">
+        <div class="ghost">10</div>
+        <div class="eyebrow">10.2 · Lire et pratiquer</div>
+        <h2>Guides, livres et <span class="hl3">code</span> à suivre</h2>
+        <div class="ds-grid">
+          <a class="ds" href="https://github.com/karpathy/nanochat" target="_blank" rel="noopener"><span class="ds-top"><b>nanochat</b><span class="size">dépôt GitHub</span></span><p>Toute la chaîne (tokenizer, pré-training, mid-training, SFT, RL, interface web) en ~8 000 lignes. Le meilleur point de départ concret.</p><span class="url">github.com/karpathy/nanochat</span></a>
+          <a class="ds" href="https://huggingfacetb-smol-training-playbook.hf.space/" target="_blank" rel="noopener"><span class="ds-top"><b>The Smol Training Playbook</b><span class="size">guide · 2025</span></span><p>Hugging Face raconte l'entraînement de SmolLM3 : choix, ablations, pannes et solutions. Le plus concret sur les petits modèles.</p><span class="url">huggingfacetb-smol-training-playbook.hf.space</span></a>
+          <a class="ds" href="https://github.com/rasbt/LLMs-from-scratch" target="_blank" rel="noopener"><span class="ds-top"><b>LLMs from Scratch</b><span class="size">livre + code</span></span><p>Sebastian Raschka : construire un GPT en PyTorch, le pré-entraîner puis le fine-tuner, chapitre par chapitre.</p><span class="url">github.com/rasbt/LLMs-from-scratch</span></a>
+          <a class="ds" href="https://rlhfbook.com/" target="_blank" rel="noopener"><span class="ds-top"><b>The RLHF Book</b><span class="size">livre gratuit</span></span><p>Nathan Lambert (AI2) : tout le post-entraînement, des préférences au RL, en ligne et gratuit.</p><span class="url">rlhfbook.com</span></a>
+          <a class="ds" href="https://huggingface.co/learn/llm-course" target="_blank" rel="noopener"><span class="ds-top"><b>Hugging Face LLM Course</b><span class="size">cours gratuit</span></span><p>Tokenizers, Transformers, fine-tuning et alignement avec les bibliothèques Hugging Face. Existe en français.</p><span class="url">huggingface.co/learn/llm-course</span></a>
+          <a class="ds" href="https://stanford-cs336.github.io/spring2025/" target="_blank" rel="noopener"><span class="ds-top"><b>CS336 : site du cours</b><span class="size">devoirs</span></span><p>Les supports et les devoirs de Stanford : on y code son tokenizer, son Transformer et son pipeline de données.</p><span class="url">stanford-cs336.github.io</span></a>
+          <a class="ds" href="https://arxiv.org/abs/2502.02737" target="_blank" rel="noopener"><span class="ds-top"><b>Article SmolLM2</b><span class="size">arXiv · 2025</span></span><p>Comment un modèle de 1,7 Md a été entraîné sur 11 T tokens, mélange de données étape par étape.</p><span class="url">arxiv.org/abs/2502.02737</span></a>
+          <a class="ds" href="https://arxiv.org/abs/2411.15124" target="_blank" rel="noopener"><span class="ds-top"><b>Article Tülu 3</b><span class="size">arXiv · 2024</span></span><p>La recette ouverte de post-entraînement d'AI2 : SFT, puis DPO, puis RLVR.</p><span class="url">arxiv.org/abs/2411.15124</span></a>
+          <a class="ds" href="https://www.freecodecamp.org/news/code-an-llm-from-scratch-theory-to-rlhf/" target="_blank" rel="noopener"><span class="ds-top"><b>Code an LLM from scratch</b><span class="size">freeCodeCamp</span></span><p>Cours vidéo en PyTorch pur, du modèle de base jusqu'au RLHF avec PPO.</p><span class="url">freecodecamp.org</span></a>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Parcours conseillé : la vidéo <strong>Deep Dive</strong> pour la vue d'ensemble, puis <strong>Let's build GPT</strong>, puis faire tourner <strong>nanochat</strong> en lisant le <strong>Smol Training Playbook</strong>.</p>
+      </section>
+
+    </div>
+
+    <div class="timeline" id="timeline">
+      <div class="tl-track"><span class="tl-fill" id="tlFill"></span></div>
+      <!-- nodes injected -->
+    </div>
+
+    <div class="counter"><b id="cur">01</b> / <span id="total">00</span></div>
+  </main>
+</div>
+
+<script>
+  // Render the worked-example matrices from their data attributes.
+  // data-v: JSON rows (null = masked cell) · data-rows / data-cols: comma-separated labels
+  // data-kind="prob": values shown as percentages · data-hl: "r,c;r,*;*,c;*" cells to outline
+  document.querySelectorAll('.mx').forEach(fig => {
+    const vals = JSON.parse(fig.dataset.v);
+    const rows = (fig.dataset.rows || '').split(',').filter(Boolean);
+    const cols = (fig.dataset.cols || '').split(',').filter(Boolean);
+    const prob = fig.dataset.kind === 'prob';
+    const hl = (fig.dataset.hl || '').split(';').filter(Boolean).map(s => s.split(','));
+    const isHl = (r, c) => hl.some(([hr, hc = '*']) => (hr === '*' || +hr === r) && (hc === '*' || +hc === c));
+    const max = Math.max(...vals.flat().filter(v => v !== null).map(Math.abs)) || 1;
+    const fmt = v => prob ? Math.round(v * 100) + ' %' : v.toFixed(2).replace('.', ',');
+
+    const grid = document.createElement('div');
+    grid.className = 'mx-grid';
+    grid.style.gridTemplateColumns = (rows.length ? 'auto ' : '') + `repeat(${vals[0].length}, auto)`;
+    let html = '';
+    if (cols.length) html += (rows.length ? '<span></span>' : '') + cols.map(c => `<span class="cl">${c}</span>`).join('');
+    vals.forEach((row, r) => {
+      if (rows.length) html += `<span class="rl">${rows[r]}</span>`;
+      row.forEach((v, c) => {
+        const cls = [v === null ? 'masked' : v < 0 ? 'neg' : '', isHl(r, c) ? 'hl' : ''].join(' ').trim();
+        html += v === null
+          ? `<i class="${cls}">−∞</i>`
+          : `<i class="${cls}" style="--a:${(Math.abs(v) / max).toFixed(3)}">${fmt(v)}</i>`;
+      });
+    });
+    grid.innerHTML = html;
+    fig.appendChild(grid);
+  });
+
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const nav = document.getElementById('nav');
+  const curEl = document.getElementById('cur');
+  const totalEl = document.getElementById('total');
+  const prevBtn = document.getElementById('prev');
+  const nextBtn = document.getElementById('next');
+
+  // Build sidebar, order-preserving: standalone items + grouped blocks (data-group).
+  const meta = slides.map((s, i) => ({ i, title: s.dataset.title, group: s.dataset.group || '' }));
+
+  // Chapter numbering: each standalone slide and each distinct group counts as one chapter.
+  let html = '', inGroup = false, groupCount = 0, chapter = 0, currentGroup = '';
+  meta.forEach(m => {
+    if (m.group && (!inGroup || currentGroup !== m.group)) {
+      if (inGroup) html += `</div>`;
+      chapter++;
+      const n = String(chapter).padStart(2, '0');
+      html += `<div class="nav-group-label">${n} · ${m.group}</div><div class="nav-sub">`;
+      inGroup = true; groupCount = 0; currentGroup = m.group;
+    } else if (!m.group && inGroup) {
+      html += `</div>`;
+      inGroup = false; currentGroup = '';
+    }
+    if (inGroup) {
+      groupCount++;
+      html += `<button class="nav-item" data-idx="${m.i}">
+        <span class="num">.${groupCount}</span><span class="label">${m.title}</span></button>`;
+    } else {
+      chapter++;
+      const n = String(chapter).padStart(2, '0');
+      html += `<button class="nav-item" data-idx="${m.i}">
+        <span class="num">${n}</span><span class="label">${m.title}</span></button>`;
+    }
+  });
+  if (inGroup) html += `</div>`;
+  nav.innerHTML = html;
+
+  const navItems = Array.from(nav.querySelectorAll('.nav-item'));
+  totalEl.textContent = String(slides.length).padStart(2, '0');
+
+  // Build the timeline: nodes spaced by their data-t value; same value collapses to one node.
+  const timeline = document.getElementById('timeline');
+  const tlFill = document.getElementById('tlFill');
+  const stamps = slides.map((s, i) => ({
+    i,
+    date: s.dataset.date || '',
+    t: parseFloat(s.dataset.t) || i,
+  }));
+  const tMin = Math.min(...stamps.map(s => s.t));
+  const tMax = Math.max(...stamps.map(s => s.t));
+  const posOf = t => 3 + ((t - tMin) / (tMax - tMin || 1)) * 94;
+  const nodeGroups = [];
+  stamps.forEach(s => {
+    const g = nodeGroups.find(g => g.t === s.t);
+    if (g) { g.idxs.push(s.i); if (!g.date && s.date) g.date = s.date; }
+    else nodeGroups.push({ t: s.t, date: s.date, idxs: [s.i] });
+  });
+  nodeGroups.forEach(g => {
+    const node = document.createElement('button');
+    node.className = 'tl-node';
+    node.dataset.idxs = g.idxs.join(',');
+    node.style.left = posOf(g.t) + '%';
+    node.innerHTML = `<span class="tl-dot"></span><span class="tl-date">${g.date}</span>`;
+    node.addEventListener('click', () => go(g.idxs[0]));
+    timeline.appendChild(node);
+  });
+  const tlNodes = Array.from(timeline.querySelectorAll('.tl-node'));
+
+  let current = 0;
+  function go(n) {
+    current = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    navItems.forEach(it => it.classList.toggle('active', +it.dataset.idx === current));
+    curEl.textContent = String(current + 1).padStart(2, '0');
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === slides.length - 1;
+    tlNodes.forEach(node => {
+      const idxs = node.dataset.idxs.split(',').map(Number);
+      node.classList.toggle('active', idxs.includes(current));
+      node.classList.toggle('done', idxs[idxs.length - 1] < current);
+    });
+    tlFill.style.width = posOf(stamps[current].t) + '%';
+    // Keep the active sidebar item in view.
+    const activeNav = navItems[current];
+    if (activeNav && activeNav.scrollIntoView) activeNav.scrollIntoView({ block: 'nearest' });
+    syncResults();
+  }
+
+  // ---------- Search ----------
+  // Accent- and case-insensitive full-text search over the slides, with in-slide highlighting.
+  const searchInput = document.getElementById('search');
+  const resultsEl = document.getElementById('searchResults');
+  const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // Fold char by char so a match in the folded string maps back to the original indices.
+  function foldWithMap(s) {
+    let out = '';
+    const map = [];
+    for (let i = 0; i < s.length; i++) {
+      const f = fold(s[i]);
+      for (let k = 0; k < f.length; k++) { out += f[k]; map.push(i); }
+    }
+    map.push(s.length);
+    return { out, map };
+  }
+
+  function findAll(haystack, needle) {
+    const found = [];
+    let from = 0, at;
+    while ((at = haystack.indexOf(needle, from)) !== -1) { found.push(at); from = at + needle.length; }
+    return found;
+  }
+
+  // Searchable text nodes of a slide: skips the decorative ghost number and SVG labels.
+  function textNodesOf(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: n => (n.parentElement.closest('.ghost, svg') || !n.nodeValue.trim())
+        ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    return nodes;
+  }
+
+  // Index built once, before any highlight splits the text nodes.
+  const slideTexts = slides.map(s =>
+    textNodesOf(s).map(n => n.nodeValue).join(' ').replace(/\s+/g, ' ').trim());
+
+  function clearMarks() {
+    document.querySelectorAll('mark.hit').forEach(m => {
+      const parent = m.parentNode;
+      parent.replaceChild(document.createTextNode(m.textContent), m);
+      parent.normalize();
+    });
+  }
+
+  function markNode(node, fq) {
+    const { out, map } = foldWithMap(node.nodeValue);
+    const ranges = findAll(out, fq).map(at => [map[at], map[at + fq.length]]);
+    // Wrap from the end so earlier offsets stay valid on the remaining prefix node.
+    for (let r = ranges.length - 1; r >= 0; r--) {
+      const [a, b] = ranges[r];
+      const mid = node.splitText(a);
+      mid.splitText(b - a);
+      const mark = document.createElement('mark');
+      mark.className = 'hit';
+      mid.parentNode.replaceChild(mark, mid);
+      mark.appendChild(mid);
+    }
+  }
+
+  let hits = [];
+
+  function runSearch() {
+    clearMarks();
+    const fq = fold(searchInput.value.trim());
+    hits = [];
+    if (fq.length < 2) { resultsEl.hidden = true; resultsEl.innerHTML = ''; return; }
+
+    slideTexts.forEach((text, i) => {
+      const { out, map } = foldWithMap(text);
+      const found = findAll(out, fq);
+      if (found.length) hits.push({ i, count: found.length, start: map[found[0]], end: map[found[0] + fq.length] });
+    });
+    slides.forEach(s => textNodesOf(s).forEach(n => markNode(n, fq)));
+
+    const total = hits.reduce((sum, h) => sum + h.count, 0);
+    let out = `<div class="search-meta">${total} résultat${total > 1 ? 's' : ''} · ${hits.length} slide${hits.length > 1 ? 's' : ''}</div>`;
+    if (!hits.length) out += `<div class="search-empty">Aucun résultat pour « ${escapeHtml(searchInput.value.trim())} ».</div>`;
+    hits.forEach(h => {
+      const text = slideTexts[h.i];
+      const from = Math.max(0, h.start - 45), to = Math.min(text.length, h.end + 70);
+      const snippet = (from > 0 ? '…' : '') + escapeHtml(text.slice(from, h.start))
+        + '<mark>' + escapeHtml(text.slice(h.start, h.end)) + '</mark>'
+        + escapeHtml(text.slice(h.end, to)) + (to < text.length ? '…' : '');
+      const { title, group } = slides[h.i].dataset;
+      out += `<button class="hit-item" data-idx="${h.i}">
+        <span class="ht"><span>${escapeHtml((group ? group + ' · ' : '') + title)}</span><small>${String(h.i + 1).padStart(2, '0')} · ×${h.count}</small></span>
+        <span class="sn">${snippet}</span></button>`;
+    });
+    resultsEl.innerHTML = out;
+    resultsEl.hidden = false;
+    resultsEl.querySelectorAll('.hit-item').forEach(b => b.addEventListener('click', () => openHit(+b.dataset.idx)));
+    syncResults();
+  }
+
+  function syncResults() {
+    if (!resultsEl) return;
+    resultsEl.querySelectorAll('.hit-item').forEach(b => b.classList.toggle('current', +b.dataset.idx === current));
+  }
+
+  // Go to a slide and scroll its first highlight into view (inside the slide only).
+  function openHit(i) {
+    go(i);
+    const slide = slides[i];
+    const m = slide.querySelector('mark.hit');
+    if (m) slide.scrollTop += m.getBoundingClientRect().top - slide.getBoundingClientRect().top - slide.clientHeight / 3;
+  }
+
+  searchInput.addEventListener('input', runSearch);
+  searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { searchInput.value = ''; runSearch(); searchInput.blur(); }
+    else if (e.key === 'Enter' && hits.length) {
+      e.preventDefault();
+      // Enter cycles forward through matching slides, Shift+Enter backward.
+      const idxs = hits.map(h => h.i);
+      const target = e.shiftKey
+        ? ([...idxs].reverse().find(i => i < current) ?? idxs[idxs.length - 1])
+        : (idxs.find(i => i > current) ?? idxs[0]);
+      openHit(target);
+    }
+  });
+
+  navItems.forEach(it => it.addEventListener('click', () => go(+it.dataset.idx)));
+  prevBtn.addEventListener('click', () => go(current - 1));
+  nextBtn.addEventListener('click', () => go(current + 1));
+
+  // Intro / cover.
+  const intro = document.getElementById('intro');
+  let introOpen = true;
+  function enterDeck() {
+    if (!introOpen) return;
+    introOpen = false;
+    intro.classList.add('hidden');
+    setTimeout(() => { intro.style.display = 'none'; }, 800);
+    timeline.classList.add('show');
+    go(0);
+  }
+  intro.addEventListener('click', enterDeck);
+
+  document.addEventListener('keydown', e => {
+    if (introOpen) { e.preventDefault(); enterDeck(); return; }
+    if (e.target === searchInput) return;   // typing in the search box must not navigate
+    if (e.key === '/') { e.preventDefault(); searchInput.focus(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); go(current + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(current - 1); }
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(slides.length - 1);
+    else if (/^[1-9]$/.test(e.key)) go(+e.key - 1);
+  });
+
+  // Mouse wheel / trackpad navigates like the arrows, throttled to one slide per gesture.
+  // Only hijacks the wheel when the current slide has nothing left to scroll.
+  let wheelLock = false;
+  window.addEventListener('wheel', e => {
+    if (introOpen) { enterDeck(); return; }
+    if (e.target.closest && e.target.closest('.sidebar')) return;   // let the sidebar (and its results) scroll
+    if (Math.abs(e.deltaY) < 8) return;
+    const active = slides[current];
+    const atTop = active.scrollTop <= 0;
+    const atBottom = active.scrollTop + active.clientHeight >= active.scrollHeight - 2;
+    if (e.deltaY > 0 && !atBottom) return;   // let the slide scroll down first
+    if (e.deltaY < 0 && !atTop) return;      // let the slide scroll up first
+    if (wheelLock) return;
+    wheelLock = true;
+    setTimeout(() => { wheelLock = false; }, 600);
+    go(current + (e.deltaY > 0 ? 1 : -1));
+  }, { passive: true });
+
+  go(0);
+</script>
+</body>
+</html>

@@ -81,10 +81,16 @@ namespace Meuble
         /// The NavMesh areas of the frozen station walks: every area but the doorways of the leaves authored closed
         /// (RoutineFactory.AllAreas on a level without a closed leaf).
         /// </summary>
-        public int StationAreaMask => AreaMaskFor(AuthoredOpenMask);
+        public int StationAreaMask => AreaMaskFor(AuthoredOpenMask | HouseholdMask);
 
         /// <summary>The NavMesh areas a plan may use now: every area but the doorways of the closed leaves.</summary>
-        public int AreaMask() => AreaMaskFor(OpenMask);
+        public int AreaMask() => AreaMaskFor(OpenMask | HouseholdMask);
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.7): the leaves an inhabitant opens on its walk (openedByInhabitants): their doorways are
+        /// always in <see cref="StationAreaMask"/> and <see cref="AreaMask"/>, closed or not. 0 on every level before M6.
+        /// </summary>
+        public int HouseholdMask => Def != null ? Def.HouseholdLeafMask() : 0;
 
         /// <summary>The NavMesh areas of an open-leaf mask: every area but area DoorAreaBase + k of each leaf k not in it.</summary>
         public int AreaMaskFor(int openMask)
@@ -175,7 +181,10 @@ namespace Meuble
     ///
     /// M4.2 textures: hard floors and thresholds show parquet, soft ones and rugs carpet, wall faces and caps plaster,
     /// door frames, leaves, baseboards and window frames (painted) wood; the procedural inhabitant's clothes linen.
-    /// The garden and the window pane stay plain. Quads and boxes use the sized meshes (UVs in metres).
+    /// The window pane stays plain (Surface.Plain). Quads and boxes use the sized meshes (UVs in metres).
+    ///
+    /// M6 (CONTRACT_M6 2.4): the garden now shows a grass detail (Surface.Grass) instead of staying plain; the window
+    /// pane keeps no texture but gets its own smoothness (<see cref="Tuning.WindowPaneSmoothness"/>).
     ///
     /// M5 (docs/CONTRACT_M5_v3.md 15.1 to 15.4 and 15.8, CONTRACT_M5.md 16.6):
     /// <list type="bullet">
@@ -359,6 +368,15 @@ namespace Meuble
                             PrimitiveKit.Lit(color, 0f), floor, Surface.Carpet);
                     }
                 }
+                else if (room.IsTile)
+                {
+                    // M7 (CONTRACT_M7 1.2): kitchen and bathroom floors, visual only (still a hard, non silent floor).
+                    // LitSurface, not Lit: Tile's own fixed finish (TextureLibrary.FinishOf) must never be silently
+                    // overridden by an unrelated Lit(color, ...) call for the same colour (PrimitiveKit.Lit caches by
+                    // colour alone, and this floor's colour is also a common wall colour at its own, different,
+                    // smoothness: CONTRACT_M6 2.4's reasoning for Grass, Lacquer, Metal, Plastic, Foliage and Soil).
+                    FloorQuad(batch, root, name, center, new Vector2(room.SizeX, room.SizeZ), PrimitiveKit.LitSurface(color, Surface.Tile), floor, Surface.Tile);
+                }
                 else
                 {
                     FloorQuad(batch, root, name, center, new Vector2(room.SizeX, room.SizeZ), PrimitiveKit.Lit(color, 0.35f), floor, Surface.Parquet);
@@ -373,8 +391,10 @@ namespace Meuble
             Rect interior = def.InteriorBounds();
             float size = Mathf.Max(GardenSize, Mathf.Max(interior.width, interior.height) + 20f);
             var mid = new Vector3(interior.center.x, 0f, interior.center.y);
+            // M6 (CONTRACT_M6 2.4): the garden shows a grass detail (Grass001) instead of staying plain.
             PrimitiveKit.Part(root, "Garden", PrimitiveKit.QuadMesh, mid + new Vector3(0f, -0.02f, 0f), Quaternion.Euler(90f, 0f, 0f),
-                new Vector3(size, size, 1f), PrimitiveKit.Lit(Outside, 0.05f), floor).GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                new Vector3(size, size, 1f), PrimitiveKit.LitSurface(Outside, Surface.Grass), floor, Surface.Grass)
+                .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             // One slab under everything, indoors and out, so the chair never falls through a door. It is on
             // the Default layer: no NavMesh source, so no island of NavMesh appears outside the house.
             var ground = new GameObject("GroundCollider") { layer = 0 };
@@ -1208,10 +1228,15 @@ namespace Meuble
         /// <summary>The floor of a doorway between two rooms, so no grass shows in the wall band.</summary>
         private static void Threshold(Transform wall, float from, float to, float t, RoomDef room, Batch batch)
         {
+            // M7 (CONTRACT_M7 1.2): a tiled room's doorway floor strip matches it, so no parquet seam shows in the gap.
+            Surface surface = room.IsTile ? Surface.Tile : room.IsSoft ? Surface.Carpet : Surface.Parquet;
+            Color color = LevelJson.ParseColor(room.FloorColor, Color.gray) * (room.IsSoft ? 0.82f : 1f);
+            // LitSurface for Tile, as the room floor itself (BuildFloors): never a plain Lit(color, smoothness) call,
+            // which would collide on colour alone with an unrelated wall or floor elsewhere at a different smoothness.
+            Material material = room.IsTile ? PrimitiveKit.LitSurface(color, Surface.Tile) : PrimitiveKit.Lit(color, room.IsSoft ? 0f : 0.35f);
             batch.Add(wall, "Threshold", PrimitiveKit.QuadMeshSized(new Vector2(to - from, t + 0.02f)),
                 new Vector3((from + to) * 0.5f, 0.001f, 0f), Quaternion.Euler(90f, 0f, 0f), new Vector3(to - from, t + 0.02f, 1f),
-                PrimitiveKit.Lit(LevelJson.ParseColor(room.FloorColor, Color.gray) * (room.IsSoft ? 0.82f : 1f), room.IsSoft ? 0f : 0.35f), Layers.Floor,
-                room.IsSoft ? Surface.Carpet : Surface.Parquet, ShadowCastingMode.Off, FloorScope, FloorName);
+                material, Layers.Floor, surface, ShadowCastingMode.Off, FloorScope, FloorName);
             // The doorway floor joins the NavMesh of the two rooms.
             var slab = new GameObject("ThresholdCollider") { layer = Layers.Floor };
             slab.transform.SetParent(wall, false);
@@ -1233,10 +1258,10 @@ namespace Meuble
             Quaternion rotation = side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
             float z = side * (t * 0.5f + 0.004f);
             // Wave 5B (CONTRACT_M5 17): the panes never fade and share one material: combined, every pane of the house is one
-            // renderer.
+            // renderer. M6 (CONTRACT_M6 2.4): no texture (Surface.Plain), but its own smoothness (0.95).
             batch.Add(wall, "WindowPane", PrimitiveKit.QuadMeshSized(new Vector2(w, hgt)), new Vector3(center, y, z), rotation,
-                new Vector3(w, hgt, 1f), PrimitiveKit.Emissive(WindowPane, WindowPaneEmission), 0, Surface.Plain, ShadowCastingMode.Off, PaneScope,
-                "WindowPane");
+                new Vector3(w, hgt, 1f), PrimitiveKit.Emissive(WindowPane, WindowPaneEmission, Tuning.WindowPaneSmoothness, 0f), 0, Surface.Plain,
+                ShadowCastingMode.Off, PaneScope, "WindowPane");
             Material trim = PrimitiveKit.Lit(Trim, 0.3f);
             const float f = 0.08f;
             float fz = side * (t * 0.5f + 0.008f);

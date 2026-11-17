@@ -25,8 +25,8 @@ namespace Meuble.Core
     public sealed class LoadBalance
     {
         // Rounding margin only: a change of exactly the threshold (the armchair's full reversal, 0.9 to -0.9) falls
-        // despite the float error of a diagonal magnitude. Not a tuning value.
-        private const float Epsilon = 1e-4f;
+        // despite the float error of a diagonal magnitude. Not a tuning value. Public for the level audit (M5 5B.1 m6).
+        public const float Epsilon = 1e-4f;
 
         // The kept samples (time, velocity), oldest first from head; the first is the rest at time 0.
         private readonly List<double> times = new List<double>();

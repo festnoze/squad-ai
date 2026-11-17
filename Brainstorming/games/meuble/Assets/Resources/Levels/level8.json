@@ -37,6 +37,7 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "tile",
       "floorColor": "#EDE6DA",
       "wallColor": "#F7F4EE"
     },

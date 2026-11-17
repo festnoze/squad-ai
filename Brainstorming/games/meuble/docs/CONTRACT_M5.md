@@ -755,3 +755,51 @@ Decisions:
 - **The balance gauge** sits to the left of the creak gauge (no room above the controls line). A
   clue costs one discovery per fall. A stool that tips over keeps its load (only the kinematic rule
   drops it).
+
+---
+
+## 19. Wave 5B.1 fix wave (binding; from the adversarial result critique of wave 5B)
+
+The critique synthesis lists every item with its evidence (B1 to B3, M1 to M10, m1 to m15). The
+integrator's decisions:
+
+- **B1, the load's triangles.** The load is its own object for the budgets, as the audit already
+  counts it: the probe subtracts the LoadView from the furniture and checks the load on its own key
+  ("Load vase") against the 400 triangle budget. PRD 7.4 is written back.
+- **B3, the shove.** `|| shoveMoving` goes (the push action already makes the furniture move), and
+  so does the `!Shoving` that repeats `!furniture.ActionActive` in StepRock. The marker moves to
+  FurnitureController.EndStep ("the push is not moving"), killed by Step42b_, Step42c_, Step42g_.
+- **M5, a free vase drop.** Open question 25 stands: a fallen load costs one discovery, never the
+  level. The levels make it cost: a listener with memory within crash range of the start area and of
+  the early corners on levels 11 and 17, and a counter-route "drop at the spawn, then full speed" that
+  must not win.
+- **M8, audit fidelity m2, m3, m4** (E action modelling, door-seen and tolerance-class fixtures, the
+  sample height) are **deferred to M6**, with the full M7 sight rework (ring, centre and intermediate
+  moves, the sliver fixture). M7's minimum lands now: a post-search fidelity replay of every schedule
+  with the game's own Vision.Test points (5 points, release offsets, intermediate positions every
+  0.1 m, the move yaw) that fails on any sighting.
+- **m4, the character slot merge** is removed (code, flag and mutation row): every level holds its
+  draw-call budget without it (verify 5B), so section 17's "cut slots first" is not needed.
+- **m12, hints:** `level13.hint` "Maj pour démarrer et tourner : chaque arrêt glisse, et le vase
+  tombe au moindre à-coup." and `level15.hint` "Près du robot, on n'entend pas tes pas. Le fauteuil
+  se balance après chaque arrêt."
+- **m13:** `Tuning.BalanceWarning` is 0.9 (the gauge turns red only near a real fall).
+- **Level 17** (M3): the first leg out of the bedroom before about 15 s, the whole route under about
+  45 s, no loitering stretch above the 8 s cap under the fixed wait rule (M2).
+- **Level 10** (M4): a schedule that only waits and drives must stop inside a cone between two watch
+  windows (a real rock lesson); Step45p asserts the rock is seen within the caught grace.
+- Waiting for the improvement loop: m3 probe gaps beyond the contract minimum, m8, m10, m15, and the
+  rest of the minors the fix wave does not reach.
+
+**19.1 Scope cut (product owner, 2026-11-15: very few credits left; overrides section 19 and the
+agent prompts where they ask for more).** Do the smallest work that turns the gate green, nothing more:
+- **levels:** fix ONLY the levels the new audit rejects, with the smallest data change (a station,
+  a glance, a spawn), then re-audit just those levels with -writeRoutes and run PlayMode filtered on
+  their Step45 replays. The level 17 dead time (M3), the level 10 rock lesson (M4), the vase drop
+  cost (M5), their counter-routes and the RouteReplayer guard go to the improvement loop, unless a
+  rejected level needs them anyway. No final full audit and no Step40 run: the integrator's verify
+  does that.
+- **integrate:** the mutation.sh rows and the verify.sh lists only, plus a short PRD v1.10 (the 3.4
+  rewrite and five to ten lines of section 11 5B notes) and a README 5B gate section of a few lines.
+  The CONTRACT_M5 section 12, 13 and 16.12 cleanup is skipped.
+- Every agent: few Unity runs, short reports.

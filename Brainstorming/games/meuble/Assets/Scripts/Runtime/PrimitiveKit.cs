@@ -24,6 +24,12 @@ namespace Meuble
         private static readonly Dictionary<Color32, Material> LitCache = new Dictionary<Color32, Material>();
         private static readonly Dictionary<Color32, Material> UnlitCache = new Dictionary<Color32, Material>();
         private static readonly Dictionary<Color32, Material> TransparentCache = new Dictionary<Color32, Material>();
+        // M6 (CONTRACT_M6 2.4): a few colours (the near-black frame, the robot's shell) are reused across several
+        // surfaces that each need their own fixed finish (TextureLibrary.FinishOf): keyed by colour AND surface, so
+        // LitSurface never collides with an unrelated Lit(color, smoothness) call for the same colour (the project
+        // reuses a handful of colours everywhere to stay under the PRD 7.4 material cap, each at its own smoothness).
+        private static readonly Dictionary<(Color32 color, Surface surface), Material> SurfaceCache =
+            new Dictionary<(Color32, Surface), Material>();
         private static readonly Dictionary<string, Mesh> MeshCache = new Dictionary<string, Mesh>();
 
         // ----- Materials -----
@@ -32,29 +38,77 @@ namespace Meuble
         /// The URP Lit material of a palette colour (one per colour, PRD 7.4). M4.2: its base colour is the palette
         /// divided by <see cref="Tuning.DetailMean"/> (TextureLibrary.Compensate) and its base map the flat map of that
         /// mean, so it shows the palette colour exactly; <see cref="Detail(Renderer, int, Surface)"/> swaps in a detail
-        /// texture of the same mean per renderer slot.
+        /// texture of the same mean per renderer slot. M6 (CONTRACT_M6 2.4): <paramref name="metallic"/>, as
+        /// <paramref name="smoothness"/> always was, a caller asking for a colour already cached (at another smoothness
+        /// or metallic) gets the cached material: deliberate reuse keeps the level under its material cap. A surface
+        /// whose finish must never be silently overridden this way (Grass, Lacquer, Metal, Plastic, Foliage, Soil) goes
+        /// through <see cref="LitSurface"/> instead, cached apart by colour and surface.
         /// </summary>
-        public static Material Lit(Color color, float smoothness = 0.25f)
+        public static Material Lit(Color color, float smoothness = 0.25f, float metallic = 0f)
         {
             Color32 key = color;
             if (LitCache.TryGetValue(key, out Material cached) && cached != null)
             {
                 return cached;
             }
+            Material m = NewLit(color, smoothness, metallic);
+            LitCache[key] = m;
+            return m;
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.4): the URP Lit material of a palette colour shown with <paramref name="surface"/>'s own
+        /// fixed finish (<see cref="TextureLibrary.FinishOf"/>), cached by colour AND surface: never shares a material
+        /// with an ordinary <see cref="Lit(Color, float, float)"/> call for the same colour, however many of those
+        /// already exist (the frame, the robot's shell and bumper, the garden and the player's own furniture all reuse
+        /// colours a level already draws elsewhere at a different smoothness). Falls back to Lit's own default (logged
+        /// once) for a surface with no fixed finish: a caller error, never a silently wrong finish.
+        /// </summary>
+        public static Material LitSurface(Color color, Surface surface)
+        {
+            Color32 color32 = color;
+            var key = (color32, surface); // MUTATION:LIT_SURFACE_KEY
+            if (SurfaceCache.TryGetValue(key, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+            if (!TextureLibrary.FinishOf(surface, out float smoothness, out float metallic))
+            {
+                ReportOnce("finish " + surface, $"[PrimitiveKit] {surface} has no fixed finish (TextureLibrary.FinishOf): LitSurface falls back to Lit's default");
+                smoothness = 0.25f;
+                metallic = 0f;
+            }
+            Material m = NewLit(color, smoothness, metallic, surface);
+            SurfaceCache[key] = m;
+            return m;
+        }
+
+        private static Material NewLit(Color color, float smoothness, float metallic, Surface? taggedSurface = null)
+        {
             Shader shader = Shader.Find(LitShaderName);
             if (shader == null)
             {
                 Debug.LogError("[PrimitiveKit] URP Lit shader not found (is it in Always Included Shaders?)");
                 shader = Shader.Find("Hidden/InternalErrorShader");
             }
-            var m = new Material(shader) { name = "Lit " + ColorUtility.ToHtmlStringRGB(color), enableInstancing = true };
+            string name = "Lit " + ColorUtility.ToHtmlStringRGB(color) + (taggedSurface.HasValue ? " " + taggedSurface.Value : "");
+            var m = new Material(shader) { name = name, enableInstancing = true };
             m.SetColor("_BaseColor", TextureLibrary.Compensate(color));
             m.SetTexture(BaseMapId, TextureLibrary.Flat);
             m.SetFloat("_Smoothness", smoothness);
-            m.SetFloat("_Metallic", 0f);
+            m.SetFloat("_Metallic", metallic);
+            // M6 polish: a smooth finish (Lacquer) needs its specular highlight and reflection probe to actually show;
+            // explicit, never left to the shader default.
+            m.SetFloat("_SpecularHighlights", 1f);
+            m.SetFloat("_EnvironmentReflections", 1f);
+            // M7 textures (CONTRACT_M7 1.2): every Lit material can show a normal map, always through the per-renderer
+            // property block (Detail below), never a material level texture: Detail already swaps the base map per
+            // slot on a material shared by several surfaces (the six M4.2 ones have no fixed finish), so the bump map
+            // follows the same path. Left unset here, _BumpMap keeps the shader's own neutral default (flat normal,
+            // "bump"): a slot without a normal map in the library renders exactly as before.
+            m.EnableKeyword("_NORMALMAP");
             m.hideFlags = HideFlags.DontUnloadUnusedAsset;
-            LitCache[key] = m;
-            Palette[m] = key;
+            Palette[m] = color;
             return m;
         }
 
@@ -70,6 +124,11 @@ namespace Meuble
 
         private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
         private static readonly int BaseMapStId = Shader.PropertyToID("_BaseMap_ST");
+        // M7 textures (CONTRACT_M7 1.2): the normal map and its strength, set through the same property block as the
+        // base map, at the base map's own UV transform (the URP Lit shader computes one uv from _BaseMap_ST and
+        // reuses it for every map of the slot, so a separate _BumpMap_ST would do nothing).
+        private static readonly int BumpMapId = Shader.PropertyToID("_BumpMap");
+        private static readonly int BumpScaleId = Shader.PropertyToID("_BumpScale");
         private static MaterialPropertyBlock detailBlock;
         private static readonly HashSet<string> ReportedProblems = new HashSet<string>();
         private static readonly Dictionary<(int mesh, int slot, Vector3Int scale), float> DensityCache =
@@ -126,6 +185,14 @@ namespace Meuble
             detailBlock.Clear();
             detailBlock.SetTexture(BaseMapId, texture); // MUTATION:DETAIL
             detailBlock.SetVector(BaseMapStId, new Vector4(repeat, repeat, 0f, 0f));
+            // M7 textures (CONTRACT_M7 1.2): a surface with a derived normal map also shows it, at its own modest
+            // scale; a surface without one (Plastic, Foliage, Soil, Plain) leaves the material's own neutral default.
+            Texture2D normal = TextureLibrary.NormalOf(surface);
+            if (normal != null) // MUTATION:DETAIL_NORMAL
+            {
+                detailBlock.SetTexture(BumpMapId, normal);
+                detailBlock.SetFloat(BumpScaleId, TextureLibrary.BumpScaleOf(surface));
+            }
             renderer.SetPropertyBlock(detailBlock, slot);
         }
 
@@ -252,9 +319,23 @@ namespace Meuble
 
         /// <summary>
         /// M3: an unlit material whose colour is <paramref name="color"/> (sRGB) times <paramref name="intensity"/>,
-        /// so it can rise above 1 and feed the bloom (the window pane). Cached by colour and intensity.
+        /// so it can rise above 1 and feed the bloom (the window pane). Cached by colour and intensity only (as
+        /// <see cref="Lit(Color, float, float)"/>: a caller asking for a smoothness or a metallic already cached gets
+        /// the cached material; deliberate reuse keeps the level under its material cap). Harmless for the shader is
+        /// Unlit (no lighting, so smoothness and metallic never render), but still read back exactly by a probe.
         /// </summary>
         public static Material Emissive(Color color, float intensity)
+        {
+            return Emissive(color, intensity, 0f, 0f);
+        }
+
+        /// <summary>
+        /// <see cref="Emissive(Color, float)"/>, carrying its own smoothness and metallic (M6, CONTRACT_M6 2.4: the
+        /// window pane, smoothness 0.95, no texture). The window is always built before any robot that might reuse its
+        /// colour (LevelBuilder.Build builds the walls, so every window, before BuildRobots), so it always sets the
+        /// shared material first.
+        /// </summary>
+        public static Material Emissive(Color color, float intensity, float smoothness, float metallic)
         {
             string key = ColorUtility.ToHtmlStringRGB(color) + "x" + intensity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
             if (EmissiveCache.TryGetValue(key, out Material cached) && cached != null)
@@ -263,6 +344,8 @@ namespace Meuble
             }
             var m = new Material(FindUnlit()) { name = "Emissive " + key, enableInstancing = true };
             m.SetColor("_BaseColor", new Color(color.r * intensity, color.g * intensity, color.b * intensity, 1f));
+            m.SetFloat("_Smoothness", smoothness);
+            m.SetFloat("_Metallic", metallic);
             m.hideFlags = HideFlags.DontUnloadUnusedAsset;
             EmissiveCache[key] = m;
             return m;
@@ -282,7 +365,8 @@ namespace Meuble
         }
 
         /// <summary>Number of distinct materials created so far (budget check, PRD 7.4).</summary>
-        public static int MaterialCount => LitCache.Count + UnlitCache.Count + TransparentCache.Count + EmissiveCache.Count;
+        public static int MaterialCount =>
+            LitCache.Count + UnlitCache.Count + TransparentCache.Count + EmissiveCache.Count + SurfaceCache.Count;
 
         // ----- Meshes (unit size, scaled by the transform) -----
 

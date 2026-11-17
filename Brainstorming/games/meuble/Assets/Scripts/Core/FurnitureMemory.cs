@@ -70,6 +70,9 @@ namespace Meuble.Core
         /// <summary>True once the current incident has given its discovery.</summary>
         private bool discovered;
 
+        /// <summary>M6: the player slot was found empty (its discovery given), until the furniture is seen again.</summary>
+        private bool spotKnownEmpty;
+
         /// <summary>The last pose at which this inhabitant saw the player furniture in place, and the carry back target.</summary>
         public FurniturePose PlayerSlot { get; private set; }
 
@@ -143,6 +146,7 @@ namespace Meuble.Core
                 ResetGrace(); // grace reset: not seen
                 return Observation.NotSeen;
             }
+            spotKnownEmpty = false;
             return SeenOutOfPlace(dt);
         }
 
@@ -159,6 +163,7 @@ namespace Meuble.Core
                 ResetGrace(); // grace reset: not seen
                 return Observation.NotSeen;
             }
+            spotKnownEmpty = false;
             if (WithinTolerance(player, PlayerSlot, Tolerance)) // MUTATION:TIDY_TOLERANCE
             {
                 PlayerSlot = player;
@@ -212,7 +217,39 @@ namespace Meuble.Core
         public void SetPlayerSlot(FurniturePose pose)
         {
             PlayerSlot = pose;
+            spotKnownEmpty = false;
             ResetGrace();
+        }
+
+        // ----- M6 (docs/CONTRACT_M6.md 2.5): the remembered spot seen empty -----
+
+        /// <summary>
+        /// M6: true once this inhabitant found the player slot empty (its discovery given), until it sees the furniture again
+        /// (any <see cref="Observe(bool, FurniturePose, float)"/> with the furniture seen) or the slot moves.
+        /// </summary>
+        public bool SpotKnownEmpty => spotKnownEmpty;
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): one observation while the player furniture is hidden in a wardrobe (it has no samples, so it
+        /// is never seen). <paramref name="spotSeen"/>: the player slot's sample box is inside this inhabitant's view. Seen
+        /// empty, the slot is an incident exactly like a furniture seen out of place: Suspect until
+        /// <see cref="Tuning.DiscoveryGrace"/>, then Discovery once (the caller investigates the slot). After that discovery
+        /// the slot is known empty: NotSeen until the furniture is seen again, so a spot gives one discovery per hiding.
+        /// </summary>
+        public Observation ObserveEmptySpot(bool spotSeen, float dt)
+        {
+            bool blind = !spotSeen || spotKnownEmpty;
+            if (blind) // MUTATION:EMPTY_SPOT
+            {
+                ResetGrace(); // grace reset: the slot not seen, or already known empty
+                return Observation.NotSeen;
+            }
+            Observation o = SeenOutOfPlace(dt);
+            if (o == Observation.Discovery)
+            {
+                spotKnownEmpty = true;
+            }
+            return o;
         }
     }
 }

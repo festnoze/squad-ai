@@ -18,7 +18,12 @@ namespace Meuble
     ///
     /// M4.2 textures: every drawn part shows the detail of what it is made of (<see cref="Surface"/>): wood for frames,
     /// legs, shelves, cabinets and table tops, upholstery for sofas, armchairs and seats, linen for table cloths and the
-    /// lamp shade, plaster for worktops and pots. Books, leaves and metal stay plain.
+    /// lamp shade, plaster for worktops and pots. Books stay plain.
+    ///
+    /// M6 texture pass 2 (CONTRACT_M6 2.4): the metal frame (office chair, lamp pole and base) and the potted plant's
+    /// foliage get their own detail; the player's own furniture (always red, PRD 7.2) shows a glossy lacquer finish
+    /// instead of its usual surface and smoothness wherever it would otherwise be wood or upholstery
+    /// (<see cref="MainSurface"/>, <see cref="MainMaterial"/>), a decoy or a prop (never red) unaffected.
     ///
     /// M5 wave 5B (docs/CONTRACT_M5.md 5, 16.11 and 17): the procedural rocking chair (<see cref="RockingChair"/>), and the
     /// budgets counted as material slots: a level build combines a bookshelf's visual parts per material (its frame, then
@@ -37,7 +42,8 @@ namespace Meuble
         /// <summary>The player chair: 6 boxes, 72 triangles (PRD 7.1). Facing +z, backrest on the -z side.</summary>
         public static void Chair(Transform parent, Vector3 size, Color color, int layer)
         {
-            Material m = PrimitiveKit.Lit(color, 0.35f);
+            Material m = MainMaterial(color, 0.35f);
+            Surface wood = MainSurface(color, Surface.Wood);
             float seatTop = size.y * 0.53f;
             const float seat = 0.05f;
             const float leg = 0.05f;
@@ -45,15 +51,36 @@ namespace Meuble
             float lx = size.x * 0.5f - leg * 0.5f - 0.01f;
             float lz = size.z * 0.5f - leg * 0.5f - 0.01f;
             float legHeight = seatTop - seat;
-            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegFL", new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegFR", new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegBL", new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegBR", new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
+            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegFL", new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegFR", new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegBL", new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegBR", new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
             float backHeight = size.y - seatTop;
             PrimitiveKit.Box(parent, "Backrest", new Vector3(0f, seatTop + backHeight * 0.5f, -size.z * 0.5f + back * 0.5f),
-                new Vector3(size.x, backHeight, back), m, layer, false, Surface.Wood);
+                new Vector3(size.x, backHeight, back), m, layer, false, wood);
         }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.4, PRD 7.2): only the player's own furniture is ever red (every level's player colour is
+        /// #D7263D, a decoy is always steered away from it), so a red main colour always means this is it: it shows the
+        /// glossy lacquer finish (PaintedWood006C, metallic 0) instead of its usual surface and smoothness. A decoy or a
+        /// prop body (never red) keeps <paramref name="normal"/>.
+        /// </summary>
+        private static Surface MainSurface(Color color, Surface normal) => ModelMath.IsRed(color) ? DebugMainFinish : normal; // MUTATION:LACQUER_RED
+
+        /// <summary>
+        /// The material that goes with <see cref="MainSurface"/>: the player's own furniture (never a decoy or a prop,
+        /// which are never red) takes <see cref="PrimitiveKit.LitSurface"/> (its own cache, apart from every other use of
+        /// the same colour at <paramref name="normalSmoothness"/>), so it never inherits a stray smoothness, and never
+        /// forces one on them either.
+        /// </summary>
+        private static Material MainMaterial(Color color, float normalSmoothness) =>
+            ModelMath.IsRed(color) ? PrimitiveKit.LitSurface(color, DebugMainFinish) : PrimitiveKit.Lit(color, normalSmoothness);
+
+        /// <summary>PRD 12.2 open question 28: a temporary "-finish metal" command line switch for the player's own
+        /// finish (the two comparison shots the look agent takes); lacquer stays the default, read once.</summary>
+        private static readonly Surface DebugMainFinish = Probe.ArgValue("-finish") == "metal" ? Surface.Metal : Surface.Lacquer;
 
         // ----- M4 bodies (docs/CONTRACT_M4.md 2) -----
 
@@ -98,31 +125,34 @@ namespace Meuble
         /// <summary>A stool (fallback of the Kenney bar stool): a seat on four legs, 5 boxes, 60 triangles.</summary>
         public static void Stool(Transform parent, Vector3 size, Color color, int layer)
         {
-            Material m = PrimitiveKit.Lit(color, 0.35f);
+            Material m = MainMaterial(color, 0.35f);
+            Surface wood = MainSurface(color, Surface.Wood);
             const float seat = 0.06f;
             const float leg = 0.04f;
             float legHeight = size.y - seat;
             float lx = size.x * 0.5f - leg * 0.5f - 0.02f;
             float lz = size.z * 0.5f - leg * 0.5f - 0.02f;
-            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, size.y - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegFL", new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegFR", new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegBL", new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
-            PrimitiveKit.Box(parent, "LegBR", new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, Surface.Wood);
+            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, size.y - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegFL", new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegFR", new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegBL", new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            PrimitiveKit.Box(parent, "LegBR", new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
         }
 
         /// <summary>A floor lamp (fallback of the Kenney lamp): a foot, a pole and the shade on top, 3 boxes, 36 triangles.</summary>
         public static void FloorLamp(Transform parent, Vector3 size, Color color, int layer)
         {
-            Material shade = PrimitiveKit.Lit(color, 0.35f);
-            Material frame = PrimitiveKit.Lit(FrameColor, Tuning.ModelSmoothness);
+            Material shade = MainMaterial(color, 0.35f);
+            // M6 (CONTRACT_M6 2.4): the pole and the foot are always metal (Metal009), player or decoy alike.
+            Material frame = PrimitiveKit.LitSurface(FrameColor, Surface.Metal);
             const float foot = 0.04f;
             const float pole = 0.035f;
             float shadeHeight = size.y * 0.22f;
             float poleTop = size.y - shadeHeight;
-            PrimitiveKit.Box(parent, "Foot", new Vector3(0f, foot * 0.5f, 0f), new Vector3(size.x * 0.8f, foot, size.z * 0.8f), frame, layer, false);
-            PrimitiveKit.Box(parent, "Pole", new Vector3(0f, (foot + poleTop) * 0.5f, 0f), new Vector3(pole, poleTop - foot, pole), frame, layer, false);
-            PrimitiveKit.Box(parent, "Shade", new Vector3(0f, poleTop + shadeHeight * 0.5f, 0f), new Vector3(size.x, shadeHeight, size.z), shade, layer, false, Surface.Linen);
+            PrimitiveKit.Box(parent, "Foot", new Vector3(0f, foot * 0.5f, 0f), new Vector3(size.x * 0.8f, foot, size.z * 0.8f), frame, layer, false, Surface.Metal);
+            PrimitiveKit.Box(parent, "Pole", new Vector3(0f, (foot + poleTop) * 0.5f, 0f), new Vector3(pole, poleTop - foot, pole), frame, layer, false, Surface.Metal);
+            PrimitiveKit.Box(parent, "Shade", new Vector3(0f, poleTop + shadeHeight * 0.5f, 0f), new Vector3(size.x, shadeHeight, size.z), shade, layer, false,
+                MainSurface(color, Surface.Linen));
         }
 
         /// <summary>The number of spokes and wheels of the office chair base.</summary>
@@ -137,17 +167,19 @@ namespace Meuble
         /// </summary>
         public static void OfficeChair(Transform parent, Vector3 size, Color color, int layer)
         {
-            Material m = PrimitiveKit.Lit(color, 0.35f);
-            Material frame = PrimitiveKit.Lit(FrameColor, Tuning.ModelSmoothness);
+            Material m = MainMaterial(color, 0.35f);
+            Surface upholstery = MainSurface(color, Surface.Upholstery);
+            // M6 (CONTRACT_M6 2.4): the frame (hub, post, spokes, wheels, column) is always metal (Metal009).
+            Material frame = PrimitiveKit.LitSurface(FrameColor, Surface.Metal);
             const float seat = 0.07f;
             const float backDepth = 0.06f;
             float seatTop = size.y * 0.5f;
             float backBottom = seatTop + 0.12f;
             float backZ = -size.z * 0.5f + backDepth * 0.5f;
-            PrimitiveKit.Part(parent, "Frame", OfficeChairFrame(size), Vector3.zero, Quaternion.identity, Vector3.one, frame, layer);
-            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, Surface.Upholstery);
+            PrimitiveKit.Part(parent, "Frame", OfficeChairFrame(size), Vector3.zero, Quaternion.identity, Vector3.one, frame, layer, Surface.Metal);
+            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, upholstery);
             PrimitiveKit.Box(parent, "Backrest", new Vector3(0f, (backBottom + size.y) * 0.5f, backZ), new Vector3(size.x * 0.9f, size.y - backBottom, backDepth),
-                m, layer, false, Surface.Upholstery);
+                m, layer, false, upholstery);
         }
 
         private static readonly Dictionary<string, Mesh> FrameCache = new Dictionary<string, Mesh>();
@@ -260,8 +292,12 @@ namespace Meuble
                 case BodyKinds.Armchair:
                     Armchair(parent, prop.Size, main, accent, layer, col, visual);
                     break;
+                case WardrobeRule.Kind:
+                    Wardrobe(parent, prop.Size, main, accent, layer, col, visual);
+                    break;
                 default:
-                    PrimitiveKit.Box(parent, "Body", new Vector3(0f, prop.SizeY * 0.5f, 0f), prop.Size, Mat(main, 0.25f, visual), layer, col, visual, Surface.Wood);
+                    PrimitiveKit.Box(parent, "Body", new Vector3(0f, prop.SizeY * 0.5f, 0f), prop.Size, Mat(main, 0.25f, visual), layer, col, visual,
+                        MainSurface(main, Surface.Wood));
                     break;
             }
         }
@@ -273,8 +309,11 @@ namespace Meuble
             return LevelJson.ParseColor(prop.AccentColor, main * 0.8f);
         }
 
-        /// <summary>No material is created for a part that will not be drawn.</summary>
-        private static Material Mat(Color color, float smoothness, bool visual) => visual ? PrimitiveKit.Lit(color, smoothness) : null;
+        /// <summary>
+        /// No material is created for a part that will not be drawn. M6: the player's own furniture (always red,
+        /// <see cref="MainMaterial"/>) takes the lacquer finish instead of <paramref name="smoothness"/>.
+        /// </summary>
+        private static Material Mat(Color color, float smoothness, bool visual) => visual ? MainMaterial(color, smoothness) : null;
 
         /// <summary>Base, backrest on +z, two arms, two cushions. Colliders on the structural parts.</summary>
         private static void Sofa(Transform p, Vector3 s, Color main, Color accent, int layer, bool col, bool visual)
@@ -320,6 +359,8 @@ namespace Meuble
         {
             Material body = Mat(main, 0.15f, visual);
             Material cushion = Mat(accent, 0.15f, visual);
+            Surface bodySurface = MainSurface(main, Surface.Upholstery);
+            Surface cushionSurface = MainSurface(accent, Surface.Upholstery);
             float seatH = s.y * ArmchairSeat;
             float armH = s.y * ArmchairArm;
             float armW = s.x * ArmchairArmWidth;
@@ -327,16 +368,16 @@ namespace Meuble
             float armDepth = s.z - backD;
             // The arms and the cushion run from the front of the backrest to the front edge: centred at +backD / 2.
             float frontZ = backD * 0.5f;
-            PrimitiveKit.Box(p, "Base", new Vector3(0f, seatH * 0.5f, 0f), new Vector3(s.x, seatH, s.z), body, layer, col, visual, Surface.Upholstery);
+            PrimitiveKit.Box(p, "Base", new Vector3(0f, seatH * 0.5f, 0f), new Vector3(s.x, seatH, s.z), body, layer, col, visual, bodySurface);
             PrimitiveKit.Box(p, "Backrest", new Vector3(0f, seatH + (s.y - seatH) * 0.5f, -s.z * 0.5f + backD * 0.5f),
-                new Vector3(s.x, s.y - seatH, backD), body, layer, col, visual, Surface.Upholstery);
+                new Vector3(s.x, s.y - seatH, backD), body, layer, col, visual, bodySurface);
             PrimitiveKit.Box(p, "ArmL", new Vector3(-s.x * 0.5f + armW * 0.5f, seatH + (armH - seatH) * 0.5f, frontZ),
-                new Vector3(armW, armH - seatH, armDepth), body, layer, col, visual, Surface.Upholstery);
+                new Vector3(armW, armH - seatH, armDepth), body, layer, col, visual, bodySurface);
             PrimitiveKit.Box(p, "ArmR", new Vector3(s.x * 0.5f - armW * 0.5f, seatH + (armH - seatH) * 0.5f, frontZ),
-                new Vector3(armW, armH - seatH, armDepth), body, layer, col, visual, Surface.Upholstery);
+                new Vector3(armW, armH - seatH, armDepth), body, layer, col, visual, bodySurface);
             float cushionH = Mathf.Min(0.1f, armH - seatH - 0.02f);
             PrimitiveKit.Box(p, "Cushion", new Vector3(0f, seatH + cushionH * 0.5f, frontZ),
-                new Vector3(s.x - 2f * armW - 0.02f, cushionH, armDepth - 0.04f), cushion, layer, false, visual, Surface.Upholstery);
+                new Vector3(s.x - 2f * armW - 0.02f, cushionH, armDepth - 0.04f), cushion, layer, false, visual, cushionSurface);
         }
 
         /// <summary>
@@ -467,7 +508,7 @@ namespace Meuble
         public static void RockingChair(Transform parent, Vector3 size, Color color, int layer)
         {
             PrimitiveKit.Part(parent, "RockingChair", RockingChairMesh(size), Vector3.zero, Quaternion.identity, Vector3.one,
-                PrimitiveKit.Lit(color, 0.35f), layer, Surface.Wood);
+                MainMaterial(color, 0.35f), layer, MainSurface(color, Surface.Wood));
         }
 
         /// <summary>The boxes of <see cref="RockingChair"/> as one mesh in the chair's frame (UVs in metres; cached by its parts).</summary>
@@ -574,6 +615,37 @@ namespace Meuble
             }
         }
 
+        /// <summary>
+        /// M6 gameplay (docs/CONTRACT_M6.md 2.5 and 2.4): the wardrobe, a full occluder with one collider over its whole box,
+        /// its two doors on the front (local +z, WardrobeRule.Front), a cornice on top, all Wood (Wood049). 4 boxes, 48
+        /// triangles, the prop's colour and its accent.
+        /// </summary>
+        private static void Wardrobe(Transform p, Vector3 s, Color wood, Color accent, int layer, bool col, bool visual)
+        {
+            Material body = Mat(wood, 0.25f, visual);
+            Material doors = Mat(accent, 0.3f, visual);
+            const float top = 0.06f;
+            const float panel = 0.02f;
+            PrimitiveKit.Box(p, "Body", new Vector3(0f, (s.y - top) * 0.5f, -panel * 0.5f), new Vector3(s.x, s.y - top, s.z - panel), body, layer, false, visual, Surface.Wood);
+            PrimitiveKit.Box(p, "Cornice", new Vector3(0f, s.y - top * 0.5f, 0f), new Vector3(s.x, top, s.z), doors, layer, false, visual, Surface.Wood);
+            float doorW = s.x * 0.5f - 0.015f;
+            float doorH = s.y - top - 0.06f;
+            for (int i = 0; i < 2; i++)
+            {
+                float x = (i == 0 ? -1f : 1f) * (doorW * 0.5f + 0.0075f);
+                PrimitiveKit.Box(p, "Door" + i, new Vector3(x, 0.03f + doorH * 0.5f, s.z * 0.5f - panel * 0.5f),
+                    new Vector3(doorW, doorH, panel), doors, layer, false, visual, Surface.Wood);
+            }
+            if (col)
+            {
+                var collider = new GameObject("Collider") { layer = layer };
+                collider.transform.SetParent(p, false);
+                var box = collider.AddComponent<BoxCollider>();
+                box.center = new Vector3(0f, s.y * 0.5f, 0f);
+                box.size = s;
+            }
+        }
+
         /// <summary>A kitchen counter (M2): a body and a worktop, solid up to its height. 2 boxes.</summary>
         private static void Counter(Transform p, Vector3 s, Color main, Color top, int layer, bool col, bool visual)
         {
@@ -583,13 +655,17 @@ namespace Meuble
             PrimitiveKit.Box(p, "Worktop", new Vector3(0f, s.y - worktop * 0.5f, 0f), new Vector3(s.x, worktop, s.z), Mat(top, 0.5f, visual), layer, col, visual, Surface.Plaster);
         }
 
-        /// <summary>A potted plant (M2): a pot and a block of foliage, each with its collider. 2 boxes.</summary>
+        /// <summary>
+        /// A potted plant (M2): a pot and a block of foliage, each with its collider. 2 boxes. M6 (CONTRACT_M6 2.4): the
+        /// foliage shows the Moss002 detail (Surface.Foliage) instead of staying plain.
+        /// </summary>
         private static void Plant(Transform p, Vector3 s, Color leaves, Color pot, int layer, bool col, bool visual)
         {
             float potH = s.y * 0.3f;
+            Material leafMaterial = visual ? PrimitiveKit.LitSurface(leaves, Surface.Foliage) : null;
             PrimitiveKit.Box(p, "Pot", new Vector3(0f, potH * 0.5f, 0f), new Vector3(s.x * 0.6f, potH, s.z * 0.6f), Mat(pot, 0.3f, visual), layer, col, visual, Surface.Plaster);
             PrimitiveKit.Box(p, "Leaves", new Vector3(0f, potH + (s.y - potH) * 0.5f, 0f), new Vector3(s.x, s.y - potH, s.z),
-                Mat(leaves, 0.15f, visual), layer, col, visual);
+                leafMaterial, layer, col, visual, Surface.Foliage);
         }
 
         /// <summary>Dining table under a floor length cloth: solid up to its height, as the PRD occluder says.</summary>

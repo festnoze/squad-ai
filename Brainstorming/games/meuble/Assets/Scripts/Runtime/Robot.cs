@@ -9,14 +9,19 @@ namespace Meuble
     /// game steps it: GameState reads <see cref="Path"/> (the <see cref="RobotPath"/> of its <see cref="RobotDef"/>, built here)
     /// and calls <see cref="SetPose"/> once per fixed step; LevelBuilder calls <see cref="Create"/> and lists it in
     /// LevelInstance.Robots.
+    /// <para>m15 (CONTRACT_M5 19): the root transform holds the rule pose exactly as set. The drawn <see cref="Body"/> is
+    /// interpolated in LateUpdate between the poses of the last two fixed steps, and turns toward the heading at most
+    /// <see cref="Tuning.RobotTurnRate"/>, so a loop end's 180 degree reversal is a short spin, never a one-frame flip. A pose
+    /// farther than <see cref="Tuning.RobotSnapDistance"/> from the last one (a teleport) snaps the body.</para>
     /// <list type="bullet">
     /// <item>A procedural disc of radius <see cref="Tuning.RobotRadius"/> and height <see cref="Tuning.RobotHeight"/>, its
     /// front on its local +z (the heading): a light shell, a dark bumper around the front half and a small lidar turret,
     /// and a pale status light near the front that pulses (visual only, held while paused).</item>
     /// <item>No collider (inhabitants walk across it, 16.8), not on the Occluder layer (it hides nothing from a watcher),
     /// no NavMesh source (the NavMesh reads colliders only).</item>
-    /// <item>Budgets: 3 material slots (shell, bumper, light), in colours every level already draws (the window trim, the
-    /// near-black frame, the window pane's glow), so it adds no material where a level has a window.</item>
+    /// <item>Budgets: 3 material slots (shell, bumper, light); the light reuses the window pane's glow colour (CONTRACT_M6
+    /// 2.4: the shell and the bumper now carry their own metal and plastic finish, Metal009 and Plastic006, so they no
+    /// longer share a material with the window trim or the frame).</item>
     /// </list>
     /// </summary>
     public sealed class Robot : MonoBehaviour
@@ -50,10 +55,22 @@ namespace Meuble
         /// <summary>The status light (its scale pulses).</summary>
         public Transform StatusLight { get; private set; }
 
+        /// <summary>m15: the drawn body (shell, bumper and light), smoothed toward the rule pose of the root.</summary>
+        public Transform Body { get; private set; }
+
+        /// <summary>m15: the drawn body's yaw, degrees (YawMath), turning toward <see cref="Yaw"/>.</summary>
+        public float VisualYaw { get; private set; }
+
         /// <summary>The number of <see cref="SetPose"/> calls (tests).</summary>
         public int PoseCount { get; private set; }
 
         private float clock;
+        // m15: the pose before the last fixed step's (the interpolation's start), the fixed time of the last pose, and the
+        // body's drawn position.
+        private Vector3 fromPosition;
+        private float poseFixedTime = float.NegativeInfinity;
+        private bool posed;
+        private Vector3 drawnPosition;
 
         /// <summary>
         /// The robot of <paramref name="def"/> under <paramref name="parent"/> (the level root), its <see cref="Path"/> built
@@ -72,30 +89,71 @@ namespace Meuble
             return robot;
         }
 
-        /// <summary>Puts the robot at <paramref name="position"/> (world), facing <paramref name="yaw"/> (degrees, YawMath).</summary>
+        /// <summary>
+        /// Puts the robot at <paramref name="position"/> (world), facing <paramref name="yaw"/> (degrees, YawMath): the root at
+        /// once (the rule pose), the drawn <see cref="Body"/> from its next LateUpdate (it snaps on the first pose, outside play
+        /// mode and past <see cref="Tuning.RobotSnapDistance"/>). Several poses in one fixed step interpolate from the pose
+        /// before that step.
+        /// </summary>
         public void SetPose(Vector3 position, float yaw)
         {
+            float now = Time.fixedTime;
+            bool snap = !posed || !Application.isPlaying || (position - transform.position).magnitude > Tuning.RobotSnapDistance;
+            if (posed && now != poseFixedTime)
+            {
+                fromPosition = transform.position;
+            }
             Yaw = yaw;
             transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f)); // MUTATION:ROBOT_POSE
             PoseCount++;
+            poseFixedTime = now;
+            posed = true;
+            if (snap)
+            {
+                fromPosition = position;
+                drawnPosition = position;
+                VisualYaw = yaw;
+            }
+            // The body keeps its drawn pose while the root moves under it.
+            if (Body != null)
+            {
+                Body.SetPositionAndRotation(drawnPosition, Quaternion.Euler(0f, VisualYaw, 0f));
+            }
         }
 
         private void LateUpdate()
         {
-            if (StatusLight == null)
+            float dt = Application.isPlaying && !GamePause.IsPaused ? Time.deltaTime : 0f;
+            if (StatusLight != null)
+            {
+                clock += dt;
+                float pulse = 0.5f + 0.5f * Mathf.Sin(clock * Tuning.RobotLightPulseRate * 2f * Mathf.PI);
+                StatusLight.localScale = Vector3.one * Mathf.Lerp(Tuning.RobotLightPulseMin, Tuning.RobotLightPulseMax, pulse);
+            }
+            if (Body == null || !posed)
             {
                 return;
             }
-            clock += Application.isPlaying && !GamePause.IsPaused ? Time.deltaTime : 0f;
-            float pulse = 0.5f + 0.5f * Mathf.Sin(clock * Tuning.RobotLightPulseRate * 2f * Mathf.PI);
-            StatusLight.localScale = Vector3.one * Mathf.Lerp(0.75f, 1.15f, pulse);
+            // One step behind the rule: from the pose before the last fixed step to its pose, by the time since that step.
+            float alpha = Time.fixedTime > poseFixedTime || Time.fixedDeltaTime <= 0f
+                ? 1f
+                : Mathf.Clamp01((Time.time - Time.fixedTime) / Time.fixedDeltaTime);
+            drawnPosition = Vector3.Lerp(fromPosition, transform.position, alpha);
+            VisualYaw = Mathf.MoveTowardsAngle(VisualYaw, Yaw, Tuning.RobotTurnRate * dt); // MUTATION:ROBOT_TURN_CAP
+            Body.SetPositionAndRotation(drawnPosition, Quaternion.Euler(0f, VisualYaw, 0f));
         }
 
         private void Build()
         {
             int layer = gameObject.layer;
-            Part("Shell", LoadView.CachedMesh("robot shell", ShellMesh), PrimitiveKit.Lit(ShellColour), layer, Surface.Plaster, true);
-            Part("Bumper", LoadView.CachedMesh("robot bumper", BumperMesh), PrimitiveKit.Lit(FurnitureKit.FrameColor), layer, Surface.Plain, true);
+            var body = new GameObject("Body") { layer = layer };
+            body.transform.SetParent(transform, false);
+            Body = body.transform;
+            // M6 (CONTRACT_M6 2.4): the shell is metal (Metal009), the bumper plastic (Plastic006); LitSurface keeps
+            // each its own material, apart from the window trim and the frame that otherwise share these colours.
+            Part("Shell", LoadView.CachedMesh("robot shell", ShellMesh), PrimitiveKit.LitSurface(ShellColour, Surface.Metal), layer, Surface.Metal, true);
+            Part("Bumper", LoadView.CachedMesh("robot bumper", BumperMesh), PrimitiveKit.LitSurface(FurnitureKit.FrameColor, Surface.Plastic), layer,
+                Surface.Plastic, true);
             GameObject light = Part("Light", LoadView.CachedMesh("robot light", LightMesh),
                 PrimitiveKit.Emissive(LightColour, Tuning.WindowPaneEmission), layer, Surface.Plain, false);
             light.transform.localPosition = new Vector3(0f, ShellTop, LightAhead);
@@ -105,7 +163,7 @@ namespace Meuble
         private GameObject Part(string name, Mesh mesh, Material material, int layer, Surface surface, bool shadows)
         {
             var go = new GameObject(name) { layer = layer };
-            go.transform.SetParent(transform, false);
+            go.transform.SetParent(Body, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;

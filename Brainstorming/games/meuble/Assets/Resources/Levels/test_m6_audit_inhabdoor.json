@@ -1,0 +1,99 @@
+{
+  "id": "test_m6_audit_inhabdoor",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "a",
+      "x": 2.0,
+      "z": 2.0,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "b",
+      "x": 6.05,
+      "z": 2.0,
+      "sizeX": 3.9,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.05,
+      "z": 2.0,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte",
+      "swing": "b",
+      "hinge": "start",
+      "openedByInhabitants": true
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.stool",
+    "kind": "stool",
+    "x": 0.75,
+    "z": 0.25,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 0.5,
+    "z": 3.5,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [],
+  "inhabitants": [
+    {
+      "name": "Ouvreur",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 5.6,
+          "z": 2.0,
+          "facing": -90.0,
+          "dwell": 0.5,
+          "glances": []
+        },
+        {
+          "x": 3.5,
+          "z": 3.5,
+          "facing": 0.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Veilleur",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 7.25,
+          "z": 2.0,
+          "facing": -90.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

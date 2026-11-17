@@ -179,13 +179,6 @@
       "z": 4.75,
       "yaw": 180.0,
       "color": "#6B4226"
-    },
-    {
-      "kind": "office_chair",
-      "x": 0.66,
-      "z": 4.25,
-      "yaw": 90.0,
-      "color": "#6B4226"
     }
   ],
   "props": [
@@ -321,30 +314,28 @@
     }
   ],
   "designerRoute": [
-    { "x": 2.25, "z": 7.75, "at": 6.5, "careful": true },
-    { "x": 2.25, "z": 6.75, "at": 7.6, "careful": true },
-    { "x": 2.25, "z": 6.25, "at": 10.4, "careful": true },
-    { "x": 2.25, "z": 5.25, "at": 12.4, "careful": true },
-    { "x": 2.25, "z": 4.75, "at": 13.2, "careful": true },
-    { "x": 1.25, "z": 4.75, "at": 20.8, "careful": true },
-    { "x": 1.25, "z": 4.25, "at": 22.0, "careful": true },
-    { "x": 1.25, "z": 3.25, "at": 25.2, "careful": true },
-    { "x": 2.25, "z": 3.25, "at": 26.4, "careful": true },
-    { "x": 3.25, "z": 3.25, "at": 27.2, "careful": true },
-    { "x": 4.25, "z": 3.25, "at": 28.0, "careful": true },
-    { "x": 5.25, "z": 3.25, "at": 28.8, "careful": true },
-    { "x": 6.25, "z": 3.25, "at": 29.6, "careful": true },
-    { "x": 6.75, "z": 3.25, "at": 30.4, "careful": true },
-    { "x": 6.75, "z": 2.25, "at": 31.2, "careful": true },
-    { "x": 6.75, "z": 1.25, "at": 32.0, "careful": true },
-    { "x": 7.75, "z": 1.25, "at": 33.2, "careful": true },
-    { "x": 8.75, "z": 1.25, "at": 34.0, "careful": true },
-    { "x": 9.75, "z": 1.25, "at": 34.8, "careful": true },
-    { "x": 10.75, "z": 1.25, "at": 35.6, "careful": true },
-    { "x": 11.75, "z": 1.25, "at": 36.4, "careful": true },
-    { "x": 12.75, "z": 1.25, "at": 37.2, "careful": true },
-    { "x": 13.25, "z": 1.25, "at": 38.0, "careful": true },
-    { "x": 13.25, "z": 1.25, "at": 38.0 }
+    { "x": 2.25, "z": 7.25, "at": 6.4, "careful": true },
+    { "x": 2.25, "z": 6.25, "at": 7.2, "careful": true },
+    { "x": 2.25, "z": 5.25, "at": 8.0, "careful": true },
+    { "x": 2.25, "z": 4.75, "at": 8.8, "careful": true },
+    { "x": 1.25, "z": 4.75, "at": 11.0, "careful": true },
+    { "x": 1.25, "z": 3.75, "at": 12.3, "careful": true },
+    { "x": 1.25, "z": 3.25, "at": 13.1, "careful": true },
+    { "x": 2.25, "z": 3.25, "at": 14.0, "careful": true },
+    { "x": 3.25, "z": 3.25, "at": 14.8, "careful": true },
+    { "x": 4.25, "z": 3.25, "at": 15.6, "careful": true },
+    { "x": 5.25, "z": 3.25, "at": 16.4, "careful": true },
+    { "x": 6.25, "z": 3.25, "at": 17.2, "careful": true },
+    { "x": 7.25, "z": 3.25, "at": 18.0, "careful": true },
+    { "x": 8.25, "z": 3.25, "at": 18.8, "careful": true },
+    { "x": 9.25, "z": 3.25, "at": 19.6, "careful": true },
+    { "x": 9.25, "z": 2.25, "at": 20.9, "careful": true },
+    { "x": 9.25, "z": 1.25, "at": 21.7, "careful": true },
+    { "x": 10.25, "z": 1.25, "at": 23.0, "careful": true },
+    { "x": 11.25, "z": 1.25, "at": 23.8, "careful": true },
+    { "x": 12.25, "z": 1.25, "at": 24.6, "careful": true },
+    { "x": 13.25, "z": 1.25, "at": 25.4, "careful": true },
+    { "x": 13.25, "z": 1.25, "at": 25.4 }
   ],
   "inhabitants": [
     {
@@ -357,7 +348,7 @@
           "x": 1.25,
           "z": 3.0,
           "facing": 270.0,
-          "dwell": 2.0,
+          "dwell": 9.0,
           "glances": []
         },
         {
@@ -379,7 +370,7 @@
           "x": 3.25,
           "z": 8.75,
           "facing": 0.0,
-          "dwell": 5.0,
+          "dwell": 4.0,
           "glances": [
             {
               "offset": 2.0,

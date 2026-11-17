@@ -62,11 +62,11 @@ namespace Meuble.Core
         public const string Level12Name = "Le chien";
         public const string Level12Hint = "Le chien voit bas : le canapé te cache de lui. S'il te voit bouger, il aboie.";
         public const string Level13Name = "Roulettes et vase";
-        public const string Level13Hint = "Chaque arrêt glisse, et le vase penche.";
+        public const string Level13Hint = "Maj pour démarrer et tourner : chaque arrêt glisse, et le vase tombe au moindre à-coup.";
         public const string Level14Name = "La mezzanine";
         public const string Level14Hint = "Monte par la rampe. Mamie s'assoit souvent : sois à ta place.";
         public const string Level15Name = "La bascule et le robot";
-        public const string Level15Hint = "Près du robot, on n'entend pas tes pas. Une chute s'entend toujours.";
+        public const string Level15Hint = "Près du robot, on n'entend pas tes pas. Le fauteuil se balance après chaque arrêt.";
         public const string Level16Name = "La nuit";
         public const string Level16Hint = "Éteins-toi quand personne ne regarde. Le chien veille.";
         public const string Level17Name = "La maison";
@@ -194,6 +194,70 @@ namespace Meuble.Core
         public static string FormatSeconds(float seconds)
         {
             return seconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture).Replace('.', ',');
+        }
+
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5): the wardrobe prompt, keyboard and gamepad. -----
+        public const string HudHide = "E : se cacher";
+        public const string HudLeave = "E : sortir";
+        public const string HudHidePad = "X : se cacher";
+        public const string HudLeavePad = "X : sortir";
+
+        // ----- M6 options (docs/CONTRACT_M6.md 2.1 and 2.2) -----
+        /// <summary>"Options", the button on the title and the pause menu, and the page's own title.</summary>
+        public const string OptionsTitle = "Options";
+        public const string OptionsSensitivity = "Sensibilité : {0}";
+        public const string OptionsVolume = "Volume : {0} %";
+        public const string OptionsCone = "Cône de vision : {0}";
+        public const string OptionsConeAlways = "Toujours";
+        public const string OptionsConeNever = "Jamais";
+        public const string OptionsDefault = "Par défaut";
+        /// <summary>hud.controls when the last input came from a gamepad (2.2): the same four commands, gamepad names.</summary>
+        public const string HudControlsGamepad = "Stick gauche : avancer    Stick droit : caméra    Y : recommencer    Start : pause";
+
+        // ----- M6 levels (docs/CONTRACT_M6.md 1.8 and 5): level 18 "L'armoire", its name and hint. -----
+        public const string Level18Name = "L'armoire";
+        public const string Level18Hint = "Le tabouret tient dans l'armoire : E pour t'y cacher, E pour ressortir.";
+        // Registered here (static initializers run in text order, after ByKey) so this block stays self-contained.
+        internal static readonly bool M6LevelsRegistered = RegisterM6Levels();
+
+        private static bool RegisterM6Levels()
+        {
+            ByKey["level18.name"] = Level18Name;
+            ByKey["level18.hint"] = Level18Hint;
+            return true;
+        }
+
+        // ----- M7 touch (docs/CONTRACT_M7.md 1.5): the controls line and the button labels of the touch controls. -----
+        /// <summary>hud.controls while the touch controls show: the same commands, touch names (restart is in the pause menu).</summary>
+        public const string HudControlsTouch = "Pouce gauche : avancer    Glisser à droite : caméra    Action : agir    II : pause";
+        public const string TouchAction = "Action";
+        public const string TouchCareful = "Prudence";
+        public const string TouchPause = "II";
+
+        // ----- M7 android (docs/CONTRACT_M7.md 1.4): the Qualité option of the Options screen. -----
+        public const string OptionsQuality = "Qualité : {0}";
+        public const string OptionsQualityLow = "Bas";
+        public const string OptionsQualityMedium = "Moyen";
+        public const string OptionsQualityHigh = "Haut";
+
+        // ----- M7 design (docs/CONTRACT_M7.md 4.1): the Difficulté option of the Options screen. -----
+        public const string OptionsDifficulty = "Difficulté : {0}";
+        public const string DifficultyFacile = "Facile";
+        public const string DifficultyNormal = "Normal";
+        public const string DifficultyDifficile = "Difficile";
+
+        /// <summary>The shown name of a difficulty id (DifficultyDef.Facile, Normal, Difficile); anything else is Normal.</summary>
+        public static string DifficultyName(string id)
+        {
+            switch (DifficultyDef.Normalize(id))
+            {
+                case DifficultyDef.Facile:
+                    return DifficultyFacile;
+                case DifficultyDef.Difficile:
+                    return DifficultyDifficile;
+                default:
+                    return DifficultyNormal;
+            }
         }
     }
 }

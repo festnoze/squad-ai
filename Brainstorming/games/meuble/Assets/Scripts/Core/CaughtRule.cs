@@ -9,7 +9,8 @@ namespace Meuble.Core
         // Ten steps of 0.02 s sum to 0.19999999 in float: the epsilon makes "0.20 s gives caught" hold.
         private const float Epsilon = 1e-4f;
 
-        public float Grace { get; }
+        /// <summary>M7 (CONTRACT_M7 4.1): settable, GameState sets the difficulty's grace when it builds a level.</summary>
+        public float Grace { get; set; }
         public float SeenMoving { get; private set; }
         public bool Caught { get; private set; }
 

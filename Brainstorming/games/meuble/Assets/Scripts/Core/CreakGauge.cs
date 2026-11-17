@@ -14,8 +14,20 @@ namespace Meuble.Core
         // 1000 steps of 0.02 s add up to 0.99999 in float: the epsilon makes "20 s still creaks" land on step 1000.
         private const float Epsilon = 1e-4f;
 
+        /// <summary>
+        /// M7 (CONTRACT_M7 4.1): the seconds from 0 to 1 while still, the difficulty's (GameState sets it when it builds a
+        /// level); <see cref="Tuning.CreakFillTime"/> by default. Values under the warning are raised to it.
+        /// </summary>
+        public float FillTime
+        {
+            get => fillTime;
+            set => fillTime = Mathf.Max(Tuning.CreakWarning, value);
+        }
+
+        private float fillTime = Tuning.CreakFillTime;
+
         /// <summary>Gauge value at which the warning starts: the last <see cref="Tuning.CreakWarning"/> seconds.</summary>
-        private const float WarningStart = 1f - Tuning.CreakWarning / Tuning.CreakFillTime;
+        public float WarningStart => 1f - Tuning.CreakWarning / fillTime;
 
         /// <summary>From 0 to 1.</summary>
         public float Value { get; private set; }
@@ -27,7 +39,7 @@ namespace Meuble.Core
         public bool Warning => Filling && Value >= WarningStart - Epsilon;
 
         /// <summary>Seconds left before the creak while filling; float.PositiveInfinity otherwise.</summary>
-        public float SecondsToCreak => Filling ? Mathf.Max(0f, 1f - Value) * Tuning.CreakFillTime : float.PositiveInfinity;
+        public float SecondsToCreak => Filling ? Mathf.Max(0f, 1f - Value) * fillTime : float.PositiveInfinity;
 
         /// <summary>
         /// M4 (docs/CONTRACT_M4.md section 3, amendment 9.11): <paramref name="paused"/> (sat on, hidden later)
@@ -59,7 +71,7 @@ namespace Meuble.Core
                 return false;
             }
             Filling = true;
-            Value += dt / Tuning.CreakFillTime;
+            Value += dt / fillTime; // MUTATION:CREAK_FILL_TIME
             if (Value >= 1f - Epsilon)
             {
                 Value = 0f;

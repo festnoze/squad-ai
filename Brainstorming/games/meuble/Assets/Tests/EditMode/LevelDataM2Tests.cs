@@ -20,12 +20,12 @@ namespace Meuble.Tests
         /// <summary>
         /// The play order (CONTRACT_M2 4, CONTRACT_M4 9.13, CONTRACT_M5 8 and 16.2): levels 1 to 7, then the wave 5A levels
         /// with their final ids (level12 stays level12). Wave 5B inserts its levels in play order: 11 levels after wave 5A,
-        /// 17 after wave 5B, level1 to level17 in number order.
+        /// 17 after wave 5B, level1 to level17 in number order; M6b adds level18 (18 levels).
         /// </summary>
         private static readonly string[] PlayOrder =
         {
             "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level10", "level11",
-            "level12", "level13", "level14", "level15", "level16", "level17",
+            "level12", "level13", "level14", "level15", "level16", "level17", "level18",
         };
 
         /// <summary>
@@ -132,8 +132,9 @@ namespace Meuble.Tests
         {
             List<string> ids = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
             // M4 (CONTRACT_M4 4, amendment 9.13): levels 4 to 7 follow the M2 levels. M5 (CONTRACT_M5 8 and 16.2): wave 5A
-            // added levels 8, 12, 14 and 16, wave 5B levels 9, 10, 11, 13, 15 and 17, all in number order: 17 levels.
-            Assert.AreEqual(17, ids.Count, "the manifest count after wave 5B: " + string.Join(", ", ids));
+            // added levels 8, 12, 14 and 16, wave 5B levels 9, 10, 11, 13, 15 and 17, all in number order; M6b (CONTRACT_M6 5)
+            // adds level 18 "L'armoire" after level 17: 18 levels.
+            Assert.AreEqual(18, ids.Count, "the manifest count after M6b: " + string.Join(", ", ids));
             CollectionAssert.AreEqual(PlayOrder, ids);
             foreach (string id in ids)
             {

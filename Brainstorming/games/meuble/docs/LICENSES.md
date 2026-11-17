@@ -60,6 +60,53 @@ license".
 | `ambientCG/detail_linen_Fabric036.png` | Fabric 036 (linen: clothes, table cloths, lamp shade) | ambientCG | https://ambientcg.com/a/Fabric036 | CC0 1.0 |
 | `ambientCG/detail_carpet_Carpet012.png` | Carpet 012 (rugs, doormat, soft floors) | ambientCG | https://ambientcg.com/a/Carpet012 | CC0 1.0 |
 
+M6 texture pass 2 (docs/CONTRACT_M6.md 2.4), the same derivation, read on each item's own page on 2026-11-15.
+
+| File | Title | Author | Source | Licence |
+|---|---|---|---|---|
+| `ambientCG/detail_grass_Grass001.png` | Grass 001 (the garden ground) | ambientCG | https://ambientcg.com/a/Grass001 | CC0 1.0 |
+| `ambientCG/detail_lacquer_PaintedWood006C.png` | Painted Wood 006C (the player furniture's glossy lacquer) | ambientCG | https://ambientcg.com/a/PaintedWood006C | CC0 1.0 |
+| `ambientCG/detail_metal_Metal009.png` | Metal 009 (office chair frame, lamp pole and base, robot body) | ambientCG | https://ambientcg.com/a/Metal009 | CC0 1.0 |
+| `ambientCG/detail_plastic_Plastic006.png` | Plastic 006 (the robot's bumper) | ambientCG | https://ambientcg.com/a/Plastic006 | CC0 1.0 |
+| `ambientCG/detail_foliage_Moss002.png` | Moss 002 (leaves: the potted plants and the fallen load's foliage) | ambientCG | https://ambientcg.com/a/Moss002 | CC0 1.0 |
+| `ambientCG/detail_soil_Ground104.png` | Ground 104 (the fallen load's spilled soil) | ambientCG | https://ambientcg.com/a/Ground104 | CC0 1.0 |
+
+M7 polish (docs/CONTRACT_M7.md 1.2), read on each item's own page on 2026-11-17.
+
+The kitchen and bathroom floor tile (room `"floorFinish": "tile"`, `LevelBuilder.BuildFloors`), the same
+grayscale derivation as M4.2/M6 above (luminance of the Color map, high-passed and softened with wrap-around
+filters, mean 240/255, highlights capped at 1.0):
+
+| File | Title | Author | Source | Licence |
+|---|---|---|---|---|
+| `ambientCG/detail_tile_Tiles049.png` | Tiles 049 (kitchen and bathroom floor tile) | ambientCG | https://ambientcg.com/a/Tiles049 | CC0 1.0 |
+
+Normal maps (CONTRACT_M7 1.2): for every M4.2/M6 detail that reads at play distance (wood, parquet, plaster,
+upholstery, linen, carpet, grass, lacquer, metal) and the new tile above, a 512 x 512 tangent space normal map
+derived from the same ambientCG material's `NormalGL` 1K-JPG download: decoded to a per texel tangent space
+vector, resized with the same wrap-around filter as its detail (so it tiles identically), renormalized (a plain
+resize of the encoded RGB would shrink the vectors and flatten the result) and re-encoded, imported as Unity's
+Normal map type. Shown through the URP Lit `_BumpMap` (`PrimitiveKit.Detail`), at a modest `_BumpScale` per
+surface (`Tuning`, CONTRACT_M7 1.2); Plastic, Foliage and Soil are not in the 1.2 list and stay bump-free. Same
+source material as its detail above, so no new id: the file is new, the licence already established.
+
+| File | Title | Author | Source | Licence |
+|---|---|---|---|---|
+| `ambientCG/normal_wood_Wood049.png` | Wood 049, NormalGL | ambientCG | https://ambientcg.com/a/Wood049 | CC0 1.0 |
+| `ambientCG/normal_parquet_WoodFloor051.png` | Wood Floor 051, NormalGL | ambientCG | https://ambientcg.com/a/WoodFloor051 | CC0 1.0 |
+| `ambientCG/normal_plaster_Plaster001.png` | Plaster 001, NormalGL | ambientCG | https://ambientcg.com/a/Plaster001 | CC0 1.0 |
+| `ambientCG/normal_upholstery_Fabric011.png` | Fabric 011, NormalGL | ambientCG | https://ambientcg.com/a/Fabric011 | CC0 1.0 |
+| `ambientCG/normal_linen_Fabric036.png` | Fabric 036, NormalGL | ambientCG | https://ambientcg.com/a/Fabric036 | CC0 1.0 |
+| `ambientCG/normal_carpet_Carpet012.png` | Carpet 012, NormalGL | ambientCG | https://ambientcg.com/a/Carpet012 | CC0 1.0 |
+| `ambientCG/normal_grass_Grass001.png` | Grass 001, NormalGL | ambientCG | https://ambientcg.com/a/Grass001 | CC0 1.0 |
+| `ambientCG/normal_lacquer_PaintedWood006C.png` | Painted Wood 006C, NormalGL | ambientCG | https://ambientcg.com/a/PaintedWood006C | CC0 1.0 |
+| `ambientCG/normal_metal_Metal009.png` | Metal 009, NormalGL | ambientCG | https://ambientcg.com/a/Metal009 | CC0 1.0 |
+| `ambientCG/normal_tile_Tiles049.png` | Tiles 049, NormalGL | ambientCG | https://ambientcg.com/a/Tiles049 | CC0 1.0 |
+
+The door leaves (`DoorLeaf.Create`) now show the lacquer detail above (`detail_lacquer_PaintedWood006C.png` and
+its normal map) too, as "painted wood": no new file, the leaf keeps its own matte material (not Lacquer's glossy
+fixed finish), only its surface tag changed.
+
 ## Audio (`Assets/ThirdParty/Audio`)
 
 Every clip was converted to mono 44.1 kHz 16-bit WAV, then trimmed and faded, by

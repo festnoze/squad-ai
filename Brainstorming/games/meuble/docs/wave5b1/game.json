@@ -1,0 +1,50 @@
+{
+  "summary": "game 5B.1 done. B3+m1: GameState drops the shove counter and stand-in (ShoveFallback, BeginShoveStep, slid/slide plumbing, StepLoad fallback params, BuildLoad fallbacks with Debug.LogError when Level.LoadView is null); Shoving is now furniture.Pushing read after the furniture step; both moving predicates are furniture.IsMoving only; StepRock drops !Shoving; header and step comments rewritten. New PUSH_MOVING marker in FurnitureController.EndStep (killed by Step42b_ Step42c_ Step42g_; 42b and 42c gained a shove into a test block so only the push action keeps them moving). LOAD_VELOCITY re-anchored on the live velocity line. M9: Step44e asserts LoadView.Tilt == Load.SwayTiltLocal(Chair.Yaw) on every carried step at yaw 90 (within 1e-4, nonzero after the full start, zero after the fall), new LOAD_SWAY marker; Step44e rewritten for BalanceWarning 0.9 (straight full start/stop 0.83 stays calm, a 70 deg full-speed turn at 0.96 turns red and the vase holds) and asserts BalanceScreenRect.xMax <= CreakScreenRect.xMin. m2: Vision.SeesClue, GameState.ShoveStepsLeft and LastRockStep deleted; Sfx hum hooks asserted in 42f, RockCreaksPlayed in 43b, BumpsPlayed in 42c. m7: Hud gauges placed from GaugeOffsetX/GaugeWidth/BalanceOffsetX, BalanceHot replaced by CreakHot. m14: GhostView.Show and ShowRings take the seer's tolerance (RingRadius, DecoyRingRadius probe hooks), asserted per personality in Step37e. m15: clue centre kept ClueClearance = max(ClueWallMargin, new Tuning.ClueSpreadRadius 0.32) from a wall, falling to the far side when the throw is cut short (new Step44h, and Step44b asserts the vase clue spread <= ClueSpreadRadius); the robot hum is a 2D source whose volume is Sfx.HumVolumeAt(furniture-to-robot distance), panned from the camera; a careful rock plays a RockCarefulTime creak clip.",
+  "blocked": false,
+  "files_changed": [
+    "Assets/Scripts/Runtime/GameState.cs",
+    "Assets/Scripts/Runtime/Vision.cs",
+    "Assets/Scripts/Runtime/Hud.cs",
+    "Assets/Scripts/Runtime/Sfx.cs",
+    "Assets/Scripts/Runtime/GhostView.cs",
+    "Assets/Scripts/Runtime/FurnitureController.cs",
+    "Assets/Scripts/Core/Tuning.cs",
+    "Assets/Tests/PlayMode/ProbeTestsM5Game.cs"
+  ],
+  "tests": "Compile clean (SetupAndCompile, no error CS). PlayMode Step0|Step1|Step2|Step36|Step37e|Step39|Step42|Step43|Step44: 131/132 green, the one red (Step37e decoy ring radius on a level without decoys) fixed in GhostView and rerun green with Step37e|Step13|Step29i|Step39d|Step39m|Step42b_|Step42c_ (11/11). Earlier Step42|Step43|Step44|Step39|Step36: 44/44. Mutants applied only while holding the Unity lock: PUSH_MOVING turned Step42b_ Step42c_ Step42g_ red; LOAD_SWAY turned Step44e_ red (tilt mismatch 26.3 deg); LOAD_VELOCITY turned Step44b_ Step44c_ Step44d_ Step44e_ red; all restored.",
+  "markers": [
+    {
+      "id": "push_moving",
+      "file": "Assets/Scripts/Runtime/FurnitureController.cs",
+      "marked": "IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive); // MUTATION:PUSH_MOVING",
+      "replacement": "IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive && Action != BodyAction.Push); // MUTATION:PUSH_MOVING",
+      "mode": "PlayMode",
+      "killers": "Step42b_ Step42c_ Step42g_"
+    },
+    {
+      "id": "load_sway",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "LoadView.SetTilt(CarryingLoad ? Load.SwayTiltLocal(furniture.Yaw) : Vector2.zero); // MUTATION:LOAD_SWAY",
+      "replacement": "LoadView.SetTilt(CarryingLoad ? Load.SwayTilt : Vector2.zero); // MUTATION:LOAD_SWAY",
+      "mode": "PlayMode",
+      "killers": "Step44e_"
+    },
+    {
+      "id": "load_velocity",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "Vector2 v = new Vector2(fv.x, fv.z); // MUTATION:LOAD_VELOCITY",
+      "replacement": "Vector2 v = Vector2.zero; // MUTATION:LOAD_VELOCITY",
+      "mode": "PlayMode",
+      "killers": "Step44b_ Step44c_ Step44d_ Step44e_"
+    }
+  ],
+  "removed_markers": ["SHOVE_MOVING", "LOAD_VELOCITY"],
+  "probe_steps": ["Step44h_TheClueFallsAwayFromAWallInTheWay"],
+  "edit_tests": [],
+  "needs": [
+    "integrator (mutation.sh): replace the shove_moving row with push_moving, re-anchor load_velocity on its new marked text, add the load_sway row (all three as in markers).",
+    "integrator (verify.sh): add Step44h_TheClueFallsAwayFromAWallInTheWay to PROBE_STEPS.",
+    "integrator (contract 18/19 note): GameState.Shoving is now FurnitureController.Pushing read after the furniture's step (no second counter); the hum is a 2D source driven by the furniture-to-robot distance (Sfx.HumVolumeAt); a careful rock plays Sfx.RockCreakCareful; Tuning.ClueSpreadRadius 0.32 added in the M5 5B.1 game block.",
+    "watchers: if LoadView.SpawnClue starts moving the clue onto one floor surface (the new ClueSurfaceTolerance / ClueSearchRadius constants), GameState.ClueAt (crash position, clue sample, Step44b and Step44h) must follow, so tell the game agent or expose the final clue position; also keep every clue's planar spread within Tuning.ClueSpreadRadius (Step44b asserts it for the vase)."
+  ]
+}

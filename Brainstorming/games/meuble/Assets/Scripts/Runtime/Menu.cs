@@ -72,6 +72,152 @@ namespace Meuble
         /// <summary>The record line under the win panel; it records every win in the save.</summary>
         public RecordLine RecordLine { get; private set; }
 
+        // ----- M6 (docs/CONTRACT_M6.md 2.1): Options, a page reachable from the title's main page and from the pause menu. -----
+
+        /// <summary>Options is open: a page of whichever menu opened it (<see cref="TitleOpen"/> or <see cref="PauseOpen"/> stays true under it).</summary>
+        public bool OptionsOpen { get; private set; }
+
+        public Button TitleOptionsButton { get; private set; }
+        public Button PauseOptionsButton { get; private set; }
+        public Button OptionsSensitivityButton { get; private set; }
+        public Button OptionsVolumeButton { get; private set; }
+        public Button OptionsConeButton { get; private set; }
+        /// <summary>M7 (docs/CONTRACT_M7.md 1.4): Qualité, cycling Bas, Moyen, Haut.</summary>
+        public Button OptionsQualityButton { get; private set; }
+        /// <summary>M7 design (CONTRACT_M7 4.1): the Difficulté row (Facile, Normal, Difficile; applies at the next level load).</summary>
+        public Button OptionsDifficultyButton { get; private set; }
+        public Button OptionsResetButton { get; private set; }
+        public Button OptionsBackButton { get; private set; }
+
+        private Canvas optionsCanvas;
+        private Text optionsSensitivityText;
+        private Text optionsVolumeText;
+        private Text optionsConeText;
+        private Text optionsQualityText;
+        private Text optionsDifficultyText;
+        // True when Options was opened from the pause menu (Retour then goes back there, not to the title).
+        private bool optionsFromPause;
+
+        /// <summary>Opens Options over the title's main page or the pause menu; ignored otherwise (the level select open,
+        /// already open, or neither menu up).</summary>
+        public void OpenOptions()
+        {
+            bool fromTitle = TitleOpen && !LevelSelectOpen;
+            if (OptionsOpen || (!fromTitle && !PauseOpen))
+            {
+                return;
+            }
+            optionsFromPause = PauseOpen;
+            OptionsOpen = true;
+            RefreshOptionsTexts();
+            Apply();
+            SelectLater(null);
+        }
+
+        /// <summary>Retour, Escape or gamepad B: closes Options, back to whichever menu opened it.</summary>
+        public void CloseOptions()
+        {
+            if (!OptionsOpen)
+            {
+                return;
+            }
+            OptionsOpen = false;
+            Apply();
+            SelectLater(optionsFromPause ? PauseOptionsButton : TitleOptionsButton);
+        }
+
+        private void CycleSensitivity()
+        {
+            SaveOptions o = SaveStore.Options;
+            float next = o.Sensitivity + Tuning.SensitivityStep;
+            if (next > Tuning.SensitivityMax + 1e-3f)
+            {
+                next = Tuning.SensitivityMin;
+            }
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = next, Volume = o.Volume, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty });
+            RefreshOptionsTexts();
+        }
+
+        private void CycleVolume()
+        {
+            SaveOptions o = SaveStore.Options;
+            int next = o.Volume + Tuning.VolumeStep;
+            if (next > Tuning.VolumeMax)
+            {
+                next = Tuning.VolumeMin;
+            }
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = next, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty });
+            RefreshOptionsTexts();
+        }
+
+        private void ToggleCone()
+        {
+            SaveOptions o = SaveStore.Options;
+            string next = o.Cone == SaveOptions.ConeAlways ? SaveOptions.ConeNever : SaveOptions.ConeAlways;
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Cone = next, Quality = o.Quality, Difficulty = o.Difficulty });
+            RefreshOptionsTexts();
+        }
+
+        // M7 (CONTRACT_M7 1.4): Bas, Moyen, Haut, from the tier in use (the platform default when none was chosen);
+        // SaveStore.SetOptions applies it at once (QualityTier).
+        private void CycleQuality()
+        {
+            SaveOptions o = SaveStore.Options;
+            string next = SaveOptions.NextQuality(o.QualityFor(Application.isMobilePlatform));
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Cone = o.Cone, Quality = next, Difficulty = o.Difficulty });
+            RefreshOptionsTexts();
+        }
+
+        // M7 design (CONTRACT_M7 4.1): Facile, Normal, Difficile; the level in play keeps its own until the next load.
+        private void CycleDifficulty()
+        {
+            SaveOptions o = SaveStore.Options;
+            SaveStore.SetOptions(new SaveOptions
+            {
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Cone = o.Cone, Quality = o.Quality, Difficulty = DifficultyDef.Next(o.DifficultyId),
+            });
+            RefreshOptionsTexts();
+        }
+
+        private static string QualityLabel(string quality)
+        {
+            return quality == SaveOptions.QualityLow ? Strings.OptionsQualityLow
+                : quality == SaveOptions.QualityMedium ? Strings.OptionsQualityMedium : Strings.OptionsQualityHigh;
+        }
+
+        private void ResetOptionsClicked()
+        {
+            SaveStore.ResetOptions();
+            RefreshOptionsTexts();
+        }
+
+        private void RefreshOptionsTexts()
+        {
+            SaveOptions o = SaveStore.Options;
+            if (optionsSensitivityText != null)
+            {
+                optionsSensitivityText.text = string.Format(Strings.OptionsSensitivity,
+                    o.Sensitivity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture));
+            }
+            if (optionsVolumeText != null)
+            {
+                optionsVolumeText.text = string.Format(Strings.OptionsVolume, o.Volume);
+            }
+            if (optionsConeText != null)
+            {
+                optionsConeText.text = string.Format(Strings.OptionsCone,
+                    o.Cone == SaveOptions.ConeAlways ? Strings.OptionsConeAlways : Strings.OptionsConeNever);
+            }
+            if (optionsDifficultyText != null)
+            {
+                optionsDifficultyText.text = string.Format(Strings.OptionsDifficulty, Strings.DifficultyName(o.DifficultyId));
+            }
+            if (optionsQualityText != null)
+            {
+                optionsQualityText.text = string.Format(Strings.OptionsQuality, QualityLabel(o.QualityFor(Application.isMobilePlatform)));
+            }
+        }
+
         /// <summary>Niveaux: opens the level select over the title (ignored when the title is not up).</summary>
         public void OpenLevelSelect()
         {
@@ -150,6 +296,7 @@ namespace Meuble
 
             BuildTitle();
             BuildPause();
+            BuildOptions();
             LevelSelect = LevelSelect.Create(transform, Game, font, Labels, id =>
             {
                 Click();
@@ -179,9 +326,10 @@ namespace Meuble
             Stretch(NewImage(titleCanvas.transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.22f)).rectTransform);
             Stretch(NewImage(titleCanvas.transform, "Edges", ProceduralArt.Vignette, new Color(0.02f, 0.02f, 0.03f, 0.6f)).rectTransform);
             // M5: the band grows down by one button row for Niveaux (the chair still shows in the lower third).
+            // M6: it grows again for Options, below Quitter.
             Image band = NewImage(titleCanvas.transform, "Band", ProceduralArt.Rounded, new Color(0.06f, 0.06f, 0.08f, 0.66f));
             band.type = Image.Type.Sliced;
-            Place(band.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(1320f, 620f));
+            Place(band.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 100f), new Vector2(1320f, 720f));
             Image chair = NewImage(titleCanvas.transform, "Emblem", ProceduralArt.Chair, Color.white);
             chair.preserveAspect = true;
             Place(chair.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 372f), new Vector2(118f, 118f));
@@ -193,9 +341,12 @@ namespace Meuble
             Place((RectTransform)LevelsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 2f), new Vector2(480f, 88f));
             QuitButton = Hud.MenuButton(titleCanvas.transform, "Quit", Strings.TitleQuit, font, Labels);
             Place((RectTransform)QuitButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -100f), new Vector2(480f, 88f));
+            // M6 (CONTRACT_M6 2.1): "Options", below Quitter so the existing Niveaux/Quitter chain (tested) is unchanged.
+            TitleOptionsButton = Hud.MenuButton(titleCanvas.transform, "TitleOptions", Strings.OptionsTitle, font, Labels);
+            Place((RectTransform)TitleOptionsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -200f), new Vector2(480f, 88f));
             Text credits = NewText(titleCanvas.transform, "Credits", Strings.TitleCredits, 28, new Color(1f, 1f, 1f, 0.8f));
             Place(credits.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 36f), new Vector2(1800f, 44f));
-            Chain(PlayButton, LevelsButton, QuitButton);
+            Chain(PlayButton, LevelsButton, QuitButton, TitleOptionsButton);
             PlayButton.onClick.AddListener(() =>
             {
                 Click();
@@ -211,6 +362,11 @@ namespace Meuble
                 Click();
                 Quit();
             });
+            TitleOptionsButton.onClick.AddListener(() =>
+            {
+                Click();
+                OpenOptions();
+            });
         }
 
         private void BuildPause()
@@ -225,7 +381,10 @@ namespace Meuble
             Place((RectTransform)RestartButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -80f), new Vector2(520f, 96f));
             MainMenuButton = Hud.MenuButton(pauseCanvas.transform, "MainMenu", Strings.PauseMenu, font, Labels);
             Place((RectTransform)MainMenuButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -200f), new Vector2(520f, 96f));
-            Chain(ResumeButton, RestartButton, MainMenuButton);
+            // M6 (CONTRACT_M6 2.1): "Options", below Menu principal.
+            PauseOptionsButton = Hud.MenuButton(pauseCanvas.transform, "PauseOptions", Strings.OptionsTitle, font, Labels);
+            Place((RectTransform)PauseOptionsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -320f), new Vector2(520f, 96f));
+            Chain(ResumeButton, RestartButton, MainMenuButton, PauseOptionsButton);
             ResumeButton.onClick.AddListener(() =>
             {
                 Click();
@@ -241,6 +400,87 @@ namespace Meuble
                 Click();
                 ToTitleFromPause();
             });
+            PauseOptionsButton.onClick.AddListener(() =>
+            {
+                Click();
+                OpenOptions();
+            });
+        }
+
+        /// <summary>M6 (CONTRACT_M6 2.1): the Options page, a single column of rows (each a button that cycles its value on
+        /// A/click), reachable from the title's main page and the pause menu.</summary>
+        private void BuildOptions()
+        {
+            optionsCanvas = Panel("Options");
+            Stretch(NewImage(optionsCanvas.transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.62f)).rectTransform);
+            Text title = NewText(optionsCanvas.transform, "OptionsTitle", Strings.OptionsTitle, 100, Cream);
+            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 345f), new Vector2(1600f, 130f));
+
+            OptionsSensitivityButton = Hud.MenuButton(optionsCanvas.transform, "OptionsSensitivity", "", font, Labels);
+            Place((RectTransform)OptionsSensitivityButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 235f), new Vector2(680f, 92f));
+            optionsSensitivityText = Labels.TryGetValue("OptionsSensitivityLabel", out Text st) ? st : null;
+
+            OptionsVolumeButton = Hud.MenuButton(optionsCanvas.transform, "OptionsVolume", "", font, Labels);
+            Place((RectTransform)OptionsVolumeButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 135f), new Vector2(680f, 92f));
+            optionsVolumeText = Labels.TryGetValue("OptionsVolumeLabel", out Text vt) ? vt : null;
+
+            OptionsConeButton = Hud.MenuButton(optionsCanvas.transform, "OptionsCone", "", font, Labels);
+            Place((RectTransform)OptionsConeButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 35f), new Vector2(680f, 92f));
+            optionsConeText = Labels.TryGetValue("OptionsConeLabel", out Text ct) ? ct : null;
+
+            // M7 (CONTRACT_M7 1.4): the fourth row.
+            OptionsQualityButton = Hud.MenuButton(optionsCanvas.transform, "OptionsQuality", "", font, Labels);
+            Place((RectTransform)OptionsQualityButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -65f), new Vector2(680f, 92f));
+            optionsQualityText = Labels.TryGetValue("OptionsQualityLabel", out Text qt) ? qt : null;
+
+            // M7 design (CONTRACT_M7 4.1): the fifth row.
+            OptionsDifficultyButton = Hud.MenuButton(optionsCanvas.transform, "OptionsDifficulty", "", font, Labels);
+            Place((RectTransform)OptionsDifficultyButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -165f), new Vector2(680f, 92f));
+            optionsDifficultyText = Labels.TryGetValue("OptionsDifficultyLabel", out Text dt) ? dt : null;
+
+            OptionsResetButton = Hud.MenuButton(optionsCanvas.transform, "OptionsReset", Strings.OptionsDefault, font, Labels);
+            Place((RectTransform)OptionsResetButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -265f), new Vector2(420f, 88f));
+
+            OptionsBackButton = Hud.MenuButton(optionsCanvas.transform, "OptionsBack", Strings.SelectBack, font, Labels);
+            Place((RectTransform)OptionsBackButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -360f), new Vector2(420f, 88f));
+
+            Chain(OptionsSensitivityButton, OptionsVolumeButton, OptionsConeButton, OptionsQualityButton, OptionsDifficultyButton, OptionsResetButton, OptionsBackButton);
+            OptionsSensitivityButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleSensitivity();
+            });
+            OptionsVolumeButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleVolume();
+            });
+            OptionsConeButton.onClick.AddListener(() =>
+            {
+                Click();
+                ToggleCone();
+            });
+            OptionsQualityButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleQuality();
+            });
+            OptionsDifficultyButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleDifficulty();
+            });
+            OptionsResetButton.onClick.AddListener(() =>
+            {
+                Click();
+                ResetOptionsClicked();
+            });
+            OptionsBackButton.onClick.AddListener(() =>
+            {
+                Click();
+                CloseOptions();
+            });
+            RefreshOptionsTexts();
         }
 
         // ----- Flow -----
@@ -385,31 +625,84 @@ namespace Meuble
         }
 
         /// <summary>
-        /// The default button of what is open (the level select's first unlocked card, title, pause, end screen), or null.
+        /// The default button of what is open (Options, the level select's first unlocked card, title, pause, end
+        /// screen), or null.
         /// </summary>
-        public Selectable DefaultButton => LevelSelectOpen && LevelSelect != null ? LevelSelect.DefaultSelectable
+        public Selectable DefaultButton => OptionsOpen ? OptionsSensitivityButton
+            : LevelSelectOpen && LevelSelect != null ? LevelSelect.DefaultSelectable
             : TitleOpen ? PlayButton : PauseOpen ? ResumeButton : Hud != null && Hud.EndVisible ? Hud.EndButton : null;
 
         private void Update()
         {
-            // M5: Escape or gamepad B leaves the level select. Read every frame, so a press made elsewhere never waits
-            // for the select to open.
-            if (InputReader.BackPressed() && LevelSelectOpen)
+            // M5 (M6: and Options): Escape or gamepad B leaves the topmost page. Read every frame, so a press made
+            // elsewhere never waits for a page to open.
+            if (InputReader.BackPressed())
             {
-                Click();
-                CloseLevelSelect();
+                if (OptionsOpen)
+                {
+                    Click();
+                    CloseOptions();
+                }
+                else if (LevelSelectOpen)
+                {
+                    Click();
+                    CloseLevelSelect();
+                }
             }
+            // M6 (CONTRACT_M6 2.2): a test drives every menu with injected gamepad input alone (InputReader has no real
+            // device to read here): D-pad/left stick moves the EventSystem selection along the same explicit
+            // Navigation links a real press would follow, A invokes the selected widget. A real gamepad already
+            // navigates through the InputSystemUIInputModule directly; this never conflicts with it (it only acts on an
+            // injected flag, which a real device never sets).
             EventSystem events = EventSystem.current;
+            if (events != null)
+            {
+                MenuDirection dir = InputReader.MenuMovePressed();
+                if (dir != MenuDirection.None)
+                {
+                    Selectable current = events.currentSelectedGameObject != null
+                        ? events.currentSelectedGameObject.GetComponent<Selectable>()
+                        : null;
+                    Selectable next = current != null ? NavigationStep(current, dir) : null;
+                    if (next != null && IsShown(next.gameObject))
+                    {
+                        events.SetSelectedGameObject(next.gameObject);
+                    }
+                }
+                if (InputReader.MenuSubmitPressed() && events.currentSelectedGameObject != null)
+                {
+                    ExecuteEvents.Execute(events.currentSelectedGameObject, new BaseEventData(events), ExecuteEvents.submitHandler);
+                }
+            }
             Selectable wanted = pendingFocus != null && IsShown(pendingFocus.gameObject) ? pendingFocus : DefaultButton;
             if (events == null || wanted == null || Time.frameCount <= openedFrame)
             {
                 return;
             }
             pendingFocus = null;
-            GameObject current = events.currentSelectedGameObject;
-            if (current == null || !IsShown(current))
+            GameObject selected = events.currentSelectedGameObject;
+            if (selected == null || !IsShown(selected))
             {
                 events.SetSelectedGameObject(wanted.gameObject);
+            }
+        }
+
+        /// <summary>The explicit Navigation link of <paramref name="from"/> in <paramref name="dir"/>, or null.</summary>
+        private static Selectable NavigationStep(Selectable from, MenuDirection dir)
+        {
+            Navigation nav = from.navigation;
+            switch (dir)
+            {
+                case MenuDirection.Up:
+                    return nav.selectOnUp;
+                case MenuDirection.Down:
+                    return nav.selectOnDown;
+                case MenuDirection.Left:
+                    return nav.selectOnLeft;
+                case MenuDirection.Right:
+                    return nav.selectOnRight;
+                default:
+                    return null;
             }
         }
 
@@ -427,13 +720,20 @@ namespace Meuble
         /// <summary>Applies the open panels: canvases, pause, HUD, camera and cursor.</summary>
         private void Apply()
         {
+            // M6: Options is a page of whichever menu opened it; it closes itself if that menu went away meanwhile
+            // (e.g. Menu principal from the pause menu while Options was open over it).
+            if (OptionsOpen && !(optionsFromPause ? PauseOpen : TitleOpen && !LevelSelectOpen))
+            {
+                OptionsOpen = false;
+            }
             bool open = IsOpen;
             if (!TitleOpen)
             {
                 LevelSelectOpen = false;
             }
-            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen);
-            SetEnabled(pauseCanvas, PauseOpen);
+            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen && !(OptionsOpen && !optionsFromPause));
+            SetEnabled(pauseCanvas, PauseOpen && !(OptionsOpen && optionsFromPause));
+            SetEnabled(optionsCanvas, OptionsOpen);
             if (LevelSelect != null && LevelSelect.IsOpen != LevelSelectOpen)
             {
                 LevelSelect.SetOpen(LevelSelectOpen);

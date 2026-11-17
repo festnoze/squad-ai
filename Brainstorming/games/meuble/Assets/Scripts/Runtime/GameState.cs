@@ -49,14 +49,16 @@ namespace Meuble
     /// through each listener's hearing factor (the dog hears nothing), the bark at the dog retargeting like a creak;
     /// 9 the HUD eye (Alarm, then Calm when a human sees, then Dog when only the dog sees, then Closed) and the door hint.
     ///
-    /// M5 wave 5B (docs/CONTRACT_M5.md 4, 5, 6, 16.5, 16.8 and 16.9), in the same order: 1 a step of an accepted robot shove
-    /// first (the furniture slides at RobotPushDistance / RobotPushTime along the robot's heading, input ignored, moving), then
-    /// the furniture, then the rocking chair's rock when it comes to rest (an external action of RockTime, RockCarefulTime
-    /// when careful; never inside an action, a shove, a pin or a carry), then the load's kinematic rule (<see cref="Load"/>, a
-    /// <see cref="LoadBalance"/> fed with the furniture's planar velocity; its fall drops a clue on the floor); 2 after the
-    /// inhabitants, every robot steps along its fixed timeline, and a robot whose disc begins to overlap the furniture's
-    /// footprint shoves it (<c>furniture.BeginPush</c>: refused while pinned, carried, lying or in an action) and reverses
-    /// either way; 3 with a load the sample box is Tuning.LoadHeight taller; 5 a watcher with memory that sees the clue costs
+    /// M5 wave 5B (docs/CONTRACT_M5.md 4, 5, 6, 16.5, 16.8, 16.9 and 18), in the same order: 1 the furniture steps (a shove
+    /// is its own push action, begun by a robot contact on an earlier step: it slides RobotPushDistance over RobotPushTime
+    /// along the robot's heading, input ignored, moving through the action like any other; <see cref="Shoving"/> reads it
+    /// after the step), then the rocking chair's rock when it comes to rest (an external action of RockTime, RockCarefulTime
+    /// when careful; never inside an action, a pin or a carry), then the load's kinematic rule (<see cref="Load"/>, a
+    /// <see cref="LoadBalance"/> fed with the furniture's planar velocity of the step; its fall drops a clue on the floor);
+    /// 2 after the inhabitants, every robot steps along its fixed timeline, and a robot whose disc begins to overlap the
+    /// furniture's footprint shoves it (<c>furniture.BeginPush</c>, from the next step: refused while pinned, carried, lying
+    /// or in an action) and reverses either way; 3 with a load the sample box is Tuning.LoadHeight taller; 4 the furniture is
+    /// moving by its own predicate only (a push step is moving through its action); 5 a watcher with memory that sees the clue costs
     /// one discovery and is sent to put it away (<see cref="InhabitantRoutine.BeginPutAway"/>); 6 the clue goes on the step
     /// it is put away (<see cref="InhabitantRoutine.JustPutAway"/>); 7 every noise goes through the robot's hum
     /// (<see cref="Hearing.IsMasked"/>: hops, rolls and clicks within RobotHumRadius of a robot are not emitted), and the
@@ -271,14 +273,14 @@ namespace Meuble
         /// <summary>Contacts of a robot with the player furniture since the level started: each one reverses the robot.</summary>
         public int RobotContactCount { get; private set; }
 
-        /// <summary>This fixed step is a step of an accepted shove (the furniture slides, moving, input ignored).</summary>
+        /// <summary>
+        /// This fixed step is a step of an accepted shove: the furniture's push action ran in step 1 (read after its step, so
+        /// the contact step itself is not one, and the RobotPushTime / dt steps after it are).
+        /// </summary>
         public bool Shoving { get; private set; }
 
-        /// <summary>The furniture was moving on the last fixed step as the rules saw it (its own predicate, or a shove step).</summary>
+        /// <summary>The furniture was moving on the last fixed step as the rules saw it (its own predicate).</summary>
         public bool FurnitureMoving { get; private set; }
-
-        /// <summary>The steps of the accepted shove still to come after this one.</summary>
-        public int ShoveStepsLeft => shoveStepsLeft;
 
         /// <summary>The planar direction of the last accepted shove (unit).</summary>
         public Vector3 LastShoveDirection { get; private set; }
@@ -318,9 +320,6 @@ namespace Meuble
 
         /// <summary>Rocks of the rocking chair since the level started (CONTRACT_M5 5, 16.9).</summary>
         public int RockCount { get; private set; }
-
-        /// <summary>The fixed step (<see cref="Steps"/>) the furniture came to rest on before its last rock, -1 before the first.</summary>
-        public int LastRockStep { get; private set; } = -1;
 
         /// <summary>The inhabitant sitting on the player furniture (which is then pinned), or null.</summary>
         public Inhabitant Sitter
@@ -388,6 +387,73 @@ namespace Meuble
         }
 
         /// <summary>Loads a level of Resources/Levels and starts it. The current level stays if the new one fails to load.</summary>
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5 to 2.7) -----
+
+        /// <summary>M6: where the player furniture stands with a wardrobe.</summary>
+        public enum WardrobeStage
+        {
+            None,
+            /// <summary>The 0.5 s entry action (moving), still visible.</summary>
+            Entering,
+            /// <summary>Hidden inside (FurnitureController.Hidden).</summary>
+            Hidden,
+            /// <summary>The 0.5 s exit action (moving), visible again in front of the wardrobe.</summary>
+            Leaving,
+        }
+
+        /// <summary>M6: the furniture's wardrobe stage.</summary>
+        public WardrobeStage Wardrobe { get; private set; }
+
+        /// <summary>M6: the wardrobe entered (from the entry press to the end of the exit action), or null.</summary>
+        public PropDef WardrobeProp { get; private set; }
+
+        /// <summary>M6: the wardrobe the furniture may enter from where it stands now (WardrobeRule.CanEnter), or null.</summary>
+        public PropDef WardrobeInReach => Level != null ? WardrobeFor(Level.Furniture) : null;
+
+        /// <summary>M6: entries completed (hidden), and exits begun, since the level started.</summary>
+        public int HideCount { get; private set; }
+        public int LeaveCount { get; private set; }
+
+        /// <summary>M6: discoveries of a remembered spot seen empty while the furniture was hidden.</summary>
+        public int EmptySpotCount { get; private set; }
+
+        /// <summary>M6: door memory Suspects (a leaf seen in another state than remembered), and doors put back.</summary>
+        public int DoorSuspectCount { get; private set; }
+        public int DoorPutBackCount { get; private set; }
+
+        /// <summary>M6: leaves opened by an inhabitant on its walk (openedByInhabitants).</summary>
+        public int HouseholdDoorOpenCount { get; private set; }
+
+        /// <summary>M6: an inhabitant's door memory (null without one: the level's doorMemory off, or no memory).</summary>
+        public DoorMemory DoorMemoryOf(Inhabitant inhabitant)
+        {
+            int i = IndexOf(inhabitant);
+            return i >= 0 && i < doorMemories.Length ? doorMemories[i] : null;
+        }
+
+        /// <summary>M6: the leaf index an inhabitant is on its way to put back, or -1.</summary>
+        public int DoorFixOf(Inhabitant inhabitant)
+        {
+            int i = IndexOf(inhabitant);
+            return i >= 0 && i < doorFixers.Length ? doorFixers[i] : -1;
+        }
+
+        private DoorMemory[] doorMemories = new DoorMemory[0];
+        private int[] doorFixers = new int[0];
+        private int householdLeaves;
+        private DoorLeaf householdDoorThisStep;
+        private readonly List<PropDef> wardrobes = new List<PropDef>();
+        private readonly Vector3[] spotSamples = new Vector3[Tuning.SampleCount];
+
+        /// <summary>M7 (CONTRACT_M7 4.1): the difficulty the current level was built with (Normal before any level).</summary>
+        public DifficultyDef Difficulty { get; private set; } = DifficultyDef.For(DifficultyDef.Normal);
+
+        /// <summary>M7: the difficulty id the next level build uses, the saved option (SaveData.options.difficulty).</summary>
+        private static string SavedDifficulty()
+        {
+            return SaveStore.Options.DifficultyId;
+        }
+
         public void LoadLevel(string id)
         {
             LevelDef def = LevelLoader.Load(id);
@@ -410,8 +476,8 @@ namespace Meuble
         /// <summary>Raised at the end of every fixed step, after every rule ran (the probe records from it).</summary>
         public event Action FixedStepped;
 
-        // A creak warning shows the last CreakWarning seconds of the fill (3.3).
-        private const float WarningStart = 1f - Tuning.CreakWarning / Tuning.CreakFillTime;
+        // A creak warning shows the last CreakWarning seconds of the fill (3.3). M7: of the difficulty's fill time.
+        private float WarningStart => Creak.WarningStart;
 
         private static readonly GameRules NoRules = GameRules.M1;
 
@@ -471,7 +537,6 @@ namespace Meuble
         private readonly List<Vector3> robotPositions = new List<Vector3>();
         private bool[] robotTouching = new bool[0];
         private int robotSteps;
-        private int shoveStepsLeft;
         // The rocking chair: the last step travelled (a rest after it starts a rock).
         private bool rockArmed;
         // The load: its velocities of the last window (the direction of a fall), the clue's state.
@@ -483,6 +548,8 @@ namespace Meuble
         private Vector3 contactAt;
         private bool crashThisStep;
         private bool rockedThisStep;
+        // The time of the rock begun this step (RockTime, or RockCarefulTime): its creak lasts as long.
+        private float rockTime;
         private bool hopMasked;
         private bool rollMasked;
 
@@ -525,9 +592,16 @@ namespace Meuble
 
         private void BuildLevel()
         {
+            // M7 (CONTRACT_M7 4.1): every level is built and played at the saved difficulty, read here on each load and
+            // restart (a change in the Options page applies from the next one). RoutineFactory reads Current for the
+            // watchers; the grace and the creak are set below; the record of a win goes under this difficulty.
+            Difficulty = DifficultyDef.For(SavedDifficulty());
+            DifficultyDef.Current = Difficulty;
             Level = LevelBuilder.Build(Def);
             Rule.Reset();
+            Rule.Grace = Difficulty.CaughtGrace; // MUTATION:DIFFICULTY_GRACE
             Creak.Reset();
+            Creak.FillTime = Difficulty.CreakFillTime;
             State = PlayState.Playing;
             LoseReason = LoseReason.None;
             LostTo = null;
@@ -585,10 +659,8 @@ namespace Meuble
             ClueDiscoveryCount = 0;
             PutAwayCount = 0;
             RockCount = 0;
-            LastRockStep = -1;
             Shoving = false;
             FurnitureMoving = false;
-            shoveStepsLeft = 0;
             LastShoveDirection = Vector3.zero;
             rockArmed = false;
             clueFound = false;
@@ -601,6 +673,19 @@ namespace Meuble
             rollMasked = false;
             BuildRobots();
             BuildLoad();
+            // M6: the wardrobe, the door memories and the doors the household opens start afresh with the level.
+            Wardrobe = WardrobeStage.None;
+            WardrobeProp = null;
+            HideCount = 0;
+            LeaveCount = 0;
+            EmptySpotCount = 0;
+            DoorSuspectCount = 0;
+            DoorPutBackCount = 0;
+            HouseholdDoorOpenCount = 0;
+            householdDoorThisStep = null;
+            wardrobes.Clear();
+            wardrobes.AddRange(Def.Wardrobes());
+            householdLeaves = Def.HouseholdLeafMask();
 
             int n = Level.Inhabitants.Count;
             seatHooks = new Func<bool>[n];
@@ -623,7 +708,7 @@ namespace Meuble
             barkCooldowns = new int[n];
             for (int i = 0; i < n; i++)
             {
-                barkRules[i] = new CaughtRule();
+                barkRules[i] = new CaughtRule(Difficulty.CaughtGrace);
             }
             // 3.1: the household knows where its chair belongs (the spawn pose), and every decoy slot is
             // fixed at the decoy pose from level start.
@@ -654,6 +739,19 @@ namespace Meuble
                 PersonalityDef p = PersonalityOf(inhabitant);
                 memories[i] = new FurnitureMemory(spawn, decoyPoses, decoyKinds, Level.Furniture.Kind, p.Tolerance);
                 meters[i] = new SuspicionMeter { GainFactor = p.SuspicionFactor };
+            }
+            // M6 (CONTRACT_M6 2.6): with the level's doorMemory, each inhabitant with a memory knows the authored leaves.
+            doorMemories = new DoorMemory[n];
+            doorFixers = new int[n];
+            var authored = new List<bool>();
+            foreach (DoorLeaf leaf in Level.Leaves)
+            {
+                authored.Add(leaf != null && leaf.Open);
+            }
+            for (int i = 0; i < n; i++)
+            {
+                doorFixers[i] = -1;
+                doorMemories[i] = Def.DoorMemory && PersonalityOf(Level.Inhabitants[i]).Memory ? new DoorMemory(authored) : null;
             }
             // M2.1: the ghost shows the first observer's memory until anyone has seen the chair (never the dog's).
             lastSeer = FirstObserver();
@@ -779,10 +877,32 @@ namespace Meuble
                 return false;
             }
             FurnitureController furniture = Level.Furniture;
+            if (furniture.Hidden)
+            {
+                // M6 (CONTRACT_M6 2.5): E inside the wardrobe leaves it: visible again in front of it, a 0.5 s moving action.
+                if (furniture.BeginExternalAction(Tuning.WardrobeActionTime))
+                {
+                    furniture.SetHidden(false);
+                    Wardrobe = WardrobeStage.Leaving;
+                    LeaveCount++;
+                }
+                return true;
+            }
             DoorLeaf leaf = NearestClosedLeafInReach(furniture);
             if (leaf == null)
             {
-                return false;
+                // M6: no closed leaf in reach: a wardrobe the furniture fits in, standing in front of it, takes E.
+                PropDef wardrobe = WardrobeFor(furniture);
+                if (wardrobe == null)
+                {
+                    return false;
+                }
+                if (furniture.BeginExternalAction(Tuning.WardrobeActionTime))
+                {
+                    WardrobeProp = wardrobe;
+                    Wardrobe = WardrobeStage.Entering;
+                }
+                return true;
             }
             if (furniture.BeginExternalAction(Tuning.DoorOpenTime))
             {
@@ -913,6 +1033,7 @@ namespace Meuble
                 robot.SetPose(Level.Floor.OnFloor(at), path.HeadingAt(t));
                 robotPositions[k] = at;
                 bool touching = RobotPath.Overlaps(at, furniture.Pose, furniture.SampleSize); // MUTATION:ROBOT_CONTACT
+                touching &= !furniture.Hidden;
                 bool begins = touching && !robotTouching[k];
                 robotTouching[k] = touching;
                 if (begins)
@@ -925,8 +1046,9 @@ namespace Meuble
         /// <summary>
         /// CONTRACT_M5 4 and 16.8, a robot's contact with the furniture: while playing, the furniture is shoved by
         /// RobotPushDistance over RobotPushTime along the robot's heading (against it when the furniture's centre is behind
-        /// the robot: the player ran into its back), through <c>furniture.BeginPush</c>, which refuses during any action and
-        /// while lying; never while pinned or carried, nor during a shove. Accepted or not, the robot reverses its loop.
+        /// the robot: the player ran into its back), through <c>furniture.BeginPush</c>, which refuses during any action (a
+        /// shove under way included) and while lying; never while pinned or carried. The push runs inside the furniture's own
+        /// steps from the next one, and a pin or a carry ends it there. Accepted or not, the robot reverses its loop.
         /// </summary>
         private void Contact(Robot robot, FurnitureController furniture, float t, Vector3 at, bool playing)
         {
@@ -937,48 +1059,14 @@ namespace Meuble
             RobotContactCount++;
             contactThisStep = true;
             contactAt = at;
-            bool free = playing && !furniture.Pinned && !furniture.Carried && shoveStepsLeft <= 0;
+            bool free = playing && !furniture.Pinned && !furniture.Carried;
             if (free && furniture.BeginPush(direction, Tuning.RobotPushDistance, Tuning.RobotPushTime))
             {
                 ShoveCount++;
-                shoveStepsLeft = Mathf.Max(1, Mathf.RoundToInt(Tuning.RobotPushTime / Time.fixedDeltaTime));
                 LastShoveDirection = direction;
             }
             path.Reverse(t);
             robot.SetPose(Level.Floor.OnFloor(YawMath.Planar(path.PositionAt(t))), path.HeadingAt(t));
-        }
-
-        /// <summary>
-        /// Step 1, before the furniture: one step of an accepted shove, round(RobotPushTime / dt) steps from the step after the
-        /// contact. A pin or a carry ends it at once. While FurnitureController has no BeginPush of its own, the stand-in
-        /// (<see cref="ShoveFallback"/>) slides the furniture here and the furniture then steps without input: true, with the
-        /// slide's planar velocity. With the bodies' BeginPush the furniture slides inside its own step: false.
-        /// </summary>
-        private bool BeginShoveStep(FurnitureController furniture, float dt, out Vector2 velocity)
-        {
-            velocity = Vector2.zero;
-            Shoving = false;
-            ShoveFallback fallback = furniture.GetComponent<ShoveFallback>();
-            if (shoveStepsLeft > 0 && (furniture.Pinned || furniture.Carried))
-            {
-                shoveStepsLeft = 0;
-            }
-            if (shoveStepsLeft <= 0)
-            {
-                if (fallback != null)
-                {
-                    fallback.Cancel();
-                }
-                return false;
-            }
-            shoveStepsLeft--;
-            Shoving = true;
-            if (fallback == null || !fallback.Active)
-            {
-                return false;
-            }
-            velocity = fallback.Slide(furniture, dt);
-            return true;
         }
 
         /// <summary>
@@ -1009,17 +1097,18 @@ namespace Meuble
 
         /// <summary>
         /// Step 1, after the furniture: the rocking chair comes to rest on the first step at or below both moving thresholds
-        /// after a step above them, measured on its travel (a shove's slide included) and its yaw only; a step inside an action,
-        /// a shove, a pin or a carry never comes to rest. It then rocks: an external action (moving, input ignored) of
-        /// RockTime, or RockCarefulTime when careful mode is held at that moment, from the next step; the visual pitches by
-        /// RockDegrees (<see cref="RockView"/>). Gated by Rules.Bodies. Sat on, it never rocks in the rules.
+        /// after a step above them, measured on its travel (a shove's slide included) and its yaw only; a step inside an action
+        /// (a shove is the push action), a pin or a carry never comes to rest. It then rocks: an external action (moving, input
+        /// ignored) of RockTime, or RockCarefulTime when careful mode is held at that moment, from the next step; the visual
+        /// pitches by RockDegrees (<see cref="RockView"/>) and the runners creak for the rock's time. Gated by Rules.Bodies.
+        /// Sat on, it never rocks in the rules.
         /// </summary>
         private void StepRock(GameRules rules, FurnitureController furniture, Vector3 stepFrom, float dt)
         {
             bool held = furniture.Pinned || furniture.Carried;
             float travel = dt > 0f ? YawMath.Planar(furniture.transform.position - stepFrom).magnitude / dt : 0f;
             bool travelled = !held && MotionRule.IsMoving(travel, furniture.YawRate);
-            bool rests = rockArmed && !travelled && !held && !furniture.ActionActive && !Shoving;
+            bool rests = rockArmed && !travelled && !held && !furniture.ActionActive;
             rockArmed = travelled;
             BodyDef body = furniture.Body;
             bool rocks = body != null && body.Rocks; // MUTATION:ROCK_STOP
@@ -1033,9 +1122,8 @@ namespace Meuble
                 return;
             }
             RockCount++;
-            // Steps counts this step in step 4: the rest step is the next count.
-            LastRockStep = Steps + 1;
             rockedThisStep = true;
+            rockTime = time;
             RockView view = furniture.GetComponent<RockView>();
             if (view == null)
             {
@@ -1048,9 +1136,9 @@ namespace Meuble
 
         /// <summary>
         /// The load of <c>player.load</c> (a known kind; never on the rocking chair nor the floor lamp, as the validator says):
-        /// a fresh <see cref="LoadBalance"/>, and its <see cref="Meuble.LoadView"/> on the furniture's visual, so it follows the
-        /// hop and the jitter: the one the level builder made (LevelInstance.LoadView), else one already on the visual, else a
-        /// new one.
+        /// a fresh <see cref="LoadBalance"/>, and its <see cref="Meuble.LoadView"/>, the one the level builder hung on the
+        /// furniture's visual (LevelInstance.LoadView, CONTRACT_M5 18). A level with a load and no view is a builder defect:
+        /// it is logged as an error, and the rule runs without a visual.
         /// </summary>
         private void BuildLoad()
         {
@@ -1065,15 +1153,10 @@ namespace Meuble
                 return;
             }
             Load = new LoadBalance();
-            Transform visual = furniture.Visual != null ? furniture.Visual : furniture.transform;
             LoadView = Level.LoadView;
             if (LoadView == null)
             {
-                LoadView = visual.GetComponentInChildren<LoadView>(true);
-            }
-            if (LoadView == null)
-            {
-                LoadView = Meuble.LoadView.Create(kind, visual, furniture.Size);
+                Debug.LogError($"[GameState] level {LevelId} carries the load '{kind}' but the level builder made no LoadView for it");
             }
             int window = Mathf.RoundToInt(Tuning.LoadWindow / Time.fixedDeltaTime);
             for (int i = 0; i <= window; i++)
@@ -1083,10 +1166,11 @@ namespace Meuble
         }
 
         /// <summary>
-        /// Step 1, after the furniture: the load's rule steps with the furniture's planar velocity of this step (the shove's
-        /// slide during a shove); on the step it falls, the fall. The visual sways with <see cref="LoadBalance.SwayTiltLocal"/>.
+        /// Step 1, after the furniture: the load's rule steps with the furniture's planar velocity of this step (a shove's slide
+        /// is the push action's velocity); on the step it falls, the fall. The visual sways with
+        /// <see cref="LoadBalance.SwayTiltLocal"/> in the furniture's frame, upright once the load fell.
         /// </summary>
-        private void StepLoad(FurnitureController furniture, bool fallbackShove, Vector2 shoveVelocity, float dt)
+        private void StepLoad(FurnitureController furniture, float dt)
         {
             if (Load == null)
             {
@@ -1095,7 +1179,7 @@ namespace Meuble
             if (!Load.Fallen && State == PlayState.Playing)
             {
                 Vector3 fv = furniture.Velocity;
-                Vector2 v = fallbackShove ? shoveVelocity : new Vector2(fv.x, fv.z); // MUTATION:LOAD_VELOCITY
+                Vector2 v = new Vector2(fv.x, fv.z); // MUTATION:LOAD_VELOCITY
                 Load.Step(dt, v);
                 loadHistory.Enqueue(v);
                 loadHistory.Dequeue();
@@ -1108,7 +1192,7 @@ namespace Meuble
             }
             if (LoadView != null)
             {
-                LoadView.SetTilt(CarryingLoad ? Load.SwayTiltLocal(furniture.Yaw) : Vector2.zero);
+                LoadView.SetTilt(CarryingLoad ? Load.SwayTiltLocal(furniture.Yaw) : Vector2.zero); // MUTATION:LOAD_SWAY
             }
         }
 
@@ -1133,7 +1217,9 @@ namespace Meuble
 
         /// <summary>
         /// Where the fallen load lies: from the furniture's centre, against the velocity change, past the footprint's edge by
-        /// Tuning.ClueThrowDistance, stopped Tuning.ClueWallMargin short of a wall or a furniture in the way, on the floor.
+        /// Tuning.ClueThrowDistance, its centre kept <see cref="ClueClearance"/> (at least the clue's spread) short of a wall or
+        /// a furniture in the way, on the floor. When something in the way cuts the throw short, the clue falls on the
+        /// opposite side, away from the wall, if there is more room there.
         /// </summary>
         private Vector3 ClueLanding(FurnitureController furniture, Vector2 change)
         {
@@ -1143,20 +1229,52 @@ namespace Meuble
                 fall = YawMath.Forward(furniture.Yaw);
             }
             fall.Normalize();
-            Vector3 local = YawMath.Rotate(fall, -furniture.Yaw);
-            Vector3 size = furniture.SampleSize;
-            float distance = Mathf.Abs(local.x) * size.x * 0.5f + Mathf.Abs(local.z) * size.z * 0.5f + Tuning.ClueThrowDistance;
-            Vector3 origin = furniture.transform.position + Vector3.up * Tuning.ClueProbeHeight;
-            RaycastHit[] hits = Physics.RaycastAll(origin, fall, distance + Tuning.ClueWallMargin, Layers.ChairBlockerMask, QueryTriggerInteraction.Ignore);
-            foreach (RaycastHit hit in hits)
+            float wanted = EdgeAlong(furniture, fall) + Tuning.ClueThrowDistance;
+            float distance = ClueRoom(furniture, fall, wanted);
+            if (distance < wanted - ClueRoomEpsilon)
             {
-                if (hit.collider != null && !hit.collider.transform.IsChildOf(furniture.transform))
+                float back = ClueRoom(furniture, -fall, wanted);
+                if (back > distance)
                 {
-                    distance = Mathf.Min(distance, hit.distance - Tuning.ClueWallMargin);
+                    fall = -fall;
+                    distance = back;
                 }
             }
             Vector3 at = YawMath.Planar(furniture.transform.position) + fall * Mathf.Max(0f, distance);
             return Level.Floor.OnFloor(at);
+        }
+
+        // A throw counts as cut short below its wanted distance by more than this (float rounding only), metres.
+        private const float ClueRoomEpsilon = 1e-4f;
+
+        /// <summary>The clue's centre stays this far from a wall or a furniture: its spread, and never less than ClueWallMargin.</summary>
+        public static float ClueClearance => Mathf.Max(Tuning.ClueWallMargin, Tuning.ClueSpreadRadius);
+
+        /// <summary>The distance from the furniture's centre to its footprint's edge along the planar unit <paramref name="way"/>.</summary>
+        private static float EdgeAlong(FurnitureController furniture, Vector3 way)
+        {
+            Vector3 local = YawMath.Rotate(way, -furniture.Yaw);
+            Vector3 size = furniture.SampleSize;
+            return Mathf.Abs(local.x) * size.x * 0.5f + Mathf.Abs(local.z) * size.z * 0.5f;
+        }
+
+        /// <summary>
+        /// How far along the planar unit <paramref name="way"/> the clue's centre may land, up to <paramref name="wanted"/>:
+        /// <see cref="ClueClearance"/> short of the first wall or other furniture in the way.
+        /// </summary>
+        private static float ClueRoom(FurnitureController furniture, Vector3 way, float wanted)
+        {
+            float distance = wanted;
+            Vector3 origin = furniture.transform.position + Vector3.up * Tuning.ClueProbeHeight;
+            RaycastHit[] hits = Physics.RaycastAll(origin, way, wanted + ClueClearance, Layers.ChairBlockerMask, QueryTriggerInteraction.Ignore);
+            foreach (RaycastHit hit in hits)
+            {
+                if (hit.collider != null && !hit.collider.transform.IsChildOf(furniture.transform))
+                {
+                    distance = Mathf.Min(distance, hit.distance - ClueClearance);
+                }
+            }
+            return distance;
         }
 
         /// <summary>
@@ -1237,7 +1355,17 @@ namespace Meuble
         private bool DoorHintWanted(FurnitureController furniture)
         {
             return State == PlayState.Playing && Level.Leaves.Count > 0 && !furniture.Carried && !furniture.Pinned && !furniture.Tipped
-                && !furniture.ActionActive && NearestClosedLeafInReach(furniture) != null;
+                && !furniture.ActionActive && !furniture.Hidden && NearestClosedLeafInReach(furniture) != null;
+        }
+
+        /// <summary>M6: the wardrobe prompt shows while hidden (and still), or in front of a wardrobe E would enter.</summary>
+        private bool HideHintWanted(FurnitureController furniture)
+        {
+            if (wardrobes.Count == 0 || State != PlayState.Playing || furniture.Carried || furniture.Pinned || furniture.Tipped || furniture.ActionActive)
+            {
+                return false;
+            }
+            return furniture.Hidden || (NearestClosedLeafInReach(furniture) == null && WardrobeFor(furniture) != null);
         }
 
         /// <summary>
@@ -1253,7 +1381,7 @@ namespace Meuble
                 return false;
             }
             BodyDef body = furniture.Body;
-            if (body == null || !body.IsSeat || furniture.Carried || furniture.Tipped)
+            if (body == null || !body.IsSeat || furniture.Carried || furniture.Tipped || furniture.Hidden)
             {
                 return false;
             }
@@ -1294,6 +1422,7 @@ namespace Meuble
             pratfallThisStep = -1;
             barksThisStep.Clear();
             doorOpenedThisStep = null;
+            householdDoorThisStep = null;
             contactThisStep = false;
             crashThisStep = false;
             rockedThisStep = false;
@@ -1302,21 +1431,23 @@ namespace Meuble
 
             // 1. The furniture: driven by input, or following its carrier. M4: it reads the rule switches itself.
             // M5: E in reach of a closed leaf begins its opening inside this step (ClaimActionKey); then the leaves swing.
-            // M5 wave 5B: a shove's step first (no input while the stand-in slides it), then the rock and the load.
+            // M5 wave 5B: a shove is the furniture's own push action (begun by a contact in step 2 of an earlier step), so it
+            // runs inside furniture.Step; Shoving reads it after the step. Then the rock and the load.
             furniture.Rules = rules;
             Vector3 stepFrom = furniture.transform.position;
-            bool slid = BeginShoveStep(furniture, dt, out Vector2 slide);
             if (furniture.Carried)
             {
                 FollowCarrier(dt);
             }
             else
             {
-                furniture.Step(dt, playing && !slid);
+                furniture.Step(dt, playing);
             }
+            Shoving = furniture.Pushing;
             StepLeaves(dt);
+            StepWardrobe(furniture);
             StepRock(rules, furniture, stepFrom, dt);
-            StepLoad(furniture, slid, slide, dt);
+            StepLoad(furniture, dt);
 
             // 2. Inhabitants, each with its seat hook, the body's carry distance and the Sitting switch (M4).
             // M5 wave 5B: then the robots, and their contacts with the furniture.
@@ -1325,6 +1456,7 @@ namespace Meuble
             {
                 inhabitants[i].Step(dt);
             }
+            StepHouseholdDoors();
             StepRobots(furniture, playing, dt);
 
             // 3. Vision of the player furniture, for every inhabitant. M2.1 (11.3): a decoy explains the chair
@@ -1359,18 +1491,17 @@ namespace Meuble
             SeenByDog = dogSees;
 
             // 4. Exit and win, then the caught rule (win first, as in M1).
-            // M5 wave 5B (CONTRACT_M5 4, 16.8): a step of a shove is moving, whoever slides the furniture.
-            bool shoveMoving = Shoving; // MUTATION:SHOVE_MOVING
-            bool furnitureMoving = furniture.IsMoving || shoveMoving;
-            FurnitureMoving = furnitureMoving;
+            // M5 wave 5B (CONTRACT_M5 4, 16.8, 19): a step of a shove is moving through the push action (FurnitureController's
+            // predicate counts any action), so the furniture's own predicate is the whole rule.
+            FurnitureMoving = furniture.IsMoving;
             if (playing)
             {
                 Steps++;
                 Elapsed = Steps * dt;
                 Vector3 center = furniture.transform.position;
-                bool exitCounts = Def.Exit.Contains(center) && !furniture.Carried && (!rules.ExitOnlyUnseen || !seenForExit);
+                bool exitCounts = Def.Exit.Contains(center) && !furniture.Carried && !furniture.Hidden && (!rules.ExitOnlyUnseen || !seenForExit);
                 // M4: a furniture pinned under a sitter never moves (FurnitureController), so it is never caught.
-                bool moving = (furniture.IsMoving /*MUTATION:SATON_MOVING*/ || shoveMoving) && !furniture.Carried;
+                bool moving = furniture.IsMoving /*MUTATION:SATON_MOVING*/ && !furniture.Carried;
                 if (exitCounts)
                 {
                     Win();
@@ -1402,6 +1533,11 @@ namespace Meuble
             {
                 StepClue();
             }
+            // M6: door memory, on a level that turns it on.
+            if (State == PlayState.Playing && rules.DisplacementMemory && Def.DoorMemory)
+            {
+                StepDoorMemory();
+            }
 
             // 6. Investigations and the carry, then the lamp switch-on (M4). M5 wave 5B: then a clue put away.
             if (State == PlayState.Playing)
@@ -1409,6 +1545,7 @@ namespace Meuble
                 StepInvestigations();
                 StepLamp(rules);
                 StepPutAway();
+                StepDoorPutBack();
             }
 
             // 7. Noise: hop events, M4's topple, click and roll (all silent on a rug or in a soft room), then the creak gauge.
@@ -1428,7 +1565,7 @@ namespace Meuble
             lastRollCount = rolls;
             if (State == PlayState.Playing)
             {
-                StepNoise(rules, furnitureMoving, dt);
+                StepNoise(rules, FurnitureMoving, dt);
             }
             bool warning = State == PlayState.Playing && rules.Creak && Creak.Warning && !furniture.Carried;
             float progress = warning ? Mathf.Clamp01((Creak.Value - WarningStart) / (1f - WarningStart)) : 0f;
@@ -1447,7 +1584,7 @@ namespace Meuble
             MaxSuspicion = max;
 
             // 9. HUD, ghost and sounds.
-            EyeState = ComputeEye(rules, furniture, furnitureMoving);
+            EyeState = ComputeEye(rules, furniture, FurnitureMoving);
             UpdateGhost(rules, furniture);
             if (Hud != null)
             {
@@ -1462,6 +1599,10 @@ namespace Meuble
                 Hud.SetTipped(State == PlayState.Playing && furniture.LyingDown && !furniture.Carried);
                 // M5 (CONTRACT_M5_v3 15.2): E opens the door in reach.
                 Hud.ShowDoorHint(DoorHintWanted(furniture));
+                // M6 (CONTRACT_M6 2.5): E hides in the wardrobe in front, or leaves it.
+                bool pad = InputReader.LastInputWasGamepad;
+                string hide = furniture.Hidden ? (pad ? Strings.HudLeavePad : Strings.HudLeave) : (pad ? Strings.HudHidePad : Strings.HudHide);
+                Hud.ShowHideHint(HideHintWanted(furniture), hide);
                 // M5 wave 5B (CONTRACT_M5 6, 16.5): the balance gauge, while a load is carried.
                 Hud.SetBalance(CarryingLoad ? Load.Ratio : 0f, State == PlayState.Playing && CarryingLoad);
             }
@@ -1620,7 +1761,10 @@ namespace Meuble
                     observations[i] = Observation.NotSeen;
                     continue;
                 }
-                Observation observation = memories[i].Observe(seesPlayer[i], pose, Time.fixedDeltaTime, lyingDown);
+                // M6 (CONTRACT_M6 2.5): hidden in a wardrobe, the furniture is never seen; its remembered spot may be seen empty.
+                Observation observation = furniture.Hidden
+                    ? memories[i].ObserveEmptySpot(SeesSpot(i), Time.fixedDeltaTime)
+                    : memories[i].Observe(seesPlayer[i], pose, Time.fixedDeltaTime, lyingDown);
                 observations[i] = observation;
                 if (observation != Observation.NotSeen)
                 {
@@ -1641,8 +1785,14 @@ namespace Meuble
                         return;
                     }
                     resolved[i] = false;
-                    investigateTargets[i] = pose.Position;
-                    routine.Investigate(pose.Position);
+                    // M6: an empty spot is investigated where it was remembered.
+                    Vector3 target = furniture.Hidden ? YawMath.Planar(memories[i].PlayerSlot.Position) : pose.Position;
+                    if (furniture.Hidden)
+                    {
+                        EmptySpotCount++;
+                    }
+                    investigateTargets[i] = target;
+                    routine.Investigate(target);
                 }
             }
         }
@@ -1737,7 +1887,7 @@ namespace Meuble
                     resolved[i] = true;
                     float reach = Tuning.InvestigateReach + Tuning.CarryReachMargin;
                     float distance = YawMath.Planar(furniture.transform.position - routine.Position).magnitude;
-                    bool free = carrier < 0 && !furniture.Carried;
+                    bool free = carrier < 0 && !furniture.Carried && !furniture.Hidden;
                     if (free && distance <= reach)
                     {
                         // The furniture is still where it was found: carry it back to where it belongs.
@@ -1746,7 +1896,7 @@ namespace Meuble
                     }
                     else
                     {
-                        if (YawMath.Planar(investigateTargets[i] - routine.Position).magnitude > reach)
+                        if (!furniture.Hidden && YawMath.Planar(investigateTargets[i] - routine.Position).magnitude > reach)
                         {
                             // M2.1 (11.4): the inhabitant never got to where the chair was (no path). It gives
                             // up and accepts the chair where it is now, instead of rediscovering it at once.
@@ -1905,7 +2055,8 @@ namespace Meuble
             {
                 CreakCount++;
                 CreakedThisStep = true;
-                EmitUnlessMasked(new NoiseEvent(source, Tuning.CreakRadius, NoiseKind.Creak));
+                float creakRadius = furniture.Hidden ? Tuning.CreakRadius * Tuning.WardrobeCreakFactor : Tuning.CreakRadius; // MUTATION:MUFFLED_CREAK
+                EmitUnlessMasked(new NoiseEvent(source, creakRadius, NoiseKind.Creak));
             }
             // M5: the barks decided in step 4, at their dogs (StepBarks already checked Rules.Hearing).
             EmitBarks();
@@ -2001,6 +2152,8 @@ namespace Meuble
             OutOfPlace = false;
             AtDecoy = false;
             bool playing = State == PlayState.Playing;
+            // M5 5B.1 (m14): the rings show the tolerance of the seer that judges (the tidy 0.4 m, the watchful 0.5 m).
+            float tolerance = memories.Length > 0 ? memories[Mathf.Clamp(lastSeer, 0, memories.Length - 1)].Tolerance : Tuning.DisplacementTolerance;
             if (rules.DisplacementMemory && memories.Length > 0 && playing && !furniture.Carried)
             {
                 FurniturePose here = furniture.Pose;
@@ -2015,10 +2168,10 @@ namespace Meuble
                 }
             }
             bool lying = furniture.Tipped;
-            Ghost?.ShowRings(OutOfPlace && !lying);
+            Ghost?.ShowRings(OutOfPlace && !lying, tolerance);
             if (OutOfPlace && !AtDecoy && !lying)
             {
-                Ghost?.Show(memories[Mathf.Clamp(lastSeer, 0, memories.Length - 1)].PlayerSlot, furniture.Size);
+                Ghost?.Show(memories[Mathf.Clamp(lastSeer, 0, memories.Length - 1)].PlayerSlot, furniture.Size, tolerance);
             }
             else
             {
@@ -2079,6 +2232,298 @@ namespace Meuble
 
         // ----- Sounds -----
 
+        // ----- M6 gameplay: the wardrobe, door memory, the doors the household opens (docs/CONTRACT_M6.md 2.5 to 2.7) -----
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): the first wardrobe of the level (level order) that a furniture of its size (plus its load's
+        /// height) fits in and whose entry zone holds its centre (WardrobeRule.CanEnter), or null. A tipped, carried or pinned
+        /// furniture never enters.
+        /// </summary>
+        private PropDef WardrobeFor(FurnitureController furniture)
+        {
+            if (furniture == null || wardrobes.Count == 0 || furniture.Hidden || furniture.Tipped || furniture.Carried || furniture.Pinned)
+            {
+                return null;
+            }
+            Vector3 at = YawMath.Planar(furniture.transform.position);
+            foreach (PropDef w in wardrobes)
+            {
+                if (WardrobeRule.CanEnter(w, at, furniture.Size, LoadExtraHeight))
+                {
+                    return w;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Step 1, after the furniture: the entry action ended (its 25 steps ran; ActionActive is false from the step after
+        /// its last one): the furniture is hidden from this step on, before any vision. An entry cut short by a pin or a carry
+        /// hides nothing. The exit action ended: the wardrobe is left.
+        /// </summary>
+        private void StepWardrobe(FurnitureController furniture)
+        {
+            if (Wardrobe == WardrobeStage.Entering && !furniture.ActionActive)
+            {
+                if (State == PlayState.Playing && !furniture.Carried && !furniture.Pinned)
+                {
+                    furniture.SetHidden(true);
+                    Wardrobe = WardrobeStage.Hidden;
+                    HideCount++;
+                }
+                else
+                {
+                    Wardrobe = WardrobeStage.None;
+                    WardrobeProp = null;
+                }
+            }
+            else if (Wardrobe == WardrobeStage.Leaving && !furniture.ActionActive)
+            {
+                Wardrobe = WardrobeStage.None;
+                WardrobeProp = null;
+            }
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.5): inhabitant <paramref name="i"/> sees its remembered spot: the sample box of the furniture's
+        /// size at its player slot (on the floor there) is inside its view (its own range, no lamp factor, and half angle,
+        /// unoccluded).
+        /// </summary>
+        private bool SeesSpot(int i)
+        {
+            Vision vision = i < visions.Length ? visions[i] : null;
+            if (vision == null)
+            {
+                return false;
+            }
+            FurniturePose slot = memories[i].PlayerSlot;
+            Vector3 floorAt = Level.Floor.OnFloor(YawMath.Planar(slot.Position));
+            VisionMath.SamplePoints(floorAt, slot.Yaw, Level.Furniture.Size, Tuning.SampleInset, spotSamples);
+            return vision.SeesAny(spotSamples);
+        }
+
+        /// <summary>
+        /// Step 5, after the clue (CONTRACT_M6 2.6, the level's doorMemory and the memory rule on): every inhabitant with a door
+        /// memory that observes this step (Routine or Alerted, not frozen) looks at each leaf whose state differs from its
+        /// memory (Vision.SeesLeafBody: the leaf's 4 samples at its current angle). The first sighting of a mismatch is a
+        /// Suspect: one discovery's gain on its own meter (suspicion 1 loses), the "hein ?". A mismatch it sees (a Suspect, or
+        /// one already noticed) sends it to put the leaf back (InhabitantRoutine.BeginPutAway toward the door) unless someone is
+        /// already on the way to that leaf.
+        /// </summary>
+        private void StepDoorMemory()
+        {
+            List<Inhabitant> inhabitants = Level.Inhabitants;
+            for (int i = 0; i < inhabitants.Count && i < doorMemories.Length; i++)
+            {
+                DoorMemory memory = doorMemories[i];
+                InhabitantRoutine routine = inhabitants[i].Routine;
+                Vision vision = i < visions.Length ? visions[i] : null;
+                if (memory == null || routine == null || vision == null || !routine.Personality.Memory)
+                {
+                    continue;
+                }
+                for (int k = 0; k < Level.Leaves.Count && k < memory.Count; k++)
+                {
+                    DoorLeaf leaf = Level.Leaves[k];
+                    // A leaf as remembered changes nothing: no ray for it.
+                    if (leaf == null || !CanObserve(routine) || !memory.Differs(k, leaf.Open))
+                    {
+                        continue;
+                    }
+                    DoorSighting sighting = memory.Observe(k, vision.SeesLeafBody(leaf), leaf.Open);
+                    if (sighting == DoorSighting.Suspect)
+                    {
+                        DoorSuspectCount++;
+                        DiscoveryCount++;
+                        meters[i].AddDiscovery(); // MUTATION:DOOR_SUSPECT
+                        Sfx?.PlayHein(PanToward(inhabitants[i].transform.position));
+                        if (meters[i].Lost || meters[i].Value >= Tuning.SuspicionLose)
+                        {
+                            Lose(LoseReason.Suspicion, i);
+                            return;
+                        }
+                    }
+                    if ((sighting == DoorSighting.Suspect || sighting == DoorSighting.Known) && DoorFixer(k) < 0)
+                    {
+                        routine.BeginPutAway(DoorApproach(leaf.Geometry, routine.Position));
+                        if (routine.Mode == InhabitantMode.Investigating)
+                        {
+                            doorFixers[i] = k;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>The inhabitant on its way to put leaf <paramref name="leaf"/> back, or -1.</summary>
+        private int DoorFixer(int leaf)
+        {
+            for (int i = 0; i < doorFixers.Length; i++)
+            {
+                if (doorFixers[i] == leaf)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// M6: where an inhabitant at <paramref name="from"/> walks to put a leaf back: on its side of the wall, on the doorway
+        /// axis, Tuning.InhabitantDoorReach from the wall centre line (exactly on the line, the side the leaf does not swing into).
+        /// </summary>
+        private static Vector3 DoorApproach(DoorGeometry g, Vector3 from)
+        {
+            Vector3 normal = g.AlongX ? Vector3.forward : Vector3.right;
+            float side = Vector3.Dot(YawMath.Planar(from - g.Center), normal);
+            float sign = Mathf.Abs(side) > 1e-4f ? Mathf.Sign(side) : -Mathf.Sign(Vector3.Dot(g.Into, normal));
+            return YawMath.Planar(g.Center) + normal * (sign * DoorStopDistance(g, sign));
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): how far from a leaf's wall centre line an inhabitant on the side of sign <paramref name="side"/>
+        /// (the sign of its offset along the wall normal +z or +x) stops: Tuning.InhabitantDoorReach on the side the leaf does
+        /// not swing into, and the door width plus Tuning.InhabitantRadius on the swing side (out of the leaf's sweep).
+        /// </summary>
+        public static float DoorStopDistance(DoorGeometry g, float side)
+        {
+            float into = g.AlongX ? g.Into.z : g.Into.x;
+            return side * into > 0f ? g.Width + Tuning.InhabitantRadius : Tuning.InhabitantDoorReach;
+        }
+
+        /// <summary>
+        /// Step 6, after the clue's put-away: an inhabitant sent to a leaf puts it back on the last step of its put-away beat
+        /// (InhabitantRoutine.JustPutAway): the leaf swings back to the state its memory holds (DoorLeaf.BeginClose, or
+        /// BeginOpen made by the household), and every door memory of the level remembers that state. Interrupted on its way
+        /// (a startle, a pin, an alert never: it is Investigating), it gives the leaf up for the next one who sees it.
+        /// </summary>
+        private void StepDoorPutBack()
+        {
+            List<Inhabitant> inhabitants = Level.Inhabitants;
+            for (int i = 0; i < inhabitants.Count && i < doorFixers.Length; i++)
+            {
+                int k = doorFixers[i];
+                if (k < 0)
+                {
+                    continue;
+                }
+                InhabitantRoutine routine = inhabitants[i].Routine;
+                if (routine != null && routine.JustPutAway && k < Level.Leaves.Count && doorMemories[i] != null)
+                {
+                    DoorLeaf leaf = Level.Leaves[k];
+                    bool open = doorMemories[i].RemembersOpen(k);
+                    if (open)
+                    {
+                        leaf.BeginOpen(true);
+                    }
+                    else
+                    {
+                        leaf.BeginClose();
+                    }
+                    if (leaf.Open == open)
+                    {
+                        RememberDoor(k, open);
+                        DoorPutBackCount++;
+                        householdDoorThisStep = leaf;
+                    }
+                    doorFixers[i] = -1;
+                }
+                else if (routine == null || routine.Mode != InhabitantMode.Investigating)
+                {
+                    doorFixers[i] = -1;
+                }
+            }
+        }
+
+        /// <summary>M6: the household changed leaf <paramref name="leaf"/>: every door memory of the level remembers it so.</summary>
+        private void RememberDoor(int leaf, bool open)
+        {
+            foreach (DoorMemory memory in doorMemories)
+            {
+                memory?.Remember(leaf, open);
+            }
+        }
+
+        /// <summary>
+        /// Step 2, after the inhabitants (CONTRACT_M6 2.7): an inhabitant whose walk in progress reaches a closed leaf that
+        /// carries openedByInhabitants (<see cref="WalkReachesLeaf"/>, on the walk's remaining corners) stops: its routine
+        /// holds the next Tuning.InhabitantDoorStop (30 steps, InhabitantRoutine.Hold), while the leaf swings open from the
+        /// next step (30 steps, made by the household: no samples), then it walks through; the leaf stays open, and every door
+        /// memory remembers it open. Inhabitants in level order, leaves in leaf order, one leaf per inhabitant and step.
+        /// </summary>
+        private void StepHouseholdDoors()
+        {
+            if (householdLeaves == 0)
+            {
+                return;
+            }
+            List<Inhabitant> inhabitants = Level.Inhabitants;
+            for (int i = 0; i < inhabitants.Count; i++)
+            {
+                InhabitantRoutine routine = inhabitants[i].Routine;
+                if (routine == null || routine.Holding || routine.WalkCorners(walkCorners) == 0)
+                {
+                    continue;
+                }
+                for (int k = 0; k < Level.Leaves.Count; k++)
+                {
+                    DoorLeaf leaf = Level.Leaves[k];
+                    if (leaf == null || (householdLeaves & (1 << k)) == 0 || leaf.Open || leaf.Swinging)
+                    {
+                        continue;
+                    }
+                    if (!WalkReachesLeaf(leaf.Geometry, routine.Position, walkCorners))
+                    {
+                        continue;
+                    }
+                    routine.Hold(Tuning.InhabitantDoorStop); // MUTATION:DOOR_STOP
+                    leaf.BeginOpen(true);
+                    HouseholdDoorOpenCount++;
+                    householdDoorThisStep = leaf;
+                    RememberDoor(k, true);
+                    break;
+                }
+            }
+        }
+
+        private readonly List<Vector3> walkCorners = new List<Vector3>();
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7), the rule the audit replays, once per fixed step after the walk's move: follow the polyline
+        /// from <paramref name="position"/> through <paramref name="corners"/> (the walk's remaining corners,
+        /// InhabitantRoutine.WalkCorners) to its first point on the leaf's wall centre line inside the opening (within half the
+        /// door width of the opening centre); true when there is one and the inhabitant stands at most
+        /// <see cref="DoorStopDistance"/> from it (planar), on its side of the wall (0.5 m on the side the leaf does not swing
+        /// into, width + 0.25 m on the swing side). A crossing of the same wall line outside the opening is another doorway.
+        /// </summary>
+        public static bool WalkReachesLeaf(DoorGeometry g, Vector3 position, IReadOnlyList<Vector3> corners)
+        {
+            if (g == null || corners == null)
+            {
+                return false;
+            }
+            float side = g.AlongX ? position.z - g.Line : position.x - g.Line;
+            Vector3 a = YawMath.Planar(position);
+            for (int c = 0; c < corners.Count; c++)
+            {
+                Vector3 b = YawMath.Planar(corners[c]);
+                float sa = g.AlongX ? a.z - g.Line : a.x - g.Line;
+                float sb = g.AlongX ? b.z - g.Line : b.x - g.Line;
+                if (sa * sb <= 0f && !(sa == 0f && sb == 0f))
+                {
+                    Vector3 crossing = a + (b - a) * (sa / (sa - sb));
+                    float along = g.AlongX ? crossing.x : crossing.z;
+                    if (Mathf.Abs(along - g.Along) <= g.Width * 0.5f)
+                    {
+                        float distance = YawMath.Planar(crossing - position).magnitude;
+                        return distance <= DoorStopDistance(g, side); // MUTATION:HOUSEHOLD_CROSS
+                    }
+                }
+                a = b;
+            }
+            return false;
+        }
+
         private void PlaySounds()
         {
             if (Sfx == null)
@@ -2119,6 +2564,10 @@ namespace Meuble
             {
                 Sfx.PlayDoor(PanToward(doorOpenedThisStep.Geometry.Center));
             }
+            if (householdDoorThisStep != null)
+            {
+                Sfx.PlayDoor(PanToward(householdDoorThisStep.Geometry.Center));
+            }
             foreach (int i in barksThisStep)
             {
                 if (i < Level.Inhabitants.Count)
@@ -2156,7 +2605,7 @@ namespace Meuble
             }
             if (rockedThisStep)
             {
-                Sfx.PlayRockCreak(pan);
+                Sfx.PlayRockCreak(pan, rockTime);
             }
             if (contactThisStep)
             {
@@ -2320,54 +2769,6 @@ namespace Meuble
             Pitch = PitchAt(elapsed / duration, degrees);
             Transform visual = furniture.Visual;
             visual.rotation = visual.rotation * Quaternion.Euler(Pitch, 0f, 0f);
-        }
-    }
-
-    /// <summary>
-    /// M5 wave 5B (docs/CONTRACT_M5.md 4, 16.8): the robot's shove while FurnitureController has no BeginPush of its own (the
-    /// bodies' stub of 16.12). <see cref="FurniturePush.BeginPush"/> adds it on demand to the furniture's own GameObject (no
-    /// Transform is created); GameState slides the furniture through it before each step of the shove, at a constant
-    /// distance / time, and the furniture then steps without input (so the input is ignored and the slide is all its travel;
-    /// GameState counts those steps as moving). Any collider stops it (the CharacterController's Move).
-    /// </summary>
-    public sealed class ShoveFallback : MonoBehaviour
-    {
-        /// <summary>The slide's velocity, planar.</summary>
-        public Vector3 Velocity { get; private set; }
-
-        /// <summary>The steps of the slide still to come.</summary>
-        public int StepsLeft { get; private set; }
-
-        public bool Active => StepsLeft > 0;
-
-        public void Begin(Vector3 velocity, int steps)
-        {
-            Velocity = YawMath.Planar(velocity);
-            StepsLeft = Mathf.Max(0, steps);
-        }
-
-        public void Cancel()
-        {
-            StepsLeft = 0;
-        }
-
-        /// <summary>One step of the slide; returns the planar velocity it really travelled (a wall slows or stops it).</summary>
-        public Vector2 Slide(FurnitureController furniture, float dt)
-        {
-            if (!Active || furniture == null || !(dt > 0f))
-            {
-                return Vector2.zero;
-            }
-            StepsLeft--;
-            CharacterController controller = furniture.GetComponent<CharacterController>();
-            if (controller == null || !controller.enabled)
-            {
-                return Vector2.zero;
-            }
-            Vector3 from = furniture.transform.position;
-            controller.Move(Velocity * dt + Vector3.down * (2f * dt));
-            Vector3 travelled = YawMath.Planar(furniture.transform.position - from);
-            return new Vector2(travelled.x, travelled.z) / dt;
         }
     }
 }

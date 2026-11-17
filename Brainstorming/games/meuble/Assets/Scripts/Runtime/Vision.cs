@@ -42,9 +42,6 @@ namespace Meuble
         /// <summary>M5 wave 5B: the height the furniture's sample box grew by on the last step (the load's, or 0).</summary>
         public float ExtraHeight { get; private set; }
 
-        /// <summary>M5 wave 5B: the last point tested by <see cref="SeesPoint"/> was seen (a fallen load's clue).</summary>
-        public bool SeesClue { get; private set; }
-
         private static readonly RaycastHit[] Hits = new RaycastHit[16];
 
         public bool Step(FurnitureController furniture)
@@ -62,6 +59,12 @@ namespace Meuble
             SeesPlayer = false;
             if (Owner == null || Owner.Routine == null || furniture == null)
             {
+                return false;
+            }
+            if (furniture.Hidden) // MUTATION:HIDDEN_SAMPLES
+            {
+                // M6 (CONTRACT_M6 2.5): hidden in a wardrobe, the furniture has no sample point at all.
+                System.Array.Clear(SampleVisible, 0, SampleVisible.Length);
                 return false;
             }
             ExtraHeight = Mathf.Max(0f, extraHeight);
@@ -131,11 +134,10 @@ namespace Meuble
 
         /// <summary>
         /// M5 wave 5B (CONTRACT_M5 6): a single world point (a fallen load's clue) seen by this watcher on its own range (no
-        /// lamp factor) and half angle, unoccluded; asleep, nothing. Sets <see cref="SeesClue"/>.
+        /// lamp factor) and half angle, unoccluded; asleep, nothing.
         /// </summary>
         public bool SeesPoint(Vector3 point)
         {
-            SeesClue = false;
             if (Owner == null || Owner.Routine == null)
             {
                 return false;
@@ -146,8 +148,46 @@ namespace Meuble
                 return false;
             }
             Vector3 eye = Owner.EyePosition;
-            SeesClue = VisionMath.IsInCone(eye, Owner.EyeForward, point, routine.ViewRange, routine.HalfAngle) && !Occluded(eye, point);
-            return SeesClue;
+            return VisionMath.IsInCone(eye, Owner.EyeForward, point, routine.ViewRange, routine.HalfAngle) && !Occluded(eye, point);
+        }
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.6): the leaf itself, open or closed, at rest or swinging, seen by this watcher? Its 4
+        /// samples at its current angle (DoorGeometry.Samples), the watcher's own range (no lamp factor) and half angle, every
+        /// occluder but the leaf itself; asleep, nothing. Used for door memory only.
+        /// </summary>
+        public bool SeesLeafBody(DoorLeaf leaf)
+        {
+            if (Owner == null || Owner.Routine == null || leaf == null || leaf.Geometry == null || Owner.Routine.Asleep)
+            {
+                return false;
+            }
+            InhabitantRoutine routine = Owner.Routine;
+            Vector3 eye = Owner.EyePosition;
+            Vector3 forward = Owner.EyeForward;
+            Vector3[] samples = leaf.Geometry.Samples(leaf.Angle);
+            for (int i = 0; i < samples.Length; i++)
+            {
+                if (VisionMath.IsInCone(eye, forward, samples[i], routine.ViewRange, routine.HalfAngle) && !Occluded(eye, samples[i], leaf.transform))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.5): any of these sample points (a remembered pose's sample box) seen by this watcher, on its
+        /// own range (no lamp factor) and half angle, unoccluded; asleep, nothing.
+        /// </summary>
+        public bool SeesAny(Vector3[] samples)
+        {
+            if (Owner == null || Owner.Routine == null || samples == null || Owner.Routine.Asleep)
+            {
+                return false;
+            }
+            InhabitantRoutine routine = Owner.Routine;
+            return Test(Owner.EyePosition, Owner.EyeForward, samples, routine.ViewRange, routine.HalfAngle, null);
         }
 
         /// <summary>M4: the full three check test with the range scaled by <paramref name="rangeFactor"/> (CONTRACT_M4 2.3).</summary>

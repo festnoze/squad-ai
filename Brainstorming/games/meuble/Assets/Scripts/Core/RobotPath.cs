@@ -99,9 +99,6 @@ namespace Meuble.Core
         /// <summary>+1 when the robot travels the loop forward at <paramref name="t"/>, -1 when it travels it backwards.</summary>
         public int DirectionAt(float t) => LegAt(t).Dir;
 
-        /// <summary>The robot's arc position on the loop at <paramref name="t"/>, in [0, Length), from waypoint 0.</summary>
-        public float ArcAt(float t) => (float)ArcOn(LegAt(t), t);
-
         /// <summary>The robot's position at <paramref name="t"/> (planar).</summary>
         public Vector3 PositionAt(float t)
         {

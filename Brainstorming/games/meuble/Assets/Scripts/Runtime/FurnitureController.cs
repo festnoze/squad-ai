@@ -333,6 +333,28 @@ namespace Meuble
             }
         }
 
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5): hidden in a wardrobe -----
+
+        /// <summary>
+        /// M6: hidden in a wardrobe (GameState sets it at the end of the entry action and clears it when E begins the exit
+        /// action). While hidden the visual is switched off, the furniture takes no move input and never moves (no hop, no
+        /// footstep), Vision gives it no sample point, and an action press goes to the game (<see cref="ActionKeyClaimed"/>).
+        /// </summary>
+        public bool Hidden { get; private set; }
+
+        /// <summary>M6: hides or shows the furniture (see <see cref="Hidden"/>); the motion stops either way.</summary>
+        public void SetHidden(bool on)
+        {
+            Init();
+            Hidden = on;
+            Velocity = Vector3.zero;
+            ClearMotionState();
+            if (Visual != null)
+            {
+                Visual.gameObject.SetActive(!on);
+            }
+        }
+
         // ----- M2 (docs/CONTRACT_M2.md 3.3, 3.4, 5) -----
 
         /// <summary>The player furniture is furniture 0 of a level (decoys come after it).</summary>
@@ -552,6 +574,19 @@ namespace Meuble
             previousWishActive = wishActive;
             Careful = bodies && allowInput && (ScriptedCareful ?? InputReader.CarefulHeld());
 
+            if (Hidden && !ActionActive)
+            {
+                // M6 (CONTRACT_M6 2.5): inside the wardrobe it cannot move; E goes to the game, which begins the exit action.
+                Velocity = Vector3.zero;
+                Careful = false;
+                ClearMotionState();
+                if (actionPress)
+                {
+                    ActionKeyClaimedByGame();
+                }
+                EndStep(dt, startPosition, startYaw, bodies);
+                return;
+            }
             if (ActionActive)
             {
                 // Falling, righting, switching or an external action: the body does not travel, and input and presses
@@ -696,7 +731,7 @@ namespace Meuble
             Vector3 delta = YawMath.Planar(transform.position - startPosition);
             PlanarSpeed = dt > 0f ? delta.magnitude / dt : 0f;
             YawRate = dt > 0f ? Mathf.DeltaAngle(startYaw, Yaw) / dt : 0f;
-            IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive);
+            IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive); // MUTATION:PUSH_MOVING
             // A wall stops the furniture: keep the velocity consistent with what really happened.
             if (dt > 0f && delta.sqrMagnitude < (Velocity * dt).sqrMagnitude * Tuning.BlockedFraction)
             {

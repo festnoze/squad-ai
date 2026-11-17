@@ -8,7 +8,8 @@ namespace Meuble
     /// <summary>
     /// M5 (docs/CONTRACT_M5.md 6 and 16.5, PRD 3.4): the visual of the load carried on the player furniture, a vase, a stack
     /// of books or a potted plant. A visual only: no collider, and it decides nothing (the kinematic rule of
-    /// <see cref="LoadBalance"/> does; FurnitureController.SetLoad creates the view and drives its sway).
+    /// <see cref="LoadBalance"/> does). CONTRACT_M5 18: LevelBuilder.ApplyLoad creates the view on the furniture's Visual;
+    /// GameState.StepLoad drives <see cref="SetTilt"/> from GameState.Load, and GameState spawns and clears the clue.
     /// <list type="bullet">
     /// <item><see cref="Create"/> puts the carried object on the top of the furniture box: its base at the box top
     /// (<c>bodySize.y</c>), centred over the highest part of the furniture's own meshes (a chair's backrest rail, a stool's
@@ -21,8 +22,10 @@ namespace Meuble
     /// takes the clue away (an inhabitant put it away). Destroying the view leaves its clue on the floor.</item>
     /// </list>
     /// Budgets (CONTRACT_M5 16.11, 17): every colour is a decor colour the levels already draw (the books, the plants, the
-    /// dark wood, FurnitureKit.FrameColor), so a load adds 2 or 3 material slots and usually no material. The vase and the
-    /// pot show the plaster detail; the sprig and the foliage are named "Leaves" and the books "Books", as the props'.
+    /// dark wood, FurnitureKit.FrameColor), so a load adds 2 or 3 material slots. The vase and the pot show the plaster
+    /// detail; the sprig and the foliage are named "Leaves" and the books "Books", as the props'. M6 (CONTRACT_M6 2.4):
+    /// the soil (FurnitureKit.FrameColor, its own finish) and the foliage (Moss002) now show their own detail too, so
+    /// they no longer share the near-black frame material.
     /// </summary>
     public sealed class LoadView : MonoBehaviour
     {
@@ -127,6 +130,11 @@ namespace Meuble
         /// The load falls: its broken version lies on the floor at <paramref name="at"/> (world; the floor point the caller
         /// chose), turned like the furniture, under the level root; the carried object is hidden. A previous clue is taken
         /// away first. Returns the clue's root.
+        /// <para>m15 (CONTRACT_M5 19): on a split level (the furniture's FloorMap) the clue lies on one floor surface, in its
+        /// frame: on a ramp's slope in <see cref="FurnitureController.RampFrame"/>'s frame (never half buried), and when its
+        /// spread would cross a platform edge or a ramp's foot or head it moves to the nearest point within
+        /// <see cref="Tuning.ClueSearchRadius"/> where it lies whole on one surface (the same height preferred, never past a
+        /// wall or a railing): it stays on the platform it fell on. A flat level keeps the caller's point.</para>
         /// </summary>
         public GameObject SpawnClue(Vector3 at)
         {
@@ -138,6 +146,8 @@ namespace Meuble
             float yaw = Furniture != null ? Furniture.eulerAngles.y : 0f;
             go.transform.SetPositionAndRotation(at, Quaternion.Euler(0f, yaw, 0f));
             BuildClue(Kind, go.transform, go.layer);
+            Vector3 rest = ClueRest(at, yaw, SpreadOf(go.transform), out Quaternion frame);
+            go.transform.SetPositionAndRotation(rest, frame);
             Clue = go;
             Fallen = true;
             if (Carried != null)
@@ -145,6 +155,159 @@ namespace Meuble
                 Carried.gameObject.SetActive(false); // MUTATION:LOAD_HIDE
             }
             return go;
+        }
+
+        /// <summary>The floor the furniture under this view stands on (the flat floor without one).</summary>
+        private FloorMap FloorUnder()
+        {
+            FurnitureController body = Furniture != null ? Furniture.GetComponentInParent<FurnitureController>() : null;
+            return body != null ? body.Floor : FloorMap.Flat;
+        }
+
+        /// <summary>The planar radius of a clue's pieces about its root (its local frame), metres.</summary>
+        private static float SpreadOf(Transform clue)
+        {
+            float spread = 0f;
+            Matrix4x4 toLocal = clue.worldToLocalMatrix;
+            foreach (MeshFilter f in clue.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (f.sharedMesh == null || !f.sharedMesh.isReadable)
+                {
+                    continue;
+                }
+                Matrix4x4 m = toLocal * f.transform.localToWorldMatrix;
+                foreach (Vector3 v in f.sharedMesh.vertices)
+                {
+                    Vector3 p = m.MultiplyPoint3x4(v);
+                    spread = Mathf.Max(spread, new Vector2(p.x, p.z).magnitude);
+                }
+            }
+            return spread;
+        }
+
+        /// <summary>The ring samples of the clue's spread.</summary>
+        private const int ClueDirections = 16;
+
+        /// <summary>
+        /// m15: where a clue of <paramref name="spread"/> fallen at <paramref name="at"/> rests and its <paramref name="frame"/>
+        /// (see <see cref="SpawnClue"/>): the caller's point, turned by <paramref name="yaw"/>, on a flat level; else the
+        /// candidate nearest <paramref name="at"/> (rings of <see cref="Tuning.ClueSearchStep"/>, a height change costing
+        /// twice its distance) where the clue lies whole on one surface, reached without crossing a wall or a railing.
+        /// Without any, the caller's point in its own floor frame.
+        /// </summary>
+        private Vector3 ClueRest(Vector3 at, float yaw, float spread, out Quaternion frame)
+        {
+            frame = Quaternion.Euler(0f, yaw, 0f);
+            FloorMap floor = FloorUnder();
+            if (floor == null || floor.IsFlat)
+            {
+                return at;
+            }
+            float baseHeight = floor.HeightAt(at);
+            Vector3 best = at;
+            Quaternion bestFrame = frame;
+            float bestCost = float.MaxValue;
+            int rings = Mathf.CeilToInt(Tuning.ClueSearchRadius / Tuning.ClueSearchStep);
+            for (int k = 0; k <= rings; k++)
+            {
+                float d = k * Tuning.ClueSearchStep;
+                if (d > bestCost)
+                {
+                    break;
+                }
+                int directions = k == 0 ? 1 : ClueDirections;
+                for (int j = 0; j < directions; j++)
+                {
+                    Vector3 c = floor.OnFloor(at + YawMath.Forward(j * 360f / directions) * d);
+                    float cost = d + 2f * Mathf.Abs(c.y - baseHeight);
+                    if (cost >= bestCost)
+                    {
+                        continue;
+                    }
+                    bool fits = LiesOnOneSurface(floor, c, yaw, spread, out Vector3 rest, out Quaternion f); // MUTATION:CLUE_SURFACE
+                    if (!fits)
+                    {
+                        continue;
+                    }
+                    if (k > 0 && ClueBlocked(at, c, spread))
+                    {
+                        continue;
+                    }
+                    best = rest;
+                    bestFrame = f;
+                    bestCost = cost;
+                }
+            }
+            if (bestCost < float.MaxValue)
+            {
+                frame = bestFrame;
+                return best;
+            }
+            float lift = 0f;
+            Vector3 on = floor.OnFloor(at);
+            if (FurnitureController.RampFrame(floor, on, yaw, new Vector3(2f * spread, 0f, 2f * spread), ref frame, ref lift))
+            {
+                on += Vector3.up * lift;
+            }
+            return on;
+        }
+
+        /// <summary>
+        /// m15: true when a clue of <paramref name="spread"/> centred on the floor point <paramref name="c"/> lies whole on one
+        /// surface: the plane of its floor frame there (a ramp's slope, <see cref="FurnitureController.RampFrame"/>, or level)
+        /// meets the floor at its centre and at <see cref="ClueDirections"/> points of its rim and of its half rim, within
+        /// <see cref="Tuning.ClueSurfaceTolerance"/>. <paramref name="rest"/> and <paramref name="frame"/>: its pose there.
+        /// </summary>
+        private static bool LiesOnOneSurface(FloorMap floor, Vector3 c, float yaw, float spread, out Vector3 rest, out Quaternion frame)
+        {
+            frame = Quaternion.Euler(0f, yaw, 0f);
+            float lift = 0f;
+            FurnitureController.RampFrame(floor, c, yaw, new Vector3(2f * spread, 0f, 2f * spread), ref frame, ref lift);
+            rest = c + Vector3.up * lift;
+            Vector3 n = frame * Vector3.up;
+            if (n.y < 1e-3f || Mathf.Abs(floor.HeightAt(c) - rest.y) > Tuning.ClueSurfaceTolerance)
+            {
+                return false;
+            }
+            for (int ring = 1; ring <= 2; ring++)
+            {
+                float r = spread * ring * 0.5f;
+                for (int j = 0; j < ClueDirections; j++)
+                {
+                    Vector3 p = c + YawMath.Forward(j * 360f / ClueDirections) * r;
+                    float plane = rest.y - (n.x * (p.x - rest.x) + n.z * (p.z - rest.z)) / n.y;
+                    if (Mathf.Abs(floor.HeightAt(p) - plane) > Tuning.ClueSurfaceTolerance)
+                    {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// m15: true when moving the clue from <paramref name="at"/> to <paramref name="c"/> (and its spread past it) crosses a
+        /// wall, a platform's side, a railing or a furniture other than the player's (Tuning.ClueProbeHeight over the floor).
+        /// </summary>
+        private bool ClueBlocked(Vector3 at, Vector3 c, float spread)
+        {
+            Vector3 from = at + Vector3.up * Tuning.ClueProbeHeight;
+            Vector3 to = c + Vector3.up * Tuning.ClueProbeHeight;
+            Vector3 way = to - from;
+            float length = way.magnitude;
+            if (length < 1e-5f)
+            {
+                return false;
+            }
+            FurnitureController body = Furniture != null ? Furniture.GetComponentInParent<FurnitureController>() : null;
+            foreach (RaycastHit hit in Physics.RaycastAll(from, way / length, length + spread, Layers.ChairBlockerMask, QueryTriggerInteraction.Ignore))
+            {
+                if (hit.collider != null && (body == null || !hit.collider.transform.IsChildOf(body.transform)))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>Takes the clue off the floor (an inhabitant put it away). Nothing without one.</summary>
@@ -280,13 +443,13 @@ namespace Meuble
                     break;
                 case Plant:
                     Part(parent, "Pot", CachedMesh("pot", PotMesh), PotBrown, layer, Surface.Plaster);
-                    Part(parent, "Soil", CachedMesh("soil", () => DiscMesh(SoilRadius, PotHeight - SoilDrop)), FurnitureKit.FrameColor, layer, Surface.Plain);
+                    Part(parent, "Soil", CachedMesh("soil", () => DiscMesh(SoilRadius, PotHeight - SoilDrop)), FurnitureKit.FrameColor, layer, Surface.Soil);
                     Part(parent, "Leaves", CachedMesh("foliage", () => FoliageMesh(new Vector3(0f, Tuning.LoadHeight - FoliageRadius, 0f))),
-                        LeafGreen, layer, Surface.Plain);
+                        LeafGreen, layer, Surface.Foliage);
                     break;
                 default:
                     Part(parent, "Vase", CachedMesh("vase", VaseMesh), VaseBlue, layer, Surface.Plaster);
-                    Part(parent, "Leaves", CachedMesh("sprig", () => SprigMesh(Matrix4x4.identity)), LeafGreen, layer, Surface.Plain);
+                    Part(parent, "Leaves", CachedMesh("sprig", () => SprigMesh(Matrix4x4.identity)), LeafGreen, layer, Surface.Foliage);
                     break;
             }
         }
@@ -302,15 +465,15 @@ namespace Meuble
                     break;
                 case Plant:
                     Part(parent, "Pot", CachedMesh("clue pot", LyingPotMesh), PotBrown, layer, Surface.Plaster);
-                    Part(parent, "Soil", CachedMesh("clue soil", SpilledSoilMesh), FurnitureKit.FrameColor, layer, Surface.Plain);
+                    Part(parent, "Soil", CachedMesh("clue soil", SpilledSoilMesh), FurnitureKit.FrameColor, layer, Surface.Soil);
                     Part(parent, "Leaves", CachedMesh("clue foliage", () => FoliageMesh(new Vector3(0.24f, FoliageRadius, 0.07f))),
-                        LeafGreen, layer, Surface.Plain);
+                        LeafGreen, layer, Surface.Foliage);
                     break;
                 default:
                     Part(parent, "Shards", CachedMesh("clue shards", ShardsMesh), VaseBlue, layer, Surface.Plaster);
                     Part(parent, "Leaves", CachedMesh("clue sprig", () => SprigMesh(Matrix4x4.TRS(new Vector3(0.17f, 0.02f, 0.12f),
                         Quaternion.Euler(0f, 35f, 0f) * Quaternion.Euler(84f, 0f, 0f), Vector3.one)
-                        * Matrix4x4.Translate(new Vector3(0f, -VaseHeight, 0f)))), LeafGreen, layer, Surface.Plain);
+                        * Matrix4x4.Translate(new Vector3(0f, -VaseHeight, 0f)))), LeafGreen, layer, Surface.Foliage);
                     break;
             }
         }
@@ -321,7 +484,11 @@ namespace Meuble
             go.transform.SetParent(parent, false);
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var renderer = go.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = PrimitiveKit.Lit(colour);
+            // M6 (CONTRACT_M6 2.4): the soil and the foliage have their own fixed finish, cached apart from every other
+            // use of the same colour (FurnitureKit.FrameColor, here the soil, is also the metal frame and the robot's
+            // bumper); every other part here (books, the vase, the pot, the shards) keeps the plain default, as before.
+            bool fixedFinish = TextureLibrary.FinishOf(surface, out _, out _);
+            renderer.sharedMaterial = fixedFinish ? PrimitiveKit.LitSurface(colour, surface) : PrimitiveKit.Lit(colour, 0.25f);
             renderer.shadowCastingMode = ShadowCastingMode.On;
             renderer.receiveShadows = true;
             PrimitiveKit.Detail(renderer, surface);

@@ -37,6 +37,17 @@ namespace Meuble.Core
     /// </summary>
     public static class RoutineFactory
     {
+        /// <summary>
+        /// M7 (docs/CONTRACT_M7.md 4.1): the personality an inhabitant plays with, a new instance: its row
+        /// (<see cref="PersonalityDef.ForInhabitant"/>) under <see cref="DifficultyDef.Current"/>. The one place the
+        /// difficulty reaches the watchers' range, angle, hearing and suspicion: every routine (game, audit, tests) gets its
+        /// personality here, and the audit's own watcher rows too.
+        /// </summary>
+        public static PersonalityDef PersonalityOf(InhabitantDef def)
+        {
+            return DifficultyDef.Current.Apply(PersonalityDef.ForInhabitant(def)); // MUTATION:DIFFICULTY_APPLY
+        }
+
         /// <summary>The area mask that keeps every area (NavMesh.AllAreas).</summary>
         public const int AllAreas = -1;
 
@@ -69,7 +80,7 @@ namespace Meuble.Core
             }
             var routine = new InhabitantRoutine(def.Stations, def.StartStation, station)
             {
-                Personality = PersonalityDef.ForInhabitant(def),
+                Personality = PersonalityOf(def),
                 Pattern = def.Pattern,
                 Seed = def.Seed,
                 InvestigatePlanner = investigatePlanner,

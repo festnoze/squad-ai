@@ -193,8 +193,8 @@ namespace Meuble
         private static readonly Color FacingDogAlarm = Shade(Tuning.DogConeAlarmColor, 1f, FacingAlpha);
         // M5: the fan floats this far above the floor under each vertex (as M1's 0.015 above y = 0).
         private const float FloorLift = 0.015f;
-        // M5B m20: a recast past a cover aims this much nearer than the exact clearance over its edge (metres).
-        private const float ClearMargin = 0.01f;
+        // M5B m20: a recast past a cover aims this much nearer than the exact clearance over its edge (Tuning).
+        private const float ClearMargin = Tuning.ConeClearMargin;
         private const float FacingSize = 0.42f;
         // Ahead of the eyes along the gaze and a little below them, so the arrow never covers the face.
         private const float FacingAhead = 0.6f;
@@ -218,7 +218,7 @@ namespace Meuble
         private float spacing;
         private float rayStep;
         // M5B m14: a sample is raised to the floor of any other sample this many spacings away (diagonal neighbours included).
-        private const float DrapeReach = 1.5f;
+        private const float DrapeReach = Tuning.ConeDrapeReach;
 
         public void Init()
         {
@@ -238,8 +238,86 @@ namespace Meuble
             gameObject.layer = XRay.ConeLayer;
             transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             BuildFacing();
+            BuildOutline();
             Rebuild();
         }
+
+        // ----- M6 (docs/CONTRACT_M6.md 2.1 and 2.3): the "Jamais" hide switch and the alerted dashed outline. -----
+
+        private LineRenderer outline;
+        private MaterialPropertyBlock outlineBlock;
+        private static Material outlineMaterial;
+        private static Texture2D dashTexture;
+        private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+
+        /// <summary>A dashed line around the fan's whole silhouette (apex and rim), shown only for an alerted watcher
+        /// (CONTRACT_M6 2.3): a pattern, not only the fill's colour change, and it hides with the cone under "Jamais".
+        /// It traces the same clipped ray hit distances as the mesh, so it never reaches past a wall.</summary>
+        private void BuildOutline()
+        {
+            outline = gameObject.AddComponent<LineRenderer>();
+            outline.useWorldSpace = true;
+            outline.loop = true;
+            outline.widthMultiplier = Tuning.ConeOutlineWidth;
+            outline.numCapVertices = 0;
+            outline.numCornerVertices = 0;
+            outline.shadowCastingMode = ShadowCastingMode.Off;
+            outline.receiveShadows = false;
+            outline.textureMode = LineTextureMode.Tile;
+            outline.sharedMaterial = OutlineMaterial();
+            outline.enabled = false;
+            // An instance block, created here (never as a static or instance field initializer: MaterialPropertyBlock's
+            // native side refuses that, "not allowed to be called from a MonoBehaviour constructor").
+            outlineBlock = new MaterialPropertyBlock();
+        }
+
+        private static Material OutlineMaterial()
+        {
+            if (outlineMaterial != null)
+            {
+                return outlineMaterial;
+            }
+            // A private instance (never PrimitiveKit's own shared white cache entry) so its texture is its own.
+            outlineMaterial = new Material(PrimitiveKit.UnlitTransparent(Color.white))
+            {
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+            };
+            outlineMaterial.SetTexture(BaseMapId, DashTexture());
+            outlineMaterial.SetTextureScale(BaseMapId, new Vector2(1f / Tuning.ConeOutlineDash, 1f));
+            return outlineMaterial;
+        }
+
+        /// <summary>A 50 percent duty cycle dash along U (Repeat), so a tiled LineRenderer reads as dashed, not solid.</summary>
+        private static Texture2D DashTexture()
+        {
+            if (dashTexture != null)
+            {
+                return dashTexture;
+            }
+            const int n = 16;
+            dashTexture = new Texture2D(n, 1, TextureFormat.RGBA32, false)
+            {
+                name = "ConeOutlineDash",
+                wrapMode = TextureWrapMode.Repeat,
+                filterMode = FilterMode.Point,
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+            };
+            var pixels = new Color[n];
+            for (int i = 0; i < n; i++)
+            {
+                pixels[i] = i < n / 2 ? Color.white : new Color(1f, 1f, 1f, 0f);
+            }
+            dashTexture.SetPixels(pixels);
+            dashTexture.Apply(false, true);
+            return dashTexture;
+        }
+
+        /// <summary>M6 (CONTRACT_M6 2.3): the dashed outline is on now (tests; it also hides under "Jamais", as the fan).</summary>
+        public bool OutlineVisible => outline != null && outline.enabled;
+
+        /// <summary>M6 (CONTRACT_M6 2.1): the floor cone fan is currently rendered (tests; "Jamais" hides it, as <see cref="Hidden"/> does for a sleeping watcher).</summary>
+        public bool MeshVisible => meshRenderer != null && meshRenderer.enabled;
 
         /// <summary>A world space Canvas of 100 x 100 units scaled to <see cref="FacingSize"/> meters, holding the chevron.</summary>
         private void BuildFacing()
@@ -275,13 +353,20 @@ namespace Meuble
             }
             // M5: a sleeping watcher sees nothing: no fan, no chevron (its "z" shows instead).
             Hidden = Owner.Routine.Asleep;
-            meshRenderer.enabled = !Hidden;
+            // M6 (CONTRACT_M6 2.1): "Jamais" hides the floor cone renderers (this fan and its alert outline), never the
+            // eye indicator or the screen edge pulse (Hud's own concern, untouched here).
+            bool coneHidden = SaveStore.Options.HidesCone; // MUTATION:CONE_HIDE
+            meshRenderer.enabled = !Hidden && !coneHidden;
             if (facingCanvas != null)
             {
                 facingCanvas.enabled = !Hidden;
             }
             if (Hidden)
             {
+                if (outline != null)
+                {
+                    outline.enabled = false;
+                }
                 return;
             }
             Rebuild();
@@ -293,6 +378,16 @@ namespace Meuble
             if (facingImage != null)
             {
                 facingImage.color = FacingColor(dog, alarm);
+            }
+            if (outline != null)
+            {
+                // CONTRACT_M6 2.3: a dashed outline on an alerted watcher's cone, not only the fill's colour change.
+                outline.enabled = !coneHidden && alarm; // MUTATION:CONE_OUTLINE_ALARM
+                if (outline.enabled)
+                {
+                    outlineBlock.SetColor(BaseColorId, new Color(Color.r, Color.g, Color.b, 0.95f));
+                    outline.SetPropertyBlock(outlineBlock);
+                }
             }
         }
 
@@ -466,6 +561,21 @@ namespace Meuble
             if (Facing != null)
             {
                 PlaceFacing(eye, YawMath.Forward(yaw));
+            }
+            if (outline != null)
+            {
+                // M6 (CONTRACT_M6 2.3): the fan's own silhouette, a little above it so it never z-fights it: the apex,
+                // then the rim ray by ray, looped (closing from the last ray's rim back to the apex). The apex must be
+                // in the loop: without it, the closing segment ran straight from the last ray's rim back to the first
+                // one, a chord across the whole wedge that ignored every wall a ray was clipped against in between.
+                outline.positionCount = n + 1;
+                Vector3 apex = vertices[0];
+                outline.SetPosition(0, new Vector3(apex.x, apex.y + FloorLift, apex.z));
+                for (int i = 0; i < n; i++)
+                {
+                    Vector3 p = vertices[i + 1];
+                    outline.SetPosition(i + 1, new Vector3(p.x, p.y + FloorLift, p.z));
+                }
             }
         }
 

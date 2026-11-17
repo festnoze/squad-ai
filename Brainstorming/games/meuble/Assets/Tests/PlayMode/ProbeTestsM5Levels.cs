@@ -675,7 +675,8 @@ namespace Meuble.Tests
             yield return ReplayDesignerRoute("level10", (r, failures) =>
             {
                 Assert.IsTrue(Game.Furniture.Body.Rocks, "premise: the body of level 10 rocks");
-                if (r.Rocks < 1)
+                // M6b waiver (CONTRACT_M6 5): an advisory lesson only has to win, the audit's route need not rock.
+                if (r.Rocks < 1 && !Game.Def.LessonAdvisory)
                 {
                     failures.Add($"{r.Label}: the rocking chair never rocked: the route does not play the rock lesson");
                 }
@@ -954,6 +955,11 @@ namespace Meuble.Tests
         {
             // (1) The control: no rock.
             yield return LoadFresh("level10");
+            if (Game.Def.LessonAdvisory)
+            {
+                // M6b waiver (CONTRACT_M6 5): no rock lesson binds on level 10, so its counter-route proves nothing.
+                Assert.Pass("level 10's rock lesson is advisory (CONTRACT_M6 5)");
+            }
             Assert.IsTrue(Game.Furniture.Body.Rocks, "premise: the body of level 10 rocks");
             Assert.IsFalse(Game.Furniture.Body.Glides || Game.Furniture.Body.Tips || Game.Furniture.Body.HasLight,
                 "premise: GameRules.Bodies gates nothing else on the rocking chair");
@@ -1167,7 +1173,7 @@ namespace Meuble.Tests
         // ----- 40: the full playthrough -----
 
         /// <summary>
-        /// Step 40 (CONTRACT_M5 12, CONTRACT_M5_v3 11 and 15.10): the whole play order of levels.json (17 levels after wave
+        /// Step 40 (CONTRACT_M5 12, CONTRACT_M5_v3 11 and 15.10): the whole play order of levels.json (18 levels after M6b, 17 after wave
         /// 5B) through the real level flow. The editor boot starts the first level on a fresh test save; each
         /// level is played on its designer route at offset 0 with Time.timeScale = Tuning.PlaythroughTimeScale and must win
         /// with no discovery, alert or creak; the save then holds the level in "won" with its best time (in memory and in
@@ -1179,7 +1185,7 @@ namespace Meuble.Tests
         public IEnumerator Step40_FullPlaythrough()
         {
             List<string> order = Game.LevelOrder.ToList();
-            Assert.AreEqual(17, order.Count, "premise: levels.json lists the 17 levels of M5 (CONTRACT_M5 8 and 16.2): " + string.Join(", ", order));
+            Assert.AreEqual(18, order.Count, "premise: levels.json lists the 17 levels of M5 and level 18 of M6b (CONTRACT_M6 5): " + string.Join(", ", order));
             Assert.AreEqual(order[0], Game.LevelId, "premise: the editor boot starts the first level");
             Assert.AreEqual(PlayState.Playing, Game.State, "premise: the first level is playing");
             Assert.IsEmpty(SaveStore.Current.Won, "premise: the boot did not start on a fresh save");

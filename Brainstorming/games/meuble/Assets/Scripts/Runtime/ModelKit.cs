@@ -36,9 +36,8 @@ namespace Meuble
     /// - M4.2: each slot then shows the detail of its source material (<see cref="SurfaceOf"/>) through
     ///   PrimitiveKit.Detail; a mesh without UVs gets them in place first (<see cref="EnsureUvs"/>).
     /// - Any failure returns null after exactly one warning, so the caller falls back to the procedural visual.
-    /// - M5B (CONTRACT_M5 17: a draw call is a material slot): <see cref="MergeSlots"/> merges the submeshes of a tinted
-    ///   character that draw the same material with the same detail into one (a shared mesh per model and grouping), behind
-    ///   <see cref="MergeCharacterSlots"/>; <see cref="SourceSlots"/> still names every source material of a merged slot.
+    /// - A character draws its catalog mesh with its own slots (CONTRACT_M5 19: no slot merge; every level holds its draw
+    ///   call budget with the unmerged characters).
     /// </summary>
     public static class ModelKit
     {
@@ -53,6 +52,10 @@ namespace Meuble
         /// keyed by colour, so a colour already used by a procedural part keeps that part's smoothness.
         /// </summary>
         private const float Smoothness = Tuning.ModelSmoothness;
+
+        /// <summary>PRD 12.2 open question 28: a temporary "-finish metal" command line switch for the player's own
+        /// finish (the two comparison shots the look agent takes); lacquer stays the default, read once.</summary>
+        private static readonly Surface DebugMainFinish = Probe.ArgValue("-finish") == "metal" ? Surface.Metal : Surface.Lacquer;
 
         /// <summary>A model flatter than this (rugs, the doormat) casts no shadow, like the M2 rugs.</summary>
         private const float FlatHeight = 0.05f;
@@ -474,23 +477,6 @@ namespace Meuble
                     continue;
                 }
                 Material[] names = original.sharedMaterials;
-                // M5B: a merged slot names every source material it draws.
-                Mesh drawnMesh = MeshOf(r);
-                if (drawnMesh != null && Merged.TryGetValue(drawnMesh, out MergedMesh merged))
-                {
-                    int count = Mathf.Min(merged.Groups.Length, r.sharedMaterials.Length);
-                    for (int j = 0; j < count; j++)
-                    {
-                        foreach (int o in merged.Groups[j])
-                        {
-                            if (o < names.Length)
-                            {
-                                found.Add((r, j, names[o] != null ? names[o].name : string.Empty));
-                            }
-                        }
-                    }
-                    continue;
-                }
                 int slots = Mathf.Min(names.Length, r.sharedMaterials.Length);
                 for (int i = 0; i < slots; i++)
                 {
@@ -546,182 +532,6 @@ namespace Meuble
             return sources;
         }
 
-        // ----- M5B: merged character slots (CONTRACT_M5 16.11 and 17) -----
-
-        /// <summary>
-        /// M5B: when true, <see cref="MergeSlots"/> merges a tinted character's slots (Inhabitant applies it after the tint).
-        /// Its default is <see cref="Tuning.CharacterSlotMerge"/>; tests may switch it.
-        /// </summary>
-        public static bool MergeCharacterSlots = Tuning.CharacterSlotMerge;
-
-        /// <summary>A merged mesh: the source mesh it was cut from and, per merged slot, the source slots it draws.</summary>
-        private sealed class MergedMesh
-        {
-            public Mesh Source;
-            public int[][] Groups;
-        }
-
-        private static readonly Dictionary<Mesh, MergedMesh> Merged = new Dictionary<Mesh, MergedMesh>();
-        private static readonly Dictionary<string, Mesh> MergedCache = new Dictionary<string, Mesh>();
-
-        /// <summary>M5B: true when <paramref name="mesh"/> is a merged character mesh.</summary>
-        public static bool IsMerged(Mesh mesh) => mesh != null && Merged.ContainsKey(mesh);
-
-        /// <summary>M5B: the catalog mesh a merged mesh was cut from (any other mesh: itself).</summary>
-        public static Mesh SourceMeshOf(Mesh mesh) => mesh != null && Merged.TryGetValue(mesh, out MergedMesh m) ? m.Source : mesh;
-
-        /// <summary>M5B: the source slots each slot of <paramref name="mesh"/> draws (a plain mesh: one each).</summary>
-        public static int[][] SlotGroups(Mesh mesh)
-        {
-            if (mesh != null && Merged.TryGetValue(mesh, out MergedMesh m))
-            {
-                return m.Groups;
-            }
-            int count = mesh != null ? mesh.subMeshCount : 0;
-            var groups = new int[count][];
-            for (int i = 0; i < count; i++)
-            {
-                groups[i] = new[] { i };
-            }
-            return groups;
-        }
-
-        /// <summary>
-        /// M5B (CONTRACT_M5 17: a draw call is a material slot): the slots of a character instance (a human or a pet) that
-        /// draw the same material with the same detail (<see cref="SurfaceOf"/>) become one slot, drawn from one submesh that
-        /// holds all their triangles: it renders exactly as before, in fewer draw calls. Clothes never share a slot with
-        /// anything else, so a later <see cref="TintClothes"/> still tints the clothes only. The merged mesh is a copy of the
-        /// catalog mesh (its UVs, bones and bind poses included), made once per model and grouping and shared by every
-        /// instance. Idempotent; nothing happens unless <see cref="MergeCharacterSlots"/>. Returns the slots saved.
-        /// </summary>
-        public static int MergeSlots(GameObject instance, ModelCatalog.Entry entry)
-        {
-            if (!MergeCharacterSlots || instance == null || entry == null || entry.prefab == null || !(entry.IsHuman || entry.IsPet))
-            {
-                return 0;
-            }
-            int saved = 0;
-            Dictionary<string, Renderer> sources = PrefabRenderers(entry);
-            foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
-            {
-                if (!sources.TryGetValue(PathUnder(r.transform, instance.transform), out Renderer original))
-                {
-                    continue;
-                }
-                Mesh mesh = MeshOf(r);
-                Mesh source = SourceMeshOf(mesh);
-                int[][] current = SlotGroups(mesh);
-                Material[] slots = r.sharedMaterials;
-                Material[] names = original.sharedMaterials;
-                if (source == null || !source.isReadable || slots.Length != current.Length || names.Length != source.subMeshCount)
-                {
-                    continue;
-                }
-                // Each source slot: the material it draws now, its detail, and whether it is clothes.
-                int count = source.subMeshCount;
-                var drawn = new Material[count];
-                var surfaces = new Surface[count];
-                var clothes = new bool[count];
-                for (int j = 0; j < current.Length; j++)
-                {
-                    foreach (int o in current[j])
-                    {
-                        drawn[o] = slots[j];
-                        string name = names[o] != null ? names[o].name : string.Empty;
-                        surfaces[o] = SurfaceOf(name, false);
-                        clothes[o] = PartOf(name, entry.IsPet) == CharacterPart.Clothes;
-                    }
-                }
-                var groups = new List<List<int>>();
-                for (int o = 0; o < count; o++)
-                {
-                    int g = groups.FindIndex(list => SameSlot(list[0], o, drawn, surfaces, clothes));
-                    if (g < 0)
-                    {
-                        groups.Add(new List<int> { o });
-                    }
-                    else
-                    {
-                        groups[g].Add(o);
-                    }
-                }
-                if (groups.Count >= slots.Length)
-                {
-                    continue;
-                }
-                int[][] grouping = groups.ConvertAll(list => list.ToArray()).ToArray();
-                Mesh merged = MergedMeshFor(source, grouping);
-                var materials = new Material[grouping.Length];
-                var details = new Surface[grouping.Length];
-                for (int j = 0; j < grouping.Length; j++)
-                {
-                    materials[j] = drawn[grouping[j][0]];
-                    details[j] = surfaces[grouping[j][0]];
-                }
-                // The old slots' detail blocks go; each merged slot gets its own detail on the merged submesh.
-                var empty = new MaterialPropertyBlock();
-                for (int i = 0; i < slots.Length; i++)
-                {
-                    r.SetPropertyBlock(empty, i);
-                }
-                if (r is SkinnedMeshRenderer skinned)
-                {
-                    skinned.sharedMesh = merged;
-                }
-                else
-                {
-                    r.GetComponent<MeshFilter>().sharedMesh = merged;
-                }
-                r.sharedMaterials = materials;
-                for (int j = 0; j < grouping.Length; j++)
-                {
-                    PrimitiveKit.Detail(r, j, details[j]);
-                }
-                saved += slots.Length - grouping.Length;
-            }
-            return saved;
-        }
-
-        /// <summary>Two source slots share a merged slot: the same material, the same detail, and clothes only with clothes.</summary>
-        private static bool SameSlot(int a, int b, Material[] drawn, Surface[] surfaces, bool[] clothes)
-        {
-            return drawn[a] == drawn[b] && surfaces[a] == surfaces[b] && clothes[a] == clothes[b]; // MUTATION:SLOT_MERGE_KEY
-        }
-
-        /// <summary>The merged copy of <paramref name="source"/> for <paramref name="grouping"/>, made once and shared.</summary>
-        private static Mesh MergedMeshFor(Mesh source, int[][] grouping)
-        {
-            var key = new System.Text.StringBuilder();
-            key.Append(source.GetInstanceID()).Append(':');
-            foreach (int[] g in grouping)
-            {
-                key.Append(string.Join(",", g)).Append('|');
-            }
-            string k = key.ToString();
-            if (MergedCache.TryGetValue(k, out Mesh cached) && cached != null)
-            {
-                return cached;
-            }
-            Mesh merged = Object.Instantiate(source);
-            merged.name = source.name + " (merged)";
-            merged.hideFlags = HideFlags.DontUnloadUnusedAsset;
-            merged.subMeshCount = grouping.Length;
-            var indices = new List<int>();
-            for (int j = 0; j < grouping.Length; j++)
-            {
-                indices.Clear();
-                foreach (int o in grouping[j])
-                {
-                    indices.AddRange(source.GetIndices(o));
-                }
-                merged.SetIndices(indices, MeshTopology.Triangles, j, false);
-            }
-            merged.bounds = source.bounds;
-            MergedCache[k] = merged;
-            Merged[merged] = new MergedMesh { Source = source, Groups = grouping };
-            return merged;
-        }
-
         /// <summary>Material slots (draw calls) of the enabled renderers under <paramref name="root"/>.</summary>
         public static int SlotsUnder(Transform root)
         {
@@ -755,9 +565,9 @@ namespace Meuble
 
         /// <summary>
         /// The surface a source material shows (by its name in the GLB, case ignored). Kenney: wood is wood, carpet is
-        /// upholstery on a seat and carpet on a flat model (rug, doormat), the lamp shade is linen, metal stays plain.
-        /// Quaternius: the clothes are linen; skin, eyes, hair and shoes stay plain (nothing harsh on a face). Any other
-        /// name stays plain.
+        /// upholstery on a seat and carpet on a flat model (rug, doormat), the lamp shade is linen. Quaternius: the
+        /// clothes are linen; skin, eyes, hair and shoes stay plain (nothing harsh on a face). Any other name stays plain.
+        /// M6 (CONTRACT_M6 2.4): metal (the floor lamp's pole and foot) is now Surface.Metal instead of staying plain.
         /// </summary>
         public static Surface SurfaceOf(string sourceMaterial, bool flat)
         {
@@ -771,6 +581,8 @@ namespace Meuble
                     return flat ? Surface.Carpet : Surface.Upholstery;
                 case "lamp":
                     return Surface.Linen;
+                case "metal":
+                    return Surface.Metal;
                 case "shirt":
                 case "pants":
                 case "socks":
@@ -862,7 +674,10 @@ namespace Meuble
 
         /// <summary>
         /// Replaces every material slot by PrimitiveKit.Lit. Returns null, or what went wrong. M4.2: then each slot shows
-        /// the detail of its source material (<see cref="SurfaceOf"/>), at the model's fitted scale.
+        /// the detail of its source material (<see cref="SurfaceOf"/>), at the model's fitted scale. M6 (CONTRACT_M6 2.4,
+        /// PRD 7.2): the main material of the player's own furniture (never a character, always red: <see cref="ModelPaint.Main"/>
+        /// exactly, and only the player is red) shows the glossy lacquer finish instead; a Metal slot (the floor lamp's
+        /// pole and foot) gets its own metal finish wherever it draws.
         /// </summary>
         private static string Paint(GameObject instance, ModelPaint paint, bool flat, ModelCatalog.Entry entry)
         {
@@ -908,13 +723,24 @@ namespace Meuble
             }
             int main = ModelMath.IndexOfMax(triangles);
             float redReference = ModelMath.RedReference(colors);
+            // M6 (CONTRACT_M6 2.4, PRD 7.2): a character is never the player's own furniture; only the player passes a
+            // literally red Main (a decoy's BuildDecoy steers its colour away from the player's before it gets here).
+            bool lacquerMain = !character && paint.Main.HasValue && ModelMath.IsRed(paint.Main.Value);
             var mapped = new Material[sources.Count];
+            var sourceSurfaces = new Surface[sources.Count];
             for (int k = 0; k < sources.Count; k++)
             {
                 Color color = character
                     ? CharacterColor(sources[k].name, colors[k], pet, paint.Main, redReference)
                     : ModelMath.MapColor(colors[k], k == main, redReference, paint);
-                mapped[k] = PrimitiveKit.Lit(color, Smoothness);
+                Surface surface = lacquerMain && k == main ? DebugMainFinish : SurfaceOf(sources[k].name, flat);
+                sourceSurfaces[k] = surface;
+                // M6 (CONTRACT_M6 2.4): Metal (the floor lamp's pole and foot) and Lacquer (the player's own main
+                // slot) take their own fixed finish, cached apart from every other use of this colour at Smoothness
+                // (characters' near-black eyes and hair, among others); everything else is unchanged.
+                mapped[k] = TextureLibrary.FinishOf(surface, out _, out _)
+                    ? PrimitiveKit.LitSurface(color, surface)
+                    : PrimitiveKit.Lit(color, Smoothness);
             }
             // Pass 2: swap the slots, then give each slot the detail of its source material.
             foreach (Renderer r in renderers)
@@ -924,8 +750,9 @@ namespace Meuble
                 var surfaces = new Surface[slots.Length];
                 for (int i = 0; i < slots.Length; i++)
                 {
-                    replaced[i] = mapped[sources.IndexOf(slots[i])];
-                    surfaces[i] = SurfaceOf(slots[i].name, flat);
+                    int k = sources.IndexOf(slots[i]);
+                    replaced[i] = mapped[k];
+                    surfaces[i] = sourceSurfaces[k];
                 }
                 r.sharedMaterials = replaced;
                 r.shadowCastingMode = flat ? ShadowCastingMode.Off : ShadowCastingMode.On;

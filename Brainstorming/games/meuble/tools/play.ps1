@@ -27,6 +27,9 @@
 .PARAMETER Windowed
     Starts the game in a 1600 x 900 window instead of full screen.
 
+.PARAMETER Mute
+    Starts the game without sound (the game's -mute argument).
+
 .EXAMPLE
     .\play.cmd                      build, then play
     .\play.cmd -NoBuild             play the last build
@@ -39,7 +42,8 @@ param(
     [switch]$Run,
     [switch]$Dev,
     [switch]$WaitForDebugger,
-    [switch]$Windowed
+    [switch]$Windowed,
+    [switch]$Mute
 )
 
 $ErrorActionPreference = 'Stop'
@@ -91,6 +95,7 @@ if (-not (Test-Path $exe)) {
 
 $gameArgs = @()
 if ($Windowed) { $gameArgs += @('-screen-fullscreen', '0', '-screen-width', '1600', '-screen-height', '900') }
+if ($Mute) { $gameArgs += '-mute' }
 Write-Host "Launching the game..."
 if ($gameArgs.Count -gt 0) {
     Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -ArgumentList $gameArgs

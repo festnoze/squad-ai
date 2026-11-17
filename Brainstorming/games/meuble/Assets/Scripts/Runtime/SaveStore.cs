@@ -39,8 +39,8 @@ namespace Meuble
     ///   (persistentDataPath/meuble_save.json, <see cref="ChoosePath"/>). The editor and --look use
     ///   temporaryCachePath/meuble_save_test.json, --probe its shot folder; that file is deleted at boot.
     /// - Writes: the .tmp is written and flushed to disk, then File.Replace swaps it in and keeps the previous file
-    ///   as .bak (3 tries, 50 ms apart); when Replace keeps failing, or there is no file yet, the target is deleted
-    ///   and the .tmp moved. An IO error after all that makes the session run in memory (a warning; nothing is
+    ///   as .bak (3 tries, 50 ms apart); when Replace keeps failing or is not supported (Android), the target is
+    ///   copied to the .bak, deleted, and the .tmp moved (CONTRACT_M7 1.6); with no file yet the .tmp is just moved. An IO error after all that makes the session run in memory (a warning; nothing is
     ///   overwritten from then on). Once the target is gone the .tmp is never deleted: it may hold the only copy of
     ///   the save (CONTRACT_M5 17, m12).
     /// - Reads: a parse failure, a missing or 0 version, or a version above 1 is corrupt. The .bak is tried; if it is
@@ -177,6 +177,57 @@ namespace Meuble
                 InMemory = true;
                 LastLoad = SaveLoadStatus.ReadError;
                 Warn("load failed, running in memory: " + e.Message);
+            }
+            // M6 (docs/CONTRACT_M6.md 2.1): the volume is applied at once, whatever path Load took.
+            ApplyVolume();
+            // M7 (docs/CONTRACT_M7.md 1.4): and the quality tier.
+            QualityTier.Apply(Options);
+        }
+
+        /// <summary>M6: the options (tests and Menu read and change them through here; never null).</summary>
+        public static SaveOptions Options => Current.Options ?? SaveOptions.Default();
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.1): sets the options (clamped to range and step), applies the volume at once
+        /// (AudioListener.volume; the sensitivity and the cone hide switch are read live every frame by OrbitCamera
+        /// and VisionConeView) and saves. Never throws.
+        /// </summary>
+        public static void SetOptions(SaveOptions options)
+        {
+            try
+            {
+                Current.Options = (options ?? SaveOptions.Default()).Clamped();
+            }
+            catch (Exception e)
+            {
+                Warn("cannot set options: " + e.Message);
+                return;
+            }
+            ApplyVolume();
+            QualityTier.Apply(Current.Options);
+            Save();
+        }
+
+        /// <summary>"Par défaut" (CONTRACT_M6 2.1): every option back to its default, applied and saved.</summary>
+        public static void ResetOptions()
+        {
+            SetOptions(SaveOptions.Default());
+        }
+
+        /// <summary>The listener volume the options ask for (AudioListener.volume is 0 while <see cref="AudioMute"/> mutes).</summary>
+        public static float AppliedVolume { get; private set; } = 0.8f;
+
+        /// <summary>CONTRACT_M6 2.1: AudioListener.volume from the current options. Never throws.</summary>
+        private static void ApplyVolume()
+        {
+            try
+            {
+                AppliedVolume = Mathf.Clamp01(Current.Options.Volume / 100f); // MUTATION:VOLUME_SCALE
+                AudioListener.volume = AudioMute.Apply(AppliedVolume);
+            }
+            catch (Exception e)
+            {
+                Warn("cannot apply the volume: " + e.Message);
             }
         }
 
@@ -350,9 +401,12 @@ namespace Meuble
                 }
                 if (!TryReplace(tmp, path))
                 {
-                    // No file yet, or Replace kept failing (Android has no File.Replace): delete, then move.
+                    // No file yet, or Replace kept failing (Android has no File.Replace): CONTRACT_M7 1.6, the current
+                    // file is copied to the .bak (overwritten, as File.Replace would keep it), then deleted, then the
+                    // .tmp is moved into place.
                     if (File.Exists(path))
                     {
+                        File.Copy(path, path + BakSuffix, true); // MUTATION:ANDROID_BAK_COPY
                         File.Delete(path);
                     }
                     File.Move(tmp, path);
@@ -380,10 +434,16 @@ namespace Meuble
         /// </summary>
         public static RecordResult RecordWin(string levelId, float seconds)
         {
+            return RecordWin(levelId, seconds, DifficultyDef.Normal);
+        }
+
+        /// <summary>M7 design (CONTRACT_M7 4.1): a win at <paramref name="difficulty"/>, its record under that difficulty's key.</summary>
+        public static RecordResult RecordWin(string levelId, float seconds, string difficulty)
+        {
             RecordResult result = default;
             try
             {
-                result = Current.RecordWin(levelId, seconds);
+                result = Current.RecordWin(levelId, seconds, difficulty);
             }
             catch (Exception e)
             {
@@ -430,6 +490,12 @@ namespace Meuble
             return levelId != null && Current.Best != null && Current.Best.TryGetValue(levelId, out seconds);
         }
 
+        /// <summary>M7 design (CONTRACT_M7 4.1): the best time of a level at <paramref name="difficulty"/>, or false.</summary>
+        public static bool TryGetBest(string levelId, string difficulty, out float seconds)
+        {
+            return TryGetBest(DifficultyDef.RecordKey(levelId, difficulty), out seconds);
+        }
+
         /// <summary>
         /// Jouer's level: the first level of <paramref name="order"/> that is unlocked but not won (level 1 on a fresh
         /// save), or the last level when every one is won. Null for an empty order.
@@ -462,6 +528,10 @@ namespace Meuble
             LastProblem = null;
             WriteCount = 0;
             ReplaceForTests = null;
+            // M6: AudioListener.volume is global state; back to the default options' volume so no test leaks it to the next.
+            ApplyVolume();
+            // M7: so is the quality level: back to the platform default (Haut on PC).
+            QualityTier.Apply(Current.Options);
         }
 
         // ----- File helpers -----

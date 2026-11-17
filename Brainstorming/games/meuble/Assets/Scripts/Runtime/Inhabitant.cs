@@ -60,12 +60,6 @@ namespace Meuble
         /// <summary>M5: the clothes slots of the model that took <see cref="Tint"/> (0 without a model or a tint).</summary>
         public int TintedSlots { get; private set; }
 
-        /// <summary>
-        /// M5B (CONTRACT_M5 17): the material slots the tinted model saved by merging its slots of one material and one
-        /// detail (<see cref="ModelKit.MergeSlots"/>; 0 when <see cref="ModelKit.MergeCharacterSlots"/> is off).
-        /// </summary>
-        public int MergedSlots { get; private set; }
-
         /// <summary>M3: the rigged model driving the visuals, or null for the procedural body (docs/CONTRACT_M3.md 5).</summary>
         public InhabitantRig Rig { get; private set; }
 
@@ -226,14 +220,10 @@ namespace Meuble
             ApplyIdentity();
         }
 
-        /// <summary>
-        /// M5: the model's clothes take the personality's tint (whichever of Init and the rig comes last). M5B: then its slots
-        /// of one material and one detail merge (every colour is final once the tint is on).
-        /// </summary>
+        /// <summary>M5: the model's clothes take the personality's tint (whichever of Init and the rig comes last).</summary>
         private void ApplyIdentity()
         {
             TintedSlots = Rig != null && Tint.HasValue ? ModelKit.TintClothes(Rig.Model, Rig.Entry, Tint.Value) : 0;
-            MergedSlots += Rig != null && Tint.HasValue ? ModelKit.MergeSlots(Rig.Model, Rig.Entry) : 0;
         }
 
         /// <summary>M5: where the body stands: the routine's planar position on the floor under it (CONTRACT_M5_v3 15.4).</summary>

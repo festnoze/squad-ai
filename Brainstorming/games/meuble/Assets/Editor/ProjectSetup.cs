@@ -62,6 +62,8 @@ namespace Meuble.Editor
             EnsureAlwaysIncludedShaders();
             EnsureBootScene();
             EnsurePlayerSettings();
+            EnsureAndroidSettings();
+            EnsureQualityLevels();
             EnsureRendererFeatures();
             AssetDatabase.SaveAssets();
             Debug.Log("[ProjectSetup] Layers, shaders, Boot scene, player settings and renderer features are in place.");
@@ -448,6 +450,177 @@ namespace Meuble.Editor
             PlayerSettings.runInBackground = true;
             PlayerSettings.visibleInBackground = true;
             PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedStrippingLevel.Low);
+        }
+
+        // ----- M7 android (docs/CONTRACT_M7.md 1.3 and 1.4) -----
+
+        public const string AndroidPackage = "com.meuble.undeuxtrois";
+        public const string PcAssetPath = "Assets/Settings/PC_RPAsset.asset";
+        public const string MobileAssetPath = "Assets/Settings/Mobile_RPAsset.asset";
+        private const string QualitySettingsPath = "ProjectSettings/QualitySettings.asset";
+
+        /// <summary>
+        /// CONTRACT_M7 1.3: IL2CPP, ARM64, minimum API 26, the highest installed target API, landscape only (both
+        /// sides), the package id, Vulkan then OpenGL ES 3, ASTC textures and the debug keystore. Minimal managed
+        /// stripping: IL2CPP needs some, and Minimal leaves the game's own assemblies (and the Newtonsoft reflection
+        /// over the save and level types) whole.
+        /// </summary>
+        private static void EnsureAndroidSettings()
+        {
+            var android = UnityEditor.Build.NamedBuildTarget.Android;
+            if (PlayerSettings.GetApplicationIdentifier(android) != AndroidPackage)
+            {
+                PlayerSettings.SetApplicationIdentifier(android, AndroidPackage);
+            }
+            PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.SetManagedStrippingLevel(android, ManagedStrippingLevel.Minimal);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
+            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
+            PlayerSettings.Android.useCustomKeystore = false;
+            TextureCompressionFormat[] formats = PlayerSettings.Android.textureCompressionFormats;
+            if (formats == null || formats.Length != 1 || formats[0] != TextureCompressionFormat.ASTC)
+            {
+                PlayerSettings.Android.textureCompressionFormats = new[] { TextureCompressionFormat.ASTC };
+            }
+            if (EditorUserBuildSettings.androidBuildSubtarget != MobileTextureSubtarget.ASTC)
+            {
+                EditorUserBuildSettings.androidBuildSubtarget = MobileTextureSubtarget.ASTC;
+            }
+            GraphicsDeviceType[] apis = { GraphicsDeviceType.Vulkan, GraphicsDeviceType.OpenGLES3 };
+            GraphicsDeviceType[] current = PlayerSettings.GetGraphicsAPIs(BuildTarget.Android);
+            if (PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.Android) || current == null || current.Length != apis.Length
+                || current[0] != apis[0] || current[1] != apis[1])
+            {
+                PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+                PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, apis);
+            }
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
+            PlayerSettings.allowedAutorotateToPortrait = false;
+            PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
+            PlayerSettings.allowedAutorotateToLandscapeLeft = true;
+            PlayerSettings.allowedAutorotateToLandscapeRight = true;
+        }
+
+        /// <summary>
+        /// CONTRACT_M7 1.4: QualitySettings holds exactly Bas, Moyen and Haut, in that order, on every platform (none
+        /// excluded, so a PC player can choose Bas and an Android one Haut). Bas and Moyen use Mobile_RPAsset (render
+        /// scale 1 and no soft shadows here; QualityTier lowers the scale to 0.75 at run time on Bas), Haut uses
+        /// PC_RPAsset. Defaults: Moyen on Android and iOS, Haut everywhere else (the editor included), so the PC look
+        /// and its frame times are those of M6. The M6 pair "Mobile" and "PC" becomes Moyen and Haut, and Bas is
+        /// inserted as a copy of Moyen.
+        /// </summary>
+        private static void EnsureQualityLevels()
+        {
+            var pc = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PcAssetPath);
+            var mobile = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(MobileAssetPath);
+            if (pc == null || mobile == null)
+            {
+                throw new InvalidOperationException("URP assets not found: " + PcAssetPath + " or " + MobileAssetPath);
+            }
+            var mobileSo = new SerializedObject(mobile);
+            bool mobileChanged = false;
+            SerializedProperty scale = mobileSo.FindProperty("m_RenderScale");
+            if (scale != null && Mathf.Abs(scale.floatValue - Tuning.QualityMediumRenderScale) > 1e-4f)
+            {
+                scale.floatValue = Tuning.QualityMediumRenderScale;
+                mobileChanged = true;
+            }
+            SerializedProperty soft = mobileSo.FindProperty("m_SoftShadowsSupported");
+            if (soft != null && soft.boolValue)
+            {
+                soft.boolValue = false;
+                mobileChanged = true;
+            }
+            if (mobileChanged)
+            {
+                mobileSo.ApplyModifiedPropertiesWithoutUndo();
+                EditorUtility.SetDirty(mobile);
+                AssetDatabase.SaveAssetIfDirty(mobile);
+            }
+
+            UnityEngine.Object[] assets = AssetDatabase.LoadAllAssetsAtPath(QualitySettingsPath);
+            if (assets.Length == 0)
+            {
+                throw new InvalidOperationException("QualitySettings.asset not found");
+            }
+            var so = new SerializedObject(assets[0]);
+            SerializedProperty levels = so.FindProperty("m_QualitySettings");
+            Rename(levels, "Mobile", QualityTier.LevelMedium);
+            Rename(levels, "PC", QualityTier.LevelHigh);
+            if (LevelIndex(levels, QualityTier.LevelLow) < 0)
+            {
+                int medium = LevelIndex(levels, QualityTier.LevelMedium);
+                if (medium < 0)
+                {
+                    throw new InvalidOperationException("QualitySettings has neither Bas nor Moyen (nor the M6 Mobile level) to copy");
+                }
+                levels.InsertArrayElementAtIndex(medium);
+                levels.GetArrayElementAtIndex(medium).FindPropertyRelative("name").stringValue = QualityTier.LevelLow;
+            }
+            string[] wanted = { QualityTier.LevelLow, QualityTier.LevelMedium, QualityTier.LevelHigh };
+            for (int i = 0; i < wanted.Length; i++)
+            {
+                int at = LevelIndex(levels, wanted[i]);
+                if (at < 0)
+                {
+                    throw new InvalidOperationException("QualitySettings has no level " + wanted[i]);
+                }
+                if (at != i)
+                {
+                    levels.MoveArrayElement(at, i);
+                }
+            }
+            while (levels.arraySize > wanted.Length)
+            {
+                Debug.LogWarning("[ProjectSetup] Extra quality level removed: "
+                    + levels.GetArrayElementAtIndex(wanted.Length).FindPropertyRelative("name").stringValue);
+                levels.DeleteArrayElementAtIndex(wanted.Length);
+            }
+            for (int i = 0; i < wanted.Length; i++)
+            {
+                SerializedProperty level = levels.GetArrayElementAtIndex(i);
+                bool high = i == wanted.Length - 1;
+                level.FindPropertyRelative("customRenderPipeline").objectReferenceValue = high ? (UnityEngine.Object)pc : mobile;
+                level.FindPropertyRelative("excludedTargetPlatforms").arraySize = 0;
+                if (!high)
+                {
+                    level.FindPropertyRelative("shadows").intValue = (int)UnityEngine.ShadowQuality.HardOnly;
+                }
+            }
+            SerializedProperty defaults = so.FindProperty("m_PerPlatformDefaultQuality");
+            for (int i = 0; defaults != null && i < defaults.arraySize; i++)
+            {
+                SerializedProperty entry = defaults.GetArrayElementAtIndex(i);
+                string platform = entry.FindPropertyRelative("first").stringValue;
+                entry.FindPropertyRelative("second").intValue = platform == "Android" || platform == "iPhone" ? 1 : 2;
+            }
+            so.FindProperty("m_CurrentQuality").intValue = 2;
+            if (so.ApplyModifiedPropertiesWithoutUndo())
+            {
+                Debug.Log("[ProjectSetup] Quality levels set: Bas, Moyen, Haut.");
+            }
+        }
+
+        private static int LevelIndex(SerializedProperty levels, string name)
+        {
+            for (int i = 0; i < levels.arraySize; i++)
+            {
+                if (levels.GetArrayElementAtIndex(i).FindPropertyRelative("name").stringValue == name)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        private static void Rename(SerializedProperty levels, string from, string to)
+        {
+            int at = LevelIndex(levels, from);
+            if (at >= 0 && LevelIndex(levels, to) < 0)
+            {
+                levels.GetArrayElementAtIndex(at).FindPropertyRelative("name").stringValue = to;
+            }
         }
     }
 }

@@ -21,6 +21,15 @@ namespace Meuble
         public static Sprite Vignette => vignette != null ? vignette : vignette = Draw(128, 128, VignetteAlpha, "Vignette");
         public static Sprite Disc => disc != null ? disc : disc = Draw(128, 128, DiscAlpha, "Disc");
 
+        private static Sprite pulsePattern;
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.3): a dashed/striped border over the seen-moving edge pulse, so it carries a
+        /// pattern as well as its colour (the calm and suspicious states never show it: Hud only shows it while
+        /// seen moving).
+        /// </summary>
+        public static Sprite PulsePattern => pulsePattern != null ? pulsePattern : pulsePattern = Draw(128, 128, PulseStripes, "PulsePattern");
+
         /// <summary>M2: the floating "?" of an alerted inhabitant (and the suspicion icon of the HUD).</summary>
         public static Sprite Question => question != null ? question : question = Draw(96, 96, QuestionGlyph, "Question");
 
@@ -196,12 +205,17 @@ namespace Meuble
             return c;
         }
 
-        /// <summary>Almond shaped open eye: white, dark outline, iris, pupil, highlight.</summary>
-        private static Color OpenEye(float u, float v, float pixel)
+        /// <summary>
+        /// Almond shaped eye: white, dark outline, iris, pupil, highlight. <paramref name="openness"/> scales how far
+        /// the lid opens (CONTRACT_M6 2.3): 1 is the original fully open eye (the alarm state keeps it, "wide open"),
+        /// under 1 a half open eye (the calm/suspicious state), so the two differ by shape as well as by colour and
+        /// by the badge each one overlays ("?" or "!", see <see cref="OpenEye"/> and <see cref="AlarmEye"/>).
+        /// </summary>
+        private static Color EyeShape(float u, float v, float pixel, float openness)
         {
             const float w = 1.45f;
             float x = u / w;
-            float lid = 0.78f * (1f - x * x);
+            float lid = openness * 0.78f * (1f - x * x);
             // Signed distance approximated by the vertical gap, good enough at this size.
             float almond = Mathf.Abs(x) >= 1f ? 1f : Mathf.Abs(v) - lid;
             float outline = 0.13f;
@@ -216,6 +230,57 @@ namespace Meuble
             float hr = Mathf.Sqrt((u - 0.17f) * (u - 0.17f) + (v - 0.17f) * (v - 0.17f));
             c = Over(c, Color.white, Cover(hr - 0.09f, pixel) * insideLid);
             return c;
+        }
+
+        // M6 2.3: the corner badge every open eye overlays ("?" for calm/suspicious, "!" for alarm), upper right so
+        // it never overlaps the lid at either openness nor AlarmEye's own alert strokes.
+        private const float BadgeX = 1.05f;
+        private const float BadgeY = 0.75f;
+        private const float BadgeScale = 0.28f;
+
+        /// <summary>
+        /// The calm/suspicious eye: half open (CONTRACT_M6 2.3), with a "?" badge, so it differs from the alarm eye by
+        /// shape (how far it opens, and the badge) as well as by colour.
+        /// </summary>
+        private static Color OpenEye(float u, float v, float pixel)
+        {
+            Color c = EyeShape(u, v, pixel, 0.55f);
+            float mark = QuestionMarkSdf(new Vector2(u - BadgeX, v - BadgeY) / BadgeScale) * BadgeScale;
+            return Over(c, new Color(1f, 0.84f, 0.22f, 1f), Cover(mark - 0.05f, pixel));
+        }
+
+        /// <summary>Signed distance (local, a roughly 2 unit tall glyph) to a "?": a hooked arc, a stem and a dot.</summary>
+        private static float QuestionMarkSdf(Vector2 p)
+        {
+            Vector2 center = new Vector2(0f, 0.36f);
+            const float radius = 0.3f;
+            const float half = 0.085f;
+            Vector2 d = p - center;
+            float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+            float arc;
+            // The arc runs from the bottom of the circle (-90 deg) counterclockwise over the top to 160 deg.
+            if (angle >= -90f && angle <= 160f)
+            {
+                arc = Mathf.Abs(d.magnitude - radius) - half;
+            }
+            else
+            {
+                Vector2 capA = center + new Vector2(Mathf.Cos(160f * Mathf.Deg2Rad), Mathf.Sin(160f * Mathf.Deg2Rad)) * radius;
+                Vector2 capB = center + new Vector2(0f, -radius);
+                arc = Mathf.Min((p - capA).magnitude, (p - capB).magnitude) - half;
+            }
+            float stem = SegmentDistance(p, new Vector2(0f, center.y - radius), new Vector2(0f, -0.3f)) - half;
+            float dot = (p - new Vector2(0f, -0.64f)).magnitude - 0.12f;
+            return Mathf.Min(arc, Mathf.Min(stem, dot));
+        }
+
+        /// <summary>Signed distance (local units) to a "!": a tapered bar and a dot.</summary>
+        private static float ExclamationMarkSdf(Vector2 p)
+        {
+            float t = Mathf.Clamp01((0.78f - p.y) / 1.08f);
+            float bar = SegmentDistance(p, new Vector2(0f, 0.78f), new Vector2(0f, -0.3f)) - Mathf.Lerp(0.14f, 0.09f, t);
+            float dot = (p - new Vector2(0f, -0.64f)).magnitude - 0.13f;
+            return Mathf.Min(bar, dot);
         }
 
         /// <summary>Closed eye: a thick lower lid arc with three lashes.</summary>
@@ -262,6 +327,18 @@ namespace Meuble
         {
             float r = Mathf.Sqrt(u * u + v * v);
             return new Color(1f, 1f, 1f, Cover(r - 0.97f, pixel));
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.3): the same rounded border band as <see cref="VignetteAlpha"/>, cut into diagonal
+        /// stripes (a 50 percent duty cycle): a pattern, not a plain glow, over the seen-moving pulse.
+        /// </summary>
+        private static Color PulseStripes(float u, float v, float pixel)
+        {
+            float r = Mathf.Pow(Mathf.Pow(Mathf.Abs(u), 6f) + Mathf.Pow(Mathf.Abs(v), 6f), 1f / 6f);
+            float band = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.62f, 1.0f, r));
+            float stripe = Mathf.Repeat((u + v) * 9f, 1f) < 0.5f ? 1f : 0f;
+            return new Color(1f, 1f, 1f, band * stripe);
         }
 
         // ----- M2 glyphs. Each is a signed distance shape: a dark outline under a colored fill, so the
@@ -314,11 +391,15 @@ namespace Meuble
             return Glyph(Mathf.Min(bar, dot), new Color(1f, 0.32f, 0.22f, 1f), pixel);
         }
 
-        /// <summary>The open eye, slightly smaller, with three alert strokes above it and one on each side.</summary>
+        /// <summary>
+        /// The alarm eye: wide open (CONTRACT_M6 2.3, full openness, slightly smaller) with three alert strokes above
+        /// it and one on each side, and a "!" badge, so it differs from the calm/suspicious eye by openness and by
+        /// badge, never only by the backdrop colour.
+        /// </summary>
         private static Color AlarmEye(float u, float v, float pixel)
         {
-            // The open eye drawn at 80 % so the strokes fit around it.
-            Color c = OpenEye(u / 0.8f, v / 0.8f + 0.12f, pixel / 0.8f);
+            // Wide open, drawn at 80 % so the strokes fit around it.
+            Color c = EyeShape(u / 0.8f, v / 0.8f + 0.12f, pixel / 0.8f, 1f);
             Color stroke = new Color(1f, 0.95f, 0.85f, 1f);
             Vector2 p = new Vector2(u, v);
             float d = float.MaxValue;
@@ -327,7 +408,9 @@ namespace Meuble
             d = Mathf.Min(d, SegmentDistance(p, new Vector2(0.5f, 0.56f), new Vector2(0.68f, 0.82f)));
             d = Mathf.Min(d, SegmentDistance(p, new Vector2(-1.32f, 0.02f), new Vector2(-1.62f, 0.1f)));
             d = Mathf.Min(d, SegmentDistance(p, new Vector2(1.32f, 0.02f), new Vector2(1.62f, 0.1f)));
-            return Over(c, stroke, Cover(d - 0.06f, pixel));
+            c = Over(c, stroke, Cover(d - 0.06f, pixel));
+            float mark = ExclamationMarkSdf(new Vector2(u - BadgeX, v - BadgeY) / BadgeScale) * BadgeScale;
+            return Over(c, new Color(1f, 0.32f, 0.22f, 1f), Cover(mark - 0.05f, pixel));
         }
 
         /// <summary>A magnifying glass: a lens ring and a handle.</summary>
@@ -517,7 +600,9 @@ namespace Meuble
             Color c = Glyph(ears, new Color(0.96f, 0.6f, 0.24f, 1f), pixel);
             float inner = Mathf.Min(PolygonDistance(p, LeftInnerEar), PolygonDistance(p, RightInnerEar));
             c = Over(c, new Color(0.98f, 0.78f, 0.72f, 1f), Cover(inner, pixel) * c.a);
-            Color eye = OpenEye(u / 0.78f, (v + 0.2f) / 0.78f, pixel / 0.78f);
+            // M6: the fully open eye with no badge (never OpenEye's calm/suspicious half open "?": the dog's own shape
+            // is the ears, not a badge shared with another state).
+            Color eye = EyeShape(u / 0.78f, (v + 0.2f) / 0.78f, pixel / 0.78f, 1f);
             return Over(c, eye, eye.a);
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Meuble.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -49,6 +50,8 @@ namespace Meuble
         private void Awake()
         {
             Instance = this;
+            // The product owner's request: silent while tests run (AudioMute: batch mode, --probe, -mute).
+            AudioListener.volume = AudioMute.Apply(AudioListener.volume);
             // M3: the pause flags are static and outlive a scene reload (tests reload Boot for every case).
             GamePause.IsPaused = false;
             AudioListener.pause = false;
@@ -124,6 +127,25 @@ namespace Meuble
             return problems;
         }
 
+        /// <summary>
+        /// M7 (ProbeTestsM7Look.Step60a_): true while the Volume carries an active tonemapper (any mode but
+        /// None) and an active, thresholded bloom. The Tests.PlayMode assembly has no reference to the
+        /// Universal Render Pipeline runtime (its asmdef), so the check lives here instead of in the test.
+        /// </summary>
+        public bool VolumeHasTonemapperAndBloom()
+        {
+            VolumeProfile profile = PostProcessing != null ? PostProcessing.sharedProfile : null;
+            if (profile == null)
+            {
+                return false;
+            }
+            bool tonemap = profile.TryGet(out Tonemapping tonemapping) && tonemapping.active && tonemapping.mode.overrideState
+                && tonemapping.mode.value != TonemappingMode.None;
+            bool bloom = profile.TryGet(out Bloom bloomOverride) && bloomOverride.active && bloomOverride.intensity.overrideState
+                && bloomOverride.intensity.value > 0f && bloomOverride.threshold.overrideState && bloomOverride.threshold.value > 1f;
+            return tonemap && bloom;
+        }
+
         private void OnDestroy()
         {
             if (Instance == this)
@@ -142,6 +164,39 @@ namespace Meuble
             {
                 // A click on a menu button must not capture the cursor it needs.
                 Cursor.lockState = CursorLockMode.Locked;
+            }
+            if (FullScreenTogglePressed())
+            {
+                ToggleFullScreen();
+            }
+        }
+
+        /// <summary>Ctrl+F or F11 (the product owner's request; Alt+Enter is Unity's own standalone toggle).</summary>
+        private static bool FullScreenTogglePressed()
+        {
+            Keyboard k = Keyboard.current;
+            if (k == null)
+            {
+                return false;
+            }
+            bool ctrl = k.leftCtrlKey.isPressed || k.rightCtrlKey.isPressed;
+            return (ctrl && k.fKey.wasPressedThisFrame) || k.f11Key.wasPressedThisFrame;
+        }
+
+        /// <summary>Borderless full screen at the display resolution, or a window of at most 1600 x 900.</summary>
+        public static void ToggleFullScreen()
+        {
+            if (Screen.fullScreenMode == FullScreenMode.Windowed)
+            {
+                Resolution d = Screen.currentResolution;
+                Screen.SetResolution(d.width, d.height, FullScreenMode.FullScreenWindow);
+            }
+            else
+            {
+                Resolution d = Screen.currentResolution;
+                int w = Mathf.Min(1600, d.width * 3 / 4);
+                int h = Mathf.Min(900, d.height * 3 / 4);
+                Screen.SetResolution(w, h, FullScreenMode.Windowed);
             }
         }
 
@@ -169,18 +224,20 @@ namespace Meuble
         {
             // PRD 7.2: a warm directional light through the window (on the -z wall), soft shadows. The only
             // shadowed light; resolution, distance and cascades come from the URP asset (PRD 8.4).
+            // M7 lighting (CONTRACT_M7 1.1, polish round 2): warmer and a little lower, for longer, more
+            // readable soft shadows; the sky side of the ambient trilight pushed cooler against it.
             GameObject go = Child("Sun");
             Sun = go.AddComponent<Light>();
             Sun.type = LightType.Directional;
-            Sun.color = new Color(1f, 0.9f, 0.76f);
+            Sun.color = new Color(1f, 0.87f, 0.67f);
             Sun.intensity = SunIntensity;
-            Sun.shadows = LightShadows.Soft;
-            Sun.shadowStrength = 0.72f;
-            go.transform.rotation = Quaternion.Euler(48f, 28f, 0f);
+            Sun.shadows = LightShadows.Soft; // MUTATION:SUN_SOFT_SHADOWS
+            Sun.shadowStrength = 0.78f;
+            go.transform.rotation = Quaternion.Euler(44f, 32f, 0f);
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.62f, 0.64f, 0.70f);
+            RenderSettings.ambientSkyColor = new Color(0.58f, 0.63f, 0.73f);
             RenderSettings.ambientEquatorColor = new Color(0.52f, 0.47f, 0.42f);
-            RenderSettings.ambientGroundColor = new Color(0.30f, 0.25f, 0.21f);
+            RenderSettings.ambientGroundColor = new Color(0.28f, 0.23f, 0.19f);
             RenderSettings.skybox = null;
             RenderSettings.fog = false;
         }
@@ -204,8 +261,10 @@ namespace Meuble
 
         /// <summary>
         /// The global volume. PRD 8.4: Neutral tonemapping, not ACES, which washes out a flat palette. M3: bloom
-        /// thresholded above 1 so only emissive surfaces (the window pane) glow, never a sunlit wall; a light
-        /// grade (a touch warmer, a little contrast and saturation); a soft vignette that frames the room.
+        /// thresholded above 1 so only emissive surfaces (the window pane, a lit lamp) glow, never a sunlit wall;
+        /// a light grade (a touch warmer, a little contrast and saturation); a soft vignette that frames the room.
+        /// M7 (CONTRACT_M7 1.1, polish round 2): the bloom reaches a little further and the grade is a touch
+        /// warmer, for a softer, more readable house; the tonemapper stays Neutral (still PRD 8.4's reason).
         /// </summary>
         private void BuildVolume()
         {
@@ -216,22 +275,22 @@ namespace Meuble
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
             profile.name = "Meuble Runtime Profile";
             Tonemapping tonemapping = profile.Add<Tonemapping>(true);
-            tonemapping.mode.Override(TonemappingMode.Neutral);
+            tonemapping.mode.Override(TonemappingMode.Neutral); // MUTATION:TONEMAP_NEUTRAL
             Bloom bloom = profile.Add<Bloom>(true);
             bloom.threshold.Override(BloomThreshold);
-            bloom.intensity.Override(BloomIntensity);
-            bloom.scatter.Override(0.62f);
-            bloom.tint.Override(new Color(1f, 0.94f, 0.84f));
+            bloom.intensity.Override(BloomIntensity); // MUTATION:BLOOM_ON
+            bloom.scatter.Override(0.68f);
+            bloom.tint.Override(new Color(1f, 0.93f, 0.8f));
             bloom.highQualityFiltering.Override(false);
             ColorAdjustments color = profile.Add<ColorAdjustments>(true);
-            color.postExposure.Override(0.05f);
-            color.saturation.Override(8f);
-            color.contrast.Override(8f);
+            color.postExposure.Override(0.08f);
+            color.saturation.Override(11f);
+            color.contrast.Override(10f);
             WhiteBalance white = profile.Add<WhiteBalance>(true);
-            white.temperature.Override(5f);
+            white.temperature.Override(9f);
             white.tint.Override(0f);
             Vignette vignette = profile.Add<Vignette>(true);
-            vignette.intensity.Override(0.2f);
+            vignette.intensity.Override(0.22f);
             vignette.smoothness.Override(0.45f);
             volume.sharedProfile = profile;
             PostProcessing = volume;

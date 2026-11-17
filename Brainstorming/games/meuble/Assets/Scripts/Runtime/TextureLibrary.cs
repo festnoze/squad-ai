@@ -18,6 +18,15 @@ namespace Meuble
         Upholstery,
         Linen,
         Carpet,
+        // ----- M6 texture pass 2 (CONTRACT_M6 2.4) -----
+        Grass,
+        Lacquer,
+        Metal,
+        Plastic,
+        Foliage,
+        Soil,
+        // ----- M7 textures (CONTRACT_M7 1.2): the kitchen and bathroom floor tiles. -----
+        Tile,
     }
 
     /// <summary>
@@ -48,6 +57,11 @@ namespace Meuble
             public float mean;
             /// <summary>The ambientCG asset the detail was derived from.</summary>
             public string source;
+            /// <summary>
+            /// M7 (CONTRACT_M7 1.2): the 512 tangent space normal map derived from the same ambientCG material's
+            /// NormalGL map, or null (Plastic, Foliage, Soil: not in the 1.2 list, stay bump-free).
+            /// </summary>
+            public Texture2D normal;
         }
 
         public List<Entry> entries = new List<Entry>();
@@ -56,6 +70,10 @@ namespace Meuble
         public static readonly Surface[] Textured =
         {
             Surface.Wood, Surface.Parquet, Surface.Plaster, Surface.Upholstery, Surface.Linen, Surface.Carpet,
+            // M6 texture pass 2 (CONTRACT_M6 2.4).
+            Surface.Grass, Surface.Lacquer, Surface.Metal, Surface.Plastic, Surface.Foliage, Surface.Soil,
+            // M7 textures (CONTRACT_M7 1.2): kitchen and bathroom floor tiles.
+            Surface.Tile,
         };
 
         /// <summary>
@@ -156,8 +174,116 @@ namespace Meuble
                     return Tuning.DetailTileLinen;
                 case Surface.Carpet:
                     return Tuning.DetailTileCarpet;
+                case Surface.Grass:
+                    return Tuning.DetailTileGrass;
+                case Surface.Lacquer:
+                    return Tuning.DetailTileLacquer;
+                case Surface.Metal:
+                    return Tuning.DetailTileMetal;
+                case Surface.Plastic:
+                    return Tuning.DetailTilePlastic;
+                case Surface.Foliage:
+                    return Tuning.DetailTileFoliage;
+                case Surface.Soil:
+                    return Tuning.DetailTileSoil;
+                case Surface.Tile:
+                    return Tuning.DetailTileTile;
                 default:
                     return 0f;
+            }
+        }
+
+        // ----- M7 textures (CONTRACT_M7 1.2): normal maps -----
+
+        /// <summary>The 512 tangent space normal map of a surface, or null (Plain, or a surface not in the 1.2 list).</summary>
+        public static Texture2D NormalOf(Surface surface)
+        {
+            if (surface == Surface.Plain)
+            {
+                return null;
+            }
+            TextureLibrary library = Load();
+            Entry e = library != null ? library.Find(surface) : null;
+            return e != null ? e.normal : null;
+        }
+
+        /// <summary>
+        /// The modest <c>_BumpScale</c> of a surface's normal map (CONTRACT_M7 1.2): one fixed value per surface, read
+        /// by PrimitiveKit.Detail wherever <see cref="NormalOf"/> resolves a texture. 0 for a surface with none.
+        /// </summary>
+        public static float BumpScaleOf(Surface surface)
+        {
+            switch (surface)
+            {
+                case Surface.Wood:
+                    return Tuning.NormalScaleWood;
+                case Surface.Parquet:
+                    return Tuning.NormalScaleParquet;
+                case Surface.Plaster:
+                    return Tuning.NormalScalePlaster;
+                case Surface.Upholstery:
+                    return Tuning.NormalScaleUpholstery;
+                case Surface.Linen:
+                    return Tuning.NormalScaleLinen;
+                case Surface.Carpet:
+                    return Tuning.NormalScaleCarpet;
+                case Surface.Grass:
+                    return Tuning.NormalScaleGrass;
+                case Surface.Lacquer:
+                    return Tuning.NormalScaleLacquer;
+                case Surface.Metal:
+                    return Tuning.NormalScaleMetal;
+                case Surface.Tile:
+                    return Tuning.NormalScaleTile;
+                default:
+                    return 0f;
+            }
+        }
+
+        // ----- M6 texture pass 2 (CONTRACT_M6 2.4) -----
+
+        /// <summary>
+        /// The one smoothness and metallic every renderer of <paramref name="surface"/> uses (a fixed finish per surface,
+        /// unlike the six M4.2 details whose smoothness varies by what draws them): Grass, Lacquer, Metal, Plastic,
+        /// Foliage, Soil and (M7, CONTRACT_M7 1.2) Tile only. False, with both out params at 0, for any other surface
+        /// (the caller picks its own).
+        /// </summary>
+        public static bool FinishOf(Surface surface, out float smoothness, out float metallic)
+        {
+            switch (surface)
+            {
+                case Surface.Tile:
+                    smoothness = Tuning.TileSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Grass:
+                    smoothness = Tuning.GrassSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Lacquer:
+                    smoothness = Tuning.LacquerSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Metal:
+                    smoothness = Tuning.MetalSmoothness;
+                    metallic = Tuning.MetalMetallic;
+                    return true;
+                case Surface.Plastic:
+                    smoothness = Tuning.PlasticSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Foliage:
+                    smoothness = Tuning.FoliageSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Soil:
+                    smoothness = Tuning.SoilSmoothness;
+                    metallic = 0f;
+                    return true;
+                default:
+                    smoothness = 0f;
+                    metallic = 0f;
+                    return false;
             }
         }
 

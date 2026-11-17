@@ -1,0 +1,113 @@
+{
+  "summary": "M6 gameplay done (CONTRACT_M6 2.5, 2.6, 2.7). All flags default off: levels 1 to 17 run exactly as before. DEVIATION 2.5: the contract's fit numbers (0.55 m, 1.7 m) contradict its own list (stool and floor lamp only) and the 'a chair does not fit' test. The lamp is 1.80 m tall, the chair 0.45 m wide, the office chair 0.55 m. Implemented as width and depth <= 0.40 m and height plus load <= 1.85 m (Tuning.WardrobeFitWidth/WardrobeFitHeight). The integrator should fix the contract text. WARDROBE (data: a prop with kind \"wardrobe\", 1.0 x 2.0 x 0.6 within 1 mm, occluder true; no new field). Its FRONT is the local +z face, normal = WardrobeRule.Front(prop) = YawMath.Forward(prop.Yaw); the front face is SizeZ/2 ahead of the centre. Entry zone: WardrobeRule.FrontFrame(prop, point, out ahead, out lateral) with 0 < ahead <= 0.6 (Tuning.WardrobeReach) and |lateral| <= SizeX/2, measured at the furniture centre, no facing condition (WardrobeRule.InFront; EntryCenter = the centre of that strip). Fit: WardrobeRule.Fits(body.Size, loadHeight); WardrobeRule.CanEnter(prop, centre, size, loadHeight). E rules in GameState.ClaimActionKey: hidden takes first (E leaves), then a closed leaf in reach (M5, unchanged), then the first wardrobe in level order that CanEnter. Both need the M5 still/free check (FurnitureController.BeginExternalAction). The entry is an External action of 0.5 s = 25 steps (Tuning.WardrobeActionTime), the press step being step 1, all moving, furniture visible. From step 26 the furniture is FurnitureController.Hidden, set in GameState step 1 right after the furniture step and before any vision. Hidden means: no vision samples (Vision.Step returns false), never moving, no move input, visual off, no exit win, no robot contact, never carried, never sat on (a pratfall instead). The exit press makes it visible again in place at once and starts a 25-step moving action. While hidden the creak gauge fills as usual and the creak NoiseEvent radius is 7 * 0.5 = 3.5 m (Tuning.WardrobeCreakFactor). Remembered spot: while hidden, each memory watcher that observes (Routine or Alerted, not frozen) tests the 5 samples of the furniture's sample box at its PlayerSlot pose (on the floor there), with its own range and half angle, no lamp factor, unoccluded (Vision.SeesAny). Seen empty: Suspect for the grace, then one Discovery at 0.2 s: +gain, GameState.EmptySpotCount++, Investigate(slot). After that the spot is known empty (FurnitureMemory.SpotKnownEmpty) until the furniture is seen again or the slot moves, so one discovery per hiding per watcher. An investigation never carries a hidden furniture and never gives up onto it. API: GameState.Wardrobe (WardrobeStage None/Entering/Hidden/Leaving), WardrobeProp, WardrobeInReach, HideCount, LeaveCount, EmptySpotCount. Hud.ShowHideHint/HideHintVisible, label HideHintLine, Strings.HudHide/HudLeave/HudHidePad/HudLeavePad chosen by InputReader.LastInputWasGamepad. The model is FurnitureKit case wardrobe: 4 boxes, Surface.Wood (Wood049), colour and accentColor, one BoxCollider. DOOR MEMORY (data: level \"doorMemory\": true; it needs at least one leaf). Each inhabitant with Personality.Memory holds a DoorMemory (Core/DoorMemory.cs), seeded with the AUTHORED leaf states. Every door change made by an inhabitant (opening on a walk, putting back) updates EVERY memory of the level (shared, like the carry back). Only the player's openings create mismatches. GameState step 5 runs after StepMemory and StepClue (needs rules.DisplacementMemory). For each observing memory watcher and each leaf whose leaf.Open differs from its memory: seen = Vision.SeesLeafBody (the leaf's 4 samples at its current angle, own range and half angle, every occluder but the leaf itself, asleep sees nothing). The first sighting gives DoorSighting.Suspect: DiscoveryCount++, DoorSuspectCount++, its meter AddDiscovery (+0.34 x factor, suspicion 1 loses), the hein sound. No grace. Then (Suspect or Known) the watcher is sent, unless another one is already on its way to that leaf, through InhabitantRoutine.BeginPutAway(GameState.DoorApproach). The target is on the doorway axis, on the watcher's side, at GameState.DoorStopDistance from the wall centre line: 0.5 m (Tuning.InhabitantDoorReach) on the side the leaf does not swing into, width + 0.25 m (InhabitantRadius) on the swing side. It stops within InvestigateReach 0.8 m of the target, faces it, then a PutAwayTime 0.6 s beat. On its last step (JustPutAway, step 6) the leaf goes back to the remembered state: DoorLeaf.BeginClose, which makes it closed and out of the open mask at once and swings it 90 to 0 deg over the next 30 steps. Then every memory remembers it; DoorPutBackCount++. The next step it resumes (EndInvestigation). Household swings have NO samples (DoorLeaf.SwungByHousehold): never a catch, never a bark. The audit must not count them in LeafSeen. API: GameState.DoorMemoryOf(h), DoorFixOf(h), DoorSuspectCount, DoorPutBackCount; DoorMemory.RemembersOpen/Differs/Noticed/Observe/Remember; DoorLeaf.BeginClose, Closing, BeginOpen(bool byHousehold). INHABITANTS OPENING DOORS (data: door \"openedByInhabitants\": true, only on a door with a leaf). The doorways of those leaves are ALWAYS in LevelInstance.StationAreaMask and AreaMask() (LevelInstance.HouseholdMask = LevelDef.HouseholdLeafMask()), so frozen station walks plan through them closed or not. The audit's StationAreaMask(w) must add these bits. GameState step 2 runs after all inhabitants stepped, inhabitants in level order, leaves in leaf order, at most one leaf per inhabitant per step. For a routine not Holding whose current action is a Walk: InhabitantRoutine.WalkCorners gives the remaining corners (current target plus the consecutive queued walk targets). If the leaf is closed, not swinging and opted in, and GameState.WalkReachesLeaf(geometry, routine.Position after this step's move, corners) holds, the inhabitant stops. That rule: the first point where the polyline from the position through the corners meets the wall centre line inside the opening (|along - Along| <= Width/2; a crossing of the same line outside the opening is ignored) lies at most DoorStopDistance(g, sign of the position's offset) away, planar. Effects that step: InhabitantRoutine.Hold(0.6 s) (the next 30 steps are Waiting with no motion or turn, the walk resumes on step 31, and every later action of that routine is delayed by 30 steps). DoorLeaf.BeginOpen(true): open and in the open mask from that step, swinging the next 30 steps, no samples. HouseholdDoorOpenCount++; every door memory remembers it open; the leaf stays open for good. On the test fixture the stop happens at 1.25 m on the swing side. Validator: wardrobe size, occluder, entry zone inside a room and clear of every prop and decoy; openedByInhabitants only on a leaf door; doorMemory needs a leaf; new lesson \"wardrobe\" (LevelDef.LessonWardrobe) needs a wardrobe and a fitting body. TESTS: EditMode CoreM6Tests 4/4 green, plus LevelDataM2/M5 (110 green). PlayMode Step53a, 53b, 53c, 54a, 55a green. The 8 mutation kills were each checked by hand. Regression \"Step36|Step45|Step40\": every Step36 and Step45 is green except the level10 and level17 replays (Step40, Step45j, Step45n, Step45p, caught at waypoint 0/21 and 15/44). Those files carry uncommitted station edits from 17:20 and 17:17 (dwells and glances changed, routes not rewritten): that is the 2.8 work in progress. My code is inert there (no wardrobe, doorMemory or openedByInhabitants).",
+  "blocked": false,
+  "files_changed": [
+    "Assets/Scripts/Core/DoorMemory.cs (new)",
+    "Assets/Scripts/Core/LevelDef.cs",
+    "Assets/Scripts/Core/LevelDefM5.cs",
+    "Assets/Scripts/Core/LevelValidator.cs",
+    "Assets/Scripts/Core/FurnitureMemory.cs",
+    "Assets/Scripts/Core/InhabitantRoutine.cs",
+    "Assets/Scripts/Core/Tuning.cs (M6 gameplay block)",
+    "Assets/Scripts/Core/Strings.cs (M6 gameplay block)",
+    "Assets/Scripts/Runtime/GameState.cs",
+    "Assets/Scripts/Runtime/Vision.cs",
+    "Assets/Scripts/Runtime/DoorLeaf.cs",
+    "Assets/Scripts/Runtime/FurnitureController.cs",
+    "Assets/Scripts/Runtime/Hud.cs (small: ShowHideHint)",
+    "Assets/Scripts/Runtime/FurnitureKit.cs (small: wardrobe model)",
+    "Assets/Scripts/Runtime/LevelBuilder.cs (small: LevelInstance.HouseholdMask in StationAreaMask and AreaMask)",
+    "Assets/Tests/EditMode/CoreM6Tests.cs (new)",
+    "Assets/Tests/PlayMode/ProbeTestsM6Gameplay.cs (new)",
+    "Assets/Resources/Levels/test_m6_gameplay_wardrobe.json (new)",
+    "Assets/Resources/Levels/test_m6_gameplay_doormemory.json (new)",
+    "Assets/Resources/Levels/test_m6_gameplay_dooropen.json (new)"
+  ],
+  "tests": "EditMode CoreM6Tests 4/4 green (plus LevelDataM2Tests and LevelDataM5Tests, 110 green). PlayMode Step53a_, Step53b_, Step53c_, Step54a_, Step55a_ green. Final run of Step36|Step45|Step40 plus mine: 40 tests, 36 green. Every Step36 is green, and so are Step45, 45a to 45i, 45k, 45l, 45m, 45o, 45q and 45r. 4 fail: Step40_FullPlaythrough, Step45j_Level10Routes, Step45n_Level17Routes and Step45p_Level10RouteWithoutTheRockIsSeenRocking, caught on level10 and level17. Those two files carry uncommitted station edits (17:20 and 17:17, before this agent's work): dwells and glances changed and the routes were not rewritten. That is the CONTRACT_M6 2.8 levels work. My rules are inert there: no wardrobe, no doorMemory, no openedByInhabitants. Mutation kills checked: EditMode DOOR_MEMORY, WARDROBE_FIT and EMPTY_SPOT; PlayMode HIDDEN_SAMPLES, MUFFLED_CREAK, DOOR_SUSPECT and HOUSEHOLD_CROSS (one run); DOOR_STOP (a second run). Each test failed on its own assertion and every file was reverted. Results are in scratchpad/gameplaym6/*.xml.",
+  "markers": [
+    {
+      "id": "DOOR_MEMORY",
+      "file": "Assets/Scripts/Core/DoorMemory.cs",
+      "marked": "if (open[leaf] == isOpen) // MUTATION:DOOR_MEMORY",
+      "replacement": "if (leaf >= 0) // MUTATION:DOOR_MEMORY",
+      "mode": "EditMode",
+      "killers": "DoorMemory_remembers_the_authored_leaves_and_a_mismatch_is_one_suspect"
+    },
+    {
+      "id": "WARDROBE_FIT",
+      "file": "Assets/Scripts/Core/LevelDefM5.cs",
+      "marked": "bool narrow = size.x <= Tuning.WardrobeFitWidth + Eps && size.z <= Tuning.WardrobeFitWidth + Eps; // MUTATION:WARDROBE_FIT",
+      "replacement": "bool narrow = true; // MUTATION:WARDROBE_FIT",
+      "mode": "EditMode",
+      "killers": "Wardrobe_fits_the_stool_and_the_floor_lamp_only Wardrobe_entry_zone_is_the_strip_in_front_of_its_front_face"
+    },
+    {
+      "id": "EMPTY_SPOT",
+      "file": "Assets/Scripts/Core/FurnitureMemory.cs",
+      "marked": "if (blind) // MUTATION:EMPTY_SPOT",
+      "replacement": "if (dt >= 0f) // MUTATION:EMPTY_SPOT",
+      "mode": "EditMode",
+      "killers": "Empty_spot_is_a_suspect_then_one_discovery_until_the_furniture_is_seen"
+    },
+    {
+      "id": "HIDDEN_SAMPLES",
+      "file": "Assets/Scripts/Runtime/Vision.cs",
+      "marked": "if (furniture.Hidden) // MUTATION:HIDDEN_SAMPLES",
+      "replacement": "if (furniture.Hidden && furniture.Carried) // MUTATION:HIDDEN_SAMPLES",
+      "mode": "PlayMode",
+      "killers": "Step53a_"
+    },
+    {
+      "id": "MUFFLED_CREAK",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "float creakRadius = furniture.Hidden ? Tuning.CreakRadius * Tuning.WardrobeCreakFactor : Tuning.CreakRadius; // MUTATION:MUFFLED_CREAK",
+      "replacement": "float creakRadius = Tuning.CreakRadius; // MUTATION:MUFFLED_CREAK",
+      "mode": "PlayMode",
+      "killers": "Step53b_"
+    },
+    {
+      "id": "DOOR_SUSPECT",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "meters[i].AddDiscovery(); // MUTATION:DOOR_SUSPECT",
+      "replacement": "DoorSuspectCount += 0; // MUTATION:DOOR_SUSPECT",
+      "mode": "PlayMode",
+      "killers": "Step54a_"
+    },
+    {
+      "id": "HOUSEHOLD_CROSS",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "return distance <= DoorStopDistance(g, side); // MUTATION:HOUSEHOLD_CROSS",
+      "replacement": "return distance < 0f; // MUTATION:HOUSEHOLD_CROSS",
+      "mode": "PlayMode",
+      "killers": "Step55a_"
+    },
+    {
+      "id": "DOOR_STOP",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "routine.Hold(Tuning.InhabitantDoorStop); // MUTATION:DOOR_STOP",
+      "replacement": "routine.Hold(0f); // MUTATION:DOOR_STOP",
+      "mode": "PlayMode",
+      "killers": "Step55a_"
+    }
+  ],
+  "removed_markers": [],
+  "probe_steps": [
+    "Step53a_EnterAndLeaveTheWardrobe",
+    "Step53b_HiddenCreakIsMuffled",
+    "Step53c_RememberedSpotSeenEmpty",
+    "Step54a_DoorMemoryPutsTheDoorBack",
+    "Step55a_InhabitantOpensAnOptInDoor"
+  ],
+  "edit_tests": [
+    "DoorMemory_remembers_the_authored_leaves_and_a_mismatch_is_one_suspect",
+    "Wardrobe_fits_the_stool_and_the_floor_lamp_only",
+    "Wardrobe_entry_zone_is_the_strip_in_front_of_its_front_face",
+    "Empty_spot_is_a_suspect_then_one_discovery_until_the_furniture_is_seen"
+  ],
+  "needs": [
+    "integrator: CONTRACT_M6 2.5 fit numbers. The contract says width/depth <= 0.55 m and height <= 1.7 m, but the floor lamp is 1.80 m tall, and the chair (0.45 m) and the office chair (0.55 m) would fit, which goes against 'the stool and the floor lamp' and 'a chair does not fit'. Implemented: width/depth <= 0.40 m, height + load <= 1.85 m (Tuning.WardrobeFitWidth/WardrobeFitHeight). Please update the contract text.",
+    "audit: StationAreaMask(w) in LevelAudit must also include the doorway area (DoorAreaBase + k) of every leaf with openedByInhabitants (LevelDef.HouseholdLeafMask()), as LevelInstance.StationAreaMask now does. The audit should replay GameState.WalkReachesLeaf (public static) plus the 30-step hold on the frozen walks, and must not count household swings (no samples) as LeafSeen.",
+    "levels: level10 and level17 replays (Step40, Step45j, Step45n, Step45p) fail on the uncommitted 2.8 station edits until their routes are re-audited with -writeRoutes.",
+    "integrator: add the 8 M6 gameplay rows above to mutation.sh, and add Step53a_ to Step55a_ plus the four CoreM6Tests names to verify.sh's required lists."
+  ]
+}

@@ -211,9 +211,11 @@ namespace Meuble.Core
         public const float ProceduralPratfallDrop = 0.35f;
         public const float ProceduralPratfallArms = 95f;
         // Main.cs
-        public const float LookSunIntensity = 1.3f;
-        public const float LookBloomThreshold = 1.25f;
-        public const float LookBloomIntensity = 0.55f;
+        // M7 lighting (CONTRACT_M7 1.1, polish round 2): a touch brighter and warmer for softer, more readable
+        // shadows, and a bloom that clears the window and a lit lamp a little more generously.
+        public const float LookSunIntensity = 1.42f;
+        public const float LookBloomThreshold = 1.15f;
+        public const float LookBloomIntensity = 0.72f;
         // OrbitCamera.cs
         public const float ShowcaseSpeed = 3f;
         public const float ShowcasePitch = 42f;
@@ -232,12 +234,14 @@ namespace Meuble.Core
         // base), so the brightest texel is this mean times 1.0625: a sunlit trim stays under the bloom threshold.
         public const float DetailMean = 240f / 255f;
         // Metres covered by one repeat of each detail texture, in world space.
-        public const float DetailTileWood = 1.0f;
+        // Wood (furniture-scale, not floor-scale): 0.6m reads as grain streaks on a chair seat or wardrobe door
+        // instead of a smooth near-flat crop (M7 texture pass, agent tex_wood).
+        public const float DetailTileWood = 0.8f;
         public const float DetailTileParquet = 1.8f;
         public const float DetailTilePlaster = 2.0f;
         public const float DetailTileUpholstery = 0.55f;
         public const float DetailTileLinen = 0.45f;
-        public const float DetailTileCarpet = 0.7f;
+        public const float DetailTileCarpet = 1.1f;
         // The Kenney Furniture Kit's own UVs: a planar projection per face at 39.37 UV per native unit (inches per
         // metre), measured on every Kenney GLB of the project. Read by the M4.2 probe as a premise.
         public const float KenneyUvPerNativeUnit = 39.37f;
@@ -292,7 +296,7 @@ namespace Meuble.Core
         public const float LoadSwayGain = 2.5f;
         public const float LoadSwaySpring = 80f;
         public const float LoadSwayDamping = 9f;
-        public const float BalanceWarning = 0.75f;
+        public const float BalanceWarning = 0.9f; // M5 5B.1 (CONTRACT_M5 19 m13): red only near a real fall
         public const float CrashRadius = 6f;
         public const float PutAwayTime = 0.6f;
         // Houses, budgets and the camera (PRD 7.4 v1.7, CONTRACT_M5 9, 16.11).
@@ -460,13 +464,6 @@ namespace Meuble.Core
         public const int ConeSupersetPasses = 4;
         /// <summary>The robot vacuum's status light pulses this many times a second (visual only).</summary>
         public const float RobotLightPulseRate = 0.8f;
-        /// <summary>
-        /// CONTRACT_M5 17 (draw calls are material slots): when true, a tinted character's slots of one material and one detail
-        /// merge into one (ModelKit.MergeSlots): watchful, teen, tidy and the dog draw 25 slots instead of 39 (brows included),
-        /// level 17's granny, teen, tidy and dog 24 instead of 34. Off until probe step 22c reads a merged slot through
-        /// ModelKit.SourceSlots and ModelKit.SourceMeshOf (it asserts the instance draws the catalog's own mesh).
-        /// </summary>
-        public static readonly bool CharacterSlotMerge = false;
 
         // ----- M5B game (docs/CONTRACT_M5.md 4, 5, 6, 16.5, 16.8 and 16.9): the robot, the rock and the load in play. -----
         /// <summary>The fallen load's clue is seen at this height above the floor (its one vision sample), metres.</summary>
@@ -504,5 +501,197 @@ namespace Meuble.Core
         /// <see cref="AuditNodeCap"/>. Measured: the largest search of wave 5B (level 17's main schedule) creates 25.8 million.
         /// </summary>
         public const int AuditSearchNodeCap = 40000000;
+
+        // ----- M5 5B.1 watchers (docs/CONTRACT_M5.md 19; critique m7, m15 and the 5B literals) -----
+        /// <summary>The robot's status light pulses between these scales (visual only; its rate is RobotLightPulseRate).</summary>
+        public const float RobotLightPulseMin = 0.75f;
+        public const float RobotLightPulseMax = 1.15f;
+        /// <summary>
+        /// m15: the robot's drawn body turns toward its heading at most this fast, degrees a second (visual only; the rule pose
+        /// stays RobotPath's): a loop end's 180 degree reversal takes a third of a second instead of one frame.
+        /// </summary>
+        public const float RobotTurnRate = 540f;
+        /// <summary>m15: a pose this far from the last one (metres) is a teleport: the drawn body snaps to it.</summary>
+        public const float RobotSnapDistance = 0.5f;
+        /// <summary>M5B m14: a fan sample is raised to the floor of any other sample this many spacings away (diagonals included).</summary>
+        public const float ConeDrapeReach = 1.5f;
+        /// <summary>M5B m20: a fan recast past a cover aims this much nearer than the exact clearance over its edge, metres.</summary>
+        public const float ConeClearMargin = 0.01f;
+        /// <summary>
+        /// m15: the fallen load's clue lies on one floor surface (the flat floor, a platform or one ramp's slope): a sample of
+        /// its spread off that surface by more than this, metres, means it crosses an edge, and it is moved.
+        /// </summary>
+        public const float ClueSurfaceTolerance = 0.01f;
+        /// <summary>m15: how far the clue may be moved to lie on one surface, metres (in ClueSearchStep rings).</summary>
+        public const float ClueSearchRadius = 0.6f;
+        public const float ClueSearchStep = 0.05f;
+
+        // ----- M5 5B.1 game (docs/CONTRACT_M5.md 19; critique m15): the fallen load's landing. -----
+        /// <summary>
+        /// The planar radius of the largest clue around its centre (the books' and the plant's spread reach about 0.31 m):
+        /// GameState keeps the clue's centre at least this far from a wall or a furniture in the way, metres.
+        /// </summary>
+        public const float ClueSpreadRadius = 0.32f;
+
+        // ----- M5 5B.1 audit (docs/CONTRACT_M5.md 19; critique M2, M7 and m9) -----
+        /// <summary>
+        /// M2: a schedule the level audit finds fails when, in one stay within this of one of its own points (metres), it
+        /// spends more than AuditMaxWait not moving: waiting by hops out and back (1.12 m L-hops restart the search's 1 m wait
+        /// anchor) is still waiting.
+        /// </summary>
+        public const float AuditLoiterRadius = 1.5f;
+        /// <summary>
+        /// m9: the audit refuses a schedule whose velocity changes by this much over LoadWindow (m/s), under LoadFallDeltaV:
+        /// twice probe 44's 0.05 m/s gap between MotionProfile and the controller.
+        /// </summary>
+        public const float AuditLoadDeltaV = 1.7f;
+        /// <summary>M7: the audit's fidelity replay tests a move at intermediate positions this far apart (metres).</summary>
+        public const float AuditFidelityStep = 0.1f;
+
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5 to 2.7) -----
+        /// <summary>The wardrobe prop's box, metres (w x h x d): 1.0 x 2.0 x 0.6.</summary>
+        public const float WardrobeSizeX = 1.0f;
+        public const float WardrobeSizeY = 2.0f;
+        public const float WardrobeSizeZ = 0.6f;
+        /// <summary>
+        /// A body fits in the wardrobe when its width and depth are at most this (metres): the stool and the floor lamp
+        /// (0.35), never the chair (0.45) nor the office chair (0.55).
+        /// </summary>
+        public const float WardrobeFitWidth = 0.40f;
+        /// <summary>A body fits when its height (plus a load's) is at most this, metres: the floor lamp (1.80) fits.</summary>
+        public const float WardrobeFitHeight = 1.85f;
+        /// <summary>The furniture centre stands at most this far in front of the wardrobe's front face to enter it, metres.</summary>
+        public const float WardrobeReach = 0.6f;
+        /// <summary>Entering or leaving the wardrobe: an action of this many seconds, seen as moving.</summary>
+        public const float WardrobeActionTime = 0.5f;
+        /// <summary>A creak made while hidden in the wardrobe is heard within CreakRadius times this (muffled).</summary>
+        public const float WardrobeCreakFactor = 0.5f;
+        /// <summary>An inhabitant opening a door stops this many seconds in front of it while the leaf swings.</summary>
+        public const float InhabitantDoorStop = 0.6f;
+        /// <summary>
+        /// An inhabitant opens a closed opt-in leaf when its walk crosses the leaf's wall centre line within the opening and
+        /// it stands at most this far from that line (metres) on the side the leaf does not swing into (on the swing side: the
+        /// door width plus InhabitantRadius, out of the leaf's sweep); a door it puts back is approached at that distance too.
+        /// </summary>
+        public const float InhabitantDoorReach = 0.5f;
+
+        // ----- M6 options (docs/CONTRACT_M6.md 2.1, 2.2 and 2.3) -----
+        /// <summary>Camera sensitivity (2.1): multiplies the mouse and the right stick orbit rates.</summary>
+        public const float SensitivityMin = 0.25f;
+        public const float SensitivityMax = 2.0f;
+        public const float SensitivityStep = 0.25f;
+        public const float SensitivityDefault = 1.0f;
+        /// <summary>Volume (2.1): AudioListener.volume, a percentage.</summary>
+        public const int VolumeMin = 0;
+        public const int VolumeMax = 100;
+        public const int VolumeStep = 10;
+        public const int VolumeDefault = 80;
+        /// <summary>
+        /// 2.3: the dashed outline drawn around an alerted watcher's cone: its width and its dash length (equal to the
+        /// gap, a 50 percent duty cycle), metres.
+        /// </summary>
+        public const float ConeOutlineWidth = 0.05f;
+        public const float ConeOutlineDash = 0.22f;
+
+        // ----- M6 textures (docs/CONTRACT_M6.md 2.4, docs/M6_TEXTURES_RESEARCH.md): texture pass 2. -----
+        // Metres covered by one repeat of each new detail texture, in world space (TextureLibrary.TileMetres).
+        public const float DetailTileGrass = 2.0f;
+        public const float DetailTileLacquer = 1.0f;
+        public const float DetailTileMetal = 0.3f;
+        public const float DetailTilePlastic = 0.2f;
+        // M7 polish (smallprops agent): leaves (2.6 cm wide sprigs, 7-14 cm foliage balls) and soil (9-23 cm
+        // discs) showed under half a texture repeat at 0.35/0.25, reading as a flat tinted blob at play
+        // distance; shrunk so 2-3 repeats cross each prop and the Moss002/Ground104 grain actually reads.
+        public const float DetailTileFoliage = 0.08f;
+        public const float DetailTileSoil = 0.09f;
+        // Per-material smoothness and metallic of texture pass 2 (CONTRACT_M6 2.4: one fixed finish per surface,
+        // read by PrimitiveKit.Lit at every call site that shows it; TextureLibrary.FinishOf is the one place that
+        // holds them). Metallic defaults to 0 except Metal (brushed, Metal009).
+        public const float GrassSmoothness = 0.2f;
+        public const float LacquerSmoothness = 0.9f;
+        public const float MetalSmoothness = 0.5f;
+        public const float MetalMetallic = 0.9f;
+        public const float PlasticSmoothness = 0.55f;
+        public const float FoliageSmoothness = 0.25f;
+        public const float SoilSmoothness = 0.08f;
+        /// <summary>The window pane (2.4): no texture (Surface.Plain), but its own smoothness; metallic stays 0.</summary>
+        public const float WindowPaneSmoothness = 0.95f;
+
+        // ----- M7 touch (docs/CONTRACT_M7.md 1.5): the touch controls. Sizes in pixels of a 1080 pixel high screen. -----
+        /// <summary>Camera degrees per pixel of orbit drag on the right half, times the sensitivity option.</summary>
+        public const float TouchOrbitDegPerPixel = 0.15f;
+        /// <summary>How far the thumb travels from where it landed for a full stick.</summary>
+        public const float TouchStickRadius = 120f;
+        /// <summary>The action button's diameter (1.5: at least 9 mm, about 140 px at 1080p).</summary>
+        public const float TouchActionSize = 190f;
+        /// <summary>The careful and pause buttons' diameter (at least 140 px at 1080p too).</summary>
+        public const float TouchButtonSize = 150f;
+
+        // ----- M7 android (docs/CONTRACT_M7.md 1.4): the quality tiers (QualityTier). -----
+        /// <summary>Bas renders at this fraction of the screen resolution; Moyen at 1 (both on Mobile_RPAsset).</summary>
+        public const float QualityLowRenderScale = 0.75f;
+        public const float QualityMediumRenderScale = 1f;
+        /// <summary>Android target frame rate on Bas and Moyen, and on Haut (PC keeps its own setting).</summary>
+        public const int QualityLowFrameRate = 30;
+        public const int QualityHighFrameRate = 60;
+        /// <summary>The priority of the global volume that turns bloom off on Bas, above the look's own volume (10).</summary>
+        public const float QualityVolumePriority = 100f;
+
+        // ----- M7 textures (docs/CONTRACT_M7.md 1.2): normal maps and the new Tile surface. -----
+        /// <summary>Metres covered by one repeat of the kitchen and bathroom floor tile detail (Tiles049):
+        /// a notch above the raw 0.5 so the mosaic's many thin grout lines repeat less densely at play
+        /// distance (still clearly smaller-scaled than Parquet's 1.8 plank repeat).</summary>
+        public const float DetailTileTile = 0.6f;
+        /// <summary>Smoothness of a tiled floor (Surface.Tile): glazed ceramic, smoother than Parquet's 0.35.</summary>
+        public const float TileSmoothness = 0.5f;
+        // The modest _BumpScale of each surface's normal map (PrimitiveKit.Detail, TextureLibrary.BumpScaleOf): a
+        // little higher for Metal (Metal009's brushed streaks read faintly at 1.0, M6_TEXTURES_RESEARCH.md), modest
+        // everywhere else, Parquet included: it covers most of the frame on an ordinary room (the Step22d probe caps
+        // how much noisier the textured view may read than the flat one), so its own faint grout seams (WoodFloor051)
+        // stay at the same modest scale as Wood rather than the stronger compensation a smaller surface could take.
+        // Wood furniture covers much less of the frame than the Parquet floor, so it can take the stronger
+        // compensation the comment above declines for Parquet (M7 texture pass, agent tex_wood).
+        public const float NormalScaleWood = 1.1f;
+        // Parquet's own source normal (WoodFloor051) is as flat as Metal's, but the floor fills most of the frame,
+        // so it gets only a small bump over the old baseline, not Metal's full compensation (M7 texture pass, agent tex_parquet).
+        public const float NormalScaleParquet = 1.0f;
+        public const float NormalScalePlaster = 0.7f;
+        public const float NormalScaleUpholstery = 0.6f;
+        public const float NormalScaleLinen = 0.85f;
+        public const float NormalScaleCarpet = 0.75f;
+        public const float NormalScaleGrass = 0.6f;
+        // PaintedWood006C's own normal map is mostly flat (xy deviation mean ~6 of 127) but has a few sharp plank-seam
+        // spikes (deviation up to ~121); at the baseline 1.0 those spikes risk pinpoint specular noise once combined
+        // with LacquerSmoothness's tight 0.9 highlight, on the piece the player furniture must stay the clearest
+        // thing in frame (PRD 7.2, M7 texture pass, agent tex_lacquer). Eased down, like Upholstery and Linen.
+        public const float NormalScaleLacquer = 0.8f;
+        // Metal009's own NormalGL is almost flat (xy std ~0.005-0.012 of 1.0: brushed metal is optically flat,
+        // its streaks are mostly specular, not geometric), so a bump scale alone barely moved it. Re-derived the
+        // normal map with a 3x gain on the source xy before the resize + renormalize (M7 texture pass, agent
+        // tex_metal), then brought this scale back down from 2.0 so the combined relief grows but stays short of
+        // noisy on the robot's body, the largest metal surface.
+        public const float NormalScaleMetal = 1.5f;
+        public const float NormalScaleTile = 1.0f;
+
+        // ----- M7 design (docs/CONTRACT_M7.md 4.1): the difficulty table (DifficultyDef). Normal is the M6 game. -----
+        // Facile only helps the player, Difficile only hinders (DifficultyM7Tests checks every knob both ways).
+        /// <summary>Every watcher's view range is multiplied by this (the lamp factor applies on top).</summary>
+        public const float EasyViewRangeFactor = 0.85f;
+        public const float HardViewRangeFactor = 1.15f;
+        /// <summary>Degrees added to every cone's half angle.</summary>
+        public const float EasyHalfAngleOffset = -5f;
+        public const float HardHalfAngleOffset = 5f;
+        /// <summary>Every listener's hearing factor is multiplied by this. Difficile keeps 1: at 1.25 the rug and decoy lessons of levels 2 and 3 had no schedule.</summary>
+        public const float EasyHearingFactor = 0.75f;
+        public const float HardHearingFactor = 1.0f;
+        /// <summary>Every suspicion gain is multiplied by this (Difficile: two discoveries lose).</summary>
+        public const float EasySuspicionFactor = 0.75f;
+        public const float HardSuspicionFactor = 1.5f;
+        /// <summary>The caught rule's grace (and the dog's bark grace), in seconds: a whole number of fixed steps.</summary>
+        public const float EasyCaughtGrace = 0.30f;
+        public const float HardCaughtGrace = 0.14f;
+        /// <summary>The creak gauge's fill time from 0 to 1 while still, in seconds.</summary>
+        public const float EasyCreakFillTime = 25f;
+        public const float HardCreakFillTime = 16f;
     }
 }

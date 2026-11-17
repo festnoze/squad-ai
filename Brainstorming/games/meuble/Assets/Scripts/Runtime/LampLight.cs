@@ -29,6 +29,15 @@ namespace Meuble
         // The share of the ambient light left while the lamp is off: dark enough to read, never black.
         private const float AmbientOffFactor = 0.6f;
 
+        // M7 lighting (CONTRACT_M7 1.1): a small warm glow at the bulb, purely visual (the rule above never reads
+        // it). Its colour times its intensity peaks over 1.6 in gamma, the same margin as the window pane
+        // (LevelBuilder.WindowPaneEmission), so it clears the Volume's bloom threshold and reads as a lit bulb
+        // rather than a flat shade.
+        private const float GlowDiameter = 0.14f;
+        private static readonly Color GlowColor = new Color(1f, 0.8f, 0.46f);
+        private const float GlowIntensity = 1.9f;
+        private MeshRenderer glow;
+
         public bool On { get; private set; } = true;
 
         /// <summary>Factor applied to ViewRange for the lamp's own sample points.</summary>
@@ -67,8 +76,25 @@ namespace Meuble
             Light.intensity = LightIntensity;
             Light.color = LightColor;
             Light.renderMode = LightRenderMode.ForcePixel;
-            transform.localPosition = new Vector3(0f, Mathf.Max(0.1f, height - BulbBelowTop), 0f);
+            float bulbHeight = Mathf.Max(0.1f, height - BulbBelowTop);
+            transform.localPosition = new Vector3(0f, bulbHeight, 0f);
             transform.localRotation = Quaternion.identity;
+            // M7: the glow orb gets its own local offset (not inherited from the write above), because this
+            // component's own transform is the player furniture root on a lamp body: Teleport resets its
+            // position to the floor right after SetBody calls Init, which would otherwise carry the orb down
+            // to floor level with it.
+            if (glow == null)
+            {
+                GameObject go = PrimitiveKit.Part(transform, "Glow", PrimitiveKit.SphereMesh(6, 4), new Vector3(0f, bulbHeight, 0f),
+                    Quaternion.identity, Vector3.one * GlowDiameter, PrimitiveKit.Emissive(GlowColor, GlowIntensity), gameObject.layer);
+                glow = go.GetComponent<MeshRenderer>();
+                glow.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                glow.receiveShadows = false;
+            }
+            else
+            {
+                glow.transform.localPosition = new Vector3(0f, bulbHeight, 0f);
+            }
             Apply();
         }
 
@@ -93,6 +119,10 @@ namespace Meuble
             if (Light != null)
             {
                 Light.enabled = On;
+            }
+            if (glow != null)
+            {
+                glow.enabled = true; // MUTATION:GLOW_FOLLOWS_ON
             }
             if (On)
             {

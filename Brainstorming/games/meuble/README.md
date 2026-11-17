@@ -13,6 +13,7 @@ strings shown to the player are in French.
   Options: `-NoBuild` (play the last build), `-Windowed`, `-Dev` (a Development Build in `Build/PlayDev/` that
   Visual Studio can attach to), `-WaitForDebugger` (with `-Dev`, the game waits for the debugger at startup). The Unity Editor must
   not have the project open while it builds.
+- In game, **Ctrl+F** or **F11** toggles full screen (Alt+Enter works too).
 - The probe's build: `Build/Windows/Meuble.exe` (produced by `./verify.sh player`).
 - Debugging in Visual Studio 2022: install the "Game development with Unity" workload (Visual Studio Installer;
   the project's `.vsconfig` lists it), set Unity's Preferences > External Tools > External Script Editor to
@@ -232,3 +233,9 @@ Each one is written back into the PRD (v1.2) as an M1 note or an open question.
 
 - The inhabitant walks through a still chair (reacting to a furniture in the way is M2).
 - No menu, no save, no second level (out of scope for M1).
+
+## M6 and M6b gate (2026-11-16)
+
+`./verify.sh` green: 448 EditMode, 214 PlayMode, 18 levels audited without defect, built player 101 MB.
+Level 10's rock lesson is advisory (docs/CONTRACT_M6.md 5). Logs in docs/m6/. The full `./mutation.sh` run
+(with the 21 M6 rows) was skipped to save credits.

@@ -910,16 +910,30 @@ namespace Meuble
                     pieces.Add(decoy.transform);
                 }
             }
+            // M5 5B.1 (CONTRACT_M5 19 B1): the load is its own object for the budgets, as LevelAudit.CheckBudgets
+            // counts it: its triangles leave the piece that carries it and are checked on their own key.
+            LoadView load = Game.Level.LoadView;
             int index = 0;
             foreach (Transform piece in pieces)
             {
                 long t = TrianglesUnder(piece);
+                if (load != null && load.transform.IsChildOf(piece))
+                {
+                    long carried = TrianglesUnder(load.transform);
+                    t -= carried;
+                    string loadKey = "Load " + load.Kind;
+                    result[loadKey] = carried;
+                    if (carried > Tuning.BudgetFurnitureTriangles)
+                    {
+                        failures.Add($"{id}: load {load.Kind} has {carried} triangles, over the {Tuning.BudgetFurnitureTriangles} budget");
+                    }
+                }
                 string key = result.ContainsKey(piece.name) ? piece.name + " " + index : piece.name;
                 result[key] = t;
                 index++;
                 if (t > Tuning.BudgetFurnitureTriangles)
                 {
-                    failures.Add($"{id}: furniture {piece.name} has {t} triangles, over the 400 budget");
+                    failures.Add($"{id}: furniture {piece.name} has {t} triangles, over the {Tuning.BudgetFurnitureTriangles} budget");
                 }
             }
             return result;

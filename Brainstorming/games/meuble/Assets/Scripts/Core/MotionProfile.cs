@@ -91,8 +91,9 @@ namespace Meuble.Core
     ///   action of <see cref="Tuning.StoolRightTime"/>) and drives again on the step the righting ends;
     /// - an action (the fall, the righting, <see cref="BeginAction"/>, <see cref="BeginPush"/>) covers round(duration / dt)
     ///   steps, ignores the input and counts as moving.
-    /// The rock of the rocking chair is not synthesized (it is the bodies' rule): a caller models it with
-    /// <see cref="BeginAction"/> and <see cref="RockSteps"/>.
+    /// The rock of the rocking chair is not synthesized: in play it is GameState.StepRock's rule (CONTRACT_M5 18: one still
+    /// rest step, then FurnitureController.BeginExternalAction of RockTime, or RockCarefulTime when careful), and a replay
+    /// models it with <see cref="BeginAction"/> and <see cref="RockSteps"/>.
     /// </summary>
     public sealed class MotionProfile
     {

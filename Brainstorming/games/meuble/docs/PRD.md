@@ -1,6 +1,6 @@
 # PRD - UN, DEUX, TROIS, MEUBLE
 
-Product requirements document. Version 1.8, 2026-11-13 (1.8 adds the M5 wave 5A notes in section 11). Version 1.7, 2026-11-13 (1.7 rewrites M5 after the product owner's M4 playtest: 10 new levels that combine mechanics, larger maze houses, several inhabitants with personalities, the robot vacuum, the rocking chair and the balanced load; adds 3.4, 4.8, 5.4 and the 7.4 house budgets). Version 1.6, 2026-11-12 (1.6 adds the M4 notes in section 11, the 3.3 and 4.7 amendments and open questions 11 to 15). Version 1.5, 2026-11-12 (1.5 adds the M3 notes in section 11 and the pause to hud.controls). Version 1.4, 2026-11-11 (1.4 writes back the
+Product requirements document. Version 1.10, 2026-11-15 (1.10 splits M6: the level work and the M6 gate move to M6b). Version 1.9, 2026-11-15 (1.9 splits milestone M6 at the product owner's request: M6 keeps the finishing work on PC and gains texture pass 2 and open question 28, the mobile port becomes M7). Version 1.8, 2026-11-13 (1.8 adds the M5 wave 5A notes in section 11). Version 1.7, 2026-11-13 (1.7 rewrites M5 after the product owner's M4 playtest: 10 new levels that combine mechanics, larger maze houses, several inhabitants with personalities, the robot vacuum, the rocking chair and the balanced load; adds 3.4, 4.8, 5.4 and the 7.4 house budgets). Version 1.6, 2026-11-12 (1.6 adds the M4 notes in section 11, the 3.3 and 4.7 amendments and open questions 11 to 15). Version 1.5, 2026-11-12 (1.5 adds the M3 notes in section 11 and the pause to hud.controls). Version 1.4, 2026-11-11 (1.4 writes back the
 M2.1 fixes found by the critique of the M2 result: discovery grace,
 position-only tolerance, decoys, level 1 start station, M2-aware audit; see
 the M2 notes of sections 4.4 and 11). Version 1.3, 2026-11-11 (1.3 writes back the
@@ -14,7 +14,7 @@ sections 3.2, 5.1 and 6.3).
 This document is the contract for `games/meuble`: a 3D stealth comedy game in
 Unity where the player is a piece of furniture that may only move while nobody
 is looking. It defines the rules, every constant, the asset strategy, the Unity
-architecture, the verification harness and six delivery milestones. Milestone 1
+architecture, the verification harness and seven delivery milestones. Milestone 1
 is deliberately tiny (one room, one inhabitant, one chair) and is specified to
 the level of detail needed to build it without further questions. Later
 milestones are specified at the level of rules and acceptance criteria; their
@@ -36,7 +36,7 @@ default taken for each.
 - Section 8 : Unity architecture and module contracts.
 - Section 9 : strings shown to the player, in French, verbatim.
 - Section 10 : verification harness.
-- Section 11 : milestones M1 to M6 with acceptance criteria.
+- Section 11 : milestones M1 to M7 with acceptance criteria.
 - Section 12 : risks and open questions.
 
 Rules are tagged with the milestone that introduces them: `[M1]`, `[M2]`, etc.
@@ -79,8 +79,8 @@ turned into a stealth game where the watcher does not know they are playing.
 ### 1.4 Platforms
 
 - PC Windows (keyboard and mouse, gamepad) from M1.
-- Android from M6. Every budget in section 7.4 is a mobile budget from day
-  one so M6 is a port, not a rewrite.
+- Android from M7. Every budget in section 7.4 is a mobile budget from day
+  one so M7 is a port, not a rewrite.
 
 ---
 
@@ -169,17 +169,20 @@ action: a pinned furniture does not move, so it is not moving.
 
 A level may put a **load** on the player furniture (a vase, a stack of books, a plant):
 `player.load`.
-- The load tilts with the furniture's planar acceleration, its braking and its turning
-  (centripetal acceleration), as a damped spring. It sways visibly, and a balance gauge on the
-  HUD shows the tilt against the fall angle.
-- With a load, the furniture accelerates and brakes at half its body's rate, so it always stops
-  in a short slide, which counts as moving.
-- Past the fall angle the load **falls**:
+- The kinematic rule (v1.10, from CONTRACT_M5 16.5 and 18): the load **falls** when the change of the
+  furniture's planar velocity over the last LoadWindow (0.5 s) reaches LoadFallDeltaV (1.8 m/s). A
+  full speed start or stop, a full speed reversal and a 90 deg turn at full chair speed drop it; a
+  careful start, stop, turn or reversal holds. There is no spring, no fall angle and no halved
+  acceleration: the furniture moves as its body does.
+- The load sways as a visual only (a damped spring fed by the same velocity), and the balance gauge
+  (left of the creak gauge) shows the velocity change against the fall threshold; it turns red from
+  BalanceWarning (0.9) of it.
+- With a load, the furniture's sample box grows by LoadHeight (0.25 m): the top of the load is seen.
+- When the load falls:
   - a crash noise of 6 m, which alerts like a creak;
   - the broken load stays on the floor as a clue: an inhabitant who sees it gets one discovery,
-    walks to it and puts it away.
-- Careful mode keeps the tilt low; sharp turns at speed and the office chair's long glide make it
-  fall.
+    walks to it and puts it away (a fall costs one discovery, never the level, q25).
+- The load's triangles are budgeted on their own (7.4), not as part of the furniture.
 
 ## 4. Observation
 
@@ -547,7 +550,7 @@ recordings (wood scrape, footsteps, room tone).
 
 v1.7: a house of 5 rooms or more (levels 8 to 17) may use **160 draw calls and 32 materials**.
 The built player must hold 60 fps on the development PC on every level. The Android
-measurement stays in M6.
+measurement stays in M7.
 
 ---
 
@@ -1039,15 +1042,63 @@ sections 16 and 17):
   - The feet fix: the idle clip did not animate the feet, so after a walk they stayed mid-stride;
     every clip now holds the bones it does not animate at rest.
 
-### M6 - "Finition et mobile" (medium)
+### M6 - "Finition" (medium)
+
+v1.9: M6 used to hold the mobile port too; the product owner moved that part to M7, so M6 is
+PC only.
+
+- Options (sensitivity, volume, cone display), gamepad pass, accessibility
+  (the seen state is never conveyed by color alone).
+- The gameplay items deferred to M6 by the open questions: the wardrobe hiding
+  prop (12, 22), door memory (19), inhabitants opening doors (23).
+- **Texture pass 2** (v1.9, the product owner's request after M5), same rule as
+  M4.2 (grayscale CC0 detail times the palette colour, licence in
+  docs/LICENSES.md):
+  - The garden: a grass detail on the green ground around the house.
+  - The player furniture: a reflective finish, glossy plastic or lacquered
+    metal, with a detail clearly visible at play distance. It keeps its own
+    colour (7.2: found instantly in any frame). See open question 28.
+  - The surfaces still plain: metal parts (office chair frame, lamp pole and
+    base, robot vacuum body), plastic (the robot's bumper), leaves and soil,
+    the window pane (a light glass sheen), and any new surface M6 adds (the
+    wardrobe).
+  - Budgets: a finish may add materials (smoothness and metallic are per
+    material); the 7.4 caps (24 and 32 materials) still hold, checked by the
+    built player check.
+- Gate: 60 fps on PC, built player check on PC.
+
+### M6b - "Finition, niveaux" (small)
+
+v1.10: the product owner split M6 on 2026-11-15, once texture pass 2 had landed: M6 keeps the
+code above (options, gamepad, accessibility, texture pass 2, the wardrobe, door memory, inhabitants
+opening doors, their audit support), and M6b takes the level work and the M6 gate.
+
+- Level 18 "L'armoire": the wardrobe, a door opened by an inhabitant and door memory in one small
+  house (docs/CONTRACT_M6.md 5).
+- Levels 10, 13 and 17 pass the audit wait rule of M5 wave 5B.1 (and level 10 its rock lesson),
+  with their routes rewritten and their replays winning.
+- The RouteReplayer plays the hide and leave route actions.
+- The M6 gate: verify.sh green, the M6 mutation rows, the PRD and README notes.
+
+**M6 and M6b notes (2026-11-16).** Gate green: 448 EditMode, 214 PlayMode, 18 levels audited without
+defect, built player 101 MB. Level 18 "L'armoire" (wardrobe lesson, a door its inhabitant opens,
+door memory on). Level 13 and 17 retimed (17: out of the bedroom early, exit about 21 s). Level 10's
+rock lesson is advisory (CONTRACT_M6 5, `lessonAdvisory`): no data change made it bind under the 5B.1
+wait rule; the level stays winnable. The wardrobe fits the stool and the floor lamp only (0.40 m,
+1.85 m). The full mutation run was skipped for credits; every new marker's kill was checked once by
+its agent. Ctrl+F and F11 toggle full screen.
+
+### M7 - "Mobile" (medium)
 
 - Android build through a `Builder` class and `--execute-method`, touch
   controls (virtual stick, drag to orbit), quality tiers on the existing
   `Mobile_RPAsset` and `PC_RPAsset`.
-- Options (sensitivity, volume, cone display), gamepad pass, accessibility
-  (the seen state is never conveyed by color alone).
-- Gate: 60 fps on PC, 30 fps on a mid range Android phone, built player
-  check on both.
+- The Android save: the delete-then-move fallback of docs/CONTRACT_M5_v3.md
+  15.7, with the .bak rule left open there.
+- The 7.4 budgets measured on Android, the house budgets of open question 27
+  included.
+- Gate: 30 fps on a mid range Android phone, built player check on Android,
+  and every M6 gate still green on PC.
 
 ---
 
@@ -1069,7 +1120,7 @@ sections 16 and 17):
 1. **Tone**: comedy, the inhabitant is puzzled rather than scared.
    Default: comedy.
 2. **Camera**: third person orbit with dollhouse walls. Default: as written.
-3. **Mobile priority**: PC first, Android at M6. Default: as written.
+3. **Mobile priority**: PC first, Android at M7. Default: as written.
 4. **Game name**: "UN, DEUX, TROIS, MEUBLE". Default: as written.
 5. **Vision cone always visible**: default yes in M1, becomes an option in M6.
 6. **Voluntary creak**: a key that creaks on demand (and resets the gauge),
@@ -1129,4 +1180,7 @@ sections 16 and 17):
 26. **The robot's shove** (v1.7): 0.25 m, then it turns back. Default: as
     written.
 27. **House budgets** (v1.7): 160 draw calls and 32 materials for houses of 5
-    rooms or more. Default: as written, measured on PC; Android in M6.
+    rooms or more. Default: as written, measured on PC; Android in M7.
+28. **The player furniture's finish** (v1.9): glossy plastic or lacquered metal.
+    Default: glossy lacquer (strong highlights, the wood grain still visible
+    under it), compared with brushed metal in screenshots at the M6 playtest.

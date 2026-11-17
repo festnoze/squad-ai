@@ -137,16 +137,23 @@ namespace Meuble
             }
             else if (!GamePause.IsPaused)
             {
+                // M6 (docs/CONTRACT_M6.md 2.1): the sensitivity option multiplies the mouse and the right stick orbit rates.
+                float sens = SaveStore.Options.Sensitivity; // MUTATION:CAMERA_SENSITIVITY
                 // Mouse look only while the cursor is captured (click to capture, Escape to release).
                 if (Cursor.lockState == CursorLockMode.Locked)
                 {
                     Vector2 delta = InputReader.LookDeltaPixels();
-                    Yaw += delta.x * Tuning.MouseSensitivity;
-                    Pitch = Mathf.Clamp(Pitch - delta.y * Tuning.MouseSensitivity, Tuning.PitchMin, Tuning.PitchMax);
+                    Yaw += delta.x * Tuning.MouseSensitivity * sens;
+                    Pitch = Mathf.Clamp(Pitch - delta.y * Tuning.MouseSensitivity * sens, Tuning.PitchMin, Tuning.PitchMax);
                 }
                 Vector2 stick = InputReader.LookStick();
-                Yaw += stick.x * 140f * Time.unscaledDeltaTime;
-                Pitch = Mathf.Clamp(Pitch - stick.y * 90f * Time.unscaledDeltaTime, Tuning.PitchMin, Tuning.PitchMax);
+                Yaw += stick.x * 140f * sens * Time.unscaledDeltaTime;
+                Pitch = Mathf.Clamp(Pitch - stick.y * 90f * sens * Time.unscaledDeltaTime, Tuning.PitchMin, Tuning.PitchMax);
+                // M7 (CONTRACT_M7 1.5): a drag on the right half of a touchscreen orbits, whatever the cursor lock, with
+                // the same sensitivity option (the drag is in pixels of a 1080 pixel high screen, so every screen turns alike).
+                Vector2 drag = InputReader.TouchLookDelta();
+                Yaw += drag.x * Tuning.TouchOrbitDegPerPixel * sens; // MUTATION:TOUCH_ORBIT_SENS
+                Pitch = Mathf.Clamp(Pitch - drag.y * Tuning.TouchOrbitDegPerPixel * sens, Tuning.PitchMin, Tuning.PitchMax);
                 // M5: a notch moves the same fraction of the zoom range in every house (0.35 m on levels 1 to 7).
                 float notch = 0.35f * MaxDistance / Tuning.OrbitDistanceMax;
                 Distance = Mathf.Clamp(Distance - InputReader.ZoomNotches() * notch, Tuning.OrbitDistanceMin, MaxDistance);

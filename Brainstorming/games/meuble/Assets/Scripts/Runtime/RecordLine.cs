@@ -96,7 +96,8 @@ namespace Meuble
                 Hide();
                 return;
             }
-            RecordResult result = SaveStore.RecordWin(game.Def.Id, game.Elapsed);
+            // M7 design (CONTRACT_M7 4.1): under the difficulty the level was built and played with.
+            RecordResult result = SaveStore.RecordWin(game.Def.Id, game.Elapsed, game.Difficulty.Id);
             Show(result, game.IsLastLevel);
         }
 

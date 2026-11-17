@@ -842,6 +842,21 @@ namespace Meuble.Core
                 LastActivity = RoutineActivity.Pinned;
                 return;
             }
+            if (holdLeft > 0f)
+            {
+                // M6 (CONTRACT_M6 2.7): stopped in front of a door it opens; the walk resumes where it stopped.
+                if (hasCurrent && current.Kind == Kind.Walk)
+                {
+                    LastActivity = RoutineActivity.Waiting;
+                    holdLeft -= dt;
+                    if (holdLeft < 1e-4f)
+                    {
+                        holdLeft = 0f;
+                    }
+                    return;
+                }
+                holdLeft = 0f;
+            }
             EnsureStarted();
             DrainInstantActions(true);
             if (!hasCurrent)
@@ -1577,6 +1592,51 @@ namespace Meuble.Core
             queue.Clear();
             hasCurrent = false;
             elapsed = 0f;
+            holdLeft = 0f;
+        }
+
+        // ----- M6 (docs/CONTRACT_M6.md 2.7): the stop in front of a door the inhabitant opens -----
+
+        private float holdLeft;
+
+        /// <summary>M6: true while a <see cref="Hold"/> keeps the current walk stopped.</summary>
+        public bool Holding => holdLeft > 0f;
+
+        /// <summary>M6: the target of the walk in progress (the next corner), or null when the current action is no walk.</summary>
+        public Vector3? WalkTarget => hasCurrent && current.Kind == Kind.Walk ? current.Target : (Vector3?)null;
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): fills <paramref name="into"/> with the remaining corners of the walk in progress: the current
+        /// walk's target, then the targets of the walks queued right after it (up to the first action that is no walk).
+        /// Returns their count, 0 when the current action is no walk.
+        /// </summary>
+        public int WalkCorners(List<Vector3> into)
+        {
+            into.Clear();
+            if (!hasCurrent || current.Kind != Kind.Walk)
+            {
+                return 0;
+            }
+            into.Add(current.Target);
+            for (int i = 0; i < queue.Count && queue[i].Kind == Kind.Walk; i++)
+            {
+                into.Add(queue[i].Target);
+            }
+            return into.Count;
+        }
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): stops the walk in progress for the next round(<paramref name="seconds"/> / dt) steps
+        /// (<see cref="RoutineActivity.Waiting"/>, no motion, no turn, every later action delayed by as much), then it walks on
+        /// from where it stopped. Refused (nothing changes) unless the current action is a walk and the routine is neither
+        /// startled nor frozen. Any new plan (an alert, an investigation, a pin) drops the hold.
+        /// </summary>
+        public void Hold(float seconds)
+        {
+            if (seconds > 0f && !IsStartled && !IsFrozen && hasCurrent && current.Kind == Kind.Walk)
+            {
+                holdLeft = seconds;
+            }
         }
 
         private void CancelEverything()

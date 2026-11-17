@@ -132,6 +132,12 @@ namespace Meuble
         /// <summary>The rocking chair rocks: two soft creaks of its runners, forward and back, over the 0.8 s rock.</summary>
         public AudioClip RockCreak { get; private set; }
 
+        /// <summary>The careful rock (RockCarefulTime, 0.4 s): the same two creaks, over the shorter rock.</summary>
+        public AudioClip RockCreakCareful { get; private set; }
+
+        /// <summary>The clip of the last rock creak played (tests: the careful rock plays the careful clip).</summary>
+        public AudioClip LastRockCreak { get; private set; }
+
         public int CrashesPlayed { get; private set; }
         public int RockCreaksPlayed { get; private set; }
         public int BumpsPlayed { get; private set; }
@@ -141,6 +147,17 @@ namespace Meuble
 
         /// <summary>Hum sources added to robots since startup (one per robot of each built level).</summary>
         public int HumSourcesAdded { get; private set; }
+
+        /// <summary>
+        /// The hum's volume for a furniture <paramref name="distance"/> metres from the robot (planar): full within
+        /// SfxHumMinDistance, falling linearly to silence at SfxHumMaxDistance. The hum is what the furniture hears, so it
+        /// follows the furniture, never the camera.
+        /// </summary>
+        public static float HumVolumeAt(float distance)
+        {
+            float fade = Mathf.InverseLerp(Tuning.SfxHumMinDistance, Tuning.SfxHumMaxDistance, distance);
+            return HumVolume * (1f - fade);
+        }
 
         /// <summary>True while the rattle loop is wanted (the stool's tell); tests read this, never isPlaying.</summary>
         public bool RattleActive { get; private set; }
@@ -305,6 +322,7 @@ namespace Meuble
             Hum = SynthesizeHum("hum", 1f);
             Crash = SynthesizeCrash("crash", 0.9f);
             RockCreak = SynthesizeRockCreak("rock creak", Tuning.RockTime);
+            RockCreakCareful = SynthesizeRockCreak("rock creak careful", Tuning.RockCarefulTime);
             // Two hop sources in turn: a hop's pitch is set on a source whose previous hop has ended, so a
             // recorded tail (up to 0.3 s, hops every 0.22 s) is never re-pitched mid sound.
             hopSources = new[] { NewSource(1f), NewSource(1f) };
@@ -449,13 +467,16 @@ namespace Meuble
             }
             EnsureFootsteps(game.Level);
             EnsureRobotHums(game.Level);
+            UpdateRobotHums(game);
             WatchCarry(game.Furniture);
         }
 
         /// <summary>
-        /// M5 wave 5B (CONTRACT_M5 4): adds the hum, a 3D AudioSource looping <see cref="Hum"/>, to every robot of the level
+        /// M5 wave 5B (CONTRACT_M5 4): adds the hum, an AudioSource looping <see cref="Hum"/>, to every robot of the level
         /// that lacks one (AddComponent on the robot's own GameObject: no GameObject is created). It runs on every fixed step,
         /// so the robots of a rebuilt level hum from its first step; it pauses with the AudioListener like every game sound.
+        /// M5 5B.1: the source is 2D; <see cref="UpdateRobotHums"/> sets its volume from the furniture's distance to the robot
+        /// (<see cref="HumVolumeAt"/>) and pans it toward the robot.
         /// </summary>
         public void EnsureRobotHums(LevelInstance level)
         {
@@ -473,14 +494,40 @@ namespace Meuble
                 s.playOnAwake = false;
                 s.clip = Hum;
                 s.loop = true;
-                s.volume = HumVolume;
-                s.spatialBlend = 1f;
-                s.rolloffMode = AudioRolloffMode.Linear;
-                s.minDistance = Tuning.SfxHumMinDistance;
-                s.maxDistance = Tuning.SfxHumMaxDistance;
+                s.volume = 0f;
+                s.spatialBlend = 0f;
                 s.dopplerLevel = 0f;
                 s.Play();
                 HumSourcesAdded++;
+            }
+        }
+
+        /// <summary>
+        /// Every fixed step: each robot's hum at <see cref="HumVolumeAt"/> of the player furniture's planar distance to it,
+        /// panned toward the robot from the camera. Silent without a player furniture.
+        /// </summary>
+        public void UpdateRobotHums(GameState game)
+        {
+            if (game == null || game.Level == null)
+            {
+                return;
+            }
+            FurnitureController furniture = game.Furniture;
+            Transform view = game.Camera != null ? game.Camera.transform : null;
+            foreach (Component robot in game.Level.Robots)
+            {
+                AudioSource s = HumOf(robot);
+                if (s == null)
+                {
+                    continue;
+                }
+                Vector3 at = robot.transform.position;
+                s.volume = furniture != null ? HumVolumeAt(YawMath.Planar(at - furniture.transform.position).magnitude) : 0f;
+                if (view != null)
+                {
+                    Vector3 local = view.InverseTransformPoint(at);
+                    s.panStereo = Mathf.Clamp(local.x / Mathf.Max(1f, local.magnitude), -0.8f, 0.8f);
+                }
             }
         }
 
@@ -861,16 +908,22 @@ namespace Meuble
             CrashesPlayed++;
         }
 
-        /// <summary>The rocking chair starts its rock: the runners creak forward and back, panned toward it.</summary>
-        public void PlayRockCreak(float pan)
+        /// <summary>
+        /// The rocking chair starts its rock of <paramref name="rockTime"/> seconds: the runners creak forward and back, panned
+        /// toward it, over the full rock (<see cref="RockCreak"/>) or the careful one (<see cref="RockCreakCareful"/>, for a
+        /// rock no longer than RockCarefulTime).
+        /// </summary>
+        public void PlayRockCreak(float pan, float rockTime)
         {
             if (rockSource == null)
             {
                 return;
             }
+            AudioClip clip = rockTime <= Tuning.RockCarefulTime + 1e-4f ? RockCreakCareful : RockCreak;
             rockSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
             rockSource.pitch = 0.95f + (float)noise.NextDouble() * 0.1f;
-            Play(rockSource, RockCreak, RockCreakSynthVolume);
+            Play(rockSource, clip, RockCreakSynthVolume);
+            LastRockCreak = clip;
             RockCreaksPlayed++;
         }
 
