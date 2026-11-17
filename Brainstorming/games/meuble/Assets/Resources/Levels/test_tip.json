@@ -1,0 +1,94 @@
+{
+  "id": "test_tip",
+  "nameKey": "level4.name",
+  "hintKey": "level4.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.25,
+      "sizeX": 6.5,
+      "sizeZ": 3.5,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 3.3,
+      "z": -1.0,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": 0.0,
+      "z": 2.05,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "model": "kenney.stool",
+    "kind": "stool",
+    "x": -3.0,
+    "z": -1.25,
+    "yaw": 90.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 2.8,
+    "z": -1.0,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Cabinet",
+      "kind": "cabinet",
+      "x": 0.0,
+      "z": -0.85,
+      "yaw": 0.0,
+      "sizeX": 0.4,
+      "sizeY": 1.0,
+      "sizeZ": 0.3,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 0.0,
+          "z": 1.5,
+          "facing": 0.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 0.0,
+          "z": 1.25,
+          "facing": 180.0,
+          "dwell": 2.5,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

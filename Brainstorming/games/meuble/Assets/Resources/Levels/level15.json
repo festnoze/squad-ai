@@ -1,0 +1,394 @@
+{
+  "id": "level15",
+  "nameKey": "level15.name",
+  "hintKey": "level15.hint",
+  "lesson": "robot",
+  "rooms": [
+    {
+      "id": "bureau",
+      "x": 2.2,
+      "z": 2.45,
+      "sizeX": 4.4,
+      "sizeZ": 4.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "chambre",
+      "x": 2.2,
+      "z": 6.95,
+      "sizeX": 4.4,
+      "sizeZ": 3.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "couloir",
+      "x": 8.95,
+      "z": 8.2,
+      "sizeX": 8.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "salon",
+      "x": 7.2,
+      "z": 4.7,
+      "sizeX": 5.4,
+      "sizeZ": 5.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine",
+      "x": 11.7,
+      "z": 4.7,
+      "sizeX": 3.4,
+      "sizeZ": 5.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorFinish": "tile",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE"
+    },
+    {
+      "id": "entree",
+      "x": 8.95,
+      "z": 0.95,
+      "sizeX": 8.9,
+      "sizeZ": 1.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 2.25,
+      "z": 4.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 4.45,
+      "z": 3.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 4.45,
+      "z": 8.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 6.25,
+      "z": 7.45,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 11.75,
+      "z": 7.45,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 8.25,
+      "z": 1.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 13.45,
+      "z": 0.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": -0.05,
+      "z": 2.25,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 2.2,
+      "z": 8.95,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 13.45,
+      "z": 4.75,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "rocking_chair",
+    "x": 1.25,
+    "z": 3.25,
+    "yaw": 90.0,
+    "sizeX": 0.6,
+    "sizeY": 1.05,
+    "sizeZ": 0.85,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 12.75,
+    "z": 0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "BureauTable",
+      "kind": "table",
+      "x": 1.75,
+      "z": 0.6,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Lit",
+      "kind": "sofa",
+      "x": 0.85,
+      "z": 7.85,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 0.55,
+      "sizeZ": 2.0,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Canape",
+      "kind": "sofa",
+      "x": 8.75,
+      "z": 6.6,
+      "yaw": 180.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9",
+      "model": "kenney.sofa"
+    },
+    {
+      "name": "Cheminee",
+      "kind": "counter",
+      "x": 4.7,
+      "z": 5.5,
+      "yaw": 90.0,
+      "sizeX": 1.4,
+      "sizeY": 1.0,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 13.1,
+      "z": 4.75,
+      "yaw": 90.0,
+      "sizeX": 2.4,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Frigo",
+      "kind": "cabinet",
+      "x": 10.4,
+      "z": 2.4,
+      "yaw": 0.0,
+      "sizeX": 0.7,
+      "sizeY": 1.8,
+      "sizeZ": 0.7,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#6B4226"
+    },
+    {
+      "name": "Console",
+      "kind": "counter",
+      "x": 10.75,
+      "z": 0.3,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 0.8,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    }
+  ],
+  "designerRoute": [
+    { "x": 2.25, "z": 3.25, "at": 6.3 },
+    { "x": 3.25, "z": 3.25, "at": 6.3 },
+    { "x": 4.25, "z": 3.25, "at": 6.3 },
+    { "x": 5.25, "z": 3.25, "at": 6.3 },
+    { "x": 6.25, "z": 3.25, "at": 6.3 },
+    { "x": 7.25, "z": 3.25, "at": 6.3 },
+    { "x": 7.75, "z": 3.25, "at": 6.3 },
+    { "x": 7.75, "z": 2.75, "at": 6.3 },
+    { "x": 8.25, "z": 2.75, "at": 6.3 },
+    { "x": 8.25, "z": 1.75, "at": 6.3 },
+    { "x": 8.25, "z": 1.25, "at": 6.3 },
+    { "x": 7.25, "z": 1.25, "at": 6.3 },
+    { "x": 6.75, "z": 1.25, "at": 21.9 },
+    { "x": 7.75, "z": 1.25, "at": 23.4 },
+    { "x": 8.75, "z": 1.25, "at": 23.4 },
+    { "x": 9.75, "z": 1.25, "at": 23.4 },
+    { "x": 10.75, "z": 1.25, "at": 23.4 },
+    { "x": 11.75, "z": 1.25, "at": 23.4 },
+    { "x": 12.75, "z": 1.25, "at": 23.4 },
+    { "x": 12.75, "z": 0.75, "at": 23.4 },
+    { "x": 12.75, "z": 0.75, "at": 23.4 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Claire",
+      "personality": "watchful",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 6.75,
+          "z": 4.25,
+          "facing": 0.0,
+          "dwell": 14.0,
+          "glances": [
+            {
+              "offset": 3.0,
+              "yaw": -55.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 9.0,
+              "yaw": 45.0,
+              "hold": 1.0
+            }
+          ]
+        },
+        {
+          "x": 6.75,
+          "z": 4.25,
+          "facing": 180.0,
+          "dwell": 6.0,
+          "glances": [
+            {
+              "offset": 2.0,
+              "yaw": -40.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 4.0,
+              "yaw": 40.0,
+              "hold": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Hugo",
+      "personality": "teen",
+      "pattern": "wander",
+      "seed": 4242,
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 1.75,
+          "z": 6.25,
+          "facing": 0.0,
+          "dwell": 8.0,
+          "glances": [
+            {
+              "offset": 4.0,
+              "yaw": 20.0,
+              "hold": 1.0
+            }
+          ]
+        },
+        {
+          "x": 8.75,
+          "z": 5.85,
+          "facing": 180.0,
+          "dwell": 6.0,
+          "glances": [],
+          "sit": "Canape"
+        },
+        {
+          "x": 11.25,
+          "z": 3.25,
+          "facing": 180.0,
+          "dwell": 4.0,
+          "glances": [
+            {
+              "offset": 2.0,
+              "yaw": -20.0,
+              "hold": 1.0
+            }
+          ]
+        },
+        {
+          "x": 12.25,
+          "z": 8.25,
+          "facing": 90.0,
+          "dwell": 5.0,
+          "glances": []
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "name": "Robot",
+      "loop": [
+        {
+          "x": 5.25,
+          "z": 2.25
+        },
+        {
+          "x": 7.25,
+          "z": 2.25
+        }
+      ]
+    }
+  ]
+}

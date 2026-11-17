@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 103c46fcb1515e24e946734679f6153a, type: 3}
+  m_Name: TextureLibrary
+  m_EditorClassIdentifier: Meuble.Runtime::Meuble.TextureLibrary
+  entries:
+  - surface: 1
+    texture: {fileID: 2800000, guid: 6523e710bb11ae4418c54ee04506d867, type: 3}
+    mean: 0.9411798
+    source: Wood049
+    normal: {fileID: 2800000, guid: 1826ca140f7963d40a92e137b82bd090, type: 3}
+  - surface: 2
+    texture: {fileID: 2800000, guid: 93d3dacfa2f03f94aa62ead78c57686e, type: 3}
+    mean: 0.9411789
+    source: WoodFloor051
+    normal: {fileID: 2800000, guid: fd6fa7263d620ee49957b682010b9d9a, type: 3}
+  - surface: 3
+    texture: {fileID: 2800000, guid: 7f37289af2e402b4d8139620164cb2fe, type: 3}
+    mean: 0.9417111
+    source: Plaster001
+    normal: {fileID: 2800000, guid: e2a006c6756f9ef4a9efac23f60caae7, type: 3}
+  - surface: 4
+    texture: {fileID: 2800000, guid: 5507ee543d597c241a27f6d2090ff93c, type: 3}
+    mean: 0.94117445
+    source: Fabric011
+    normal: {fileID: 2800000, guid: 1b36f986ab07fe740b4bc2636640d5ab, type: 3}
+  - surface: 5
+    texture: {fileID: 2800000, guid: a76a06022100af64ea220e6e0704c5dd, type: 3}
+    mean: 0.94117993
+    source: Fabric036
+    normal: {fileID: 2800000, guid: 291a0d2ee4714f940a64c9372e625aff, type: 3}
+  - surface: 6
+    texture: {fileID: 2800000, guid: 54e27dbe72815d74b92c121bd4ae151c, type: 3}
+    mean: 0.9411796
+    source: Carpet012
+    normal: {fileID: 2800000, guid: 8111991e5a7bdb045a01841333afacb7, type: 3}
+  - surface: 7
+    texture: {fileID: 2800000, guid: c8499a0a83b9a3f46a7dea23f746626a, type: 3}
+    mean: 0.9411739
+    source: Grass001
+    normal: {fileID: 2800000, guid: 4361090f4a23dd349ae58026acfe2410, type: 3}
+  - surface: 8
+    texture: {fileID: 2800000, guid: f0f33e459383a9e48831375271ba895b, type: 3}
+    mean: 0.9411848
+    source: PaintedWood006C
+    normal: {fileID: 2800000, guid: e90007402de5d064bb2dd5316a351e03, type: 3}
+  - surface: 9
+    texture: {fileID: 2800000, guid: 0193f03050e62fc47bcb53dd508b583b, type: 3}
+    mean: 0.94118047
+    source: Metal009
+    normal: {fileID: 2800000, guid: 913c9e68173888d459330cd16a90c5e1, type: 3}
+  - surface: 10
+    texture: {fileID: 2800000, guid: 122a71ebe37bbc0499a5beced280aec1, type: 3}
+    mean: 0.9411785
+    source: Plastic006
+    normal: {fileID: 0}
+  - surface: 11
+    texture: {fileID: 2800000, guid: 45f13d3a045d6f64a95a1e4be8fda517, type: 3}
+    mean: 0.9411782
+    source: Moss002
+    normal: {fileID: 0}
+  - surface: 12
+    texture: {fileID: 2800000, guid: 27e738102b125b641aca811c2a8f181e, type: 3}
+    mean: 0.94117737
+    source: Ground104
+    normal: {fileID: 0}
+  - surface: 13
+    texture: {fileID: 2800000, guid: 5b8951777b194cf4995eb9aa0dcccfd6, type: 3}
+    mean: 0.9411757
+    source: Tiles049
+    normal: {fileID: 2800000, guid: 51ba979c51fd59e4288df164158a09e4, type: 3}

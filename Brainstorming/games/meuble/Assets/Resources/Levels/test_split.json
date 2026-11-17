@@ -1,0 +1,90 @@
+{
+  "id": "test_split",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 3.95,
+      "z": 2.95,
+      "sizeX": 7.9,
+      "sizeZ": 5.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 7.95,
+      "z": 2.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "platforms": [
+    {
+      "name": "Estrade",
+      "x": 4.0,
+      "z": 2.95,
+      "sizeX": 1.0,
+      "sizeZ": 5.9,
+      "height": 0.6,
+      "color": "#B07A4E"
+    }
+  ],
+  "ramps": [
+    {
+      "x": 2.5,
+      "z": 2.75,
+      "width": 1.5,
+      "length": 2.0,
+      "yaw": 90.0,
+      "platform": "Estrade"
+    },
+    {
+      "x": 5.5,
+      "z": 2.75,
+      "width": 1.5,
+      "length": 2.0,
+      "yaw": 270.0,
+      "platform": "Estrade"
+    }
+  ],
+  "player": {
+    "kind": "armchair",
+    "x": 0.75,
+    "z": 2.75,
+    "yaw": 90.0,
+    "sizeX": 0.85,
+    "sizeY": 1.05,
+    "sizeZ": 0.85,
+    "color": "#D7263D",
+    "model": "kenney.armchair"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 7.25,
+    "z": 2.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 7.25,
+          "z": 5.25,
+          "facing": 0.0,
+          "dwell": 30.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

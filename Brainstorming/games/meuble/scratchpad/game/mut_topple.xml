@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="UN, DEUX, TROIS, MEUBLE" tests="3" failures="3" errors="0" skipped="0" time="11.129">
+  <testsuite name="Meuble.Tests.ProbeTestsM4Game" tests="3" failures="3" errors="0" skipped="0" time="11.129">
+    <testcase name="Step28_StoolTipsWhenReleasedFastAndIsHeard" classname="Meuble.Tests.ProbeTestsM4Game" time="2.467">
+      <failure message="one Topple noise event&#13;&#10;  Expected: 1&#13;&#10;  But was:  0" type="Failed">at Meuble.Tests.ProbeTestsM4Game+&lt;Step28_StoolTipsWhenReleasedFastAndIsHeard&gt;d__39.MoveNext () [0x002bd] in C:\Dev\squad-ai\Brainstorming\games\meuble\Assets\Tests\PlayMode\ProbeTestsM4Game.cs:286
+at UnityEngine.TestTools.TestEnumerator+&lt;Execute&gt;d__7.MoveNext () [0x0003a] in .\Library\PackageCache\com.unity.test-framework@bd7f943e9647\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44</failure>
+      <system-out>[Step28] tipped at (-1,16, -2,20), 3,28 m from the listener; fall 14 moving steps, topple on step 14</system-out>
+    </testcase>
+    <testcase name="Step28b_StoolToppleUnheardBeyondItsRadius" classname="Meuble.Tests.ProbeTestsM4Game" time="1.925">
+      <failure message="premise: the topple noise event fired&#13;&#10;  Expected: 1&#13;&#10;  But was:  0" type="Failed">at Meuble.Tests.ProbeTestsM4Game+&lt;Step28b_StoolToppleUnheardBeyondItsRadius&gt;d__40.MoveNext () [0x000f8] in C:\Dev\squad-ai\Brainstorming\games\meuble\Assets\Tests\PlayMode\ProbeTestsM4Game.cs:327
+at UnityEngine.TestTools.TestEnumerator+&lt;Execute&gt;d__7.MoveNext () [0x0003a] in .\Library\PackageCache\com.unity.test-framework@bd7f943e9647\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44</failure>
+    </testcase>
+    <testcase name="Step28d_StoolHeadOnWallHitTips" classname="Meuble.Tests.ProbeTestsM4Game" time="6.738">
+      <failure message="no Topple noise for the wall tip&#13;&#10;  Expected: 1&#13;&#10;  But was:  0" type="Failed">at Meuble.Tests.ProbeTestsM4Game+&lt;Step28d_StoolHeadOnWallHitTips&gt;d__42.MoveNext () [0x0037d] in C:\Dev\squad-ai\Brainstorming\games\meuble\Assets\Tests\PlayMode\ProbeTestsM4Game.cs:410
+at UnityEngine.TestTools.TestEnumerator+&lt;Execute&gt;d__7.MoveNext () [0x0003a] in .\Library\PackageCache\com.unity.test-framework@bd7f943e9647\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44</failure>
+      <system-out>Saving results to: C:/Users/e.millerioux/AppData/LocalLow/Meuble/UN, DEUX, TROIS, MEUBLE\TestResults.xml</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

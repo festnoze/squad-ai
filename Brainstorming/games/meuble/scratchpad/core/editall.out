@@ -1,0 +1,3 @@
+[unity.sh] waiting for the Unity lock held by: 36952 game test . --mode PlayMode --filter Step28|Step30|Step31|Step32|Step33 --report-format junit --output scratchpad/game/m4.xml --timeout 1800 (0s)
+[unity.sh] waiting for the Unity lock held by: 36952 game test . --mode PlayMode --filter Step28|Step30|Step31|Step32|Step33 --report-format junit --output scratchpad/game/m4.xml --timeout 1800 (60s)
+test exit 0

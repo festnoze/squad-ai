@@ -1,0 +1,72 @@
+{
+  "id": "test_m5_game_people",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 13.0,
+    "sizeZ": 9.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": -3.0, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "kind": "chair",
+    "x": 2.0,
+    "z": -1.0,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 6.0, "z": -3.0, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    {
+      "name": "Canape",
+      "kind": "sofa",
+      "x": -3.0,
+      "z": 3.6,
+      "yaw": 0.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": false,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9"
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Un",
+      "personality": "dreamer",
+      "startStation": 0,
+      "stations": [
+        { "x": -3.0, "z": 2.85, "facing": 180.0, "dwell": 30.0, "sit": "Canape", "glances": [] },
+        { "x": -5.5, "z": 1.0, "facing": 270.0, "dwell": 2.0, "glances": [] }
+      ]
+    },
+    {
+      "name": "Deux",
+      "personality": "watchful",
+      "startStation": 0,
+      "stations": [
+        { "x": 0.5, "z": 2.0, "facing": 270.0, "dwell": 1.0, "glances": [] },
+        { "x": -2.75, "z": 2.85, "facing": 180.0, "dwell": 3.0, "sit": "Canape", "glances": [] }
+      ]
+    },
+    {
+      "name": "Chien",
+      "kind": "dog",
+      "startStation": 0,
+      "stations": [
+        { "x": 5.0, "z": 3.5, "facing": 0.0, "dwell": 60.0, "glances": [] },
+        { "x": 5.0, "z": 2.0, "facing": 0.0, "dwell": 2.0, "glances": [] }
+      ]
+    }
+  ]
+}

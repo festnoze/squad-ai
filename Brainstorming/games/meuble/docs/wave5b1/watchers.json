@@ -1,0 +1,49 @@
+{
+  "summary": "Watchers 5B.1 done. m4: the character slot merge is gone: ModelKit.MergeSlots, MergeCharacterSlots, the merged-mesh tables, SourceMeshOf, IsMerged and SlotGroups, the merged branch of SourceSlots, Inhabitant.MergedSlots, Tuning.CharacterSlotMerge (it sat in the M5B watchers block), the EditMode test Merged_slots_are_the_distinct_colours_and_details_of_each_character, and the PlayMode merged-slots test. Step22c already had the unmerged assertions (AreSame on the catalog mesh), so ProbeTestsM42Look.cs is unchanged. The draw-call budgets still hold: Step22c and Step39h_ pass on every manifest level, and the new Step37x_ logs 39 character slots and 60 of 120 draw calls on the people fixture. m11: the second Step37w_ test is now Step37x_CharacterSlotsAreTheCatalogSlotsWithinTheBudget. Its old body tested the merge, which is removed, so the old name would have been false. It now asserts that every character draws the catalog prefab's own mesh with exactly the prefab's slots, that the clothes alone take the tint, and that the level's draw calls stay within budget. m5 and m41: rewrote the LoadView header (LevelBuilder.ApplyLoad creates the view, GameState.StepLoad drives SetTilt) and the MotionProfile rock comment (GameState.StepRock, then BeginExternalAction of RockTime or RockCarefulTime). Deleted RobotPath.ArcAt, which had no caller. Moved the Robot pulse range to Tuning.RobotLightPulseMin and Max, and the VisionConeView literals to Tuning.ConeClearMargin and Tuning.ConeDrapeReach, all in a new 'M5 5B.1 watchers' block at the end of Tuning.cs. m15 robot: the root transform keeps the rule pose exactly. A new Robot.Body child holds the shell, bumper and light. In LateUpdate the body is interpolated between the poses of the last two fixed steps and turns at most Tuning.RobotTurnRate (540 deg/s), so a reversal is a one-third-second spin. A jump past Tuning.RobotSnapDistance (0.5 m) snaps the body. Step42w_ now covers this with a per-frame turn cap check during a driven reversal. m15 clue: on a split level, LoadView.SpawnClue lays the clue in FurnitureController.RampFrame's frame, so it lies on the slope. If its spread would cross a platform edge or a ramp foot or head, the clue moves (within Tuning.ClueSearchRadius, never through a ChairBlockerMask collider) to the nearest spot where it lies whole on one surface. It stays on the platform it fell on. Flat levels are unchanged. The new Step44x_ checks the platform edge, the floor beside the platform and the ramp on the floor fixture. Results: PlayMode 'Step37|Step38|Step22|Step39h|Step42|Step44' gave 45 of 46. The one failure is Step37e_ ('watchful: the decoy rings are not the seer's tolerance', expected 0.5, got 0.75). That is m14 work in progress in GhostView and GameState, which other agents own, not a watchers file. EditMode ModelM5Tests: 12 of 12. Both new mutants were verified killed under the Unity lock, and the files were restored byte for byte.",
+  "blocked": false,
+  "files_changed": [
+    "Assets/Scripts/Runtime/ModelKit.cs",
+    "Assets/Scripts/Runtime/Inhabitant.cs",
+    "Assets/Scripts/Runtime/Robot.cs",
+    "Assets/Scripts/Runtime/LoadView.cs",
+    "Assets/Scripts/Runtime/VisionConeView.cs",
+    "Assets/Scripts/Core/MotionProfile.cs",
+    "Assets/Scripts/Core/RobotPath.cs",
+    "Assets/Scripts/Core/Tuning.cs",
+    "Assets/Tests/EditMode/ModelM5Tests.cs",
+    "Assets/Tests/PlayMode/ProbeTestsM5BWatchers.cs"
+  ],
+  "tests": "Compile clean (SetupAndCompile, no error CS). PlayMode --filter 'Step37|Step38|Step22|Step39h|Step42|Step44': 45 passed, 1 failed: Step37e_EachPersonalityRangeAngleHearingGainAndToleranceApplied (m14 decoy-ring tolerance, owned by game and bodies, in progress). Passing include Step22c_, Step39h_, Step37w_ConeFollowsThePlatformTop, Step37x_ (39 character slots, 60 of 120 draw calls), Step38w_, Step42w_ (91 driven poses, 691 frames seen mid-turn, worst turn over the cap 0.00 deg), Step44w_, Step44x_ (platform edge: moved 0.25 m inward and stays at 0.6 m; beside the platform: moved 0.25 m away and stays at 0 m; ramp: not moved, tilted 16.7 deg; every vertex 0.000 to 0.065 m over the floor), and Step42b-g_ and Step44b-h_. EditMode --filter ModelM5Tests: 12 of 12. Mutants ROBOT_TURN_CAP and CLUE_SURFACE applied together under the lock: Step42w_ failed ('the body turned 180.0 deg in a frame of 0.001 s') and Step44x_ failed ('the platform's edge: a piece floats over the floor', 0.66 m); sources restored and checked with cmp.",
+  "markers": [
+    {
+      "id": "ROBOT_TURN_CAP",
+      "file": "Assets/Scripts/Runtime/Robot.cs",
+      "marked": "VisualYaw = Mathf.MoveTowardsAngle(VisualYaw, Yaw, Tuning.RobotTurnRate * dt); // MUTATION:ROBOT_TURN_CAP",
+      "replacement": "VisualYaw = Yaw; // MUTATION:ROBOT_TURN_CAP",
+      "mode": "PlayMode",
+      "killers": "Step42w_"
+    },
+    {
+      "id": "CLUE_SURFACE",
+      "file": "Assets/Scripts/Runtime/LoadView.cs",
+      "marked": "bool fits = LiesOnOneSurface(floor, c, yaw, spread, out Vector3 rest, out Quaternion f); // MUTATION:CLUE_SURFACE",
+      "replacement": "bool fits = LiesOnOneSurface(floor, c, yaw, spread, out Vector3 rest, out Quaternion f) && false; // MUTATION:CLUE_SURFACE",
+      "mode": "PlayMode",
+      "killers": "Step44x_"
+    }
+  ],
+  "removed_markers": ["SLOT_MERGE_KEY"],
+  "probe_steps": [
+    "Step37w_ConeFollowsThePlatformTop (the remaining Step37w_ test, unchanged)",
+    "Step37x_ (Step37x_CharacterSlotsAreTheCatalogSlotsWithinTheBudget, the renamed second Step37w_ test; it replaces Step37w_MergedSlotsKeepTheLookAndCountFewerDrawCalls, which no longer exists)",
+    "Step44x_ (Step44x_ClueLiesOnTheRampAndStaysOnThePlatform, new, m15 clue posture)"
+  ],
+  "edit_tests": [],
+  "needs": [
+    "integrator: in mutation.sh, delete the slot_merge_key row (its ModelKit line is gone) and add the ROBOT_TURN_CAP and CLUE_SURFACE rows above",
+    "integrator: in verify.sh PROBE_STEPS, add Step37x_ and Step44x_. Step37w_MergedSlotsKeepTheLookAndCountFewerDrawCalls no longer exists, so do not list it",
+    "integrator: in CONTRACT_M5 (17 or 19), record that the character slot merge is removed: no ModelKit.MergeSlots, no Tuning.CharacterSlotMerge. Step37x_ asserts the unmerged slots and the draw-call budget",
+    "game: on a split level, LoadView.SpawnClue may move the drawn clue up to Tuning.ClueSearchRadius (0.6 m) from the point it was given, to keep it on one surface. GameState.Fall keeps ClueAt at that point, so the vision sample can sit up to 0.6 m from the drawn clue. Suggest setting ClueAt = LoadView.Clue.transform.position after SpawnClue. Flat levels are unaffected: the clue stays exactly at ClueAt, as Step44b_ checks",
+    "game or bodies: Step37e_ fails on the decoy-ring tolerance (m14: GhostView.ShowRings still uses 0.75 m for the watchful seer, whose tolerance is 0.5 m). This is not a watchers file"
+  ]
+}

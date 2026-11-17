@@ -1,0 +1,90 @@
+
+=== Le jeu dans un player construit (PRD 10.4) ===
+  player construit : 104 MB (budget 120 MB)
+[UnityMemory] Configuration Parameters - Can be set up in boot.config
+    "memorysetup-allocator-temp-initial-block-size-main=262144"
+    "memorysetup-allocator-temp-initial-block-size-worker=262144"
+    "memorysetup-temp-allocator-size-background-worker=32768"
+    "memorysetup-temp-allocator-size-job-worker=262144"
+    "memorysetup-temp-allocator-size-preload-manager=262144"
+    "memorysetup-remapper-allocator-initial-capacity=32768"
+    "memorysetup-temp-allocator-size-nav-mesh-worker=65536"
+    "memorysetup-temp-allocator-size-audio-worker=65536"
+    "memorysetup-temp-allocator-size-cloud-worker=32768"
+    "memorysetup-bucket-allocator-granularity=16"
+    "memorysetup-bucket-allocator-bucket-count=8"
+    "memorysetup-bucket-allocator-block-size=4194304"
+    "memorysetup-bucket-allocator-block-count=1"
+    "memorysetup-main-allocator-block-size=16777216"
+    "memorysetup-thread-allocator-block-size=16777216"
+    "memorysetup-gfx-main-allocator-block-size=16777216"
+    "memorysetup-gfx-thread-allocator-block-size=16777216"
+    "memorysetup-cache-allocator-block-size=4194304"
+    "memorysetup-typetree-allocator-block-size=2097152"
+    "memorysetup-profiler-bucket-allocator-granularity=16"
+    "memorysetup-profiler-bucket-allocator-bucket-count=8"
+    "memorysetup-profiler-bucket-allocator-block-size=4194304"
+    "memorysetup-profiler-bucket-allocator-block-count=1"
+    "memorysetup-profiler-allocator-block-size=16777216"
+    "memorysetup-profiler-editor-allocator-block-size=1048576"
+    "memorysetup-temp-allocator-size-main=4194304"
+    "memorysetup-job-temp-allocator-block-size=2097152"
+    "memorysetup-job-temp-allocator-block-size-background=1048576"
+    "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
+    "memorysetup-temp-allocator-size-gfx=262144"
+  sauvegarde de la sonde : C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\meuble_save_test.json
+  shader Universal Render Pipeline/Lit         ok
+  shader Universal Render Pipeline/Unlit       ok
+  renderers 30, sans materiau 0, triangles 3143, materiaux 21, lumieres 1 (ombrees 1)
+  police : LegacyRuntime, 24 libelles
+  capture 01_start.png   1280x720 luminance moyenne 0.434
+  capture 02_caught.png  1280x720 luminance moyenne 0.295
+  capture 03_won.png     1280x720 luminance moyenne 0.417
+  capture 04_level2.png  1280x720 luminance moyenne 0.445
+  capture 05_level3.png  1280x720 luminance moyenne 0.448
+  capture 06_level4.png  1280x720 luminance moyenne 0.415
+  capture 07_level5.png  1280x720 luminance moyenne 0.434
+  capture 08_level6.png  1280x720 luminance moyenne 0.527
+  capture 09_level7.png  1280x720 luminance moyenne 0.456
+  capture 10_level8.png  1280x720 luminance moyenne 0.483
+  capture 11_level9.png  1280x720 luminance moyenne 0.506
+  capture 12_level10.png 1280x720 luminance moyenne 0.483
+  capture 13_level11.png 1280x720 luminance moyenne 0.490
+  capture 14_level12.png 1280x720 luminance moyenne 0.476
+  capture 15_level13.png 1280x720 luminance moyenne 0.390
+  capture 16_level14.png 1280x720 luminance moyenne 0.437
+  capture 17_level15.png 1280x720 luminance moyenne 0.450
+  capture 18_level16.png 1280x720 luminance moyenne 0.447
+  capture 19_level17.png 1280x720 luminance moyenne 0.483
+  capture 20_level18.png 1280x720 luminance moyenne 0.451
+  capture 21_alert.png   1280x720 luminance moyenne 0.462
+  capture 22_investigate.png 1280x720 luminance moyenne 0.463
+  capture 23_creak.png   1280x720 luminance moyenne 0.438
+  capture 24_suspicion.png 1280x720 luminance moyenne 0.450
+  capture 25_alarm.png   1280x720 luminance moyenne 0.295
+  images level1   mediane   4.1 ms, p95   7.7 ms
+  images level10  mediane   4.2 ms, p95   7.8 ms
+  images level11  mediane   4.7 ms, p95   7.3 ms
+  images level12  mediane   4.9 ms, p95   8.1 ms
+  images level13  mediane   4.6 ms, p95   7.4 ms
+  images level14  mediane   7.0 ms, p95  10.1 ms
+  images level15  mediane   4.5 ms, p95   6.7 ms
+  images level16  mediane   5.0 ms, p95   7.7 ms
+  images level17  mediane   7.6 ms, p95   9.1 ms
+  images level18  mediane   4.2 ms, p95   6.0 ms
+  images level2   mediane   5.0 ms, p95  10.2 ms
+  images level3   mediane   3.6 ms, p95   5.7 ms
+  images level4   mediane   3.7 ms, p95   5.7 ms
+  images level5   mediane   3.9 ms, p95   7.6 ms
+  images level6   mediane   3.7 ms, p95   4.9 ms
+  images level7   mediane   4.2 ms, p95   6.2 ms
+  images level8   mediane   4.6 ms, p95   6.6 ms
+  images level9   mediane   5.2 ms, p95   7.6 ms
+  etats atteints : Caught=True Won=True, panneaux echec=True victoire=True
+  Player.log : 0 ligne(s) d'exception
+  ECHEC level9: materials 25 over the 24 budget
+  ECHEC level16: materials 25 over the 24 budget
+  ECHEC le player est sorti avec le code 1
+  ROUGE : verification du player
+
+=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults) ===

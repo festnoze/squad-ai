@@ -1,0 +1,331 @@
+{
+  "id": "level9",
+  "nameKey": "level9.name",
+  "hintKey": "level9.hint",
+  "lesson": "robot",
+  "rooms": [
+    {
+      "id": "chambre",
+      "x": 2.2,
+      "z": 6.7,
+      "sizeX": 4.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine",
+      "x": 2.2,
+      "z": 2.2,
+      "sizeX": 4.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE"
+    },
+    {
+      "id": "salon",
+      "x": 8.2,
+      "z": 4.45,
+      "sizeX": 7.4,
+      "sizeZ": 8.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "entree",
+      "x": 13.45,
+      "z": 7.2,
+      "sizeX": 2.9,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.45,
+      "z": 8.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 2.25,
+      "z": 4.45,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 11.95,
+      "z": 8.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 14.95,
+      "z": 6.25,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": 8.25,
+      "z": 8.95,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": -0.05,
+      "z": 6.75,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 2.2,
+      "z": -0.05,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "rugs": [
+    {
+      "model": "kenney.rug",
+      "x": 2.75,
+      "z": 6.75,
+      "sizeX": 1.8,
+      "sizeZ": 1.4,
+      "yaw": 0.0,
+      "color": "#2E6DB4"
+    },
+    {
+      "model": "kenney.rug",
+      "x": 9.75,
+      "z": 2.5,
+      "sizeX": 2.0,
+      "sizeZ": 1.6,
+      "yaw": 0.0,
+      "color": "#2E6DB4"
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 2.75,
+    "z": 6.75,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D",
+    "model": "kenney.chair"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 14.25,
+    "z": 6.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Lit",
+      "kind": "sofa",
+      "x": 0.85,
+      "z": 7.85,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 0.55,
+      "sizeZ": 2.0,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Armoire",
+      "kind": "cabinet",
+      "x": 3.6,
+      "z": 4.8,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 2.0,
+      "sizeZ": 0.55,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 0.35,
+      "z": 2.2,
+      "yaw": 0.0,
+      "sizeX": 0.6,
+      "sizeY": 0.9,
+      "sizeZ": 2.4,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "TableCuisine",
+      "kind": "table",
+      "x": 2.75,
+      "z": 1.75,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Bureau",
+      "kind": "table",
+      "x": 8.25,
+      "z": 5.6,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Canape",
+      "kind": "sofa",
+      "x": 6.25,
+      "z": 2.25,
+      "yaw": 0.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9",
+      "model": "kenney.sofa"
+    },
+    {
+      "name": "Television",
+      "kind": "counter",
+      "x": 6.25,
+      "z": 0.3,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.6,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "MeubleChaussures",
+      "kind": "cabinet",
+      "x": 13.45,
+      "z": 8.65,
+      "yaw": 0.0,
+      "sizeX": 0.9,
+      "sizeY": 0.9,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    }
+  ],
+  "designerRoute": [
+    { "x": 3.75, "z": 6.75, "at": 0.3 },
+    { "x": 3.75, "z": 7.75, "at": 1.1 },
+    { "x": 3.75, "z": 8.25, "at": 1.9 },
+    { "x": 4.75, "z": 8.25, "at": 2.3 },
+    { "x": 5.75, "z": 8.25, "at": 3.1 },
+    { "x": 6.75, "z": 8.25, "at": 3.9 },
+    { "x": 7.75, "z": 8.25, "at": 4.7 },
+    { "x": 8.75, "z": 8.25, "at": 5.5 },
+    { "x": 9.75, "z": 8.25, "at": 6.3 },
+    { "x": 10.75, "z": 8.25, "at": 7.1 },
+    { "x": 11.75, "z": 8.25, "at": 7.9 },
+    { "x": 12.75, "z": 8.25, "at": 8.7 },
+    { "x": 12.75, "z": 7.25, "at": 9.5 },
+    { "x": 12.75, "z": 6.25, "at": 10.3 },
+    { "x": 13.75, "z": 6.25, "at": 11.1 },
+    { "x": 14.25, "z": 6.25, "at": 11.9 },
+    { "x": 14.25, "z": 6.25, "at": 11.9 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Claire",
+      "personality": "watchful",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 8.25,
+          "z": 6.75,
+          "facing": 180.0,
+          "dwell": 16.0,
+          "glances": [
+            {
+              "offset": 3.0,
+              "yaw": -45.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 10.0,
+              "yaw": 45.0,
+              "hold": 1.5
+            }
+          ]
+        },
+        {
+          "x": 8.25,
+          "z": 6.75,
+          "facing": 0.0,
+          "dwell": 6.0,
+          "glances": [
+            {
+              "offset": 2.0,
+              "yaw": -40.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 4.0,
+              "yaw": 40.0,
+              "hold": 1.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "name": "Robot",
+      "loop": [
+        {
+          "x": 5.75,
+          "z": 7.25
+        },
+        {
+          "x": 10.75,
+          "z": 7.25
+        }
+      ]
+    }
+  ]
+}

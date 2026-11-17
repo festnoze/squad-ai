@@ -1,0 +1,83 @@
+{
+  "id": "test_door",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "a",
+      "x": 1.95,
+      "z": 1.95,
+      "sizeX": 3.9,
+      "sizeZ": 3.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "b",
+      "x": 5.95,
+      "z": 1.95,
+      "sizeX": 3.9,
+      "sizeZ": 3.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 3.95,
+      "z": 1.75,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte",
+      "swing": "b",
+      "hinge": "start"
+    },
+    {
+      "x": 7.95,
+      "z": 1.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 1.25,
+    "z": 1.75,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D",
+    "model": "kenney.chair"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 7.25,
+    "z": 1.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 0.75,
+          "z": 3.25,
+          "facing": 0.0,
+          "dwell": 30.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

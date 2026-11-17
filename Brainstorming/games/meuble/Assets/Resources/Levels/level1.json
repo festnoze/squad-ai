@@ -1,0 +1,81 @@
+{
+  "id": "level1",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 8.0,
+    "sizeZ": 6.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": 2.3, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [
+    { "wall": "-z", "center": 0.0, "width": 1.6, "bottom": 0.9, "top": 2.1 }
+  ],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -3.2,
+    "z": -2.2,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "model": "kenney.doormat", "x": 3.5, "z": 2.3, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    {
+      "model": "kenney.sofa",
+      "name": "Sofa", "kind": "sofa", "x": -0.75, "z": -0.05, "yaw": 0.0,
+      "sizeX": 2.0, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true,
+      "color": "#2E6DB4", "accentColor": "#5B93D9"
+    },
+    {
+      "name": "Bookshelf", "kind": "bookshelf", "x": -1.5, "z": 2.8, "yaw": 0.0,
+      "sizeX": 1.6, "sizeY": 2.0, "sizeZ": 0.35, "occluder": true,
+      "color": "#6B4226", "accentColor": "#E3B23C"
+    },
+    {
+      "name": "Table", "kind": "table", "x": 2.45, "z": -1.9, "yaw": 0.0,
+      "sizeX": 1.4, "sizeY": 0.75, "sizeZ": 0.9, "occluder": true,
+      "color": "#E3B23C", "accentColor": "#8C5A36"
+    }
+  ],
+  "designerRoute": [
+    { "x": -2.25, "z": -2.25, "at": 1.9 },
+    { "x": -2.25, "z": -1.25, "at": 2.7 },
+    { "x": -2.25, "z": -0.25, "at": 3.5 },
+    { "x": -2.25, "z": 0.75, "at": 4.3 },
+    { "x": -1.25, "z": 0.75, "at": 5.1 },
+    { "x": -0.75, "z": 0.75, "at": 5.9 },
+    { "x": -0.75, "z": 1.25, "at": 6.3 },
+    { "x": -0.25, "z": 1.25, "at": 6.7 },
+    { "x": -0.25, "z": 1.75, "at": 7.1 },
+    { "x": 0.75, "z": 1.75, "at": 7.5 },
+    { "x": 1.75, "z": 1.75, "at": 8.3 },
+    { "x": 1.75, "z": 2.25, "at": 9.1 },
+    { "x": 2.75, "z": 2.25, "at": 9.5 },
+    { "x": 3.25, "z": 2.25, "at": 10.3 },
+    { "x": 3.5, "z": 2.3, "at": 10.3 }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 2,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": -1.5, "z": 2.2, "facing": 0.0, "dwell": 6.0, "glances": [ { "offset": 3.0, "yaw": -70.0, "hold": 1.0 } ] },
+        { "x": 1.2, "z": 1.4, "facing": 180.0, "dwell": 3.0, "glances": [ { "offset": 1.0, "yaw": 60.0, "hold": 0.8 } ] },
+        { "x": 0.0, "z": -2.3, "facing": 180.0, "dwell": 5.0, "glances": [] },
+        { "x": 2.2, "z": -0.7, "facing": 180.0, "dwell": 4.0, "glances": [ { "offset": 2.0, "yaw": -80.0, "hold": 1.0 } ] }
+      ]
+    }
+  ]
+}

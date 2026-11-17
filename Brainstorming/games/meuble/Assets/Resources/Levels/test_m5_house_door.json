@@ -1,0 +1,105 @@
+{
+  "id": "test_m5_house_door",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "a",
+      "x": -2.05,
+      "z": 0.0,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "b",
+      "x": 2.05,
+      "z": 0.0,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "c",
+      "x": 2.05,
+      "z": 4.1,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 0.0,
+      "z": 0.25,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "hinge": "start",
+      "id": "porte",
+      "swing": "b"
+    },
+    {
+      "x": 2.3,
+      "z": 2.05,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "open",
+      "hinge": "start",
+      "id": "ouverte",
+      "swing": "c"
+    },
+    {
+      "x": 4.1,
+      "z": 5.35,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 3.3,
+    "z": -1.3,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 3.55,
+    "z": 5.35,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -3.55,
+          "z": -1.55,
+          "facing": -90.0,
+          "dwell": 60.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

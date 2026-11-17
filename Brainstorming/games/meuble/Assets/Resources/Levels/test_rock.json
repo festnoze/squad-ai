@@ -1,0 +1,99 @@
+{
+  "id": "test_rock",
+  "nameKey": "level10.name",
+  "hintKey": "level10.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 3.95,
+      "z": 1.95,
+      "sizeX": 7.9,
+      "sizeZ": 3.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "sortie",
+      "x": 3.95,
+      "z": 4.7,
+      "sizeX": 7.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 5.75,
+      "z": 3.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 7.95,
+      "z": 4.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "rocking_chair",
+    "x": 1.25,
+    "z": 1.75,
+    "yaw": 90.0,
+    "sizeX": 0.6,
+    "sizeY": 1.05,
+    "sizeZ": 0.85,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 7.25,
+    "z": 4.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 7.25,
+          "z": 1.75,
+          "facing": 270.0,
+          "dwell": 4.5,
+          "glances": []
+        },
+        {
+          "x": 7.25,
+          "z": 1.75,
+          "facing": 90.0,
+          "dwell": 1.8,
+          "glances": []
+        },
+        {
+          "x": 7.25,
+          "z": 1.75,
+          "facing": 270.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 7.25,
+          "z": 1.75,
+          "facing": 90.0,
+          "dwell": 8.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

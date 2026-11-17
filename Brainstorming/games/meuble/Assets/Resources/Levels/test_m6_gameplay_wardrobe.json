@@ -1,0 +1,47 @@
+{
+  "id": "test_m6_gameplay_wardrobe",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 8.0,
+    "sizeZ": 8.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": 3.0, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "kind": "stool",
+    "x": 3.2,
+    "z": -1.0,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 3.5, "z": 3.0, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    {
+      "name": "Armoire", "kind": "wardrobe", "x": 0.0, "z": 3.65, "yaw": 180.0,
+      "sizeX": 1.0, "sizeY": 2.0, "sizeZ": 0.6, "occluder": true,
+      "color": "#8C5A36", "accentColor": "#A0703F"
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Guetteur",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": 0.0, "z": -1.0, "facing": 0.0, "dwell": 40.0, "glances": [] },
+        { "x": -2.5, "z": -2.5, "facing": 0.0, "dwell": 40.0, "glances": [] }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,951 @@
+
+=== Setup du projet et compilation ===
+  les scripts compilent, couches, shaders et scene Boot en place
+
+=== Tests unitaires (EditMode, PRD 10.1) ===
+  tous les tueurs EditMode de mutation.sh sont exiges
+  EditMode : 436 tests, 0 echecs
+
+=== Sonde PlayMode (PRD 10.2) ===
+  tous les tueurs PlayMode de mutation.sh sont exiges
+  PlayMode : 202 tests, 0 echecs
+
+=== Audit de niveau (PRD 10.3) ===
+  17 niveaux et 19 fixtures : limite de 11232 s
+  [LevelAudit] Niveau level1 : aucun defaut
+    [info] NavMesh : 39 triangles, 14 sources
+    [info] budgets : 38 emplacements (draw calls, max 120), 30 renderers, 21 materiaux (max 24, un par couleur de cone), 3143 triangles, 4 modeles
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] flanerie la plus longue : 1.9 s sans bouger sur un sejour de 4.7 s a moins de 1.5 m de (-2.25, -1.25), de 0.0 s a 4.7 s (max 8 s)
+    [info] horaire : sortie a 10.7 s, attente la plus longue 2.7 s (max 8 s), marge 0.3 s en avance / 3.0 s en retard, 22 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 41 pas de l'horaire, 4070 poses testees, 0 rayons, 0 observation(s)
+    [info] AVERTISSEMENT depart retarde : aucun horaire sans attente de plus de 8 s quand le joueur commence a 29, 30 s (boucle de 38,8 s)
+    [info] departs retardes (toutes les 1 s sur la boucle de 38.8 s) : 2 en echec, pire depart a 19 s (sortie 30.4 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 15 echantillons de marge de chaque cote (1.5 s ; l'audit en exige 3), au moins
+    [info] temps : 5.1 s, 2902155 noeuds developpes (plafond 80000000, au plus 241972 crees par recherche), 157297 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+      # # # # # # # # # # # # # # # # 
+      # 7 7 7 7 8 8 8 8 8 8 * * * E E 
+      # 7 7 8 8 8 8 * * * * * 8 8 8 # 
+      # 8 8 8 8 8 * * 8 8 8 8 8 8 8 # 
+      # 8 8 * * * * 8 7 7 7 7 7 8 8 # 
+      # 8 8 * # # # # # 7 7 7 7 7 7 # 
+      # 8 8 * # # # # # 7 7 7 7 7 7 # 
+      # 8 8 * # # # # # 7 7 7 7 7 7 # 
+      # 8 8 * 8 8 8 8 8 7 7 # # # # # 
+      # 8 8 * 8 8 8 8 8 6 7 # # # # # 
+      # S * * 8 8 8 7 7 6 7 # # # # # 
+      # # # # # # # # # # # # # # # # 
+  [LevelAudit] Niveau level2 : aucun defaut
+    [info] NavMesh : 41 triangles, 25 sources
+    [info] budgets : 58 emplacements (draw calls, max 120), 48 renderers, 21 materiaux (max 24, un par couleur de cone), 3073 triangles, 5 modeles
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] flanerie la plus longue : 4.1 s sans bouger sur un sejour de 6.5 s a moins de 1.5 m de (-2.25, -2.25), de 0.0 s a 6.5 s (max 8 s)
+    [info] horaire : sortie a 13.3 s, attente la plus longue 4.9 s (max 8 s), marge 0.3 s en avance / 2.9 s en retard, 23 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 31 echantillons sur tapis a portee d'oreille
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 64 pas de l'horaire, 6388 poses testees, 26 rayons, 0 observation(s)
+    [info] AVERTISSEMENT depart retarde : aucun horaire sans attente de plus de 8 s quand le joueur commence a 26, 27 s (boucle de 30,8 s)
+    [info] departs retardes (toutes les 1 s sur la boucle de 30.8 s) : 2 en echec, pire depart a 7 s (sortie 37.1 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 15 echantillons de marge de chaque cote (1.5 s ; l'audit en exige 3), au moins
+    [info] temps : 5.0 s, 3837227 noeuds developpes (plafond 80000000, au plus 365211 crees par recherche), 116386 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece couloir :
+      # # # # # # # # # # # # # # # # # # 
+      # 7 7 7 8 8 7 7 7 7 7 7 7 7 7 7 E E 
+      # 7 7 7 * * * * * * * * * * * * E E 
+      # # # # * # # # # # # # # # # # # # 
+    piece chambre :
+      # # # # * # # # # # 
+      # 8 7 7 * 8 8 9 9 # 
+      # 7 7 8 * 8 8 8 # # 
+      # 8 8 8 * 8 8 8 # # 
+      # 8 8 8 * # # # # # 
+      # 8 8 8 * # # # # # 
+      # S * * * # # # # # 
+      # # # 8 8 # # # # # 
+      # # # # # # # # # # 
+  [LevelAudit] Niveau level3 : aucun defaut
+    [info] NavMesh : 93 triangles, 29 sources
+    [info] Habitant marche 1 -> 2 contourne un obstacle : 1 coin(s)
+    [info] budgets : 60 emplacements (draw calls, max 120), 52 renderers, 22 materiaux (max 24, un par couleur de cone), 4949 triangles, 10 modeles
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] flanerie la plus longue : 5.5 s sans bouger sur un sejour de 8.6 s a moins de 1.5 m de (1.85, 0.25), de 7.9 s a 16.5 s (max 8 s)
+    [info] horaire : sortie a 18.6 s, attente la plus longue 6.3 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 24 deplacements de case, grincement au plus 0.27, 30 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 114 pas de l'horaire, 12409 poses testees, 448 rayons, 0 observation(s)
+    [info] leurres eteints : aucun horaire, les leurres sont necessaires
+    [info] AVERTISSEMENT depart retarde : aucun horaire sans attente de plus de 8 s quand le joueur commence a 7, 8, 9, 10, 11, 12 s (boucle de 43,2 s)
+    [info] departs retardes (toutes les 1 s sur la boucle de 43.2 s) : 6 en echec, pire depart a 4 s (sortie 57.8 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 9 echantillons de marge de chaque cote (0.9 s ; l'audit en exige 3)
+    [info] temps : 9.9 s, 9217854 noeuds developpes (plafond 80000000, au plus 710807 crees par recherche), 111205 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece salle :
+      # # # # # # # # # # # 
+      # # # 6 6 6 6 6 6 6 # 
+      # 8 * * * * * * * * * 
+      # 8 * # # c # # 8 # # 
+      # 7 * # # # # # 7 7 # 
+      # 7 S # # # # # 8 8 # 
+      # 7 7 # # # # # 8 # # 
+      # 7 7 # # c # # 8 # # 
+      # 8 8 8 8 8 8 8 8 # # 
+      # # # # # # # # # # # 
+    piece cuisine :
+      # # # # # # # # 
+      # # # # # # # # 
+      * * 6 7 8 8 6 # 
+      # * 7 7 8 8 8 # 
+      # * 7 8 8 8 8 # 
+      # * * * * * * # 
+      # 9 # # # # * # 
+      # 9 # # # # * # 
+      # 9 # # # # E # 
+      # # # # # # E # 
+  [LevelAudit] Niveau level4 : aucun defaut
+    [info] NavMesh : 52 triangles, 25 sources
+    [info] budgets : 48 emplacements (draw calls, max 120), 38 renderers, 21 materiaux (max 24, un par couleur de cone), 3337 triangles, 4 modeles
+    [info] corps stool : 5 echantillons par case (1.00 m/s) en mode prudent (4 a pleine vitesse), anneau 0.25 m, bruit de deplacement 2.0 m
+    [info] flanerie la plus longue : 3.2 s sans bouger sur un sejour de 6.8 s a moins de 1.5 m de (-3.35, -0.25), de 0.0 s a 6.8 s (max 8 s)
+    [info] horaire : sortie a 14.9 s, attente la plus longue 4.2 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 20 deplacements de case, grincement au plus 0.09, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 69 pas de l'horaire, 7243 poses testees, 1422 rayons, 0 observation(s)
+    [info] lecon careful : a pleine vitesse (chaque arret renverse le tabouret), aucun horaire : le mode prudent est requis
+    [info] departs retardes (toutes les 1 s sur la boucle de 22.0 s) : 0 en echec, pire depart a 3 s (sortie 33.8 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 8 echantillons de marge de chaque cote (0.8 s ; l'audit en exige 3)
+    [info] temps : 10.3 s, 8346557 noeuds developpes (plafond 80000000, au plus 2363665 crees par recherche), 70898 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece entree :
+      9 9 9 9 9 9 9 9 
+      9 S 9 9 9 9 9 9 
+      9 * 9 9 9 9 9 9 
+      9 * 9 9 9 9 9 9 
+      9 * 9 9 9 9 9 9 
+      9 * 9 9 9 9 9 9 
+      9 * * * * * * * 
+      8 # # # # 6 6 6 
+    piece salon :
+      5 5 5 # # # # 8 8 7 
+      5 5 5 # # # # 7 7 7 
+      5 5 4 3 5 5 4 6 7 7 
+      5 3 3 3 5 5 4 6 6 7 
+      # # 3 3 # # 3 5 5 5 
+      # # # 5 # # 5 5 5 4 
+      * * * * * * * * E E 
+      3 # # # # # # # 5 4 
+  [LevelAudit] Niveau level5 : aucun defaut
+    [info] NavMesh : 30 triangles, 14 sources
+    [info] Habitant marche 2 -> 3 contourne un obstacle : 1 coin(s)
+    [info] Habitant marche 3 -> 4 contourne un obstacle : 1 coin(s)
+    [info] budgets : 44 emplacements (draw calls, max 120), 32 renderers, 23 materiaux (max 24, un par couleur de cone), 3129 triangles, 5 modeles
+    [info] corps armchair : 6 echantillons par case (0.83 m/s), anneau 0.67 m, bruit de deplacement 2.0 m
+    [info] assis sur le joueur (presence au siege, de l'instant de l'assise a la fin de l'epingle) : 8.5-10.2 s, 47.7-49.4 s, 86.9-88.6 s, 126.1-127.7 s, 165.2-166.9 s
+    [info] flanerie la plus longue : 7.1 s sans bouger sur un sejour de 12.9 s a moins de 1.5 m de (-3.25, 0.25), de 0.0 s a 12.9 s (max 8 s)
+    [info] horaire : sortie a 16.1 s, attente la plus longue 6.5 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 15 deplacements de case, grincement au plus 0.18, 0 echantillons expliques par un leurre, 28 echantillons sur tapis a portee d'oreille, assis dessus 1.7 s
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 86 pas de l'horaire, 9766 poses testees, 293 rayons, 0 observation(s)
+    [info] lecon sit : premiere assise a 8.5 s ; sans s'asseoir, sortie au plus tot 13.7 s : la lecon ne peut pas etre evitee
+    [info] AVERTISSEMENT depart retarde : aucun horaire sans attente de plus de 8 s quand le joueur commence a 2, 3, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 s (boucle de 39,2 s)
+    [info] departs retardes (toutes les 1 s sur la boucle de 39.2 s) : 13 en echec, pire depart a 31 s (sortie 24.2 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 10 echantillons de marge de chaque cote (1.0 s ; l'audit en exige 3)
+    [info] temps : 1.3 s, 312704 noeuds developpes (plafond 80000000, au plus 26689 crees par recherche), 139296 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+      # # # # # # # # # # # # # # # # 
+      # 7 # # # # 5 E E 5 5 5 5 6 5 # 
+      # 7 5 5 5 5 5 * 5 5 5 5 5 5 5 # 
+      # * * * * * * * 5 5 5 5 5 5 5 # 
+      # S 6 5 5 5 5 5 # # # # # # 5 # 
+      # * 6 6 5 5 5 5 # # # # # # 5 # 
+      # * 6 6 6 5 5 5 # # # # # # 5 # 
+      # * 7 6 6 5 5 5 # # # # # # 5 # 
+      # 7 7 7 6 6 5 5 5 5 5 5 # # # # 
+      # # # # # # # # # # # # # # # # 
+  [LevelAudit] Niveau level6 : aucun defaut
+    [info] NavMesh : 51 triangles, 24 sources
+    [info] Habitant marche 3 -> 1 contourne un obstacle : 1 coin(s)
+    [info] budgets : 54 emplacements (draw calls, max 120), 44 renderers, 23 materiaux (max 24, un par couleur de cone), 3159 triangles, 4 modeles
+    [info] corps floor_lamp : 9 echantillons par case (0.56 m/s), anneau 0.25 m, bruit de deplacement 2.0 m, lampe : jamais vue, deux tables de vue
+    [info] flanerie la plus longue : 0.6 s sans bouger sur un sejour de 7.5 s a moins de 1.5 m de (-3.25, -3.35), de 0.0 s a 7.5 s (max 8 s)
+    [info] horaire : sortie a 15.9 s, attente la plus longue 2.4 s (max 8 s), marge 0.4 s en avance / 1.4 s en retard, 17 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 1 interrupteur(s)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 21 pas de l'horaire, 894 poses testees, 85 rayons, 0 observation(s)
+    [info] lecon dark : lampe toujours allumee, aucun horaire : le noir est requis
+    [info] lecon dark : Habitant passe a 1.3 m du chemin de la lampe a 19.8 s (sa portee dans le noir 4.0 m) : le noir ne suffit pas, il faut choisir le moment
+    [info] departs retardes (toutes les 1 s sur la boucle de 29.5 s) : 0 en echec, pire depart a 2 s (sortie 27.4 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 15 echantillons de marge de chaque cote (1.5 s ; l'audit en exige 3), au moins
+    [info] temps : 8.2 s, 5033997 noeuds developpes (plafond 80000000, au plus 260154 crees par recherche), 236602 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece salon :
+      2 # # # # 2 2 E E 2 3 3 3 3 3 3 6 6 7 8 
+      2 2 2 2 2 2 2 E E ! 3 3 3 3 3 3 5 5 7 8 
+      2 2 2 2 2 2 2 * ! # # # # 3 3 3 3 5 7 8 
+      2 2 2 2 2 2 ! * ! # # # # 3 3 3 3 5 7 8 
+      2 2 2 2 2 2 2 * 3 # # # # 3 3 3 5 5 7 8 
+      2 2 2 2 2 2 ! * 3 3 4 4 4 4 4 4 5 5 7 8 
+      2 2 2 2 2 2 ! * 3 4 4 4 # # # # 5 7 7 8 
+      2 2 2 2 * * * * 3 4 4 4 # # # # 8 7 7 8 
+    piece chambre :
+      7 4 2 2 * 9 9 9 
+      4 5 5 8 * 9 9 9 
+      5 7 8 * * 9 9 9 
+      8 8 8 * # # # # 
+      8 S * * # # # # 
+      8 9 9 9 # # # # 
+  [LevelAudit] Niveau level7 : aucun defaut
+    [info] NavMesh : 61 triangles, 21 sources
+    [info] budgets : 48 emplacements (draw calls, max 120), 42 renderers, 16 materiaux (max 24, un par couleur de cone), 3929 triangles, 2 modeles
+    [info] corps office_chair : 3 echantillons par case (1.67 m/s), anneau 0.41 m, bruit de deplacement 1.2 m, arret glisse 4 echantillons
+    [info] flanerie la plus longue : 7.6 s sans bouger sur un sejour de 9.4 s a moins de 1.5 m de (-3.25, -0.25), de 0.0 s a 9.4 s (max 8 s)
+    [info] horaire : sortie a 20.3 s, attente la plus longue 7.8 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 24 deplacements de case, grincement au plus 0.21, 24 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 6 arret(s) glisse(s)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 137 pas de l'horaire, 15850 poses testees, 368 rayons, 0 observation(s)
+    [info] leurres eteints : aucun horaire, les leurres sont necessaires
+    [info] lecon glide : sortie a 20.3 s avec les 4 echantillons d'arret, a 20.3 s sans ; l'horaire qui ignore la glissade est vu en glissant a 12.8 s : les arrets sont requis
+    [info] AVERTISSEMENT depart retarde : aucun horaire sans attente de plus de 8 s quand le joueur commence a 11, 12, 13, 14, 15 s (boucle de 18,3 s)
+    [info] departs retardes (toutes les 1 s sur la boucle de 18.3 s) : 5 en echec, pire depart a 9 s (sortie 29.5 s plus tard), attente la plus longue 8.0 s
+    [info] marge maximale : un horaire existe encore avec 10 echantillons de marge de chaque cote (1.0 s ; l'audit en exige 3)
+    [info] temps : 5.2 s, 3936401 noeuds developpes (plafond 80000000, au plus 2481436 crees par recherche), 218733 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+      # # # # # # # # # # # # # # # # # # # # 
+      # # 7 7 7 # # # 7 7 7 7 # # # 7 7 5 5 # 
+      # 5 5 7 7 c # # 7 7 7 7 # # c 7 7 5 5 # 
+      # 5 5 6 7 7 # # 7 7 7 7 # # 7 7 5 5 5 # 
+      # S 5 5 6 6 6 6 6 6 6 6 6 6 6 6 5 5 5 # 
+      # * * * * * * * * 6 * * * * 6 6 4 4 5 # 
+      # 5 5 5 7 7 # # * 7 * # # * 7 6 6 4 4 # 
+      # 5 5 7 7 c # # * * * # # * * * * * E E 
+      # 5 5 7 7 # # # 7 7 # # # 7 7 7 7 6 4 # 
+      # # # # # # # # # # # # # # # # # # # # 
+  [LevelAudit] Niveau level8 : aucun defaut
+    [info] NavMesh : 106 triangles, 49 sources
+    [info] Paul marche 1 -> 2 contourne un obstacle : 5 coin(s)
+    [info] Paul marche 2 -> 3 contourne un obstacle : 2 coin(s)
+    [info] Paul marche 3 -> 1 contourne un obstacle : 2 coin(s)
+    [info] budgets : 73 emplacements (draw calls, max 120), 64 renderers, 22 materiaux (max 24, un par couleur de cone), 3733 triangles, 4 modeles
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] habitants : Paul (dreamer, 8 m, 45 deg, ouie x0.7, tolerance 0.75 m) ; 1 classe(s) de tolerance, 4 table(s) de portes
+    [info] porte porte_cuisine : 1 case(s) d'atteinte : (1.25, 4.75)
+    [info] porte porte_salon : 1 case(s) d'atteinte : (8.75, 7.25)
+    [info] flanerie la plus longue : 6.6 s sans bouger sur un sejour de 9.4 s a moins de 1.5 m de (2.25, 5.25), de 0.0 s a 9.4 s (max 8 s)
+    [info] horaire : sortie a 18.2 s, attente la plus longue 6.8 s (max 8 s), marge 0.3 s en avance / 3.0 s en retard, 29 deplacements de case, grincement au plus 0.05, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 1 porte(s) ouverte(s)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 90 pas de l'horaire, 9573 poses testees, 105 rayons, 0 observation(s)
+    [info] route : 19 points, ouvertures : porte_cuisine en (1.25, 4.75) a 8.4 s
+    [info] lecon door : toutes les portes verrouillees, aucun horaire : il faut ouvrir une porte
+    [info] temps : 6.1 s, 130196 noeuds developpes (plafond 80000000, au plus 148958 crees par recherche), 492445 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece chambre :
+      # # # # # # # # # 
+      # # # # 9 9 9 9 9 
+      # # # # 9 9 9 9 # 
+      # # # # 9 9 9 9 # 
+      # # # # 9 9 9 9 # 
+      # 9 9 9 * * S 9 # 
+      # 9 * * * # # # # 
+      # # * # # # # # # 
+    piece couloir :
+      # # # # # # # # # # # 
+      9 9 9 9 9 9 9 9 9 9 # 
+      # # # # # # # # 9 # # 
+    piece cuisine :
+      # # * # # # # # # 
+      # 8 * 8 7 9 9 9 # 
+      # # * 9 9 9 9 9 # 
+      # # * * * * * * # 
+      # # 8 8 # # # * # 
+      # # 8 8 # # # * * 
+      # # 8 8 # # # 8 # 
+      # # # # # # # # # 
+    piece salon :
+      # # # # # # # # 8 # # 
+      # # # 9 9 9 9 9 8 8 # 
+      # 9 9 9 9 9 9 8 8 8 # 
+      # 9 9 9 9 9 8 8 8 8 # 
+      # 9 9 9 9 9 8 8 8 7 # 
+      # 9 9 9 9 9 8 8 8 8 # 
+      # 9 9 9 9 9 8 8 8 8 # 
+      # 9 8 # # # # # 8 8 # 
+      # 8 8 # # # # # 8 8 # 
+      # 8 8 # # # # # 8 8 # 
+      * * 7 6 6 6 6 6 8 8 # 
+      # * * * * * * * * E 8 
+      # # # # # # # # # # # 
+  [LevelAudit] Niveau level9 : aucun defaut
+    [info] NavMesh : 108 triangles, 44 sources
+    [info] budgets : 84 emplacements (draw calls, max 120), 67 renderers, 22 materiaux (max 24, un par couleur de cone), 4101 triangles, 6 modeles
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] robot (0.40 m/s, boucle de 25.0 s) : trajet fixe ; zone de contact 0.71 m (rayon 0.17 + demi-diagonale 0.32 + relache 0.1 + course sur la marge 0.12), sur chaque deplacement, chaque arret et au depart ; ronronnement a 2.38 m (2.5 moins la course) sur toute la fenetre de marge
+    [info] habitants : Claire (watchful, 10 m, 60 deg, ouie x1.0, tolerance 0.5 m) ; 1 classe(s) de tolerance, 1 table(s) de portes
+    [info] flanerie la plus longue : 0.3 s sans bouger sur un sejour de 3.4 s a moins de 1.5 m de (3.75, 7.75), de 0.0 s a 3.4 s (max 8 s)
+    [info] horaire : sortie a 12.3 s, attente la plus longue 1.1 s (max 8 s), marge 0.4 s en avance / 2.6 s en retard, 30 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille
+    [info] robot : l'horaire passe au plus pres a 1.00 m de lui a 5.7 s ; 27 echantillon(s) de deplacement entendus sans le ronronnement, masques par lui
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 33 pas de l'horaire, 2346 poses testees, 0 rayons, 0 observation(s)
+    [info] lecon robot : ronronnement coupe, aucun horaire : le ronronnement est requis (le robot contraint par son bruit)
+    [info] temps : 4.3 s, 76288 noeuds developpes (plafond 80000000, au plus 86684 crees par recherche), 2461 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece chambre :
+      # # # # # # # # # 
+      # # # # 9 9 9 * * 
+      # # # # 9 9 9 * # 
+      # # # # 9 9 9 * # 
+      # # # # 9 S * * # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 # # # 
+      # # # # 9 # # # # 
+    piece cuisine :
+      # # # # 9 # # # # 
+      # 9 9 9 9 9 9 9 # 
+      # # 9 9 9 9 9 9 # 
+      # # 9 9 9 9 9 9 # 
+      # # 9 9 # # # 9 # 
+      # # 9 9 # # # 9 # 
+      # # 9 9 # # # 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # # # # # # # # # 
+    piece salon :
+      # # # # # # # # # # # # # # # 
+      * * * * * * * * * * * * * * * 
+      # 8 9 7 7 7 6 6 6 7 7 7 9 8 # 
+      # 8 8 8 8 7 7 6 7 7 8 8 8 8 # 
+      # 8 8 8 8 8 8 9 8 8 8 8 8 8 # 
+      # 8 8 8 8 4 # # # 4 8 8 8 8 # 
+      # 8 8 4 4 4 # # # 4 4 4 8 8 # 
+      # 4 4 4 4 4 # # # 4 4 4 4 4 # 
+      # 4 4 4 4 4 3 3 3 4 4 4 4 4 # 
+      # 4 4 4 4 4 3 3 3 4 4 4 4 4 # 
+      # 4 4 4 4 3 3 3 3 3 4 4 4 4 # 
+      # 4 4 4 4 3 3 3 3 3 4 4 4 4 # 
+      # # # # # # 3 3 3 3 4 4 4 4 # 
+      # # # # # # 3 3 3 3 3 4 4 4 # 
+      # # # # # # 3 3 3 3 3 4 4 4 # 
+      # 4 4 4 3 3 3 3 3 3 3 4 4 4 # 
+      # 4 # # # 3 3 3 3 3 3 4 4 4 # 
+      # # # # # # # # # # # # # # # 
+    piece entree :
+      # # # # # # 
+      * * # # 9 # 
+      # * 9 9 9 # 
+      # * 9 9 9 # 
+      # * 9 9 9 # 
+      # * * * E 9 
+      # # # # # # 
+  [LevelAudit] Niveau level10 : 2 defaut(s)
+    [DEFAUT] l'horaire trouve flane 8.2 s sans bouger sur un sejour de 13.8 s a moins de 1.5 m de (6.25, 5.25), de 0.0 s a 13.8 s, plus de 8 s : attendre sur place, meme en sautillant d'une case a l'autre, n'est pas un horaire
+    [DEFAUT] lecon rock : l'horaire calcule sans la bascule n'est jamais vu en basculant (sortie a 22.6 s, attente max 0.0 s, flanerie max 11.1 s) : les arrets ne contraignent rien
+    [info] NavMesh : 112 triangles, 51 sources
+    [info] Mamie marche 1 -> 2 contourne un obstacle : 3 coin(s)
+    [info] Mamie marche 2 -> 3 contourne un obstacle : 4 coin(s)
+    [info] Mamie marche 3 -> 4 contourne un obstacle : 2 coin(s)
+    [info] budgets : 73 emplacements (draw calls, max 160), 65 renderers, 23 materiaux (max 32, un par couleur de cone), 3675 triangles, 3 modeles
+    [info] corps rocking_chair : 5 echantillons par case (1.00 m/s), anneau 0.57 m, bruit de deplacement 2.0 m
+    [info] bascule : chaque arret coute 9 echantillons vus en mouvement (le pas de repos et la bascule) ; 5 echantillons par case au depart et dans un virage, 4 en continuant tout droit, 6 quand le meuble prendrait plus d'un echantillon de retard sur le plan (cout reel : depart 5.17, tout droit 4.17 a 4.33, virage 4.83 a 5.33 echantillons) ; demi-tour en mouvement interdit ; la designerRoute enchaine les points d'une meme course
+    [info] assis sur le joueur (presence au siege, de l'instant de l'assise a la fin de l'epingle) : 66.4-71.5 s, 143.4-148.6 s, 220.4-225.6 s, 297.4-300.0 s
+    [info] habitants : Mamie (granny, 7 m, 55 deg, ouie x0.6, tolerance 0.75 m) ; 1 classe(s) de tolerance, 1 table(s) de portes
+    [info] flanerie la plus longue : 8.2 s sans bouger sur un sejour de 13.8 s a moins de 1.5 m de (6.25, 5.25), de 0.0 s a 13.8 s (max 8 s)
+    [info] horaire : sortie a 22.6 s, attente la plus longue 6.3 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 33 deplacements de case, grincement au plus 0.10, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 1 bascule(s)
+    [info] bascule, rejeu cinematique de la route (MotionProfile, relache 0.1 m) : 33 cases, retard au plus 0.07 s, avance au plus 0.08 s sur l'horaire (tolere : 0.1 s de retard)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 107 pas de l'horaire, 11471 poses testees, 34 rayons, 0 observation(s)
+    [info] la designerRoute du fichier differe de cet horaire (elle reste valable si la sonde 20 la gagne) ; -writeRoutes la remplace
+    [info] temps : 9.7 s, 4355080 noeuds developpes (plafond 80000000, au plus 4857044 crees par recherche), 656866 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece chambre :
+      # # # # # # # # # 
+      # # # # 9 9 9 9 9 
+      # # # # 9 9 9 9 # 
+      # # # # 9 9 9 9 # 
+      # # # # 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 # # # 9 9 # 
+      # # # # # # # # # 
+    piece couloir :
+      # # # # # # # # # # # # 
+      9 9 9 9 9 9 9 9 9 9 9 9 
+      # # # # # # # # # # # # 
+    piece salon :
+      # # # # # # # # # # # # 
+      # # 7 7 7 7 7 7 8 8 # # 
+      # # S * 7 7 7 7 7 8 # # 
+      # # * * 7 7 7 7 7 8 # # 
+      # 8 * * 7 7 7 7 7 7 # # 
+      # 7 8 * 7 7 7 7 7 7 7 # 
+      # 6 6 * 7 7 7 7 7 7 7 7 
+      # 5 5 * 7 7 7 7 8 7 7 # 
+      # # # * # # # # # # # # 
+    piece cuisine :
+      # # # # # # # # # 
+      9 # # # # # # 8 # 
+      # 9 9 9 9 8 8 8 # 
+      # 9 9 9 9 8 8 8 # 
+      # 9 9 9 9 8 8 8 # 
+      # 9 9 # # # 8 8 # 
+      # 9 9 # # # 8 8 # 
+      # 9 9 # # # 8 8 # 
+      # 7 7 8 8 8 8 7 # 
+      7 7 7 7 8 8 7 7 # 
+      # 7 7 7 7 6 7 7 # 
+      # # # # # 6 # # # 
+    piece veranda :
+      # # # * # # # # # # # # # # # # # 6 # # # 
+      # 6 6 * 5 7 7 7 7 7 7 7 8 8 8 7 7 6 8 # # 
+      # 7 7 * 8 7 7 7 7 7 7 7 7 8 7 7 8 8 8 8 # 
+      # 7 7 * * * * * * * * * * * * * * * * E 9 
+      # 7 8 8 8 8 8 8 # # # # # 9 8 8 8 8 8 8 # 
+      # # # # # # # # # # # # # # # # # # # # # 
+  [LevelAudit] Niveau level11 : aucun defaut
+    [info] NavMesh : 109 triangles, 43 sources
+    [info] Lea marche 1 -> 2 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 2 -> 3 contourne un obstacle : 1 coin(s)
+    [info] Lea marche 3 -> 4 contourne un obstacle : 5 coin(s)
+    [info] Lea marche 4 -> 1 contourne un obstacle : 4 coin(s)
+    [info] budgets : 76 emplacements (draw calls, max 120), 63 renderers, 22 materiaux (max 24, un par couleur de cone), 4849 triangles, 5 modeles
+    [info] charge vase : 204 triangles, comptee a part du meuble Chair (340 triangles), budget de 400 chacun
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] charge vase : tombe quand la vitesse change de 1.8 m/s en 0.5 s, l'audit refuse des 1.7 m/s (MotionProfile et LoadBalance sur l'historique des 13 derniers echantillons) ; jambes prudentes permises (7 echantillons par case), pleine vitesse 4 ; boite de vue plus haute de 0.25 m
+    [info] habitants : Lea (tidy, 10 m, 55 deg, ouie x1.0, tolerance 0.4 m) ; 1 classe(s) de tolerance, 1 table(s) de portes
+    [info] flanerie la plus longue : 0.3 s sans bouger sur un sejour de 3.0 s a moins de 1.5 m de (2.25, 7.75), de 0.0 s a 3.0 s (max 8 s)
+    [info] horaire : sortie a 15.5 s, attente la plus longue 1.1 s (max 8 s), marge 0.4 s en avance / 3.0 s en retard, 35 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille
+    [info] charge : tenue sur tout l'horaire (ecart de vitesse au plus 1.68 m/s sur 0.5 s, sous 1.8), 4 deplacement(s) de case prudent(s) ; marge 0.12 m/s avant la chute (1.8), 0.02 m/s sous le refus de l'audit (1.7)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 38 pas de l'horaire, 2814 poses testees, 0 rayons, 0 observation(s)
+    [info] lecon load : l'horaire calcule sans la regle de la charge (sortie a 14.3 s) la fait tomber a 1.68 s (ecart de vitesse 2.12 m/s sur 0.5 s) : la conduite prudente est requise ; contre-route : [{ "x": 3.25, "z": 6.25, "at": 0.3 }, { "x": 3.75, "z": 6.25, "at": 1.1 }, { "x": 3.75, "z": 7.25, "at": 1.5 }, { "x": 3.75, "z": 7.75, "at": 2.3 }, { "x": 4.75, "z": 7.75, "at": 2.7 }, { "x": 5.25, "z": 7.75, "at": 3.5 }, { "x": 5.25, "z": 6.75, "at": 3.9 }, { "x": 5.25, "z": 5.75, "at": 4.7 }, { "x": 5.25, "z": 4.75, "at": 5.5 }, { "x": 5.25, "z": 3.75, "at": 6.3 }, { "x": 5.25, "z": 2.75, "at": 7.1 }, { "x": 5.25, "z": 1.75, "at": 7.9 }, { "x": 5.25, "z": 1.25, "at": 8.7 }, { "x": 6.25, "z": 1.25, "at": 9.1 }, { "x": 7.25, "z": 1.25, "at": 9.9 }, { "x": 8.25, "z": 1.25, "at": 10.7 }, { "x": 9.25, "z": 1.25, "at": 11.5 }, { "x": 10.25, "z": 1.25, "at": 12.3 }, { "x": 11.25, "z": 1.25, "at": 13.1 }, { "x": 11.25, "z": 1.75, "at": 13.9 }, { "x": 11.25, "z": 1.75, "at": 13.9 }]
+    [info] temps : 3.8 s, 818368 noeuds developpes (plafond 80000000, au plus 910853 crees par recherche), 448450 rayons (plafond 20000000), 85 etats de charge
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece chambre :
+      # # # # # # # # # 
+      # # # # 9 9 9 9 # 
+      # # # # * * * * * 
+      # # # # * 9 9 9 # 
+      # # # # * 9 9 9 # 
+      # 8 8 9 S 9 9 9 # 
+      # 8 8 9 9 9 9 9 # 
+      # 8 8 9 # # # 9 # 
+      # # # # # # # # # 
+    piece couloir :
+      # # # 
+      # 7 # 
+      * * # 
+      # * # 
+      # * 7 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * # 
+      # * * 
+      # 7 # 
+      # # # 
+    piece salon :
+      # # # # # # # # # # # # 
+      # 9 9 9 # # # 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 9 9 9 # 
+      7 9 9 9 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 9 9 9 # 
+      # 9 9 9 # # # # # 9 8 # 
+      # 9 9 9 # # # # # 8 8 # 
+      # # # # # # # # # # # # 
+    piece cuisine :
+      # # # # # # # # 8 # # # 
+      # 8 8 8 8 8 8 9 9 9 9 # 
+      # 8 8 # # # 9 9 9 9 9 # 
+      # 8 8 # # # 9 9 9 9 9 # 
+      # 8 8 9 9 9 9 9 9 9 E 9 
+      * * * * * * * * * * * # 
+      # 9 # # # # # 9 9 9 9 # 
+      # # # # # # # # # # # # 
+  [LevelAudit] Niveau level12 : aucun defaut
+    [info] NavMesh : 122 triangles, 57 sources
+    [info] Paul marche 1 -> 2 contourne un obstacle : 1 coin(s)
+    [info] Paul marche 2 -> 3 contourne un obstacle : 5 coin(s)
+    [info] Paul marche 3 -> 4 contourne un obstacle : 2 coin(s)
+    [info] Paul marche 4 -> 1 contourne un obstacle : 8 coin(s)
+    [info] budgets : 90 emplacements (draw calls, max 160), 70 renderers, 24 materiaux (max 32, un par couleur de cone), 6046 triangles, 7 modeles
+    [info] corps stool : 5 echantillons par case (1.00 m/s) en mode prudent (4 a pleine vitesse), anneau 0.25 m, bruit de deplacement 2.0 m
+    [info] habitants : Paul (dreamer, 8 m, 45 deg, ouie x0.7, tolerance 0.75 m), Rex (dog, voit en mouvement seulement, 6 m, 70 deg) ; 1 classe(s) de tolerance, 1 table(s) de portes
+    [info] flanerie la plus longue : 0.3 s sans bouger sur un sejour de 4.7 s a moins de 1.5 m de (3.75, 7.75), de 0.0 s a 4.7 s (max 8 s)
+    [info] horaire : sortie a 14.3 s, attente la plus longue 1.3 s (max 8 s), marge 0.4 s en avance / 3.0 s en retard, 28 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 31 pas de l'horaire, 4794 poses testees, 457 rayons, 0 observation(s)
+    [info] lecon pet : l'oeil du chien a 1.6 m, aucun horaire : le couvert bas est requis
+    [info] temps : 8.9 s, 1885644 noeuds developpes (plafond 80000000, au plus 1894908 crees par recherche), 537463 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece chambre :
+      # # # # # # # # # 
+      # # # # # # # * * 
+      # # # # 9 9 9 * # 
+      # # # # 9 9 9 * # 
+      # # # # 9 9 9 * # 
+      9 9 9 9 9 9 9 * # 
+      9 9 9 9 9 9 9 S # 
+      9 9 9 9 9 9 9 9 # 
+    piece couloir :
+      # # # # # # # # # # # 
+      * 8 8 9 9 9 9 9 9 # # 
+      * * 8 9 9 9 9 9 9 9 # 
+    piece cuisine :
+      # # 9 # # # # # # 
+      9 9 9 9 9 9 9 9 # 
+      9 9 9 9 9 9 9 9 # 
+      # # 9 9 9 9 9 9 # 
+      # # 9 9 9 9 9 9 # 
+      # # 9 9 # # # 9 # 
+      # # 9 9 # # # 9 # 
+      # # 9 9 # # # 9 # 
+      # # 9 9 9 9 9 9 # 
+      9 9 9 9 9 9 9 9 # 
+      9 9 9 9 9 9 9 9 # 
+    piece salon :
+      # * # # # # # # # # # 
+      ! * * * * * * * * * # 
+      ! # # # # # # # # * # 
+      ! # # # # # # # # * # 
+      ! ! ! ! ! ! ! 9 9 * * 
+      ! ! ! ! ! ! ! 9 9 9 # 
+      ! ! ! ! ! ! 9 9 9 9 # 
+      ! ! ! ! ! 9 9 9 9 9 # 
+      ! ! ! 9 9 9 9 9 9 9 # 
+      8 8 9 9 9 9 9 9 9 9 # 
+      8 8 9 # # # # # 9 9 # 
+      8 8 9 # # # # # 9 9 # 
+      8 8 8 # # # # # 9 8 # 
+      8 8 8 7 7 8 8 8 9 9 # 
+      8 8 7 7 7 8 8 8 8 9 # 
+      8 7 7 7 # # # 8 8 8 # 
+    piece entree :
+      # # # # # 
+      9 # # 9 # 
+      9 9 9 9 # 
+      9 9 9 9 # 
+      9 9 9 9 # 
+      9 9 9 9 # 
+      9 9 9 E 9 
+      * * * * # 
+      9 9 9 9 # 
+  [LevelAudit] Niveau level13 : 1 defaut(s)
+    [DEFAUT] l'horaire trouve flane 14.0 s sans bouger sur un sejour de 16.8 s a moins de 1.5 m de (2.25, 5.25), de 8.4 s a 25.2 s, plus de 8 s : attendre sur place, meme en sautillant d'une case a l'autre, n'est pas un horaire
+    [info] NavMesh : 190 triangles, 58 sources
+    [info] Max marche 1 -> 2 contourne un obstacle : 2 coin(s)
+    [info] Max marche 2 -> 1 contourne un obstacle : 2 coin(s)
+    [info] Claire marche 1 -> 2 contourne un obstacle : 3 coin(s)
+    [info] Claire marche 2 -> 3 contourne un obstacle : 1 coin(s)
+    [info] Claire marche 3 -> 1 contourne un obstacle : 2 coin(s)
+    [info] budgets : 110 emplacements (draw calls, max 160), 93 renderers, 26 materiaux (max 32, un par couleur de cone), 7714 triangles, 3 modeles
+    [info] charge vase : 204 triangles, comptee a part du meuble Player office_chair (312 triangles), budget de 400 chacun
+    [info] corps office_chair : 3 echantillons par case (1.67 m/s), anneau 0.41 m, bruit de deplacement 1.2 m, arret glisse 4 echantillons
+    [info] charge vase : tombe quand la vitesse change de 1.8 m/s en 0.5 s, l'audit refuse des 1.7 m/s (MotionProfile et LoadBalance sur l'historique des 13 derniers echantillons) ; jambes prudentes seulement (4 echantillons par case), un depart a pleine vitesse la fait tomber ; boite de vue plus haute de 0.25 m
+    [info] habitants : Max (hurried, 10 m, 50 deg, ouie x0.5, tolerance 0.75 m), Claire (watchful, 10 m, 60 deg, ouie x1.0, tolerance 0.5 m) ; 2 classe(s) de tolerance, 1 table(s) de portes
+    [info] Max et Claire : au plus pres 1.32 m a 223.5 s, se croisent
+    [info] AVERTISSEMENT tolerance 0.5 m : le leurre 1 (2.84, 2.25) n'est a moins de 0.35 m d'aucun centre de case : il n'explique rien
+    [info] AVERTISSEMENT tolerance 0.5 m : le leurre 2 (5.84, 2.25) n'est a moins de 0.35 m d'aucun centre de case : il n'explique rien
+    [info] AVERTISSEMENT tolerance 0.5 m : le leurre 3 (2.84, 4.75) n'est a moins de 0.35 m d'aucun centre de case : il n'explique rien
+    [info] AVERTISSEMENT tolerance 0.5 m : le leurre 4 (5.84, 4.75) n'est a moins de 0.35 m d'aucun centre de case : il n'explique rien
+    [info] AVERTISSEMENT tolerance 0.5 m : le leurre 5 (0.66, 4.25) n'est a moins de 0.35 m d'aucun centre de case : il n'explique rien
+    [info] flanerie la plus longue : 14.0 s sans bouger sur un sejour de 16.8 s a moins de 1.5 m de (2.25, 5.25), de 8.4 s a 25.2 s (max 8 s)
+    [info] horaire : sortie a 38.7 s, attente la plus longue 8.0 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 40 deplacements de case, grincement au plus 0.34, 66 echantillons expliques par un leurre, 1 echantillons sur tapis a portee d'oreille, 10 arret(s) glisse(s)
+    [info] charge : tenue sur tout l'horaire (ecart de vitesse au plus 1.60 m/s sur 0.5 s, sous 1.8), 40 deplacement(s) de case prudent(s) ; marge 0.20 m/s avant la chute (1.8), 0.10 m/s sous le refus de l'audit (1.7)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 237 pas de l'horaire, 54004 poses testees, 5114 rayons, 0 observation(s)
+    [info] la designerRoute du fichier differe de cet horaire (elle reste valable si la sonde 20 la gagne) ; -writeRoutes la remplace
+    [info] leurres eteints : aucun horaire, les leurres sont necessaires
+    [info] lecon load : l'horaire calcule sans la regle de la charge (sortie a 32.0 s) la fait tomber a 4.04 s (ecart de vitesse 3.96 m/s sur 0.5 s) : la conduite prudente est requise ; contre-route : [{ "x": 2.25, "z": 7.25, "at": 3.8 }, { "x": 2.25, "z": 6.75, "at": 4.4 }, { "x": 1.75, "z": 6.75, "at": 5.1 }, { "x": 1.25, "z": 6.75, "at": 5.8 }, { "x": 2.25, "z": 6.75, "at": 6.9 }, { "x": 2.25, "z": 5.75, "at": 7.5 }, { "x": 2.25, "z": 5.25, "at": 8.1 }, { "x": 1.25, "z": 5.25, "at": 8.4 }, { "x": 1.25, "z": 4.25, "at": 9.0 }, { "x": 1.25, "z": 3.25, "at": 9.6 }, { "x": 2.25, "z": 3.25, "at": 10.2 }, { "x": 3.25, "z": 3.25, "at": 10.8 }, { "x": 3.75, "z": 3.25, "at": 11.4 }, { "x": 3.75, "z": 2.25, "at": 11.7 }, { "x": 4.75, "z": 2.25, "at": 12.3 }, { "x": 5.25, "z": 2.25, "at": 12.9 }, { "x": 4.75, "z": 2.25, "at": 19.4 }, { "x": 4.25, "z": 2.25, "at": 20.1 }, { "x": 3.75, "z": 2.25, "at": 20.8 }, { "x": 3.75, "z": 1.75, "at": 21.5 }, { "x": 3.75, "z": 1.25, "at": 22.2 }, { "x": 3.25, "z": 1.25, "at": 22.9 }, { "x": 3.25, "z": 0.75, "at": 23.6 }, { "x": 2.75, "z": 0.75, "at": 24.3 }, { "x": 3.75, "z": 0.75, "at": 25.4 }, { "x": 4.75, "z": 0.75, "at": 26.0 }, { "x": 5.75, "z": 0.75, "at": 26.6 }, { "x": 6.75, "z": 0.75, "at": 27.2 }, { "x": 7.25, "z": 0.75, "at": 27.8 }, { "x": 7.25, "z": 1.25, "at": 28.1 }, { "x": 8.25, "z": 1.25, "at": 28.4 }, { "x": 9.25, "z": 1.25, "at": 29.0 }, { "x": 10.25, "z": 1.25, "at": 29.6 }, { "x": 11.25, "z": 1.25, "at": 30.2 }, { "x": 12.25, "z": 1.25, "at": 30.8 }, { "x": 13.25, "z": 1.25, "at": 31.4 }, { "x": 13.25, "z": 1.25, "at": 31.4 }]
+    [info] temps : 6.4 s, 965411 noeuds developpes (plafond 80000000, au plus 1092770 crees par recherche), 1079901 rayons (plafond 20000000), 85 etats de charge
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece direction :
+      # # # # # # # # # 
+      # # # # 7 # # # # 
+      # # # # 8 7 7 7 # 
+      # # # # S 8 8 8 # 
+      # # # # * 6 6 6 # 
+      # # # # * 6 6 6 # 
+      # 6 6 6 * 6 6 6 6 
+      # # # # * # # # # 
+    piece plateau :
+      # # # # * # # # # # # # # # # # # # # # 
+      # 6 6 6 * # # 7 7 7 7 # # 6 6 6 6 6 6 # 
+      # # * * * # # 6 6 6 c # # 6 6 6 6 6 6 6 
+      # # * # # # # 6 6 # # # # 6 6 6 6 6 6 # 
+      # # * # # # 6 6 6 # # # 6 6 6 6 6 6 6 # 
+      # 5 * * * * * * * * * * * * 6 6 6 7 7 # 
+      # 5 5 6 6 # # 6 6 6 6 # # * 7 7 7 7 7 # 
+      # 5 7 6 c # # 6 6 6 c # # * 7 7 7 7 8 # 
+      # 7 7 # # # # 6 7 # # # # * 7 7 8 8 8 # 
+      # 7 7 # # # 7 7 7 # # # 7 * * * * * * * 
+      # 7 7 7 7 7 7 7 8 8 7 8 8 8 8 # # # 8 # 
+      # # # # # # # # # # # # # # # # # # # # 
+    piece couloir :
+      # # # # # # # # # # # 
+      6 6 6 6 6 6 7 7 7 7 6 
+      # # # # # # # # # # # 
+    piece cafeteria :
+      # # # # # # # # 
+      6 # # # # # # # 
+      # 6 4 5 5 5 4 # 
+      # 5 5 5 5 5 # # 
+      # 6 6 6 6 4 # # 
+      6 6 6 6 6 6 # # 
+      # 6 6 6 7 7 6 # 
+      # 8 8 8 8 8 8 # 
+      # # # # 8 # # # 
+    piece accueil :
+      # # # # 8 # # # 
+      # 9 9 9 9 9 9 # 
+      # 8 8 9 9 9 9 # 
+      * * * * * * E 9 
+      # # # # # 8 8 # 
+      # # # # # # # # 
+  [LevelAudit] Niveau level14 : aucun defaut
+    [info] NavMesh : 155 triangles, 67 sources
+    [info] Mamie marche 2 -> 3 contourne un obstacle : 3 coin(s)
+    [info] Mamie marche 3 -> 4 contourne un obstacle : 5 coin(s)
+    [info] Mamie marche 4 -> 1 contourne un obstacle : 9 coin(s)
+    [info] Lea marche 1 -> 2 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 1 -> 3 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 1 -> 4 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 2 -> 1 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 2 -> 3 contourne un obstacle : 5 coin(s)
+    [info] Lea marche 2 -> 4 contourne un obstacle : 4 coin(s)
+    [info] Lea marche 3 -> 1 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 3 -> 2 contourne un obstacle : 5 coin(s)
+    [info] Lea marche 3 -> 4 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 4 -> 1 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 4 -> 2 contourne un obstacle : 2 coin(s)
+    [info] Lea marche 4 -> 3 contourne un obstacle : 2 coin(s)
+    [info] budgets : 94 emplacements (draw calls, max 160), 73 renderers, 27 materiaux (max 32, un par couleur de cone), 12184 triangles, 7 modeles
+    [info] corps armchair : 6 echantillons par case (0.83 m/s), anneau 0.67 m, bruit de deplacement 2.0 m
+    [info] assis sur le joueur (presence au siege, de l'instant de l'assise a la fin de l'epingle) : 5.1-6.7 s, 57.8-59.5 s, 110.5-112.2 s, 163.3-165.0 s, 216.0-217.7 s, 268.8-270.4 s
+    [info] habitants : Mamie (granny, 7 m, 55 deg, ouie x0.6, tolerance 0.75 m), Lea (tidy, 10 m, 55 deg, ouie x1.0, tolerance 0.4 m) ; 2 classe(s) de tolerance, 1 table(s) de portes
+    [info] Mamie et Lea : au plus pres 6.58 m a 104.2 s, se croisent
+    [info] flanerie la plus longue : 3.6 s sans bouger sur un sejour de 10.8 s a moins de 1.5 m de (5.75, 4.75), de 0.0 s a 10.8 s (max 8 s)
+    [info] horaire : sortie a 27.0 s, attente la plus longue 3.7 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 39 deplacements de case, grincement au plus 0.04, 0 echantillons expliques par un leurre, 51 echantillons sur tapis a portee d'oreille, assis dessus 1.6 s
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 75 pas de l'horaire, 13787 poses testees, 27 rayons, 0 observation(s)
+    [info] lecon split : plateforme et rampe interdites, aucun horaire : la mezzanine est requise
+    [info] temps : 2.8 s, 74945 noeuds developpes (plafond 80000000, au plus 84689 crees par recherche), 607665 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece sejour :
+      # # # # # # # # # # # # # # # # # # 
+      # 7 8 # # # 8 # # # # 8 8 8 8 8 8 # 
+      6 7 8 # # # 8 # # # # 8 8 8 8 8 9 # 
+      # 6 8 # # # 8 # # # # 8 8 8 8 8 9 9 
+      # 7 S # # # 8 # # # # 8 8 8 8 9 9 # 
+      # 7 * # # # # # # # # # # # # 9 9 # 
+      # * * # # # # # # # # # # # # 8 8 # 
+      # 8 * * * * * * * * * * * * * * 9 # 
+      # 8 8 # # # # # # # # # # # # * 9 # 
+      # 8 8 # # # # # # # # # # # # * * * 
+      # 8 8 8 8 8 8 # # # # 8 8 9 9 9 9 # 
+      # 8 8 8 8 8 8 # # # # 8 8 # # # # # 
+      # # 8 8 8 8 8 # # # # 8 9 # # # # # 
+      # # # # # # # # # # # # # # # # # # 
+    piece chambre :
+      # # # # # # # # # 
+      # 7 6 # # # 5 6 # 
+      # 6 6 # # # 5 5 6 
+      # # 6 6 6 6 6 5 # 
+      # # # 6 6 6 6 7 # 
+      # # # 5 6 7 7 7 # 
+      # # # # # # # # # 
+    piece salle :
+      # # 5 # # # # # # 
+      # 6 6 6 6 8 8 9 # 
+      # # # # # # 8 8 # 
+      # # # # # # 8 8 # 
+      # # # # # # 8 8 # 
+      # 7 7 6 8 7 7 7 # 
+      # # # # # # # # # 
+    piece cuisine :
+      # # # # # # # # # 
+      # # # # # # # # # 
+      # 9 4 4 4 8 8 8 # 
+      9 9 8 8 8 8 8 8 # 
+      # 9 9 8 8 8 8 8 # 
+      # 9 9 8 8 8 8 8 # 
+      # # # # # 8 # # # 
+    piece couloir :
+      # # # # # 8 # # # 
+      # 9 9 8 8 7 7 7 # 
+      * * * * * * * 7 # 
+      # # # # # # * # # 
+    piece entree :
+      # # # # # # * # # 
+      # 9 9 9 8 8 * 8 # 
+      # 9 9 9 8 8 * 8 # 
+      # 8 8 8 8 8 * E 8 
+      # # # # 8 8 8 8 # 
+      # # # # # # # # # 
+  [LevelAudit] Niveau level15 : aucun defaut
+    [info] NavMesh : 118 triangles, 54 sources
+    [info] Hugo marche 1 -> 2 contourne un obstacle : 5 coin(s)
+    [info] Hugo marche 1 -> 3 contourne un obstacle : 4 coin(s)
+    [info] Hugo marche 1 -> 4 contourne un obstacle : 1 coin(s)
+    [info] Hugo marche 2 -> 1 contourne un obstacle : 5 coin(s)
+    [info] Hugo marche 2 -> 3 contourne un obstacle : 6 coin(s)
+    [info] Hugo marche 2 -> 4 contourne un obstacle : 4 coin(s)
+    [info] Hugo marche 3 -> 1 contourne un obstacle : 4 coin(s)
+    [info] Hugo marche 3 -> 2 contourne un obstacle : 6 coin(s)
+    [info] Hugo marche 3 -> 4 contourne un obstacle : 1 coin(s)
+    [info] Hugo marche 4 -> 1 contourne un obstacle : 1 coin(s)
+    [info] Hugo marche 4 -> 2 contourne un obstacle : 4 coin(s)
+    [info] Hugo marche 4 -> 3 contourne un obstacle : 1 coin(s)
+    [info] budgets : 90 emplacements (draw calls, max 160), 69 renderers, 23 materiaux (max 32, un par couleur de cone), 6084 triangles, 4 modeles
+    [info] corps rocking_chair : 5 echantillons par case (1.00 m/s), anneau 0.57 m, bruit de deplacement 2.0 m
+    [info] robot (0.40 m/s, boucle de 10.0 s) : trajet fixe ; zone de contact 0.91 m (rayon 0.17 + demi-diagonale 0.52 + relache 0.1 + course sur la marge 0.12), sur chaque deplacement, chaque arret et au depart ; ronronnement a 2.38 m (2.5 moins la course) sur toute la fenetre de marge
+    [info] bascule : chaque arret coute 9 echantillons vus en mouvement (le pas de repos et la bascule) ; 5 echantillons par case au depart et dans un virage, 4 en continuant tout droit, 6 quand le meuble prendrait plus d'un echantillon de retard sur le plan (cout reel : depart 5.17, tout droit 4.17 a 4.33, virage 4.83 a 5.33 echantillons) ; demi-tour en mouvement interdit ; la designerRoute enchaine les points d'une meme course
+    [info] habitants : Claire (watchful, 10 m, 60 deg, ouie x1.0, tolerance 0.5 m), Hugo (teen, 6 m, 35 deg, ouie x0.4, tolerance 0.75 m) ; 2 classe(s) de tolerance, 1 table(s) de portes
+    [info] Claire et Hugo : au plus pres 1.90 m a 155.1 s, se croisent
+    [info] flanerie la plus longue : 5.9 s sans bouger sur un sejour de 8.5 s a moins de 1.5 m de (2.75, 3.25), de 0.0 s a 8.5 s (max 8 s)
+    [info] horaire : sortie a 28.9 s, attente la plus longue 6.8 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 40 deplacements de case, grincement au plus 0.21, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 1 bascule(s)
+    [info] robot : l'horaire passe au plus pres a 1.00 m de lui a 15.0 s ; 38 echantillon(s) de deplacement entendus sans le ronronnement, masques par lui
+    [info] bascule, rejeu cinematique de la route (MotionProfile, relache 0.1 m) : 40 cases, retard au plus 0.07 s, avance au plus 0.27 s sur l'horaire (tolere : 0.1 s de retard)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 142 pas de l'horaire, 30910 poses testees, 511 rayons, 0 observation(s)
+    [info] la designerRoute du fichier differe de cet horaire (elle reste valable si la sonde 20 la gagne) ; -writeRoutes la remplace
+    [info] lecon robot : ronronnement coupe, aucun horaire : le ronronnement est requis (le robot contraint par son bruit)
+    [info] temps : 31.3 s, 7272279 noeuds developpes (plafond 80000000, au plus 9671564 crees par recherche), 154935 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece bureau :
+      # # # # 9 # # # # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 8 8 8 8 # 
+      # 8 S * * * * * * 
+      # 7 7 7 8 8 6 6 # 
+      # 7 7 8 6 8 6 7 # 
+      # 8 8 6 6 7 7 7 # 
+      # 6 # # # 7 9 9 # 
+      # # # # # # 9 9 # 
+      # # # # # # # # # 
+    piece chambre :
+      # # # # # # # # # 
+      # # # # 7 7 7 8 8 
+      # # # # 7 7 7 8 # 
+      # # # # 7 7 8 8 # 
+      # # # # 7 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # # # # 9 # # # # 
+    piece couloir :
+      # # # # # # # # # # # # # # # # # # 
+      8 2 2 2 2 3 8 8 8 8 8 8 7 7 8 7 7 # 
+      # # # 2 # # # # # # # # # # 7 # # # 
+    piece salon :
+      # # # 3 # # # # # # # 
+      # 3 3 3 3 3 # # # # # 
+      # # 3 3 3 3 # # # # # 
+      # # 4 3 3 3 4 4 4 4 # 
+      # # 4 3 3 3 4 4 4 4 # 
+      # # 3 3 3 4 3 3 7 7 # 
+      # 7 7 ! ! ! 7 7 7 7 # 
+      # 6 6 5 6 5 6 6 7 7 # 
+      * * * * * * 6 7 6 6 # 
+      # 7 6 6 6 * * * 7 7 # 
+      # # # # # # # * # # # 
+    piece cuisine :
+      # # # 7 # # # 
+      # 9 9 8 8 8 # 
+      # 9 9 9 9 # # 
+      # 9 9 8 9 # # 
+      # 9 9 8 9 # # 
+      # 9 9 8 9 # # 
+      # 9 9 8 9 # # 
+      # 9 9 8 9 # # 
+      # 9 9 9 8 # # 
+      # # 8 8 8 8 # 
+      # # # # # # # 
+    piece entree :
+      # # # # # # # * # # # # # # # # # # 
+      # 9 9 9 * * * * * * * * * * * * * # 
+      # 9 9 9 * * 7 7 7 7 7 # # # 9 9 E 9 
+      # # # # # # # # # # # # # # # # # # 
+  [LevelAudit] Niveau level16 : aucun defaut
+    [info] NavMesh : 124 triangles, 46 sources
+    [info] Max marche 1 -> 2 contourne un obstacle : 1 coin(s)
+    [info] Max marche 2 -> 1 contourne un obstacle : 1 coin(s)
+    [info] Max marche 2 -> 3 contourne un obstacle : 2 coin(s)
+    [info] Max marche 3 -> 2 contourne un obstacle : 2 coin(s)
+    [info] budgets : 82 emplacements (draw calls, max 120), 56 renderers, 24 materiaux (max 24, un par couleur de cone), 7491 triangles, 6 modeles
+    [info] corps floor_lamp : 9 echantillons par case (0.56 m/s), anneau 0.25 m, bruit de deplacement 2.0 m, lampe : jamais vue, deux tables de vue
+    [info] habitants : Claire (watchful, 10 m, 60 deg, ouie x1.0, tolerance 0.5 m), Max (hurried, 10 m, 50 deg, ouie x0.5, tolerance 0.75 m), Rex (dog, voit en mouvement seulement, 6 m, 70 deg) ; 2 classe(s) de tolerance, 2 table(s) de portes
+    [info] porte porte_salon : 3 case(s) d'atteinte : (0.75, 4.25) (1.25, 4.25) (1.75, 4.25)
+    [info] Claire et Max : au plus pres 7.76 m a 55.7 s, se croisent
+    [info] flanerie la plus longue : 0.6 s sans bouger sur un sejour de 10.7 s a moins de 1.5 m de (3.75, 6.25), de 0.0 s a 10.7 s (max 8 s)
+    [info] horaire : sortie a 27.6 s, attente la plus longue 2.4 s (max 8 s), marge 0.4 s en avance / 1.0 s en retard, 30 deplacements de case, grincement au plus 0.00, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 1 interrupteur(s)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 34 pas de l'horaire, 7624 poses testees, 110 rayons, 0 observation(s)
+    [info] route : 19 points, ouvertures : aucune
+    [info] lecon dark : lampe toujours allumee, aucun horaire : le noir est requis
+    [info] lecon dark : Max passe a 1.5 m du chemin de la lampe a 10.1 s (sa portee dans le noir 4.0 m) : le noir ne suffit pas, il faut choisir le moment
+    [info] temps : 10.8 s, 376662 noeuds developpes (plafond 80000000, au plus 431465 crees par recherche), 361346 rayons (plafond 20000000)
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece salon :
+      # # 5 # # # # # # # * # # # # # # # ! # # # 
+      8 6 5 3 ! ! ! ! ! ! * ! ! ! ! ! ! ! ! ! ! # 
+      8 4 4 3 ! ! ! ! ! ! * * * * * ! ! ! ! ! ! # 
+      8 7 3 3 ! ! ! ! ! # # # # ! * ! ! ! ! ! ! # 
+      7 7 4 3 ! ! ! ! ! # # # # ! * ! ! ! ! ! ! # 
+      7 5 5 3 ! ! ! ! ! # # # # ! * * * * * * E ! 
+      7 6 5 3 ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! # 
+      7 6 5 5 3 ! ! ! ! # # # # 2 ! ! ! ! ! ! ! # 
+    piece chambre :
+      # # # # # # # # # 
+      9 9 # # # # 8 8 # 
+      9 9 # # # # 9 * * 
+      9 9 # # # # 9 * # 
+      9 9 # # # # 9 * # 
+      9 9 9 9 9 9 9 * # 
+      9 9 9 9 9 9 S * # 
+      9 9 9 9 9 9 9 9 # 
+      9 9 9 9 9 9 9 9 # 
+    piece couloir :
+      # # # # 
+      8 8 8 # 
+      * 8 8 8 
+      * 9 8 # 
+      * 9 9 # 
+      * 9 9 # 
+      * 9 7 # 
+      * 7 6 # 
+      * * 2 # 
+    piece cuisine :
+      # # # # # # # # # 
+      8 8 # # # # # 8 # 
+      8 8 8 6 7 7 7 7 # 
+      8 8 8 8 8 7 7 7 # 
+      8 8 8 # # # 7 7 # 
+      9 9 9 # # # 6 5 # 
+      9 9 9 # # # 6 5 # 
+      9 9 9 9 8 6 5 4 # 
+      9 9 9 9 6 2 ! ! # 
+  [LevelAudit] Niveau level17 : 1 defaut(s)
+    [DEFAUT] l'horaire trouve flane 33.0 s sans bouger sur un sejour de 44.3 s a moins de 1.5 m de (2.75, 6.25), de 0.0 s a 44.3 s, plus de 8 s : attendre sur place, meme en sautillant d'une case a l'autre, n'est pas un horaire
+    [info] NavMesh : 159 triangles, 71 sources
+    [info] Mamie marche 1 -> 2 contourne un obstacle : 1 coin(s)
+    [info] Mamie marche 2 -> 3 contourne un obstacle : 1 coin(s)
+    [info] Hugo marche 1 -> 2 contourne un obstacle : 1 coin(s)
+    [info] Hugo marche 1 -> 3 contourne un obstacle : 9 coin(s)
+    [info] Hugo marche 2 -> 1 contourne un obstacle : 1 coin(s)
+    [info] Hugo marche 2 -> 3 contourne un obstacle : 7 coin(s)
+    [info] Hugo marche 3 -> 1 contourne un obstacle : 9 coin(s)
+    [info] Hugo marche 3 -> 2 contourne un obstacle : 7 coin(s)
+    [info] budgets : 109 emplacements (draw calls, max 160), 77 renderers, 29 materiaux (max 32, un par couleur de cone), 20136 triangles, 9 modeles
+    [info] charge vase : 204 triangles, comptee a part du meuble Chair (340 triangles), budget de 400 chacun
+    [info] corps chair : 4 echantillons par case (1.25 m/s), anneau 0.33 m, bruit de deplacement 2.0 m
+    [info] robot (0.40 m/s, boucle de 10.0 s) : trajet fixe ; zone de contact 0.71 m (rayon 0.17 + demi-diagonale 0.32 + relache 0.1 + course sur la marge 0.12), sur chaque deplacement, chaque arret et au depart ; ronronnement a 2.38 m (2.5 moins la course) sur toute la fenetre de marge
+    [info] charge vase : tombe quand la vitesse change de 1.8 m/s en 0.5 s, l'audit refuse des 1.7 m/s (MotionProfile et LoadBalance sur l'historique des 13 derniers echantillons) ; jambes prudentes permises (7 echantillons par case), pleine vitesse 4 ; boite de vue plus haute de 0.25 m
+    [info] habitants : Mamie (granny, 7 m, 55 deg, ouie x0.6, tolerance 0.75 m), Hugo (teen, 6 m, 35 deg, ouie x0.4, tolerance 0.75 m), Lea (tidy, 10 m, 55 deg, ouie x1.0, tolerance 0.4 m), Rex (dog, voit en mouvement seulement, 6 m, 70 deg) ; 2 classe(s) de tolerance, 4 table(s) de portes
+    [info] porte porte_bureau : 1 case(s) d'atteinte : (2.25, 5.25)
+    [info] porte porte_entree : 1 case(s) d'atteinte : (12.75, 2.25)
+    [info] Mamie et Hugo : au plus pres 3.19 m a 50.0 s, se croisent
+    [info] Mamie et Lea : au plus pres 6.50 m a 114.5 s, se croisent
+    [info] Hugo et Lea : au plus pres 1.25 m a 60.1 s, se croisent
+    [info] flanerie la plus longue : 33.0 s sans bouger sur un sejour de 44.3 s a moins de 1.5 m de (2.75, 6.25), de 0.0 s a 44.3 s (max 8 s)
+    [info] horaire : sortie a 85.5 s, attente la plus longue 8.0 s (max 8 s), marge 0.3 s en avance / 0.3 s en retard, 59 deplacements de case, grincement au plus 0.77, 0 echantillons expliques par un leurre, 0 echantillons sur tapis a portee d'oreille, 1 porte(s) ouverte(s)
+    [info] robot : l'horaire passe au plus pres a 1.14 m de lui a 78.8 s ; 24 echantillon(s) de deplacement entendus sans le ronronnement, masques par lui
+    [info] charge : tenue sur tout l'horaire (ecart de vitesse au plus 1.68 m/s sur 0.5 s, sous 1.8), 44 deplacement(s) de case prudent(s) ; marge 0.12 m/s avant la chute (1.8), 0.02 m/s sous le refus de l'audit (1.7)
+    [info] fidelite de la vue (les 5 points du jeu, relache 0.1 m, positions intermediaires tous les 0.1 m, fenetre de marge) : 541 pas de l'horaire, 163862 poses testees, 4658 rayons, 0 observation(s)
+    [info] route : 44 points, ouvertures : porte_entree en (12.75, 2.25) a 80.2 s
+    [info] lecon final, lecon door : toutes les portes verrouillees, aucun horaire : il faut ouvrir une porte
+    [info] lecon final, lecon pet : un horaire existe aussi avec l'oeil du chien a 1.6 m : la lecon n'est pas requise (sortie a 85.5 s, attente max 0.0 s, flanerie max 25.6 s ; arret (2.25, 6.25) a 7.0 s ; arret (2.25, 5.75) a 9.1 s ; arret (2.25, 5.25) a 12.1 s ; porte (2.25, 5.25) a 13.8 s ; arret (2.25, 5.75) a 15.1 s ; arret (2.75, 5.75) a 17.2 s ; arret (3.25, 5.75) a 19.3 s ; arret (3.75, 5.75) a 21.4 s ; arret (3.75, 6.25) a 23.5 s ; arret (3.75, 6.75) a 25.6 s ; arret (3.75, 7.25) a 27.7 s ; arret (3.75, 7.75) a 29.8 s ; arret (3.75, 8.25) a 31.9 s ; arret (4.25, 8.25) a 34.0 s ; arret (3.75, 8.25) a 42.3 s ; arret (5.25, 8.25) a 54.0 s ; arret (5.75, 8.25) a 54.8 s ; arret (6.25, 5.75) a 59.8 s ; arret (6.75, 4.25) a 66.0 s ; arret (7.25, 4.25) a 67.6 s ; arret (7.75, 4.25) a 69.7 s ; porte (12.75, 2.25) a 79.9 s)
+    [info] lecon final, lecon split : plateforme et rampe interdites, aucun horaire : la mezzanine est requise
+    [info] lecon final, lecon robot : ronronnement coupe, aucun horaire : le ronronnement est requis (le robot contraint par son bruit)
+    [info] lecon final, lecon rock : le niveau n'a pas la mecanique (le meuble ne bascule pas)
+    [info] lecon final, lecon load : l'horaire calcule sans la regle de la charge (sortie a 82.6 s) la fait tomber a 25.52 s (ecart de vitesse 2.12 m/s sur 0.5 s) : la conduite prudente est requise ; contre-route : [{ "x": 2.25, "z": 6.25, "at": 21.9 }, { "x": 2.25, "z": 5.75, "at": 23.1 }, { "x": 2.25, "z": 5.25, "at": 23.9 }, { "x": 2.25, "z": 5.25, "at": 24.3, "action": "open", "door": "porte_bureau" }, { "x": 2.25, "z": 5.75, "at": 24.9 }, { "x": 2.75, "z": 5.75, "at": 25.3 }, { "x": 2.25, "z": 5.75, "at": 29.7 }, { "x": 2.25, "z": 5.25, "at": 30.9 }, { "x": 2.25, "z": 5.75, "at": 32.1 }, { "x": 2.25, "z": 5.25, "at": 33.3 }, { "x": 2.25, "z": 5.75, "at": 34.5 }, { "x": 2.75, "z": 5.75, "at": 35.7 }, { "x": 3.25, "z": 5.75, "at": 36.9 }, { "x": 3.75, "z": 5.75, "at": 38.1 }, { "x": 3.75, "z": 6.25, "at": 39.3 }, { "x": 3.75, "z": 5.75, "at": 40.5 }, { "x": 3.25, "z": 5.75, "at": 41.7 }, { "x": 3.75, "z": 5.75, "at": 42.9 }, { "x": 3.25, "z": 5.75, "at": 44.1 }, { "x": 3.75, "z": 5.75, "at": 45.3 }, { "x": 3.75, "z": 6.25, "at": 46.5 }, { "x": 3.75, "z": 6.75, "at": 47.7 }, { "x": 3.75, "z": 7.25, "at": 48.9 }, { "x": 3.75, "z": 7.75, "at": 50.1 }, { "x": 3.75, "z": 8.25, "at": 51.3 }, { "x": 4.25, "z": 8.25, "at": 52.5 }, { "x": 4.75, "z": 8.25, "at": 53.7 }, { "x": 5.25, "z": 8.25, "at": 54.9 }, { "x": 5.75, "z": 8.25, "at": 56.1 }, { "x": 6.25, "z": 8.25, "at": 57.3 }, { "x": 6.25, "z": 7.75, "at": 58.5 }, { "x": 6.25, "z": 6.75, "at": 59.2 }, { "x": 6.25, "z": 6.25, "at": 60.0 }, { "x": 6.25, "z": 5.75, "at": 63.3 }, { "x": 6.25, "z": 5.25, "at": 64.5 }, { "x": 6.25, "z": 4.75, "at": 65.7 }, { "x": 6.25, "z": 4.25, "at": 66.9 }, { "x": 6.75, "z": 4.25, "at": 68.1 }, { "x": 7.25, "z": 4.25, "at": 69.3 }, { "x": 7.75, "z": 4.25, "at": 70.5 }, { "x": 8.25, "z": 4.25, "at": 71.7 }, { "x": 8.75, "z": 4.25, "at": 72.4 }, { "x": 9.25, "z": 4.25, "at": 72.8 }, { "x": 9.75, "z": 4.25, "at": 73.2 }, { "x": 10.75, "z": 4.25, "at": 73.6 }, { "x": 11.25, "z": 4.25, "at": 74.4 }, { "x": 11.75, "z": 4.25, "at": 74.8 }, { "x": 11.75, "z": 3.25, "at": 75.2 }, { "x": 12.25, "z": 3.25, "at": 76.0 }, { "x": 12.25, "z": 2.25, "at": 76.4 }, { "x": 12.75, "z": 2.25, "at": 77.2 }, { "x": 12.75, "z": 2.25, "at": 77.6, "action": "open", "door": "porte_entree" }, { "x": 13.75, "z": 2.25, "at": 78.2 }, { "x": 14.25, "z": 2.25, "at": 79.0 }, { "x": 14.25, "z": 1.25, "at": 79.4 }, { "x": 15.25, "z": 1.25, "at": 80.2 }, { "x": 16.25, "z": 1.25, "at": 81.0 }, { "x": 17.25, "z": 1.25, "at": 81.8 }, { "x": 17.25, "z": 1.25, "at": 81.8 }]
+    [info] lecon final : 4 verifications contraignent (door, split, robot, load)
+    [info] temps : 111.6 s, 29468494 noeuds developpes (plafond 80000000, au plus 30239552 crees par recherche), 1341339 rayons (plafond 20000000), 85 etats de charge, par recherche : 26784835 1932951 750708
+    carte (haut = +z) : # bloque, 0-9 = part du temps non vue (! sous 25 %), c case expliquee par un leurre, * horaire, S depart, E sortie
+    piece chambre :
+      # # # # # # # # # 
+      # # # # 9 9 9 * * 
+      # # # # 9 9 9 * # 
+      # # # # 9 9 9 * # 
+      # # # # S 9 9 * # 
+      # 9 * * * * * * # 
+      # 9 9 * * * 9 9 # 
+      # # # # 6 # # # # 
+    piece couloir :
+      # # # # # # # # # # # # # # # # # # 
+      * * * * 8 8 8 8 8 8 8 8 8 8 7 7 7 7 
+      # # # * # # # # # # # # # # # # # # 
+    piece sejour :
+      # # # * # # # # # # # # # # # # # # 
+      # 8 8 * 8 8 8 # # # # 8 # # # # # # 
+      # 8 8 * 8 8 8 # # # # 8 # # # # # # 
+      # 8 8 * 8 8 8 # # # # 6 6 6 5 5 5 # 
+      # 8 8 * # # # # # # # # # # 6 5 5 # 
+      # 8 8 * # # # # 6 6 # # # # 6 5 5 # 
+      # 8 7 * * * * * * * * * * * * 5 5 # 
+      # 5 7 8 # # # # 5 5 # # # # * 5 5 # 
+      # 5 5 5 # # # # # # # # # # * 5 5 # 
+      # 5 4 4 4 3 5 # # # # 5 5 5 * 5 5 # 
+      # 4 4 4 3 3 4 # # # # 5 5 4 * * * * 
+      # 3 3 3 3 3 3 # # # # 5 5 5 4 5 5 # 
+      3 3 3 3 3 2 3 # # # # 4 5 5 5 5 6 # 
+      # 3 3 3 2 2 2 # # # # 4 5 5 5 4 5 # 
+      # # # # # # # # # # # # # # # # # # 
+    piece bureau :
+      # # # # 6 # # # # 
+      # 5 6 6 6 6 9 9 # 
+      # 5 5 5 5 5 6 9 # 
+      # 5 5 5 5 5 # # # 
+      # 5 5 5 5 5 # # # 
+      # 5 5 5 5 5 # # # 
+      # 5 5 5 5 5 5 5 # 
+      # 5 # # # 3 5 4 3 
+      # 3 # # # 2 5 4 # 
+      # # # # # # # # # 
+    piece cuisine :
+      # # # # # # # # # 
+      8 # # # # # # 8 # 
+      # 8 8 8 8 8 8 8 # 
+      # 9 8 8 8 8 8 8 # 
+      # 9 9 9 9 9 8 8 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # # # # # # # # # 
+    piece entree :
+      # # # # # # # # # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      # 9 9 9 9 9 9 9 # 
+      * * * * * * * * # 
+      # 9 9 9 9 9 9 * # 
+      # 9 9 9 9 9 9 E 9 
+      # 9 9 9 9 9 9 9 # 
+      # # # # # # # # # 
+  [LevelAudit] Auto-test : 19 niveaux qui doivent echouer, chacun pour sa regle
+    [ok] test_wait : aucun horaire (attente de 8 s au plus) ; sans la regle wait (attente illimitee), sortie a 14.9 s
+    [temps] test_wait : temps : 0.3 s, 825 noeuds developpes (plafond 80000000, au plus 909 crees par recherche), 6034 rayons (plafond 20000000)
+    [ok] test_noise : aucun horaire (bruit) ; sans la regle noise (sans bruit), sortie a 4.7 s
+    [temps] test_noise : temps : 0.3 s, 399 noeuds developpes (plafond 80000000, au plus 548 crees par recherche), 250 rayons (plafond 20000000)
+    [ok] test_creak : aucun horaire (grincement) ; sans la regle creak (sans grincement), sortie a 46.6 s
+    [temps] test_creak : temps : 0.7 s, 4077 noeuds developpes (plafond 80000000, au plus 2542 crees par recherche), 20219 rayons (plafond 20000000)
+    [ok] test_tip : aucun horaire (pleine vitesse, chaque arret renverse le tabouret) ; sans la regle tip (mode prudent), sortie a 10.9 s
+    [temps] test_tip : temps : 0.5 s, 4224 noeuds developpes (plafond 80000000, au plus 5028 crees par recherche), 4337 rayons (plafond 20000000)
+    [ok] test_dark : aucun horaire (lampe toujours allumee) ; sans la regle dark (la lampe peut s'eteindre), sortie a 6.9 s
+    [temps] test_dark : temps : 0.5 s, 777 noeuds developpes (plafond 80000000, au plus 1335 crees par recherche), 5118 rayons (plafond 20000000)
+    [ok] test_sit : aucun horaire (on s'assoit sur le joueur) ; sans la regle sit (personne ne s'assoit), sortie a 8.1 s
+    [temps] test_sit : temps : 0.5 s, 583 noeuds developpes (plafond 80000000, au plus 752 crees par recherche), 44265 rayons (plafond 20000000)
+    [ok] test_door : aucun horaire (toutes les portes verrouillees) ; sans la regle door (la porte peut s'ouvrir), sortie a 5.7 s
+    [temps] test_door : temps : 1.0 s, 11826 noeuds developpes (plafond 80000000, au plus 15382 crees par recherche), 0 rayons (plafond 20000000)
+    [ok] test_pet : aucun horaire (le chien voit a 1.6 m) ; sans la regle pet (le chien voit a 0.35 m), sortie a 5.8 s
+    [temps] test_pet : temps : 0.9 s, 1856 noeuds developpes (plafond 80000000, au plus 2714 crees par recherche), 994 rayons (plafond 20000000)
+    [ok] test_cross : Habitant et Voisine passent a 0.50 m l'un de l'autre a 4.3 s (au moins 0.6 m) (deux humains a 0.6 m au moins) ; sans la regle cross (a 0.3 m au moins), aucun defaut
+    [temps] test_cross : temps : 1.1 s, 0 noeuds developpes (plafond 80000000, au plus 0 crees par recherche), 83663 rayons (plafond 20000000)
+    [ok] test_split : aucun horaire (plateforme et rampes interdites) ; sans la regle split (plateforme et rampes permises), sortie a 8.1 s
+    [temps] test_split : temps : 0.6 s, 4651 noeuds developpes (plafond 80000000, au plus 6088 crees par recherche), 3 rayons (plafond 20000000)
+    [ok] test_m5_audit_darkpass : lecon dark : aucun habitant qui rallume la lampe ne passe a sa portee dans le noir du chemin de la lampe (au plus pres : Mamie passe a 3.5 m du chemin de la lampe a 0.0 s (sa portee dans le noir 2.8 m)) : le noir est un passe-droit (seuls les habitants avec memoire, chacun a sa portee dans le noir) ; sans la regle darkpass (tous les habitants, chien compris, a la portee par defaut), aucun defaut
+    [temps] test_m5_audit_darkpass : temps : 0.8 s, 6660 noeuds developpes (plafond 80000000, au plus 5905 crees par recherche), 7412 rayons (plafond 20000000)
+    [ok] test_m5_audit_drawcalls : 162 emplacements de materiau (draw calls), au dessus du budget de 120 (un draw call par emplacement de materiau) ; sans la regle drawcalls (un draw call par renderer), aucun defaut
+    [temps] test_m5_audit_drawcalls : temps : 0.0 s, 0 noeuds developpes (plafond 80000000, au plus 0 crees par recherche), 0 rayons (plafond 20000000)
+    [ok] test_m5_audit_conecolours : 19 materiaux, au dessus du budget de 18 (un materiau par couleur de cone, celle du chien comprise) ; sans la regle conecolours (chaque cone compte le materiau calme de sa construction), aucun defaut
+    [temps] test_m5_audit_conecolours : temps : 0.0 s, 0 noeuds developpes (plafond 80000000, au plus 0 crees par recherche), 0 rayons (plafond 20000000)
+    [ok] test_robot : aucun horaire (le ronronnement du robot ne masque rien) ; sans la regle robot (le ronronnement masque les petits bruits pres du robot), sortie a 5.4 s
+    [temps] test_robot : temps : 1.3 s, 535 noeuds developpes (plafond 80000000, au plus 709 crees par recherche), 162 rayons (plafond 20000000)
+    [ok] test_rock : aucun horaire (chaque arret coute la bascule) ; sans la regle rock (sans la bascule), sortie a 21.5 s
+    [temps] test_rock : temps : 2.0 s, 1025022 noeuds developpes (plafond 80000000, au plus 1638107 crees par recherche), 898 rayons (plafond 20000000)
+    [ok] test_load : aucun horaire (la regle de la charge) ; sans la regle load (sans la regle de la charge (pleine vitesse, la charge ne tombe jamais)), sortie a 13.0 s
+    [temps] test_load : temps : 0.5 s, 6581 noeuds developpes (plafond 80000000, au plus 8021 crees par recherche), 415 rayons (plafond 20000000), 85 etats de charge
+    [ok] test_m5_levels_robotblock : aucun horaire (la zone de contact du robot) ; sans la regle robotcontact (sans robot (ni zone de contact ni ronronnement)), sortie a 5.1 s
+    [temps] test_m5_levels_robotblock : temps : 0.9 s, 7336 noeuds developpes (plafond 80000000, au plus 9468 crees par recherche), 0 rayons (plafond 20000000)
+    [ok] test_m5_audit_fidget : l'horaire trouve flane 12.5 s sans bouger sur un sejour de 15.7 s a moins de 1.5 m de (-1.25, -1.75), de 0.0 s a 15.7 s, plus de 8 s : attendre sur place, meme en sautillant d'une case a l'autre, n'est pas un horaire (la flanerie de l'horaire trouve, a moins de 1.5 m d'un meme point) ; sans la regle fidget (la seule ancre d'attente de 1 m (un saut en L la relance)), aucun defaut
+    [temps] test_m5_audit_fidget : temps : 0.6 s, 11722 noeuds developpes (plafond 80000000, au plus 8136 crees par recherche), 6938 rayons (plafond 20000000)
+    [ok] test_m5_audit_fidelity : fidelite de la vue : l'horaire trouve est vu en mouvement par Claire (oeil a 3.9 s) a l'echantillon de 4.4 s, le meuble en (2.75, 3.30) cap 90 (14 pas vus) : l'echantillonnage de l'audit le croyait cache (l'horaire rejoue avec les 5 points du jeu) ; sans la regle fidelity (les seuls echantillons de l'audit (centre et anneau de 8)), aucun defaut
+    [temps] test_m5_audit_fidelity : temps : 21.4 s, 7605096 noeuds developpes (plafond 80000000, au plus 10132880 crees par recherche), 154935 rayons (plafond 20000000)
+  ROUGE : audit (code 6)
+
+=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults) ===
+verify exit 1

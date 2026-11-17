@@ -1,0 +1,64 @@
+{
+  "id": "test_m4_game_sit",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 8.0,
+    "sizeZ": 6.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": 2.3, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": 0.0,
+    "z": -1.85,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 3.5, "z": 2.3, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "rugs": [
+    { "x": -0.5, "z": -1.6, "sizeX": 1.8, "sizeZ": 1.0, "yaw": 0.0, "color": "#2E6DB4" }
+  ],
+  "props": [
+    {
+      "model": "kenney.sofa",
+      "name": "Sofa", "kind": "sofa", "x": 1.5, "z": 1.6, "yaw": 0.0,
+      "sizeX": 2.0, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true,
+      "color": "#2E6DB4", "accentColor": "#5B93D9"
+    }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Assis",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": -3.0, "z": -1.2, "facing": 90.0, "dwell": 3.0, "glances": [] },
+        { "x": 0.0, "z": -1.2, "facing": 0.0, "dwell": 4.0, "glances": [], "sit": "player", "seat": { "x": 0.0, "z": -1.85, "yaw": 0.0 } }
+      ]
+    },
+    {
+      "model": "quaternius.man",
+      "name": "Temoin",
+      "startStation": 0,
+      "bodyColor": "#6A4C93",
+      "headColor": "#C68B59",
+      "stations": [
+        { "x": 3.0, "z": -1.85, "facing": 270.0, "dwell": 60.0, "glances": [] },
+        { "x": 3.0, "z": -1.4, "facing": 270.0, "dwell": 60.0, "glances": [] }
+      ]
+    }
+  ]
+}

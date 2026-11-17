@@ -1,0 +1,106 @@
+{
+  "summary": "Difficulty system done and compiling (one SetupAndCompile, 0 error CS): DifficultyDef (Facile, Normal, Difficile) applied in RoutineFactory.PersonalityOf (game, audit and tests), grace and creak in GameState.BuildLevel and the audit search; option saved in SaveData.options.difficulty, Difficulté row on the Options page, applies at the next level build; records per difficulty (levelN, levelN@facile, levelN@difficile), level select shows the current one. LevelAudit -difficulty (default normal then difficile), writes designerRoute and designerRouteHard (new LevelDef field, validated). Baseline audit measured (docs/m7/design.md): curve flat. Difficile at hearing 1.25 failed levels 2 and 3, so Difficile hearing is now 1 (not re-audited); level 13 fails the Difficile fidelity replay; level 16 fails the material budget at both (not mine); 17 and 18 not measured at Difficile. No level file changed (stopped before any retune was audited at both difficulties). No test was run (product owner stop).",
+  "files_changed": [
+    "Assets/Scripts/Core/DifficultyDef.cs (new)",
+    "Assets/Scripts/Core/RoutineFactory.cs",
+    "Assets/Scripts/Core/CaughtRule.cs",
+    "Assets/Scripts/Core/CreakGauge.cs",
+    "Assets/Scripts/Core/Tuning.cs (M7 design block)",
+    "Assets/Scripts/Core/Strings.cs (M7 design block)",
+    "Assets/Scripts/Core/LevelDef.cs (DesignerRouteHard)",
+    "Assets/Scripts/Core/LevelValidator.cs (hard route checked)",
+    "Assets/Scripts/Core/SaveData.cs (options.difficulty, RecordWin with difficulty)",
+    "Assets/Scripts/Runtime/SaveStore.cs (RecordWin and TryGetBest with difficulty)",
+    "Assets/Scripts/Runtime/GameState.cs (Difficulty, BuildLevel)",
+    "Assets/Scripts/Runtime/Menu.cs (Difficulté row)",
+    "Assets/Scripts/Runtime/LevelSelect.cs",
+    "Assets/Scripts/Runtime/RecordLine.cs",
+    "Assets/Editor/LevelAudit.cs (-difficulty, route keys, creak fill)",
+    "Assets/Tests/EditMode/DifficultyM7Tests.cs (new)",
+    "Assets/Tests/PlayMode/ProbeTestsM7Design.cs (new)",
+    "Assets/Tests/PlayMode/RouteReplayer.cs (route override)",
+    "docs/m7/design.md (new)"
+  ],
+  "tests": "Compiled, never run (product owner stop). EditMode DifficultyM7Tests (16). PlayMode Step64a_, Step64b_Level01Hard..Level18Hard (need designerRouteHard: run LevelAudit -writeRoutes first), Step64c_.",
+  "markers": [
+    {
+      "id": "HARD_RANGE",
+      "file": "Assets/Scripts/Core/DifficultyDef.cs",
+      "marked": "ViewRangeFactor = Tuning.HardViewRangeFactor, HalfAngleOffset = Tuning.HardHalfAngleOffset, // MUTATION:HARD_RANGE",
+      "replacement": "ViewRangeFactor = 1f, HalfAngleOffset = Tuning.HardHalfAngleOffset, // MUTATION:HARD_RANGE",
+      "mode": "EditMode",
+      "killers": "Table_EveryKnobHelpsAtFacileAndHindersAtDifficile PersonalityOf_EveryRowMonotoneKnobByKnob RoutineFactory_RoutineSeesWithTheCurrentDifficulty"
+    },
+    {
+      "id": "RECORD_KEY_NORMAL",
+      "file": "Assets/Scripts/Core/DifficultyDef.cs",
+      "marked": "return string.IsNullOrEmpty(levelId) || d == Normal ? levelId : levelId + \"@\" + d; // MUTATION:RECORD_KEY_NORMAL",
+      "replacement": "return string.IsNullOrEmpty(levelId) ? levelId : levelId + \"@\" + d; // MUTATION:RECORD_KEY_NORMAL",
+      "mode": "EditMode",
+      "killers": "RecordKey_NormalKeepsTheBareIdOthersGetASuffix RecordWin_KeepsOneRecordPerDifficultyAndOneWinPerLevel RecordWin_OldSaveRecordsStayNormalAndRoundTrip"
+    },
+    {
+      "id": "DIFFICULTY_ANGLE",
+      "file": "Assets/Scripts/Core/DifficultyDef.cs",
+      "marked": "p.HalfAngle = Mathf.Clamp(p.HalfAngle + HalfAngleOffset, 1f, 89f); // MUTATION:DIFFICULTY_ANGLE",
+      "replacement": "p.HalfAngle = Mathf.Clamp(p.HalfAngle, 1f, 89f); // MUTATION:DIFFICULTY_ANGLE",
+      "mode": "EditMode",
+      "killers": "PersonalityOf_EveryRowMonotoneKnobByKnob RoutineFactory_RoutineSeesWithTheCurrentDifficulty"
+    },
+    {
+      "id": "DIFFICULTY_APPLY",
+      "file": "Assets/Scripts/Core/RoutineFactory.cs",
+      "marked": "return DifficultyDef.Current.Apply(PersonalityDef.ForInhabitant(def)); // MUTATION:DIFFICULTY_APPLY",
+      "replacement": "return PersonalityDef.ForInhabitant(def); // MUTATION:DIFFICULTY_APPLY",
+      "mode": "EditMode",
+      "killers": "PersonalityOf_EveryRowMonotoneKnobByKnob RoutineFactory_RoutineSeesWithTheCurrentDifficulty"
+    },
+    {
+      "id": "CREAK_FILL_TIME",
+      "file": "Assets/Scripts/Core/CreakGauge.cs",
+      "marked": "Value += dt / fillTime; // MUTATION:CREAK_FILL_TIME",
+      "replacement": "Value += dt / Tuning.CreakFillTime; // MUTATION:CREAK_FILL_TIME",
+      "mode": "EditMode",
+      "killers": "CreakGauge_CreaksAfterTheDifficultyFillTime"
+    },
+    {
+      "id": "DIFFICULTY_GRACE",
+      "file": "Assets/Scripts/Runtime/GameState.cs",
+      "marked": "Rule.Grace = Difficulty.CaughtGrace; // MUTATION:DIFFICULTY_GRACE",
+      "replacement": "Rule.Grace = Tuning.CaughtGrace; // MUTATION:DIFFICULTY_GRACE",
+      "mode": "PlayMode",
+      "killers": "Step64a_"
+    },
+    {
+      "id": "OPTIONS_DIFFICULTY_FALLBACK",
+      "file": "Assets/Scripts/Core/SaveData.cs",
+      "marked": "Difficulty = DifficultyDef.Normalize(Difficulty) == Difficulty ? Difficulty : null, // MUTATION:OPTIONS_DIFFICULTY_FALLBACK",
+      "replacement": "Difficulty = Difficulty, // MUTATION:OPTIONS_DIFFICULTY_FALLBACK",
+      "mode": "EditMode",
+      "killers": "Option_UnknownDifficultyFallsBackToNormal"
+    },
+    {
+      "id": "SELECT_DIFFICULTY_RECORD",
+      "file": "Assets/Scripts/Runtime/LevelSelect.cs",
+      "marked": "SaveStore.TryGetBest(card.LevelId, SaveStore.Options.DifficultyId, out float seconds) // MUTATION:SELECT_DIFFICULTY_RECORD",
+      "replacement": "SaveStore.TryGetBest(card.LevelId, out float seconds) // MUTATION:SELECT_DIFFICULTY_RECORD",
+      "mode": "PlayMode",
+      "killers": "Step64c_"
+    }
+  ],
+  "probe_steps": [
+    "Step64a_DifficultyAppliesAtTheNextLevelLoad",
+    "Step64b_Level01Hard ... Step64b_Level18Hard",
+    "Step64c_OptionCyclesAndTheSelectShowsTheDifficultyRecord"
+  ],
+  "edit_tests": [
+    "DifficultyM7Tests (Table_*, Next_*, PersonalityOf_*, RoutineFactory_*, CreakGauge_*, CaughtRule_*, RecordKey_*, Option_*, RecordWin_*)"
+  ],
+  "needs": [
+    "Run LevelAudit -writeRoutes at both difficulties: no level has a designerRouteHard yet, so Step64b_ fails until then.",
+    "Re-audit levels 2 and 3 at Difficile with hearing 1 (only 1.25 was audited); fix level 13's Difficile fidelity sighting (design.md 3).",
+    "Level 16: 25 materials over its 24 budget at both difficulties since the M7 texture or lighting work (textures or lighting owner).",
+    "The progression retune (4.2) was not done: plan per level in docs/m7/design.md section 3, variants in the design scratch round1.py.",
+    "Run the new tests (never run) and add the markers to mutation.sh (integrator)."
+  ]
+}

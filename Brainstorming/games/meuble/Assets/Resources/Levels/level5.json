@@ -1,0 +1,173 @@
+{
+  "id": "level5",
+  "nameKey": "level5.name",
+  "hintKey": "level5.hint",
+  "lesson": "sit",
+  "rooms": [
+    {
+      "id": "salon",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 5.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 0.0,
+      "z": 2.55,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": -4.05,
+      "z": 2.0,
+      "width": 0.8,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 3.0,
+      "z": -2.55,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "model": "kenney.armchair",
+    "kind": "armchair",
+    "x": -3.25,
+    "z": 0.25,
+    "yaw": 90.0,
+    "sizeX": 0.85,
+    "sizeY": 1.05,
+    "sizeZ": 0.85,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 0.0,
+    "z": 1.95,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "rugs": [
+    {
+      "model": "kenney.rug",
+      "x": -2.5,
+      "z": 0.0,
+      "sizeX": 3.0,
+      "sizeZ": 4.0,
+      "yaw": 0.0,
+      "color": "#2E6DB4"
+    }
+  ],
+  "props": [
+    {
+      "name": "Bookshelf",
+      "kind": "bookshelf",
+      "x": -1.8,
+      "z": 2.3,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 2.0,
+      "sizeZ": 0.35,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "model": "kenney.sofa",
+      "name": "Sofa",
+      "kind": "sofa",
+      "x": 1.5,
+      "z": -0.5,
+      "yaw": 0.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9"
+    },
+    {
+      "name": "TV",
+      "kind": "counter",
+      "x": 3.0,
+      "z": -2.3,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 0.6,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#F7F4EE"
+    }
+  ],
+  "designerRoute": [
+    { "x": -3.25, "z": -0.75, "at": 1.8 },
+    { "x": -3.25, "z": -1.25, "at": 3.0 },
+    { "x": -3.25, "z": -0.25, "at": 3.6 },
+    { "x": -3.25, "z": 0.25, "at": 4.8 },
+    { "x": -3.25, "z": 0.75, "at": 10.7 },
+    { "x": -2.25, "z": 0.75, "at": 11.3 },
+    { "x": -1.25, "z": 0.75, "at": 12.5 },
+    { "x": -0.25, "z": 0.75, "at": 13.7 },
+    { "x": -0.25, "z": 1.75, "at": 14.9 },
+    { "x": 0.0, "z": 1.95, "at": 14.9 }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -2.75,
+          "z": 1.75,
+          "facing": 90.0,
+          "dwell": 5.0,
+          "glances": []
+        },
+        {
+          "x": -2.75,
+          "z": 0.25,
+          "facing": 90.0,
+          "dwell": 0.5,
+          "sit": "player",
+          "seat": {
+            "x": -3.25,
+            "z": 0.25,
+            "yaw": 90.0
+          },
+          "glances": []
+        },
+        {
+          "x": 3.0,
+          "z": -1.75,
+          "facing": 180.0,
+          "dwell": 8.0,
+          "glances": []
+        },
+        {
+          "x": 2.5,
+          "z": 1.25,
+          "facing": 270.0,
+          "dwell": 3.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

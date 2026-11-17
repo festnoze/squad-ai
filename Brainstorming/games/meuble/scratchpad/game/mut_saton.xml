@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="UN, DEUX, TROIS, MEUBLE" tests="1" failures="1" errors="0" skipped="0" time="4.109">
+  <testsuite name="Meuble.Tests.ProbeTestsM4Game" tests="1" failures="1" errors="0" skipped="0" time="4.109">
+    <testcase name="Step32_SatOnFurnitureIsPinnedNotCaughtNotCreaking" classname="Meuble.Tests.ProbeTestsM4Game" time="4.109">
+      <failure message="seen moving while sat on&#13;&#10;  Expected: 0.0f&#13;&#10;  But was:  0.0399999842f" type="Failed">at Meuble.Tests.ProbeTestsM4Game+&lt;Step32_SatOnFurnitureIsPinnedNotCaughtNotCreaking&gt;d__66.MoveNext () [0x003e2] in C:\Dev\squad-ai\Brainstorming\games\meuble\Assets\Tests\PlayMode\ProbeTestsM4Game.cs:914
+at UnityEngine.TestTools.TestEnumerator+&lt;Execute&gt;d__7.MoveNext () [0x0003a] in .\Library\PackageCache\com.unity.test-framework@bd7f943e9647\UnityEngine.TestRunner\NUnitExtensions\Attributes\TestEnumerator.cs:44</failure>
+      <system-out>Saving results to: C:/Users/e.millerioux/AppData/LocalLow/Meuble/UN, DEUX, TROIS, MEUBLE\TestResults.xml</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

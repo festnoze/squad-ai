@@ -1,0 +1,6 @@
+
+=== Sonde PlayMode (PRD 10.2) ===
+  PlayMode : 97 tests, 0 echecs
+./verify.sh: line 104: Step01_ Step02_ Step03_ Step04_ Step05_ Step06_ Step07_ Step08_ Step09_ Step10_ Step11_ Step12_ Step13_ Step14_ Step15_ Step16_ Step17_ Step18_ Step19_ Step20_ Step21_ Step13b_ Step13c_ Step14b_ Step19b_ Step20b_ Step21b_ Step13d_ Step13e_ Step14c_ Step22_ Step23_ Step24_ Step25_ Step26_ Step27_ Step28_ Step28b_ Step28c_ Step28d_ Step28e_ Step28f_ Step29_ Step29b_ Step29c_ Step29d_ Step29e_ Step29f_ Step29g_ Step29h_ Step29i_ Step29j_ Step29k_ Step29l_ Step30_ Step30b_ Step30c_ Step30d_ Step31_ Step32_ Step33_ Step33b_ Step33c_ Step33d_ Step35_ Step35a_: command not found
+./verify.sh: line 105: syntax error near unexpected token `fi'
+./verify.sh: line 105: `fi'

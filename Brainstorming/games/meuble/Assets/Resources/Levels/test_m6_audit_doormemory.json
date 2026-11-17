@@ -1,0 +1,270 @@
+{
+  "id": "test_m6_audit_doormemory",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "doorMemory": true,
+  "rooms": [
+    {
+      "id": "a",
+      "x": 2.0,
+      "z": 1.5,
+      "sizeX": 4.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "b",
+      "x": 7.1,
+      "z": 1.5,
+      "sizeX": 6.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.05,
+      "z": 1.5,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte",
+      "swing": "b",
+      "hinge": "start"
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.stool",
+    "kind": "stool",
+    "x": 3.25,
+    "z": 0.25,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 9.6,
+    "z": 2.5,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [],
+  "inhabitants": [
+    {
+      "name": "Veilleur",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 0.75,
+          "z": 2.5,
+          "facing": 0.0,
+          "dwell": 320.0,
+          "glances": [
+            {
+              "offset": 1.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 9.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 17.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 25.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 33.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 41.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 49.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 57.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 65.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 73.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 81.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 89.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 97.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 105.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 113.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 121.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 129.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 137.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 145.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 153.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 161.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 169.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 177.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 185.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 193.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 201.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 209.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 217.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 225.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 233.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 241.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 249.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 257.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 265.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 273.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 281.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 289.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 297.0,
+              "yaw": 80.0,
+              "hold": 1.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "id": "test_m5_house_robot",
+  "nameKey": "level9.name",
+  "hintKey": "level9.hint",
+  "rooms": [
+    {
+      "id": "a",
+      "x": -2.05,
+      "z": 0.0,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "b",
+      "x": 2.05,
+      "z": 0.0,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "c",
+      "x": 2.05,
+      "z": 4.1,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 0.0,
+      "z": -1.0,
+      "width": 1.2,
+      "top": 2.1
+    },
+    {
+      "x": 2.3,
+      "z": 2.05,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 4.1,
+      "z": 5.35,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 2.8,
+    "z": 0.8,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D",
+    "load": "vase"
+  },
+  "exit": {
+    "x": 3.55,
+    "z": 5.35,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -3.0,
+          "z": 1.2,
+          "facing": 90.0,
+          "dwell": 60.0,
+          "glances": []
+        }
+      ]
+    }
+  ],
+  "rugs": [
+    {
+      "x": 1.5,
+      "z": -1.0,
+      "sizeX": 1.2,
+      "sizeZ": 0.8,
+      "yaw": 0.0,
+      "color": "#2E6DB4"
+    }
+  ],
+  "lesson": "robot",
+  "robots": [
+    {
+      "name": "Robi",
+      "loop": [
+        {
+          "x": -2.5,
+          "z": -1.0
+        },
+        {
+          "x": 2.5,
+          "z": -1.0
+        }
+      ]
+    }
+  ]
+}

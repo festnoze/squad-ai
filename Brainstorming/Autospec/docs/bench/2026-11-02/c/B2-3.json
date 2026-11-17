@@ -1,0 +1,105 @@
+{
+  "date": "2026-11-02",
+  "config": "c",
+  "project": "B2",
+  "model": "sonnet",
+  "git_sha": "85c7e437",
+  "brief_sha256": "2d1f19a5bb72e486712a41b6f0aee281cb0e8d75b9dd47ca7f703c4e8fce0d18",
+  "bench_version": 1,
+  "m1_completed": true,
+  "m2_duration_s": 152.242,
+  "m3_cost_usd": 0.261832,
+  "m4_agent_calls": 3,
+  "m8_interventions": 0,
+  "factory": {
+    "completed": true,
+    "phase": "done",
+    "error": "",
+    "workspace": "C:\\Dev\\squad-ai\\.claude\\worktrees\\autospec-bench\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\c\\B2-143622\\todo-cli-c6b1bbd1",
+    "duration_s": 152.242,
+    "cost_usd": 0.261832,
+    "agent_calls": 3,
+    "timed_out": false,
+    "stories": [
+      {
+        "id": "US-1",
+        "status": "done",
+        "attempts": 1
+      }
+    ]
+  },
+  "oracle": {
+    "lock_present": true,
+    "env_built": true,
+    "env_detail": "",
+    "m5_suite": {
+      "green": true,
+      "passed": 19,
+      "failed": 0,
+      "detail": "...................                                                      [100%]\r\n19 passed in 6.51s\r\n"
+    },
+    "m6_oracle": {
+      "passed": 10,
+      "total": 10,
+      "rate": 1.0,
+      "checks": [
+        {
+          "id": "help_exits_zero",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "add_prints_ids_from_one",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "list_format_and_done",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "remove_and_ids_never_reused",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "title_is_trimmed",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "empty_title_exit_2",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "unknown_id_exit_1_unchanged",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "list_missing_file_is_empty",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "db_is_valid_json",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "default_db_in_cwd",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": "usage: todo_cli [-h] [--db DB] {add,list,done,remove} ...\r\n\r\nTodo CLI\r\n\r\npositional arguments:\r\n  {add,list,done,remove}\r\n    add                 ajouter une tâche\r\n    list                lister les tâches\r\n    done                marquer une tâche comme faite\r\n    remove              supprimer une tâche\r\n\r\noptions:\r\n  -h, --help            show this help message and exit\r\n  --db DB               fichier JSON (défaut : todo.json)\r\n"
+    },
+    "duration_s": 12.2
+  },
+  "note": "adaptive sizing (85c7e437)"
+}

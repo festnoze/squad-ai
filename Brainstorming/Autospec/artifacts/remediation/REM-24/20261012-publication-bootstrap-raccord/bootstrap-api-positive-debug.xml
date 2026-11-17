@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="16.504" timestamp="2026-10-12T12:35:15.999620+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_bootstrap_browser_real" name="test_real_bootstrap_requires_frontend_originated_nonce_bound_api_response[actual_frontend_fetch]" time="15.056"><failure message="autospec.orchestrator.bootstrap.BootstrapFailure: ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (Error; private driver output withheld)">tests\test_bootstrap_browser_real.py:72: in test_real_bootstrap_requires_frontend_originated_nonce_bound_api_response
-    detail=await bootstrap._browser_preflight(runtime,timeout_s=30,require_api=True,expected_health=expected)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-autospec\orchestrator\bootstrap.py:943: in _browser_preflight
-    raise BootstrapFailure("ISOLATION_UNAVAILABLE: Docker browser preflight unavailable ("+type(exc).__name__+"; private driver output withheld)",infra=True) from None
-E   autospec.orchestrator.bootstrap.BootstrapFailure: ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (Error; private driver output withheld)</failure></testcase></testsuite></testsuites>

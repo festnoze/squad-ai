@@ -1,0 +1,6 @@
+{
+    "name": "Smoke",
+    "rootNamespace": "Smoke",
+    "references": ["Unity.InputSystem", "UnityEngine.UI"],
+    "autoReferenced": true
+}

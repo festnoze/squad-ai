@@ -1,0 +1,336 @@
+{
+  "date": "2026-11-02",
+  "config": "c-resume",
+  "project": "B5",
+  "model": "sonnet",
+  "git_sha": "dc09c88c",
+  "brief_sha256": "b20d9a2599427a9f76a41a69cfeef57dd1b5330ce35fec8b4d6ac4cd91f64f0a",
+  "bench_version": 2,
+  "m1_completed": null,
+  "m2_duration_s": null,
+  "m3_cost_usd": null,
+  "m4_agent_calls": null,
+  "m8_interventions": 2,
+  "factory": {
+    "completed": null,
+    "workspace": "C:\\Dev\\squad-ai\\.claude\\worktrees\\autospec-bench\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\c\\B5-150751\\relais-support-cfc780e3"
+  },
+  "oracle": {
+    "lock_present": true,
+    "env_built": true,
+    "env_detail": "",
+    "frontend_built": true,
+    "frontend_detail": "",
+    "m5_suite": {
+      "green": true,
+      "passed": 241,
+      "failed": 0,
+      "detail": "........................................................................ [ 42%]\r\n........................................................................ [ 84%]\r\n...........................                                              [100%]\r\n============================== warnings summary ===============================\r\n..\\env\\Lib\\site-packages\\fastapi\\testclient.py:1\r\n  C:\\Users\\e.millerioux\\AppData\\Local\\Temp\\bench-oracle-ouw47puo\\env\\Lib\\site-packages\\fastapi\\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\r\n    from starlette.testclient import TestClient as TestClient  # noqa\r\n\r\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\r\n171 passed, 1 warning in 254.76s (0:04:14)\r\n",
+      "frontend": {
+        "green": true,
+        "passed": 70,
+        "failed": 0,
+        "detail": "\n> relais-support-frontend@0.1.0 test\n> vitest run\n\n\n RUN  v5.0.5 C:/Users/e.millerioux/AppData/Local/Temp/bench-oracle-ouw47puo/product/frontend\n\n\n Test Files  25 passed (25)\n      Tests  70 passed (70)\n   Start at  23:07:06\n   Duration  17.02s (environment 71%, import 15%, tests 9%, transform 4%, worker 1%)\n\nEnvironment  jsdom was created 25 times · 153.97s total, 71% of tracked time\n             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)\n             learn more: https://vitest.dev/guide/improving-performance#test-environments\n\n\n"
+      }
+    },
+    "m6_oracle": {
+      "passed": 23,
+      "total": 57,
+      "rate": 0.404,
+      "not_automated": 22,
+      "checks": [
+        {
+          "id": "SEC-01",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-02",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-03",
+          "passed": false,
+          "detail": "password of 129 characters -> 201, expected 422"
+        },
+        {
+          "id": "SEC-04",
+          "passed": false,
+          "detail": "correct login after 10 failures in 60 s (5 of them with a forged X-Forwarded-For, one success in between) -> 200, expected 429; the limit exists but counts the forged X-Forwarded-For as the client address (uvicorn trusts proxy headers from 127.0.0.1 unless proxy_headers=False)"
+        },
+        {
+          "id": "SEC-05",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-06",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-07",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-08",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-09",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-10",
+          "passed": false,
+          "detail": "internal content or ids visible to the client in ['/api/tickets/{id}', '/api/tickets/{id}/history', '/api/tickets/{id}/messages']"
+        },
+        {
+          "id": "SEC-11",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-12",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-13",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-14",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "SEC-15",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "FUN-01",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "FUN-02",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "FUN-03",
+          "passed": false,
+          "detail": "assign before in_progress -> 422 {\"error\":{\"code\":\"validation_error\",\"message\":\"Données invalides.\",\"fields\":{\"assignee_id\":\"Valeur invalide.\"}}}"
+        },
+        {
+          "id": "FUN-04",
+          "passed": false,
+          "detail": "assign"
+        },
+        {
+          "id": "FUN-05",
+          "passed": false,
+          "detail": "assign before in_progress -> 422 {\"error\":{\"code\":\"validation_error\",\"message\":\"Données invalides.\",\"fields\":{\"assignee_id\":\"Valeur invalide.\"}}}"
+        },
+        {
+          "id": "FUN-06",
+          "passed": false,
+          "detail": "assign before in_progress -> 422 {\"error\":{\"code\":\"validation_error\",\"message\":\"Données invalides.\",\"fields\":{\"assignee_id\":\"Valeur invalide.\"}}}"
+        },
+        {
+          "id": "FUN-07",
+          "passed": false,
+          "detail": "assign before in_progress -> 422 {\"error\":{\"code\":\"validation_error\",\"message\":\"Données invalides.\",\"fields\":{\"assignee_id\":\"Valeur invalide.\"}}}; after restart: nothing recorded before the restart"
+        },
+        {
+          "id": "FUN-08",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "FUN-09",
+          "passed": false,
+          "detail": "assign"
+        },
+        {
+          "id": "FUN-10",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "FUN-11",
+          "passed": false,
+          "detail": "assign"
+        },
+        {
+          "id": "FUN-12",
+          "passed": false,
+          "detail": "assign before in_progress -> 422 {\"error\":{\"code\":\"validation_error\",\"message\":\"Données invalides.\",\"fields\":{\"assignee_id\":\"Valeur invalide.\"}}}"
+        },
+        {
+          "id": "FUN-13",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "ARC-01",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-03",
+          "passed": false,
+          "detail": "write while the database is locked -> 500 'internal_error' after 7.5 s, expected 503 DB_BUSY"
+        },
+        {
+          "id": "ARC-04",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "ARC-06",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "ARC-07",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "ARC-08",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "ARC-09",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-01",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-03",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-04",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-06",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-07",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "UX-08",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "TST-01",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-03",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-04",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "TST-06",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "OPS-01",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "OPS-02",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "OPS-03",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "OPS-04",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "OPS-05",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        },
+        {
+          "id": "OPS-06",
+          "passed": false,
+          "detail": "NOT_AUTOMATED"
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": "GET / -> 200"
+    },
+    "duration_s": 37896.4
+  },
+  "note": "v2 B5 run c/B5-1 parked at US-8 by a DNS outage, resumed with 03d3a7f0: 20/20 stories done at the first dev attempt, final suite 241/241, factory smoke failed (it probed /health while the brief fixes /api/health); total factory cost 2.46 + 8.82 USD; wall clock inflated by machine sleep"
+}

@@ -1,0 +1,61 @@
+{
+  "agent": "touch",
+  "summary": "CONTRACT_M7 1.5 touch controls done. New Runtime/TouchControls.cs: its own overlay canvas (sorting 30, CanvasScaler matched on a 1080 high reference), created once per run, shown while InputReader.TouchUIActive (a finger on Touchscreen.current, the -touch argument, or the test hook ForceTouchUI) and hidden while paused. Left half: a floating stick that lands under the thumb (radius 120 ref px) feeding InputReader.Move like the left stick (dead zone and move press included). Right half: drag to orbit, read by OrbitCamera.TouchLookDelta times Tuning.TouchOrbitDegPerPixel times the sensitivity option, whatever the cursor lock. Bottom right: the action button (E, 190 px) and the careful toggle (150 px); top right: the pause button (150 px) through InputReader.PausePressed. No raycast targets: the fingers are hit tested from InputReader.ReadTouches (real touches plus injected ones, ids kept apart), so menus still take taps through the InputSystemUIInputModule and keyboard, mouse and gamepad paths are unchanged. InputReader gains InjectTouch/ReleaseTouch, ForceTouchUI, TouchUIActive and the touch outputs, all cleared by ResetInjections. Hud's controls line shows Strings.HudControlsTouch while touch is active. GamePause.cs needed no change (it is only the flag; the pause button goes through PausePressed like Escape).",
+  "blocked": false,
+  "files_changed": [
+    "Assets/Scripts/Runtime/TouchControls.cs (new)",
+    "Assets/Scripts/Runtime/InputReader.cs",
+    "Assets/Scripts/Runtime/OrbitCamera.cs",
+    "Assets/Scripts/Runtime/Hud.cs (controls line only)",
+    "Assets/Scripts/Core/Strings.cs (M7 touch block)",
+    "Assets/Scripts/Core/Tuning.cs (M7 touch block)",
+    "Assets/Tests/PlayMode/ProbeTestsM7Touch.cs (new)"
+  ],
+  "tests": "PlayMode filter Step51|Step52|Step63|Step0|Step1: 34/34 passed (2026-11-17). Step63a_TouchStickMovesFurniture, Step63a_TouchDragOrbitsCamera, Step63a_TouchButtonsActionCarefulPause (lamp switch, careful on and off, pause opens the pause menu and hides the overlay), Step63b_OverlayHiddenWithoutTouchAndButtonsBig all pass. The 4 markers were each killed by their own test (one mutated run).",
+  "markers": [
+    {
+      "id": "TOUCH_UI_GATE",
+      "file": "Assets/Scripts/Runtime/InputReader.cs",
+      "marked": "public static bool TouchUIActive => ForceTouchUI || lastWasTouch || HasTouchArgument; // MUTATION:TOUCH_UI_GATE",
+      "replacement": "public static bool TouchUIActive => true; // MUTATION:TOUCH_UI_GATE",
+      "mode": "PlayMode",
+      "killers": "Step63b_OverlayHiddenWithoutTouchAndButtonsBig"
+    },
+    {
+      "id": "TOUCH_HALF_SPLIT",
+      "file": "Assets/Scripts/Runtime/TouchControls.cs",
+      "marked": "bool left = p.Position.x < Screen.width * 0.5f; // MUTATION:TOUCH_HALF_SPLIT",
+      "replacement": "bool left = false; // MUTATION:TOUCH_HALF_SPLIT",
+      "mode": "PlayMode",
+      "killers": "Step63a_TouchStickMovesFurniture"
+    },
+    {
+      "id": "TOUCH_ORBIT_SENS",
+      "file": "Assets/Scripts/Runtime/OrbitCamera.cs",
+      "marked": "Yaw += drag.x * Tuning.TouchOrbitDegPerPixel * sens; // MUTATION:TOUCH_ORBIT_SENS",
+      "replacement": "Yaw += drag.x * Tuning.TouchOrbitDegPerPixel; // MUTATION:TOUCH_ORBIT_SENS",
+      "mode": "PlayMode",
+      "killers": "Step63a_TouchDragOrbitsCamera"
+    },
+    {
+      "id": "TOUCH_CAREFUL_TOGGLE",
+      "file": "Assets/Scripts/Runtime/TouchControls.cs",
+      "marked": "InputReader.SetTouchCareful(!InputReader.TouchCareful); // MUTATION:TOUCH_CAREFUL_TOGGLE",
+      "replacement": "InputReader.SetTouchCareful(true); // MUTATION:TOUCH_CAREFUL_TOGGLE",
+      "mode": "PlayMode",
+      "killers": "Step63a_TouchButtonsActionCarefulPause"
+    }
+  ],
+  "probe_steps": [
+    "PC player with -touch: the overlay shows (stick disc bottom left, Action and Prudence bottom right, II top right) and the controls line reads the touch names; without -touch and no touchscreen nothing changes.",
+    "On an Android device: a thumb on the left half moves the furniture, a drag on the right half orbits, Action switches a lamp or opens a door, Prudence toggles careful (button turns amber), II opens the pause menu, menus work by tap."
+  ],
+  "edit_tests": [
+    "Step63a_",
+    "Step63b_"
+  ],
+  "needs": [
+    "integrator: add Step63a_ and Step63b_ (ProbeTestsM7Touch) to the verify PlayMode lists and the 4 markers above to mutation.sh.",
+    "integrator (note, no action required): on a Windows touch laptop the touch-to-mouse promotion can end touch mode after a finger lifts (PollLastDevice sees mouse input); Android has no such mouse, and -touch forces the overlay on PC."
+  ]
+}

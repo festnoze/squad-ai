@@ -1,1 +1,0 @@
-{"status": "PASS", "checks": ["generic_unknown_falls_back_to_dev", "every_review_and_prewarmed_unknown_name_refused_before_cache", "allowed_generation_persona_reuses_cache", "generic_fallback_resumes_without_cache_reset", "cache_clear_and_cache_info_public_api_preserved"], "provider_calls": 0, "cli_calls": 0, "auth_calls": 0}

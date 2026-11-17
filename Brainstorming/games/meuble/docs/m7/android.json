@@ -1,0 +1,60 @@
+{
+  "agent": "android",
+  "summary": "CONTRACT_M7 1.3, 1.4 and 1.6 done (resumed run: the code was already in place, this run tested it and rebuilt the APK). 1.3: Builder.BuildAndroid (-output, default Build/Android/Meuble.apk, -development as on Windows) switches to Android, builds, checks the APK is at most 150 MB, then switches back. ProjectSetup.EnsureAndroidSettings sets IL2CPP, ARM64, min API 26, target API auto (highest installed), landscape left/right only, com.meuble.undeuxtrois, Vulkan then GLES3, ASTC, debug keystore, Minimal stripping. Screen.sleepTimeout = NeverSleep is set by QualityTier.Apply on mobile. The Android back button arrives as Keyboard.escapeKey in the Input System, so the existing Escape path (pause / back) handles it with no new code. SDK/NDK/JDK: nothing to configure, the build used the editor module's own AndroidPlayer/SDK, NDK and OpenJDK. APK: 49.0 MB (51,351,354 bytes), built 14:31, Build Finished Success. No build warnings that matter (URP terrain shaders stripped, shader min16float notes, one CS0628 in Inhabitant.cs). 1.4: QualitySettings holds Bas, Moyen (Mobile_RPAsset, hard shadows, no SSAO in Mobile_Renderer) and Haut (PC_RPAsset), none excluded per platform. Defaults: Android/iPhone Moyen, the others Haut (PC unchanged). Runtime/QualityTier.cs applies the tier at once: SetQualityLevel, render scale 0.75 on Bas and 1 on Moyen (shared asset), bloom off on Bas through a priority-100 global volume (the look's profile is untouched), Android target frame rate 30/30/60 (PC keeps its setting). The Options page has a Qualite row that cycles Bas, Moyen, Haut. SaveData.options.quality is optional (missing or unknown means the platform default), version still 1. 1.6: SaveStore falls back when File.Replace is unsupported: write .tmp, copy the target to .bak (overwrite), delete the target, move the .tmp in. Load order unchanged: main, .tmp, .bak.",
+  "blocked": false,
+  "files_changed": [
+    "Assets/Editor/Builder.cs (BuildAndroid)",
+    "Assets/Editor/ProjectSetup.cs (EnsureAndroidSettings, EnsureQualityLevels)",
+    "Assets/Settings/Mobile_RPAsset.asset (render scale 1, no soft shadows)",
+    "ProjectSettings/QualitySettings.asset (Bas, Moyen, Haut and per platform defaults)",
+    "ProjectSettings/ProjectSettings.asset (Android part, landscape only)",
+    "Assets/Scripts/Runtime/QualityTier.cs (new)",
+    "Assets/Scripts/Runtime/SaveStore.cs (Android fallback, QualityTier.Apply on boot/options/reset)",
+    "Assets/Scripts/Core/SaveData.cs (options.quality)",
+    "Assets/Scripts/Runtime/Menu.cs (Qualite row)",
+    "Assets/Scripts/Core/Strings.cs (M7 android block)",
+    "Assets/Scripts/Core/Tuning.cs (M7 android block)",
+    "Assets/Tests/EditMode/AndroidM7Tests.cs (new)",
+    "Assets/Tests/PlayMode/ProbeTestsM7Quality.cs (new)"
+  ],
+  "tests": "EditMode OptionsM6Tests|SaveM5Tests|AndroidM7Tests: 52/52 pass (AndroidM7Tests 4/4). PlayMode Step51|Step52|Step62: Step62a pass, Step51b and Step52a pass, Step51a and Step52b FAIL. These two tests are not mine and my code does not cause the failure: on PC, QualityTier is a no-op at Haut. They wait one WaitForFixedUpdate, then assert a flag that VisionConeView sets in LateUpdate (MeshVisible, OutlineVisible). When they run first in a run, frames are slow and two fixed steps can pass with no LateUpdate between them. The touch agent's run at 14:23 (Step0|Step1 first, same code) passed all 34, including Step51/52. Mutation kills verified once in the first run: QUALITY_PLATFORM_DEFAULT and ANDROID_BAK_COPY killed by AndroidM7Tests (3 failures), QUALITY_LOW_BLOOM killed by Step62a (Bas at once: the bloom the camera gets). APK built: 49.0 MB, under 150 MB.",
+  "markers": [
+    {
+      "id": "QUALITY_PLATFORM_DEFAULT",
+      "file": "Assets/Scripts/Core/SaveData.cs",
+      "marked": "public static string DefaultQuality(bool mobile) => mobile ? QualityMedium : QualityHigh; // MUTATION:QUALITY_PLATFORM_DEFAULT",
+      "replacement": "public static string DefaultQuality(bool mobile) => mobile ? QualityHigh : QualityHigh; // MUTATION:QUALITY_PLATFORM_DEFAULT",
+      "mode": "EditMode",
+      "killers": "Quality_defaults_to_Moyen_on_mobile_and_Haut_on_PC Quality_round_trips_through_the_save_and_an_old_save_gets_the_platform_default"
+    },
+    {
+      "id": "ANDROID_BAK_COPY",
+      "file": "Assets/Scripts/Runtime/SaveStore.cs",
+      "marked": "File.Copy(path, path + BakSuffix, true); // MUTATION:ANDROID_BAK_COPY",
+      "replacement": "// MUTATION:ANDROID_BAK_COPY",
+      "mode": "EditMode",
+      "killers": "Without_File_Replace_the_save_writes_the_tmp_copies_the_bak_then_replaces_the_target"
+    },
+    {
+      "id": "QUALITY_LOW_BLOOM",
+      "file": "Assets/Scripts/Runtime/QualityTier.cs",
+      "marked": "SetBloomOff(quality == SaveOptions.QualityLow); // MUTATION:QUALITY_LOW_BLOOM",
+      "replacement": "SetBloomOff(false); // MUTATION:QUALITY_LOW_BLOOM",
+      "mode": "PlayMode",
+      "killers": "Step62a_QualityTiersSwitchAtOnceAndSurviveRestart"
+    }
+  ],
+  "probe_steps": [
+    "PC player: Options shows Qualite : Haut by default, the look and frame times are unchanged; cycling to Bas lowers the resolution and removes bloom at once, Moyen restores the resolution, Haut restores the PC look.",
+    "On an Android device (pending, product owner): install Build/Android/Meuble.apk (adb install -r). It starts in landscape on Moyen, the screen never dims while playing, the back button pauses and leaves menus like Escape, and the target is 30 fps on Bas/Moyen and 60 on Haut. Progress survives a restart of the app (the File.Replace fallback)."
+  ],
+  "edit_tests": [
+    "AndroidM7Tests",
+    "Step62a_"
+  ],
+  "needs": [
+    "Integrator (verify lists): add EditMode AndroidM7Tests and PlayMode Step62a_; add the 3 markers above to mutation.sh; add the BuildAndroid run (tools/unity.sh run . --timeout 3600 -- -executeMethod Meuble.Editor.Builder.BuildAndroid -output Build/Android/Meuble.apk -logFile x.log; it exits 1 above 150 MB).",
+    "Owner of ProbeTestsM6Options (integrator): Step51a (line 153 to 155) and Step52b (line 276 to 283) check VisionConeView.LateUpdate output after Steps(1)/Steps(2) of WaitForFixedUpdate. They fail when they run first in a filtered run. Wait for a plain frame (yield return null) before those asserts.",
+    "Design agent (Difficulte option, CONTRACT_M7 4.1): every new SaveOptions in Menu.cs (Cycle*), and SaveOptions.Clamped/Parse in SaveData.cs, copy each field by name. A new difficulty field must be added to each of them, or a click on another option resets it."
+  ]
+}

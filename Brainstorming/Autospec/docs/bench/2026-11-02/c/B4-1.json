@@ -1,0 +1,106 @@
+{
+  "date": "2026-11-02",
+  "config": "c",
+  "project": "B4",
+  "model": "sonnet",
+  "git_sha": "964d808a",
+  "brief_sha256": "460941ee61ec2ee0872057609e4d454a8dc549b56d06f72f1c5bc8ad0e24ea69",
+  "bench_version": 2,
+  "m1_completed": true,
+  "m2_duration_s": 493.129,
+  "m3_cost_usd": 0.319882,
+  "m4_agent_calls": 3,
+  "m8_interventions": 0,
+  "factory": {
+    "completed": true,
+    "phase": "done",
+    "error": "",
+    "workspace": "C:\\Dev\\squad-ai\\.claude\\worktrees\\autospec-bench\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\c\\B4-150741\\counter-app-f7f3d03d",
+    "duration_s": 493.129,
+    "cost_usd": 0.319882,
+    "agent_calls": 3,
+    "timed_out": false,
+    "stories": [
+      {
+        "id": "US-1",
+        "status": "done",
+        "attempts": 1
+      }
+    ]
+  },
+  "oracle": {
+    "lock_present": true,
+    "env_built": true,
+    "env_detail": "",
+    "frontend_built": true,
+    "frontend_detail": "",
+    "m5_suite": {
+      "green": true,
+      "passed": 20,
+      "failed": 0,
+      "detail": "................                                                         [100%]\r\n============================== warnings summary ===============================\r\n..\\env\\Lib\\site-packages\\fastapi\\testclient.py:1\r\n  C:\\Users\\e.millerioux\\AppData\\Local\\Temp\\bench-oracle-v96rdl9w\\env\\Lib\\site-packages\\fastapi\\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\r\n    from starlette.testclient import TestClient as TestClient  # noqa\r\n\r\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\r\n16 passed, 1 warning in 4.55s\r\n",
+      "frontend": {
+        "green": true,
+        "passed": 4,
+        "failed": 0,
+        "detail": "\n> counter-app-frontend@0.1.0 test\n> vitest run\n\n\n RUN  v5.0.5 C:/Users/e.millerioux/AppData/Local/Temp/bench-oracle-v96rdl9w/product/frontend\n\n\n Test Files  2 passed (2)\n      Tests  4 passed (4)\n   Start at  15:16:38\n   Duration  1.75s (environment 73%, import 15%, tests 7%, transform 3%, worker 1%)\n\n\n"
+      }
+    },
+    "m6_oracle": {
+      "passed": 8,
+      "total": 8,
+      "rate": 1.0,
+      "checks": [
+        {
+          "id": "health",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "initial_value_zero",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "increment_returns_new_value",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "two_increments",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "reset_returns_zero",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "index_serves_built_page",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "built_asset_served",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "persists_across_restart",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": "GET / -> 200"
+    },
+    "duration_s": 25.2
+  },
+  "rejudged": {
+    "git_sha": "2e65ee87",
+    "note": "oracle fix: resolve the 8.3 short temp path before running vitest"
+  }
+}

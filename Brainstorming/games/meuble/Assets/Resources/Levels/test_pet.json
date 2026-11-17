@@ -1,0 +1,77 @@
+{
+  "id": "test_pet",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 3.45,
+      "z": 2.45,
+      "sizeX": 6.9,
+      "sizeZ": 4.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 6.95,
+      "z": 4.25,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "stool",
+    "x": 0.75,
+    "z": 4.25,
+    "yaw": 90.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D",
+    "model": "kenney.stool"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 6.25,
+    "z": 4.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Banc",
+      "kind": "counter",
+      "x": 3.45,
+      "z": 3.0,
+      "yaw": 0.0,
+      "sizeX": 6.9,
+      "sizeY": 0.6,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Chien",
+      "kind": "dog",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 3.25,
+          "z": 0.75,
+          "facing": 0.0,
+          "dwell": 30.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

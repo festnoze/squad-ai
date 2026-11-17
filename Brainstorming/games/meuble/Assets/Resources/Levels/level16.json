@@ -1,0 +1,328 @@
+{
+  "id": "level16",
+  "nameKey": "level16.name",
+  "hintKey": "level16.hint",
+  "lesson": "dark",
+  "rooms": [
+    {
+      "id": "salon",
+      "x": 5.45,
+      "z": 1.95,
+      "sizeX": 10.9,
+      "sizeZ": 3.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "chambre",
+      "x": 2.2,
+      "z": 6.2,
+      "sizeX": 4.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "couloir",
+      "x": 5.45,
+      "z": 6.2,
+      "sizeX": 1.9,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine",
+      "x": 8.7,
+      "z": 6.2,
+      "sizeX": 4.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.45,
+      "z": 7.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 1.25,
+      "z": 3.95,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte_salon",
+      "swing": "salon",
+      "hinge": "end"
+    },
+    {
+      "x": 5.25,
+      "z": 3.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 6.45,
+      "z": 7.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 9.25,
+      "z": 3.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 10.95,
+      "z": 1.25,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": 2.5,
+      "z": -0.05,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 10.95,
+      "z": 5.75,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "floor_lamp",
+    "x": 3.25,
+    "z": 5.25,
+    "yaw": 180.0,
+    "sizeX": 0.35,
+    "sizeY": 1.8,
+    "sizeZ": 0.35,
+    "color": "#D7263D",
+    "model": "kenney.floorlamp"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 10.25,
+    "z": 1.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Cheminee",
+      "kind": "counter",
+      "x": 5.5,
+      "z": 0.25,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 1.0,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C6A4A",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Canape",
+      "kind": "sofa",
+      "x": 5.5,
+      "z": 1.75,
+      "yaw": 0.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9",
+      "model": "kenney.sofa"
+    },
+    {
+      "name": "Lit",
+      "kind": "sofa",
+      "x": 2.2,
+      "z": 7.35,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 0.55,
+      "sizeZ": 2.0,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 8.7,
+      "z": 8.1,
+      "yaw": 0.0,
+      "sizeX": 2.4,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "TableCuisine",
+      "kind": "table",
+      "x": 8.75,
+      "z": 5.75,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C6A4A"
+    }
+  ],
+  "designerRoute": [
+    { "x": 3.25, "z": 5.25, "at": 0.3, "action": "toggle" },
+    { "x": 3.75, "z": 5.25, "at": 0.6 },
+    { "x": 3.75, "z": 6.25, "at": 1.5 },
+    { "x": 3.75, "z": 7.25, "at": 3.3 },
+    { "x": 4.75, "z": 7.25, "at": 5.1 },
+    { "x": 4.75, "z": 6.25, "at": 6.9 },
+    { "x": 4.75, "z": 5.25, "at": 8.7 },
+    { "x": 4.75, "z": 4.25, "at": 10.5 },
+    { "x": 5.25, "z": 4.25, "at": 12.3 },
+    { "x": 5.25, "z": 3.25, "at": 13.2 },
+    { "x": 5.25, "z": 2.75, "at": 15.0 },
+    { "x": 6.25, "z": 2.75, "at": 15.9 },
+    { "x": 7.25, "z": 2.75, "at": 17.7 },
+    { "x": 7.25, "z": 1.75, "at": 19.5 },
+    { "x": 7.25, "z": 1.25, "at": 21.3 },
+    { "x": 8.25, "z": 1.25, "at": 22.2 },
+    { "x": 9.25, "z": 1.25, "at": 24.0 },
+    { "x": 10.25, "z": 1.25, "at": 25.8 },
+    { "x": 10.25, "z": 1.25, "at": 25.8 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Claire",
+      "personality": "watchful",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 0.75,
+          "z": 2.75,
+          "facing": 90.0,
+          "dwell": 8.0,
+          "glances": [
+            {
+              "offset": 2.5,
+              "yaw": -45.0,
+              "hold": 1.0
+            },
+            {
+              "offset": 5.0,
+              "yaw": 45.0,
+              "hold": 1.0
+            }
+          ]
+        },
+        {
+          "x": 0.75,
+          "z": 1.25,
+          "facing": 90.0,
+          "dwell": 6.0,
+          "glances": [
+            {
+              "offset": 2.0,
+              "yaw": 40.0,
+              "hold": 1.0
+            }
+          ]
+        },
+        {
+          "x": 2.25,
+          "z": 0.75,
+          "facing": 60.0,
+          "dwell": 4.0,
+          "glances": [
+            {
+              "offset": 1.5,
+              "yaw": -30.0,
+              "hold": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Max",
+      "personality": "hurried",
+      "pattern": "pingpong",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 8.25,
+          "z": 7.25,
+          "facing": 0.0,
+          "dwell": 1.5,
+          "glances": []
+        },
+        {
+          "x": 10.25,
+          "z": 5.75,
+          "facing": 90.0,
+          "dwell": 1.5,
+          "glances": []
+        },
+        {
+          "x": 9.75,
+          "z": 2.75,
+          "facing": 90.0,
+          "dwell": 2.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Rex",
+      "kind": "dog",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 5.5,
+          "z": 0.75,
+          "facing": 0.0,
+          "dwell": 10.0,
+          "glances": [],
+          "sleep": true
+        },
+        {
+          "x": 6.75,
+          "z": 0.75,
+          "facing": 90.0,
+          "dwell": 4.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

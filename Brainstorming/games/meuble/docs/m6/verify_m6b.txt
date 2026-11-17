@@ -1,0 +1,12 @@
+
+=== Setup du projet et compilation ===
+  les scripts compilent, couches, shaders et scene Boot en place
+
+=== Tests unitaires (EditMode, PRD 10.1) ===
+  tous les tueurs EditMode de mutation.sh sont exiges
+  EditMode : 448 tests, 0 echecs
+
+=== Sonde PlayMode (PRD 10.2) ===
+  ROUGE : tueurs PlayMode de mutation.sh absents de la liste exigee par verify.sh : volume_scale:Step51a_OptionsAppliedAtOnce volume_scale:Step51b_OptionsSurviveRestartAndReload camera_sensitivity:Step51a_OptionsAppliedAtOnce cone_hide:Step51a_OptionsAppliedAtOnce cone_outline_alarm:Step52b_EyeShapesEdgePatternAndConeOutline pulse_pattern_gate:Step52b_EyeShapesEdgePatternAndConeOutline controls_gamepad_text:Step52b_EyeShapesEdgePatternAndConeOutline
+
+=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults) ===

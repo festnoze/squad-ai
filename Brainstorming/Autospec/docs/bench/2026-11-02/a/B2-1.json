@@ -1,0 +1,98 @@
+{
+  "date": "2026-11-02",
+  "config": "a",
+  "project": "B2",
+  "model": "sonnet",
+  "git_sha": "bd600f04",
+  "brief_sha256": "2d1f19a5bb72e486712a41b6f0aee281cb0e8d75b9dd47ca7f703c4e8fce0d18",
+  "bench_version": 1,
+  "m1_completed": false,
+  "m2_duration_s": 1.2,
+  "m3_cost_usd": 0.0,
+  "m4_agent_calls": 0,
+  "m8_interventions": 0,
+  "factory": {
+    "completed": false,
+    "phase": "needs_attention",
+    "error": "❌ Socle technique non opérationnel : Préflight isolé : ISOLATION_UNAVAILABLE: Linux Docker engine is required; no host fallback",
+    "timed_out": false,
+    "workspace": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\a\\B2-133328\\ws\\todo-cli-db8a8f10",
+    "duration_s": 1.2,
+    "cost_usd": 0.0,
+    "agent_calls": 0,
+    "stories": []
+  },
+  "oracle": {
+    "lock_present": false,
+    "env_built": true,
+    "env_detail": "",
+    "m5_suite": {
+      "green": false,
+      "passed": 0,
+      "failed": 0,
+      "detail": "\r\nno tests ran in 0.03s\r\n"
+    },
+    "m6_oracle": {
+      "passed": 1,
+      "total": 10,
+      "rate": 0.1,
+      "checks": [
+        {
+          "id": "help_exits_zero",
+          "passed": false,
+          "detail": "rc=1"
+        },
+        {
+          "id": "add_prints_ids_from_one",
+          "passed": false,
+          "detail": "[] []"
+        },
+        {
+          "id": "list_format_and_done",
+          "passed": false,
+          "detail": "[]"
+        },
+        {
+          "id": "remove_and_ids_never_reused",
+          "passed": false,
+          "detail": "add -> [], list -> []"
+        },
+        {
+          "id": "title_is_trimmed",
+          "passed": false,
+          "detail": ""
+        },
+        {
+          "id": "empty_title_exit_2",
+          "passed": false,
+          "detail": "rc=1"
+        },
+        {
+          "id": "unknown_id_exit_1_unchanged",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "list_missing_file_is_empty",
+          "passed": false,
+          "detail": "rc=1"
+        },
+        {
+          "id": "db_is_valid_json",
+          "passed": false,
+          "detail": "[Errno 2] No such file or directory: 'C:\\\\Users\\\\E6FB4~1.MIL\\\\AppData\\\\Local\\\\Temp\\\\bench-oracle-feiqgrgn\\\\b2\\\\t7.json'"
+        },
+        {
+          "id": "default_db_in_cwd",
+          "passed": false,
+          "detail": "rc=1"
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": false,
+      "detail": "C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-feiqgrgn\\env\\Scripts\\python.exe: No module named todo_cli.__main__; 'todo_cli' is a package and cannot be directly executed\r\n"
+    },
+    "duration_s": 17.6
+  }
+}

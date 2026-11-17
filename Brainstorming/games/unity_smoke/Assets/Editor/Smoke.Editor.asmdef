@@ -1,0 +1,6 @@
+{
+    "name": "Smoke.Editor",
+    "rootNamespace": "Smoke.Editor",
+    "references": ["Smoke", "UnityEngine.UI"],
+    "includePlatforms": ["Editor"]
+}

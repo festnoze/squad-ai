@@ -1,0 +1,252 @@
+{
+  "id": "test_m5_audit_house2",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "r00",
+      "x": -4.1,
+      "z": -2.05,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "r10",
+      "x": 0.0,
+      "z": -2.05,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "r20",
+      "x": 4.1,
+      "z": -2.05,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "r01",
+      "x": -4.1,
+      "z": 2.05,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "r11",
+      "x": 0.0,
+      "z": 2.05,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "r21",
+      "x": 4.1,
+      "z": 2.05,
+      "sizeX": 4.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "props": [
+    {
+      "name": "Sofa",
+      "kind": "sofa",
+      "x": 0.0,
+      "z": -1.0,
+      "yaw": 0.0,
+      "sizeX": 1.8,
+      "sizeY": 0.85,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#8C5A36"
+    },
+    {
+      "name": "Shelf",
+      "kind": "bookshelf",
+      "x": -4.1,
+      "z": 3.75,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 2.0,
+      "sizeZ": 0.35,
+      "occluder": true,
+      "color": "#8C5A36"
+    },
+    {
+      "name": "Table",
+      "kind": "table",
+      "x": 4.1,
+      "z": -2.05,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#8C5A36"
+    },
+    {
+      "name": "Cabinet",
+      "kind": "cabinet",
+      "x": -5.7,
+      "z": 0.9,
+      "yaw": 90.0,
+      "sizeX": 0.8,
+      "sizeY": 1.2,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36"
+    }
+  ],
+  "doors": [
+    {
+      "x": -2.05,
+      "z": -1.8,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": -2.05,
+      "z": 2.3,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 2.05,
+      "z": -1.8,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 2.05,
+      "z": 2.3,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": -4.35,
+      "z": 0.0,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": -0.25,
+      "z": 0.0,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 3.85,
+      "z": 0.0,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 6.15,
+      "z": 2.3,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": -5.35,
+    "z": -3.3,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 5.6,
+    "z": 2.3,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Reveur",
+      "personality": "dreamer",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 0.0,
+          "z": -3.4,
+          "facing": 0.0,
+          "dwell": 5.0,
+          "glances": []
+        },
+        {
+          "x": 0.0,
+          "z": 3.4,
+          "facing": 180.0,
+          "dwell": 6.0,
+          "glances": []
+        },
+        {
+          "x": -4.1,
+          "z": 2.05,
+          "facing": 90.0,
+          "dwell": 4.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Chien",
+      "kind": "dog",
+      "startStation": 0,
+      "bodyColor": "#C68B59",
+      "headColor": "#C68B59",
+      "stations": [
+        {
+          "x": -1.4,
+          "z": -3.4,
+          "facing": 90.0,
+          "dwell": 8.0,
+          "glances": [],
+          "sleep": true
+        },
+        {
+          "x": 1.4,
+          "z": -3.4,
+          "facing": 270.0,
+          "dwell": 4.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,0 @@
-{
-  "source": "https://registry.npmjs.org/npm/11.6.4",
-  "version": "11.6.4",
-  "engines": {
-    "node": "^20.17.0 || >=22.9.0"
-  },
-  "integrity": "sha512-ERjKtGoFpQrua/9bG0+h3xiv/4nVdGViCjUYA1AmlV24fFvfnSB7B7dIfZnySQ1FDLd0ZVrWPsLLp78dCtJdRQ==",
-  "tarball": "https://registry.npmjs.org/npm/-/npm-11.6.4.tgz"
-}

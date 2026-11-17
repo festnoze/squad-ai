@@ -1,0 +1,63 @@
+{
+  "agent": "levels",
+  "summary": "M6b levels work. RouteReplayer plays the route actions \"hide\" and \"leave\" like \"open\" (still at (x, z), E at \"at\", the next leg waits for the 0.5 s wardrobe action; wardrobe actions are not counted as openings; Result.Hides/Leaves). level13 and level17 now pass the audit with -writeRoutes and their Step45 replays win. level18 \"L'armoire\" passes the audit (wardrobe lesson binds) but cannot load in the game: LevelValidator (gameplay file) rejects the route actions hide/leave, so Step56a and the manifest validity test fail until the gameplay agent accepts them. level10 is NOT fixed: under the current audit a still chair seen by a human must be within 0.3 m of its slot (InPlaceRadius) and the rock-off search has no wait cap and waits as early as possible, so its only stops in view would be an out-and-back to the spawn, which a time-optimal schedule never makes; diagnostic seen maps showed the spawn is unseen during Mamie's glance and her final sweep is what binds. Variants tried (spawn by the door with a 1.0/1.2 s glance, no glance) gave the same verdict. It needs a design change (a dog or a decoy watcher) or an audit-side choice; left as the earlier agent edited it (wait rule passes, rock lesson fails, Step45j/45p/Step40 red). 3 audit runs used (variant files, deleted). UPDATE after the validator fix: Step56a green. Level 10 dog trial (2 audits): a dog Rex at the veranda west end (sleep/awake loop) plus Mamie station 1 dwell 15 makes the rock lesson bind (rock-off schedule seen rocking at 14.2 s at (7.75, 4.25)), but the chair then idles 11.7 to 16.8 s near the spawn (loiter rule). Stopped per the 2-audit cap; level10.json left unchanged. UPDATE 2 (2 more audits, cap reached): dog at the west end with Mamie leaving earlier: rock binds but the spawn idle stays 11.5 to 12.7 s (Mamie's timing has no effect, the dog's view through the door reaches the salon). Dog east of the door at (8.0, 2.4) facing east: the wait rule passes (idle 6.8 to 7.1 s, exit 18.8 to 19.0 s), but the schedule escapes through the kitchen and the rock lesson no longer binds. level10.json left unchanged; Step45j, Step45p and Step40 stay red.",
+  "blocked": true,
+  "files_changed": [
+    "Assets/Tests/PlayMode/RouteReplayer.cs",
+    "Assets/Tests/PlayMode/ProbeTestsM6Levels.cs (new)",
+    "Assets/Tests/PlayMode/ProbeTestsM5Levels.cs (Step40 count 18)",
+    "Assets/Tests/EditMode/LevelDataM2Tests.cs (manifest count 18, play order)",
+    "Assets/Resources/Levels/level13.json (Max station 0 dwell 2 -> 9, Claire station 0 dwell 5 -> 4, decoy at (0.66, 4.25) removed, route rewritten)",
+    "Assets/Resources/Levels/level17.json (Lea station 0 dwell 10 -> 25, route rewritten; keeps the earlier seed 777 and Hugo dwell 3)",
+    "Assets/Resources/Levels/level18.json (new)",
+    "Assets/Resources/Levels/levels.json (level18 after level17)",
+    "Assets/Scripts/Core/Strings.cs (M6 levels block: level18 name and hint)"
+  ],
+  "probe_steps": [
+    "Step56a_Level18RouteWins"
+  ],
+  "edit_tests": [
+    "Manifest_lists_the_levels_in_play_order_and_each_is_valid (count 18)"
+  ],
+  "markers": [],
+  "audit_table": [
+    {
+      "level": "level10",
+      "verdict": "1 defect: lecon rock (rock-off schedule never seen rocking)",
+      "exit_s": 18.1,
+      "longest_wait_s": 7.6,
+      "loiter_s": 6.6,
+      "lesson": "rock: does not bind"
+    },
+    {
+      "level": "level13",
+      "verdict": "aucun defaut",
+      "exit_s": 26.2,
+      "longest_wait_s": 7.2,
+      "loiter_s": 6.4,
+      "lesson": "load binds (drop at 6.1 s), decoys necessary, 8 samples explained"
+    },
+    {
+      "level": "level17",
+      "verdict": "aucun defaut",
+      "exit_s": 21.2,
+      "longest_wait_s": 1.4,
+      "loiter_s": 0.6,
+      "lesson": "final: door, split, robot, load bind"
+    },
+    {
+      "level": "level18",
+      "verdict": "aucun defaut",
+      "exit_s": 21.7,
+      "longest_wait_s": 6.4,
+      "loiter_s": 5.4,
+      "lesson": "wardrobe binds (no schedule without hiding), 1 hide 3.8 s, kitchen door opened by Odile 1.8-2.4 s"
+    }
+  ],
+  "playmode": "Step45|Step40|Step56: 18 passed, 3 failed (Step45j, Step45p, Step40: level10 only). EditMode LevelDataM2|M4|M5: 156/156 green.",
+  "needs": [
+    "done by the integrator (validator accepts hide/leave).",
+    "product owner: level10 still red. The dog binds the rock lesson; what is left is making the dog's first usable sleep window start by about 9 s (or delaying Mamie) so the spawn idle stays under 8 s.",
+    "integrator: add Step56a_ to verify.sh's required list once the validator accepts hide/leave."
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "id": "test_m4_game_prop",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "room": {
+    "sizeX": 8.0,
+    "sizeZ": 6.0,
+    "wallHeight": 2.7,
+    "wallThickness": 0.1,
+    "floorColor": "#B07A4E",
+    "wallColor": "#EDE6DA"
+  },
+  "doors": [
+    { "wall": "+x", "center": 2.3, "width": 1.0, "bottom": 0.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -3.2,
+    "z": -2.2,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "x": 3.5, "z": 2.3, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    {
+      "model": "kenney.sofa",
+      "name": "Sofa", "kind": "sofa", "x": 1.5, "z": 1.6, "yaw": 0.0,
+      "sizeX": 2.0, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true,
+      "color": "#2E6DB4", "accentColor": "#5B93D9"
+    }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Assis",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": 1.5, "z": -0.3, "facing": 0.0, "dwell": 0.6, "glances": [] },
+        { "x": 1.5, "z": 0.85, "facing": 180.0, "dwell": 3.0, "glances": [], "sit": "Sofa" }
+      ]
+    }
+  ]
+}

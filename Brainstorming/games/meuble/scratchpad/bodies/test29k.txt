@@ -1,0 +1,89 @@
+        /// <summary>
+        /// A player furniture of its own, stepped by the test itself: GameState pins the level's player from its sit
+        /// flag on every step (amendment 9.2), so the pin semantics are checked on a controller nobody else drives.
+        /// </summary>
+        private FurnitureController Standalone(string kind, Vector3 at, float yaw)
+        {
+            var go = new GameObject("Standalone " + kind) { layer = Layers.Player };
+            go.transform.SetParent(Game.Level.Root.transform, false);
+            var cc = go.AddComponent<CharacterController>();
+            cc.skinWidth = 0.02f;
+            cc.minMoveDistance = 0f;
+            cc.stepOffset = 0.05f;
+            var f = go.AddComponent<FurnitureController>();
+            f.Rules = GameRules.M4;
+            f.SetBody(BodyDef.For(kind));
+            f.Teleport(at, yaw);
+            return f;
+        }
+
+        private static void StepManually(FurnitureController f, int count)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                f.Step(Dt, true);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator Step29k_PinnedTakesNoInputAndUnpinWaitsForNeutral()
+        {
+            PinAway();
+            yield return Steps(1);
+            // Away from the level's player, on free floor between the sofa and the table.
+            var at = new Vector3(1.0f, 0f, 0.9f);
+            FurnitureController f = Standalone("chair", at, 90f);
+            Assert.AreNotSame(Chair, f, "premise: a controller GameState does not drive");
+            f.ScriptedDirection = Vector3.right;
+            StepManually(f, 3);
+            Assert.IsTrue(f.IsMoving, "premise: the standalone chair moves");
+            f.ScriptedDirection = null;
+            StepManually(f, 1);
+            at = f.transform.position;
+
+            f.Pin(true);
+            f.ScriptedDirection = Vector3.right;
+            StepManually(f, 20);
+            Assert.IsTrue(f.Pinned);
+            Assert.IsFalse(f.IsMoving, "a pinned chair moves");
+            Assert.Less(Planar(f.transform.position, at), 1e-4f, "a pinned chair travelled");
+
+            // Unpinned with the key still held: ignored until the input is neutral for one step.
+            f.Pin(false);
+            StepManually(f, 10);
+            Assert.IsTrue(f.WaitingForNeutralInput, "Pin(false) did not wait for a neutral input");
+            Assert.IsFalse(f.IsMoving, "a key held through the pin moved the chair");
+            Assert.Less(Planar(f.transform.position, at), 1e-4f, "a key held through the pin moved the chair");
+            f.ScriptedDirection = null;
+            StepManually(f, 1);
+            Assert.IsFalse(f.WaitingForNeutralInput, "a neutral step did not re-arm the input");
+            f.ScriptedDirection = Vector3.right;
+            StepManually(f, 3);
+            Assert.IsTrue(f.IsMoving, "the input is dead after the unpin");
+            f.ScriptedDirection = null;
+            StepManually(f, 1);
+
+            // Only a change does anything (GameState calls it on every step).
+            f.Pin(false);
+            Assert.IsFalse(f.WaitingForNeutralInput, "a repeated Pin(false) re-armed the wait");
+            f.Pin(true);
+            f.Pin(true);
+            f.Pin(false);
+            Assert.IsTrue(f.WaitingForNeutralInput, "premise: a real unpin re-arms the wait");
+            StepManually(f, 1);
+
+            // A pin ends an action at once: a lamp switching.
+            f.SetBody(BodyDef.For("floor_lamp"));
+            InputReader.InjectAction();
+            StepManually(f, 1);
+            Assert.IsTrue(f.ActionActive && f.ToggleCount == 1, "premise: the lamp switch runs");
+            f.Pin(true);
+            Assert.IsFalse(f.ActionActive, "a pin left the action running");
+            StepManually(f, 1);
+            Assert.IsFalse(f.IsMoving, "pinned during an action, still moving");
+            f.Pin(false);
+            UnityEngine.Object.DestroyImmediate(f.gameObject);
+            yield return Steps(1);
+            AssertClean();
+        }
+

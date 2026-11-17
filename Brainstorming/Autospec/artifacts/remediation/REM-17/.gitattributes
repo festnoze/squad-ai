@@ -1,2 +1,0 @@
-# Evidence SHA256 covers exact bytes, including original platform line endings.
-fixtures/** -text

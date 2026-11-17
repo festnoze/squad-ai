@@ -1,0 +1,159 @@
+{
+  "date": "2026-11-02",
+  "config": "c",
+  "project": "B3",
+  "model": "sonnet",
+  "git_sha": "836de199",
+  "brief_sha256": "90b6e1939e3b919952ebcce264ece9be9dfd167a56477e00167847dce58f4d80",
+  "bench_version": 1,
+  "m1_completed": true,
+  "m2_duration_s": 1205.607,
+  "m3_cost_usd": 0.887917,
+  "m4_agent_calls": 14,
+  "m8_interventions": 0,
+  "factory": {
+    "completed": true,
+    "phase": "done",
+    "error": "",
+    "workspace": "C:\\Dev\\squad-ai\\.claude\\worktrees\\autospec-bench\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\c\\B3-140733\\notes-api-3325e312",
+    "duration_s": 1205.607,
+    "cost_usd": 0.887917,
+    "agent_calls": 14,
+    "timed_out": false,
+    "stories": [
+      {
+        "id": "US-1",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-2",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-3",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-4",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-5",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-6",
+        "status": "done",
+        "attempts": 1
+      },
+      {
+        "id": "US-7",
+        "status": "done",
+        "attempts": 0
+      }
+    ]
+  },
+  "oracle": {
+    "lock_present": true,
+    "env_built": true,
+    "env_detail": "",
+    "m5_suite": {
+      "green": true,
+      "passed": 58,
+      "failed": 0,
+      "detail": "..........................................................               [100%]\r\n============================== warnings summary ===============================\r\n..\\..\\..\\..\\..\\..\\e.millerioux\\AppData\\Local\\Temp\\bench-oracle-13yz013y\\env\\Lib\\site-packages\\fastapi\\testclient.py:1\r\n  C:\\Users\\e.millerioux\\AppData\\Local\\Temp\\bench-oracle-13yz013y\\env\\Lib\\site-packages\\fastapi\\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.\r\n    from starlette.testclient import TestClient as TestClient  # noqa\r\n\r\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\r\n58 passed, 1 warning in 8.45s\r\n"
+    },
+    "m6_oracle": {
+      "passed": 15,
+      "total": 15,
+      "rate": 1.0,
+      "checks": [
+        {
+          "id": "health",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "create_201",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "body_defaults_to_empty",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "list_sorted_by_id",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "get_200",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "get_missing_404",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "empty_title_422",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "title_121_chars_422",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "title_120_chars_ok",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "put_keeps_id_and_created_at",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "put_missing_404",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "search_case_insensitive",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "delete_204_then_404",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "delete_missing_404",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "id": "persists_across_restart",
+          "passed": true,
+          "detail": ""
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": "GET /health -> 200"
+    },
+    "duration_s": 14.9
+  }
+}

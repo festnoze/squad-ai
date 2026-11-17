@@ -1,0 +1,108 @@
+{
+  "date": "2026-11-02",
+  "config": "a",
+  "project": "B1",
+  "model": "sonnet",
+  "git_sha": "bd600f04",
+  "brief_sha256": "1ed18206208e8f067585c6ab94044fe46dece059bc9378e279b39ffd042f9d9e",
+  "bench_version": 1,
+  "m1_completed": false,
+  "m2_duration_s": 0.9,
+  "m3_cost_usd": 0.0,
+  "m4_agent_calls": 0,
+  "m8_interventions": 0,
+  "factory": {
+    "completed": false,
+    "phase": "needs_attention",
+    "error": "❌ Socle technique non opérationnel : Préflight isolé : ISOLATION_UNAVAILABLE: Linux Docker engine is required; no host fallback",
+    "timed_out": false,
+    "workspace": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace_bench\\2026-11-02\\a\\B1-133312\\ws\\slugify-lib-5d07a73e",
+    "duration_s": 0.9,
+    "cost_usd": 0.0,
+    "agent_calls": 0,
+    "stories": []
+  },
+  "oracle": {
+    "lock_present": false,
+    "env_built": true,
+    "env_detail": "",
+    "m5_suite": {
+      "green": false,
+      "passed": 0,
+      "failed": 0,
+      "detail": "\r\nno tests ran in 0.03s\r\n"
+    },
+    "m6_oracle": {
+      "passed": 0,
+      "total": 12,
+      "rate": 0.0,
+      "checks": [
+        {
+          "id": "brief_hello_world",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "brief_accents_spaces",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "brief_empty",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "brief_underscore_dot",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "brief_max_15",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "brief_max_12",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "brief_long_word_cut",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "cedilla_and_symbols",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "only_symbols",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "no_edge_dashes",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "max_none_unchanged",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        },
+        {
+          "id": "short_enough_unchanged",
+          "passed": false,
+          "detail": "cannot call slugify: Traceback (most recent call last):\r\n  File \"C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\b1_oracle.py\", line 3, in <module>\r\n    from slugify_lib import slugify\r\nImportError: cannot import name 'slugify' from 'slugify_lib' (C:\\Users\\E6FB4~1.MIL\\AppData\\Local\\Temp\\bench-oracle-z_6rz_uc\\product\\slugify_lib\\__init__.py)\r\n"
+        }
+      ]
+    },
+    "m7_smoke": {
+      "ok": true,
+      "detail": ""
+    },
+    "duration_s": 11.4
+  }
+}

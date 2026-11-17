@@ -1,4 +1,0 @@
-*.json -text
-*.xml -text
-**/*.json -text
-**/*.xml -text

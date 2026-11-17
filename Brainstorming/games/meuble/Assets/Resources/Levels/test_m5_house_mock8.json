@@ -1,0 +1,109 @@
+{
+  "id": "test_m5_house_mock8",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    { "id": "entree", "x": -4.0, "z": -2.0, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" },
+    { "id": "salon", "x": 0.1, "z": -2.0, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "soft", "floorColor": "#5B93D9", "wallColor": "#F7F4EE" },
+    { "id": "cuisine", "x": 4.2, "z": -2.0, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE" },
+    { "id": "couloir", "x": 0.1, "z": 0.7, "sizeX": 12.2, "sizeZ": 1.2, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" },
+    { "id": "mezzanine", "x": -4.0, "z": 3.4, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" },
+    { "id": "chambre", "x": 0.1, "z": 3.4, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "soft", "floorColor": "#5B93D9", "wallColor": "#F7F4EE" },
+    { "id": "bureau", "x": 4.2, "z": 3.4, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#EDE6DA", "wallColor": "#EDE6DA" },
+    { "id": "passage", "x": 6.9, "z": 0.7, "sizeX": 1.2, "sizeZ": 9.4, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" }
+  ],
+  "platforms": [
+    { "name": "Mezzanine", "x": -4.0, "z": 4.65, "sizeX": 4.0, "sizeZ": 1.5, "height": 0.6, "color": "#A0703E" }
+  ],
+  "ramps": [
+    { "x": -5.25, "z": 3.0, "width": 1.2, "length": 1.8, "yaw": 0.0, "platform": "Mezzanine" }
+  ],
+  "doors": [
+    { "x": -4.25, "z": 0.05, "width": 1.0, "top": 2.1 },
+    { "x": 0.35, "z": 0.05, "width": 1.0, "top": 2.1, "leaf": "closed", "hinge": "start", "id": "porte_salon", "swing": "salon" },
+    { "x": 4.45, "z": 0.05, "width": 1.0, "top": 2.1 },
+    { "x": -4.25, "z": 1.35, "width": 1.0, "top": 2.1 },
+    { "x": 0.35, "z": 1.35, "width": 1.0, "top": 2.1 },
+    { "x": 4.45, "z": 1.35, "width": 1.0, "top": 2.1, "leaf": "open", "hinge": "start", "id": "porte_bureau", "swing": "bureau" },
+    { "x": 6.25, "z": 0.7, "width": 1.0, "top": 2.1 },
+    { "x": 6.25, "z": -2.25, "width": 1.0, "top": 2.1 },
+    { "x": 2.15, "z": 3.65, "width": 1.0, "top": 2.1 },
+    { "x": -1.95, "z": -2.25, "width": 1.0, "top": 2.1 },
+    { "x": -6.05, "z": -2.25, "width": 1.0, "top": 2.1 }
+  ],
+  "windows": [
+    { "x": -4.0, "z": -4.05, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 0.1, "z": -4.05, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 0.1, "z": 5.45, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 4.2, "z": 5.45, "width": 1.6, "bottom": 0.9, "top": 2.1 }
+  ],
+  "player": { "model": "kenney.chair", "kind": "chair", "x": 3.0, "z": 2.5, "yaw": 180.0, "sizeX": 0.45, "sizeY": 0.9, "sizeZ": 0.45, "color": "#D7263D" },
+  "exit": { "model": "kenney.doormat", "x": -5.45, "z": -2.25, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    { "name": "Plant", "kind": "plant", "x": -2.6, "z": -3.5, "yaw": 0.0, "sizeX": 0.5, "sizeY": 1.3, "sizeZ": 0.5, "occluder": true, "color": "#3F8F4F", "accentColor": "#8C5A36" },
+    { "name": "Shoes", "kind": "cabinet", "x": -3.0, "z": -0.35, "yaw": 0.0, "sizeX": 0.9, "sizeY": 0.9, "sizeZ": 0.4, "occluder": true, "color": "#8C5A36", "accentColor": "#E3B23C" },
+    { "model": "kenney.sofa", "name": "Sofa", "kind": "sofa", "x": 0.1, "z": -3.4, "yaw": 0.0, "sizeX": 2.0, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true, "color": "#2E6DB4", "accentColor": "#5B93D9" },
+    { "name": "Table", "kind": "table", "x": 0.1, "z": -2.3, "yaw": 0.0, "sizeX": 1.2, "sizeY": 0.75, "sizeZ": 0.8, "occluder": true, "color": "#F7F4EE", "accentColor": "#8C5A36" },
+    { "name": "Counter", "kind": "counter", "x": 4.2, "z": -3.6, "yaw": 0.0, "sizeX": 2.4, "sizeY": 0.9, "sizeZ": 0.6, "occluder": true, "color": "#5B93D9", "accentColor": "#F7F4EE" },
+    { "name": "KitchenTable", "kind": "table", "x": 4.2, "z": -1.8, "yaw": 0.0, "sizeX": 1.0, "sizeY": 0.75, "sizeZ": 0.8, "occluder": true, "color": "#E3B23C", "accentColor": "#8C5A36" },
+    { "name": "Bookshelf", "kind": "bookshelf", "x": -3.0, "z": 5.15, "yaw": 0.0, "sizeX": 1.6, "sizeY": 2.0, "sizeZ": 0.35, "occluder": true, "color": "#6B4226", "accentColor": "#E3B23C" },
+    { "model": "kenney.sofa", "name": "Couch", "kind": "sofa", "x": -2.5, "z": 2.85, "yaw": 90.0, "sizeX": 2.0, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true, "color": "#2E6DB4", "accentColor": "#5B93D9" },
+    { "name": "Bed", "kind": "sofa", "x": -0.7, "z": 3.8, "yaw": 0.0, "sizeX": 1.6, "sizeY": 0.55, "sizeZ": 2.0, "occluder": true, "color": "#5B93D9", "accentColor": "#F7F4EE" },
+    { "name": "Wardrobe", "kind": "cabinet", "x": -1.0, "z": 5.1, "yaw": 0.0, "sizeX": 1.2, "sizeY": 2.0, "sizeZ": 0.55, "occluder": true, "color": "#6B4226", "accentColor": "#8C5A36" },
+    { "name": "Desk", "kind": "table", "x": 5.4, "z": 4.9, "yaw": 0.0, "sizeX": 1.0, "sizeY": 0.75, "sizeZ": 0.5, "occluder": true, "color": "#E3B23C", "accentColor": "#8C5A36" },
+    { "name": "Shelf", "kind": "bookshelf", "x": 3.2, "z": 5.2, "yaw": 0.0, "sizeX": 1.6, "sizeY": 2.0, "sizeZ": 0.35, "occluder": true, "color": "#6B4226", "accentColor": "#E3B23C" },
+    { "name": "Fern", "kind": "plant", "x": 6.9, "z": 5.0, "yaw": 0.0, "sizeX": 0.5, "sizeY": 1.3, "sizeZ": 0.5, "occluder": true, "color": "#3F8F4F", "accentColor": "#8C5A36" }
+  ],
+  "decoys": [
+    { "model": "kenney.chair", "kind": "chair", "x": 1.6, "z": -2.6, "yaw": 90.0, "color": "#8C5A36" },
+    { "model": "kenney.chair", "kind": "chair", "x": 3.4, "z": -1.8, "yaw": 90.0, "color": "#8C5A36" }
+  ],
+  "rugs": [
+    { "model": "kenney.rug", "x": 0.1, "z": -2.2, "sizeX": 2.4, "sizeZ": 1.8, "yaw": 0.0, "color": "#2E6DB4" },
+    { "model": "kenney.rug", "x": 0.1, "z": 3.0, "sizeX": 2.0, "sizeZ": 1.2, "yaw": 0.0, "color": "#2E6DB4" }
+  ],
+  "inhabitants": [
+    {
+      "name": "Reveur",
+      "personality": "dreamer",
+      "startStation": 0,
+      "stations": [
+        { "x": 1.5, "z": -1.3, "facing": 180.0, "dwell": 6.0, "glances": [] },
+        { "x": -4.0, "z": -1.5, "facing": 0.0, "dwell": 5.0, "glances": [] },
+        { "x": -0.5, "z": 0.7, "facing": 90.0, "dwell": 4.0, "glances": [] }
+      ]
+    },
+    {
+      "name": "Mefiante",
+      "personality": "watchful",
+      "pattern": "pingpong",
+      "startStation": 0,
+      "stations": [
+        { "x": 0.5, "z": 2.6, "facing": 0.0, "dwell": 5.0, "glances": [ { "offset": 1.0, "yaw": 60.0, "hold": 0.8 } ] },
+        { "x": 5.2, "z": 3.2, "facing": 90.0, "dwell": 4.0, "glances": [ { "offset": 1.5, "yaw": -60.0, "hold": 0.8 } ] },
+        { "x": 6.9, "z": -2.5, "facing": 180.0, "dwell": 4.0, "glances": [ { "offset": 1.0, "yaw": 45.0, "hold": 0.8 } ] }
+      ]
+    },
+    {
+      "name": "Maniaque",
+      "personality": "tidy",
+      "pattern": "wander",
+      "seed": 7,
+      "startStation": 0,
+      "stations": [
+        { "x": -3.5, "z": 2.2, "facing": 90.0, "dwell": 5.0, "glances": [] },
+        { "x": -4.0, "z": 4.6, "facing": 180.0, "dwell": 5.0, "glances": [] },
+        { "x": 3.0, "z": -2.8, "facing": 0.0, "dwell": 5.0, "glances": [] }
+      ]
+    },
+    {
+      "name": "Chien",
+      "kind": "dog",
+      "startStation": 0,
+      "stations": [
+        { "x": 5.5, "z": -2.8, "facing": 270.0, "dwell": 6.0, "glances": [], "sleep": true },
+        { "x": 5.5, "z": -0.8, "facing": 180.0, "dwell": 3.0, "glances": [] }
+      ]
+    }
+  ]
+}
