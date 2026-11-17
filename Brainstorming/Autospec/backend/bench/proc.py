@@ -6,6 +6,10 @@ depend on the code of the factories it measures.
 Output goes to files, never to pipes: a grandchild that inherits a pipe
 (uv -> python -> uvicorn) can keep it open after its parent died and stall the
 reader forever.
+
+Caps are wall-clock deadlines checked every ``_WAIT_SLICE_S``: on Windows a
+``Popen.wait`` timeout does not count the time the machine sleeps, and a 90 min
+cap once never fired over a 2.7 h run.
 """
 
 from __future__ import annotations
@@ -22,6 +26,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 _TAIL_CHARS = 200_000
+_WAIT_SLICE_S = 0.5
+
+
+def _now() -> float:
+    """Wall-clock seconds, the clock of every cap (tests patch it to simulate a sleep)."""
+    return time.time()
 
 
 @dataclass
@@ -63,6 +73,17 @@ def kill_tree(proc: subprocess.Popen) -> None:
         proc.kill()
 
 
+def wait_until(proc: subprocess.Popen, deadline: float) -> bool:
+    """Wait for ``proc`` until the wall-clock ``deadline`` (``time.time``); True when it exited."""
+    while (remaining := deadline - _now()) > 0:
+        try:
+            proc.wait(timeout=min(remaining, _WAIT_SLICE_S))
+            return True
+        except subprocess.TimeoutExpired:
+            pass
+    return proc.poll() is not None
+
+
 def _read(handle) -> str:
     handle.flush()
     handle.seek(0)
@@ -73,12 +94,12 @@ def _read(handle) -> str:
 def run(argv: list[str], *, cwd: Path | None = None, env: dict[str, str] | None = None,
         timeout_s: float = 60.0, input_text: str | None = None,
         stdout_path: Path | None = None, stderr_path: Path | None = None) -> Result:
-    """Blocking run capped at ``timeout_s``; the whole tree is killed on timeout.
+    """Blocking run capped at ``timeout_s`` of wall-clock time; the whole tree is killed on timeout.
 
     ``stdout_path`` / ``stderr_path`` keep the streams on disk (long factory
     runs); otherwise anonymous temporary files are used.
     """
-    started = time.monotonic()
+    started = _now()
     out = open(stdout_path, "w+b") if stdout_path else tempfile.TemporaryFile()
     err = open(stderr_path, "w+b") if stderr_path else tempfile.TemporaryFile()
     try:
@@ -93,22 +114,22 @@ def run(argv: list[str], *, cwd: Path | None = None, env: dict[str, str] | None 
                 except (BrokenPipeError, OSError, ValueError):
                     pass
             threading.Thread(target=feed, daemon=True).start()
-        timed_out = False
+        timed_out = True
         try:
-            proc.wait(timeout=timeout_s)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            kill_tree(proc)
+            timed_out = not wait_until(proc, started + timeout_s)
+        finally:  # a timeout, or Ctrl-C on the bench: the child's own group never sees it
+            if timed_out:
+                kill_tree(proc)
         return Result(
             returncode=None if timed_out else proc.returncode,
             stdout=_read(out),
             stderr=_read(err),
             timed_out=timed_out,
-            duration_s=round(time.monotonic() - started, 3),
+            duration_s=round(_now() - started, 3),
         )
     except OSError as exc:  # executable not found, permission denied
         return Result(returncode=None, stdout="", stderr=f"{type(exc).__name__}: {exc}",
-                      timed_out=False, duration_s=round(time.monotonic() - started, 3))
+                      timed_out=False, duration_s=round(_now() - started, 3))
     finally:
         out.close()
         err.close()

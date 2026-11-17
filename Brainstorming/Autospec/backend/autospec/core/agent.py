@@ -3,11 +3,11 @@
 One call = one CLI process. The prompt travels through stdin and the system prompt
 through a temporary file, so the command line never carries a newline or a quote.
 No retry happens here: the pipeline decides what to do with an ``AgentError``.
+Cancelling ``arun`` (a stop, Ctrl-C) kills the CLI process tree at once.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import re
@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from autospec.core.ports import AgentCall, AgentError, AgentResult, Capability
-from autospec.core.procs import run_capped
+from autospec.core.procs import arun_capped
 from autospec.core.settings import Settings
 
 TOOLS = "Read,Edit,Write,Glob,Grep,Bash"
@@ -200,8 +200,8 @@ class ClaudeCodeRunner:
             system_file.write_bytes(call.system_prompt.encode("utf-8"))
             argv = [*self._command, *build_argv(self._settings, call, system_file)]
             try:
-                proc = await asyncio.to_thread(run_capped, argv, cwd=call.cwd, env=_child_env(),
-                                               timeout_s=call.timeout_s, input_text=call.prompt)
+                proc = await arun_capped(argv, cwd=call.cwd, env=_child_env(), timeout_s=call.timeout_s,
+                                         input_text=call.prompt)
             except OSError as exc:
                 raise AgentError(f"cannot start {argv[0]}: {exc}", kind="unavailable") from exc
         if call.cwd is not None:

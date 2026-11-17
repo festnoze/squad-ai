@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import subprocess
@@ -187,8 +188,8 @@ async def test_success_feeds_prompt_on_stdin_and_system_prompt_by_file(fake, wor
     result = await runner.arun(call)
     assert result.session_id == "sess-123" and result.input_tokens == 123
     seen = recorded()
-    # procs.popen writes stdin in text mode: on Windows every LF reaches the CLI as CRLF.
-    assert seen["stdin"].replace("\r\n", "\n") == call.prompt
+    # Written as UTF-8 bytes: a text-mode stdin turned every LF into CRLF on Windows.
+    assert seen["stdin"] == call.prompt
     assert seen["system_prompt"] == call.system_prompt
     system_file = Path(seen["argv"][seen["argv"].index("--append-system-prompt-file") + 1])
     assert seen["argv"] == build_argv(SETTINGS, call, system_file)
@@ -261,6 +262,29 @@ async def test_timeout_kills_the_cli_quickly(fake, workspace, tmp_path, monkeypa
     assert size > 0
     time.sleep(0.6)
     assert ticks.stat().st_size == size  # nothing ticks any more: the process tree is dead
+
+
+async def test_cancelling_the_call_kills_the_cli_at_once(fake, workspace, tmp_path, monkeypatch):
+    """An API stop or Ctrl-C must not leave the CLI running until its own timeout."""
+    runner, recorded = fake
+    ticks = tmp_path / "ticks.txt"
+    monkeypatch.setenv("FAKE_CLAUDE_SCENARIO", "sleep")
+    monkeypatch.setenv("FAKE_CLAUDE_TICKS", str(ticks))
+    task = asyncio.create_task(runner.arun(_call(Capability.DEV, cwd=workspace, timeout_s=600)))
+    deadline = time.monotonic() + 30
+    while not (ticks.is_file() and ticks.stat().st_size):
+        assert time.monotonic() < deadline, "the fake CLI never started"
+        await asyncio.sleep(0.1)
+    started = time.monotonic()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert time.monotonic() - started < 10
+    size = ticks.stat().st_size
+    time.sleep(0.6)
+    assert ticks.stat().st_size == size  # nothing ticks any more: the process tree is dead
+    argv = recorded()["argv"]
+    assert not Path(argv[argv.index("--append-system-prompt-file") + 1]).exists()
 
 
 async def test_missing_cli_is_unavailable():
