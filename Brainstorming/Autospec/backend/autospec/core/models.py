@@ -110,6 +110,9 @@ class ProjectState(_Model):
     stories: list[Story] = Field(default_factory=list)
     usage: Usage = Field(default_factory=Usage)
     error: str = ""
+    model: str = ""  # agent model chosen at creation ("" = the factory default)
+    # Epoch seconds at which a run parked by the provider (usage limit, outage) resumes by itself.
+    resume_at: float | None = None
     created_at: str = Field(default_factory=utcnow)
     updated_at: str = Field(default_factory=utcnow)
 

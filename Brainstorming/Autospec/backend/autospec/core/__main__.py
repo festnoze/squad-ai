@@ -1,4 +1,4 @@
-"""Command line entry point: ``python -m autospec.core run|resume`` (docs/v2/CONTRACTS.md section 7)."""
+"""Command line entry point: ``python -m autospec.core run|resume|serve`` (docs/v2/CONTRACTS.md 7, 9.1)."""
 
 from __future__ import annotations
 
@@ -70,12 +70,22 @@ def main(argv: list[str] | None = None) -> int:
     resume.add_argument("workspace", type=Path)
     resume.add_argument("--model")
     resume.add_argument("--fake", action="store_true")
+    serve = sub.add_parser("serve", help="serve the HTTP API v2 and the built frontend_v2")
+    serve.add_argument("--port", type=int, default=8400)
+    serve.add_argument("--workspace-root", type=Path)
+    serve.add_argument("--fake", action="store_true", help="scripted agents, no LLM call")
     args = parser.parse_args(argv)
 
     settings = Settings()
-    if args.model:
+    if getattr(args, "model", None):  # serve has no --model: each project carries its own
         settings = replace(settings, model=args.model)
 
+    if args.command == "serve":
+        from .api import serve
+        root = (args.workspace_root or settings.workspace_root).resolve()
+        settings = replace(settings, workspace_root=root)
+        return serve(settings, port=args.port,
+                     runner_factory=lambda state: _runner(settings, state.package, args.fake))
     if args.command == "resume":
         ws = args.workspace.resolve()
         state = Store(ws).load()
