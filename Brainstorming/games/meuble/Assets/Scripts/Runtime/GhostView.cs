@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M2.1 readability (docs/CONTRACT_M2.md 11.6): a translucent ghost of the chair at the pose the
@@ -16,7 +16,7 @@ namespace Meuble
     /// under Main and kept across levels: the object count never changes (probe step 09).
     ///
     /// M4 (docs/CONTRACT_M4.md 2.4 and 3): two more renderers, each shown and hidden on its own and never by
-    /// <see cref="Show"/> or <see cref="Hide"/>: the seat ghost at the home of a seat an inhabitant is about to sit
+    /// <see cref="Show(FurniturePose, Vector3, float)"/> or <see cref="Hide"/>: the seat ghost at the home of a seat an inhabitant is about to sit
     /// on (ShowSeat), and the office chair's predicted stop point, a small ring with a cross
     /// (<see cref="ShowStopRing"/>, driven by FurnitureController). M4.1 (CONTRACT_M4 10.7): the seat ghost has its own
     /// warm amber material, so "someone will sit here" never reads as the cyan "this is where it belongs"; the stop
@@ -28,7 +28,12 @@ namespace Meuble
     /// ramp the memory ghost and the seat ghost also lie on the slope, as the furniture visual does
     /// (<see cref="FurnitureController.RampFrame"/>); the stop ring and the decoy rings stay level. M5 5B.1 (CONTRACT_M5 3):
     /// the memory ring and the decoy rings take the tolerance of the seer that judges the furniture (tidy 0.4 m, watchful
-    /// 0.5 m, default 0.75 m), passed by GameState to <see cref="Show"/> and <see cref="ShowRings"/>.
+    /// 0.5 m, default 0.75 m), passed by GameState to <see cref="Show(FurniturePose, Vector3, Transform, float)"/> and <see cref="ShowRings"/>.
+    ///
+    /// M8 (the product owner's 2026-11-18 report): the memory ghost copies the real player furniture body's own meshes
+    /// (<see cref="Show(FurniturePose, Vector3, Transform, float)"/>, GameState passes FurnitureController.Visual), whatever
+    /// its kind, a model from the ModelCatalog or a procedural FurnitureKit body alike, skipping a carried load (LoadView);
+    /// only a bare size with no furniture behind it (direct callers, tests) still draws the chair's own boxes.
     /// </summary>
     public sealed class GhostView : MonoBehaviour
     {
@@ -67,6 +72,8 @@ namespace Meuble
         private Mesh ringsMesh;
         private MeshRenderer ringsRenderer;
         private Vector3 builtSize = new Vector3(-1f, -1f, -1f);
+        // M8: the furniture Visual the memory ghost's mesh was last copied from (null: the chair's own boxes).
+        private Transform builtVisual;
         // The decoys' planar centres of the current level, kept so the rings can be rebuilt at another radius.
         private readonly List<Vector3> decoyCenters = new List<Vector3>();
 
@@ -138,15 +145,27 @@ namespace Meuble
         }
 
         /// <summary>
-        /// Shows the ghost of a chair of <paramref name="size"/> at <paramref name="pose"/>, inside a ring of
-        /// <paramref name="tolerance"/> (the seer's; DisplacementTolerance by default).
+        /// <see cref="Show(FurniturePose, Vector3, Transform, float)"/> with no real furniture to copy: the chair's own
+        /// boxes, as before M8 (direct callers with a bare size, no FurnitureController behind it).
         /// </summary>
         public void Show(FurniturePose pose, Vector3 size, float tolerance = Tuning.DisplacementTolerance)
         {
+            Show(pose, size, null, tolerance);
+        }
+
+        /// <summary>
+        /// Shows the ghost of the real player furniture body under <paramref name="furnitureVisual"/> (FurnitureController.Visual:
+        /// its own meshes, a model from the ModelCatalog or a procedural FurnitureKit body alike, a carried load skipped) at
+        /// <paramref name="pose"/>, inside a ring of <paramref name="tolerance"/> (the seer's; DisplacementTolerance by
+        /// default). Null, or a visual with no readable mesh under it, falls back to the chair's own boxes at
+        /// <paramref name="size"/> (M8, the product owner's 2026-11-18 report: the start ghost was always a chair).
+        /// </summary>
+        public void Show(FurniturePose pose, Vector3 size, Transform furnitureVisual, float tolerance = Tuning.DisplacementTolerance)
+        {
             Init();
-            if ((size - builtSize).sqrMagnitude > 1e-6f || Mathf.Abs(tolerance - RingRadius) > 1e-6f)
+            if ((size - builtSize).sqrMagnitude > 1e-6f || Mathf.Abs(tolerance - RingRadius) > 1e-6f || furnitureVisual != builtVisual)
             {
-                Rebuild(size, tolerance);
+                Rebuild(size, furnitureVisual, tolerance);
             }
             Pose = pose;
             PlaceOnFloor(transform, pose, size);
@@ -212,16 +231,40 @@ namespace Meuble
             ringsMesh.RecalculateBounds();
         }
 
-        /// <summary>The chair of FurnitureKit.Chair (seat, four legs, backrest) and the tolerance ring, in one mesh.</summary>
-        private void Rebuild(Vector3 size, float tolerance)
+        /// <summary>The real furniture body under <paramref name="visual"/> (or the chair's own boxes without one) and the tolerance ring, in one mesh.</summary>
+        private void Rebuild(Vector3 size, Transform visual, float tolerance)
         {
             builtSize = size;
+            builtVisual = visual;
             RingRadius = tolerance;
-            BuildGhost(mesh, size, tolerance);
+            BuildGhost(mesh, size, tolerance, visual);
         }
 
-        /// <summary>A ghost chair of <paramref name="size"/> inside a floor ring of <paramref name="ringRadius"/>, into <paramref name="target"/>.</summary>
-        private static void BuildGhost(Mesh target, Vector3 size, float ringRadius)
+        /// <summary>
+        /// A ghost of <paramref name="size"/> inside a floor ring of <paramref name="ringRadius"/>, into <paramref name="target"/>:
+        /// the real furniture body under <paramref name="visual"/> (<see cref="AddVisualMeshes"/>) when it has at least one
+        /// readable mesh, else the chair's own boxes (<see cref="AddChairBoxes"/>).
+        /// </summary>
+        private static void BuildGhost(Mesh target, Vector3 size, float ringRadius, Transform visual)
+        {
+            var vertices = new List<Vector3>();
+            var normals = new List<Vector3>();
+            var triangles = new List<int>();
+            if (!AddVisualMeshes(visual, vertices, normals, triangles))
+            {
+                AddChairBoxes(size, vertices, normals, triangles);
+            }
+            AddRing(Vector3.zero, ringRadius, RingWidth, vertices, normals, triangles);
+
+            target.Clear();
+            target.SetVertices(vertices);
+            target.SetNormals(normals);
+            target.SetTriangles(triangles, 0);
+            target.RecalculateBounds();
+        }
+
+        /// <summary>The chair of FurnitureKit.Chair (seat, four legs, backrest): the fallback shape with no real furniture to copy.</summary>
+        private static void AddChairBoxes(Vector3 size, List<Vector3> vertices, List<Vector3> normals, List<int> triangles)
         {
             float seatTop = size.y * 0.53f;
             const float seat = 0.05f;
@@ -244,10 +287,6 @@ namespace Meuble
             Vector3[] boxVertices = box.vertices;
             Vector3[] boxNormals = box.normals;
             int[] boxTriangles = box.triangles;
-
-            var vertices = new List<Vector3>();
-            var normals = new List<Vector3>();
-            var triangles = new List<int>();
             foreach ((Vector3 center, Vector3 s) in boxes)
             {
                 int start = vertices.Count;
@@ -261,13 +300,54 @@ namespace Meuble
                     triangles.Add(start + t);
                 }
             }
-            AddRing(Vector3.zero, ringRadius, RingWidth, vertices, normals, triangles);
+        }
 
-            target.Clear();
-            target.SetVertices(vertices);
-            target.SetNormals(normals);
-            target.SetTriangles(triangles, 0);
-            target.RecalculateBounds();
+        /// <summary>
+        /// The real furniture body's own meshes, in <paramref name="visual"/>'s local frame (the frame FurnitureKit and
+        /// ModelKit build it in: x and z centered, y from the floor up, matching <see cref="AddChairBoxes"/>'s own frame):
+        /// every MeshFilter under it with a readable mesh, skipping a carried load's own meshes (LoadView.Create parents them
+        /// under a LoadView component, never the furniture body). False, nothing added, without <paramref name="visual"/> or
+        /// without one readable mesh under it, so the caller falls back to the chair's own boxes.
+        /// </summary>
+        private static bool AddVisualMeshes(Transform visual, List<Vector3> vertices, List<Vector3> normals, List<int> triangles)
+        {
+            if (visual == null)
+            {
+                return false;
+            }
+            bool any = false;
+            Matrix4x4 toLocal = visual.worldToLocalMatrix;
+            foreach (MeshFilter filter in visual.GetComponentsInChildren<MeshFilter>(true))
+            {
+                Mesh source = filter.sharedMesh;
+                if (source == null || !source.isReadable || filter.GetComponentInParent<LoadView>(true) != null)
+                {
+                    continue;
+                }
+                Matrix4x4 m = toLocal * filter.transform.localToWorldMatrix;
+                Matrix4x4 normalMatrix = m.inverse.transpose;
+                bool mirrored = m.determinant < 0f;
+                int start = vertices.Count;
+                Vector3[] v = source.vertices;
+                Vector3[] n = source.normals;
+                for (int i = 0; i < v.Length; i++)
+                {
+                    vertices.Add(m.MultiplyPoint3x4(v[i]));
+                    normals.Add(i < n.Length ? normalMatrix.MultiplyVector(n[i]).normalized : Vector3.up);
+                }
+                for (int sub = 0; sub < source.subMeshCount; sub++)
+                {
+                    int[] t = source.GetTriangles(sub);
+                    for (int i = 0; i + 2 < t.Length; i += 3)
+                    {
+                        triangles.Add(start + t[i]);
+                        triangles.Add(start + (mirrored ? t[i + 2] : t[i + 1]));
+                        triangles.Add(start + (mirrored ? t[i + 1] : t[i + 2]));
+                    }
+                }
+                any = true;
+            }
+            return any;
         }
 
         /// <summary>A flat band on the floor of <paramref name="radius"/> and <paramref name="width"/>.</summary>
@@ -437,7 +517,8 @@ namespace Meuble
             if ((size - seatBuiltSize).sqrMagnitude > 1e-6f)
             {
                 seatBuiltSize = size;
-                BuildGhost(seatMesh, size, Tuning.SeatHomeTolerance);
+                // The seat ghost keeps the chair's own boxes (M4.1's warm amber "someone will sit here", unaffected by M8).
+                BuildGhost(seatMesh, size, Tuning.SeatHomeTolerance, null);
             }
             FurniturePose pose = seat.Value;
             SeatPose = pose;

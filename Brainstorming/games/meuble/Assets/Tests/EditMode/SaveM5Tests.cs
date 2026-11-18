@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.7, CONTRACT_M5 16.11): the save file on a real temporary folder. The path
@@ -22,8 +22,8 @@ namespace Meuble.Tests
     /// </summary>
     public sealed class SaveM5Tests
     {
-        private const string Persistent = "C:/meuble/persistent";
-        private const string Temp = "C:/meuble/temp";
+        private const string Persistent = "C:/outofsight/persistent";
+        private const string Temp = "C:/outofsight/temp";
 
         private string dir;
         private string path;
@@ -32,7 +32,7 @@ namespace Meuble.Tests
         public void SetUp()
         {
             SaveStore.ResetForTests();
-            dir = Path.Combine(Path.GetTempPath(), "meuble_save_tests_" + Guid.NewGuid().ToString("N"));
+            dir = Path.Combine(Path.GetTempPath(), "outofsight_save_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             path = Path.Combine(dir, SaveStore.FileName);
             SaveStore.PathOverride = path;

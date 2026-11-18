@@ -1,8 +1,8 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 3, 9, 15.1 and 15.2): one door leaf and its 0.6 s swing.

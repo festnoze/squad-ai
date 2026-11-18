@@ -1,10 +1,10 @@
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The gameplay layers of PRD 8.3 (plus Furniture, docs/CONTRACT_M2.md 6), declared in
-    /// ProjectSettings/TagManager.asset by Meuble.Editor.ProjectSetup. Vision raycasts use the Occluder
+    /// ProjectSettings/TagManager.asset by OutOfSight.Editor.ProjectSetup. Vision raycasts use the Occluder
     /// mask only. Furniture (decoys) collides with the player and is a NavMesh source, but never occludes.
     /// </summary>
     public static class Layers
@@ -54,7 +54,7 @@ namespace Meuble
             int layer = LayerMask.NameToLayer(name);
             if (layer < 0)
             {
-                Debug.LogError($"[Layers] Layer '{name}' is not declared; run Meuble > Project Setup. Using {fallback}.");
+                Debug.LogError($"[Layers] Layer '{name}' is not declared; run OutOfSight > Project Setup. Using {fallback}.");
                 return fallback;
             }
             return layer;

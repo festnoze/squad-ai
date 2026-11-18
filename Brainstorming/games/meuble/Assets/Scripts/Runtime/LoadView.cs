@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5.md 6 and 16.5, PRD 3.4): the visual of the load carried on the player furniture, a vase, a stack

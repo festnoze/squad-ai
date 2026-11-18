@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.5): the touch controls, on their own overlay canvas, shown while

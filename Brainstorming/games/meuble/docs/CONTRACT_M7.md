@@ -29,9 +29,9 @@ does the smallest work that meets its items, with few Unity runs and a short rep
 - The material caps of PRD 7.4 hold on every level (24 and 32).
 
 ### 1.3 Android build (M7)
-- `Meuble.Editor.Builder.BuildAndroid` (`-output`, default `Build/Android/Meuble.apk`; the
+- `OutOfSight.Editor.Builder.BuildAndroid` (`-output`, default `Build/Android/OutOfSight.apk`; the
   `-development` flag as for Windows): IL2CPP, ARM64, minimum API 26, the installed target API,
-  landscape only, package id `com.meuble.undeuxtrois`, Vulkan then OpenGL ES 3, ASTC textures, debug
+  landscape only, package id `com.outofsight.game`, Vulkan then OpenGL ES 3, ASTC textures, debug
   signing. The APK is at most 150 MB.
 - On Android: `Screen.sleepTimeout = NeverSleep` while playing; the Android back button (Escape in
   the Input System) pauses or goes back, as Escape does on PC.
@@ -110,3 +110,39 @@ in 15.6 s): every level is easy and the curve is flat. Owner: the **design** age
 - Levers: more watchers or a watcher placed on the route, shorter glance gaps, longer routes and
   houses, fewer covers, tighter door and robot timings. Every level keeps its lesson and its hint
   true. The audit table (margin and exit per level, Normal and Difficile) goes in docs/m7/design.md.
+
+## 5. Real-colour textures (product owner, 2026-11-18)
+
+Replaces the colour rule of 1.2 and PRD 7.2 v1.7 (grayscale detail times the palette colour) for
+the environment. Owner: the **envcolour** agent.
+
+- Every image of `Assets/Art/Environment` is the base map of its surface in the image's own
+  colours, tiled as a visible repeating pattern, on every surface of its kind: floors, walls, the
+  garden, props, decoys, doors, the metal parts (`metal.png`) and the robot. The colour maps are
+  seamless 512 sRGB textures in `Assets/Art/Environment/Colour` (`tools/assets/derive_env_colours.py`,
+  same geometry as the Detail maps, so the gentle normal maps of 1.2 stay aligned).
+- One URP Lit material per surface (`PrimitiveKit.SurfaceMaterial`): white base colour, the colour
+  map, one finish per surface (`TextureLibrary.ColourFinishOf`); `PrimitiveKit.Detail` puts it in
+  the slot and sets the tiling (metres per repeat: `Tuning.DetailTile*`) in the property block;
+  LevelBuilder's combiner groups by that material. Repeats picked on the built player's shots:
+  parquet 1.8, wood 0.8, plaster 2.0, upholstery 0.4, linen 0.35, carpet 0.6, grass 2.5,
+  lacquer 1.0, metal 0.3, plastic 0.2, foliage 0.3, soil 0.25, tile 1.5 (25 cm tiles).
+- It replaces one material per palette colour: the built player's probe (24 levels) measures 13 to
+  23 materials below 5 rooms (cap 24) and 19 to 29 from 5 rooms (cap 32), at most 80 draw calls
+  below 5 rooms (cap 120) and 156 from 5 rooms (cap 160); every level is at or under its count
+  before the change.
+- The one exception is the player furniture (PRD 7.2, found instantly in any frame): its red slots
+  show the owner's red painted metal image (`red_metal_source.png`) through
+  `PrimitiveKit.PlayerMaterial` (smoothness 0.8, metallic 0.35, no normal map). Decoys are the
+  player's furniture kind and model in real colours, never its red.
+- The inhabitants keep the M4.2 rule (palette material, grayscale detail): their clothes belong to
+  `CharacterLook`.
+- Tests: Step22c (every textured slot outside the inhabitants shows a colour map through its
+  surface's white material, the player's red image only on the player), Step22d (the images add
+  visible detail, at least 1.1 times the flat view's, under a raised noise cap of 5.0, measured
+  4.2 on level1 and 2.5 on level5; at least 85 % of the red pixels of the start view lie on the
+  player furniture, measured 99 % and 97 %), Step22f (colour maps ship sRGB, compressed,
+  mipmapped), Step50a and Step61a (the player's finish, the garden, metal and tile colour
+  materials), Step60a (the player furniture's built colour, base colour times its image's mean,
+  stays the most saturated). Shots: docs/m7/env_colour_1.png (level 3) and env_colour_2.png
+  (level 17).

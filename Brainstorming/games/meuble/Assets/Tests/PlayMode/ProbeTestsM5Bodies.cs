@@ -1,13 +1,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// The M5 bodies probe, wave 5A (docs/CONTRACT_M5.md 16.12; CONTRACT_M5_v3.md 15.2 and 15.4), on the real Boot scene,

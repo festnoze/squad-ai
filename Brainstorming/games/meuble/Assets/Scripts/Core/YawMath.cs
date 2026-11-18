@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Yaw convention of the whole game: degrees around +y, 0 faces +z, 90 faces +x

@@ -1,5 +1,5 @@
 """
-Derives the M4.2 grayscale detail textures of UN, DEUX, TROIS, MEUBLE from ambientCG 1K-JPG downloads.
+Derives the M4.2 grayscale detail textures of Out of Sight from ambientCG 1K-JPG downloads.
 
 Every output is a seamless 512 x 512 RGB PNG with r = g = b, imported LINEAR (sRGB off): a texel is the
 multiplier applied to the palette colour. Every texture has the same mean (MEAN, 240/255), so a material's

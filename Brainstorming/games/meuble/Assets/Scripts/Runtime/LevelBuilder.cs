@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>Everything one built level owns. Nothing about a level lives anywhere else.</summary>
     public sealed class LevelInstance
@@ -40,6 +40,13 @@ namespace Meuble
         /// that path starts (time 0) until the game steps it. Empty on a level without a robot.
         /// </summary>
         public readonly List<Robot> Robots = new List<Robot>();
+
+        /// <summary>
+        /// M7 polish (CONTRACT_M6 2.5), presentation only: wardrobe k of <see cref="LevelDef.Wardrobes"/> has its door
+        /// animation here at index k (<see cref="WardrobeDoors.Attach"/>), or null for a wardrobe shown by a model
+        /// visual instead of the procedural doors. GameState plays it the instant the entry or exit action starts.
+        /// </summary>
+        public readonly List<WardrobeDoors> Wardrobes = new List<WardrobeDoors>();
 
         /// <summary>
         /// Wave 5B (CONTRACT_M5 6, 16.5 and 18): the view of the player's load (the builder makes it, on
@@ -275,6 +282,12 @@ namespace Meuble
                 GameObject model = Model(level, prop.Model, "prop " + prop.Name, go.transform, prop.Size, ModelFit.Box,
                     new ModelPaint { Red = FurnitureKit.AccentOf(prop) });
                 FurnitureKit.Build(prop, go.transform, go.layer, model == null, CombineRenderers);
+                if (WardrobeRule.IsWardrobe(prop))
+                {
+                    // M7 polish: one entry per LevelDef.Wardrobes() wardrobe, in the same order, so GameState can
+                    // index into it the way it already indexes its own PropDef list (null for a model visual).
+                    level.Wardrobes.Add(WardrobeDoors.Attach(go.transform));
+                }
             }
             Color playerColor = LevelJson.ParseColor(def.Player.Color, Color.red);
             for (int i = 0; i < def.Decoys.Count; i++)
@@ -757,6 +770,9 @@ namespace Meuble
                     }
                     return;
                 }
+                // M7 real colours (CONTRACT_M7 5): grouped by the material the part will show (one per surface), so two
+                // palette colours of one surface on one plane draw as one renderer.
+                material = PrimitiveKit.ShownMaterial(material, surface, layer == Layers.Inhabitant);
                 string key = Key(material, layer, surface, shadow, scope, fader != null, point, normal);
                 if (!byKey.TryGetValue(key, out Group group))
                 {
@@ -1287,22 +1303,22 @@ namespace Meuble
         {
             ZoneDef e = def.Exit;
             Color color = LevelJson.ParseColor(e.Color, Color.green);
-            if (!string.IsNullOrEmpty(e.Model))
+            // M3: the doormat model, its red carpet in the exit colour. No collider, as the procedural one. M7 rug
+            // image (product owner, 2026-11-18): same treatment as BuildRug/BuildRugImage, the model's own "carpet"
+            // slots stay a plain shaded skirt, the picture sits on its own nested quad.
+            GameObject group = PrimitiveKit.Group(root, "Doormat", new Vector3(e.X, def.FloorHeightAt(e.X, e.Z), e.Z));
+            group.layer = 0;
+            GameObject model = Model(level, e.Model, "exit doormat", group.transform, new Vector3(e.SizeX, DoormatHeight, e.SizeZ),
+                ModelFit.Box, new ModelPaint { Red = color });
+            if (model != null)
             {
-                // M3: the doormat model, its red carpet in the exit colour. No collider, as the procedural one.
-                GameObject group = PrimitiveKit.Group(root, "Doormat", new Vector3(e.X, def.FloorHeightAt(e.X, e.Z), e.Z));
-                group.layer = 0;
-                if (Model(level, e.Model, "exit doormat", group.transform, new Vector3(e.SizeX, DoormatHeight, e.SizeZ), ModelFit.Box,
-                        new ModelPaint { Red = color }) != null)
-                {
-                    return;
-                }
-                Object.DestroyImmediate(group);
+                BuildRugImage(group.transform, model.transform, color, new Vector2(e.SizeX, e.SizeZ), DoormatHeight + 0.002f);
+                return;
             }
-            GameObject mat = PrimitiveKit.Box(root, "Doormat", new Vector3(e.X, def.FloorHeightAt(e.X, e.Z) + DoormatHeight * 0.5f, e.Z),
-                new Vector3(e.SizeX, DoormatHeight, e.SizeZ),
-                PrimitiveKit.Lit(color, 0.05f), 0, false, Surface.Carpet);
+            GameObject mat = PrimitiveKit.Box(group.transform, "Mat", new Vector3(0f, DoormatHeight * 0.5f, 0f),
+                new Vector3(e.SizeX, DoormatHeight, e.SizeZ), PrimitiveKit.Lit(color, 0.05f), 0, false);
             mat.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            BuildRugImage(group.transform, null, color, new Vector2(e.SizeX, e.SizeZ), DoormatHeight + 0.001f);
         }
 
         private const float DoormatHeight = 0.012f;
@@ -1394,29 +1410,53 @@ namespace Meuble
 
         // ----- Rugs and decoys -----
 
-        /// <summary>A flat rug, no collider (it is a silent floor, not an obstacle): a border and a field.</summary>
+        /// <summary>
+        /// A flat rug, no collider (it is a silent floor, not an obstacle): the model (or, as a fallback, a plain
+        /// shaded border) for the shape and the edge, plus <see cref="BuildRugImage"/>'s own quad for the picture.
+        /// </summary>
         private static void BuildRug(LevelInstance level, LevelDef def, RugDef rug, int index, Transform root)
         {
             GameObject go = PrimitiveKit.Group(root, "Rug " + (index + 1), def.Floor.OnFloor(rug.Position), rug.Yaw);
             go.layer = 0;
             Color color = LevelJson.ParseColor(rug.Color, new Color32(0x5B, 0x93, 0xD9, 0xFF));
-            // M3: the rug model, its red carpet in the rug colour. A rug has no collider either way.
-            if (Model(level, rug.Model, "rug " + (index + 1), go.transform, new Vector3(rug.SizeX, RugHeight, rug.SizeZ), ModelFit.Box,
-                    new ModelPaint { Red = color }) != null)
+            // M3: the rug model, its red carpet in the rug colour. A rug has no collider either way. M7 rug image
+            // (product owner, 2026-11-18): the model's own "carpet" slots stay a plain shaded skirt (ModelKit.SurfaceOf),
+            // the picture itself goes on BuildRugImage's own quad, nested under the model root so no procedural
+            // renderer is left beside it (ProbeTestsM3Models).
+            GameObject model = Model(level, rug.Model, "rug " + (index + 1), go.transform, new Vector3(rug.SizeX, RugHeight, rug.SizeZ),
+                ModelFit.Box, new ModelPaint { Red = color });
+            if (model != null)
             {
+                BuildRugImage(go.transform, model.transform, color, new Vector2(rug.SizeX, rug.SizeZ), RugHeight + 0.002f);
                 return;
             }
             GameObject border = PrimitiveKit.Box(go.transform, "Border", new Vector3(0f, RugHeight * 0.5f, 0f),
-                new Vector3(rug.SizeX, RugHeight, rug.SizeZ), PrimitiveKit.Lit(color * 0.8f, 0f), 0, false, Surface.Carpet);
+                new Vector3(rug.SizeX, RugHeight, rug.SizeZ), PrimitiveKit.Lit(color * 0.8f, 0f), 0, false);
             border.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            const float band = 0.1f;
-            if (rug.SizeX > 2f * band && rug.SizeZ > 2f * band)
+            BuildRugImage(go.transform, null, color, new Vector2(rug.SizeX, rug.SizeZ), RugHeight + 0.001f);
+        }
+
+        /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): the rug's or the doormat's own picture
+        /// (Assets/Art/Environment/rug_modern_inset_border.png, <see cref="TextureLibrary.RugColour"/>), on a quad built
+        /// at <paramref name="localHeight"/> above <paramref name="parent"/> (the rug's own unscaled group transform,
+        /// never the model's: a non uniform fit scale would distort a size set directly here) and sized to
+        /// <paramref name="size"/> (its SizeX, SizeZ). The literal <see cref="PrimitiveKit.QuadMesh"/> keeps its own
+        /// unit UV (0 to 1), so <see cref="PrimitiveKit.RugDetail"/> shows the picture exactly once, stretched, never
+        /// tiled. When <paramref name="modelRoot"/> is not null (the model succeeded), the quad is reparented under it
+        /// keeping its world transform (its rotation here is always a right angle away from the model's own, so no
+        /// shear results), so it counts as part of the model rather than a stray renderer beside it.
+        /// </summary>
+        private static void BuildRugImage(Transform parent, Transform modelRoot, Color color, Vector2 size, float localHeight)
+        {
+            GameObject image = PrimitiveKit.Part(parent, "Image", PrimitiveKit.QuadMesh, new Vector3(0f, localHeight, 0f),
+                Quaternion.Euler(90f, 0f, 0f), new Vector3(size.x, size.y, 1f), PrimitiveKit.Lit(color, 0f), parent.gameObject.layer);
+            image.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            if (modelRoot != null)
             {
-                var fieldSize = new Vector2(rug.SizeX - 2f * band, rug.SizeZ - 2f * band);
-                GameObject field = PrimitiveKit.Part(go.transform, "Field", PrimitiveKit.QuadMeshSized(fieldSize), new Vector3(0f, RugHeight + 0.001f, 0f),
-                    Quaternion.Euler(90f, 0f, 0f), new Vector3(fieldSize.x, fieldSize.y, 1f), PrimitiveKit.Lit(color, 0f), 0, Surface.Carpet);
-                field.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+                image.transform.SetParent(modelRoot, true);
             }
+            PrimitiveKit.RugDetail(image.GetComponent<MeshRenderer>(), 0);
         }
 
         /// <summary>

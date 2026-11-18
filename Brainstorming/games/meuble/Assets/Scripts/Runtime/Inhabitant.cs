@@ -1,8 +1,8 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Applies an <see cref="InhabitantRoutine"/> to a body made of primitives (PRD 5.1, 5.2). The routine
@@ -224,6 +224,9 @@ namespace Meuble
         private void ApplyIdentity()
         {
             TintedSlots = Rig != null && Tint.HasValue ? ModelKit.TintClothes(Rig.Model, Rig.Entry, Tint.Value) : 0;
+            // M7 (product owner, 2026-11-18): the human's prints keep their real colours; the tint shows on the shirt's
+            // collar and hem bands (CharacterLook).
+            CharacterLook.Identify(Rig, Tint);
         }
 
         /// <summary>M5: where the body stands: the routine's planar position on the floor under it (CONTRACT_M5_v3 15.4).</summary>

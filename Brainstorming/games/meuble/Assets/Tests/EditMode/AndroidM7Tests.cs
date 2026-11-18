@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.4 and 1.6): the Qualité option in the save (the platform default, Moyen on mobile and
@@ -21,7 +21,7 @@ namespace Meuble.Tests
         public void SetUp()
         {
             SaveStore.ResetForTests();
-            dir = Path.Combine(Path.GetTempPath(), "meuble_android_tests_" + Guid.NewGuid().ToString("N"));
+            dir = Path.Combine(Path.GetTempPath(), "outofsight_android_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             path = Path.Combine(dir, SaveStore.FileName);
             SaveStore.PathOverride = path;

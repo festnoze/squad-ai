@@ -11,79 +11,132 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ea1d56af9fb96ab4ea55b30bbe419b7f, type: 3}
   m_Name: AudioLibrary
-  m_EditorClassIdentifier: Meuble.Runtime::Meuble.AudioLibrary
+  m_EditorClassIdentifier: OutOfSight.Runtime::OutOfSight.AudioLibrary
   hops:
   - clip: {fileID: 8300000, guid: 1a293ffdc5f63834fbad7966ff98e532, type: 3}
-    activeRmsDb: -17.1
-    gain: 0.7161434
+    loudness: -14.3
+    gain: 1.3031669
   - clip: {fileID: 8300000, guid: 1899d418216ef5f44b0f06cba4ad896f, type: 3}
-    activeRmsDb: -16
-    gain: 0.63095737
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: 07df37b06afa36f479a44d3309db738f, type: 3}
-    activeRmsDb: -20.1
-    gain: 1.0115795
+    loudness: -17.4
+    gain: 1.862087
   - clip: {fileID: 8300000, guid: b498d920f228fff4c80dea822149ef38, type: 3}
-    activeRmsDb: -16
-    gain: 0.63095737
+    loudness: -12
+    gain: 1
+  softHops:
+  - clip: {fileID: 8300000, guid: b8315e66c486e6645a64d38ed1a7e178, type: 3}
+    loudness: -14.1
+    gain: 1.2735032
+  - clip: {fileID: 8300000, guid: 4e621565d04d338469682f95d61cee04, type: 3}
+    loudness: -12
+    gain: 1
+  - clip: {fileID: 8300000, guid: de6ac366c1e656e40b48a34869b87cbd, type: 3}
+    loudness: -17.2
+    gain: 1.8197011
+  - clip: {fileID: 8300000, guid: 0bc1db33bc178a848b30b00b1b83fa07, type: 3}
+    loudness: -12
+    gain: 1
   scrapes:
   - clip: {fileID: 8300000, guid: eb7c04d7a30d6d3468dfae1ccd7d12c3, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: 5b299df39db1ae745a0ed32d9c7f8677, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: 1696efdf16cf14f489bb493cc4d794d8, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12
+    gain: 1
   creakLong:
     clip: {fileID: 8300000, guid: d43d98d945f1a1a4585ab02a8202b974, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12
+    gain: 1
   creakShort:
     clip: {fileID: 8300000, guid: 23c096e06954e7b4ca29b9b3c059884c, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12
+    gain: 1
   footsteps:
   - clip: {fileID: 8300000, guid: 7255c0c8fa38a0a48a1dac135bd1643b, type: 3}
-    activeRmsDb: -20
-    gain: 1
+    loudness: -14.6
+    gain: 1.3489629
   - clip: {fileID: 8300000, guid: 347dc16741ab2304f901f000d9ef5da0, type: 3}
-    activeRmsDb: -18.1
-    gain: 0.80352616
+    loudness: -14.3
+    gain: 1.3031669
   - clip: {fileID: 8300000, guid: 16727b93aa07ec8418f39c7ea66c394d, type: 3}
-    activeRmsDb: -20.5
-    gain: 1.0592537
+    loudness: -14.4
+    gain: 1.3182567
   - clip: {fileID: 8300000, guid: 799e8e216bf34d148be0636c8bb17e56, type: 3}
-    activeRmsDb: -19.7
-    gain: 0.966051
+    loudness: -16
+    gain: 1.5848932
   - clip: {fileID: 8300000, guid: 0138b436973888d4991fc8d8d65556a0, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12.3
+    gain: 1.0351422
   roomTone:
     clip: {fileID: 8300000, guid: f0bf491b8615eab48a07a0bde31d673d, type: 3}
-    activeRmsDb: -30
-    gain: 3.1622777
+    loudness: -30
+    gain: 7.943282
   clockLoop:
     clip: {fileID: 8300000, guid: 699d7f0125cc1604eace8741f3362125, type: 3}
-    activeRmsDb: -30
-    gain: 3.1622777
+    loudness: -30
+    gain: 7.943282
   thump:
     clip: {fileID: 8300000, guid: 9c3c36c6caa459d42ac13d8567e2a3b3, type: 3}
-    activeRmsDb: -17.1
-    gain: 0.7161434
+    loudness: -12
+    gain: 1
   stingCaught:
     clip: {fileID: 8300000, guid: 7f24d74941ac62e44888781b89443ac5, type: 3}
-    activeRmsDb: -16
-    gain: 0.63095737
+    loudness: -12
+    gain: 1
   stingCaughtLong:
     clip: {fileID: 8300000, guid: 282ab0d88c992ff4d909941e7b28c079, type: 3}
-    activeRmsDb: -16
-    gain: 0.63095737
+    loudness: -12
+    gain: 1
   vocalHuh:
     clip: {fileID: 8300000, guid: 901cf16a6ff0a2846896dc210d8bf852, type: 3}
-    activeRmsDb: -18
-    gain: 0.7943282
+    loudness: -12
+    gain: 1
   uiClick:
     clip: {fileID: 8300000, guid: 78d3aae25a681fd47a05a20c30ea17b2, type: 3}
-    activeRmsDb: -19.2
-    gain: 0.9120109
+    loudness: -23.1
+    gain: 3.5892193
+  uiHover:
+    clip: {fileID: 8300000, guid: 71cb6e7e9cb395c47933396c5a710e77, type: 3}
+    loudness: -23.3
+    gain: 3.6728225
+  stingWin:
+    clip: {fileID: 8300000, guid: eba9d52825e9cf8489175dd30c28a596, type: 3}
+    loudness: -12
+    gain: 1
+  doorOpen:
+    clip: {fileID: 8300000, guid: 76b86324e3e142447beb9edd4cc2f512, type: 3}
+    loudness: -12
+    gain: 1
+  wardrobeOpen:
+    clip: {fileID: 8300000, guid: 9fac3c52aafc8ff4ea1530f10721e841, type: 3}
+    loudness: -14.3
+    gain: 1.3031669
+  wardrobeClose:
+    clip: {fileID: 8300000, guid: 63b49fa4a83689b40ab0412d19551aa6, type: 3}
+    loudness: -14.2
+    gain: 1.2882495
+  crash:
+    clip: {fileID: 8300000, guid: 155f474335b6fb748a6aada5a6ddc2e0, type: 3}
+    loudness: -13.8
+    gain: 1.2302688
+  topple:
+    clip: {fileID: 8300000, guid: 8f71ea1ba128d7848b58212e219be7fb, type: 3}
+    loudness: -15.8
+    gain: 1.5488167
+  lampClick:
+    clip: {fileID: 8300000, guid: deab49869a64a75488dd653686ac8173, type: 3}
+    loudness: -18
+    gain: 1.9952624
+  musicTitle:
+    clip: {fileID: 8300000, guid: 06ede74f194c5df409563203996e0e49, type: 3}
+    loudness: -18
+    gain: 1.9952624
+  musicLevel:
+    clip: {fileID: 8300000, guid: 3c5c046e7230be846815568afbf79b4e, type: 3}
+    loudness: -18.2
+    gain: 2.041738

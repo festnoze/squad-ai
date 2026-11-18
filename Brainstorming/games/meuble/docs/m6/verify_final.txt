@@ -1023,7 +1023,7 @@
     "memorysetup-job-temp-allocator-block-size-background=1048576"
     "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
     "memorysetup-temp-allocator-size-gfx=262144"
-  sauvegarde de la sonde : C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\meuble_save_test.json
+  sauvegarde de la sonde : C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\outofsight_save_test.json
   shader Universal Render Pipeline/Lit         ok
   shader Universal Render Pipeline/Unlit       ok
   renderers 30, sans materiau 0, triangles 3143, materiaux 21, lumieres 1 (ombrees 1)
@@ -1074,30 +1074,30 @@
   etats atteints : Caught=True Won=True, panneaux echec=True victoire=True
   Player.log : 0 ligne(s) d'exception
   captures a regarder (aucune assertion ne remplace un oeil) :
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\01_start.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\02_caught.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\03_won.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\04_level2.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\05_level3.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\06_level4.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\07_level5.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\08_level6.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\09_level7.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\10_level8.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\11_level9.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\12_level10.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\13_level11.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\14_level12.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\15_level13.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\16_level14.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\17_level15.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\18_level16.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\19_level17.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\20_level18.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\21_alert.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\22_investigate.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\23_creak.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\24_suspicion.png
-    C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\25_alarm.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\01_start.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\02_caught.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\03_won.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\04_level2.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\05_level3.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\06_level4.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\07_level5.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\08_level6.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\09_level7.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\10_level8.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\11_level9.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\12_level10.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\13_level11.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\14_level12.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\15_level13.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\16_level14.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\17_level15.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\18_level16.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\19_level17.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\20_level18.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\21_alert.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\22_investigate.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\23_creak.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\24_suspicion.png
+    C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\25_alarm.png
 
 === VERT ===

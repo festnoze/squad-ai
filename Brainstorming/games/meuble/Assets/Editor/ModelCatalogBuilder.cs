@@ -2,11 +2,11 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEditor;
 using UnityEngine;
 
-namespace Meuble.Editor
+namespace OutOfSight.Editor
 {
     /// <summary>
     /// Builds Assets/Resources/ModelCatalog.asset from the imported models (docs/CONTRACT_M3.md 3). Called by
@@ -35,6 +35,7 @@ namespace Meuble.Editor
         public const string AssetPath = "Assets/Resources/ModelCatalog.asset";
         private const string Kenney = "Assets/ThirdParty/Models/Kenney/";
         private const string Quaternius = "Assets/ThirdParty/Models/Quaternius/";
+        private const string RoundedHumans = "Assets/Art/Characters/Models/";
 
         /// <summary>The head bone of the Quaternius HumanArmature skeleton (M3_ASSETS 6.1, read from the GLB).</summary>
         public const string HeadBoneName = "Head";
@@ -106,18 +107,18 @@ namespace Meuble.Editor
             new Spec(ModelCatalog.KenneyArmchair, Kenney + "kenney_lounge_chair.glb", 180f, false),
             new Spec(ModelCatalog.KenneyStool, Kenney + "kenney_bar_stool.glb", 0f, false),
             new Spec(ModelCatalog.KenneyFloorLamp, Kenney + "kenney_lamp_round_floor.glb", 0f, false),
-            new Spec(ModelCatalog.QuaterniusMan, Quaternius + "quaternius_man.glb", 0f, true),
-            new Spec(ModelCatalog.QuaterniusWoman, Quaternius + "quaternius_woman.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusMan, RoundedHumans + "quaternius_man.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusWoman, RoundedHumans + "quaternius_woman.glb", 0f, true),
             // M5: the personalities' humans (the same 31 bone HumanArmature rig and 11 clips) and the dog.
-            new Spec(ModelCatalog.QuaterniusManShorts, Quaternius + "quaternius_man_shorts.glb", 0f, true),
-            new Spec(ModelCatalog.QuaterniusManSuit, Quaternius + "quaternius_man_suit.glb", 0f, true),
-            new Spec(ModelCatalog.QuaterniusManTshirt, Quaternius + "quaternius_man_tshirt.glb", 0f, true),
-            new Spec(ModelCatalog.QuaterniusWomanJacket, Quaternius + "quaternius_woman_jacket.glb", 0f, true),
-            new Spec(ModelCatalog.QuaterniusWomanDress, Quaternius + "quaternius_woman_dress.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusManShorts, RoundedHumans + "quaternius_man_shorts.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusManSuit, RoundedHumans + "quaternius_man_suit.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusManTshirt, RoundedHumans + "quaternius_man_tshirt.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusWomanJacket, RoundedHumans + "quaternius_woman_jacket.glb", 0f, true),
+            new Spec(ModelCatalog.QuaterniusWomanDress, RoundedHumans + "quaternius_woman_dress.glb", 0f, true),
             Spec.Pet(ModelCatalog.QuaterniusShiba, Quaternius + "quaternius_shiba.glb", Tuning.DogEyeHeight, "Idle", "Walk"),
         };
 
-        [MenuItem("Meuble/Build Model Catalog")]
+        [MenuItem("OutOfSight/Build Model Catalog")]
         public static void Build()
         {
             var entries = new List<ModelCatalog.Entry>();
@@ -158,42 +159,61 @@ namespace Meuble.Editor
         // ----- M4.2 textures -----
 
         public const string TextureLibraryPath = "Assets/Resources/TextureLibrary.asset";
-        private const string AmbientCg = "Assets/ThirdParty/Textures/ambientCG/";
+        /// <summary>
+        /// Where the shipped details and normal maps live: derived by tools/assets/derive_env_textures.py from the
+        /// product owner's environment images (Assets/Art/Environment/&lt;surface&gt;.png, docs/LICENSES.md). They
+        /// replaced the ambientCG derived ones (Assets/ThirdParty/Textures/ambientCG, left on disk, no longer shipped).
+        /// </summary>
+        private const string DetailFolder = "Assets/Art/Environment/Detail/";
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): where the shipped colour maps live, derived by tools/assets/derive_env_colours.py
+        /// from the same images (seamless, 512, sRGB, in phase with the normal maps), plus the player furniture's own
+        /// colour map from the owner's red painted metal image (<see cref="PlayerSource"/>).
+        /// </summary>
+        private const string ColourFolder = "Assets/Art/Environment/Colour/";
+
+        private const string PlayerColourFile = "colour_player.png";
+
+        /// <summary>The owner's red image the player's colour map comes from (its file stem in Assets/Art/Environment).</summary>
+        private const string PlayerSource = "red_metal_source";
 
         /// <summary>Import size of every detail texture: they tile, so 512 is plenty at the game's camera distance.</summary>
         public const int DetailMaxSize = 512;
 
         /// <summary>
-        /// The detail of each surface: a 512 x 512 grayscale derivative of an ambientCG CC0 material (docs/LICENSES.md),
-        /// mean 240 / 255, highlights capped at 1.0, seamless. M7 (CONTRACT_M7 1.2): <c>normalFile</c> is the matching
-        /// 512 tangent space normal map derived from the same material's NormalGL map, or null where the surface is
-        /// not in the 1.2 list (Plastic, Foliage, Soil stay bump-free).
+        /// The detail of each surface: a 512 x 512 grayscale derivative of the product owner's image of that surface
+        /// (its file stem is the source), mean 240 / 255, highlights capped at 1.0, seamless. M7 (CONTRACT_M7 1.2):
+        /// <c>normalFile</c> is the matching 512 tangent space normal map (a gentle one derived from the detail itself),
+        /// or null where the surface is not in the 1.2 list (Plastic, Foliage, Soil stay bump-free).
         /// </summary>
         private static readonly (Surface surface, string file, string source, string normalFile)[] Details =
         {
-            (Surface.Wood, "detail_wood_Wood049.png", "Wood049", "normal_wood_Wood049.png"),
-            (Surface.Parquet, "detail_parquet_WoodFloor051.png", "WoodFloor051", "normal_parquet_WoodFloor051.png"),
-            (Surface.Plaster, "detail_plaster_Plaster001.png", "Plaster001", "normal_plaster_Plaster001.png"),
-            (Surface.Upholstery, "detail_upholstery_Fabric011.png", "Fabric011", "normal_upholstery_Fabric011.png"),
-            (Surface.Linen, "detail_linen_Fabric036.png", "Fabric036", "normal_linen_Fabric036.png"),
-            (Surface.Carpet, "detail_carpet_Carpet012.png", "Carpet012", "normal_carpet_Carpet012.png"),
+            (Surface.Wood, "detail_wood.png", "wood", "normal_wood.png"),
+            (Surface.Parquet, "detail_parquet.png", "parquet", "normal_parquet.png"),
+            (Surface.Plaster, "detail_plaster.png", "plaster", "normal_plaster.png"),
+            (Surface.Upholstery, "detail_upholstery.png", "upholstery", "normal_upholstery.png"),
+            (Surface.Linen, "detail_linen.png", "linen", "normal_linen.png"),
+            (Surface.Carpet, "detail_carpet.png", "carpet", "normal_carpet.png"),
             // M6 texture pass 2 (CONTRACT_M6 2.4, docs/M6_TEXTURES_RESEARCH.md).
-            (Surface.Grass, "detail_grass_Grass001.png", "Grass001", "normal_grass_Grass001.png"),
-            (Surface.Lacquer, "detail_lacquer_PaintedWood006C.png", "PaintedWood006C", "normal_lacquer_PaintedWood006C.png"),
-            (Surface.Metal, "detail_metal_Metal009.png", "Metal009", "normal_metal_Metal009.png"),
-            (Surface.Plastic, "detail_plastic_Plastic006.png", "Plastic006", null),
-            (Surface.Foliage, "detail_foliage_Moss002.png", "Moss002", null),
-            (Surface.Soil, "detail_soil_Ground104.png", "Ground104", null),
+            (Surface.Grass, "detail_grass.png", "grass", "normal_grass.png"),
+            (Surface.Lacquer, "detail_lacquer.png", "lacquer", "normal_lacquer.png"),
+            (Surface.Metal, "detail_metal.png", "metal", "normal_metal.png"),
+            (Surface.Plastic, "detail_plastic.png", "plastic", null),
+            (Surface.Foliage, "detail_foliage.png", "foliage", null),
+            (Surface.Soil, "detail_soil.png", "soil", null),
             // M7 textures (CONTRACT_M7 1.2): the kitchen and bathroom floor tiles.
-            (Surface.Tile, "detail_tile_Tiles049.png", "Tiles049", "normal_tile_Tiles049.png"),
+            (Surface.Tile, "detail_tile.png", "tile", "normal_tile.png"),
         };
 
         /// <summary>
         /// Builds Assets/Resources/TextureLibrary.asset (what ships the textures in the player) and enforces the import
         /// settings of every detail: linear (a texel is a multiplier, not a colour), mipmaps, repeat, trilinear, 512, high
-        /// quality platform compression, not readable. Idempotent: reimports and writes only what changed.
+        /// quality platform compression, not readable. M7 real colours (CONTRACT_M7 5): every surface's colour map and the
+        /// player's, the same settings but sRGB, with their measured mean colours. Idempotent: reimports and writes only
+        /// what changed.
         /// </summary>
-        [MenuItem("Meuble/Build Texture Library")]
+        [MenuItem("OutOfSight/Build Texture Library")]
         public static void BuildTextureLibrary()
         {
             var log = new StringBuilder("[ModelCatalogBuilder] texture library:\n");
@@ -207,7 +227,7 @@ namespace Meuble.Editor
             var entries = new List<TextureLibrary.Entry>();
             foreach ((Surface surface, string file, string source, string normalFile) in Details)
             {
-                string path = AmbientCg + file;
+                string path = DetailFolder + file;
                 if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
                 {
                     Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no texture at {path}; the surface stays flat at run time");
@@ -224,7 +244,7 @@ namespace Meuble.Editor
                 Texture2D normal = null;
                 if (!string.IsNullOrEmpty(normalFile))
                 {
-                    string normalPath = AmbientCg + normalFile;
+                    string normalPath = DetailFolder + normalFile;
                     if (AssetImporter.GetAtPath(normalPath) is TextureImporter normalImporter)
                     {
                         if (ConfigureNormalImporter(normalImporter))
@@ -239,10 +259,27 @@ namespace Meuble.Editor
                         Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no normal map at {normalPath}; the surface stays bump-free at run time");
                     }
                 }
-                entries.Add(new TextureLibrary.Entry { surface = surface, texture = texture, mean = mean, source = source, normal = normal });
+                // M7 real colours (CONTRACT_M7 5): the surface's colour map, imported sRGB.
+                Texture2D colour = LoadColourMap(ColourFolder + "colour_" + source + ".png", log);
+                if (colour == null)
+                {
+                    Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no colour map at {ColourFolder}colour_{source}.png; the surface keeps its palette colour at run time");
+                }
+                Color colourMean = colour != null ? MeanColour(ColourFolder + "colour_" + source + ".png") : Color.clear;
+                entries.Add(new TextureLibrary.Entry
+                {
+                    surface = surface, texture = texture, mean = mean, source = source, normal = normal, colour = colour, colourMean = colourMean,
+                });
                 log.Append($"  {surface}: {file}, mean {F(mean)}, {(texture != null ? texture.width + " px, " + texture.mipmapCount + " mips, " + texture.graphicsFormat : "not loaded")}" +
-                    $"{(normal != null ? ", normal " + normalFile : "")}\n");
+                    $"{(normal != null ? ", normal " + normalFile : "")}{(colour != null ? ", colour " + colour.graphicsFormat : "")}\n");
             }
+            Texture2D playerColour = LoadColourMap(ColourFolder + PlayerColourFile, log);
+            if (playerColour == null)
+            {
+                Debug.LogWarning($"[ModelCatalogBuilder] no player colour map at {ColourFolder}{PlayerColourFile}; the player furniture keeps its palette red at run time");
+            }
+            string playerSource = playerColour != null ? PlayerSource : null;
+            Color playerMean = playerColour != null ? MeanColour(ColourFolder + PlayerColourFile) : Color.clear;
 
             var library = AssetDatabase.LoadAssetAtPath<TextureLibrary>(TextureLibraryPath);
             if (library == null)
@@ -250,12 +287,19 @@ namespace Meuble.Editor
                 Directory.CreateDirectory(Path.GetDirectoryName(TextureLibraryPath) ?? "Assets/Resources");
                 library = ScriptableObject.CreateInstance<TextureLibrary>();
                 library.entries = entries;
+                library.playerColour = playerColour;
+                library.playerSource = playerSource;
+                library.playerMean = playerMean;
                 AssetDatabase.CreateAsset(library, TextureLibraryPath);
                 log.Append("  created ").Append(TextureLibraryPath).Append('\n');
             }
-            else if (!SameDetails(library.entries, entries))
+            else if (!SameDetails(library.entries, entries) || library.playerColour != playerColour || library.playerSource != playerSource
+                || library.playerMean != playerMean)
             {
                 library.entries = entries;
+                library.playerColour = playerColour;
+                library.playerSource = playerSource;
+                library.playerMean = playerMean;
                 EditorUtility.SetDirty(library);
                 log.Append("  updated ").Append(TextureLibraryPath).Append('\n');
             }
@@ -265,13 +309,16 @@ namespace Meuble.Editor
             }
         }
 
-        /// <summary>Sets the detail import settings; true when anything changed (a reimport is needed).</summary>
-        private static bool ConfigureDetailImporter(TextureImporter t)
+        /// <summary>
+        /// Sets the detail import settings (a colour map: the same, but <paramref name="srgb"/>); true when anything
+        /// changed (a reimport is needed).
+        /// </summary>
+        private static bool ConfigureDetailImporter(TextureImporter t, bool srgb = false)
         {
             bool changed = false;
             if (t.textureType != TextureImporterType.Default) { t.textureType = TextureImporterType.Default; changed = true; }
             if (t.textureShape != TextureImporterShape.Texture2D) { t.textureShape = TextureImporterShape.Texture2D; changed = true; }
-            if (t.sRGBTexture) { t.sRGBTexture = false; changed = true; }
+            if (t.sRGBTexture != srgb) { t.sRGBTexture = srgb; changed = true; }
             if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
             if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
             if (t.isReadable) { t.isReadable = false; changed = true; }
@@ -281,14 +328,33 @@ namespace Meuble.Editor
             if (t.maxTextureSize != DetailMaxSize) { t.maxTextureSize = DetailMaxSize; changed = true; }
             if (t.textureCompression != TextureImporterCompression.CompressedHQ) { t.textureCompression = TextureImporterCompression.CompressedHQ; changed = true; }
             if (t.npotScale != TextureImporterNPOTScale.ToNearest) { t.npotScale = TextureImporterNPOTScale.ToNearest; changed = true; }
+            changed |= ConfigureAndroidOverride(t);
             return changed;
+        }
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): imports a colour map (sRGB, otherwise as a detail: mipmaps, repeat, trilinear,
+        /// 512, high quality compression, not readable) and loads it; null when there is no texture at that path.
+        /// </summary>
+        private static Texture2D LoadColourMap(string path, StringBuilder log)
+        {
+            if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
+            {
+                return null;
+            }
+            if (ConfigureDetailImporter(importer, true))
+            {
+                importer.SaveAndReimport();
+                log.Append("  reimported ").Append(path).Append('\n');
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         /// <summary>
         /// M7 (CONTRACT_M7 1.2): sets a normal map's import settings (Unity's Normal map type, so the platform
         /// compressor and the shader's UnpackNormal pick the right encoding whatever the target); true when anything
-        /// changed (a reimport is needed). The source PNG already encodes a tangent space normal (derived from the
-        /// ambientCG NormalGL map): "create from grayscale" stays off.
+        /// changed (a reimport is needed). The source PNG already encodes a tangent space normal (OpenGL convention,
+        /// derived offline by tools/assets/derive_env_textures.py): "create from grayscale" stays off.
         /// </summary>
         private static bool ConfigureNormalImporter(TextureImporter t)
         {
@@ -304,7 +370,27 @@ namespace Meuble.Editor
             if (t.maxTextureSize != DetailMaxSize) { t.maxTextureSize = DetailMaxSize; changed = true; }
             if (t.textureCompression != TextureImporterCompression.CompressedHQ) { t.textureCompression = TextureImporterCompression.CompressedHQ; changed = true; }
             if (t.npotScale != TextureImporterNPOTScale.ToNearest) { t.npotScale = TextureImporterNPOTScale.ToNearest; changed = true; }
+            changed |= ConfigureAndroidOverride(t);
             return changed;
+        }
+
+        /// <summary>
+        /// Compact APK: an Android only override (ASTC 6x6 at the 512 px source size) for the tiling detail and
+        /// normal maps. The default (PC) settings are untouched; on a phone screen 6x6 blocks are not visible on these
+        /// low contrast tiling maps, and they take less than half the bytes of the default 4x4.
+        /// </summary>
+        private static bool ConfigureAndroidOverride(TextureImporter t)
+        {
+            TextureImporterPlatformSettings android = t.GetPlatformTextureSettings("Android");
+            if (android.overridden && android.maxTextureSize == DetailMaxSize && android.format == TextureImporterFormat.ASTC_6x6)
+            {
+                return false;
+            }
+            android.overridden = true;
+            android.maxTextureSize = DetailMaxSize;
+            android.format = TextureImporterFormat.ASTC_6x6;
+            t.SetPlatformTextureSettings(android);
+            return true;
         }
 
         /// <summary>The mean texel (red channel, r = g = b) of the source PNG, read from the file, as a linear multiplier.</summary>
@@ -331,6 +417,41 @@ namespace Meuble.Editor
             }
         }
 
+        /// <summary>M7 real colours: the mean texel of an sRGB colour map PNG, in linear (each texel decoded, then averaged).</summary>
+        private static Color MeanColour(string path)
+        {
+            var image = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+            try
+            {
+                if (!image.LoadImage(File.ReadAllBytes(path)))
+                {
+                    return Color.clear;
+                }
+                var lut = new double[256];
+                for (int i = 0; i < 256; i++)
+                {
+                    lut[i] = Mathf.GammaToLinearSpace(i / 255f);
+                }
+                Color32[] pixels = image.GetPixels32();
+                double r = 0, g = 0, b = 0;
+                foreach (Color32 p in pixels)
+                {
+                    r += lut[p.r];
+                    g += lut[p.g];
+                    b += lut[p.b];
+                }
+                int n = Mathf.Max(1, pixels.Length);
+                // Rounded to 1e-4 so an unchanged PNG compares equal across builds (no needless asset write).
+                return new Color(Round4(r / n), Round4(g / n), Round4(b / n), 1f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(image);
+            }
+        }
+
+        private static float Round4(double v) => (float)System.Math.Round(v, 4);
+
         private static bool SameDetails(List<TextureLibrary.Entry> a, List<TextureLibrary.Entry> b)
         {
             if (a == null || a.Count != b.Count)
@@ -340,7 +461,8 @@ namespace Meuble.Editor
             for (int i = 0; i < a.Count; i++)
             {
                 if (a[i] == null || a[i].surface != b[i].surface || a[i].texture != b[i].texture || a[i].source != b[i].source
-                    || a[i].normal != b[i].normal || Mathf.Abs(a[i].mean - b[i].mean) > 1e-6f)
+                    || a[i].normal != b[i].normal || a[i].colour != b[i].colour || a[i].colourMean != b[i].colourMean
+                    || Mathf.Abs(a[i].mean - b[i].mean) > 1e-6f)
                 {
                     return false;
                 }

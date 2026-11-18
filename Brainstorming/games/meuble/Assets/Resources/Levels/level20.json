@@ -1,0 +1,769 @@
+{
+  "id": "level20",
+  "nameKey": "level20.name",
+  "hintKey": "level20.hint",
+  "lesson": "dark",
+  "doorMemory": true,
+  "rooms": [
+    {
+      "id": "salon",
+      "x": 3.45,
+      "z": 2.45,
+      "sizeX": 6.9,
+      "sizeZ": 4.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine",
+      "x": 9.7,
+      "z": 2.45,
+      "sizeX": 5.4,
+      "sizeZ": 4.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorFinish": "tile",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE"
+    },
+    {
+      "id": "entree",
+      "x": 15.2,
+      "z": 2.45,
+      "sizeX": 5.4,
+      "sizeZ": 4.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "couloir",
+      "x": 8.95,
+      "z": 5.95,
+      "sizeX": 17.9,
+      "sizeZ": 1.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "chambre",
+      "x": 2.95,
+      "z": 9.2,
+      "sizeX": 5.9,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "bureau",
+      "x": 8.95,
+      "z": 9.2,
+      "sizeX": 5.9,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "sdb",
+      "x": 14.95,
+      "z": 9.2,
+      "sizeX": 5.9,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorFinish": "tile",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE"
+    }
+  ],
+  "doors": [
+    {
+      "x": 2.25,
+      "z": 4.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 9.25,
+      "z": 4.95,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte_cuisine",
+      "swing": "cuisine",
+      "hinge": "start",
+      "openedByInhabitants": true
+    },
+    {
+      "x": 12.45,
+      "z": 1.75,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 13.25,
+      "z": 4.95,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte_entree",
+      "swing": "entree",
+      "hinge": "end"
+    },
+    {
+      "x": 3.25,
+      "z": 6.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 11.25,
+      "z": 6.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 14.75,
+      "z": 6.95,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [
+    {
+      "x": 3.45,
+      "z": -0.05,
+      "width": 1.6,
+      "bottom": 0.9,
+      "top": 2.1
+    },
+    {
+      "x": 17.95,
+      "z": 2.45,
+      "width": 1.2,
+      "bottom": 0.9,
+      "top": 2.1
+    }
+  ],
+  "rugs": [
+    {
+      "model": "kenney.rug",
+      "x": 4.25,
+      "z": 2.75,
+      "sizeX": 2.0,
+      "sizeZ": 1.6,
+      "yaw": 0.0,
+      "color": "#2E6DB4"
+    }
+  ],
+  "player": {
+    "kind": "floor_lamp",
+    "x": 5.75,
+    "z": 1.25,
+    "yaw": 270.0,
+    "sizeX": 0.35,
+    "sizeY": 1.8,
+    "sizeZ": 0.35,
+    "color": "#D7263D",
+    "model": "kenney.floorlamp"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 16.75,
+    "z": 0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Canape",
+      "kind": "sofa",
+      "x": 2.5,
+      "z": 0.75,
+      "yaw": 0.0,
+      "sizeX": 2.0,
+      "sizeY": 0.85,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#2E6DB4",
+      "accentColor": "#5B93D9",
+      "model": "kenney.sofa"
+    },
+    {
+      "name": "Lit",
+      "kind": "sofa",
+      "x": 1.25,
+      "z": 9.9,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 0.55,
+      "sizeZ": 2.0,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Bureau",
+      "kind": "table",
+      "x": 9.0,
+      "z": 10.6,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Baignoire",
+      "kind": "counter",
+      "x": 15.0,
+      "z": 11.0,
+      "yaw": 0.0,
+      "sizeX": 1.8,
+      "sizeY": 0.6,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#5B93D9"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 9.2,
+      "z": 0.3,
+      "yaw": 0.0,
+      "sizeX": 3.4,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "ArmoireCouloir",
+      "kind": "wardrobe",
+      "x": 6.25,
+      "z": 6.45,
+      "yaw": 180.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "ArmoireCuisine",
+      "kind": "wardrobe",
+      "x": 11.75,
+      "z": 4.45,
+      "yaw": 180.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "ArmoireEntree",
+      "kind": "wardrobe",
+      "x": 14.25,
+      "z": 0.55,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    }
+  ],
+  "designerRoute": [
+    { "x": 5.75, "z": 1.25, "at": 0.3, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 0.6, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 0.9, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 1.2, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 1.5, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 1.8, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 2.1, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 2.4, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 2.7, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.0, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.3, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.6, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.9, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 4.2, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 4.5, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 4.8, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 5.1, "action": "toggle" },
+    { "x": 4.75, "z": 1.25, "at": 5.4 },
+    { "x": 3.75, "z": 1.25, "at": 7.2 },
+    { "x": 3.75, "z": 1.75, "at": 9.0 },
+    { "x": 2.75, "z": 1.75, "at": 9.9 },
+    { "x": 2.75, "z": 2.75, "at": 11.7 },
+    { "x": 2.75, "z": 3.75, "at": 13.5 },
+    { "x": 2.75, "z": 4.25, "at": 15.3 },
+    { "x": 2.25, "z": 4.25, "at": 16.2 },
+    { "x": 2.25, "z": 5.25, "at": 17.1 },
+    { "x": 3.25, "z": 5.25, "at": 18.9 },
+    { "x": 4.25, "z": 5.25, "at": 20.7 },
+    { "x": 5.25, "z": 5.25, "at": 22.5 },
+    { "x": 6.25, "z": 5.25, "at": 24.3 },
+    { "x": 7.25, "z": 5.25, "at": 26.1 },
+    { "x": 8.25, "z": 5.25, "at": 27.9 },
+    { "x": 9.25, "z": 5.25, "at": 29.7 },
+    { "x": 9.25, "z": 4.25, "at": 31.5 },
+    { "x": 9.25, "z": 3.75, "at": 33.3 },
+    { "x": 10.25, "z": 3.75, "at": 34.2 },
+    { "x": 11.25, "z": 3.75, "at": 36.0 },
+    { "x": 11.75, "z": 3.75, "at": 37.8 },
+    { "x": 11.75, "z": 2.75, "at": 38.7 },
+    { "x": 11.75, "z": 2.25, "at": 40.5 },
+    { "x": 11.75, "z": 1.75, "at": 43.6 },
+    { "x": 12.75, "z": 1.75, "at": 44.5 },
+    { "x": 12.75, "z": 1.25, "at": 46.3 },
+    { "x": 13.75, "z": 1.25, "at": 47.2 },
+    { "x": 14.75, "z": 1.25, "at": 49.0 },
+    { "x": 15.25, "z": 1.25, "at": 50.8 },
+    { "x": 15.25, "z": 0.75, "at": 51.7 },
+    { "x": 16.25, "z": 0.75, "at": 52.6 },
+    { "x": 16.75, "z": 0.75, "at": 54.4 },
+    { "x": 16.75, "z": 0.75, "at": 54.4 }
+  ],
+  "designerRouteHard": [
+    { "x": 5.75, "z": 1.25, "at": 0.6, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 0.9, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 1.2, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 1.5, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 1.8, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 2.1, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 2.4, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 2.7, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.0, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.3, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.6, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 3.9, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 4.2, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 4.5, "action": "toggle" },
+    { "x": 5.75, "z": 1.25, "at": 4.8, "action": "toggle" },
+    { "x": 4.75, "z": 1.25, "at": 5.1 },
+    { "x": 3.75, "z": 1.25, "at": 6.9 },
+    { "x": 3.75, "z": 1.75, "at": 8.7 },
+    { "x": 2.75, "z": 1.75, "at": 9.6 },
+    { "x": 2.75, "z": 2.75, "at": 11.4 },
+    { "x": 2.75, "z": 3.75, "at": 13.2 },
+    { "x": 2.75, "z": 4.25, "at": 15.0 },
+    { "x": 2.25, "z": 4.25, "at": 15.9 },
+    { "x": 2.25, "z": 5.25, "at": 16.8 },
+    { "x": 3.25, "z": 5.25, "at": 18.6 },
+    { "x": 4.25, "z": 5.25, "at": 20.4 },
+    { "x": 5.25, "z": 5.25, "at": 22.2 },
+    { "x": 6.25, "z": 5.25, "at": 24.0 },
+    { "x": 7.25, "z": 5.25, "at": 25.8 },
+    { "x": 8.25, "z": 5.25, "at": 27.6 },
+    { "x": 9.25, "z": 5.25, "at": 29.4 },
+    { "x": 9.25, "z": 4.25, "at": 31.2 },
+    { "x": 9.25, "z": 3.25, "at": 33.0 },
+    { "x": 10.25, "z": 3.25, "at": 34.8 },
+    { "x": 10.25, "z": 2.75, "at": 36.6 },
+    { "x": 10.75, "z": 2.75, "at": 37.5 },
+    { "x": 10.75, "z": 2.25, "at": 38.4 },
+    { "x": 11.75, "z": 2.25, "at": 39.3 },
+    { "x": 11.75, "z": 1.75, "at": 43.8 },
+    { "x": 12.75, "z": 1.75, "at": 44.7 },
+    { "x": 12.75, "z": 1.25, "at": 46.5 },
+    { "x": 13.75, "z": 1.25, "at": 47.4 },
+    { "x": 14.75, "z": 1.25, "at": 49.2 },
+    { "x": 15.75, "z": 1.25, "at": 51.0 },
+    { "x": 16.25, "z": 1.25, "at": 52.8 },
+    { "x": 16.25, "z": 0.75, "at": 53.7 },
+    { "x": 16.75, "z": 0.75, "at": 56.3 },
+    { "x": 16.75, "z": 0.75, "at": 56.3 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Maman",
+      "personality": "watchful",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 17.25,
+          "z": 5.75,
+          "facing": 270.0,
+          "dwell": 320.0,
+          "glances": [
+            {
+              "offset": 1.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 7.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 12.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 18.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 23.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 29.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 34.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 40.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 45.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 51.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 56.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 62.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 67.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 73.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 78.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 84.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 89.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 95.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 100.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 106.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 111.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 117.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 122.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 128.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 133.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 139.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 144.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 150.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 155.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 161.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 166.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 172.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 177.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 183.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 188.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 194.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 199.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 205.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 210.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 216.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 221.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 227.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 232.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 238.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 243.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 249.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 254.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 260.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 265.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 271.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 276.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 282.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 287.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 293.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 298.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 304.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 309.5,
+              "yaw": 80.0,
+              "hold": 1.5
+            },
+            {
+              "offset": 315.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            }
+          ]
+        },
+        {
+          "x": 17.25,
+          "z": 6.25,
+          "facing": 270.0,
+          "dwell": 1.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Papa",
+      "personality": "dreamer",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 2.75,
+          "z": 9.75,
+          "facing": 270.0,
+          "dwell": 10.0,
+          "glances": []
+        },
+        {
+          "x": 9.25,
+          "z": 1.25,
+          "facing": 180.0,
+          "dwell": 10.0,
+          "glances": [
+            {
+              "offset": 5.0,
+              "yaw": -80.0,
+              "hold": 1.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Rex",
+      "kind": "dog",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 16.25,
+          "z": 3.25,
+          "facing": 225.0,
+          "dwell": 10.0,
+          "glances": [],
+          "sleep": true
+        },
+        {
+          "x": 10.75,
+          "z": 2.25,
+          "facing": 0.0,
+          "dwell": 6.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

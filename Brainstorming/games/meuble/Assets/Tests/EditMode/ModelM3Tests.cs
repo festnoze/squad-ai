@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// docs/CONTRACT_M3.md 9, EditMode (Core-only): the pure math of the model pipeline (ModelMath: Box and

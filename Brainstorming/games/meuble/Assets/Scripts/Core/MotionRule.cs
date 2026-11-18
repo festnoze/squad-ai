@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>The "moving" predicate of PRD 3.3, the single source of truth for the caught rule.</summary>
     public static class MotionRule

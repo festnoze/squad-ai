@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M6 gameplay, pure logic (docs/CONTRACT_M6.md 2.5 and 2.6): the door memory, the wardrobe fit and entry rules, and the

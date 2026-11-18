@@ -175,13 +175,13 @@ per-kind values, `WatcherDef.For(kind)`, a new instance on every call (null or u
 ## 6. Level select, best times, save
 
 **Save file (`SaveStore`, Runtime; `SaveData`, Core):**
-- `Application.persistentDataPath/meuble_save.json`.
+- `Application.persistentDataPath/outofsight_save.json`.
 - Content: `{ "version": 1, "won": [levelIds], "best": { "<levelId>": seconds } }`.
-- Written atomically: write `meuble_save.json.tmp`, then `File.Replace(tmp, path, path + ".bak")`
+- Written atomically: write `outofsight_save.json.tmp`, then `File.Replace(tmp, path, path + ".bak")`
   when the file exists, `File.Move(tmp, path)` otherwise.
 - A best time is replaced only by a strictly lower one.
 - A corrupt file, an unreadable file or a `version` above 1: the file is renamed to
-  `meuble_save.json.bad` (replacing an older one), a warning is logged, and the game starts fresh.
+  `outofsight_save.json.bad` (replacing an older one), a warning is logged, and the game starts fresh.
   **Never an exception out of `SaveStore`.**
 - `SaveStore.PathOverride`: tests inject a path; `--probe` redirects the save into its shot
   folder, so the probe never touches the real save.
@@ -647,7 +647,7 @@ From the contract critic's review of v2 (5 blockers, 9 majors). Decided by the i
 
 - **Paths.**
   - In the editor, and under `--probe` or `--look`, Main points `SaveStore.PathOverride` at
-    `Application.temporaryCachePath/meuble_save_test.json` and deletes it at boot.
+    `Application.temporaryCachePath/outofsight_save_test.json` and deletes it at boot.
   - Only a built player with neither flag touches the real file.
 - **Test isolation.**
   - `SaveStore.ResetForTests()` clears Current, PathOverride, UnlockAll and the `Recorded`

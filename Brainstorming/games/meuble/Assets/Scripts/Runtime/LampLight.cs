@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The floor lamp's light (docs/CONTRACT_M4.md 2.3, amendments 9.3 and 9.12). An unshadowed point light at

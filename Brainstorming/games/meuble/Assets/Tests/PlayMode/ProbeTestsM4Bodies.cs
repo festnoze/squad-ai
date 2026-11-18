@@ -1,13 +1,13 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// The M4 bodies probe (docs/CONTRACT_M4.md 2, 8 step 29, amendments 9.3, 9.7, 9.9, 9.10) on the real Boot scene,
@@ -978,6 +978,44 @@ namespace Meuble.Tests
             Assert.Greater(Chair.transform.position.z - contactZ, 0.3f, "premise: it slid along the wall");
             Assert.IsFalse(everTipped, "a graze along a wall tipped the stool");
             Chair.ScriptedDirection = null;
+            AssertClean();
+        }
+
+        /// <summary>
+        /// Input change (2026-11-18, PC arrows and full gamepad support): InputReader.Move() reads an arrow key
+        /// exactly like WASD/ZQSD, and the gamepad D-pad exactly like the left stick (same v.x/v.y accumulation,
+        /// same line). A PlayMode test cannot drive a real keyboard or gamepad device headlessly, so this injects
+        /// the same vector an Up Arrow (or the D-pad up, or W) press alone would produce through InjectMoveVector,
+        /// InputReader's equivalent of InjectLookStick for the move vector, and checks it drives the furniture
+        /// exactly like ScriptedDirection (every other movement test's stand-in for a real move key) does.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step29o_InjectedArrowKeyEquivalentMovesLikeAnyOtherMoveKey()
+        {
+            PinAway();
+            Place("office_chair", LaneStart, 0f);
+            Vector3 before = Chair.transform.position;
+            Assert.IsFalse(Chair.IsMoving, "premise: the chair is not moving before any input");
+
+            InputReader.InjectMoveVector(Vector2.up);
+            yield return Steps(10);
+            Assert.IsTrue(Chair.IsMoving, "the injected arrow key equivalent (Vector2.up) did not move the furniture");
+            Assert.Greater(Planar(Chair.transform.position, before), 0.05f,
+                "the injected arrow key equivalent (Vector2.up) did not displace the furniture");
+            InputReader.ClearMoveVector();
+            yield return Steps(1);
+
+            // The same body, driven the same distance by ScriptedDirection (every other movement test's stand-in
+            // for a real move key), moves by the same mechanism: this is not a special case.
+            Chair.ScriptedDirection = null;
+            Chair.Teleport(LaneStart, 0f);
+            Vector3 before2 = Chair.transform.position;
+            Chair.ScriptedDirection = Vector3.forward;
+            yield return Steps(10);
+            Assert.IsTrue(Chair.IsMoving, "premise: ScriptedDirection moves the same body");
+            float scriptedDelta = Planar(Chair.transform.position, before2);
+            Chair.ScriptedDirection = null;
+            Assert.Greater(scriptedDelta, 0.05f, "premise: ScriptedDirection displaced the furniture");
             AssertClean();
         }
     }

@@ -11,70 +11,99 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 103c46fcb1515e24e946734679f6153a, type: 3}
   m_Name: TextureLibrary
-  m_EditorClassIdentifier: Meuble.Runtime::Meuble.TextureLibrary
+  m_EditorClassIdentifier: OutOfSight.Runtime::OutOfSight.TextureLibrary
   entries:
   - surface: 1
-    texture: {fileID: 2800000, guid: 6523e710bb11ae4418c54ee04506d867, type: 3}
-    mean: 0.9411798
-    source: Wood049
-    normal: {fileID: 2800000, guid: 1826ca140f7963d40a92e137b82bd090, type: 3}
+    texture: {fileID: 2800000, guid: 3f6f43b486e02b349b42d8d4911ca7ee, type: 3}
+    mean: 0.9411787
+    source: wood
+    normal: {fileID: 2800000, guid: 9e68b5a18e5768c4b826e3b99d13de8d, type: 3}
+    colour: {fileID: 2800000, guid: 2a66ac6d783cd9f43a4aa54357d4beb1, type: 3}
+    colourMean: {r: 0.5387, g: 0.1955, b: 0.0328, a: 1}
   - surface: 2
-    texture: {fileID: 2800000, guid: 93d3dacfa2f03f94aa62ead78c57686e, type: 3}
-    mean: 0.9411789
-    source: WoodFloor051
-    normal: {fileID: 2800000, guid: fd6fa7263d620ee49957b682010b9d9a, type: 3}
+    texture: {fileID: 2800000, guid: 07ca01c393dddd749a4cae1c15ddafc8, type: 3}
+    mean: 0.9411756
+    source: parquet
+    normal: {fileID: 2800000, guid: 346efa1b67ef42e4e917dbc86cf1fdd8, type: 3}
+    colour: {fileID: 2800000, guid: 120f0344812c0b847a1c7409294795e9, type: 3}
+    colourMean: {r: 0.6198, g: 0.2595, b: 0.0618, a: 1}
   - surface: 3
-    texture: {fileID: 2800000, guid: 7f37289af2e402b4d8139620164cb2fe, type: 3}
-    mean: 0.9417111
-    source: Plaster001
-    normal: {fileID: 2800000, guid: e2a006c6756f9ef4a9efac23f60caae7, type: 3}
+    texture: {fileID: 2800000, guid: ee00370ca1a2ea04bac6cd7aefb9af16, type: 3}
+    mean: 0.9411754
+    source: plaster
+    normal: {fileID: 2800000, guid: 1009c484685909342b88597bcd8671f8, type: 3}
+    colour: {fileID: 2800000, guid: b1691de88f4e1554682993f2ad55115f, type: 3}
+    colourMean: {r: 0.9511, g: 0.7556, b: 0.4692, a: 1}
   - surface: 4
-    texture: {fileID: 2800000, guid: 5507ee543d597c241a27f6d2090ff93c, type: 3}
-    mean: 0.94117445
-    source: Fabric011
-    normal: {fileID: 2800000, guid: 1b36f986ab07fe740b4bc2636640d5ab, type: 3}
+    texture: {fileID: 2800000, guid: afdf8d70f1f1b4141a65d5a0dc2012fc, type: 3}
+    mean: 0.9411784
+    source: upholstery
+    normal: {fileID: 2800000, guid: 1181feda1441b3948ab546052c571a68, type: 3}
+    colour: {fileID: 2800000, guid: d7fd868a8892c454d9f2e48c47e4bb35, type: 3}
+    colourMean: {r: 0.1566, g: 0.2386, b: 0.3269, a: 1}
   - surface: 5
-    texture: {fileID: 2800000, guid: a76a06022100af64ea220e6e0704c5dd, type: 3}
-    mean: 0.94117993
-    source: Fabric036
-    normal: {fileID: 2800000, guid: 291a0d2ee4714f940a64c9372e625aff, type: 3}
+    texture: {fileID: 2800000, guid: e5cb0f608d2c213409f662cf91604dfb, type: 3}
+    mean: 0.9411802
+    source: linen
+    normal: {fileID: 2800000, guid: 712a4098a7cda7649beaa87eb3f0abd7, type: 3}
+    colour: {fileID: 2800000, guid: 20403e4dce7a2084db546f4f19b7fe88, type: 3}
+    colourMean: {r: 0.9035, g: 0.7896, b: 0.6188, a: 1}
   - surface: 6
-    texture: {fileID: 2800000, guid: 54e27dbe72815d74b92c121bd4ae151c, type: 3}
-    mean: 0.9411796
-    source: Carpet012
-    normal: {fileID: 2800000, guid: 8111991e5a7bdb045a01841333afacb7, type: 3}
+    texture: {fileID: 2800000, guid: 6dc6d560995509e4e821398827bce75e, type: 3}
+    mean: 0.9411828
+    source: carpet
+    normal: {fileID: 2800000, guid: 290ace60c20162e48ab42133409ed504, type: 3}
+    colour: {fileID: 2800000, guid: 981a32e68ed3a78468e1fbb56dd2a8ea, type: 3}
+    colourMean: {r: 0.5528, g: 0.3894, b: 0.2714, a: 1}
   - surface: 7
-    texture: {fileID: 2800000, guid: c8499a0a83b9a3f46a7dea23f746626a, type: 3}
-    mean: 0.9411739
-    source: Grass001
-    normal: {fileID: 2800000, guid: 4361090f4a23dd349ae58026acfe2410, type: 3}
+    texture: {fileID: 2800000, guid: 6550ceb74f58e7449a5ed52f64c8d5e6, type: 3}
+    mean: 0.94118005
+    source: grass
+    normal: {fileID: 2800000, guid: 21e9963d525c14442a2b9098be6dbd93, type: 3}
+    colour: {fileID: 2800000, guid: 923afa2fe7060db4080707de53f22a9d, type: 3}
+    colourMean: {r: 0.0725, g: 0.2314, b: 0.0046, a: 1}
   - surface: 8
-    texture: {fileID: 2800000, guid: f0f33e459383a9e48831375271ba895b, type: 3}
-    mean: 0.9411848
-    source: PaintedWood006C
-    normal: {fileID: 2800000, guid: e90007402de5d064bb2dd5316a351e03, type: 3}
+    texture: {fileID: 2800000, guid: 4d98120787286304482f620afb0818a0, type: 3}
+    mean: 0.9411776
+    source: lacquer
+    normal: {fileID: 2800000, guid: 85e43fe84f40d6245a5abb8b25387212, type: 3}
+    colour: {fileID: 2800000, guid: 35d69fa9533274943b363b3047a29812, type: 3}
+    colourMean: {r: 0.9476, g: 0.8019, b: 0.5676, a: 1}
   - surface: 9
-    texture: {fileID: 2800000, guid: 0193f03050e62fc47bcb53dd508b583b, type: 3}
-    mean: 0.94118047
-    source: Metal009
-    normal: {fileID: 2800000, guid: 913c9e68173888d459330cd16a90c5e1, type: 3}
+    texture: {fileID: 2800000, guid: d14cb2baec1132b40835be080168dcf0, type: 3}
+    mean: 0.94118
+    source: metal
+    normal: {fileID: 2800000, guid: 547b29c3f1106ce4e986b0edf149f8b2, type: 3}
+    colour: {fileID: 2800000, guid: 43b9072f9fa60834990430ed5448382f, type: 3}
+    colourMean: {r: 0.4008, g: 0.3992, b: 0.3988, a: 1}
   - surface: 10
-    texture: {fileID: 2800000, guid: 122a71ebe37bbc0499a5beced280aec1, type: 3}
-    mean: 0.9411785
-    source: Plastic006
+    texture: {fileID: 2800000, guid: 69bbd44eab4b18649afd0742854c2b37, type: 3}
+    mean: 0.9411752
+    source: plastic
     normal: {fileID: 0}
+    colour: {fileID: 2800000, guid: e023f5f75041b514d9378d2aca7b24ce, type: 3}
+    colourMean: {r: 0.7321, g: 0.5606, b: 0.3961, a: 1}
   - surface: 11
-    texture: {fileID: 2800000, guid: 45f13d3a045d6f64a95a1e4be8fda517, type: 3}
-    mean: 0.9411782
-    source: Moss002
+    texture: {fileID: 2800000, guid: 4e9a8d3139cc2b840af0cbadd52e5a06, type: 3}
+    mean: 0.9411845
+    source: foliage
     normal: {fileID: 0}
+    colour: {fileID: 2800000, guid: 95c0bf5e376beb34ba36569a813b64e0, type: 3}
+    colourMean: {r: 0.0738, g: 0.2677, b: 0.0059, a: 1}
   - surface: 12
-    texture: {fileID: 2800000, guid: 27e738102b125b641aca811c2a8f181e, type: 3}
+    texture: {fileID: 2800000, guid: f7d2500fb615880488e91c129a21798d, type: 3}
     mean: 0.94117737
-    source: Ground104
+    source: soil
     normal: {fileID: 0}
+    colour: {fileID: 2800000, guid: c19d4c9b8a8036242a26c8d4da53bd63, type: 3}
+    colourMean: {r: 0.1225, g: 0.0442, b: 0.0177, a: 1}
   - surface: 13
-    texture: {fileID: 2800000, guid: 5b8951777b194cf4995eb9aa0dcccfd6, type: 3}
-    mean: 0.9411757
-    source: Tiles049
-    normal: {fileID: 2800000, guid: 51ba979c51fd59e4288df164158a09e4, type: 3}
+    texture: {fileID: 2800000, guid: ee33d6780cfb7814ba6772190a3abc35, type: 3}
+    mean: 0.94118166
+    source: tile
+    normal: {fileID: 2800000, guid: 617b0a213775b3e4f848f204a6aefff9, type: 3}
+    colour: {fileID: 2800000, guid: 939519a2250260b448e0bd9b436232fb, type: 3}
+    colourMean: {r: 0.8783, g: 0.5989, b: 0.373, a: 1}
+  playerColour: {fileID: 2800000, guid: 1ae5feb84193b50449600b6a2f11da09, type: 3}
+  playerMean: {r: 0.8211, g: 0.0014, b: 0.0004, a: 1}
+  playerSource: red_metal_source

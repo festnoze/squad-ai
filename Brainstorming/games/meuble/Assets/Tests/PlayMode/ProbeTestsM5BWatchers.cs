@@ -2,14 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M5B watchers probe (docs/CONTRACT_M5.md 4, 6, 16.5, 16.8, 16.11, 16.12 and 17): the robot vacuum's visual (step 42w),
@@ -899,7 +899,14 @@ namespace Meuble.Tests
                 SkinnedMeshRenderer prefab = h.Rig.Entry.prefab.GetComponentInChildren<SkinnedMeshRenderer>(true);
                 Assert.IsNotNull(skin, $"premise: {h.name} is not skinned");
                 Assert.IsNotNull(prefab, $"premise: {h.name}'s catalog prefab is not skinned");
-                Assert.AreSame(prefab.sharedMesh, skin.sharedMesh, $"{h.name} does not draw the catalog prefab's own mesh");
+                if (h.Rig.IsPet)
+                {
+                    Assert.AreSame(prefab.sharedMesh, skin.sharedMesh, $"{h.name} does not draw the catalog prefab's mesh");
+                }
+                else
+                {
+                    Assert.IsTrue(CharacterLook.UsesProjection(prefab.sharedMesh, skin.sharedMesh), $"{h.name} uses the wrong projected mesh");
+                }
                 Assert.AreEqual(prefab.sharedMaterials.Length, skin.sharedMaterials.Length, $"{h.name}: slots merged or dropped");
                 Assert.AreEqual(skin.sharedMesh.subMeshCount, skin.sharedMaterials.Length, $"{h.name}: slots and submeshes differ");
                 Material tint = PrimitiveKit.Lit(h.Tint.Value);

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Builds the Windows player of UN, DEUX, TROIS, MEUBLE and launches it.
+    Builds the Windows player of Out of Sight and launches it.
 
 .DESCRIPTION
     The build goes through tools/unity.sh, the same Unity lock and fair queue as verify.sh and the agents, so it
@@ -50,7 +50,7 @@ $ErrorActionPreference = 'Stop'
 $project = Split-Path -Parent $PSScriptRoot
 if ($Run -and $Dev) { throw "-Run plays the release build; use play.cmd -Dev for a debuggable one." }
 $folder = if ($Dev) { 'PlayDev' } else { 'Play' }
-$exe = Join-Path $project "Build\$folder\Meuble.exe"
+$exe = Join-Path $project "Build\$folder\OutOfSight.exe"
 $log = Join-Path $project "Build\$($folder.ToLower())_build.log"
 if ($Run -and (Test-Path $exe)) { $NoBuild = $true }
 
@@ -65,7 +65,7 @@ if (-not $NoBuild) {
     }
     New-Item -ItemType Directory -Force (Join-Path $project 'Build') | Out-Null
 
-    $unityArgs = @('-executeMethod', 'Meuble.Editor.Builder.BuildWindows', '-output', "Build/$folder/Meuble.exe", '-logFile', (Split-Path $log -Leaf | ForEach-Object { "Build/$_" }))
+    $unityArgs = @('-executeMethod', 'OutOfSight.Editor.Builder.BuildWindows', '-output', "Build/$folder/OutOfSight.exe", '-logFile', (Split-Path $log -Leaf | ForEach-Object { "Build/$_" }))
     if ($Dev) { $unityArgs += '-development' }
     if ($Dev -and $WaitForDebugger) { $unityArgs += '-waitForDebugger' }
 
@@ -73,7 +73,7 @@ if (-not $NoBuild) {
     Write-Host "If an agent or verify.sh holds Unity, the build waits in the queue."
     Push-Location $project
     try {
-        $env:MEUBLE_AGENT = 'play'
+        $env:OUTOFSIGHT_AGENT = 'play'
         & $bash tools/unity.sh run . --timeout 1800 -- @unityArgs
         $code = $LASTEXITCODE
     }

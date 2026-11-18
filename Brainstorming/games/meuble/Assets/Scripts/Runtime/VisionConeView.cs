@@ -1,15 +1,15 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The x-ray of docs/CONTRACT_M3.md 6 (pillar 2: the player always knows where every inhabitant looks).
-    /// Four URP RenderObjects features on the renderer, set up by Meuble.Editor.ProjectSetup:
+    /// Four URP RenderObjects features on the renderer, set up by OutOfSight.Editor.ProjectSetup:
     /// 1. <see cref="MaskFeature"/>: the visible pixels of the Occluder layer (the walls and every prop flagged
     ///    as an occluder, such as the tall bookshelf) mark the stencil, drawn with an invisible material;
     /// 2. <see cref="ConeFeature"/>: the vision cones (their own layer) where a marked occluder hides them, at
@@ -47,7 +47,7 @@ namespace Meuble
                     coneLayer = LayerMask.NameToLayer(ConeLayerName);
                     if (coneLayer < 0)
                     {
-                        Debug.LogWarning($"[XRay] Layer '{ConeLayerName}' is not declared; run Meuble > Project Setup. Cones get no x-ray.");
+                        Debug.LogWarning($"[XRay] Layer '{ConeLayerName}' is not declared; run OutOfSight > Project Setup. Cones get no x-ray.");
                         coneLayer = 0;
                     }
                 }

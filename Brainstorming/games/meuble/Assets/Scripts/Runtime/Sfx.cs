@@ -1,7 +1,7 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The sounds of the game (PRD 7.3).
@@ -29,6 +29,12 @@ namespace Meuble
     /// M5 wave 5B (docs/CONTRACT_M5.md 4, 5 and 6): the robot vacuum's hum, a quiet 3D loop on every robot (an AudioSource
     /// added to the robot's own GameObject, like the footsteps: no GameObject is created), the fallen load's crash, the
     /// rocking chair's creak while it rocks and the robot's bump into the furniture, all synthesized.
+    ///
+    /// Audio overhaul (docs/audio/AUDIO_REPORT.md): every recording is loudness matched by tools/audio/audio_pipeline.py and
+    /// played at its role's playback target (Tuning mixes). Recordings now replace the synthesized door swing, crash,
+    /// topple and lamp click when the library has them (the synthesis stays the fallback), a hop on a rug plays its own
+    /// muffled variants, and three silent events get a sound: the win (<see cref="PlayWin"/>), the wardrobe's doors
+    /// (<see cref="PlayWardrobe"/>) and the menu selection (<see cref="PlayUiHover"/>). The music is <see cref="MusicPlayer"/>.
     /// </summary>
     public sealed class Sfx : MonoBehaviour
     {
@@ -77,6 +83,22 @@ namespace Meuble
         public AudioClip LastStingClip { get; private set; }
         public float LastStingVolume { get; private set; }
         public int UiClicksPlayed { get; private set; }
+
+        // ----- Audio overhaul (docs/audio/AUDIO_REPORT.md): new events (tests read these, never isPlaying) -----
+
+        /// <summary>Menu selection ticks played (a new button selected).</summary>
+        public int UiHoversPlayed { get; private set; }
+
+        /// <summary>Win jingles played (one per win), and the clip of the last one.</summary>
+        public int WinsPlayed { get; private set; }
+        public AudioClip LastWinClip { get; private set; }
+
+        /// <summary>Wardrobe door sounds played: the doors opening, and shutting.</summary>
+        public int WardrobeOpensPlayed { get; private set; }
+        public int WardrobeClosesPlayed { get; private set; }
+
+        /// <summary>Index in the library's softHops of the last muffled hop, -1 before the first one.</summary>
+        public int LastSoftHopVariant { get; private set; } = -1;
 
         /// <summary>FootstepAudio components added to inhabitant roots since startup.</summary>
         public int FootstepComponentsAdded { get; private set; }
@@ -253,6 +275,16 @@ namespace Meuble
         private const float RoomToneMix = Tuning.SfxRoomToneMix;
         private const float ClockMix = Tuning.SfxClockMix;
         private const float UiClickMix = Tuning.SfxUiClickMix;
+        // Audio overhaul: the new recorded roles (playback targets in Tuning).
+        private const float SoftHopMix = Tuning.SfxSoftHopMix;
+        private const float UiHoverMix = Tuning.SfxUiHoverMix;
+        private const float WinMix = Tuning.SfxWinMix;
+        private const float DoorMix = Tuning.SfxDoorMix;
+        private const float WardrobeMix = Tuning.SfxWardrobeMix;
+        private const float CrashMix = Tuning.SfxCrashMix;
+        private const float ToppleMix = Tuning.SfxToppleMix;
+        private const float LampClickMix = Tuning.SfxLampClickMix;
+        private const float PitchJitter = Tuning.SfxPitchJitter;
 
         // A hop taken while the chair turns hard on the spot (a reversal) is a leg scrape instead.
         private const float PivotYawRate = Tuning.SfxPivotYawRate;
@@ -285,6 +317,7 @@ namespace Meuble
         private AudioSource crashSource;
         private AudioSource rockSource;
         private AudioSource bumpSource;
+        private AudioSource wardrobeSource;
         private System.Random noise;
         private System.Random choice;
         private bool tensionWasActive;
@@ -347,6 +380,7 @@ namespace Meuble
             rockSource = NewSource(1f);
             bumpSource = NewSource(1f);
             bumpSource.pitch = BumpPitch;
+            wardrobeSource = NewSource(1f);
             RattleSource = NewSource(0f);
             RattleSource.clip = Rattle;
             RattleSource.loop = true;
@@ -439,6 +473,7 @@ namespace Meuble
         }
 
         private bool HasHops => Library != null && AudioLibrary.HasAll(Library.hops);
+        private bool HasSoftHops => Library != null && AudioLibrary.HasAll(Library.softHops);
         private bool HasScrapes => Library != null && AudioLibrary.HasAll(Library.scrapes);
         private bool HasFootsteps => Library != null && AudioLibrary.HasAll(Library.footsteps);
 
@@ -590,6 +625,68 @@ namespace Meuble
             UiClicksPlayed++;
         }
 
+        /// <summary>
+        /// Audio overhaul: the menu's selection tick (a new button selected by the mouse, the arrows or the D-pad), heard
+        /// while the game is paused like the click. Silent without its recording (no synthesized fallback). It never
+        /// sets <see cref="LastClip"/>, so a selection change between a test's call and its check cannot change it.
+        /// </summary>
+        public void PlayUiHover()
+        {
+            AudioLibrary.Entry entry = Recorded(l => l.uiHover);
+            if (UiSource == null || entry == null)
+            {
+                return;
+            }
+            UiSource.PlayOneShot(entry.clip, Mathf.Clamp01(Mix(entry, UiHoverMix)));
+            UiHoversPlayed++;
+        }
+
+        /// <summary>
+        /// Audio overhaul: the win, a rising pizzicato jingle on the sting source (the music fades out under it,
+        /// <see cref="MusicPlayer"/>). Silent without its recording.
+        /// </summary>
+        public void PlayWin()
+        {
+            AudioLibrary.Entry entry = Recorded(l => l.stingWin);
+            if (stingSource == null || entry == null)
+            {
+                return;
+            }
+            Play(stingSource, entry.clip, Mix(entry, WinMix));
+            LastWinClip = entry.clip;
+            WinsPlayed++;
+        }
+
+        /// <summary>
+        /// Audio overhaul: the wardrobe's doors, panned toward the furniture: <paramref name="open"/> as they swing open at the
+        /// start of the entry or exit action, then shut at its end. Silent without the recordings.
+        /// </summary>
+        public void PlayWardrobe(float pan, bool open)
+        {
+            AudioLibrary.Entry entry = Recorded(open ? (System.Func<AudioLibrary, AudioLibrary.Entry>)(l => l.wardrobeOpen) : l => l.wardrobeClose);
+            if (wardrobeSource == null || entry == null)
+            {
+                return;
+            }
+            wardrobeSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
+            wardrobeSource.pitch = Jitter();
+            Play(wardrobeSource, entry.clip, Mix(entry, WardrobeMix));
+            if (open)
+            {
+                WardrobeOpensPlayed++;
+            }
+            else
+            {
+                WardrobeClosesPlayed++;
+            }
+        }
+
+        /// <summary>A pitch around 1 (+- <see cref="PitchJitter"/>) for a recording without variants.</summary>
+        private float Jitter()
+        {
+            return 1f + PitchJitter * (2f * (float)noise.NextDouble() - 1f);
+        }
+
         public void PlayHop()
         {
             PlayHop(1f);
@@ -631,9 +728,33 @@ namespace Meuble
             HopsPlayed++;
         }
 
+        /// <summary>
+        /// A hop on a silent floor (a rug, a soft room) or masked by a robot: the muffled recorded variants at their own
+        /// mix (audio overhaul), never the one before; a pivot there scrapes at a quarter. Without the muffled recordings,
+        /// the hard hop at a quarter of its volume (M2).
+        /// </summary>
         public void PlaySoftHop()
         {
-            PlayHop(SoftHopVolume);
+            if (!HasSoftHops || hopSources == null)
+            {
+                PlayHop(SoftHopVolume);
+                return;
+            }
+            GameState game = CurrentGame();
+            FurnitureController furniture = game != null ? game.Furniture : null;
+            if (HasScrapes && furniture != null && IsPivot(furniture.PlanarSpeed, furniture.YawRate))
+            {
+                PlayScrape(PivotScrapeMix, SoftHopVolume);
+                return;
+            }
+            AudioSource source = hopSources[nextHopSource];
+            nextHopSource = (nextHopSource + 1) % hopSources.Length;
+            source.pitch = 0.92f + (float)noise.NextDouble() * 0.16f;
+            int v = PickVariant(choice, Library.softHops.Length, LastSoftHopVariant);
+            LastSoftHopVariant = v;
+            AudioLibrary.Entry entry = Library.softHops[v];
+            Play(source, entry.clip, Mix(entry, SoftHopMix));
+            HopsPlayed++;
         }
 
         /// <summary>The inhabitant grabs the chair: a leg scrape (called by the carry watch, and tests).</summary>
@@ -811,7 +932,10 @@ namespace Meuble
             }
             toppleSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
             toppleSource.pitch = (soft ? SoftTopplePitch : 0.95f) + (float)noise.NextDouble() * 0.1f;
-            Play(toppleSource, Topple, ToppleSynthVolume * (soft ? SoftToppleVolume : 1f));
+            // Audio overhaul: the recorded wooden fall when there is one, muffled the same way on a silent floor.
+            AudioLibrary.Entry entry = Recorded(l => l.topple);
+            float scale = soft ? SoftToppleVolume : 1f;
+            Play(toppleSource, entry != null ? entry.clip : Topple, (entry != null ? Mix(entry, ToppleMix) : ToppleSynthVolume) * scale);
             TopplesPlayed++;
         }
 
@@ -823,7 +947,18 @@ namespace Meuble
                 return;
             }
             clickSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
-            Play(clickSource, Click, ClickSynthVolume);
+            // Audio overhaul: the recorded switch when there is one.
+            AudioLibrary.Entry entry = Recorded(l => l.lampClick);
+            if (entry != null)
+            {
+                clickSource.pitch = Jitter();
+                Play(clickSource, entry.clip, Mix(entry, LampClickMix));
+            }
+            else
+            {
+                clickSource.pitch = 1f;
+                Play(clickSource, Click, ClickSynthVolume);
+            }
             ClicksPlayed++;
         }
 
@@ -862,7 +997,9 @@ namespace Meuble
             }
             doorSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
             doorSource.pitch = 0.96f + (float)noise.NextDouble() * 0.08f;
-            Play(doorSource, Door, DoorSynthVolume);
+            // Audio overhaul: the recorded wooden door when there is one.
+            AudioLibrary.Entry entry = Recorded(l => l.doorOpen);
+            Play(doorSource, entry != null ? entry.clip : Door, entry != null ? Mix(entry, DoorMix) : DoorSynthVolume);
             DoorsPlayed++;
         }
 
@@ -904,7 +1041,9 @@ namespace Meuble
             LastCrashPan = Mathf.Clamp(pan, -0.8f, 0.8f);
             crashSource.panStereo = LastCrashPan;
             crashSource.pitch = 0.96f + (float)noise.NextDouble() * 0.08f;
-            Play(crashSource, Crash, CrashSynthVolume);
+            // Audio overhaul: the recorded breaking dishes when there is one.
+            AudioLibrary.Entry entry = Recorded(l => l.crash);
+            Play(crashSource, entry != null ? entry.clip : Crash, entry != null ? Mix(entry, CrashMix) : CrashSynthVolume);
             CrashesPlayed++;
         }
 

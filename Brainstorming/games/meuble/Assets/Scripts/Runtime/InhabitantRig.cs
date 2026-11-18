@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Drives a rigged human model from the inhabitant's routine (docs/CONTRACT_M3.md 5). The model is a visual
@@ -69,7 +69,7 @@ namespace Meuble
         private const float CarryArmSplay = Tuning.RigCarryArmSplay;
 
         // Brows (M3.1), in meters in the face frame (x right, y up, z forward) from the eye centroid. Wanted in Tuning.
-        private static readonly Vector3 BrowSize = new Vector3(0.042f, 0.010f, 0.012f);   // Tuning.RigBrowSize
+        private static readonly Vector3 BrowSize = new Vector3(0.033f, 0.007f, 0.006f);   // Tuning.RigBrowSize
         private static readonly Vector3 BrowOffset = new Vector3(0.032f, 0.030f, 0.016f); // Tuning.RigBrowOffset (x mirrored)
         private const float BrowFlatDegrees = Tuning.RigBrowFlat;       // inner ends slightly up at rest
         private const float BrowFrownDegrees = Tuning.RigBrowFrown;    // inner ends down
@@ -139,6 +139,9 @@ namespace Meuble
 
         /// <summary>The face frame on the head bone: origin at the eyes, meters, x right, y up, z forward.</summary>
         public Transform BrowPivot { get; private set; }
+
+        /// <summary>True when the head textures have been applied to the skinned mesh.</summary>
+        public bool HasPaintedHead { get; private set; }
 
         /// <summary>Animation state names (the glTF clip names), null when the model lacks the clip.</summary>
         public string IdleClipName { get; private set; }
@@ -306,6 +309,15 @@ namespace Meuble
             if (!IsPet)
             {
                 BuildBrows();
+                // M7 faces and clothes (CharacterLook): never at the cost of the rig.
+                try
+                {
+                    CharacterLook.Apply(this);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[InhabitantRig] model '{entry?.id}': CharacterLook failed: {e}");
+                }
             }
             var bones = new System.Collections.Generic.List<Transform>();
             foreach (Transform t in new[] { Spine, UpperArmLeft, LowerArmLeft, UpperArmRight, LowerArmRight, Head })
@@ -397,6 +409,19 @@ namespace Meuble
                 }
             }
             return best;
+        }
+
+        /// <summary>The eyebrows are part of the continuous head artwork. Keep the rig transforms for expression timing.</summary>
+        internal void SetPaintedHead()
+        {
+            HasPaintedHead = true;
+            foreach (Transform brow in new[] { BrowLeft, BrowRight })
+            {
+                if (brow != null && brow.TryGetComponent(out Renderer renderer))
+                {
+                    renderer.forceRenderingOff = true;
+                }
+            }
         }
 
         private void PoseBrows(float frown, float startled)

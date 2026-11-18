@@ -32,7 +32,7 @@
     "memorysetup-job-temp-allocator-block-size-background=1048576"
     "memorysetup-job-temp-allocator-reduction-small-platforms=262144"
     "memorysetup-temp-allocator-size-gfx=262144"
-  sauvegarde de la sonde : C:\Dev\squad-ai\Brainstorming\games\meuble\TestResults\shots\meuble_save_test.json
+  sauvegarde de la sonde : C:\Dev\squad-ai\Brainstorming\games\OutOfSight\TestResults\shots\outofsight_save_test.json
   shader Universal Render Pipeline/Lit         ok
   shader Universal Render Pipeline/Unlit       ok
   renderers 30, sans materiau 0, triangles 3143, materiaux 21, lumieres 1 (ombrees 1)
@@ -87,4 +87,4 @@
   ECHEC le player est sorti avec le code 1
   ROUGE : verification du player
 
-=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults) ===
+=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/OutOfSight/TestResults) ===

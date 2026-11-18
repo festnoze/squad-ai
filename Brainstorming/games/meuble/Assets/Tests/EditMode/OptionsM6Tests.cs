@@ -1,7 +1,7 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M6 (docs/CONTRACT_M6.md 2.1): SaveOptions defaults, clamping (the "OPTIONS_STEP_ROUND" and
@@ -117,10 +117,46 @@ namespace Meuble.Tests
             Assert.IsTrue(parsed.Options.HidesCone);
         }
 
+        // ----- Audio overhaul: the Music option (docs/audio/AUDIO_REPORT.md 5) -----
+
+        [Test]
+        public void Music_DefaultsAndOldSavesGetTheDefault()
+        {
+            Assert.AreEqual(Tuning.MusicDefault, SaveOptions.Default().Music);
+            Assert.AreEqual(70, Tuning.MusicDefault, "the documented default");
+            // A save from before the Music option (an options object without "music"): the default, nothing else moves.
+            string json = "{ \"version\": 1, \"won\": [], \"best\": {}, \"options\": { \"sensitivity\": 1.5, \"volume\": 30, \"cone\": \"never\" } }";
+            SaveData data = SaveData.Parse(json, out string problem);
+            Assert.IsNotNull(data, $"an options object without music must parse: {problem}");
+            Assert.AreEqual(Tuning.MusicDefault, data.Options.Music);
+            Assert.AreEqual(30, data.Options.Volume, "the volume is kept");
+            // No options at all: the default too.
+            SaveData old = SaveData.Parse("{ \"version\": 1 }", out problem);
+            Assert.IsNotNull(old, problem);
+            Assert.AreEqual(Tuning.MusicDefault, old.Options.Music);
+        }
+
+        [Test]
+        public void Music_ClampsRoundsAndRoundTrips()
+        {
+            Assert.AreEqual(70, new SaveOptions { Music = 74 }.Clamped().Music, "74 rounds to the 70 step");
+            Assert.AreEqual(80, new SaveOptions { Music = 76 }.Clamped().Music, "76 rounds to the 80 step");
+            Assert.AreEqual(100, new SaveOptions { Music = 500 }.Clamped().Music);
+            Assert.AreEqual(0, new SaveOptions { Music = -5 }.Clamped().Music);
+            SaveData wrongType = SaveData.Parse("{ \"version\": 1, \"options\": { \"music\": \"loud\" } }", out string problem);
+            Assert.IsNotNull(wrongType, problem);
+            Assert.AreEqual(Tuning.MusicDefault, wrongType.Options.Music, "a non-numeric music keeps the default");
+            var data = new SaveData { Options = new SaveOptions { Music = 40 } };
+            SaveData parsed = SaveData.Parse(data.ToJson(), out problem);
+            Assert.IsNotNull(parsed, problem);
+            Assert.AreEqual(40, parsed.Options.Music);
+            StringAssert.Contains("\"music\": 40", data.ToJson(), "the saved key");
+        }
+
         [Test]
         public void SaveStore_SetOptions_RoundTripsThroughLoad()
         {
-            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "meuble_options_tests_" + System.Guid.NewGuid().ToString("N"));
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "outofsight_options_tests_" + System.Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(dir);
             try
             {

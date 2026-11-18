@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -11,14 +11,17 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
-    /// M4.2 textures probe (steps 22c to 22f) on the real Boot scene, every level of levels.json. The technique under
-    /// test: one URP Lit material per palette colour, its base colour the palette divided by Tuning.DetailMean and its
-    /// base map a flat texture of that mean; a renderer slot shows a grayscale detail of the same mean through a
-    /// MaterialPropertyBlock (PrimitiveKit.Detail). Every step asserts its premise first (the library resolves, the
-    /// level has model visuals and detailed slots), so a Detail that does nothing cannot pass.
+    /// Textures probe (steps 22c to 22f) on the real Boot scene, every level of levels.json. M7 real colours
+    /// (CONTRACT_M7 5, product owner decision of 2026-11-18): every textured surface shows its image in the image's own
+    /// colours through ONE URP Lit material per surface (white base colour, the colour map as base map,
+    /// PrimitiveKit.SurfaceMaterial), tiled through a MaterialPropertyBlock (PrimitiveKit.Detail); the player furniture
+    /// shows the owner's red image (PrimitiveKit.PlayerMaterial) and stays the one saturated red of the frame (PRD 7.2);
+    /// the inhabitants keep the M4.2 rule (palette material, grayscale detail of mean Tuning.DetailMean). Every step
+    /// asserts its premise first (the library resolves, the level has model visuals and textured slots), so a Detail that
+    /// does nothing cannot pass.
     /// </summary>
     public sealed class ProbeTestsM42Look
     {
@@ -26,21 +29,22 @@ namespace Meuble.Tests
         private static readonly int BaseMapSt = Shader.PropertyToID("_BaseMap_ST");
 
         /// <summary>
-        /// "Nothing becomes noisy": the textured start view may have at most this much more fine detail (mean absolute
-        /// difference between neighbour pixels) than the same view flat. Calibrated on the M4.2 shots: about 1.1 to 1.3.
-        /// M6 (CONTRACT_M6 2.4, q28): the player furniture's glossy lacquer is a deliberately bolder grain ("strong
-        /// highlights, the wood grain still visible under it"), measured up to about 1.8 on level1's red chair.
+        /// "A visible pattern, not noise": the textured start view may have at most this much more fine detail (mean
+        /// absolute difference between neighbour pixels) than the same view flat. M7 real colours: the images are meant to
+        /// read as a pattern, so the M4.2 cap (2.0, calm grayscale details) is raised to what a clear but not noisy
+        /// pattern measures, with a margin: 4.2 on level1 (the lawn and the parquet fill the frame), 2.5 on level5
+        /// (CONTRACT_M7 5). Pixel-level noise (an aliasing image, a texture shown without its mipmaps) blows through it.
         /// </summary>
-        private const float MaxDetailGain = 2.0f;
+        private const float MaxDetailGain = 5.0f;
 
-        /// <summary>Premise of the side by side render: the textures add at least this much fine detail, or they do not show.</summary>
-        private const float MinDetailGain = 1.02f;
+        /// <summary>The images must show: the textured view has at least this much more fine detail than the flat one.</summary>
+        private const float MinDetailGain = 1.1f;
 
-        /// <summary>The player furniture's rendered colour, textured against flat: at most this hue shift (degrees).</summary>
-        private const float MaxHueShift = 4f;
-
-        /// <summary>... and at most this relative change of its mean value and saturation.</summary>
-        private const float MaxShadeChange = 0.06f;
+        /// <summary>
+        /// PRD 7.2 in the rendered start view: of every red pixel of the frame (ModelMath.IsRed), at least this fraction lies
+        /// on the player furniture's screen box (the floor, walls and props in their real colours must never read as red).
+        /// </summary>
+        private const float MinPlayerRedShare = 0.85f;
 
         private Main main;
         private GameState Game => main.Game;
@@ -133,6 +137,12 @@ namespace Meuble.Tests
                     }
                     r.GetPropertyBlock(block, i);
                     Texture texture = block.isEmpty ? null : block.GetTexture(BaseMap);
+                    // M7 faces (CharacterLook): the head and garment surfaces show the product owner's prints, not
+                    // a library detail; Step22c checks the humans wear them.
+                    if (CharacterLook.IsCharacterTexture(texture))
+                    {
+                        continue;
+                    }
                     slots.Add(new Slot
                     {
                         Renderer = r,
@@ -153,16 +163,23 @@ namespace Meuble.Tests
             return $"{parent}/{s.Renderer.name}[{s.Index}] ({s.Material.name})";
         }
 
-        /// <summary>The library resolves a texture for every textured surface (the premise of every step).</summary>
+        /// <summary>
+        /// The library resolves a detail and a colour map for every textured surface, and the player's own colour map
+        /// (the premise of every step).
+        /// </summary>
         private static void AssertLibrary()
         {
             TextureLibrary library = TextureLibrary.Load();
             Assert.IsNotNull(library, $"premise: no Resources/{TextureLibrary.ResourcePath}");
             foreach (Surface s in TextureLibrary.Textured)
             {
-                Assert.IsNotNull(TextureLibrary.TextureOf(s), $"premise: the library has no texture for {s}");
+                Assert.IsNotNull(TextureLibrary.TextureOf(s), $"premise: the library has no detail for {s}");
+                Assert.IsNotNull(TextureLibrary.ColourOf(s), $"premise: the library has no colour map for {s}");
             }
+            Assert.IsNotNull(TextureLibrary.PlayerColour, "premise: the library has no player colour map");
         }
+
+        private static bool OnInhabitant(Slot s) => s.Renderer.GetComponentInParent<Inhabitant>() != null;
 
         /// <summary>
         /// The surface each slot of every model visual must show, by the name of its source material in the catalog
@@ -265,11 +282,13 @@ namespace Meuble.Tests
         // ----- 22c -----
 
         /// <summary>
-        /// On every level: every URP Lit slot shows its detail texture, except the few that must stay plain; floors are
-        /// parquet (hard) or carpet (soft), wall faces and caps plaster, rugs and the doormat carpet; each prop, the
+        /// On every level: every URP Lit slot shows its texture, except the few that must stay plain; floors are
+        /// parquet (hard), carpet (soft) or tile, wall faces and caps plaster, rugs and the doormat carpet; each prop, the
         /// player body and the decoys show the surfaces of what they are made of; every model slot shows the surface of
         /// its source material, so the inhabitants' clothes are linen and their skin plain, on a skinned mesh that now
-        /// has UVs. The budgets of PRD 7.4 hold (materials are still one per palette colour).
+        /// has UVs. M7 real colours (CONTRACT_M7 5): outside the inhabitants, every textured slot shows a colour map
+        /// through its surface's one white-based material, the player furniture through its own red one, and no other
+        /// slot shows the player's red image. The budgets of PRD 7.4 hold (one material per surface now).
         /// </summary>
         [UnityTest]
         public IEnumerator Step22c_EveryMaterialHasItsDetailTexture()
@@ -277,6 +296,8 @@ namespace Meuble.Tests
             AssertLibrary();
             Assert.GreaterOrEqual(Game.LevelOrder.Count, 7, "premise: levels.json lists the seven levels");
             var table = new List<string>();
+            // The head image of each gender (keyed by "female"): one shared texture, whatever the character.
+            var heads = new Dictionary<bool, Texture>();
             foreach (string id in Game.LevelOrder.ToList())
             {
                 yield return LoadLevel(id);
@@ -287,6 +308,7 @@ namespace Meuble.Tests
                 Dictionary<(Renderer, int), Surface> models = ExpectedModelSurfaces(level);
 
                 int detailed = 0;
+                int coloured = 0;
                 var missing = new List<string>();
                 foreach (Slot s in slots)
                 {
@@ -295,6 +317,25 @@ namespace Meuble.Tests
                         detailed++;
                         Assert.AreNotEqual(Surface.Plain, s.Surface, $"{id}: {Label(s)} shows a texture that is not in the library ({s.Texture.name})");
                         Assert.Greater(s.St.x, 0f, $"{id}: {Label(s)} has no tiling");
+                        if (!OnInhabitant(s))
+                        {
+                            // M7 real colours: the image in its own colours, under its surface's one white-based material.
+                            Assert.IsTrue(TextureLibrary.IsColourMap(s.Texture), $"{id}: {Label(s)} shows {s.Texture.name}, not its image in real colours");
+                            bool mine = s.Renderer.transform.IsChildOf(Game.Furniture.transform);
+                            Material want = s.Texture == TextureLibrary.PlayerColour
+                                ? PrimitiveKit.PlayerMaterial(PrimitiveKit.PaletteOf(s.Material) ?? Color.clear)
+                                : PrimitiveKit.SurfaceMaterial(s.Surface);
+                            Assert.AreSame(want, s.Material, $"{id}: {Label(s)} is not drawn with its surface's one material");
+                            Assert.IsTrue(s.Texture != TextureLibrary.PlayerColour || mine, $"{id}: {Label(s)} shows the player's red image (PRD 7.2)");
+                            Color baseColour = s.Material.GetColor("_BaseColor");
+                            Assert.That(Mathf.Min(baseColour.r, Mathf.Min(baseColour.g, baseColour.b)), Is.EqualTo(1f).Within(1e-4f),
+                                $"{id}: {Label(s)}: the base colour is not white, the image's colours are tinted");
+                            coloured++;
+                        }
+                        else
+                        {
+                            Assert.IsFalse(TextureLibrary.IsColourMap(s.Texture), $"{id}: {Label(s)}: an inhabitant keeps its palette colour (CharacterLook)");
+                        }
                     }
                     if (models.TryGetValue((s.Renderer, s.Index), out Surface wanted))
                     {
@@ -314,6 +355,7 @@ namespace Meuble.Tests
                 }
                 CollectionAssert.IsEmpty(missing, $"{id}: Lit slots without their detail texture");
                 Assert.Greater(detailed, slots.Count / 2, $"{id}: only {detailed} of {slots.Count} slots show a detail");
+                Assert.Greater(coloured, slots.Count / 3, $"{id}: only {coloured} of {slots.Count} slots show an image in real colours");
 
                 // Floors, walls, caps.
                 bool soft = Game.Def.AllRooms().Any(r => r.IsSoft);
@@ -366,16 +408,20 @@ namespace Meuble.Tests
                 List<Slot> player = LitSlots(Game.Furniture.transform);
                 Assert.Greater(player.Count, 0, $"{id}: premise: the player furniture has no Lit slot");
                 Assert.IsTrue(player.Any(s => s.Surface == BodySurface[body]), $"{id}: the {body} shows no {BodySurface[body]}");
-                // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
-                Material red = PrimitiveKit.LitSurface(LevelJson.ParseColor(Game.Def.Player.Color, Color.red), Surface.Lacquer);
+                // M7 real colours (CONTRACT_M7 5): the player's own furniture shows the owner's red image (PlayerMaterial).
+                Material red = PrimitiveKit.PlayerMaterial(LevelJson.ParseColor(Game.Def.Player.Color, Color.red));
                 Assert.IsTrue(player.Any(s => s.Material == red), $"{id}: premise: the player furniture is not in the player colour");
-                Assert.IsTrue(player.Where(s => s.Material == red).All(s => s.Texture != null), $"{id}: a slot of the player colour shows no detail");
+                Assert.IsTrue(player.Where(s => s.Material == red).All(s => s.Texture == TextureLibrary.PlayerColour),
+                    $"{id}: a slot of the player colour does not show the player's red image");
                 foreach (Decoy decoy in level.Decoys)
                 {
-                    Assert.IsTrue(LitSlots(decoy.transform).Any(s => s.Texture != null), $"{id}: decoy {decoy.Id} shows no detail");
+                    // A decoy is the player's furniture kind in real colours, never its red (PRD 7.2).
+                    List<Slot> decoySlots = LitSlots(decoy.transform);
+                    Assert.IsTrue(decoySlots.Any(s => s.Texture != null), $"{id}: decoy {decoy.Id} shows no detail");
+                    Assert.IsFalse(decoySlots.Any(s => s.Texture == TextureLibrary.PlayerColour), $"{id}: decoy {decoy.Id} shows the player's red image");
                 }
 
-                // The inhabitants: UVs generated in place on the prefab's own mesh, clothes linen, skin plain.
+                // Humans share a projected mesh derived from the selected catalog model.
                 foreach (Inhabitant h in level.Inhabitants)
                 {
                     var skin = h.GetComponentInChildren<SkinnedMeshRenderer>(true);
@@ -396,13 +442,44 @@ namespace Meuble.Tests
                         continue; // the dog has no clothes: its fur shows no detail (watchers, M5)
                     }
                     Mesh prefabMesh = entry.prefab.GetComponentInChildren<SkinnedMeshRenderer>(true).sharedMesh;
-                    Assert.AreSame(prefabMesh, mesh, $"{id}: {h.name} no longer draws the catalog prefab's own mesh (UVs must be added in place)");
-                    List<Slot> worn = LitSlots(h.transform).Where(s => s.Renderer == skin).ToList();
-                    Assert.IsTrue(worn.Any(s => s.Surface == Surface.Linen), $"{id}: {h.name}'s clothes show no linen");
+                    Assert.IsTrue(CharacterLook.UsesProjection(prefabMesh, mesh), $"{id}: {h.name} uses the wrong projected mesh");
+                    CollectionAssert.AreEqual(prefabMesh.bindposes, mesh.bindposes, $"{id}: {h.name}'s binding was changed");
+                    // M7 faces (CharacterLook): the shirt and trousers show the clothes prints instead of the linen, in
+                    // their real colours (a white base colour; the personality's colour is banded into its own copy).
+                    var garment = new MaterialPropertyBlock();
+                    bool dressed = false;
+                    for (int slot = 0; slot < skin.sharedMaterials.Length; slot++)
+                    {
+                        skin.GetPropertyBlock(garment, slot);
+                        dressed |= !garment.isEmpty && CharacterLook.IsClothesTexture(garment.GetTexture(BaseMap))
+                            && garment.GetColor("_BaseColor") == Color.white;
+                    }
+                    Assert.IsTrue(dressed, $"{id}: {h.name}'s clothes show no print");
+                    Assert.IsTrue(h.Rig.HasPaintedHead, $"{id}: {h.name} has no painted head");
                     Material[] sources = entry.prefab.GetComponentInChildren<SkinnedMeshRenderer>(true).sharedMaterials;
                     int skinSlot = Array.FindIndex(sources, m => m.name == "Skin");
                     Assert.GreaterOrEqual(skinSlot, 0, $"premise: {entry.id} has a Skin material");
-                    Assert.AreEqual(Surface.Plain, worn.First(s => s.Index == skinSlot).Surface, $"{id}: {h.name}'s skin shows a detail");
+                    skin.GetPropertyBlock(garment, skinSlot);
+                    Texture portrait = garment.GetTexture(BaseMap);
+                    Assert.AreEqual(Surface.Plain, TextureLibrary.SurfaceOf(portrait), $"{id}: {h.name}'s skin uses an environment texture");
+                    Assert.IsTrue(CharacterLook.IsCharacterTexture(portrait), $"{id}: {h.name}'s skin shows no portrait");
+                    // The product owner's head image in its own colours: a white base colour and the same image for
+                    // every head of a gender, so no character gets its own skin or hair colour.
+                    Assert.AreEqual(Color.white, garment.GetColor("_BaseColor"), $"{id}: {h.name}'s head image is tinted");
+                    bool female = CharacterLook.IsFemale(entry);
+                    if (heads.TryGetValue(female, out Texture shared))
+                    {
+                        Assert.AreSame(shared, portrait, $"{id}: {h.name}'s head image differs from the other {(female ? "women" : "men")}'s");
+                    }
+                    else
+                    {
+                        heads[female] = portrait;
+                    }
+                    Vector3[] normals = mesh.normals;
+                    int[] head = mesh.GetTriangles(skinSlot).Where(vertex => uv[vertex].y > 0.05f).Distinct().ToArray();
+                    Assert.IsNotEmpty(head, $"{id}: {h.name}'s skin has no wrapped head vertices");
+                    Assert.IsTrue(head.All(vertex => normals[vertex].sqrMagnitude > 0.9f),
+                        $"{id}: {h.name}'s head contains unlit vertices with missing normals");
                 }
 
                 Renderer[] drawn = level.Root.GetComponentsInChildren<Renderer>(false);
@@ -435,38 +512,51 @@ namespace Meuble.Tests
         // ----- 22d -----
 
         /// <summary>
-        /// The palette colour is kept. Numerically: every detail texture's mean is Tuning.DetailMean, and every Lit
-        /// material's base colour times that mean is its palette colour, its base map the flat map of that mean.
-        /// Rendered: on level 1 (the red chair, the blue sofa) and level 5 (the red armchair), the start view is
-        /// rendered textured, then flat (TextureLibrary.Disabled, the same level rebuilt at the same step): the red
-        /// and blue pixels keep their hue, value and saturation; the textured view has more fine detail than the flat
-        /// one (the textures show) but not much more (nothing becomes noisy).
+        /// M7 real colours (CONTRACT_M7 5, product owner decision of 2026-11-18). Numerically: each textured surface's one
+        /// material has a white base colour, its own sRGB colour map as base map and its surface's finish; the player's
+        /// material has a white base colour, the owner's red image and the painted metal finish, and that image reads as
+        /// red. Rendered: on level 1 (the red chair) and level 5 (the red armchair), the start view is rendered textured,
+        /// then flat (TextureLibrary.Disabled: the palette materials and no image, the same level rebuilt at the same
+        /// step): the textured view has clearly more fine detail than the flat one (the images read as a pattern) but stays
+        /// under the noise cap, and the player furniture is still the one saturated red region of the frame: nearly every
+        /// red pixel of the textured view lies on it, and its red is saturated.
         /// </summary>
         [UnityTest]
-        public IEnumerator Step22d_PaletteColourIsKept()
+        public IEnumerator Step22d_ImageColoursShowAndThePlayerStaysTheRedOne()
         {
             AssertLibrary();
-            foreach (TextureLibrary.Entry e in TextureLibrary.Load().entries)
+            foreach (Surface s in TextureLibrary.Textured)
             {
-                Assert.That(e.mean, Is.EqualTo(Tuning.DetailMean).Within(Tuning.DetailMeanTolerance), $"{e.surface}: mean of {e.texture.name}");
+                Material m = PrimitiveKit.SurfaceMaterial(s);
+                Assert.IsNotNull(m, $"{s}: no colour material");
+                Assert.AreSame(TextureLibrary.ColourOf(s), m.GetTexture(BaseMap), $"{s}: its material does not show its colour map");
+                AssertWhite(m, s.ToString());
+                Assert.IsTrue(TextureLibrary.ColourFinishOf(s, out float smoothness, out float metallic), $"{s}: no finish");
+                Assert.That(m.GetFloat("_Smoothness"), Is.EqualTo(smoothness).Within(1e-4f), $"{s}: smoothness");
+                Assert.That(m.GetFloat("_Metallic"), Is.EqualTo(metallic).Within(1e-4f), $"{s}: metallic");
+                Color? mean = TextureLibrary.MeanColourOf(TextureLibrary.ColourOf(s));
+                Assert.IsTrue(mean.HasValue && mean.Value.maxColorComponent > 0.005f, $"{s}: the colour map's mean colour was not measured");
+                // PRD 7.2: no surface image may read as the player's red.
+                Assert.IsFalse(ModelMath.IsRed(mean.Value.gamma), $"{s}: its image reads as red ({Hex(mean.Value.gamma)})");
             }
-            Assert.That(TextureLibrary.MeanOf(TextureLibrary.Flat), Is.EqualTo(Tuning.DetailMean).Within(1e-4f), "the flat map");
+            Color? playerMean = TextureLibrary.MeanColourOf(TextureLibrary.PlayerColour);
+            Assert.IsTrue(playerMean.HasValue, "premise: the player colour map's mean colour was not measured");
+            Assert.IsTrue(ModelMath.IsRed(playerMean.Value.gamma), $"the player's image does not read as red ({Hex(playerMean.Value.gamma)})");
 
             int checkedMaterials = 0;
             foreach (string id in new[] { "level1", "level5" })
             {
                 yield return LoadLevel(id);
-                foreach (Material m in LitSlots(Game.Level.Root.transform).Select(s => s.Material).Distinct())
+                Material playerMaterial = PrimitiveKit.PlayerMaterial(LevelJson.ParseColor(Game.Def.Player.Color, Color.red));
+                Assert.IsNotNull(playerMaterial, $"{id}: no player material");
+                Assert.AreSame(TextureLibrary.PlayerColour, playerMaterial.GetTexture(BaseMap), $"{id}: the player material does not show the red image");
+                AssertWhite(playerMaterial, id + " player");
+                Assert.That(playerMaterial.GetFloat("_Smoothness"), Is.EqualTo(Tuning.PlayerSmoothness).Within(1e-4f), $"{id}: player smoothness");
+                Assert.That(playerMaterial.GetFloat("_Metallic"), Is.EqualTo(Tuning.PlayerMetallic).Within(1e-4f), $"{id}: player metallic");
+                // Every material that shows an image outside the inhabitants is a white-based colour material.
+                foreach (Material m in LitSlots(Game.Level.Root.transform).Where(s => s.Texture != null && !OnInhabitant(s)).Select(s => s.Material).Distinct())
                 {
-                    Color? palette = PrimitiveKit.PaletteOf(m);
-                    Assert.IsTrue(palette.HasValue, $"{id}: {m.name} is not a PrimitiveKit material");
-                    Assert.AreSame(TextureLibrary.Flat, m.GetTexture(BaseMap), $"{id}: {m.name}'s base map is not the flat map");
-                    Color baseLinear = m.GetColor("_BaseColor").linear;
-                    Color want = palette.Value.linear;
-                    for (int c = 0; c < 3; c++)
-                    {
-                        Assert.That(baseLinear[c] * Tuning.DetailMean, Is.EqualTo(want[c]).Within(0.004f), $"{id}: {m.name} channel {c}");
-                    }
+                    AssertWhite(m, $"{id}: {m.name}");
                     checkedMaterials++;
                 }
 
@@ -476,7 +566,6 @@ namespace Meuble.Tests
                 int width = 640;
                 int height = 360;
                 Rect player = default;
-                Rect sofa = default;
                 foreach (bool flat in new[] { false, true })
                 {
                     TextureLibrary.Disabled = flat;
@@ -492,13 +581,10 @@ namespace Meuble.Tests
                     }
                     else
                     {
-                        Assert.Greater(all.Count(s => s.Texture != null), 20, $"{id}: premise: few detailed slots");
+                        Assert.Greater(all.Count(s => s.Texture != null), 20, $"{id}: premise: few textured slots");
                     }
                     Camera cam = main.Camera;
-                    player = ScreenBox(cam, Game.Furniture.transform, width, height);
-                    Transform sofaProp = Game.Def.Props.Where(p => p.Kind == "sofa" && !string.IsNullOrEmpty(p.Model))
-                        .Select(p => Game.Level.Root.transform.Find(p.Name)).FirstOrDefault();
-                    sofa = sofaProp != null ? ScreenBox(cam, sofaProp, width, height) : default;
+                    Rect box = ScreenBox(cam, Game.Furniture.transform, width, height);
                     Color32[] pixels = RenderPixels(cam, width, height);
                     if (flat)
                     {
@@ -507,65 +593,63 @@ namespace Meuble.Tests
                     else
                     {
                         textured = pixels;
+                        player = box;
                     }
                 }
                 TextureLibrary.Disabled = false;
 
                 float gain = FineDetail(textured, width, height) / Mathf.Max(1e-4f, FineDetail(plain, width, height));
                 Debug.Log($"[Step22d] {id}: fine detail textured / flat = {gain:0.000}");
-                Assert.Greater(gain, MinDetailGain, $"{id}: the textured view has no more fine detail than the flat one: the details do not show");
+                Assert.Greater(gain, MinDetailGain, $"{id}: the textured view has hardly more fine detail than the flat one: the images do not show");
                 Assert.Less(gain, MaxDetailGain, $"{id}: the textured view is noisy ({gain:0.00} times the fine detail of the flat one)");
-
-                AssertColourKept(textured, plain, width, height, player, c => ModelMath.IsRed(c), id + " player furniture (red)");
-                if (sofa.width > 0f)
-                {
-                    AssertColourKept(textured, plain, width, height, sofa, c => IsBlue(c), id + " sofa (blue)");
-                }
+                AssertPlayerIsTheRedOne(textured, width, height, player, id);
             }
-            Assert.Greater(checkedMaterials, 20, "premise: few materials checked");
+            Assert.Greater(checkedMaterials, 5, "premise: few colour materials checked");
             CollectionAssert.IsEmpty(errors, "no error logged");
         }
 
-        private static bool IsBlue(Color c)
+        private static void AssertWhite(Material m, string label)
         {
-            Color.RGBToHSV(c, out float h, out float s, out float v);
-            return h * 360f > 190f && h * 360f < 240f && s > 0.35f && v > 0.25f;
+            Color c = m.GetColor("_BaseColor");
+            Assert.That(Mathf.Min(c.r, Mathf.Min(c.g, c.b)), Is.EqualTo(1f).Within(1e-4f), $"{label}: base colour {Hex(c)} is not white: the image's own colours are tinted");
         }
 
         /// <summary>
-        /// The pixels of <paramref name="box"/> that pass <paramref name="isColour"/> in the flat render: their mean colour
-        /// in the textured render keeps its hue, value and saturation, and still passes the test.
+        /// PRD 7.2 on the rendered frame: the red pixels (ModelMath.IsRed) are found on the player furniture's screen box
+        /// (<paramref name="box"/>), at least <see cref="MinPlayerRedShare"/> of all of them, and their mean is a saturated red.
         /// </summary>
-        private static void AssertColourKept(Color32[] textured, Color32[] plain, int width, int height, Rect box, Func<Color, bool> isColour, string label)
+        private static void AssertPlayerIsTheRedOne(Color32[] pixels, int width, int height, Rect box, string label)
         {
-            Color sumT = Color.clear;
-            Color sumF = Color.clear;
-            int n = 0;
-            for (int y = Mathf.Max(0, (int)box.yMin); y < Mathf.Min(height, (int)box.yMax); y++)
+            int inside = 0;
+            int outside = 0;
+            Color sum = Color.clear;
+            for (int y = 0; y < height; y++)
             {
-                for (int x = Mathf.Max(0, (int)box.xMin); x < Mathf.Min(width, (int)box.xMax); x++)
+                for (int x = 0; x < width; x++)
                 {
-                    int i = y * width + x;
-                    if (!isColour(plain[i]))
+                    Color32 p = pixels[y * width + x];
+                    if (!ModelMath.IsRed(p))
                     {
                         continue;
                     }
-                    sumT += textured[i];
-                    sumF += plain[i];
-                    n++;
+                    if (box.Contains(new Vector2(x + 0.5f, y + 0.5f)))
+                    {
+                        inside++;
+                        sum += p;
+                    }
+                    else
+                    {
+                        outside++;
+                    }
                 }
             }
-            Assert.Greater(n, 40, $"{label}: premise: only {n} pixels of that colour in the flat render ({box})");
-            Color t = sumT / n;
-            Color f = sumF / n;
-            Color.RGBToHSV(t, out float ht, out float st, out float vt);
-            Color.RGBToHSV(f, out float hf, out float sf, out float vf);
-            float hue = Mathf.Abs(Mathf.DeltaAngle(ht * 360f, hf * 360f));
-            Debug.Log($"[Step22d] {label}: {n} px, flat {Hex(f)} textured {Hex(t)}, hue shift {hue:0.0} deg, value {vt / vf:0.000}, saturation {st / sf:0.000}");
-            Assert.Less(hue, MaxHueShift, $"{label}: hue shift");
-            Assert.That(vt / vf, Is.EqualTo(1f).Within(MaxShadeChange), $"{label}: value");
-            Assert.That(st / sf, Is.EqualTo(1f).Within(MaxShadeChange), $"{label}: saturation");
-            Assert.IsTrue(isColour(t), $"{label}: the textured mean colour {Hex(t)} no longer reads as that colour");
+            float share = inside / (float)Mathf.Max(1, inside + outside);
+            Color mean = inside > 0 ? sum / inside : Color.clear;
+            Color.RGBToHSV(mean, out _, out float saturation, out _);
+            Debug.Log($"[Step22d] {label}: {inside} red px on the player furniture, {outside} elsewhere (share {share:0.000}), its mean red {Hex(mean)}, saturation {saturation:0.00}");
+            Assert.Greater(inside, 40, $"{label}: premise: the player furniture shows only {inside} red pixels ({box})");
+            Assert.GreaterOrEqual(share, MinPlayerRedShare, $"{label}: {outside} red pixels lie off the player furniture (it is no longer the one red thing, PRD 7.2)");
+            Assert.Greater(saturation, 0.6f, $"{label}: the player furniture's red is washed out ({Hex(mean)})");
         }
 
         private static string Hex(Color c) => "#" + ColorUtility.ToHtmlStringRGB(c);
@@ -706,7 +790,8 @@ namespace Meuble.Tests
             Debug.Log("[Step22e] worst relative error per surface: " + string.Join(", ", worst.Select(p => $"{p.Key} {p.Value:0.000}")));
             Assert.Greater(measured, 100, "premise: few detailed slots measured");
             Assert.Greater(sized, 50, "premise: few PrimitiveKit boxes and quads checked against 1 / tile");
-            Assert.Greater(skinnedSlots, 6, "premise: few skinned slots checked against their scale");
+            // M7 faces: the garments left the library details (CharacterLook); the socks still show linen.
+            Assert.Greater(skinnedSlots, 0, "premise: no skinned slot checked against its scale");
             // M6 (CONTRACT_M6 2.4): Soil is never level data (only LoadView's "plant" load reaches it, and no shipped
             // level sets player.load to "plant"; ProbeTestsM6Textures.Step50b_ exercises it directly), so it alone is
             // never seen here.
@@ -749,11 +834,25 @@ namespace Meuble.Tests
 
         // ----- 22f -----
 
+        /// <summary>A shipped colour map: its own texture, sRGB, mipmapped, repeating, compressed, at most 512 px, not readable.</summary>
+        private static void AssertColourMap(Texture2D t, string label, HashSet<Texture2D> seen)
+        {
+            Assert.IsNotNull(t, $"{label}: no colour map");
+            Assert.IsTrue(seen.Add(t), $"{label}: its colour map is another texture of the library");
+            Assert.LessOrEqual(Mathf.Max(t.width, t.height), 512, $"{label}: {t.width} px");
+            Assert.Greater(t.mipmapCount, 5, $"{label}: colour map mipmaps");
+            Assert.AreEqual(TextureWrapMode.Repeat, t.wrapMode, $"{label}: colour map wrap");
+            Assert.IsFalse(t.isReadable, $"{label}: colour map CPU readable (twice the memory)");
+            Assert.IsTrue(GraphicsFormatUtility.IsSRGBFormat(t.graphicsFormat), $"{label}: the colour map is linear ({t.graphicsFormat}); its texels are sRGB colours");
+            Assert.IsTrue(GraphicsFormatUtility.IsCompressedFormat(t.graphicsFormat), $"{label}: colour map not compressed ({t.graphicsFormat})");
+        }
+
         /// <summary>
-        /// What ships: the library in Resources holds one texture per textured surface, each linear (a multiplier, not a
-        /// colour), mipmapped, repeating, compressed for the platform, at most 512 px and not CPU readable (light enough for
-        /// mobile); its measured mean is the detail mean. A missing texture is reported as an error, never silently flat:
-        /// the built player's probe fails on any logged error.
+        /// What ships: the library in Resources holds, per textured surface, a grayscale detail (linear: a multiplier, not
+        /// a colour; its measured mean the detail mean) and, M7 real colours, an sRGB colour map, plus the player's own
+        /// colour map; all mipmapped, repeating, compressed for the platform, at most 512 px and not CPU readable (light
+        /// enough for mobile). A missing texture is reported as an error, never silently flat: the built player's probe
+        /// fails on any logged error.
         /// </summary>
         [UnityTest]
         public IEnumerator Step22f_LibraryShipsLinearCompressedMipmappedTextures()
@@ -777,7 +876,14 @@ namespace Meuble.Tests
                 Assert.That(e.mean, Is.EqualTo(Tuning.DetailMean).Within(Tuning.DetailMeanTolerance), $"{s}: mean");
                 Assert.IsFalse(string.IsNullOrEmpty(e.source), $"{s}: no source asset");
                 StringAssert.Contains(e.source, t.name, $"{s}: the texture is not derived from {e.source}");
+                // M7 real colours (CONTRACT_M7 5): the colour map, sRGB (it is a colour), otherwise shipped as the detail.
+                AssertColourMap(e.colour, s.ToString(), seen);
+                StringAssert.Contains(e.source, e.colour.name, $"{s}: the colour map is not prepared from {e.source}");
+                Assert.AreEqual(s, TextureLibrary.SurfaceOf(e.colour), $"{s}: its colour map is not recognised");
             }
+            AssertColourMap(library.playerColour, "player", seen);
+            Assert.IsFalse(string.IsNullOrEmpty(library.playerSource), "player: no source asset");
+            Assert.AreEqual(Surface.Lacquer, TextureLibrary.SurfaceOf(library.playerColour), "the player's image replaces its lacquer");
             Assert.AreEqual(Surface.Plain, TextureLibrary.SurfaceOf(TextureLibrary.Flat), "the flat map is no detail");
             Assert.AreEqual(0f, TextureLibrary.TileMetres(Surface.Plain));
 

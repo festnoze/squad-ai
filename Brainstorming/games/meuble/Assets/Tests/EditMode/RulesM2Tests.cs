@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// docs/CONTRACT_M2.md 3.3 and 10: the creak gauge, driven like GameState drives it, one call per fixed

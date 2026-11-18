@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 4.1): the difficulty option, one table of data rows like <see cref="PersonalityDef"/>.

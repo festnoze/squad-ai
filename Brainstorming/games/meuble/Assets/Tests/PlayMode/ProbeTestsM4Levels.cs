@@ -3,14 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M4 levels probe (docs/CONTRACT_M4.md 2, 4, amendments 9.5 and 9.13), on the real Boot scene.
@@ -362,8 +362,8 @@ namespace Meuble.Tests
                     Assert.AreEqual(0, roots.Count, label + ": no model");
                     Assert.Greater(f.GetComponentsInChildren<MeshRenderer>(true).Length, 0, label + ": no procedural visual");
                 }
-                // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
-                Assert.IsTrue(f.GetComponentsInChildren<Renderer>(true).Any(r => r.sharedMaterials.Contains(PrimitiveKit.LitSurface(red, Surface.Lacquer))),
+                // M7 real colours (CONTRACT_M7 5): the player's own furniture shows the owner's red image (PlayerMaterial).
+                Assert.IsTrue(f.GetComponentsInChildren<Renderer>(true).Any(r => r.sharedMaterials.Contains(PrimitiveKit.PlayerMaterial(red))),
                     label + ": nothing is in the player colour");
                 long triangles = Probe.TrianglesUnder(f.transform);
                 Assert.Greater(triangles, 0, label + ": premise: triangles are counted");
@@ -444,7 +444,8 @@ namespace Meuble.Tests
             Game.Restart();
             yield return Steps(2);
             Assert.AreEqual(BodyKinds.All.Length, Game.Level.Decoys.Count, "premise: the decoys were built");
-            Material red = PrimitiveKit.Lit(LevelJson.ParseColor(Game.Def.Player.Color, Color.red));
+            // M7 real colours (CONTRACT_M7 5): the player's red is its own material (the owner's red image).
+            Material red = PrimitiveKit.PlayerMaterial(LevelJson.ParseColor(Game.Def.Player.Color, Color.red));
             for (int i = 0; i < BodyKinds.All.Length; i++)
             {
                 string kind = BodyKinds.All[i];

@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// PRD 4.1, per inhabitant and per fixed step: the furniture is seen when at least one of its five

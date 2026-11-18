@@ -2,14 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// The M5 game probe, wave 5A (docs/CONTRACT_M5.md 3, 12 and 16; CONTRACT_M5_v3.md 3, 4, 15.1, 15.2, 15.5 and 15.6), on the
@@ -2062,7 +2062,7 @@ namespace Meuble.Tests
         /// chair's first hop lands about 2.4 m from it: masked (no Hop noise event, a NoiseMasked one, Temoin 1.4 m away hears
         /// nothing); about 2.6 m away it is emitted and heard. A creak 1.4 m from the robot is never masked: it is emitted and
         /// alerts a listener. Every rebuilt level gives its robot one hum source (looping the hum), whose volume follows the
-        /// furniture's distance to the robot (<see cref="Meuble.Sfx.HumVolumeAt"/>), full near it and silent past the rolloff.
+        /// furniture's distance to the robot (<see cref="OutOfSight.Sfx.HumVolumeAt"/>), full near it and silent past the rolloff.
         /// </summary>
         [UnityTest]
         [Timeout(300000)]
@@ -2114,12 +2114,12 @@ namespace Meuble.Tests
         /// <summary>The robot's hum source loops the hum at the volume of the furniture's planar distance to the robot.</summary>
         private void AssertHum(Robot robot)
         {
-            AudioSource source = Meuble.Sfx.HumOf(robot);
+            AudioSource source = OutOfSight.Sfx.HumOf(robot);
             Assert.IsNotNull(source, "the robot has no hum source");
             Assert.AreSame(Game.Sfx.Hum, source.clip, "the robot's source does not play the hum");
             Assert.IsTrue(source.loop, "the hum does not loop");
             float d = Planar(robot.Position, Chair.transform.position);
-            float expected = Meuble.Sfx.HumVolumeAt(d);
+            float expected = OutOfSight.Sfx.HumVolumeAt(d);
             Assert.AreEqual(expected, source.volume, 1e-4f, $"the hum's volume with the furniture {d:0.00} m from the robot");
             if (d < Tuning.SfxHumMaxDistance - 0.1f)
             {

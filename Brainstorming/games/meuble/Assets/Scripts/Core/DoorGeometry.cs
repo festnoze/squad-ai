@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 3 and 15.2): the geometry of a door leaf, shared by DoorLeaf, the validator, the level

@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M7 lighting polish (docs/CONTRACT_M7.md 1.1, polish round 2). Step60a_ guards what the before/after shots
@@ -55,7 +55,11 @@ namespace Meuble.Tests
             }
         }
 
-        /// <summary>The HSV saturation of a renderer's own _BaseColor, or -1 for a material without one (never black).</summary>
+        /// <summary>
+        /// The HSV saturation of a renderer's own colour, or -1 for a material without one (never black). M7 real colours
+        /// (CONTRACT_M7 5): a white base colour now shows an image, so the colour is the base colour times the mean of the
+        /// image the slot shows (PrimitiveKit.ShownColour).
+        /// </summary>
         private static float Saturation(Renderer r)
         {
             Material m = r != null ? r.sharedMaterial : null;
@@ -63,7 +67,7 @@ namespace Meuble.Tests
             {
                 return -1f;
             }
-            Color.RGBToHSV(m.GetColor("_BaseColor"), out _, out float s, out float v);
+            Color.RGBToHSV(PrimitiveKit.ShownColour(r, 0), out _, out float s, out float v);
             return v > 0.02f ? s : -1f;
         }
 

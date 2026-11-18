@@ -24,6 +24,9 @@ games/*/*.unity.queue
 games/*/scratchpad/
 games/*/smoke/
 games/*/.utmp/
+# Unity Test Framework / Performance Testing leftovers, regenerated on every test run
+games/*/Assets/InitTestScene*.unity
+games/*/Assets/Resources/PerformanceTestRun*.json
 # Generated benchmark projects with their own git repository
 Autospec/workspace_bench/2026-11-02/c/B1-131855/slugify-lib-c5307449/
 Autospec/workspace_bench/2026-11-02/c/B2-132947/todo-cli-5f23649b/

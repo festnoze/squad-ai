@@ -1,5 +1,9 @@
 # M3 audio shortlist - free CC0 recordings
 
+> Superseded for the shipped files on 2026-11-18 by the audio overhaul ([audio/AUDIO_REPORT.md](audio/AUDIO_REPORT.md)):
+> the same picks plus new ones are now made by `tools/audio/audio_pipeline.py` (LUFS based loudness matching, true peak
+> ceiling), and the game has music. The scouting and licence evidence below still applies to the M3 picks.
+
 Status: scouting done on 2026-11-11, nothing imported into `Assets/`. Scope: PRD 7.3
 ("M3 brings CC0 recordings: wood scrape, footsteps, room tone") and the M3 line
 "recorded audio" of section 11, measured against the seven sounds that

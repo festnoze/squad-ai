@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Plans a walk for an inhabitant (docs/CONTRACT_M2.md 3.4). Fills <paramref name="corners"/> with the

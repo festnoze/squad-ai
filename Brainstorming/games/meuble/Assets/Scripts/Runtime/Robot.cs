@@ -1,8 +1,8 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5.md 4, 16.8 and 16.12, PRD 4.8): the robot vacuum's visual and transform. Watchers draws it, the

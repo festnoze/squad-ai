@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -8,7 +8,7 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Entry point, the only component of Boot.unity (PRD 8.3). Builds every subsystem in code. Each build
@@ -26,6 +26,10 @@ namespace Meuble
         public GameState Game { get; private set; }
         public Hud Hud { get; private set; }
         public Sfx Sfx { get; private set; }
+
+        /// <summary>Audio overhaul: the title and level music (docs/audio/AUDIO_REPORT.md 5).</summary>
+        public MusicPlayer Music { get; private set; }
+
         public OrbitCamera OrbitCamera { get; private set; }
         public Camera Camera { get; private set; }
         public Light Sun { get; private set; }
@@ -52,6 +56,7 @@ namespace Meuble
             Instance = this;
             // The product owner's request: silent while tests run (AudioMute: batch mode, --probe, -mute).
             AudioListener.volume = AudioMute.Apply(AudioListener.volume);
+            StartFullScreen();
             // M3: the pause flags are static and outlive a scene reload (tests reload Boot for every case).
             GamePause.IsPaused = false;
             AudioListener.pause = false;
@@ -67,6 +72,7 @@ namespace Meuble
             Run("post processing", BuildVolume);
             Run("event system", BuildEventSystem);
             Run("sfx", BuildSfx);
+            Run("music", BuildMusic);
             Run("hud", BuildHud);
             Run("game", BuildGame);
             Run("menu", BuildMenu);
@@ -171,6 +177,29 @@ namespace Meuble
             }
         }
 
+        /// <summary>
+        /// The product owner's request (2026-11-18): every launch starts in borderless full screen at the display
+        /// resolution, even when the last session ended in a window (Unity restores the last window mode otherwise).
+        /// Not in batch mode, the probe's runs (they set their own resolution) or with an explicit -screen-fullscreen.
+        /// </summary>
+        private static void StartFullScreen()
+        {
+            if (Application.isBatchMode || Application.isEditor || Application.isMobilePlatform)
+            {
+                return;
+            }
+            string[] args = Environment.GetCommandLineArgs();
+            foreach (string a in args)
+            {
+                if (a == "-screen-fullscreen" || a == "--probe" || a == "--look" || a == "--titletour")
+                {
+                    return;
+                }
+            }
+            Resolution d = Screen.currentResolution;
+            Screen.SetResolution(d.width, d.height, FullScreenMode.FullScreenWindow);
+        }
+
         /// <summary>Ctrl+F or F11 (the product owner's request; Alt+Enter is Unity's own standalone toggle).</summary>
         private static bool FullScreenTogglePressed()
         {
@@ -273,7 +302,7 @@ namespace Meuble
             volume.isGlobal = true;
             volume.priority = 10f;
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
-            profile.name = "Meuble Runtime Profile";
+            profile.name = "OutOfSight Runtime Profile";
             Tonemapping tonemapping = profile.Add<Tonemapping>(true);
             tonemapping.mode.Override(TonemappingMode.Neutral); // MUTATION:TONEMAP_NEUTRAL
             Bloom bloom = profile.Add<Bloom>(true);
@@ -308,6 +337,13 @@ namespace Meuble
         {
             Sfx = Child("Sfx").AddComponent<Sfx>();
             Sfx.Init();
+        }
+
+        /// <summary>The music on its own child: its two sources ignore the listener pause, unlike every effect of Sfx.</summary>
+        private void BuildMusic()
+        {
+            Music = Child("Music").AddComponent<MusicPlayer>();
+            Music.Init(AudioLibrary.Load());
         }
 
         private void BuildHud()

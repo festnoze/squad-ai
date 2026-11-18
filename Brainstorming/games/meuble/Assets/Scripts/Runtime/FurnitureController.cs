@@ -1,8 +1,8 @@
 using System;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The player furniture (PRD 3.2, 3.3). A CharacterController moved only from <see cref="Step"/>, which
@@ -369,6 +369,14 @@ namespace Meuble
         /// visual child only: the transform never moves, so the tremble never counts as motion (3.3).
         /// </summary>
         public float CreakTremble;
+
+        /// <summary>
+        /// M7 polish (WardrobeDoors), presentation only: a world-space offset added to the visual while it enters or
+        /// leaves a wardrobe, so it slips through the open doors instead of popping in or out. Like
+        /// <see cref="CreakTremble"/>, the transform (<see cref="Pose"/>, every rule) never moves; only
+        /// <see cref="Visual"/> is nudged, in <see cref="LateUpdate"/>.
+        /// </summary>
+        public Vector3 WardrobeSlideOffset;
 
         /// <summary>The pose as the rules see it: base position on the floor and yaw.</summary>
         public FurniturePose Pose => new FurniturePose(YawMath.Planar(transform.position), Yaw);
@@ -1018,7 +1026,7 @@ namespace Meuble
                 float heldLift = 0f;
                 GroundFrame(currentPose, currentYaw, ref heldFrame, ref heldLift);
                 Vector3 heldBase = currentPose + Vector3.up * heldLift;
-                Visual.SetPositionAndRotation(heldBase + heldFrame * TipOffset(heldTip), heldFrame * Quaternion.Euler(0f, 0f, -heldTip));
+                Visual.SetPositionAndRotation(heldBase + heldFrame * TipOffset(heldTip) + WardrobeSlideOffset, heldFrame * Quaternion.Euler(0f, 0f, -heldTip));
                 return;
             }
             float alpha = Mathf.Clamp01((Time.time - Time.fixedTime) / Time.fixedDeltaTime);
@@ -1068,7 +1076,7 @@ namespace Meuble
                 rotation *= Quaternion.Euler(0f, 0f, -tip);
                 position += ground * TipOffset(tip);
             }
-            Visual.SetPositionAndRotation(position + jitter + Vector3.up * hop, rotation);
+            Visual.SetPositionAndRotation(position + jitter + Vector3.up * hop + WardrobeSlideOffset, rotation);
         }
 
         /// <summary>

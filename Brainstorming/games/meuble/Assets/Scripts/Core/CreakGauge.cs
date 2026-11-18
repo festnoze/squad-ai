@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Creak gauge of the player furniture (PRD 4.6, docs/CONTRACT_M2.md 3.3). It fills from 0 to 1 in

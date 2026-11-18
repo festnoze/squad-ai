@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Model catalog (docs/CONTRACT_M3.md 3), at Assets/Resources/ModelCatalog.asset, built by
-    /// Meuble.Editor.ModelCatalogBuilder. Being referenced from Resources is what ships the GLBs in the player.
+    /// OutOfSight.Editor.ModelCatalogBuilder. Being referenced from Resources is what ships the GLBs in the player.
     ///
     /// Every size and position is in the model's native root space (root at the origin, no rotation, unit
     /// scale), measured from the imported prefab, never typed by hand. Only the yaw offsets of the static
@@ -58,7 +58,7 @@ namespace Meuble
             public bool IsPet => kind == KindPet;
 
             /// <summary>The eye height of the fitted model above its root: <see cref="targetEyeHeight"/>, or Tuning.EyeHeight.</summary>
-            public float TargetEye => targetEyeHeight > 0f ? targetEyeHeight : Meuble.Core.Tuning.EyeHeight;
+            public float TargetEye => targetEyeHeight > 0f ? targetEyeHeight : OutOfSight.Core.Tuning.EyeHeight;
         }
 
         /// <summary>The kinds of a character entry (M5).</summary>

@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.4), on the real Boot scene: the Qualité option of the Options page, clicked from the
@@ -119,11 +119,11 @@ namespace Meuble.Tests
         [UnityTest]
         public IEnumerator Step62a_QualityTiersSwitchAtOnceAndSurviveRestart()
         {
-            tempDir = Path.Combine(Path.GetTempPath(), "meuble_quality_tests_" + Guid.NewGuid().ToString("N"));
+            tempDir = Path.Combine(Path.GetTempPath(), "outofsight_quality_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempDir);
             SaveStore.PathOverride = Path.Combine(tempDir, SaveStore.FileName);
             CollectionAssert.AreEqual(new[] { QualityTier.LevelLow, QualityTier.LevelMedium, QualityTier.LevelHigh }, QualitySettings.names,
-                "premise: QualitySettings holds Bas, Moyen and Haut (run Meuble/Project Setup)");
+                "premise: QualitySettings holds Bas, Moyen and Haut (run OutOfSight/Project Setup)");
             Assert.IsNull(SaveStore.Options.Quality, "premise: a fresh save holds no quality choice");
             AssertTier(QualityTier.LevelHigh, "PC_RPAsset", 1f, true, "the PC default");
             // The look's own checks (lighting's) on Haut, as they stand now: the same problems again once back on Haut.

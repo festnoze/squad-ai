@@ -1,4 +1,4 @@
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// PRD 4.2: a timer accumulates while the furniture is both seen and moving, resets on any step where

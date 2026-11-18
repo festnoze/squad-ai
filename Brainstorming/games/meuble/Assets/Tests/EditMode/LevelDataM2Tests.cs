@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// docs/CONTRACT_M2.md 4 and 10 (level data): LevelDef v2, its helpers, every validator rule added in
@@ -25,7 +25,8 @@ namespace Meuble.Tests
         private static readonly string[] PlayOrder =
         {
             "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level10", "level11",
-            "level12", "level13", "level14", "level15", "level16", "level17", "level18",
+            "level12", "level13", "level14", "level15", "level16", "level17", "level18", "level19", "level20", "level21",
+            "level22", "level23", "level24",
         };
 
         /// <summary>
@@ -134,7 +135,7 @@ namespace Meuble.Tests
             // M4 (CONTRACT_M4 4, amendment 9.13): levels 4 to 7 follow the M2 levels. M5 (CONTRACT_M5 8 and 16.2): wave 5A
             // added levels 8, 12, 14 and 16, wave 5B levels 9, 10, 11, 13, 15 and 17, all in number order; M6b (CONTRACT_M6 5)
             // adds level 18 "L'armoire" after level 17: 18 levels.
-            Assert.AreEqual(18, ids.Count, "the manifest count after M6b: " + string.Join(", ", ids));
+            Assert.AreEqual(24, ids.Count, "the manifest count after M7 (levels 19 to 24 added): " + string.Join(", ", ids));
             CollectionAssert.AreEqual(PlayOrder, ids);
             foreach (string id in ids)
             {

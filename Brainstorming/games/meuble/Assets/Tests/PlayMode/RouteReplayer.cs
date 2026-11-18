@@ -2,10 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// The shared designer route replay (docs/CONTRACT_M5_v3.md 15.9, CONTRACT_M5.md 16.11), used by the M4 level replays

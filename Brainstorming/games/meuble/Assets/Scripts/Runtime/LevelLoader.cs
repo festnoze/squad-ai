@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>Reads a <see cref="LevelDef"/> from Resources/Levels and validates it (PRD 6.1, 8.3).</summary>
     public static class LevelLoader

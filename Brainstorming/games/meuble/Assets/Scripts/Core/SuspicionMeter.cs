@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Suspicion of one inhabitant (PRD 4.4, docs/CONTRACT_M2.md 3.1). Each discovery adds

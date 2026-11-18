@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>M5 (docs/CONTRACT_M5_v3.md 2 and 15.4): a raised, axis-aligned walkable area.</summary>
     public sealed class PlatformDef

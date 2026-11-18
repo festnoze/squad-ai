@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// docs/CONTRACT_M4.md section 2 and amendments 9.5, 9.6: the body table. The chair row must equal the M1

@@ -1,8 +1,8 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.10): records every win in the save and shows the record line under the win
@@ -41,10 +41,11 @@ namespace Meuble
         private Text best;
         private Text newBest;
 
-        // Reference pixels (1920 x 1080), from the win panel's center: below win.next on the win panel, below the
-        // "Menu principal" button on the end screen (Hud: win.next at -170, the end button at -250, 88 high).
-        private const float WinY = -236f;
-        private const float EndY = -340f;
+        // Reference pixels (1920 x 1080), from the win panel's center: below the win panel's own button row on both
+        // the win panel and the end screen (M8 touch redesign moved Hud's button row to y -300, 150 high, so the
+        // record line now sits below it on both; previously below win.next alone, and below the end button alone).
+        private const float WinY = -430f;
+        private const float EndY = -430f;
         private const float RowHeight = 56f;
         private const float Gap = 40f;
         private const int FontSize = 40;
@@ -111,6 +112,26 @@ namespace Meuble
             best.enabled = true;
             newBest.enabled = result.NewBest;
             Layout(endScreen ? EndY : WinY, result.NewBest);
+        }
+
+        /// <summary>The language changed: "New record!" and the record line again, in the new language.</summary>
+        public void Relocalize()
+        {
+            if (newBest != null)
+            {
+                newBest.text = Strings.WinNewBest;
+            }
+            if (HasRecord && best != null)
+            {
+                bool shown = best.enabled;
+                bool newShown = newBest != null && newBest.enabled;
+                Show(Last, OnEndScreen);
+                best.enabled = shown;
+                if (newBest != null)
+                {
+                    newBest.enabled = newShown;
+                }
+            }
         }
 
         public void Hide()

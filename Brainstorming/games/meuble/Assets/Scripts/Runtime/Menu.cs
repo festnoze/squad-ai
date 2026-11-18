@@ -1,16 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Title screen and pause menu (docs/CONTRACT_M3.md 6).
-    /// - The title shows UN, DEUX, TROIS, MEUBLE, Jouer, Quitter and the credits over the first level of
+    /// - The title shows the game title (Strings.Title), Jouer, Quitter and the author line over the first level of
     ///   levels.json, with the camera in a slow orbit. Main shows it at start only in a player and not under
     ///   --probe; a test may call <see cref="ShowTitle"/>. Editor runs never see it by themselves.
     /// - The pause menu (Escape or gamepad Start, read by GameState) shows PAUSE, Reprendre, Recommencer and
@@ -43,8 +43,11 @@ namespace Meuble
         /// <summary>True on the frame a menu closed: its Enter must not also act on the game (GameState reads it).</summary>
         public bool ClosedThisFrame => closedFrame == Time.frameCount;
 
-        /// <summary>The cursor must stay free: a menu is open, or the end screen offers its button.</summary>
-        public bool WantsCursor => IsOpen || (Hud != null && Hud.EndVisible);
+        /// <summary>
+        /// The cursor must stay free: a menu is open, or the end, win or fail panel offers its own buttons (M8 touch
+        /// redesign: Retry, Replay, Next level and Menu need a visible mouse pointer to be clickable, not just tappable).
+        /// </summary>
+        public bool WantsCursor => IsOpen || (Hud != null && (Hud.EndVisible || Hud.FailVisible || Hud.WinButtonsVisible));
 
         /// <summary>
         /// M3.1: the end screen leads back to the title (a player) instead of restarting the first level (the
@@ -81,20 +84,26 @@ namespace Meuble
         public Button PauseOptionsButton { get; private set; }
         public Button OptionsSensitivityButton { get; private set; }
         public Button OptionsVolumeButton { get; private set; }
+        /// <summary>Audio overhaul: the Music row, right under Volume (0 to 100 % by 10).</summary>
+        public Button OptionsMusicButton { get; private set; }
         public Button OptionsConeButton { get; private set; }
         /// <summary>M7 (docs/CONTRACT_M7.md 1.4): Qualité, cycling Bas, Moyen, Haut.</summary>
         public Button OptionsQualityButton { get; private set; }
         /// <summary>M7 design (CONTRACT_M7 4.1): the Difficulté row (Facile, Normal, Difficile; applies at the next level load).</summary>
         public Button OptionsDifficultyButton { get; private set; }
+        /// <summary>The Language / Langue row (English, Français; applied at once).</summary>
+        public Button OptionsLanguageButton { get; private set; }
         public Button OptionsResetButton { get; private set; }
         public Button OptionsBackButton { get; private set; }
 
         private Canvas optionsCanvas;
         private Text optionsSensitivityText;
         private Text optionsVolumeText;
+        private Text optionsMusicText;
         private Text optionsConeText;
         private Text optionsQualityText;
         private Text optionsDifficultyText;
+        private Text optionsLanguageText;
         // True when Options was opened from the pause menu (Retour then goes back there, not to the title).
         private bool optionsFromPause;
 
@@ -134,7 +143,7 @@ namespace Meuble
             {
                 next = Tuning.SensitivityMin;
             }
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = next, Volume = o.Volume, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = next, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language });
             RefreshOptionsTexts();
         }
 
@@ -146,7 +155,24 @@ namespace Meuble
             {
                 next = Tuning.VolumeMin;
             }
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = next, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = next, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language });
+            RefreshOptionsTexts();
+        }
+
+        // Audio overhaul: the music's own level, 0 to 100 % by 10, then back to 0 (MusicPlayer reads it every frame).
+        private void CycleMusic()
+        {
+            SaveOptions o = SaveStore.Options;
+            int next = o.Music + Tuning.MusicStep;
+            if (next > Tuning.MusicMax)
+            {
+                next = Tuning.MusicMin;
+            }
+            SaveStore.SetOptions(new SaveOptions
+            {
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = next, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty,
+                Language = o.Language,
+            });
             RefreshOptionsTexts();
         }
 
@@ -154,7 +180,7 @@ namespace Meuble
         {
             SaveOptions o = SaveStore.Options;
             string next = o.Cone == SaveOptions.ConeAlways ? SaveOptions.ConeNever : SaveOptions.ConeAlways;
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Cone = next, Quality = o.Quality, Difficulty = o.Difficulty });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = next, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language });
             RefreshOptionsTexts();
         }
 
@@ -164,7 +190,7 @@ namespace Meuble
         {
             SaveOptions o = SaveStore.Options;
             string next = SaveOptions.NextQuality(o.QualityFor(Application.isMobilePlatform));
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Cone = o.Cone, Quality = next, Difficulty = o.Difficulty });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = next, Difficulty = o.Difficulty, Language = o.Language });
             RefreshOptionsTexts();
         }
 
@@ -174,9 +200,56 @@ namespace Meuble
             SaveOptions o = SaveStore.Options;
             SaveStore.SetOptions(new SaveOptions
             {
-                Sensitivity = o.Sensitivity, Volume = o.Volume, Cone = o.Cone, Quality = o.Quality, Difficulty = DifficultyDef.Next(o.DifficultyId),
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = DifficultyDef.Next(o.DifficultyId),
+                Language = o.Language,
             });
             RefreshOptionsTexts();
+        }
+
+        // English and Français, applied at once: SaveStore.SetOptions switches Strings, whose LanguageChanged relabels every view.
+        private void CycleLanguage()
+        {
+            SaveOptions o = SaveStore.Options;
+            string next = o.LanguageId == Strings.French ? Strings.English : Strings.French;
+            SaveStore.SetOptions(new SaveOptions
+            {
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = next,
+            });
+            RefreshOptionsTexts();
+        }
+
+        /// <summary>
+        /// Strings.LanguageChanged: every label that shows a table string verbatim is translated in place (menus, HUD, hints,
+        /// touch buttons), then the views whose lines are formatted or composed rebuild them (the options rows, the intro card
+        /// and its people, the end panels, the record line, the level select).
+        /// </summary>
+        private void OnLanguageChanged(string previous)
+        {
+            foreach (Text label in FindObjectsByType<Text>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (label != null && Strings.TryTranslate(label.text, previous, out string translated))
+                {
+                    label.text = translated;
+                }
+            }
+            RefreshOptionsTexts();
+            if (Hud != null)
+            {
+                Hud.Relocalize();
+            }
+            if (RecordLine != null)
+            {
+                RecordLine.Relocalize();
+            }
+            if (LevelSelectOpen && LevelSelect != null)
+            {
+                LevelSelect.Refresh();
+            }
+        }
+
+        private void OnDestroy()
+        {
+            Strings.LanguageChanged -= OnLanguageChanged;
         }
 
         private static string QualityLabel(string quality)
@@ -203,6 +276,10 @@ namespace Meuble
             {
                 optionsVolumeText.text = string.Format(Strings.OptionsVolume, o.Volume);
             }
+            if (optionsMusicText != null)
+            {
+                optionsMusicText.text = string.Format(Strings.OptionsMusic, o.Music);
+            }
             if (optionsConeText != null)
             {
                 optionsConeText.text = string.Format(Strings.OptionsCone,
@@ -215,6 +292,10 @@ namespace Meuble
             if (optionsQualityText != null)
             {
                 optionsQualityText.text = string.Format(Strings.OptionsQuality, QualityLabel(o.QualityFor(Application.isMobilePlatform)));
+            }
+            if (optionsLanguageText != null)
+            {
+                optionsLanguageText.text = string.Format(Strings.OptionsLanguage, Strings.LanguageName(o.LanguageId));
             }
         }
 
@@ -276,12 +357,26 @@ namespace Meuble
 
         private static readonly Color Cream = new Color(1f, 0.92f, 0.75f, 1f);
 
+        // ----- M7 title redesign: the title page's warm palette and its column metrics (1920 x 1080 reference). -----
+        private static readonly Color TitleDim = new Color(0.08f, 0.05f, 0.035f, 0.16f);
+        private static readonly Color TitlePanel = new Color(0.1f, 0.066f, 0.05f, 0.84f);
+        private static readonly Color TitleInk = new Color(1f, 0.94f, 0.82f, 1f);
+        private static readonly Color TaglineInk = new Color(0.96f, 0.8f, 0.58f, 0.95f);
+        private static readonly Color CreditsInk = new Color(1f, 0.94f, 0.82f, 0.6f);
+        private static readonly Color ChairRed = new Color(0.82f, 0.2f, 0.16f, 1f);
+        private const float TitlePanelWidth = 1240f;
+        private const float TitleMargin = 150f;
+        private const float TitleButtonStep = 92f;
+        private static readonly Vector2 TitleButtonSize = new Vector2(420f, 78f);
+
         public void Init(GameState game, Hud hud, OrbitCamera camera, Sfx sfx)
         {
             Game = game;
             Hud = hud;
             Camera = camera;
             Sfx = sfx;
+            // M7 title camera: the eye level tour of the title house behind the title page (TitleCameraTour).
+            TitleCameraTour.Attach(this, game, camera);
             TitleAfterEnd = !Application.isEditor;
             font = hud != null && hud.Font != null ? hud.Font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -315,38 +410,84 @@ namespace Meuble
                     ReturnToTitle();
                 });
             }
+            // M8 touch redesign: the fail, win and end panels' own buttons (a phone has neither Enter nor R).
+            BindMenuButton(Hud?.FailMenuButton);
+            BindMenuButton(Hud?.WinMenuButton);
+            BindRestartButton(Hud?.FailRetryButton);
+            BindRestartButton(Hud?.WinReplayButton);
+            BindRestartButton(Hud?.EndReplayButton);
+            if (Hud != null && Hud.WinNextLevelButton != null)
+            {
+                Hud.WinNextLevelButton.onClick.AddListener(() =>
+                {
+                    Click();
+                    Game.NextLevel();
+                });
+            }
+            Strings.LanguageChanged -= OnLanguageChanged;
+            Strings.LanguageChanged += OnLanguageChanged;
             Apply();
         }
 
         private void BuildTitle()
         {
             titleCanvas = Panel("Title");
-            // The level shows through: a light dim, darker toward the edges. The panel holds the upper half; the
-            // showcase camera frames the red chair in the lower third, under the buttons (OrbitCamera).
-            Stretch(NewImage(titleCanvas.transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.22f)).rectTransform);
-            Stretch(NewImage(titleCanvas.transform, "Edges", ProceduralArt.Vignette, new Color(0.02f, 0.02f, 0.03f, 0.6f)).rectTransform);
-            // M5: the band grows down by one button row for Niveaux (the chair still shows in the lower third).
-            // M6: it grows again for Options, below Quitter.
-            Image band = NewImage(titleCanvas.transform, "Band", ProceduralArt.Rounded, new Color(0.06f, 0.06f, 0.08f, 0.66f));
-            band.type = Image.Type.Sliced;
-            Place(band.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 100f), new Vector2(1320f, 720f));
+            // M7 title redesign: the level still shows through, orbiting behind a translucent overlay. A light warm dim
+            // over the whole screen, soft dark edges, and a warm espresso panel fading in from the left that carries the
+            // title column; the right of the screen stays open on the scene (the showcase camera frames the red chair in
+            // the lower third, right of the column).
+            Stretch(NewImage(titleCanvas.transform, "Dim", null, TitleDim).rectTransform);
+            Stretch(NewImage(titleCanvas.transform, "Edges", ProceduralArt.Vignette, new Color(0.04f, 0.025f, 0.02f, 0.5f)).rectTransform);
+            Image side = NewImage(titleCanvas.transform, "Band", ProceduralArt.SideFade, TitlePanel);
+            side.rectTransform.anchorMin = new Vector2(0f, 0f);
+            side.rectTransform.anchorMax = new Vector2(0f, 1f);
+            side.rectTransform.pivot = new Vector2(0f, 0.5f);
+            side.rectTransform.anchoredPosition = Vector2.zero;
+            side.rectTransform.sizeDelta = new Vector2(TitlePanelWidth, 0f);
+
+            // The column, every element left aligned on the same margin: emblem, title, a short red rule, the subtitle
+            // ("Don't Get Caught Moving"),
+            // then the four buttons (top to bottom: Jouer, Niveaux, Options, Quitter), and the author line at the bottom.
+            var left = new Vector2(0f, 0.5f);
             Image chair = NewImage(titleCanvas.transform, "Emblem", ProceduralArt.Chair, Color.white);
             chair.preserveAspect = true;
-            Place(chair.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 372f), new Vector2(118f, 118f));
-            Text title = NewText(titleCanvas.transform, "Title", Strings.Title, 100, Cream);
-            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 244f), new Vector2(1700f, 130f));
-            PlayButton = Hud.MenuButton(titleCanvas.transform, "Play", Strings.TitlePlay, font, Labels);
-            Place((RectTransform)PlayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 104f), new Vector2(480f, 88f));
-            LevelsButton = Hud.MenuButton(titleCanvas.transform, "Levels", Strings.TitleLevels, font, Labels);
-            Place((RectTransform)LevelsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 2f), new Vector2(480f, 88f));
-            QuitButton = Hud.MenuButton(titleCanvas.transform, "Quit", Strings.TitleQuit, font, Labels);
-            Place((RectTransform)QuitButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -100f), new Vector2(480f, 88f));
-            // M6 (CONTRACT_M6 2.1): "Options", below Quitter so the existing Niveaux/Quitter chain (tested) is unchanged.
-            TitleOptionsButton = Hud.MenuButton(titleCanvas.transform, "TitleOptions", Strings.OptionsTitle, font, Labels);
-            Place((RectTransform)TitleOptionsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -200f), new Vector2(480f, 88f));
-            Text credits = NewText(titleCanvas.transform, "Credits", Strings.TitleCredits, 28, new Color(1f, 1f, 1f, 0.8f));
-            Place(credits.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 36f), new Vector2(1800f, 44f));
-            Chain(PlayButton, LevelsButton, QuitButton, TitleOptionsButton);
+            Place(chair.rectTransform, left, new Vector2(TitleMargin - 6f, 418f), new Vector2(76f, 76f));
+            // M7 title logo: the red chair in 3D with its long low-sun shadow, baked once when the page first shows
+            // (TitleLogo); the flat icon above stays hidden and comes back only if the bake fails.
+            TitleLogo logo = TitleLogo.Create(titleCanvas.transform, this, chair);
+            Place(logo.Image.rectTransform, left, new Vector2(Tuning.TitleLogoUiX, Tuning.TitleLogoUiY),
+                new Vector2(Tuning.TitleLogoUiWidth, Tuning.TitleLogoUiHeight));
+            Font display = Hud.DisplayFont;
+            // The title wraps in a narrow box, so "Out of Sight" stacks as two lines; the label keeps the exact string.
+            Text title = NewText(titleCanvas.transform, "Title", Strings.Title, 136, TitleInk, display);
+            title.alignment = TextAnchor.MiddleLeft;
+            title.horizontalOverflow = HorizontalWrapMode.Wrap;
+            title.lineSpacing = 0.82f;
+            SoftShadow(title);
+            Place(title.rectTransform, left, new Vector2(TitleMargin, 222f), new Vector2(585f, 300f));
+            Image rule = NewImage(titleCanvas.transform, "Rule", null, ChairRed);
+            Place(rule.rectTransform, left, new Vector2(TitleMargin + 4f, 66f), new Vector2(84f, 6f));
+            Text tagline = NewText(titleCanvas.transform, "Tagline", Strings.TitleTagline, 34, TaglineInk);
+            tagline.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(tagline);
+            Place(tagline.rectTransform, left, new Vector2(TitleMargin, 22f), new Vector2(900f, 50f));
+
+            PlayButton = TitleButton("Play", Strings.TitlePlay, display, -84f);
+            LevelsButton = TitleButton("Levels", Strings.TitleLevels, display, -84f - TitleButtonStep);
+            // M6 (CONTRACT_M6 2.1): "Options", between Niveaux and Quitter (the product owner asked for Quitter last).
+            TitleOptionsButton = TitleButton("TitleOptions", Strings.OptionsTitle, display, -84f - 2f * TitleButtonStep);
+            QuitButton = TitleButton("Quit", Strings.TitleQuit, display, -84f - 3f * TitleButtonStep);
+
+            Text credits = NewText(titleCanvas.transform, "Credits", Strings.TitleCredits, 24, CreditsInk);
+            credits.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(credits);
+            Place(credits.rectTransform, new Vector2(0f, 0f), new Vector2(TitleMargin, 40f), new Vector2(900f, 36f));
+            // Audio overhaul: the music's attribution (CC BY 4.0 requires it in the game, docs/LICENSES.md), under the credits.
+            Text musicCredits = NewText(titleCanvas.transform, "MusicCredits", Strings.TitleMusicCredits, 17, CreditsInk);
+            musicCredits.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(musicCredits);
+            Place(musicCredits.rectTransform, new Vector2(0f, 0f), new Vector2(TitleMargin, 16f), new Vector2(1500f, 24f));
+            Chain(PlayButton, LevelsButton, TitleOptionsButton, QuitButton);
             PlayButton.onClick.AddListener(() =>
             {
                 Click();
@@ -407,44 +548,59 @@ namespace Meuble
             });
         }
 
-        /// <summary>M6 (CONTRACT_M6 2.1): the Options page, a single column of rows (each a button that cycles its value on
-        /// A/click), reachable from the title's main page and the pause menu.</summary>
+        /// <summary>
+        /// M7 options redesign: the Options page in the title page's own style (a dark translucent band behind a left
+        /// column, the display face for the heading under a short red rule). A single column of rows (each a button
+        /// that cycles its value on A/click), each with its own small icon and its value shown within the row, plus
+        /// decorative left/right arrows hinting that it cycles. Reachable from the title's main page and the pause menu.
+        /// </summary>
         private void BuildOptions()
         {
             optionsCanvas = Panel("Options");
-            Stretch(NewImage(optionsCanvas.transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.62f)).rectTransform);
-            Text title = NewText(optionsCanvas.transform, "OptionsTitle", Strings.OptionsTitle, 100, Cream);
-            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 345f), new Vector2(1600f, 130f));
+            Stretch(NewImage(optionsCanvas.transform, "Dim", null, TitleDim).rectTransform);
+            Image band = NewImage(optionsCanvas.transform, "Band", ProceduralArt.SideFade, TitlePanel);
+            band.rectTransform.anchorMin = new Vector2(0f, 0f);
+            band.rectTransform.anchorMax = new Vector2(0f, 1f);
+            band.rectTransform.pivot = new Vector2(0f, 0.5f);
+            band.rectTransform.anchoredPosition = Vector2.zero;
+            band.rectTransform.sizeDelta = new Vector2(Tuning.OptionsPanelWidth, 0f);
 
-            OptionsSensitivityButton = Hud.MenuButton(optionsCanvas.transform, "OptionsSensitivity", "", font, Labels);
-            Place((RectTransform)OptionsSensitivityButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 235f), new Vector2(680f, 92f));
-            optionsSensitivityText = Labels.TryGetValue("OptionsSensitivityLabel", out Text st) ? st : null;
+            var left = new Vector2(0f, 0.5f);
+            Font display = Hud.DisplayFont;
+            Text title = NewText(optionsCanvas.transform, "OptionsTitle", Strings.OptionsTitle, 92, TitleInk, display);
+            title.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(title);
+            Place(title.rectTransform, left, new Vector2(Tuning.OptionsMargin, OptionsTop + 155f), new Vector2(760f, 110f));
+            Image rule = NewImage(optionsCanvas.transform, "OptionsRule", null, ChairRed);
+            Place(rule.rectTransform, left, new Vector2(Tuning.OptionsMargin + 4f, OptionsTop + 95f), new Vector2(84f, 6f));
 
-            OptionsVolumeButton = Hud.MenuButton(optionsCanvas.transform, "OptionsVolume", "", font, Labels);
-            Place((RectTransform)OptionsVolumeButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 135f), new Vector2(680f, 92f));
-            optionsVolumeText = Labels.TryGetValue("OptionsVolumeLabel", out Text vt) ? vt : null;
+            OptionsSensitivityButton = OptionsRow("OptionsSensitivity", 0, ProceduralArt.OptionMouse, out optionsSensitivityText);
+            OptionsVolumeButton = OptionsRow("OptionsVolume", 1, ProceduralArt.OptionSpeaker, out optionsVolumeText);
+            // Audio overhaul: the music's own level, next to Volume.
+            OptionsMusicButton = OptionsRow("OptionsMusic", 2, ProceduralArt.OptionMusicNote, out optionsMusicText);
+            OptionsConeButton = OptionsRow("OptionsCone", 3, ProceduralArt.OptionSightCone, out optionsConeText);
+            // M7 (CONTRACT_M7 1.4): the Qualité row.
+            OptionsQualityButton = OptionsRow("OptionsQuality", 4, ProceduralArt.OptionQualityBars, out optionsQualityText);
+            // M7 design (CONTRACT_M7 4.1): the Difficulté row.
+            OptionsDifficultyButton = OptionsRow("OptionsDifficulty", 5, ProceduralArt.OptionDifficultyGauge, out optionsDifficultyText);
+            // Language / Langue, English or Français.
+            OptionsLanguageButton = OptionsRow("OptionsLanguage", 6, ProceduralArt.OptionGlobe, out optionsLanguageText);
 
-            OptionsConeButton = Hud.MenuButton(optionsCanvas.transform, "OptionsCone", "", font, Labels);
-            Place((RectTransform)OptionsConeButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 35f), new Vector2(680f, 92f));
-            optionsConeText = Labels.TryGetValue("OptionsConeLabel", out Text ct) ? ct : null;
+            OptionsResetButton = OptionsPlainButton("OptionsReset", Strings.OptionsDefault, 7);
+            OptionsBackButton = OptionsPlainButton("OptionsBack", Strings.SelectBack, 8);
 
-            // M7 (CONTRACT_M7 1.4): the fourth row.
-            OptionsQualityButton = Hud.MenuButton(optionsCanvas.transform, "OptionsQuality", "", font, Labels);
-            Place((RectTransform)OptionsQualityButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -65f), new Vector2(680f, 92f));
-            optionsQualityText = Labels.TryGetValue("OptionsQualityLabel", out Text qt) ? qt : null;
-
-            // M7 design (CONTRACT_M7 4.1): the fifth row.
-            OptionsDifficultyButton = Hud.MenuButton(optionsCanvas.transform, "OptionsDifficulty", "", font, Labels);
-            Place((RectTransform)OptionsDifficultyButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -165f), new Vector2(680f, 92f));
-            optionsDifficultyText = Labels.TryGetValue("OptionsDifficultyLabel", out Text dt) ? dt : null;
-
-            OptionsResetButton = Hud.MenuButton(optionsCanvas.transform, "OptionsReset", Strings.OptionsDefault, font, Labels);
-            Place((RectTransform)OptionsResetButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -265f), new Vector2(420f, 88f));
-
-            OptionsBackButton = Hud.MenuButton(optionsCanvas.transform, "OptionsBack", Strings.SelectBack, font, Labels);
-            Place((RectTransform)OptionsBackButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -360f), new Vector2(420f, 88f));
-
-            Chain(OptionsSensitivityButton, OptionsVolumeButton, OptionsConeButton, OptionsQualityButton, OptionsDifficultyButton, OptionsResetButton, OptionsBackButton);
+            Chain(OptionsSensitivityButton, OptionsVolumeButton, OptionsMusicButton, OptionsConeButton, OptionsQualityButton, OptionsDifficultyButton,
+                OptionsLanguageButton, OptionsResetButton, OptionsBackButton);
+            OptionsMusicButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleMusic();
+            });
+            OptionsLanguageButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleLanguage();
+            });
             OptionsSensitivityButton.onClick.AddListener(() =>
             {
                 Click();
@@ -483,6 +639,129 @@ namespace Meuble
             RefreshOptionsTexts();
         }
 
+        // The Options rows: the first row's centre, the step between rows and a row's height (seven value rows, then Par
+        // défaut and Retour). Audio overhaul: the Music row made it nine rows; the step went from 90 to 80 and the rows from
+        // 84 to 72 high so the last one still clears the bottom of a 20:9 phone (966 reference units high at match 0.5).
+        private const float OptionsTop = 270f;
+        private const float OptionsStep = 80f;
+        private const float OptionsRowHeight = 72f;
+
+        /// <summary>
+        /// A value row of the Options page at <paramref name="index"/> (0 is the top one): the row's icon at its left
+        /// (the row's own small identification), its label and value text (unchanged: still the one string, value
+        /// included, that <see cref="RefreshOptionsTexts"/> sets), and two small decorative arrows at the right
+        /// hinting that a click cycles it.
+        /// </summary>
+        private Button OptionsRow(string name, int index, Sprite icon, out Text label)
+        {
+            Button row = Hud.MenuButton(optionsCanvas.transform, name, "", font, Labels);
+            Place((RectTransform)row.transform, new Vector2(0f, 0.5f), new Vector2(Tuning.OptionsMargin, OptionsTop - index * OptionsStep), new Vector2(820f, OptionsRowHeight));
+            StyleOptionsButton(row);
+            Image glyph = NewImage(row.transform, name + "Icon", icon, Color.white);
+            glyph.preserveAspect = true;
+            Place(glyph.rectTransform, new Vector2(0f, 0.5f), new Vector2(Tuning.OptionsIconInset, 0f),
+                new Vector2(Tuning.OptionsIconSize, Tuning.OptionsIconSize));
+            OptionsArrows(row.transform);
+            label = Labels.TryGetValue(name + "Label", out Text text) ? text : null;
+            if (label != null)
+            {
+                label.alignment = TextAnchor.MiddleLeft;
+                label.fontSize = 34;
+                label.color = TitleInk;
+                // Clear of the icon on the left and the two arrows on the right (their reserved band, see OptionsArrows).
+                label.rectTransform.offsetMin = new Vector2(Tuning.OptionsLabelOffset, 0f);
+                label.rectTransform.offsetMax = new Vector2(-100f, 0f);
+            }
+            return row;
+        }
+
+        /// <summary>M7 options redesign: a plain row (Par défaut, Retour) in the same left column, no icon.</summary>
+        private Button OptionsPlainButton(string name, string label, int index)
+        {
+            Button button = Hud.MenuButton(optionsCanvas.transform, name, label, font, Labels);
+            Place((RectTransform)button.transform, new Vector2(0f, 0.5f), new Vector2(Tuning.OptionsMargin, OptionsTop - index * OptionsStep),
+                new Vector2(420f, OptionsRowHeight));
+            StyleOptionsButton(button);
+            if (Labels.TryGetValue(name + "Label", out Text text))
+            {
+                text.color = TitleInk;
+            }
+            return button;
+        }
+
+        /// <summary>M7 options redesign: the shared menu button restyled warm brown at rest, the chair's red when
+        /// selected or under the mouse (never the same as the other, so the two never look alike), matching the
+        /// title page's own buttons.</summary>
+        private static void StyleOptionsButton(Button button)
+        {
+            ColorBlock colors = button.colors;
+            colors.normalColor = new Color(0.17f, 0.115f, 0.085f, 0.74f);
+            colors.highlightedColor = new Color(0.36f, 0.25f, 0.18f, 0.92f);
+            colors.selectedColor = new Color(0.8f, 0.2f, 0.16f, 0.97f);
+            colors.pressedColor = new Color(0.55f, 0.12f, 0.09f, 1f);
+            button.colors = colors;
+        }
+
+        /// <summary>
+        /// M7 options redesign: two small chevrons at the row's right edge (the shared arrowhead glyph, rotated to
+        /// point left and right), a purely decorative hint that a click on the row cycles its value; never a
+        /// separate target, so the keyboard/gamepad/touch chain is untouched.
+        /// </summary>
+        private void OptionsArrows(Transform parent)
+        {
+            // Text chevrons: the rotated Chevron sprite is not centred on its pivot, so turning it shifted the two arrows
+            // apart diagonally (the product owner's 2026-11-18 screenshot).
+            Color tint = new Color(0.96f, 0.8f, 0.58f, 0.8f);
+            int size = Mathf.RoundToInt(Tuning.OptionsArrowSize * 1.6f);
+            Text right = NewText(parent, "ArrowRight", "›", size, tint);
+            right.alignment = TextAnchor.MiddleCenter;
+            right.raycastTarget = false;
+            Place(right.rectTransform, new Vector2(1f, 0.5f), new Vector2(-Tuning.OptionsArrowInset, 0f),
+                new Vector2(Tuning.OptionsArrowSize, Tuning.OptionsArrowSize * 2f));
+            Text left = NewText(parent, "ArrowLeft", "‹", size, tint);
+            left.alignment = TextAnchor.MiddleCenter;
+            left.raycastTarget = false;
+            Place(left.rectTransform, new Vector2(1f, 0.5f),
+                new Vector2(-(Tuning.OptionsArrowInset + Tuning.OptionsArrowSize + 8f), 0f),
+                new Vector2(Tuning.OptionsArrowSize, Tuning.OptionsArrowSize * 2f));
+        }
+
+        private void Start()
+        {
+            // "--optionsshot <dir>" (a built player): a screenshot of this page over the title, then quit (the same
+            // pattern as LevelSelect's own "--levelshot").
+            string dir = Probe.ArgValue("--optionsshot");
+            if (!Application.isEditor && !string.IsNullOrEmpty(dir))
+            {
+                StartCoroutine(OptionsShot(dir));
+            }
+        }
+
+        /// <summary>
+        /// "--optionsshot &lt;dir&gt;": waits for the title, opens Options over it, selects the Volume row (so the
+        /// selection's chair red shows in the shot) and writes options_page.png, then quits.
+        /// </summary>
+        private IEnumerator OptionsShot(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            float until = Time.realtimeSinceStartup + 20f;
+            while (!TitleOpen && Time.realtimeSinceStartup < until)
+            {
+                yield return null;
+            }
+            yield return new WaitForSecondsRealtime(2.5f);
+            OpenOptions();
+            yield return new WaitForSecondsRealtime(0.5f);
+            if (OptionsVolumeButton != null && EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(OptionsVolumeButton.gameObject);
+            }
+            yield return new WaitForSecondsRealtime(1f);
+            ScreenCapture.CaptureScreenshot(Path.Combine(dir, "options_page.png"));
+            yield return new WaitForSecondsRealtime(1f);
+            Application.Quit();
+        }
+
         // ----- Flow -----
 
         /// <summary>
@@ -504,7 +783,7 @@ namespace Meuble
             PauseOpen = false;
             TitleOpen = true;
             LevelSelectOpen = false;
-            string first = Game.FirstLevelId;
+            string first = TitleCameraTour.LevelFor(Game); // M7 title camera: the title house, never played
             if (reload || Game.Level == null || Game.LevelId != first)
             {
                 Game.LoadLevel(first);
@@ -611,6 +890,53 @@ namespace Meuble
         }
 
         /// <summary>
+        /// M8 touch redesign: the win panel (not the end screen) is up (GameState.Win): free the cursor so Next
+        /// level, Replay and Menu can be clicked. None of them is selected (<see cref="Hud.WinButtonsVisible"/> doc):
+        /// Enter and gamepad A keep loading the next level exactly as GameState already reads them.
+        /// </summary>
+        public void OnWinScreen()
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+        /// <summary>M8 touch redesign: the fail panel is up (GameState.Lose): free the cursor; Retry is selected on the next frame.</summary>
+        public void OnFailScreen()
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            SelectLater(null);
+        }
+
+        /// <summary>M8 touch redesign: Retry, Replay (fail, win and end panels) all restart the current level the same way.</summary>
+        private void BindRestartButton(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+            button.onClick.AddListener(() =>
+            {
+                Click();
+                Game.Restart();
+            });
+        }
+
+        /// <summary>M8 touch redesign: Menu (the fail and win panels) is the same "back to the title" as the pause menu's.</summary>
+        private void BindMenuButton(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+            button.onClick.AddListener(() =>
+            {
+                Click();
+                ToTitleFromPause();
+            });
+        }
+
+        /// <summary>
         /// Clears the selection now; <see cref="Update"/> selects <paramref name="focus"/> (when shown), else the open
         /// panel's default button, next frame.
         /// </summary>
@@ -626,11 +952,17 @@ namespace Meuble
 
         /// <summary>
         /// The default button of what is open (Options, the level select's first unlocked card, title, pause, end
-        /// screen), or null.
+        /// screen, the fail panel), or null. M8 touch redesign: the win panel's own buttons are deliberately left out
+        /// (Hud.WinButtonsVisible doc): Enter and gamepad A already load the next level the way GameState reads them,
+        /// and selecting a button here would make the same press submit it too.
         /// </summary>
         public Selectable DefaultButton => OptionsOpen ? OptionsSensitivityButton
             : LevelSelectOpen && LevelSelect != null ? LevelSelect.DefaultSelectable
-            : TitleOpen ? PlayButton : PauseOpen ? ResumeButton : Hud != null && Hud.EndVisible ? Hud.EndButton : null;
+            : TitleOpen ? PlayButton
+            : PauseOpen ? ResumeButton
+            : Hud != null && Hud.EndVisible ? Hud.EndButton
+            : Hud != null && Hud.FailVisible ? Hud.FailRetryButton
+            : null;
 
         private void Update()
         {
@@ -755,8 +1087,12 @@ namespace Meuble
             }
         }
 
-        /// <summary>Back in the game: a player captures the cursor again (the editor leaves it to the click).</summary>
-        private void CaptureCursor()
+        /// <summary>
+        /// Back in the game: a player captures the cursor again (the editor leaves it to the click). Public so
+        /// GameState.Restart/NextLevel can call it too (M8 touch redesign: a real Restart/NextLevel press no longer
+        /// leaves the mouse cursor free from the panel it just left).
+        /// </summary>
+        public void CaptureCursor()
         {
             if (!Application.isEditor && !WantsCursor)
             {
@@ -805,6 +1141,43 @@ namespace Meuble
 
         // ----- Construction helpers -----
 
+        /// <summary>
+        /// M7 title redesign: a title page button, the shared menu button (<see cref="Hud.MenuButton"/>, so the same
+        /// navigation and label naming) restyled for the column: left aligned in the display face on a warm translucent
+        /// plate; under the mouse a lighter brown, selected the chair's red, so the two never look alike.
+        /// </summary>
+        private Button TitleButton(string name, string label, Font display, float y)
+        {
+            Button button = Hud.MenuButton(titleCanvas.transform, name, label, display, Labels);
+            Place((RectTransform)button.transform, new Vector2(0f, 0.5f), new Vector2(TitleMargin, y), TitleButtonSize);
+            ColorBlock colors = button.colors;
+            colors.normalColor = new Color(0.17f, 0.115f, 0.085f, 0.62f);
+            colors.highlightedColor = new Color(0.36f, 0.25f, 0.18f, 0.9f);
+            colors.selectedColor = new Color(0.8f, 0.2f, 0.16f, 0.97f);
+            colors.pressedColor = new Color(0.55f, 0.12f, 0.09f, 1f);
+            button.colors = colors;
+            if (Labels.TryGetValue(name + "Label", out Text text))
+            {
+                text.fontSize = 44;
+                text.alignment = TextAnchor.MiddleLeft;
+                text.color = TitleInk;
+                text.rectTransform.offsetMin = new Vector2(36f, 0f);
+                text.rectTransform.offsetMax = new Vector2(-24f, 0f);
+            }
+            return button;
+        }
+
+        /// <summary>A soft, low drop shadow: readable over the moving scene without the hard offset of the HUD text.</summary>
+        private static void SoftShadow(Text text)
+        {
+            var shadow = text.GetComponent<Shadow>();
+            if (shadow != null)
+            {
+                shadow.effectColor = new Color(0.05f, 0.03f, 0.02f, 0.55f);
+                shadow.effectDistance = new Vector2(2f, -3f);
+            }
+        }
+
         private Canvas Panel(string name)
         {
             var go = new GameObject(name, typeof(RectTransform));
@@ -830,10 +1203,15 @@ namespace Meuble
 
         private Text NewText(Transform parent, string name, string value, int size, Color color)
         {
+            return NewText(parent, name, value, size, color, font);
+        }
+
+        private Text NewText(Transform parent, string name, string value, int size, Color color, Font face)
+        {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var text = go.AddComponent<Text>();
-            text.font = font;
+            text.font = face;
             text.fontSize = size;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = color;

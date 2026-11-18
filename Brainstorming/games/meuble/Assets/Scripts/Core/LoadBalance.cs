@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5.md 16.5, option A; PRD 3.4): the load on the player furniture, a KINEMATIC rule. Fed once per

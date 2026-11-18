@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5.md 4 and 16.8, PRD 4.8): the robot vacuum's timeline, pure and deterministic. The robot follows

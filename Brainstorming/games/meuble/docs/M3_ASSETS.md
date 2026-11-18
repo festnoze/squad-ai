@@ -506,7 +506,7 @@ the same `LevelDef`, with a `model` field that may be absent.
 13. **Textures.** No pick has a texture. The textured ones are only the
     alternates: Building Kit door 512 px, blocky cat 512 px, alternate woman
     32 px.
-14. **Git.** `games/meuble/` is untracked today. `ThirdParty_staging/` holds
+14. **Git.** `games/OutOfSight/` is untracked today. `ThirdParty_staging/` holds
     9.7 MB of binaries: decide whether it is committed, ignored, or emptied
     once the picks move into `Assets/`.
 

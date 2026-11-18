@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Device reads (Input System package only). Keys are read by physical position: wKey is the key in
@@ -13,9 +13,19 @@ namespace Meuble
     /// </summary>
     public static class InputReader
     {
-        /// <summary>Movement intent, x right and y forward, magnitude at most 1.</summary>
+        /// <summary>
+        /// Movement intent, x right and y forward, magnitude at most 1. The arrow keys count exactly like WASD/ZQSD
+        /// (same v.x/v.y accumulation), and the gamepad D-pad exactly like the left stick: either moves the furniture.
+        /// While <see cref="InjectMoveVector"/> set a value (PlayMode tests cannot drive a keyboard device headless),
+        /// it is returned instead of reading any device; <see cref="ClearMoveVector"/> (or <see cref="ResetInjections"/>)
+        /// goes back to reading one.
+        /// </summary>
         public static Vector2 Move()
         {
+            if (injectedMoveVector.HasValue)
+            {
+                return Vector2.ClampMagnitude(injectedMoveVector.Value, 1f);
+            }
             Vector2 v = Vector2.zero;
             Keyboard k = Keyboard.current;
             if (k != null)
@@ -33,6 +43,11 @@ namespace Meuble
                 {
                     v += stick;
                 }
+                Vector2 dpad = g.dpad.ReadValue();
+                if (dpad.sqrMagnitude > 0.04f)
+                {
+                    v += dpad;
+                }
             }
             // M7 (CONTRACT_M7 1.5): the floating touch stick, with the left stick's dead zone.
             if (touchStick.sqrMagnitude > StickDeadZoneSq)
@@ -40,6 +55,25 @@ namespace Meuble
                 v += touchStick;
             }
             return Vector2.ClampMagnitude(v, 1f);
+        }
+
+        private static Vector2? injectedMoveVector;
+
+        /// <summary>
+        /// Tests: <see cref="Move"/> returns this value until <see cref="ClearMoveVector"/>, with no real device read.
+        /// Proves the furniture reacts to a move vector exactly as it would to a real key or stick, with no real
+        /// keyboard or gamepad device to drive headlessly: inject the same vector the arrow keys (or the D-pad) would
+        /// produce to prove they move the furniture like any other move key.
+        /// </summary>
+        public static void InjectMoveVector(Vector2 value)
+        {
+            injectedMoveVector = value;
+        }
+
+        /// <summary>Tests: <see cref="Move"/> goes back to reading a real device.</summary>
+        public static void ClearMoveVector()
+        {
+            injectedMoveVector = null;
         }
 
         /// <summary>Mouse motion this frame in pixels (zero when the window has no focus).</summary>
@@ -144,8 +178,8 @@ namespace Meuble
         }
 
         /// <summary>
-        /// One move press since the last call: a move key pressed, the left stick leaving its dead zone, or an
-        /// injected press. Consumes it. Rights a tipped stool (CONTRACT_M4 2.1).
+        /// One move press since the last call: a move key (including an arrow key) pressed, the left stick or the
+        /// D-pad leaving its dead zone, or an injected press. Consumes it. Rights a tipped stool (CONTRACT_M4 2.1).
         /// </summary>
         public static bool MovePressed()
         {
@@ -184,7 +218,8 @@ namespace Meuble
             bool move = k != null && (k.wKey.wasPressedThisFrame || k.sKey.wasPressedThisFrame || k.aKey.wasPressedThisFrame
                 || k.dKey.wasPressedThisFrame || k.upArrowKey.wasPressedThisFrame || k.downArrowKey.wasPressedThisFrame
                 || k.leftArrowKey.wasPressedThisFrame || k.rightArrowKey.wasPressedThisFrame);
-            bool stick = g != null && g.leftStick.ReadValue().sqrMagnitude > StickDeadZoneSq;
+            bool stick = g != null && (g.leftStick.ReadValue().sqrMagnitude > StickDeadZoneSq
+                || g.dpad.ReadValue().sqrMagnitude > StickDeadZoneSq);
             move |= stick && !stickWasActive;
             stickWasActive = stick;
             // M7: the touch action button is the E key, and the touch stick leaving its dead zone is a move press.
@@ -211,6 +246,7 @@ namespace Meuble
             injectedAction = false;
             injectedCareful = false;
             injectedMove = false;
+            injectedMoveVector = null;
             injectedPause = false;
             injectedRestart = false;
             injectedNextLevel = false;

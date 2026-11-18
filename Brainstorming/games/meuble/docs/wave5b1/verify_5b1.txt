@@ -947,5 +947,5 @@
     [temps] test_m5_audit_fidelity : temps : 21.4 s, 7605096 noeuds developpes (plafond 80000000, au plus 10132880 crees par recherche), 154935 rayons (plafond 20000000)
   ROUGE : audit (code 6)
 
-=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/meuble/TestResults) ===
+=== ROUGE (voir /c/Dev/squad-ai/Brainstorming/games/OutOfSight/TestResults) ===
 verify exit 1

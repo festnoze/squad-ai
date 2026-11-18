@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 2 and 15.4, CONTRACT_M5.md 16.6): the one floor height source of a level, from its

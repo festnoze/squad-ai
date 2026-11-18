@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEngine;
 
-namespace Meuble.Editor
+namespace OutOfSight.Editor
 {
     /// <summary>
     /// Command line entry points. In batch mode a failed build still exits 0 unless the method exits
@@ -13,8 +13,8 @@ namespace Meuble.Editor
     /// </summary>
     public static class Builder
     {
-        public const string WindowsOutput = "Build/Windows/Meuble.exe";
-        public const string AndroidOutput = "Build/Android/Meuble.apk";
+        public const string WindowsOutput = "Build/Windows/OutOfSight.exe";
+        public const string AndroidOutput = "Build/Android/OutOfSight.apk";
         /// <summary>CONTRACT_M7 1.3: the APK is at most 150 MB.</summary>
         public const long AndroidMaxBytes = 150L * 1024 * 1024;
 
@@ -38,7 +38,7 @@ namespace Meuble.Editor
             }
         }
 
-        [MenuItem("Meuble/Build Windows Player")]
+        [MenuItem("OutOfSight/Build Windows Player")]
         public static void BuildWindows()
         {
             string output = ArgOr("-output", WindowsOutput);
@@ -54,7 +54,7 @@ namespace Meuble.Editor
         /// switches to Android for the build and back to the target it had, so the other command line runs keep theirs.
         /// Fails when the APK is over <see cref="AndroidMaxBytes"/>.
         /// </summary>
-        [MenuItem("Meuble/Build Android Player")]
+        [MenuItem("OutOfSight/Build Android Player")]
         public static void BuildAndroid()
         {
             string output = ArgOr("-output", AndroidOutput);

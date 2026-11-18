@@ -1,4 +1,4 @@
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Rule switches (docs/CONTRACT_M2.md 3.7). M1 and M2 return a new instance on every call, so a test

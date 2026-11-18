@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M7 design (docs/CONTRACT_M7.md 4.1): the difficulty table. Facile only ever helps and Difficile only ever hinders,
@@ -270,7 +270,7 @@ namespace Meuble.Tests
         [Test]
         public void Option_DifficultyRoundTripsThroughSaveStore()
         {
-            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "meuble_difficulty_tests_" + System.Guid.NewGuid().ToString("N"));
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "outofsight_difficulty_tests_" + System.Guid.NewGuid().ToString("N"));
             System.IO.Directory.CreateDirectory(dir);
             try
             {

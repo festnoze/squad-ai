@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>Geometric half of the vision test (PRD 4.1, checks 1 and 2). Occlusion is the Runtime's job.</summary>
     public static class VisionMath

@@ -265,7 +265,7 @@
       "kind": "cabinet",
       "x": 8.25,
       "z": 0.35,
-      "yaw": 0.0,
+      "yaw": 180.0,
       "sizeX": 1.0,
       "sizeY": 1.0,
       "sizeZ": 0.6,

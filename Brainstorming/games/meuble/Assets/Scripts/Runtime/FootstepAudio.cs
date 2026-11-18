@@ -1,7 +1,7 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The footsteps of one inhabitant (docs/CONTRACT_M3.md 7). Added by <see cref="Sfx"/> with AddComponent on the
@@ -138,7 +138,7 @@ namespace Meuble
                 var entries = new AudioLibrary.Entry[Mathf.Max(1, Tuning.DogPatterVariants)];
                 for (int v = 0; v < entries.Length; v++)
                 {
-                    entries[v] = new AudioLibrary.Entry { clip = SynthesizePatter(v), activeRmsDb = AudioLibrary.TargetRmsDb, gain = Tuning.DogPatterGain };
+                    entries[v] = new AudioLibrary.Entry { clip = SynthesizePatter(v), loudness = AudioLibrary.ReferenceLufs, gain = Tuning.DogPatterGain };
                 }
                 dogPatter = entries;
                 return dogPatter;

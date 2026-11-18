@@ -85,7 +85,7 @@ mutation script five times against a file it did not own.
 
   Facing cannot be measured from bounds. **Yaw offsets are multiples of 90**, set in
   `ModelCatalogBuilder`, and checked by a test.
-- **Built by `Meuble.Editor.ModelCatalogBuilder.Build()`**, called from
+- **Built by `OutOfSight.Editor.ModelCatalogBuilder.Build()`**, called from
   `Builder.SetupAndCompile` (integrator) and idempotent. Being referenced from Resources is what
   ships the GLBs in the player.
 
@@ -222,7 +222,7 @@ and `end.body`. Enter returns to the title (or restarts level 1 in the editor).
 ## 7. Recorded audio
 
 - **`AudioLibrary`** (Runtime, ScriptableObject at `Assets/Resources/AudioLibrary.asset`), built
-  by `Meuble.Editor.AudioLibraryBuilder.Build()`. The integrator calls it from `SetupAndCompile`.
+  by `OutOfSight.Editor.AudioLibraryBuilder.Build()`. The integrator calls it from `SetupAndCompile`.
 - **`Sfx`** uses a recorded clip when the library has one, and its synthesis otherwise. Kept
   synthesized: "hm ?" and the tension loop. "hein ?" too, unless `vocal_huh` passes the product
   owner's listening pass.

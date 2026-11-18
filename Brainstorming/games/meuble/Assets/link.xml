@@ -1,0 +1,9 @@
+<!-- Compact Android APK (High managed stripping): keep what reflection reaches. Newtonsoft.Json builds the level,
+     manifest and save types through reflection (constructors and property setters the linker sees no call to), so
+     the game's assemblies and Newtonsoft.Json stay whole. The Input System needs no entry: its own
+     IUnityLinkerProcessor (InputSystem/Editor/BuildPipeline/LinkFileGenerator.cs) keeps the layouts in use. -->
+<linker>
+  <assembly fullname="OutOfSight.Core" preserve="all"/>
+  <assembly fullname="OutOfSight.Runtime" preserve="all"/>
+  <assembly fullname="Newtonsoft.Json" preserve="all"/>
+</linker>

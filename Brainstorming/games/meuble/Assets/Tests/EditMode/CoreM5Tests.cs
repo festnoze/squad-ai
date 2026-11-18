@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>Shared fixtures, recorder and telegraph analyzer of the M5 core tests (docs/CONTRACT_M5.md 3, 16.7).</summary>
     internal static class M5

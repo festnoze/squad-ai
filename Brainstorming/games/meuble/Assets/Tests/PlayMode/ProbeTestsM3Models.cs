@@ -3,14 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// The M3 models probe (docs/CONTRACT_M3.md 9, steps 22, 23 and 25) on the real Boot scene. Every step first
@@ -293,8 +293,8 @@ namespace Meuble.Tests
                 if (!string.IsNullOrEmpty(def.Player.Model))
                 {
                     Transform model = AssertModelElement(Game.Furniture.transform, level + " player");
-                    // M6 (CONTRACT_M6 2.4): the player's own furniture is lacquered (PrimitiveKit.LitSurface), not a plain Lit material.
-                    Material red = PrimitiveKit.LitSurface(playerColor, Surface.Lacquer);
+                    // M7 real colours (CONTRACT_M7 5): the player's own furniture shows the owner's red image (PlayerMaterial).
+                    Material red = PrimitiveKit.PlayerMaterial(playerColor);
                     Assert.IsTrue(model.GetComponentsInChildren<Renderer>(true).Any(r => r.sharedMaterials.Contains(red)),
                         level + ": the player model is not in the player colour");
                     foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
@@ -602,7 +602,7 @@ namespace Meuble.Tests
             foreach (Inhabitant h in Game.Level.Inhabitants)
             {
                 SkinnedMeshRenderer skin = h.GetComponentInChildren<SkinnedMeshRenderer>(true);
-                Assert.AreSame(womanMesh, skin.sharedMesh, $"premise: inhabitant {h.name} wears the woman model");
+                Assert.IsTrue(CharacterLook.UsesProjection(womanMesh, skin.sharedMesh), $"premise: {h.name} uses the woman model projection");
                 Assert.AreEqual(8, skin.sharedMaterials.Length, "premise: the woman has 8 material slots");
                 Assert.LessOrEqual(Probe.TrianglesUnder(h.transform), Tuning.BudgetInhabitantTriangles, $"the woman {h.name}: triangles");
                 Assert.LessOrEqual(Probe.BonesUnder(h.transform), Tuning.BudgetInhabitantBones, $"the woman {h.name}: bones");

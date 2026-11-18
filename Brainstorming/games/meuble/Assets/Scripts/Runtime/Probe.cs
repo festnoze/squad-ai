@@ -2,12 +2,12 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using Newtonsoft.Json;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Built player self check (PRD 10.4), in the Runtime assembly so a player can run it.
@@ -235,10 +235,11 @@ namespace Meuble
             report["frameTimeFailMs"] = FrameFailMs;
 
             // M2 inhabitant markers, a world space Canvas each: the "?" while Alerted, the "!" while
-            // Investigating. Shot in front of the chair, on the level loaded last.
+            // Investigating. Shot in front of the chair, on the start level (its main inhabitant is a human: since level 24
+            // the level loaded last starts with the dog, which never shows a marker).
             // The inhabitant stands ahead of the chair and to the right, so neither the HUD eye (top center)
             // nor the title card (which fades out after about 5 s) hides the marker.
-            Game.Restart();
+            Game.LoadLevel(startLevel);
             chair = Game.Furniture;
             inhabitant = Game.MainInhabitant;
             Vector3 chairAt = YawMath.Planar(chair.transform.position);

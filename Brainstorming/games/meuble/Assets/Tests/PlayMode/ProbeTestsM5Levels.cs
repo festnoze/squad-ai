@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M5 levels probe (docs/CONTRACT_M5.md 8, 12 and 16.10, 16.11, CONTRACT_M5_v3 11 and 15.10), on the real Boot scene.

@@ -1,7 +1,7 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// A static furniture of the same kind as the player (PRD 11 M2, docs/CONTRACT_M2.md 3.1). It never

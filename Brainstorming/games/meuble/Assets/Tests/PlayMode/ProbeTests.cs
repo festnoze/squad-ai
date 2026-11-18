@@ -1,12 +1,12 @@
 using System.Collections;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// PRD 10.2, the PlayMode probe. Runs the real Boot scene. Every wait is a count of fixed steps

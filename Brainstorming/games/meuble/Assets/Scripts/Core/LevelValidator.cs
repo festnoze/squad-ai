@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Static checks of a <see cref="LevelDef"/> (PRD 10.1, docs/CONTRACT_M2.md 4): everything that can be

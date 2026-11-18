@@ -18,8 +18,8 @@ of M1.
    write it in your final report instead of making it.
 2. **Never break the build for the others.** Changes to existing Core APIs are additive. Old
    signatures keep working, and new parameters are optional. Compile through the lock:
-   `MEUBLE_AGENT=<your-name> ./verify.sh compile`. Run only your tests:
-   `MEUBLE_AGENT=<name> tools/unity.sh test . --mode EditMode --filter "<Fixture>" --report-format junit --output TestResults/<name>.xml`
+   `OUTOFSIGHT_AGENT=<your-name> ./verify.sh compile`. Run only your tests:
+   `OUTOFSIGHT_AGENT=<name> tools/unity.sh test . --mode EditMode --filter "<Fixture>" --report-format junit --output TestResults/<name>.xml`
    Never call `unity` directly: always go through `tools/unity.sh`. It waits for the other
    agents' Unity runs.
 3. **Compile errors in a file you do not own** are another agent's work in progress. Wait about a
@@ -293,7 +293,7 @@ The integrator lands **compiling stubs** of every member below, each in its owne
 the builders start. A builder replaces the stub bodies in its own files and keeps the signatures.
 
 ```csharp
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     // GameRules.cs (core-rules)
     public sealed class GameRules { public bool DisplacementMemory, Hearing, Creak, ExitOnlyUnseen;
@@ -357,7 +357,7 @@ namespace Meuble.Core
     //   static class LevelManifest { static List<string> Parse(string json); }
 }
 
-namespace Meuble   // Runtime
+namespace OutOfSight   // Runtime
 {
     // Decoy.cs (runtime-world)
     public sealed class Decoy : MonoBehaviour { public int Id; public string Kind; public FurniturePose Pose;

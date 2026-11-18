@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Dollhouse view through shared walls (docs/CONTRACT_M2.md 6). An outer wall has a single inward face,

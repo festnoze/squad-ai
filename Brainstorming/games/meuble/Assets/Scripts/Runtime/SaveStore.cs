@@ -2,10 +2,10 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>How the last <see cref="SaveStore.Load"/> went (tests and the probe read it).</summary>
     public enum SaveLoadStatus
@@ -36,8 +36,8 @@ namespace Meuble
     /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.7, CONTRACT_M5 16.11): the save file, { "version": 1, "won": [...],
     /// "best": {...} } (<see cref="SaveData"/>). Static: Main calls <see cref="Boot"/> once at start.
     /// - Paths: only a built player run with neither --probe nor --look touches the real file
-    ///   (persistentDataPath/meuble_save.json, <see cref="ChoosePath"/>). The editor and --look use
-    ///   temporaryCachePath/meuble_save_test.json, --probe its shot folder; that file is deleted at boot.
+    ///   (persistentDataPath/outofsight_save.json, <see cref="ChoosePath"/>). The editor and --look use
+    ///   temporaryCachePath/outofsight_save_test.json, --probe its shot folder; that file is deleted at boot.
     /// - Writes: the .tmp is written and flushed to disk, then File.Replace swaps it in and keeps the previous file
     ///   as .bak (3 tries, 50 ms apart); when Replace keeps failing or is not supported (Android), the target is
     ///   copied to the .bak, deleted, and the .tmp moved (CONTRACT_M7 1.6); with no file yet the .tmp is just moved. An IO error after all that makes the session run in memory (a warning; nothing is
@@ -55,8 +55,8 @@ namespace Meuble
     /// </summary>
     public static class SaveStore
     {
-        public const string FileName = "meuble_save.json";
-        public const string TestFileName = "meuble_save_test.json";
+        public const string FileName = "outofsight_save.json";
+        public const string TestFileName = "outofsight_save_test.json";
         public const string TmpSuffix = ".tmp";
         public const string BakSuffix = ".bak";
         public const string BadSuffix = ".bad";
@@ -105,8 +105,8 @@ namespace Meuble
         }
 
         /// <summary>
-        /// The save path, pure: the real one (<paramref name="persistentDir"/>/meuble_save.json) only for a built player
-        /// run with neither --probe nor --look; otherwise <paramref name="tempDir"/>/meuble_save_test.json.
+        /// The save path, pure: the real one (<paramref name="persistentDir"/>/outofsight_save.json) only for a built player
+        /// run with neither --probe nor --look; otherwise <paramref name="tempDir"/>/outofsight_save_test.json.
         /// </summary>
         public static string ChoosePath(bool editor, bool probe, bool look, string persistentDir, string tempDir)
         {
@@ -131,7 +131,65 @@ namespace Meuble
         /// <summary>The path of this run when nothing overrides it (never the real file in the editor).</summary>
         public static string DefaultPath()
         {
-            return ChoosePath(Application.isEditor, Probe.Requested, LookRequested, Application.persistentDataPath, TestDir());
+            string path = ChoosePath(Application.isEditor, Probe.Requested, LookRequested, Application.persistentDataPath, TestDir());
+            if (!Application.isEditor && !Probe.Requested && !LookRequested)
+            {
+                MigrateFromOldProductFolder(path);
+            }
+            return path;
+        }
+
+        // The names before the rename to "Out of Sight" (2026-11-18): the old save must still be found under them.
+        /// <summary>The company folder before the rename (the desktop persistent path is company/product).</summary>
+        public const string OldCompanyFolder = "Meuble";
+        /// <summary>The product folder before the game became "Out of Sight".</summary>
+        public const string OldProductFolder = "UN, DEUX, TROIS, MEUBLE";
+        /// <summary>The save file name before the rename.</summary>
+        public const string OldFileName = "meuble_save.json";
+
+        /// <summary>
+        /// The rename to "Out of Sight" (2026-11-18) moved the desktop save: new company and product folders, new file
+        /// name. When the new save does not exist yet, the newest old one (company Meuble, product "Out of Sight" then
+        /// the older product folder) and its backup are copied over once, so the player's progress and records survive
+        /// the rename. Android keys its folder on the package id, a new app there. Never throws.
+        /// </summary>
+        private static void MigrateFromOldProductFolder(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    return;
+                }
+                string dir = Path.GetDirectoryName(path);
+                string company = string.IsNullOrEmpty(dir) ? null : Path.GetDirectoryName(dir);
+                string root = string.IsNullOrEmpty(company) ? null : Path.GetDirectoryName(company);
+                if (string.IsNullOrEmpty(root))
+                {
+                    return;
+                }
+                string oldCompany = Path.Combine(root, OldCompanyFolder);
+                foreach (string oldDir in new[] { Path.Combine(oldCompany, Path.GetFileName(dir)), Path.Combine(oldCompany, OldProductFolder) })
+                {
+                    string oldFile = Path.Combine(oldDir, OldFileName);
+                    if (!File.Exists(oldFile) || string.Equals(Path.GetFullPath(oldDir), Path.GetFullPath(dir), StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    Directory.CreateDirectory(dir);
+                    File.Copy(oldFile, path, false);
+                    if (File.Exists(oldFile + BakSuffix) && !File.Exists(path + BakSuffix))
+                    {
+                        File.Copy(oldFile + BakSuffix, path + BakSuffix, false);
+                    }
+                    Debug.Log("[SaveStore] save copied from the old folder " + oldDir);
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[SaveStore] could not copy the old save: " + e.Message);
+            }
         }
 
         /// <summary>
@@ -182,6 +240,8 @@ namespace Meuble
             ApplyVolume();
             // M7 (docs/CONTRACT_M7.md 1.4): and the quality tier.
             QualityTier.Apply(Options);
+            // And the language of every shown string (the views relabel through Strings.LanguageChanged).
+            Strings.SetLanguage(Options.LanguageId);
         }
 
         /// <summary>M6: the options (tests and Menu read and change them through here; never null).</summary>
@@ -205,13 +265,17 @@ namespace Meuble
             }
             ApplyVolume();
             QualityTier.Apply(Current.Options);
+            Strings.SetLanguage(Current.Options.LanguageId);
             Save();
         }
 
-        /// <summary>"Par défaut" (CONTRACT_M6 2.1): every option back to its default, applied and saved.</summary>
+        /// <summary>"Par défaut" (CONTRACT_M6 2.1): every option back to its default, applied and saved. The language is kept:
+        /// a player who picked French does not want the reset to switch the menus to English under them.</summary>
         public static void ResetOptions()
         {
-            SetOptions(SaveOptions.Default());
+            SaveOptions reset = SaveOptions.Default();
+            reset.Language = Options.Language;
+            SetOptions(reset);
         }
 
         /// <summary>The listener volume the options ask for (AudioListener.volume is 0 while <see cref="AudioMute"/> mutes).</summary>
@@ -532,6 +596,8 @@ namespace Meuble
             ApplyVolume();
             // M7: so is the quality level: back to the platform default (Haut on PC).
             QualityTier.Apply(Current.Options);
+            // And the language: back to English.
+            Strings.SetLanguage(Current.Options.LanguageId);
         }
 
         // ----- File helpers -----

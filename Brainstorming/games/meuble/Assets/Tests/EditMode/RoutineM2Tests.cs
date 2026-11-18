@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// docs/CONTRACT_M2.md section 10, the routine items: alert, retarget, investigate then carry then put down

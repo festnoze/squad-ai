@@ -1,4 +1,4 @@
-# UN, DEUX, TROIS, MEUBLE
+# Out of Sight: Don't Get Caught Moving
 
 A 3D stealth comedy in Unity 6.3 (URP): you are a chair, and you may only move while nobody is
 looking. The contract is [docs/PRD.md](docs/PRD.md). Code, comments and docs are in English. The
@@ -14,17 +14,18 @@ strings shown to the player are in French.
   Visual Studio can attach to), `-WaitForDebugger` (with `-Dev`, the game waits for the debugger at startup). The Unity Editor must
   not have the project open while it builds.
 - In game, **Ctrl+F** or **F11** toggles full screen (Alt+Enter works too).
-- The probe's build: `Build/Windows/Meuble.exe` (produced by `./verify.sh player`).
+- The probe's build: `Build/Windows/OutOfSight.exe` (produced by `./verify.sh player`).
 - Debugging in Visual Studio 2022: install the "Game development with Unity" workload (Visual Studio Installer;
   the project's `.vsconfig` lists it), set Unity's Preferences > External Tools > External Script Editor to
-  Visual Studio 2022, open `meuble.sln`, then Debug > Attach Unity Debugger: the Editor in Play mode (switch the
+  Visual Studio 2022, open `OutOfSight.sln`, then Debug > Attach Unity Debugger: the Editor in Play mode (switch the
   Editor to Debug mode with the bug icon in its status bar) or a player built with `play.cmd -Dev`.
 - In the editor: open the project with Unity 6000.3.23f1, open `Assets/Scenes/Boot.unity`, press Play.
 - Controls: ZQSD or the arrow keys move (camera relative, keys read by physical position), the
   mouse orbits the camera (click to capture the cursor), the wheel zooms, R restarts, Escape
   pauses (title, pause and end screens since M3). Since M4: Left Shift moves carefully (half
-  speed), E switches the floor lamp. Gamepad: the left stick moves, the right stick orbits, the
-  left trigger is careful mode, X is the action, Start pauses, Y restarts.
+  speed), E switches the floor lamp. Gamepad: the left stick or the D-pad moves, the right stick
+  orbits, the left trigger is careful mode, X is the action, Start pauses, Y restarts, B goes back
+  (closes the level select). A gamepad alone plays the whole game, menus included.
 
 ## Verify
 
@@ -32,7 +33,7 @@ strings shown to the player are in French.
 |---|---|
 | `./verify.sh` | runs every stage below and stops on the first red one |
 | `./verify.sh compile` | project setup (layers, Always Included Shaders, Boot scene) and the scripts compile |
-| `./verify.sh edit` | EditMode unit tests of `Meuble.Core` (PRD 10.1) |
+| `./verify.sh edit` | EditMode unit tests of `OutOfSight.Core` (PRD 10.1) |
 | `./verify.sh play` | PlayMode probe on the real Boot scene, steps 01 to 35 (PRD 10.2 and every milestone since) |
 | `./verify.sh audit` | level audit: walks free of props, an unseen schedule from spawn to exit, lesson checks and self-test fixtures (PRD 10.3) |
 | `./verify.sh player` | builds the Windows player, runs it with `--probe --shot`, and reads its report (PRD 10.4) |
@@ -188,10 +189,10 @@ because a project can be open in only one editor.
 
 | Assembly | Content |
 |---|---|
-| `Meuble.Core` | pure logic: `Tuning` (every constant), `Strings`, `VisionMath`, `MotionRule`, `CaughtRule`, `InhabitantRoutine`, `LevelDef` + `LevelJson`, `LevelValidator` |
-| `Meuble.Runtime` | `Main` (the only component of `Boot.unity`), `GameState` (one FixedUpdate drives every rule in a fixed order), `LevelBuilder`, `FurnitureKit`, `PrimitiveKit`, `FurnitureController`, `Inhabitant`, `Vision`, `VisionConeView`, `OrbitCamera`, `Hud`, `ProceduralArt`, `Sfx`, `Probe` |
-| `Meuble.Editor` | `ProjectSetup`, `Builder`, `LevelAudit` |
-| `Meuble.Tests.EditMode` / `.PlayMode` | unit tests of Core, and the probe |
+| `OutOfSight.Core` | pure logic: `Tuning` (every constant), `Strings`, `VisionMath`, `MotionRule`, `CaughtRule`, `InhabitantRoutine`, `LevelDef` + `LevelJson`, `LevelValidator` |
+| `OutOfSight.Runtime` | `Main` (the only component of `Boot.unity`), `GameState` (one FixedUpdate drives every rule in a fixed order), `LevelBuilder`, `FurnitureKit`, `PrimitiveKit`, `FurnitureController`, `Inhabitant`, `Vision`, `VisionConeView`, `OrbitCamera`, `Hud`, `ProceduralArt`, `Sfx`, `Probe` |
+| `OutOfSight.Editor` | `ProjectSetup`, `Builder`, `LevelAudit` |
+| `OutOfSight.Tests.EditMode` / `.PlayMode` | unit tests of Core, and the probe |
 
 Levels are data in `Assets/Resources/Levels/*.json`, played in the order of `levels.json`. Meshes, materials, HUD sprites and part of
 the sounds are generated in C#. Since M3 the project also ships CC0 models (Kenney, Quaternius) and recordings, and since M4.2 six CC0

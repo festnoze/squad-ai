@@ -248,7 +248,7 @@ PY
     flags=()
     if [ -n "$levels" ]; then flags+=(-auditLevels "$levels"); fi
     if [ -n "$fixtures" ]; then flags+=(-fixtures "$fixtures"); else flags+=(-skipFixtures); fi
-    "$PROJECT/tools/unity.sh" run . --timeout 2400 -- -executeMethod Meuble.Editor.LevelAudit.RunBatch "${flags[@]}" -logFile "$RESULTS/$id.audit.log" >"$RESULTS/$id.log" 2>&1
+    "$PROJECT/tools/unity.sh" run . --timeout 2400 -- -executeMethod OutOfSight.Editor.LevelAudit.RunBatch "${flags[@]}" -logFile "$RESULTS/$id.audit.log" >"$RESULTS/$id.log" 2>&1
   else
     # Only the tests that must turn red are run (a regex alternation of their name prefixes).
     "$PROJECT/tools/unity.sh" test . --mode "$mode" --filter "$(echo $expected | tr ' ' '|')" --report-format junit --output "$xml" --timeout 3600 >"$RESULTS/$id.log" 2>&1

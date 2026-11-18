@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// How a model is painted at instantiate time (docs/CONTRACT_M3.md 3, colours). Every colour is sRGB.

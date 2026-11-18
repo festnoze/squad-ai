@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M5 house data (docs/CONTRACT_M5_v3.md 2, 3, 4, 15.2, 15.4, 15.10; CONTRACT_M5.md 3, 6, 16.5 to 16.7): FloorMap,

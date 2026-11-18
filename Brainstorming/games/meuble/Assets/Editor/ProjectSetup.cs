@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEditor;
+using UnityEditor.Android;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 
-namespace Meuble.Editor
+namespace OutOfSight.Editor
 {
     /// <summary>
     /// Idempotent project setup, run before every build and by verify.sh: the layers of PRD 8.3 (plus
@@ -26,7 +27,7 @@ namespace Meuble.Editor
     public static class ProjectSetup
     {
         public const string ScenePath = "Assets/Scenes/Boot.unity";
-        public const string ProductName = "UN, DEUX, TROIS, MEUBLE";
+        public const string ProductName = "Out of Sight";
 
         private const int InhabitantLayerIndex = 8;
 
@@ -46,7 +47,8 @@ namespace Meuble.Editor
         // The x-ray look: whatever a wall hides is blue, a hue no wall, floor or furniture uses. The silhouette is a
         // light, dense blue; the hidden part of a cone a deeper blue at about a third (M3.1: the M3 pale yellow at
         // 0.12 vanished on the cream walls). The gaze itself is the facing chevron of VisionConeView.
-        private static readonly Color SilhouetteColor = new Color(0.22f, 0.52f, 1f, 0.7f);
+        // 0.85 opaque: at 0.7 the warm cream crepi walls (2026-11-18) washed the blue out to a faint tint.
+        private static readonly Color SilhouetteColor = new Color(0.22f, 0.52f, 1f, 0.85f);
         private static readonly Color ConeXRayColor = new Color(0.12f, 0.3f, 0.95f, 0.38f);
 
         // SSAO: contact shadows under the furniture and in the corners, kept light on a flat palette.
@@ -54,7 +56,7 @@ namespace Meuble.Editor
         private const float SsaoRadius = 0.3f;
         private const float SsaoDirectLighting = 0.25f;
 
-        [MenuItem("Meuble/Project Setup")]
+        [MenuItem("OutOfSight/Project Setup")]
         public static void Apply()
         {
             EnsureLayers();
@@ -62,9 +64,11 @@ namespace Meuble.Editor
             EnsureAlwaysIncludedShaders();
             EnsureBootScene();
             EnsurePlayerSettings();
+            EnsureSplashScreenDisabled();
             EnsureAndroidSettings();
             EnsureQualityLevels();
             EnsureRendererFeatures();
+            EnsureAppIcon();
             AssetDatabase.SaveAssets();
             Debug.Log("[ProjectSetup] Layers, shaders, Boot scene, player settings and renderer features are in place.");
         }
@@ -439,11 +443,13 @@ namespace Meuble.Editor
             {
                 PlayerSettings.productName = ProductName;
             }
-            if (PlayerSettings.companyName != "Meuble")
+            if (PlayerSettings.companyName != "OutOfSight")
             {
-                PlayerSettings.companyName = "Meuble";
+                PlayerSettings.companyName = "OutOfSight";
             }
-            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            // The product owner's request (2026-11-18): full screen by default (play.cmd -Windowed still opens a window).
+            PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
+            PlayerSettings.defaultIsNativeResolution = true;
             PlayerSettings.defaultScreenWidth = 1600;
             PlayerSettings.defaultScreenHeight = 900;
             PlayerSettings.resizableWindow = true;
@@ -452,18 +458,25 @@ namespace Meuble.Editor
             PlayerSettings.SetManagedStrippingLevel(UnityEditor.Build.NamedBuildTarget.Standalone, ManagedStrippingLevel.Low);
         }
 
+        /// <summary>No Unity splash screen or logo on startup, on Windows and Android (Unity 6 allows this on every plan).</summary>
+        private static void EnsureSplashScreenDisabled()
+        {
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.SplashScreen.showUnityLogo = false;
+        }
+
         // ----- M7 android (docs/CONTRACT_M7.md 1.3 and 1.4) -----
 
-        public const string AndroidPackage = "com.meuble.undeuxtrois";
+        public const string AndroidPackage = "com.outofsight.game";
         public const string PcAssetPath = "Assets/Settings/PC_RPAsset.asset";
         public const string MobileAssetPath = "Assets/Settings/Mobile_RPAsset.asset";
         private const string QualitySettingsPath = "ProjectSettings/QualitySettings.asset";
 
         /// <summary>
         /// CONTRACT_M7 1.3: IL2CPP, ARM64, minimum API 26, the highest installed target API, landscape only (both
-        /// sides), the package id, Vulkan then OpenGL ES 3, ASTC textures and the debug keystore. Minimal managed
-        /// stripping: IL2CPP needs some, and Minimal leaves the game's own assemblies (and the Newtonsoft reflection
-        /// over the save and level types) whole.
+        /// sides), the package id, Vulkan then OpenGL ES 3, ASTC textures and the debug keystore. Sized for a compact
+        /// APK: High managed stripping (Assets/link.xml leaves the game's own assemblies, and so the Newtonsoft
+        /// reflection over the save and level types, whole), IL2CPP code for size, R8 for the Java side.
         /// </summary>
         private static void EnsureAndroidSettings()
         {
@@ -473,7 +486,14 @@ namespace Meuble.Editor
                 PlayerSettings.SetApplicationIdentifier(android, AndroidPackage);
             }
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
-            PlayerSettings.SetManagedStrippingLevel(android, ManagedStrippingLevel.Minimal);
+            // Compact APK: High stripping (Assets/link.xml keeps the game's assemblies and Newtonsoft whole, for
+            // the reflection over the save and level types), IL2CPP code generated for size,
+            // Master configuration (link time optimization) and R8 minification of the Java code.
+            PlayerSettings.SetManagedStrippingLevel(android, ManagedStrippingLevel.High);
+            PlayerSettings.SetIl2CppCodeGeneration(android, UnityEditor.Build.Il2CppCodeGeneration.OptimizeSize);
+            PlayerSettings.SetIl2CppCompilerConfiguration(android, Il2CppCompilerConfiguration.Master);
+            PlayerSettings.Android.minifyRelease = true;
+            PlayerSettings.stripEngineCode = true;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
@@ -600,6 +620,94 @@ namespace Meuble.Editor
             {
                 Debug.Log("[ProjectSetup] Quality levels set: Bas, Moyen, Haut.");
             }
+        }
+
+        // ----- M7 app icon: a red chair with a long shadow (docs/m7/app_icon.png) -----
+
+        public const string AppIconPath = "Assets/Art/Icon/AppIcon_1024.png";
+        public const string AppIconAdaptiveBackgroundPath = "Assets/Art/Icon/AppIcon_Adaptive_Background_1024.png";
+        public const string AppIconAdaptiveForegroundPath = "Assets/Art/Icon/AppIcon_Adaptive_Foreground_1024.png";
+
+        /// <summary>
+        /// The app icon: the red chair, uncompressed and without mipmaps (PlayerSettings never samples
+        /// icon mips), set as the default/Standalone (Windows) icon and as the Android legacy icon, plus
+        /// the Android adaptive icon's background and foreground layers.
+        /// </summary>
+        private static void EnsureAppIcon()
+        {
+            Texture2D master = EnsureIconImporter(AppIconPath);
+            Texture2D background = EnsureIconImporter(AppIconAdaptiveBackgroundPath);
+            Texture2D foreground = EnsureIconImporter(AppIconAdaptiveForegroundPath);
+            if (master == null || background == null || foreground == null)
+            {
+                throw new InvalidOperationException("App icon textures not found under Assets/Art/Icon");
+            }
+
+            SetIcons(BuildTargetGroup.Unknown, master);     // PlayerSettings default icon
+            SetIcons(BuildTargetGroup.Standalone, master);  // Windows/Mac/Linux standalone icon
+            SetIcons(BuildTargetGroup.Android, master);     // Android legacy icon (shown if adaptive is off)
+
+            PlatformIconKind adaptive = AndroidPlatformIconKind.Adaptive;
+            PlatformIcon[] adaptiveIcons = PlayerSettings.GetPlatformIcons(BuildTargetGroup.Android, adaptive);
+            foreach (PlatformIcon icon in adaptiveIcons)
+            {
+                icon.SetTextures(new[] { background, foreground });
+            }
+            PlayerSettings.SetPlatformIcons(BuildTargetGroup.Android, adaptive, adaptiveIcons);
+        }
+
+        private static void SetIcons(BuildTargetGroup group, Texture2D icon)
+        {
+            int[] sizes = PlayerSettings.GetIconSizesForTargetGroup(group);
+            if (sizes.Length == 0)
+            {
+                return;
+            }
+            var icons = new Texture2D[sizes.Length];
+            for (int i = 0; i < icons.Length; i++)
+            {
+                icons[i] = icon;
+            }
+            PlayerSettings.SetIconsForTargetGroup(group, icons);
+        }
+
+        /// <summary>Uncompressed, no mipmaps, sRGB: a crisp source icon with no compression artefacts.</summary>
+        private static Texture2D EnsureIconImporter(string path)
+        {
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer)
+            {
+                bool changed = false;
+                if (importer.textureType != TextureImporterType.Default)
+                {
+                    importer.textureType = TextureImporterType.Default;
+                    changed = true;
+                }
+                if (importer.mipmapEnabled)
+                {
+                    importer.mipmapEnabled = false;
+                    changed = true;
+                }
+                if (importer.textureCompression != TextureImporterCompression.Uncompressed)
+                {
+                    importer.textureCompression = TextureImporterCompression.Uncompressed;
+                    changed = true;
+                }
+                if (!importer.alphaIsTransparency)
+                {
+                    importer.alphaIsTransparency = true;
+                    changed = true;
+                }
+                if (!importer.sRGBTexture)
+                {
+                    importer.sRGBTexture = true;
+                    changed = true;
+                }
+                if (changed)
+                {
+                    importer.SaveAndReimport();
+                }
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
 
         private static int LevelIndex(SerializedProperty levels, string name)

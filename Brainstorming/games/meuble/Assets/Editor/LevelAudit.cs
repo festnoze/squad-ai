@@ -5,7 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using Meuble.Core;
+using OutOfSight.Core;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEditor;
@@ -13,7 +13,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 
-namespace Meuble.Editor
+namespace OutOfSight.Editor
 {
     /// <summary>
     /// Level audit (PRD 10.3, docs/CONTRACT_M2.md 6 and 11.7), against the real built level, its real
@@ -118,7 +118,8 @@ namespace Meuble.Editor
     ///
     /// M6 (CONTRACT_M6 2.8; levels without these features keep their M5 results):
     /// - the wardrobe is a hiding cell (<see cref="SetUpHiding"/>): from a cell in its entry zone (WardrobeRule.InFront at every
-    ///   release offset), a body that fits (WardrobeRule.Fits, no load) enters with a 0.5 s action seen as moving, is then hidden
+    ///   release offset), a body that fits (WardrobeRule.Fits, no load) enters with a Tuning.WardrobeActionTime action seen as
+    ///   moving, is then hidden
     ///   (a state bit: no sight, no noise, no move; the gauge fills and the wait cap holds), and leaves where it entered with the
     ///   same action. Hidden, a human seeing the remembered spot empty (<see cref="SetUpSpot"/>) or a sitter forcing the player is
     ///   refused; a creak is muffled (half radius) and allowed only when nobody hears it over its whole window. Routes say
@@ -233,7 +234,7 @@ namespace Meuble.Editor
         /// </summary>
         public const string RouteHide = "hide";
         public const string RouteLeave = "leave";
-        // M6 (CONTRACT_M6 2.5): the wardrobe's entry and exit actions, in samples (0.5 s, rounded up).
+        // M6 (CONTRACT_M6 2.5): the wardrobe's entry and exit actions, in samples (Tuning.WardrobeActionTime, rounded up).
         private static readonly int HideSamples = Mathf.CeilToInt(Tuning.WardrobeActionTime / SampleSeconds - 1e-3f);
         // M6 (CONTRACT_M6 2.5): a creak while hidden happens somewhere in this many samples after the plan's gauge reaches the
         // cap (the replay's gauge runs up to 1 - GaugeCap ahead of the plan's): 30 samples.
@@ -473,7 +474,7 @@ namespace Meuble.Editor
             return DifficultyDef.Current.Id == DifficultyDef.Difficile ? def.DesignerRouteHard : def.DesignerRoute;
         }
 
-        [MenuItem("Meuble/Audit Levels")]
+        [MenuItem("OutOfSight/Audit Levels")]
         public static void RunFromMenu()
         {
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -482,7 +483,7 @@ namespace Meuble.Editor
             }
         }
 
-        [MenuItem("Meuble/Audit Levels and Write Designer Routes")]
+        [MenuItem("OutOfSight/Audit Levels and Write Designer Routes")]
         public static void RunAndWriteFromMenu()
         {
             if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())

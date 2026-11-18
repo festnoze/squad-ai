@@ -5,7 +5,8 @@ This is the licence file required by the M3 gate (PRD 11). The EditMode test `Li
 fails when a file under `Assets/ThirdParty` has no line here.
 
 All assets below are **CC0 1.0 Universal** (public domain dedication,
-https://creativecommons.org/publicdomain/zero/1.0/). CC0 requires no attribution: the credits
+https://creativecommons.org/publicdomain/zero/1.0/), except the title font (section Fonts, SIL OFL 1.1) and the music
+(section Music, CC BY 4.0, credited in the game on the title page). CC0 requires no attribution: the credits
 are a courtesy, and they keep the provenance auditable. Each licence was read on the item's own
 page on 2026-11-11. The full evidence is in [M3_ASSETS.md](M3_ASSETS.md) section 10 and
 [M3_AUDIO.md](M3_AUDIO.md).
@@ -43,79 +44,70 @@ The dog steps are synthesized at run time (`FootstepAudio`): no file.
 
 ## Textures (`Assets/ThirdParty/Textures`)
 
-M4.2. Each file is a 512 x 512 grayscale detail derived from the 1K-JPG download of an ambientCG material
-(https://ambientcg.com/get?file=<id>_1K-JPG.zip): the luminance of its Color map (times its AmbientOcclusion
-map for the parquet seams), rotated so the grain or the planks run vertically, high-passed and softened with
-wrap-around filters (still seamless), then remapped to a low contrast with a mean of exactly 240/255 and the
-highlights capped at 1.0. The licence was read on each item's own page (`https://ambientcg.com/a/<id>`) and on
-https://docs.ambientcg.com/license/ on 2026-11-13: "All assets are released under the Creative Commons CC0
-license".
+Retired on 2026-11-18: the ambientCG (CC0) derived details and normal maps of M4.2, M6 and M7 were replaced by the
+product owner's environment images below and deleted from `Assets/ThirdParty/Textures` (they remain in the git
+history; `tools/assets/derive_textures.py` documents how they were made). No file ships from this folder any more.
 
-| File | Title | Author | Source | Licence |
+## Environment (`Assets/Art/Environment`)
+
+The detail textures of every textured surface (`TextureLibrary`, `PrimitiveKit.Detail`), shipped through
+`Assets/Resources/TextureLibrary.asset` (built by `ModelCatalogBuilder.BuildTextureLibrary`). Not third party: the 13
+source images were provided by the product owner for this game on 2026-11-18. The shipped files under `Detail/` are
+derived from them by `tools/assets/derive_env_textures.py`: the luminance of the source (grayscale: the palette colour
+carries the meaning), its wrap edges cross-faded with a rolled copy where the source was not exactly seamless, wood,
+parquet and lacquer rotated so the grain or the planks run vertically, resized to 512 x 512 with a wrap-around filter,
+high-passed and softened (still seamless), then remapped to a calm contrast (no more fine detail than the detail it
+replaced) with a mean of exactly 240/255 and the highlights capped at 1.0. The normal maps (the ten surfaces of
+CONTRACT_M7 1.2; Plastic, Foliage and Soil stay bump-free) are a gentle periodic Sobel of the detail itself, OpenGL
+convention, no stronger than the map they replaced. The 1254 x 1254 sources are not referenced by any shipped asset,
+so they do not ship.
+
+M7 real colours (CONTRACT_M7 5, product owner decision of 2026-11-18): the shipped colour maps under `Colour/` are
+derived by `tools/assets/derive_env_colours.py` from the same sources and from `red_metal_source.png` (the player
+furniture, provided on 2026-11-18 too): the same wrap-edge cross-fade (rolls found on the luminance, applied to every
+channel), the same rotations and the same 512 x 512 wrap-around resize as the details, so the normal maps stay aligned;
+the colours are kept as they are (sRGB, no high pass, no remap). Every surface shows its colour map; the details still
+ship but are only shown on the inhabitants (CharacterLook keeps the palette rule).
+
+| Asset | Files | Author | Source | Licence |
 |---|---|---|---|---|
-| `ambientCG/detail_wood_Wood049.png` | Wood 049 (furniture wood grain) | ambientCG | https://ambientcg.com/a/Wood049 | CC0 1.0 |
-| `ambientCG/detail_parquet_WoodFloor051.png` | Wood Floor 051 (parquet of the hard floors) | ambientCG | https://ambientcg.com/a/WoodFloor051 | CC0 1.0 |
-| `ambientCG/detail_plaster_Plaster001.png` | Plaster 001 (walls and caps) | ambientCG | https://ambientcg.com/a/Plaster001 | CC0 1.0 |
-| `ambientCG/detail_upholstery_Fabric011.png` | Fabric 011 (upholstery weave) | ambientCG | https://ambientcg.com/a/Fabric011 | CC0 1.0 |
-| `ambientCG/detail_linen_Fabric036.png` | Fabric 036 (linen: clothes, table cloths, lamp shade) | ambientCG | https://ambientcg.com/a/Fabric036 | CC0 1.0 |
-| `ambientCG/detail_carpet_Carpet012.png` | Carpet 012 (rugs, doormat, soft floors) | ambientCG | https://ambientcg.com/a/Carpet012 | CC0 1.0 |
-
-M6 texture pass 2 (docs/CONTRACT_M6.md 2.4), the same derivation, read on each item's own page on 2026-11-15.
-
-| File | Title | Author | Source | Licence |
-|---|---|---|---|---|
-| `ambientCG/detail_grass_Grass001.png` | Grass 001 (the garden ground) | ambientCG | https://ambientcg.com/a/Grass001 | CC0 1.0 |
-| `ambientCG/detail_lacquer_PaintedWood006C.png` | Painted Wood 006C (the player furniture's glossy lacquer) | ambientCG | https://ambientcg.com/a/PaintedWood006C | CC0 1.0 |
-| `ambientCG/detail_metal_Metal009.png` | Metal 009 (office chair frame, lamp pole and base, robot body) | ambientCG | https://ambientcg.com/a/Metal009 | CC0 1.0 |
-| `ambientCG/detail_plastic_Plastic006.png` | Plastic 006 (the robot's bumper) | ambientCG | https://ambientcg.com/a/Plastic006 | CC0 1.0 |
-| `ambientCG/detail_foliage_Moss002.png` | Moss 002 (leaves: the potted plants and the fallen load's foliage) | ambientCG | https://ambientcg.com/a/Moss002 | CC0 1.0 |
-| `ambientCG/detail_soil_Ground104.png` | Ground 104 (the fallen load's spilled soil) | ambientCG | https://ambientcg.com/a/Ground104 | CC0 1.0 |
-
-M7 polish (docs/CONTRACT_M7.md 1.2), read on each item's own page on 2026-11-17.
-
-The kitchen and bathroom floor tile (room `"floorFinish": "tile"`, `LevelBuilder.BuildFloors`), the same
-grayscale derivation as M4.2/M6 above (luminance of the Color map, high-passed and softened with wrap-around
-filters, mean 240/255, highlights capped at 1.0):
-
-| File | Title | Author | Source | Licence |
-|---|---|---|---|---|
-| `ambientCG/detail_tile_Tiles049.png` | Tiles 049 (kitchen and bathroom floor tile) | ambientCG | https://ambientcg.com/a/Tiles049 | CC0 1.0 |
-
-Normal maps (CONTRACT_M7 1.2): for every M4.2/M6 detail that reads at play distance (wood, parquet, plaster,
-upholstery, linen, carpet, grass, lacquer, metal) and the new tile above, a 512 x 512 tangent space normal map
-derived from the same ambientCG material's `NormalGL` 1K-JPG download: decoded to a per texel tangent space
-vector, resized with the same wrap-around filter as its detail (so it tiles identically), renormalized (a plain
-resize of the encoded RGB would shrink the vectors and flatten the result) and re-encoded, imported as Unity's
-Normal map type. Shown through the URP Lit `_BumpMap` (`PrimitiveKit.Detail`), at a modest `_BumpScale` per
-surface (`Tuning`, CONTRACT_M7 1.2); Plastic, Foliage and Soil are not in the 1.2 list and stay bump-free. Same
-source material as its detail above, so no new id: the file is new, the licence already established.
-
-| File | Title | Author | Source | Licence |
-|---|---|---|---|---|
-| `ambientCG/normal_wood_Wood049.png` | Wood 049, NormalGL | ambientCG | https://ambientcg.com/a/Wood049 | CC0 1.0 |
-| `ambientCG/normal_parquet_WoodFloor051.png` | Wood Floor 051, NormalGL | ambientCG | https://ambientcg.com/a/WoodFloor051 | CC0 1.0 |
-| `ambientCG/normal_plaster_Plaster001.png` | Plaster 001, NormalGL | ambientCG | https://ambientcg.com/a/Plaster001 | CC0 1.0 |
-| `ambientCG/normal_upholstery_Fabric011.png` | Fabric 011, NormalGL | ambientCG | https://ambientcg.com/a/Fabric011 | CC0 1.0 |
-| `ambientCG/normal_linen_Fabric036.png` | Fabric 036, NormalGL | ambientCG | https://ambientcg.com/a/Fabric036 | CC0 1.0 |
-| `ambientCG/normal_carpet_Carpet012.png` | Carpet 012, NormalGL | ambientCG | https://ambientcg.com/a/Carpet012 | CC0 1.0 |
-| `ambientCG/normal_grass_Grass001.png` | Grass 001, NormalGL | ambientCG | https://ambientcg.com/a/Grass001 | CC0 1.0 |
-| `ambientCG/normal_lacquer_PaintedWood006C.png` | Painted Wood 006C, NormalGL | ambientCG | https://ambientcg.com/a/PaintedWood006C | CC0 1.0 |
-| `ambientCG/normal_metal_Metal009.png` | Metal 009, NormalGL | ambientCG | https://ambientcg.com/a/Metal009 | CC0 1.0 |
-| `ambientCG/normal_tile_Tiles049.png` | Tiles 049, NormalGL | ambientCG | https://ambientcg.com/a/Tiles049 | CC0 1.0 |
-
-The door leaves (`DoorLeaf.Create`) now show the lacquer detail above (`detail_lacquer_PaintedWood006C.png` and
-its normal map) too, as "painted wood": no new file, the leaf keeps its own matte material (not Lacquer's glossy
-fixed finish), only its surface tag changed.
+| Wood (furniture wood grain) | `wood.png`; derived: `Colour/colour_wood.png`, `Detail/detail_wood.png`, `Detail/normal_wood.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Parquet (parquet of the hard floors) | `parquet.png`; derived: `Colour/colour_parquet.png`, `Detail/detail_parquet.png`, `Detail/normal_parquet.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Plaster (walls and caps) | `plaster.png` (from `crepi_cream_source.png`, 2026-11-18); derived: `Colour/colour_plaster.png`, `Detail/detail_plaster.png`, `Detail/normal_plaster.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Upholstery (upholstery weave) | `upholstery.png`; derived: `Colour/colour_upholstery.png`, `Detail/detail_upholstery.png`, `Detail/normal_upholstery.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Linen (linen: clothes, table cloths, lamp shade) | `linen.png`; derived: `Colour/colour_linen.png`, `Detail/detail_linen.png`, `Detail/normal_linen.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Carpet (rugs, doormat, soft floors) | `carpet.png`; derived: `Colour/colour_carpet.png`, `Detail/detail_carpet.png`, `Detail/normal_carpet.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Grass (the garden ground) | `grass.png`; derived: `Colour/colour_grass.png`, `Detail/detail_grass.png`, `Detail/normal_grass.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Lacquer (door leaves; until 2026-11-18 also the player furniture) | `lacquer.png`; derived: `Colour/colour_lacquer.png`, `Detail/detail_lacquer.png`, `Detail/normal_lacquer.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Metal (office chair frame, lamp pole and base, robot body) | `metal.png`; derived: `Colour/colour_metal.png`, `Detail/detail_metal.png`, `Detail/normal_metal.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Plastic (the robot's bumper) | `plastic.png`; derived: `Colour/colour_plastic.png`, `Detail/detail_plastic.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Foliage (leaves: the potted plants and the fallen load's foliage) | `foliage.png`; derived: `Colour/colour_foliage.png`, `Detail/detail_foliage.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Soil (the fallen load's spilled soil) | `soil.png`; derived: `Colour/colour_soil.png`, `Detail/detail_soil.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Tile (kitchen and bathroom floor tile) | `tile.png`; derived: `Colour/colour_tile.png`, `Detail/detail_tile.png`, `Detail/normal_tile.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Red painted metal (the player furniture, PRD 7.2) | `red_metal_source.png`; derived: `Colour/colour_player.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 
 ## Audio (`Assets/ThirdParty/Audio`)
 
-Every clip was converted to mono 44.1 kHz 16-bit WAV, then trimmed and faded, by
-`tools/assets/audio_derive.py`. The original file names are given in parentheses.
+Every clip is made from the original download by `tools/audio/audio_pipeline.py` (audio overhaul of 2026-11-18,
+docs/audio/AUDIO_REPORT.md; until then `tools/assets/audio_derive.py`): mono 44.1 kHz, a 30 Hz high pass, silence
+trimmed, short fades, loudness matched under a -1 dBTP true peak, 16-bit WAV. The original file names are given in
+parentheses. The licences of the M3 picks were read on 2026-11-11 (docs/M3_AUDIO.md); the new picks of 2026-11-18 come
+from the same item pages, whose licence facts are in `ThirdParty_staging/audio/sources.json`.
 
 | File | Title | Author | Source | Licence |
 |---|---|---|---|---|
 | `hop_01.wav`, `hop_02.wav` | 75 CC0 breaking / falling / hit sfx (bfh1_wood_hit_01, 02) | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | `hop_03.wav`, `hop_04.wav` | 100 CC0 metal and wood SFX (wood_hit_05, 09) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
+| `hop_soft_01.wav`, `hop_soft_02.wav` | 75 CC0 breaking / falling / hit sfx (bfh1_wood_hit_01, 02, low passed at 700 Hz) | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
+| `hop_soft_03.wav`, `hop_soft_04.wav` | 100 CC0 metal and wood SFX (wood_hit_05, 09, low passed at 700 Hz) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
+| `wardrobe_close.wav` | 100 CC0 metal and wood SFX (wood_close_01) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
+| `topple.wav` | 100 CC0 metal and wood SFX (wood_falling_02) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
+| `wardrobe_open.wav` | 100 CC0 SFX (wooded_box_open) | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
+| `crash.wav` | 100 CC0 SFX (dishes_01) | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
+| `lamp_click.wav` | 100 CC0 SFX (switch_02) | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
+| `door_open.wav` | 50 RPG sound effects (doorOpen_1) | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| `sting_win.wav` | 85 Short music jingles (jingles_PIZZA10) | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
+| `ui_hover.wav` | Interface Sounds (tick_001) | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
 | `scrape_01.wav`, `scrape_02.wav`, `scrape_03.wav` | Saw or Wood Impact (three excerpts) | StarNinjas | https://opengameart.org/content/saw-or-wood-impact | CC0 1.0 |
 | `creak_long.wav` | 100 CC0 SFX (door_02) | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
 | `creak_short.wav` | 50 RPG sound effects (creak3) | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
@@ -127,3 +119,47 @@ Every clip was converted to mono 44.1 kHz 16-bit WAV, then trimmed and faded, by
 | `sting_caught_long.wav` | Game Over Trumpet SFX (losetrumpet) | 0new4y | https://opengameart.org/content/game-over-trumpet-sfx | CC0 1.0 |
 | `vocal_huh.wav` | huh? | TinyWorlds | https://opengameart.org/content/huh | CC0 1.0 |
 | `ui_click.wav` | Interface Sounds (click_001) | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+
+## Music (`Assets/ThirdParty/Audio/Music`)
+
+Audio overhaul (2026-11-18, docs/audio/AUDIO_REPORT.md section 5). Not CC0: both tracks are by Kevin MacLeod under
+**Creative Commons Attribution 4.0** (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/), which allows using them in a
+game, sold or not, with credit. The licence and the credit format were read on https://incompetech.com/music/royalty-free/faq.html
+on 2026-11-18 ("Title Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0"). The credit is
+shown in the game on the title page, under the game's own credits (`Strings` key `title.musicCredits`, English and French);
+`LicenseTests` checks it. Each shipped file is a seamless loop cut from the original MP3 (a stretch of the piece and a
+120 ms crossfade, the "changes made" CC BY asks to indicate), loudness normalised, Ogg Vorbis, by `tools/audio/audio_pipeline.py`.
+
+| File | Title | Author | Source | Licence |
+|---|---|---|---|---|
+| `Music/music_title.ogg` | "Sneaky Snitch" (the title page; a loop of 11.52 to 77.72 s) | Kevin MacLeod (incompetech.com) | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sneaky%20Snitch.mp3 (ISRC USUAN1100772) | CC BY 4.0 |
+| `Music/music_level.ogg` | "Investigations" (the levels; a loop of 18.11 to 58.53 s) | Kevin MacLeod (incompetech.com) | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Investigations.mp3 (ISRC USUAN1100646) | CC BY 4.0 |
+
+## Fonts (`Assets/ThirdParty/Fonts`)
+
+M7 title redesign. The game title's display face (title page, title page buttons, intro cards), loaded at run time
+from `Assets/ThirdParty/Fonts/Resources` (`Hud.DisplayFont`). Not CC0: it is under the **SIL Open Font License 1.1**
+(https://openfontlicense.org), which allows bundling it in a game, sold or not, as long as the font file is not sold on
+its own and its licence travels with it (the licence text sits next to the font and ships in the build). Downloaded
+from the Google Fonts repository on 2026-11-18; the licence was read in the file below.
+
+| File | Title | Author | Source | Licence |
+|---|---|---|---|---|
+| `Resources/DMSerifDisplay-Regular.ttf` | DM Serif Display Regular | Colophon Foundry (DM fonts, from Adobe's Source Serif) | https://github.com/google/fonts/tree/main/ofl/dmserifdisplay | SIL OFL 1.1 |
+| `Resources/DMSerifDisplay-OFL.txt` | DM Serif Display licence text (OFL.txt) | Adobe, Google LLC | https://github.com/google/fonts/blob/main/ofl/dmserifdisplay/OFL.txt | SIL OFL 1.1 |
+
+## Characters (`Assets/Art/Characters`)
+
+Rounded human GLBs in `Assets/Art/Characters/Models` are CC0 derivatives of the original Quaternius models listed above. Regenerate them with `tools/assets/round_characters.py`. The rig, clips and triangle indices are preserved.
+
+M7 heads and clothes (`CharacterHead`, `CharacterLook`). Not third party: the sources were provided by the product owner
+for this game on 2026-11-18. The heads use only `man_head_around.png` and `woman_head_around.png` (an all-around head
+image wrapped once around each human head), copied unchanged to `Resources/CharacterManHeadWrap.png` and
+`Resources/CharacterWomanHeadWrap.png` for the game. The clothes files are derived from their sources (the shirt and
+trousers files: the garment cropped, in its real colours; `Resources/CharacterClothesAtlas.png` packs them). The earlier
+face and head-back files (`man_face*.png`, `woman_face*.png`, `man_head_back*.png`, `woman_head_back*.png`) and the
+fabric sources `cotton_source.png` and `twill_source.png` in the same folder are not used by the game.
+
+| Asset | Files | Author | Source | Licence |
+|---|---|---|---|---|
+| Characters | `man_head_around.png`, `woman_head_around.png`, `man_face_source.png`, `woman_face_source.png`, `man_head_back_source.png`, `woman_head_back_source.png`, `shirt_front_source.png`, `shirt_back_source.png`, `trousers_front_source.png`, `trousers_back_source.png`; derived: `man_face.png`, `woman_face.png`, `man_head_back.png`, `woman_head_back.png`, `shirt_front.png`, `shirt_back.png`, `trousers_front.png`, `trousers_back.png`, `Resources/CharacterManHeadWrap.png`, `Resources/CharacterWomanHeadWrap.png`, `Resources/CharacterClothesAtlas.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |

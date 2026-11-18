@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// HUD (PRD 4.3, 9): eye indicator top center, red edge pulse, title card, controls, fail and win
@@ -39,7 +39,40 @@ namespace Meuble
         public HudEye Eye { get; private set; }
         public bool FailVisible => failCanvas != null && failCanvas.enabled;
         public bool WinVisible => winCanvas != null && winCanvas.enabled;
+
+        /// <summary>
+        /// M8 touch redesign: the win panel's own Next level/Replay/Menu buttons are up (a win with no end screen; the
+        /// end screen has its own Menu and Replay instead). None of them is EventSystem-selected (Enter and gamepad A
+        /// keep loading the next level the way GameState already reads them, so nothing here double-fires it); Menu
+        /// reads this only to free the mouse cursor so the buttons can be clicked (<see cref="Menu.WantsCursor"/>).
+        /// </summary>
+        public bool WinButtonsVisible => WinVisible && !EndVisible;
         public Font Font { get; private set; }
+
+        /// <summary>Resources path of the title's display face (Assets/ThirdParty/Fonts/Resources, SIL OFL 1.1, docs/LICENSES.md).</summary>
+        public const string DisplayFontResource = "DMSerifDisplay-Regular";
+        private static Font displayFont;
+
+        /// <summary>
+        /// M7 title redesign: the display face of the game title (title page, intro cards, title page buttons). Falls back to
+        /// the built-in font when the file is missing, so text always renders.
+        /// </summary>
+        public static Font DisplayFont
+        {
+            get
+            {
+                if (displayFont == null)
+                {
+                    displayFont = Resources.Load<Font>(DisplayFontResource);
+                    if (displayFont == null)
+                    {
+                        Debug.LogWarning("[Hud] " + DisplayFontResource + " not found: the title uses the built-in font");
+                        displayFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                    }
+                }
+                return displayFont;
+            }
+        }
 
         /// <summary>M6 (CONTRACT_M6 2.3): the dashed/striped pattern over the pulse is showing now (tests).</summary>
         public bool PulsePatternVisible => pulsePattern != null && pulsePattern.color.a > 0f;
@@ -85,6 +118,21 @@ namespace Meuble
         public string FailTitleText => failTitle != null ? failTitle.text : null;
         public string FailBodyText => failBody != null ? failBody.text : null;
 
+        // ----- M8 touch redesign (a phone has neither Enter nor R): the fail, win and end panels' own buttons. -----
+
+        /// <summary>The fail panel's Retry (restarts the level); selected by default, so Enter and gamepad A submit it.</summary>
+        public Button FailRetryButton { get; private set; }
+        /// <summary>The fail panel's Menu (back to the title).</summary>
+        public Button FailMenuButton { get; private set; }
+        /// <summary>The win panel's Next level (only while a next level exists; shares win.next's own Canvas).</summary>
+        public Button WinNextLevelButton { get; private set; }
+        /// <summary>The win panel's Replay (restarts the level).</summary>
+        public Button WinReplayButton { get; private set; }
+        /// <summary>The win panel's Menu (back to the title).</summary>
+        public Button WinMenuButton { get; private set; }
+        /// <summary>The end screen's Replay (restarts the last level), beside <see cref="EndButton"/>.</summary>
+        public Button EndReplayButton { get; private set; }
+
         private Canvas creakCanvas;
         private Canvas suspicionCanvas;
         private Canvas winNextCanvas;
@@ -95,6 +143,10 @@ namespace Meuble
         private Image suspicionFillImage;
         private Text failTitle;
         private Text failBody;
+        // The fail panel's and win panel's own hint lines (the ones that used to say "Press R"/"Press Enter"): kept so
+        // ShowFail/ShowWin/Relocalize can swap them for the touch wording while their Canvas stays the same.
+        private Text failAction;
+        private Text winNext;
 
         // ----- M3 (docs/CONTRACT_M3.md 6): menus, end screen, markers below the HUD band. -----
 
@@ -236,6 +288,14 @@ namespace Meuble
         private const float GaugeY = 96f;
         private const float ActionY = -110f;
         private const float EndActionY = -150f;
+        // M8 touch redesign: the fail, win and end panels' own button row, below every hint line and (on the win and
+        // end panels) below win.next or the record line. At least 140 px tall at 1080p (a touch target) even when a
+        // narrower than 16:9 window scales the canvas down (0.87 at 16:10, hence 170); the spacing is the
+        // centre-to-centre distance of two adjacent buttons.
+        private const float PanelButtonY = -300f;
+        private const float PanelButtonWidth = 480f;
+        private const float PanelButtonHeight = 170f;
+        private const float PanelButtonSpacing = 520f;
         // M4: the sat-on line, just above the eye backdrop (80 + 128 px).
         private const float SatOnY = 222f;
         private static readonly Color SatOnPlate = new Color(0.12f, 0.1f, 0.14f, 0.82f);
@@ -331,6 +391,9 @@ namespace Meuble
             titleCard.blocksRaycasts = false;
             Stretch((RectTransform)cardGo.transform);
             Text title = NewText(cardGo.transform, "Title", Strings.Title, 40, TextAnchor.MiddleCenter, new Color(1f, 0.92f, 0.75f, 1f));
+            // M7 title redesign: the game title in its own display face, as on the title page.
+            title.font = DisplayFont;
+            title.fontSize = 46;
             Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardTitleY), new Vector2(1600f, 60f));
             Text levelName = NewText(cardGo.transform, "LevelName", Strings.Level1Name, 84, TextAnchor.MiddleCenter, Color.white);
             Place(levelName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardNameY), new Vector2(1600f, 110f));
@@ -345,20 +408,59 @@ namespace Meuble
 
             failCanvas = NewPanel("FailPanel", Strings.FailTitle, Strings.FailBody, Strings.FailAction, new Color(0.25f, 0.02f, 0.03f, 0.62f),
                 new Color(1f, 0.42f, 0.38f, 1f), out failBody);
+            // M8 touch redesign: the panel's own Canvas overrides its sorting, so it needs its own raycaster for the
+            // buttons below to be clickable and tappable (the same reason BuildEndGroup already adds one of its own).
+            failCanvas.gameObject.AddComponent<GraphicRaycaster>();
             Labels.TryGetValue("FailPanelTitle", out failTitle);
-            winCanvas = NewPanel("WinPanel", Strings.WinTitle, string.Format(Strings.WinBody, "0,0"), Strings.WinAction,
+            Labels.TryGetValue("FailPanelAction", out failAction);
+            FailRetryButton = MenuButton(failCanvas.transform, "FailRetry", Strings.FailRetry, DisplayFont, Labels);
+            Place((RectTransform)FailRetryButton.transform, new Vector2(0.5f, 0.5f), new Vector2(-PanelButtonSpacing * 0.5f, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            FailMenuButton = MenuButton(failCanvas.transform, "FailMenu", Strings.PauseMenu, DisplayFont, Labels);
+            Place((RectTransform)FailMenuButton.transform, new Vector2(0.5f, 0.5f), new Vector2(PanelButtonSpacing * 0.5f, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            ChainLR(FailRetryButton, FailMenuButton);
+
+            winCanvas = NewPanel("WinPanel", Strings.WinTitle, string.Format(Strings.WinBody, Strings.FormatSeconds(0f)), Strings.WinAction,
                 new Color(0.02f, 0.16f, 0.08f, 0.58f), new Color(0.55f, 1f, 0.6f, 1f), out winBody);
+            winCanvas.gameObject.AddComponent<GraphicRaycaster>();
             Labels.TryGetValue("WinPanelTitle", out winTitle);
             Labels.TryGetValue("WinPanelAction", out winAction);
-            // win.next has its own Canvas inside the win panel: shown only when there is a next level.
+            // win.next and the Next level button share a Canvas inside the win panel: shown only with a next level.
             var nextGo = new GameObject("WinNextGroup", typeof(RectTransform));
             nextGo.transform.SetParent(winCanvas.transform, false);
             Stretch((RectTransform)nextGo.transform);
             winNextCanvas = nextGo.AddComponent<Canvas>();
-            Text next = NewText(nextGo.transform, "WinNext", Strings.WinNext, 38, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.6f, 1f));
-            Place(next.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -170f), new Vector2(1600f, 60f));
+            nextGo.AddComponent<GraphicRaycaster>();
+            winNext = NewText(nextGo.transform, "WinNext", Strings.WinNext, 38, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.6f, 1f));
+            Place(winNext.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -170f), new Vector2(1600f, 60f));
+            WinNextLevelButton = MenuButton(nextGo.transform, "WinNextLevel", Strings.WinNextButton, DisplayFont, Labels);
+            Place((RectTransform)WinNextLevelButton.transform, new Vector2(0.5f, 0.5f), new Vector2(-PanelButtonSpacing, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            // Replay and Menu are not EventSystem-selected (WinButtonsVisible doc): Enter and gamepad A keep loading
+            // the next level exactly as GameState already reads them, so no button here must also catch that press.
+            WinReplayButton = MenuButton(winCanvas.transform, "WinReplay", Strings.WinReplay, DisplayFont, Labels);
+            Place((RectTransform)WinReplayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            WinMenuButton = MenuButton(winCanvas.transform, "WinMenu", Strings.PauseMenu, DisplayFont, Labels);
+            Place((RectTransform)WinMenuButton.transform, new Vector2(0.5f, 0.5f), new Vector2(PanelButtonSpacing, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+
             BuildEndGroup();
             HidePanels();
+        }
+
+        /// <summary>M8 touch redesign: explicit left/right Navigation between two buttons of the same row.</summary>
+        private static void ChainLR(Button left, Button right)
+        {
+            Navigation ln = left.navigation;
+            ln.mode = Navigation.Mode.Explicit;
+            ln.selectOnRight = right;
+            left.navigation = ln;
+            Navigation rn = right.navigation;
+            rn.mode = Navigation.Mode.Explicit;
+            rn.selectOnLeft = left;
+            right.navigation = rn;
         }
 
         /// <summary>Creak gauge (PRD 4.6), left of the eye: crack icon, "Grincement", a bar filling to the right.</summary>
@@ -592,11 +694,19 @@ namespace Meuble
             Stretch((RectTransform)go.transform);
             endCanvas = go.AddComponent<Canvas>();
             go.AddComponent<GraphicRaycaster>();
-            endTime = NewText(go.transform, "EndTime", string.Format(Strings.WinBody, "0,0"), 40, TextAnchor.MiddleCenter,
+            endTime = NewText(go.transform, "EndTime", string.Format(Strings.WinBody, Strings.FormatSeconds(0f)), 40, TextAnchor.MiddleCenter,
                 new Color(1f, 1f, 1f, 0.92f));
             Place(endTime.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -82f), new Vector2(1600f, 60f));
-            EndButton = MenuButton(go.transform, "EndMenuButton", Strings.PauseMenu, Font, Labels);
-            Place((RectTransform)EndButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -250f), new Vector2(480f, 88f));
+            // M8 touch redesign: Rejouer beside Menu principal (a phone has no R key either). Menu principal stays the
+            // end screen's default-selected button (Enter submits it, docs/CONTRACT_M3.md 6, S2); Rejouer is reachable
+            // beside it with the keyboard or a gamepad's D-pad, and both are now at least 140 px tall at 1080p.
+            EndReplayButton = MenuButton(go.transform, "EndReplay", Strings.WinReplay, DisplayFont, Labels);
+            Place((RectTransform)EndReplayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(-PanelButtonSpacing * 0.5f, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            EndButton = MenuButton(go.transform, "EndMenuButton", Strings.PauseMenu, DisplayFont, Labels);
+            Place((RectTransform)EndButton.transform, new Vector2(0.5f, 0.5f), new Vector2(PanelButtonSpacing * 0.5f, PanelButtonY),
+                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            ChainLR(EndReplayButton, EndButton);
             endCanvas.enabled = false;
         }
 
@@ -624,6 +734,8 @@ namespace Meuble
             colors.colorMultiplier = 1f;
             colors.fadeDuration = 0.08f;
             button.colors = colors;
+            // Audio overhaul: the selection tick under the mouse and on keyboard or D-pad navigation.
+            go.AddComponent<UiHoverSound>();
             var textGo = new GameObject(name + "Label", typeof(RectTransform));
             textGo.transform.SetParent(go.transform, false);
             var text = textGo.AddComponent<Text>();
@@ -960,8 +1072,84 @@ namespace Meuble
             return string.IsNullOrEmpty(trait) ? coloured : coloured + "    " + trait;
         }
 
+        /// <summary>
+        /// The people block for these personalities (<see cref="PeopleLines"/>), remembered so a language change can list them
+        /// again in the new language.
+        /// </summary>
+        public void ShowPeopleOf(IEnumerable<PersonalityDef> people)
+        {
+            peopleDefs = people != null ? new List<PersonalityDef>(people) : null;
+            ShowPeople(PeopleLines(peopleDefs));
+        }
+
+        // What the intro card and the panels show, kept for Relocalize.
+        private LevelDef shownLevel;
+        private List<PersonalityDef> peopleDefs;
+        private float shownSeconds;
+
+        /// <summary>
+        /// The language changed: the lines built from formatted or composed strings are built again in the new language (the
+        /// intro card's level name, hint and people, the controls line, the fail, win and end panels). The plain labels were
+        /// already translated in place (Menu.OnLanguageChanged); nothing here changes what shows or the card's fade.
+        /// </summary>
+        public void Relocalize()
+        {
+            if (shownLevel != null)
+            {
+                if (Labels.TryGetValue("LevelName", out Text name))
+                {
+                    name.text = Strings.Get(shownLevel.NameKey);
+                }
+                if (Labels.TryGetValue("Hint", out Text hint))
+                {
+                    hint.text = Strings.Get(shownLevel.HintKey);
+                }
+            }
+            if (peopleOn && peopleDefs != null)
+            {
+                ShowPeople(PeopleLines(peopleDefs));
+            }
+            if (controls != null)
+            {
+                controls.text = controlsTouch ? Strings.HudControlsTouch : controlsGamepad ? Strings.HudControlsGamepad : Strings.HudControls;
+            }
+            if (failTitle != null)
+            {
+                failTitle.text = FailReason == LoseReason.Suspicion ? Strings.FailSuspicionTitle : Strings.FailTitle;
+            }
+            if (failBody != null)
+            {
+                failBody.text = FailReason == LoseReason.Suspicion ? Strings.FailSuspicionBody : Strings.FailBody;
+            }
+            if (failAction != null)
+            {
+                failAction.text = InputReader.TouchUIActive ? Strings.FailActionTouch : Strings.FailAction;
+            }
+            if (winTitle != null)
+            {
+                winTitle.text = endOn ? Strings.EndTitle : Strings.WinTitle;
+            }
+            if (winBody != null)
+            {
+                winBody.text = endOn ? Strings.EndBody : string.Format(Strings.WinBody, Strings.FormatSeconds(shownSeconds));
+            }
+            if (winAction != null)
+            {
+                winAction.text = InputReader.TouchUIActive ? Strings.WinActionTouch : Strings.WinAction;
+            }
+            if (winNext != null)
+            {
+                winNext.text = InputReader.TouchUIActive ? Strings.WinNextTouch : Strings.WinNext;
+            }
+            if (endTime != null)
+            {
+                endTime.text = string.Format(Strings.WinBody, Strings.FormatSeconds(shownSeconds));
+            }
+        }
+
         public void ShowLevel(LevelDef level)
         {
+            shownLevel = level;
             HidePanels();
             if (Labels.TryGetValue("LevelName", out Text name))
             {
@@ -1007,6 +1195,11 @@ namespace Meuble
             {
                 failBody.text = suspicion ? Strings.FailSuspicionBody : Strings.FailBody;
             }
+            if (failAction != null)
+            {
+                // M8 touch redesign: the hint line next to Retry/Menu never names a key a phone does not have.
+                failAction.text = InputReader.TouchUIActive ? Strings.FailActionTouch : Strings.FailAction;
+            }
             FailReason = reason == LoseReason.None ? LoseReason.SeenMoving : reason;
             failOn = true;
             winOn = false;
@@ -1026,10 +1219,17 @@ namespace Meuble
             {
                 winTitle.text = Strings.WinTitle;
             }
+            shownSeconds = seconds;
             winBody.text = string.Format(Strings.WinBody, Strings.FormatSeconds(seconds));
             if (winAction != null)
             {
                 winAction.rectTransform.anchoredPosition = new Vector2(0f, ActionY);
+                // M8 touch redesign: the hint line next to Replay/Next level/Menu never names a key a phone lacks.
+                winAction.text = InputReader.TouchUIActive ? Strings.WinActionTouch : Strings.WinAction;
+            }
+            if (winNext != null)
+            {
+                winNext.text = InputReader.TouchUIActive ? Strings.WinNextTouch : Strings.WinNext;
             }
             winNextOn = hasNext;
             endOn = false;

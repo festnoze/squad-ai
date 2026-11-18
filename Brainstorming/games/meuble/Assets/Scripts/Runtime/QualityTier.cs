@@ -1,10 +1,10 @@
 using System;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.3 and 1.4): the Qualité option applied at once. ProjectSetup writes three levels in
@@ -99,7 +99,7 @@ namespace Meuble
             int index = Array.IndexOf(names, LevelName(quality));
             if (index < 0)
             {
-                Debug.LogWarning($"[QualityTier] no quality level named {LevelName(quality)} (run Meuble/Project Setup)");
+                Debug.LogWarning($"[QualityTier] no quality level named {LevelName(quality)} (run OutOfSight/Project Setup)");
                 return;
             }
             if (QualitySettings.GetQualityLevel() != index)
@@ -148,7 +148,7 @@ namespace Meuble
             volume.isGlobal = true;
             volume.priority = Tuning.QualityVolumePriority;
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
-            profile.name = "Meuble Quality Bas";
+            profile.name = "OutOfSight Quality Bas";
             Bloom bloom = profile.Add<Bloom>(false);
             bloom.intensity.Override(0f);
             volume.sharedProfile = profile;

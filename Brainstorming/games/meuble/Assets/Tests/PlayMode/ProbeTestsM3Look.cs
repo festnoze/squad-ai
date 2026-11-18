@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M3 probe step 26 (docs/CONTRACT_M3.md 6 and 9): the title screen, the pause, the end screen, the world
@@ -167,7 +167,7 @@ namespace Meuble.Tests
 
             Menu.ShowTitle();
             Assert.IsTrue(Menu.TitleOpen && Menu.IsOpen, "ShowTitle did not open the title");
-            Assert.AreEqual(first, Game.LevelId, "the title is not over the first level of levels.json");
+            Assert.AreEqual(TitleCameraTour.LevelId, Game.LevelId, "the title is not over the title house (M7 title camera)");
             Assert.IsTrue(Game.Paused, "the title does not pause the game");
             Assert.IsTrue(GamePause.IsPaused);
             Assert.IsTrue(AudioListener.pause, "the audio listener is not paused under the title");
@@ -383,8 +383,8 @@ namespace Meuble.Tests
             Assert.IsTrue(Menu.TitleOpen, "Menu principal did not open the title");
             Assert.IsFalse(Menu.PauseOpen);
             Assert.IsTrue(Game.Paused);
-            Assert.AreEqual(Game.LevelOrder[0], Game.LevelId, "the title is not over the first level");
-            Assert.Less(YawMath.Planar(Chair.transform.position - spawn).magnitude, 0.05f, "the title shows the level as it was left (chair moved)");
+            Assert.AreEqual(TitleCameraTour.LevelId, Game.LevelId, "the title is not over the title house (M7 title camera)");
+            Assert.Less(YawMath.Planar(Chair.transform.position - Game.Def.Player.Position).magnitude, 0.05f, "the title shows the level as it was left (chair moved)");
             Assert.AreEqual(0f, Game.Elapsed, "the title shows the level as it was left (clock)");
             Menu.PlayButton.onClick.Invoke();
             Assert.IsFalse(Game.Paused);
@@ -442,7 +442,6 @@ namespace Meuble.Tests
         public IEnumerator Step26_EndScreenEnterOpensTheTitleOnlyOnce()
         {
             Menu.TitleAfterEnd = true;
-            string first = Game.LevelOrder[0];
             string last = Game.LevelOrder[Game.LevelOrder.Count - 1];
             Game.LoadLevel(last);
             Game.Rules = GameRules.M2;
@@ -454,7 +453,7 @@ namespace Meuble.Tests
 
             Submit();
             Assert.IsTrue(Menu.TitleOpen, "Enter on the end screen did not open the title (player branch)");
-            Assert.AreEqual(first, Game.LevelId, "the title is not over the first level");
+            Assert.AreEqual(TitleCameraTour.LevelId, Game.LevelId, "the title is not over the title house (M7 title camera)");
             Assert.IsTrue(Game.Paused);
             Assert.IsNull(EventSystem.current.currentSelectedGameObject, "a button of the title is selected in the frame of the Enter");
             Submit();
@@ -462,7 +461,12 @@ namespace Meuble.Tests
             yield return Steps(3);
             Assert.IsTrue(Menu.TitleOpen, "the Enter that opened the title also pressed Jouer");
             Assert.IsTrue(Game.Paused);
-            yield return Until(() => EventSystem.current.currentSelectedGameObject == Menu.PlayButton.gameObject, 5);
+            // Menu selects on its next Update, a rendered frame: the title house is a heavy load, and the long frame it
+            // makes runs several fixed steps at once, so a wait in fixed steps can end before that frame.
+            for (int i = 0; i < 10 && EventSystem.current.currentSelectedGameObject != Menu.PlayButton.gameObject; i++)
+            {
+                yield return null;
+            }
             Assert.AreEqual(Menu.PlayButton.gameObject, EventSystem.current.currentSelectedGameObject, "Jouer never got the selection");
 
             // Control: a later Enter does press Jouer.
@@ -480,6 +484,71 @@ namespace Meuble.Tests
             {
                 ExecuteEvents.Execute(selected, new BaseEventData(EventSystem.current), ExecuteEvents.submitHandler);
             }
+        }
+
+        // ----- M8 touch redesign: the fail and win panels' own buttons (a phone has neither Enter nor R) -----
+
+        /// <summary>Every button of a row is at least 140 px at 1080p, the touch target size (docs/CONTRACT_M7.md 1.5, Step63b).</summary>
+        private static void AssertButtonBig(Button button, string name)
+        {
+            Assert.IsNotNull(button, $"no {name} button");
+            var corners = new Vector3[4];
+            ((RectTransform)button.transform).GetWorldCorners(corners);
+            float w = (corners[2].x - corners[0].x) * 1080f / Screen.height;
+            float h = (corners[2].y - corners[0].y) * 1080f / Screen.height;
+            Assert.GreaterOrEqual(Mathf.Min(w, h), 140f, $"{name} is {w:0} x {h:0} px at 1080p, under 140");
+        }
+
+        /// <summary>
+        /// A win with a next level: Next level is big, clickable and loads it exactly like Enter (GameState still
+        /// reads Enter directly, docs/CONTRACT_M3.md 6; the button is a second, unselected way to the same call, so a
+        /// click never double-fires it, Hud.WinButtonsVisible doc). Caught on the next level: Retry is big, selected
+        /// by default (M3.1's pattern) and restarts the same level through its onClick, like R already does.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step65a_FailAndWinButtonsWorkThroughTheirOnClick()
+        {
+            Assert.IsTrue(Game.HasNextLevel, "premise: the first level has a next level");
+            string next = Game.NextLevelId;
+
+            yield return WinCurrentLevel();
+            Assert.IsTrue(Hud.WinButtonsVisible, "the win panel's own buttons are not up");
+            Assert.AreEqual(CursorLockMode.None, Cursor.lockState, "the cursor is not free for the win panel's buttons");
+            AssertButtonBig(Hud.WinNextLevelButton, "WinNextLevel");
+            AssertButtonBig(Hud.WinReplayButton, "WinReplay");
+            AssertButtonBig(Hud.WinMenuButton, "WinMenu");
+
+            Hud.WinNextLevelButton.onClick.Invoke();
+            yield return Until(() => Game.LevelId == next, 10);
+            Assert.AreEqual(next, Game.LevelId, "the Next level button did not load the next level");
+            Assert.AreEqual(PlayState.Playing, Game.State);
+            Assert.IsFalse(Hud.WinVisible, "the win panel is still shown");
+
+            // Caught on the new level: the chair moves right next to the inhabitant, in plain sight.
+            Vector3 at = Habitant.Routine.Position;
+            Vector3 near = at + new Vector3(0.8f, 0f, 0.4f);
+            Chair.Teleport(near, Chair.Yaw);
+            Habitant.Pin(at, YawToward(at, near));
+            Chair.ScriptedDirection = Vector3.forward;
+            yield return Until(() => Game.State != PlayState.Playing, 150);
+            Chair.ScriptedDirection = null;
+            Assert.AreEqual(PlayState.Caught, Game.State, "premise: the next level was not caught");
+            Assert.IsTrue(Hud.FailVisible);
+            Assert.AreEqual(CursorLockMode.None, Cursor.lockState, "the cursor is not free for the fail panel's buttons");
+            AssertButtonBig(Hud.FailRetryButton, "FailRetry");
+            AssertButtonBig(Hud.FailMenuButton, "FailMenu");
+            yield return Until(() => EventSystem.current.currentSelectedGameObject == Hud.FailRetryButton.gameObject, 5);
+            Assert.AreEqual(Hud.FailRetryButton.gameObject, EventSystem.current.currentSelectedGameObject, "Retry is not selected by default");
+
+            string caughtLevel = Game.LevelId;
+            int restarts = Game.Restarts;
+            Hud.FailRetryButton.onClick.Invoke();
+            yield return Steps(2);
+            Assert.AreEqual(caughtLevel, Game.LevelId, "Retry did not keep the same level");
+            Assert.AreEqual(restarts + 1, Game.Restarts, "Retry did not restart the level");
+            Assert.AreEqual(PlayState.Playing, Game.State);
+            Assert.IsFalse(Hud.FailVisible, "the fail panel is still shown");
+            Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
         }
 
         // ----- World markers and the HUD -----

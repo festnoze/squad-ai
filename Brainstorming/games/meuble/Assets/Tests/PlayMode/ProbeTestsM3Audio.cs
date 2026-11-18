@@ -1,14 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// Probe step 27, recorded audio (docs/CONTRACT_M3.md 7 and 9), on the real Boot scene. Every assertion reads
@@ -44,6 +44,11 @@ namespace Meuble.Tests
             { "roomTone", "roomtone_airvent_loop" }, { "clockLoop", "roomtone_clock_loop" },
             { "thump", "thump" }, { "stingCaught", "sting_caught" }, { "stingCaughtLong", "sting_caught_long" },
             { "vocalHuh", "vocal_huh" }, { "uiClick", "ui_click" },
+            // Audio overhaul (docs/audio/AUDIO_REPORT.md 2).
+            { "softHops[0]", "hop_soft_01" }, { "softHops[1]", "hop_soft_02" }, { "softHops[2]", "hop_soft_03" }, { "softHops[3]", "hop_soft_04" },
+            { "uiHover", "ui_hover" }, { "stingWin", "sting_win" }, { "doorOpen", "door_open" },
+            { "wardrobeOpen", "wardrobe_open" }, { "wardrobeClose", "wardrobe_close" }, { "crash", "crash" }, { "topple", "topple" },
+            { "lampClick", "lamp_click" },
         };
 
         [UnitySetUp]
@@ -180,13 +185,14 @@ namespace Meuble.Tests
                 AudioClipLoadType wanted = loop ? AudioClipLoadType.CompressedInMemory : AudioClipLoadType.DecompressOnLoad;
                 Assert.AreEqual(wanted, clip.loadType, role + " load type");
                 // The volume comes from the measured RMS to the common target (contract 7).
-                Assert.That(entry.activeRmsDb, Is.InRange(-40f, -10f), role + " has no measured RMS");
-                Assert.AreEqual(AudioLibrary.GainFor(entry.activeRmsDb), entry.gain, 1e-4f, role + " gain is not derived from its RMS");
-                float matched = entry.activeRmsDb + 20f * Mathf.Log10(entry.gain);
-                Assert.AreEqual(AudioLibrary.TargetRmsDb, matched, 0.01f, role + " is not matched to the common target");
+                Assert.That(entry.loudness, Is.InRange(-40f, -10f), role + " has no measured RMS");
+                Assert.AreEqual(AudioLibrary.GainFor(entry.loudness), entry.gain, 1e-4f, role + " gain is not derived from its RMS");
+                float matched = entry.loudness + 20f * Mathf.Log10(entry.gain);
+                Assert.AreEqual(AudioLibrary.ReferenceLufs, matched, 0.01f, role + " is not matched to the common target");
             }
             Assert.AreEqual(ExpectedRoles.Count, roles, "role count");
             Assert.AreEqual(4, library.hops.Length);
+            Assert.AreEqual(4, library.softHops.Length);
             Assert.AreEqual(3, library.scrapes.Length);
             Assert.AreEqual(5, library.footsteps.Length);
             yield return Steps(5);
@@ -478,7 +484,7 @@ namespace Meuble.Tests
             Assert.IsFalse(tone.ignoreListenerPause, "the room tone must pause with the game");
             Assert.AreSame(Sfx.gameObject, tone.gameObject);
             // A bed at a low level: between -55 and -38 dBFS active RMS (the cues sit near -18 to -29).
-            float level = library.roomTone.activeRmsDb + 20f * Mathf.Log10(Mathf.Max(tone.volume, 1e-6f));
+            float level = library.roomTone.loudness + 20f * Mathf.Log10(Mathf.Max(tone.volume, 1e-6f));
             Assert.That(level, Is.InRange(-55f, -38f), $"room tone at {level:0.0} dBFS");
             int loops = 0;
             foreach (AudioSource s in Sfx.GetComponents<AudioSource>())
@@ -517,6 +523,9 @@ namespace Meuble.Tests
                 { "roomTone", Tuning.SfxRoomToneMix }, { "clockLoop", Tuning.SfxClockMix }, { "thump", Tuning.SfxThumpMix },
                 { "stingCaught", Tuning.SfxCaughtMix }, { "stingCaughtLong", Tuning.SfxCaughtMix }, { "vocalHuh", Tuning.SfxHeinMix },
                 { "uiClick", Tuning.SfxUiClickMix },
+                { "softHops", Tuning.SfxSoftHopMix }, { "uiHover", Tuning.SfxUiHoverMix }, { "stingWin", Tuning.SfxWinMix },
+                { "doorOpen", Tuning.SfxDoorMix }, { "wardrobeOpen", Tuning.SfxWardrobeMix }, { "wardrobeClose", Tuning.SfxWardrobeMix },
+                { "crash", Tuning.SfxCrashMix }, { "topple", Tuning.SfxToppleMix }, { "lampClick", Tuning.SfxLampClickMix },
             };
             foreach (KeyValuePair<string, AudioLibrary.Entry> pair in library.Roles())
             {
@@ -535,8 +544,10 @@ namespace Meuble.Tests
                 AssertEffective("hops[" + v + "]", library.hops[v], Tuning.SfxHopMix, sfx.LastVolume);
             }
             Assert.AreEqual(4, hopVariants.Count, "premise: every hop variant played");
+            // Audio overhaul: a soft hop plays its own muffled variant at its own mix.
             sfx.PlaySoftHop();
-            Assert.AreEqual(library.hops[sfx.LastHopVariant].gain * Tuning.SfxHopMix * 0.25f, sfx.LastVolume, 1e-3f, "soft hop");
+            Assert.AreSame(library.softHops[sfx.LastSoftHopVariant].clip, sfx.LastClip, "the soft hop plays a muffled variant");
+            AssertEffective("softHops[" + sfx.LastSoftHopVariant + "]", library.softHops[sfx.LastSoftHopVariant], Tuning.SfxSoftHopMix, sfx.LastVolume);
 
             // Scrapes on a pick up, one of each variant.
             var scrapeVariants = new HashSet<int>();

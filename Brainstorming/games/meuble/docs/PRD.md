@@ -1,4 +1,4 @@
-# PRD - UN, DEUX, TROIS, MEUBLE
+# PRD - Out of Sight
 
 Product requirements document. Version 1.10, 2026-11-15 (1.10 splits M6: the level work and the M6 gate move to M6b). Version 1.9, 2026-11-15 (1.9 splits milestone M6 at the product owner's request: M6 keeps the finishing work on PC and gains texture pass 2 and open question 28, the mobile port becomes M7). Version 1.8, 2026-11-13 (1.8 adds the M5 wave 5A notes in section 11). Version 1.7, 2026-11-13 (1.7 rewrites M5 after the product owner's M4 playtest: 10 new levels that combine mechanics, larger maze houses, several inhabitants with personalities, the robot vacuum, the rocking chair and the balanced load; adds 3.4, 4.8, 5.4 and the 7.4 house budgets). Version 1.6, 2026-11-12 (1.6 adds the M4 notes in section 11, the 3.3 and 4.7 amendments and open questions 11 to 15). Version 1.5, 2026-11-12 (1.5 adds the M3 notes in section 11 and the pause to hud.controls). Version 1.4, 2026-11-11 (1.4 writes back the
 M2.1 fixes found by the critique of the M2 result: discovery grace,
@@ -11,7 +11,7 @@ sofa and table positions of level 1 moved after the level audit, dwell
 extension rule, a still furniture is never displaced, see the M1 notes in
 sections 3.2, 5.1 and 6.3).
 
-This document is the contract for `games/meuble`: a 3D stealth comedy game in
+This document is the contract for `games/OutOfSight`: a 3D stealth comedy game in
 Unity where the player is a piece of furniture that may only move while nobody
 is looking. It defines the rules, every constant, the asset strategy, the Unity
 architecture, the verification harness and seven delivery milestones. Milestone 1
@@ -558,7 +558,7 @@ measurement stays in M7.
 
 ### 8.1 Project
 
-- Location: `Brainstorming/games/meuble` (Unity project at the root, this PRD
+- Location: `Brainstorming/games/OutOfSight` (Unity project at the root, this PRD
   in `docs/`).
 - Unity 6.3 LTS (`6000.3.23f1` as installed on 2026-09-03 in
   `C:\Dev\Unity\Editors`; confirm the installed version before bootstrapping).
@@ -572,11 +572,11 @@ measurement stays in M7.
 
 | Assembly | Content | References |
 |---|---|---|
-| `Meuble.Core` | pure logic, no `UnityEngine` scene access: `VisionMath`, `MotionRule`, `CaughtRule`, `LevelDef`, `LevelValidator` | UnityEngine (math types only), Newtonsoft |
-| `Meuble.Runtime` | MonoBehaviours | Core, Input System, URP |
-| `Meuble.Editor` | `Builder` (player build entry point), menu tools | Runtime |
-| `Meuble.Tests.EditMode` | unit tests of Core | Core |
-| `Meuble.Tests.PlayMode` | probe (section 10.2) | Core, Runtime |
+| `OutOfSight.Core` | pure logic, no `UnityEngine` scene access: `VisionMath`, `MotionRule`, `CaughtRule`, `LevelDef`, `LevelValidator` | UnityEngine (math types only), Newtonsoft |
+| `OutOfSight.Runtime` | MonoBehaviours | Core, Input System, URP |
+| `OutOfSight.Editor` | `Builder` (player build entry point), menu tools | Runtime |
+| `OutOfSight.Tests.EditMode` | unit tests of Core | Core |
+| `OutOfSight.Tests.PlayMode` | probe (section 10.2) | Core, Runtime |
 
 Any assembly that sets `overrideReferences` must list `Newtonsoft.Json.dll`
 in `precompiledReferences`.
@@ -624,7 +624,7 @@ These were paid for on `viewpoint_unity` and are requirements here:
 
 | Key | Text |
 |---|---|
-| title | UN, DEUX, TROIS, MEUBLE |
+| title | Out of Sight |
 | level1.name | Le salon |
 | level1.hint | Ne bouge que lorsque personne ne regarde. |
 | hud.controls | ZQSD : avancer    Souris : caméra    R : recommencer    Échap : pause (v1.5: pause added in M3) |
@@ -1026,7 +1026,7 @@ sections 16 and 17):
   - The furniture visual follows the ramp slope, while the rules box stays upright.
   - Eyes, samples and cells add the floor height.
 - **Save, level select, records.**
-  - Save: `meuble_save.json` in the persistent folder, written atomically with a .bak. A missing
+  - Save: `outofsight_save.json` in the persistent folder, written atomically with a .bak. A missing
     file is recovered from the .tmp, then the .bak. The editor, `--probe` and `--look` never touch
     it.
   - Level select: one card per level with its best time, levels unlocked in order. Play starts the
@@ -1121,7 +1121,7 @@ its agent. Ctrl+F and F11 toggle full screen.
    Default: comedy.
 2. **Camera**: third person orbit with dollhouse walls. Default: as written.
 3. **Mobile priority**: PC first, Android at M7. Default: as written.
-4. **Game name**: "UN, DEUX, TROIS, MEUBLE". Default: as written.
+4. **Game name**: "Out of Sight". Default: as written.
 5. **Vision cone always visible**: default yes in M1, becomes an option in M6.
 6. **Voluntary creak**: a key that creaks on demand (and resets the gauge),
    to use the creak as a deliberate lure. Default: not in M2, decided after

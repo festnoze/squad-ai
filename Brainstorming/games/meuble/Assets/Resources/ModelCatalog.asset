@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 533f33752cde18148ab5fae783871fd0, type: 3}
   m_Name: ModelCatalog
-  m_EditorClassIdentifier: Meuble.Runtime::Meuble.ModelCatalog
+  m_EditorClassIdentifier: OutOfSight.Runtime::OutOfSight.ModelCatalog
   entries:
   - id: kenney.chair
     prefab: {fileID: 2107409826236812522, guid: 4712022730a83ed4baae237a7c93fa8b, type: 3}
@@ -105,9 +105,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.man
-    prefab: {fileID: 2242888416370347441, guid: aa95814197af2064e9276295fe399d46, type: 3}
-    nativeSize: {x: 1.4170315, y: 4.8119526, z: 0.9098803}
-    boundsCenter: {x: -0.0067906976, y: 2.4016817, z: 0.044088632}
+    prefab: {fileID: 2242888416370347441, guid: 40e1141da2e6d714e9096a4c124ec055, type: 3}
+    nativeSize: {x: 1.4108887, y: 4.8082066, z: 0.88955534}
+    boundsCenter: {x: -0.009862125, y: 2.3998086, z: 0.05089152}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -118,9 +118,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.woman
-    prefab: {fileID: 2242888416370347441, guid: 7720401172c91334b89759aec9edac3a, type: 3}
-    nativeSize: {x: 1.407968, y: 4.6362534, z: 0.818936}
-    boundsCenter: {x: -0.011322379, y: 2.293133, z: 0.07693812}
+    prefab: {fileID: 2242888416370347441, guid: 671e718e2565341499f074b765dbfefc, type: 3}
+    nativeSize: {x: 1.3914616, y: 4.6288385, z: 0.80106974}
+    boundsCenter: {x: -0.019575596, y: 2.2894256, z: 0.08587125}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -131,9 +131,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.man_shorts
-    prefab: {fileID: 2242888416370347441, guid: f625164da931479b9d7cc4980cd50613, type: 3}
-    nativeSize: {x: 1.4263439, y: 4.8267894, z: 0.8228686}
-    boundsCenter: {x: -0.002134502, y: 2.4101646, z: 0.08379105}
+    prefab: {fileID: 2242888416370347441, guid: 8d2ae590109d65a4a83e395fa1471523, type: 3}
+    nativeSize: {x: 1.4230211, y: 4.823945, z: 0.80128145}
+    boundsCenter: {x: -0.0037959218, y: 2.4087424, z: 0.09121105}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -144,9 +144,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.man_suit
-    prefab: {fileID: 2242888416370347441, guid: b2e7337fd09f4e06a16974ddd873cfee, type: 3}
-    nativeSize: {x: 1.4199846, y: 4.8282843, z: 0.9217315}
-    boundsCenter: {x: -0.0053141713, y: 2.4111106, z: 0.025540292}
+    prefab: {fileID: 2242888416370347441, guid: 8aaadee9ea291c44b8e1e63019d4ab0a, type: 3}
+    nativeSize: {x: 1.4185038, y: 4.824891, z: 0.9021946}
+    boundsCenter: {x: -0.00605458, y: 2.409414, z: 0.03530869}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -157,9 +157,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.man_tshirt
-    prefab: {fileID: 2242888416370347441, guid: ae8989c009f240788a59f052ceeaa1d3, type: 3}
-    nativeSize: {x: 1.4280725, y: 4.8432784, z: 0.8219147}
-    boundsCenter: {x: -0.0012702346, y: 2.4186738, z: 0.08331409}
+    prefab: {fileID: 2242888416370347441, guid: 91367e09f21e4c14f9dc172b662d7221, type: 3}
+    nativeSize: {x: 1.4245925, y: 4.8272977, z: 0.80032384}
+    boundsCenter: {x: -0.0030102134, y: 2.4106834, z: 0.090732455}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -170,9 +170,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.woman_jacket
-    prefab: {fileID: 2242888416370347441, guid: e385902b549e4fcdb5bc56ae52e99934, type: 3}
-    nativeSize: {x: 1.4011832, y: 4.65279, z: 0.81450427}
-    boundsCenter: {x: -0.0147147775, y: 2.3031452, z: 0.079154015}
+    prefab: {fileID: 2242888416370347441, guid: 2cfec1b0de9663d4e81e7c2a1d960c7d, type: 3}
+    nativeSize: {x: 1.3943197, y: 4.646077, z: 0.79625297}
+    boundsCenter: {x: -0.018146574, y: 2.299789, z: 0.088279665}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -183,9 +183,9 @@ MonoBehaviour:
     idleClip: 
     walkClip: 
   - id: quaternius.woman_dress
-    prefab: {fileID: 2242888416370347441, guid: 6625eaaa26ab4d79b5b0bc02666bca5d, type: 3}
-    nativeSize: {x: 1.3988769, y: 4.654792, z: 1.2175982}
-    boundsCenter: {x: -0.015867949, y: 2.3014133, z: 0.09146088}
+    prefab: {fileID: 2242888416370347441, guid: f1e7f8a48b1679d43a7299444ea68f2e, type: 3}
+    nativeSize: {x: 1.3824658, y: 4.6513023, z: 1.1367922}
+    boundsCenter: {x: -0.024073482, y: 2.2996686, z: 0.06699169}
     yawOffset: 0
     rigged: 1
     headBone: Head

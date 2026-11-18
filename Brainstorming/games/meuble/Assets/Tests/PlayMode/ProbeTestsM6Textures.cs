@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M6 texture pass 2 probe (docs/CONTRACT_M6.md 2.4): the six new surfaces (Grass, Lacquer, Metal, Plastic,
@@ -134,6 +134,28 @@ namespace Meuble.Tests
             Assert.That(s.Material.GetFloat("_Metallic"), Is.EqualTo(metallic).Within(1e-4f), $"{label}: {Label(s)} metallic");
         }
 
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): a player furniture slot shows the owner's red image through its own material,
+        /// at the painted metal finish (Tuning.PlayerSmoothness and PlayerMetallic), with a white base colour.
+        /// </summary>
+        private static void AssertPlayerFinish(Slot s, string label)
+        {
+            Assert.AreSame(TextureLibrary.PlayerColour, ShownTexture(s.Renderer, s.Index), $"{label}: {Label(s)} does not show the player's red image");
+            Assert.That(s.Material.GetFloat("_Smoothness"), Is.EqualTo(Tuning.PlayerSmoothness).Within(1e-4f), $"{label}: {Label(s)} smoothness");
+            Assert.That(s.Material.GetFloat("_Metallic"), Is.EqualTo(Tuning.PlayerMetallic).Within(1e-4f), $"{label}: {Label(s)} metallic");
+            Assert.AreEqual(Color.white, s.Material.GetColor("_BaseColor"), $"{label}: {Label(s)} tints the red image");
+        }
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): an ordinary slot shows its surface's image through that surface's one material
+        /// (white base colour, the colour map as base map).
+        /// </summary>
+        private static void AssertRealColour(Slot s, Surface surface, string label)
+        {
+            Assert.AreSame(PrimitiveKit.SurfaceMaterial(surface), s.Material, $"{label}: {Label(s)} is not drawn with the {surface} colour material");
+            Assert.AreSame(TextureLibrary.ColourOf(surface), ShownTexture(s.Renderer, s.Index), $"{label}: {Label(s)} does not show the {surface} image");
+        }
+
         private static void AssertMaterialBudget(GameState game, string id)
         {
             Renderer[] drawn = game.Level.Root.GetComponentsInChildren<Renderer>(false);
@@ -170,7 +192,10 @@ namespace Meuble.Tests
                 Assert.IsNotNull(TextureLibrary.TextureOf(s), $"premise: the library has no texture for {s}");
                 float mean = TextureLibrary.MeanOf(TextureLibrary.TextureOf(s));
                 Assert.That(mean, Is.EqualTo(Tuning.DetailMean).Within(Tuning.DetailMeanTolerance), $"{s}: mean");
+                // M7 real colours (CONTRACT_M7 5): Metal included (metal.png), every surface has its colour map.
+                Assert.IsNotNull(TextureLibrary.ColourOf(s), $"premise: the library has no colour map for {s}");
             }
+            Assert.IsNotNull(TextureLibrary.PlayerColour, "premise: the library has no player colour map");
 
             var shots = new List<string>();
 
@@ -183,12 +208,14 @@ namespace Meuble.Tests
             Assert.IsNotNull(garden.Renderer, "premise: level7 has a Garden renderer");
             Assert.AreEqual(Surface.Grass, garden.Surface, "the garden shows no grass detail");
             AssertFinish(garden, Surface.Grass, "level7 garden");
+            AssertRealColour(garden, Surface.Grass, "level7 garden");
 
             List<Slot> player7 = LitSlots(Game.Furniture.transform);
             Assert.IsTrue(player7.Any(s => s.Surface == Surface.Lacquer), "level7: the office chair's seat shows no lacquer");
             foreach (Slot s in player7.Where(s => s.Surface == Surface.Lacquer))
             {
-                AssertFinish(s, Surface.Lacquer, "level7 player (procedural)");
+                // M7 real colours (CONTRACT_M7 5): the owner's red painted metal image replaces the lacquer.
+                AssertPlayerFinish(s, "level7 player (procedural)");
                 Color? palette = PrimitiveKit.PaletteOf(s.Material);
                 Assert.IsTrue(palette.HasValue && ModelMath.IsRed(palette.Value), $"level7: a lacquer slot ({Label(s)}) is not the player's own red");
             }
@@ -197,6 +224,7 @@ namespace Meuble.Tests
             foreach (Slot s in frame7)
             {
                 AssertFinish(s, Surface.Metal, "level7 player frame");
+                AssertRealColour(s, Surface.Metal, "level7 player frame");
             }
 
             // A decoy (never red, PRD 7.2) keeps its usual surface: no lacquer, but the same metal frame.
@@ -236,7 +264,7 @@ namespace Meuble.Tests
             Assert.IsTrue(player9.Any(s => s.Surface == Surface.Lacquer), "level9: the model chair shows no lacquer");
             foreach (Slot s in player9.Where(s => s.Surface == Surface.Lacquer))
             {
-                AssertFinish(s, Surface.Lacquer, "level9 player (model)");
+                AssertPlayerFinish(s, "level9 player (model)");
             }
 
             Assert.Greater(Game.Robots.Count, 0, "premise: level9 has a robot");
@@ -270,10 +298,13 @@ namespace Meuble.Tests
         }
 
         /// <summary>The detail texture a renderer's slot 0 shows through its property block, or null.</summary>
-        private static Texture ShownTexture(Renderer r)
+        private static Texture ShownTexture(Renderer r) => ShownTexture(r, 0);
+
+        /// <summary>The texture a renderer's slot shows through its property block, or null.</summary>
+        private static Texture ShownTexture(Renderer r, int slot)
         {
             var block = new MaterialPropertyBlock();
-            r.GetPropertyBlock(block, 0);
+            r.GetPropertyBlock(block, slot);
             return block.isEmpty ? null : block.GetTexture(BaseMap);
         }
 
@@ -414,6 +445,8 @@ namespace Meuble.Tests
             Assert.Greater(tileFloor.Count, 0, "level3: the kitchen floor shows no tile detail");
             foreach (Slot s in tileFloor)
             {
+                // M7 real colours (CONTRACT_M7 5): the tile image in its own colours, at the tile's finish and normal map.
+                AssertRealColour(s, Surface.Tile, "level3 tile floor");
                 Assert.That(s.Material.GetFloat("_Smoothness"), Is.EqualTo(Tuning.TileSmoothness).Within(1e-4f), $"{Label(s)}: tile smoothness");
                 Assert.AreSame(TextureLibrary.NormalOf(Surface.Tile), ShownNormal(s.Renderer, s.Index), $"{Label(s)}: shows no tile normal map");
                 Assert.That(ShownBumpScale(s.Renderer, s.Index), Is.EqualTo(Tuning.NormalScaleTile).Within(1e-4f), $"{Label(s)}: wrong tile _BumpScale");

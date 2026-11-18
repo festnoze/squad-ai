@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using Newtonsoft.Json;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// docs/CONTRACT_M4.md 2, 3, 4 and amendments 9.3, 9.5, 9.11 (level data): the player kind selects its BodyDef,

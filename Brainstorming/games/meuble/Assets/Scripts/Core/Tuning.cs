@@ -1,4 +1,4 @@
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// Every M1 constant of docs/PRD.md, in one place. Units: meters, seconds, degrees.
@@ -164,19 +164,54 @@ namespace Meuble.Core
         public const float DoorClearanceMargin = 0.1f;
 
         // ----- M3 presentation values (docs/CONTRACT_M3.md), moved here at integration -----
-        // Sfx.cs
-        public const float SfxHopMix = 0.27f;
-        public const float SfxPivotScrapeMix = 0.31f;
-        public const float SfxPickUpScrapeMix = 0.46f;
-        public const float SfxCreakMix = 0.97f;
-        public const float SfxWarningCreakMix = 0.31f;
-        public const float SfxThumpMix = 0.92f;
-        public const float SfxCaughtMix = 0.96f;
-        public const float SfxHeinMix = 1f;
-        public const float SfxFootstepMix = 0.69f;
-        public const float SfxRoomToneMix = 0.062f;
-        public const float SfxClockMix = 0.038f;
-        public const float SfxUiClickMix = 0.48f;
+        // Sfx.cs. Audio overhaul (docs/audio/AUDIO_REPORT.md 4): each recorded role's mix is 10^((playback target -
+        // AudioLibrary.ReferenceLufs) / 20), with ReferenceLufs -12. The playback target (at Volume 100 %) is the max
+        // loudness over 100 ms for a one-shot and the integrated loudness for a loop, in LUFS, given after each value.
+        // The M3.1 balance is kept (the old levels re-measured that way), the variants of a role are now matched by loudness.
+        public const float SfxHopMix = 0.158f;              // -28
+        /// <summary>A hop on a rug or in a soft room: the muffled variants, felt more than heard.</summary>
+        public const float SfxSoftHopMix = 0.05f;           // -38
+        public const float SfxPivotScrapeMix = 0.251f;      // -24
+        public const float SfxPickUpScrapeMix = 0.355f;     // -21
+        public const float SfxCreakMix = 0.891f;            // -13, the loudest cue: the alert every inhabitant in range hears
+        public const float SfxWarningCreakMix = 0.224f;     // -25
+        public const float SfxThumpMix = 0.794f;            // -14
+        public const float SfxCaughtMix = 0.708f;           // -15, both caught stings
+        public const float SfxHeinMix = 0.794f;             // -14
+        public const float SfxFootstepMix = 0.501f;         // -18 within a metre (linear rolloff to 10 m)
+        public const float SfxRoomToneMix = 0.0224f;        // -45 LUFS integrated
+        public const float SfxClockMix = 0.0158f;           // -48 LUFS integrated
+        public const float SfxUiClickMix = 0.158f;          // -28
+        /// <summary>The menu's selection tick, well under the click.</summary>
+        public const float SfxUiHoverMix = 0.079f;          // -34
+        /// <summary>The win jingle, level with the caught stings.</summary>
+        public const float SfxWinMix = 0.708f;              // -15
+        /// <summary>A room door opening, a little under the put-down thump.</summary>
+        public const float SfxDoorMix = 0.562f;             // -17
+        /// <summary>The wardrobe's doors opening and shutting (the furniture's own move, inside or in front of it).</summary>
+        public const float SfxWardrobeMix = 0.398f;         // -20
+        /// <summary>The fallen load's crash: as loud as a caught sting (heard 6 m away).</summary>
+        public const float SfxCrashMix = 0.794f;            // -14
+        /// <summary>The stool's topple: about as loud as a caught sting (the M4 synthesized level).</summary>
+        public const float SfxToppleMix = 0.631f;           // -16
+        /// <summary>The floor lamp's switch, near the hop.</summary>
+        public const float SfxLampClickMix = 0.2f;          // -26
+        /// <summary>The variation of a recorded one-shot without variants (door, wardrobe, crash, topple, lamp): pitch +- this.</summary>
+        public const float SfxPitchJitter = 0.05f;
+
+        // ----- Music (MusicPlayer.cs, docs/audio/AUDIO_REPORT.md 5) -----
+        /// <summary>The title page loop at Music 100 %: -24 LUFS integrated, the cues of a menu are only clicks.</summary>
+        public const float MusicTitleMix = 0.251f;
+        /// <summary>The in-level loop at Music 100 %: -33 LUFS integrated, 15 dB under a near footstep, under every cue.</summary>
+        public const float MusicLevelMix = 0.089f;
+        /// <summary>Seconds of the crossfade between the title loop and the level loop.</summary>
+        public const float MusicCrossfadeSeconds = 1.5f;
+        /// <summary>The music under the pause menu: -6 dB.</summary>
+        public const float MusicPauseDuck = 0.5f;
+        /// <summary>Seconds to silence the music when a caught or win sting starts (the sting plays alone).</summary>
+        public const float MusicStingFadeSeconds = 0.25f;
+        /// <summary>Seconds for the music to come back after a duck (a retry, the next level, the pause closed).</summary>
+        public const float MusicReturnSeconds = 1.5f;
         public const float SfxPivotYawRate = 180f;
         public const float SfxPivotMaxSpeed = 0.75f;
         // Sfx.cs, M4 synthesized cues (volumes before the mix scale)
@@ -239,9 +274,11 @@ namespace Meuble.Core
         public const float DetailTileWood = 0.8f;
         public const float DetailTileParquet = 1.8f;
         public const float DetailTilePlaster = 2.0f;
-        public const float DetailTileUpholstery = 0.55f;
-        public const float DetailTileLinen = 0.45f;
-        public const float DetailTileCarpet = 1.1f;
+        // M7 envcolour (CONTRACT_M7 5): the fabrics' images are fine weaves; in real colours their weave must read at
+        // play distance, so they repeat a little smaller than the M4.2 grayscale details did (0.55, 0.45, 1.1).
+        public const float DetailTileUpholstery = 0.4f;
+        public const float DetailTileLinen = 0.35f;
+        public const float DetailTileCarpet = 0.6f;
         // The Kenney Furniture Kit's own UVs: a planar projection per face at 39.37 UV per native unit (inches per
         // metre), measured on every Kenney GLB of the project. Read by the M4.2 probe as a premise.
         public const float KenneyUvPerNativeUnit = 39.37f;
@@ -408,7 +445,8 @@ namespace Meuble.Core
         /// <summary>The dog's synthesized patter (FootstepAudio): two paw ticks this far apart (seconds), variants, gain.</summary>
         public const float DogPatterGap = 0.055f;
         public const int DogPatterVariants = 3;
-        public const float DogPatterGain = 0.55f;
+        // Audio overhaul: 0.55 x 0.69 / 0.501, so the patter keeps its level under the new SfxFootstepMix (it plays at gain x mix).
+        public const float DogPatterGain = 0.757f;
         /// <summary>
         /// The character palette (CONTRACT_M5 16.11), sRGB on ModelMath's 1/64 grid: every human and the dog map onto these
         /// 8 shared colours, plus one clothes tint per personality (PersonalityDef.Tint), so 3 humans and a dog add at most 12
@@ -562,8 +600,25 @@ namespace Meuble.Core
         public const float WardrobeFitHeight = 1.85f;
         /// <summary>The furniture centre stands at most this far in front of the wardrobe's front face to enter it, metres.</summary>
         public const float WardrobeReach = 0.6f;
-        /// <summary>Entering or leaving the wardrobe: an action of this many seconds, seen as moving.</summary>
-        public const float WardrobeActionTime = 0.5f;
+        /// <summary>
+        /// Entering or leaving the wardrobe: an action of this many seconds, seen as moving. Shortened from the
+        /// original 0.5 s (M7 polish: the PO reported a noticeable delay between the key press and the furniture
+        /// disappearing) now that WardrobeDoors gives the player immediate visual feedback on the key press, so the
+        /// action itself can be brisk. A shorter action only helps the player (CONTRACT_M6, the audit reads this same
+        /// constant for both the entry and the exit action, so level 18 stays verified consistently).
+        /// </summary>
+        public const float WardrobeActionTime = 0.25f;
+        /// <summary>
+        /// M7 polish (WardrobeDoors), presentation only: each wardrobe door's ease-out swing from its outer hinge,
+        /// in degrees. Never read by a rule; the wardrobe keeps its one whole-box collider throughout.
+        /// </summary>
+        public const float WardrobeDoorSwingDegrees = 100f;
+        /// <summary>
+        /// M7 polish (WardrobeDoors), presentation only: how far (metres) the furniture's visual slides along the
+        /// wardrobe's own axis while entering or leaving, so it visibly slips through the open doors instead of
+        /// popping in or out at the end of the action. Never moves the transform the rules read.
+        /// </summary>
+        public const float WardrobeSlideDistance = 0.3f;
         /// <summary>A creak made while hidden in the wardrobe is heard within CreakRadius times this (muffled).</summary>
         public const float WardrobeCreakFactor = 0.5f;
         /// <summary>An inhabitant opening a door stops this many seconds in front of it while the leaf swings.</summary>
@@ -586,6 +641,11 @@ namespace Meuble.Core
         public const int VolumeMax = 100;
         public const int VolumeStep = 10;
         public const int VolumeDefault = 80;
+        /// <summary>Music (audio overhaul): the music's own level under the Volume, a percentage. A save without it gets the default.</summary>
+        public const int MusicMin = 0;
+        public const int MusicMax = 100;
+        public const int MusicStep = 10;
+        public const int MusicDefault = 70;
         /// <summary>
         /// 2.3: the dashed outline drawn around an alerted watcher's cone: its width and its dash length (equal to the
         /// gap, a 50 percent duty cycle), metres.
@@ -595,15 +655,19 @@ namespace Meuble.Core
 
         // ----- M6 textures (docs/CONTRACT_M6.md 2.4, docs/M6_TEXTURES_RESEARCH.md): texture pass 2. -----
         // Metres covered by one repeat of each new detail texture, in world space (TextureLibrary.TileMetres).
-        public const float DetailTileGrass = 2.0f;
+        // M7 envcolour (CONTRACT_M7 5): grass.png in real colours, a little larger than 2.0 so the blades read as a lawn
+        // rather than fine noise over the garden that fills a third of most start views.
+        public const float DetailTileGrass = 2.5f;
         public const float DetailTileLacquer = 1.0f;
         public const float DetailTileMetal = 0.3f;
         public const float DetailTilePlastic = 0.2f;
         // M7 polish (smallprops agent): leaves (2.6 cm wide sprigs, 7-14 cm foliage balls) and soil (9-23 cm
         // discs) showed under half a texture repeat at 0.35/0.25, reading as a flat tinted blob at play
         // distance; shrunk so 2-3 repeats cross each prop and the Moss002/Ground104 grain actually reads.
-        public const float DetailTileFoliage = 0.08f;
-        public const float DetailTileSoil = 0.09f;
+        // M7 envcolour (CONTRACT_M7 5): in real colours each leaf of foliage.png must read as a leaf, not as noise: about
+        // 12 leaves across the image, so a 0.3 m repeat gives leaves of about 2.5 cm; soil's grains likewise.
+        public const float DetailTileFoliage = 0.3f;
+        public const float DetailTileSoil = 0.25f;
         // Per-material smoothness and metallic of texture pass 2 (CONTRACT_M6 2.4: one fixed finish per surface,
         // read by PrimitiveKit.Lit at every call site that shows it; TextureLibrary.FinishOf is the one place that
         // holds them). Metallic defaults to 0 except Metal (brushed, Metal009).
@@ -641,7 +705,9 @@ namespace Meuble.Core
         /// <summary>Metres covered by one repeat of the kitchen and bathroom floor tile detail (Tiles049):
         /// a notch above the raw 0.5 so the mosaic's many thin grout lines repeat less densely at play
         /// distance (still clearly smaller-scaled than Parquet's 1.8 plank repeat).</summary>
-        public const float DetailTileTile = 0.6f;
+        // M7 envcolour (CONTRACT_M7 5): tile.png holds 6 x 6 tiles; in real colours a 1.5 m repeat gives 25 cm kitchen
+        // tiles, a pattern that reads at play distance instead of a fine mosaic.
+        public const float DetailTileTile = 1.5f;
         /// <summary>Smoothness of a tiled floor (Surface.Tile): glazed ceramic, smoother than Parquet's 0.35.</summary>
         public const float TileSmoothness = 0.5f;
         // The modest _BumpScale of each surface's normal map (PrimitiveKit.Detail, TextureLibrary.BumpScaleOf): a
@@ -673,6 +739,25 @@ namespace Meuble.Core
         public const float NormalScaleMetal = 1.5f;
         public const float NormalScaleTile = 1.0f;
 
+        // ----- M7 envcolour (docs/CONTRACT_M7.md 5): real-colour textures (product owner, 2026-11-18). -----
+        // One colour material per surface (PrimitiveKit.SurfaceMaterial, TextureLibrary.ColourFinishOf): the M4.2
+        // surfaces, whose smoothness used to come from each palette material, get one finish each. The other surfaces
+        // keep their M6 finish (GrassSmoothness and the rest above).
+        public const float ColourWoodSmoothness = 0.3f;
+        public const float ColourParquetSmoothness = 0.35f;
+        public const float ColourPlasterSmoothness = 0.1f;
+        public const float ColourUpholsterySmoothness = 0.1f;
+        public const float ColourLinenSmoothness = 0.1f;
+        public const float ColourCarpetSmoothness = 0f;
+        /// <summary>The Lacquer colour material (the door leaves: painted wood, matte, as the DoorWood palette material was).</summary>
+        public const float ColourDoorSmoothness = 0.35f;
+        /// <summary>
+        /// The player furniture (PrimitiveKit.PlayerMaterial): the owner's "vivid red painted metal" image. Painted metal:
+        /// glossy, partly metallic so the highlights move, but mostly diffuse so the red reads in any light (PRD 7.2).
+        /// </summary>
+        public const float PlayerSmoothness = 0.8f;
+        public const float PlayerMetallic = 0.35f;
+
         // ----- M7 design (docs/CONTRACT_M7.md 4.1): the difficulty table (DifficultyDef). Normal is the M6 game. -----
         // Facile only helps the player, Difficile only hinders (DifficultyM7Tests checks every knob both ways).
         /// <summary>Every watcher's view range is multiplied by this (the lamp factor applies on top).</summary>
@@ -693,5 +778,113 @@ namespace Meuble.Core
         /// <summary>The creak gauge's fill time from 0 to 1 while still, in seconds.</summary>
         public const float EasyCreakFillTime = 25f;
         public const float HardCreakFillTime = 16f;
+
+        // ----- M7 title camera (TitleCameraTour): the eye level tour of Resources/Levels/title_house.json behind the title. -----
+        /// <summary>Camera height above the floor, in metres: a piece of furniture's eye level.</summary>
+        public const float TitleTourHeight = 1.0f;
+        /// <summary>Travel speed along the loop on straight stretches, in metres per second.</summary>
+        public const float TitleTourSpeed = 0.5f;
+        /// <summary>Fraction of <see cref="TitleTourSpeed"/> kept in the sharpest turn (a 90 degree turn over <see cref="TitleTourTurnProbe"/>).</summary>
+        public const float TitleTourTurnSpeedFactor = 0.55f;
+        /// <summary>Path distance ahead over which the turn rate is measured to slow down, in metres.</summary>
+        public const float TitleTourTurnProbe = 1.2f;
+        /// <summary>The view aims at points this far ahead along the path (and at half and one and a half times it), in metres.</summary>
+        public const float TitleTourLookAhead = 1.4f;
+        /// <summary>Degrees the view looks down from the horizontal.</summary>
+        public const float TitleTourPitch = 7f;
+        /// <summary>Horizontal lens shift in normalized device units: the vanishing point sits right of centre, clear of the title column.</summary>
+        public const float TitleTourLensShift = 0.3f;
+        /// <summary>Spline samples per waypoint segment for the arc length table.</summary>
+        public const int TitleTourSamplesPerSegment = 24;
+
+        // ----- M7 level select (LevelSelect, LevelMiniature): the Levels page in the title page's style. -----
+        /// <summary>Left edge of the card grid from the screen's left edge, in reference pixels (the title column sits left of it).</summary>
+        public const float LevelSelectGridLeft = 640f;
+        /// <summary>Right, top and bottom margins of the card grid, in reference pixels.</summary>
+        public const float LevelSelectGridRight = 56f;
+        public const float LevelSelectGridTop = 64f;
+        public const float LevelSelectGridBottom = 64f;
+        /// <summary>Gap between two cards, in reference pixels.</summary>
+        public const float LevelSelectCardGap = 16f;
+        /// <summary>Fraction of a card's height (from the top) taken by the level miniature.</summary>
+        public const float LevelSelectMiniatureShare = 0.52f;
+        /// <summary>Most watcher icons drawn on a card; more show as "+n".</summary>
+        public const int LevelSelectMaxWatcherIcons = 5;
+        /// <summary>Size of a level miniature texture, in pixels (drawn once per level, at twice this and box filtered).</summary>
+        public const int LevelMiniatureWidth = 240;
+        public const int LevelMiniatureHeight = 200;
+        /// <summary>Empty border around the house in a miniature, in metres.</summary>
+        public const float LevelMiniaturePadding = 0.5f;
+        /// <summary>Thinnest wall line in a miniature, in final pixels (real walls are 0.1 m, too thin to see).</summary>
+        public const float LevelMiniatureWallPixels = 2.2f;
+        /// <summary>Radius of the player start dot in a miniature, in metres (never under 3.5 final pixels).</summary>
+        public const float LevelMiniaturePlayerRadius = 0.38f;
+
+        // ----- M7 title logo (TitleLogo): the red chair rendered once at a three-quarter angle, with a long low-sun shadow. -----
+        /// <summary>Size of the baked logo texture, in pixels (rendered at twice this and averaged down).</summary>
+        public const int TitleLogoWidth = 640;
+        public const int TitleLogoHeight = 256;
+        /// <summary>Elevation of the low sun above the logo's ground, in degrees: the shadow is height / tan of it.</summary>
+        public const float TitleLogoSunElevation = 16f;
+        /// <summary>Heading of the sun's travel on the logo's ground, in degrees from the camera's right toward its depth.</summary>
+        public const float TitleLogoSunHeading = 24f;
+        /// <summary>The chair's yaw in the logo's frame (180 faces the camera), in degrees.</summary>
+        public const float TitleLogoChairYaw = 220f;
+        /// <summary>Degrees the logo camera looks down.</summary>
+        public const float TitleLogoPitch = 26f;
+        /// <summary>Width of ground the orthographic logo camera frames, in metres, and the chair's distance from its left edge.</summary>
+        public const float TitleLogoFrameWidth = 4.0f;
+        public const float TitleLogoChairInset = 0.6f;
+        /// <summary>Where the chair's foot sits, as a fraction of the frame height from the bottom.</summary>
+        public const float TitleLogoFootHeight = 0.18f;
+        /// <summary>Distance of the logo rig from the world origin, sideways to the sun: far outside every camera's far plane and shadow cascades.</summary>
+        public const float TitleLogoRigDistance = 600f;
+        /// <summary>The unnamed layer only the two logo cameras render.</summary>
+        public const int TitleLogoLayer = 30;
+        /// <summary>The sunlit pool on the ground: centre along the shadow and half axes, as fractions of the shadow length (across: metres).</summary>
+        public const float TitleLogoPoolCenter = 0.5f;
+        public const float TitleLogoPoolAlong = 0.66f;
+        public const float TitleLogoPoolAcross = 1.1f;
+        /// <summary>Opacity of the pool's centre, and the radius (fraction of the half axes) where its soft edge begins.</summary>
+        public const float TitleLogoPoolAlpha = 0.95f;
+        public const float TitleLogoPoolInner = 0.35f;
+        /// <summary>Shadow darkness at the chair's foot and at the tip of the shadow.</summary>
+        public const float TitleLogoShadowNear = 0.95f;
+        public const float TitleLogoShadowFar = 0.6f;
+        /// <summary>The shadow's penumbra at its tip, in logo pixels (it starts sharp at the foot).</summary>
+        public const int TitleLogoShadowBlur = 10;
+        /// <summary>Size of the logo on the title page (1920 x 1080 reference) and the offset of its left centre.</summary>
+        public const float TitleLogoUiWidth = 540f;
+        public const float TitleLogoUiHeight = 216f;
+        public const float TitleLogoUiX = 116f;
+        public const float TitleLogoUiY = 448f;
+
+        // ----- M7 options page (Menu.BuildOptions, OptionsRow): the title page's left column style, reused. -----
+        /// <summary>Left margin of the title and every row, in reference pixels (the title page's own margin).</summary>
+        public const float OptionsMargin = 150f;
+        /// <summary>Width of the dark translucent band behind the column, in reference pixels.</summary>
+        public const float OptionsPanelWidth = 1180f;
+        /// <summary>Size of a row's icon, and its inset from the row's left edge, in reference pixels.</summary>
+        public const float OptionsIconSize = 52f;
+        public const float OptionsIconInset = 14f;
+        /// <summary>Left offset of a row's label text, clear of the icon, in reference pixels.</summary>
+        public const float OptionsLabelOffset = 82f;
+        /// <summary>Size of a row's decorative cycle arrows, and their inset from the row's right edge.</summary>
+        public const float OptionsArrowSize = 26f;
+        public const float OptionsArrowInset = 20f;
+
+        // ----- M7 heads and clothes (CharacterLook): the product owner's head images and clothes on the human inhabitants. -----
+        /// <summary>Resources name of the clothes atlas: shirt front and back over trousers front and back, in their real colours (sRGB, readable).</summary>
+        public const string ClothesAtlasResource = "CharacterClothesAtlas";
+        /// <summary>Clothes: metres from the waist to the hem of the trousers print (shorts show its upper part).</summary>
+        public const float ClothesTrousersLength = 0.88f;
+        /// <summary>
+        /// Clothes: the personality's colour on the shirt (its prints keep their real colours): a collar band over the
+        /// shoulders and a band at the hem, fractions of the shirt's height from its top and from its hem.
+        /// </summary>
+        public const float ClothesCollarBand = 0.13f;
+        public const float ClothesHemBand = 0.08f;
+        /// <summary>Clothes: how much of the fabric's shading the bands keep (an exponent on the luminance ratio).</summary>
+        public const float ClothesBandContrast = 0.5f;
     }
 }

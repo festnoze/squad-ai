@@ -1,10 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using Meuble.Core;
+using System.IO;
+using OutOfSight.Core;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.10, CONTRACT_M5 16.10): the level select, a page of the title screen opened
@@ -18,6 +21,12 @@ namespace Meuble
     /// selection): left and right follow the play order, up and down keep the column as well as they can, and "Retour"
     /// closes the loop. The first unlocked card is the default selection (<see cref="DefaultSelectable"/>).
     /// The page has its own Canvas, enabled only while it is open (never its GameObject, PRD 8.4).
+    /// M7 level select redesign: the title page's look. A left column (the page title in the display face, the red rule,
+    /// the difficulty and the progress, a legend of the miniatures, Retour) over the warm translucent side panel, and a
+    /// grid of portrait cards right of it, sized by anchors so it fits any aspect. Each card shows a top-down miniature
+    /// of its level (<see cref="LevelMiniature"/>, drawn once and cached), its number and name, one icon per watcher
+    /// (people, pets and robots apart), the player's furniture, the record of the current difficulty, and its won or
+    /// locked state.
     /// </summary>
     public sealed class LevelSelect : MonoBehaviour
     {
@@ -31,6 +40,16 @@ namespace Meuble
             public Text Name;
             public Text Best;
             public Text Locked;
+            /// <summary>M7: the level's top-down miniature, its frame, the won badge and the lock over the miniature.</summary>
+            public Image Miniature;
+            public Image Frame;
+            public Image WonBadge;
+            public Image LockIcon;
+            /// <summary>M7: the watcher icons, the "+n" past the last one, and the player furniture.</summary>
+            public readonly List<Image> Watchers = new List<Image>();
+            public Text MoreWatchers;
+            public Image Furniture;
+            public bool ArtReady;
         }
 
         public bool IsOpen { get; private set; }
@@ -63,22 +82,25 @@ namespace Meuble
         private Canvas canvas;
         private RectTransform grid;
         private Font font;
+        private Font display;
         private GameState game;
         private Action<string> choose;
         private Dictionary<string, Text> labels;
+        private Text difficultyLine;
+        private Text progressLine;
+        private readonly List<KeyValuePair<Text, Func<string>>> legend = new List<KeyValuePair<Text, Func<string>>>();
 
-        // Reference pixels (1920 x 1080) from the screen center.
-        private const float CardWidth = 240f;
-        private const float CardHeight = 168f;
-        private const float GapX = 20f;
-        private const float GapY = 22f;
-        private const float GridTop = 300f;
-        private const float GridBottom = -320f;
-        private const float HeaderY = 400f;
-        private const float BackY = -420f;
-        private static readonly Color Cream = new Color(1f, 0.92f, 0.75f, 1f);
-        private static readonly Color LockedInk = new Color(1f, 0.55f, 0.45f, 0.95f);
-        private static readonly Color DimInk = new Color(1f, 1f, 1f, 0.55f);
+        // ----- The title page's palette and column (Menu's M7 title redesign), 1920 x 1080 reference pixels. -----
+        private static readonly Color PageDim = new Color(0.07f, 0.045f, 0.032f, 0.62f);
+        private static readonly Color SidePanel = new Color(0.1f, 0.066f, 0.05f, 0.86f);
+        private static readonly Color TitleInk = new Color(1f, 0.94f, 0.82f, 1f);
+        private static readonly Color TaglineInk = new Color(0.96f, 0.8f, 0.58f, 0.95f);
+        private static readonly Color SoftInk = new Color(1f, 0.94f, 0.82f, 0.72f);
+        private static readonly Color LockedInk = new Color(1f, 0.62f, 0.5f, 0.95f);
+        private static readonly Color DimInk = new Color(1f, 0.94f, 0.82f, 0.45f);
+        private const float Margin = 150f;
+        private const float SidePanelWidth = 1240f;
+        private static readonly Vector2 BackSize = new Vector2(420f, 78f);
 
         /// <summary>
         /// Builds the page under <paramref name="parent"/> (the Menu's root Canvas). <paramref name="onChoose"/> receives
@@ -98,6 +120,7 @@ namespace Meuble
         {
             game = gameState;
             font = textFont;
+            display = Hud.DisplayFont;
             labels = labelMap;
             choose = onChoose;
             var rect = (RectTransform)transform;
@@ -107,20 +130,103 @@ namespace Meuble
             gameObject.AddComponent<GraphicRaycaster>();
             canvas.enabled = false;
 
-            Stretch(NewImage(transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.55f)).rectTransform);
-            Stretch(NewImage(transform, "Edges", ProceduralArt.Vignette, new Color(0.02f, 0.02f, 0.03f, 0.6f)).rectTransform);
-            Text header = NewText(transform, "SelectTitle", Strings.TitleLevels, 96, Cream);
-            Place(header.rectTransform, new Vector2(0f, HeaderY), new Vector2(1600f, 120f));
+            // The title page's backdrop, a little darker so the cards stand off the moving scene: a warm dim, soft
+            // edges, and the espresso panel fading in from the left under the column.
+            Stretch(NewImage(transform, "Dim", null, PageDim).rectTransform);
+            Stretch(NewImage(transform, "Edges", ProceduralArt.Vignette, new Color(0.04f, 0.025f, 0.02f, 0.55f)).rectTransform);
+            Image side = NewImage(transform, "Band", ProceduralArt.SideFade, SidePanel);
+            side.rectTransform.anchorMin = new Vector2(0f, 0f);
+            side.rectTransform.anchorMax = new Vector2(0f, 1f);
+            side.rectTransform.pivot = new Vector2(0f, 0.5f);
+            side.rectTransform.anchoredPosition = Vector2.zero;
+            side.rectTransform.sizeDelta = new Vector2(SidePanelWidth, 0f);
+
+            BuildColumn(onBack);
 
             var gridGo = new GameObject("Grid", typeof(RectTransform));
             gridGo.transform.SetParent(transform, false);
             grid = (RectTransform)gridGo.transform;
-            Stretch(grid);
-
-            BackButton = Hud.MenuButton(transform, "SelectBack", Strings.SelectBack, font, labels);
-            Place((RectTransform)BackButton.transform, new Vector2(0f, BackY), new Vector2(420f, 88f));
-            BackButton.onClick.AddListener(() => onBack?.Invoke());
+            grid.anchorMin = Vector2.zero;
+            grid.anchorMax = Vector2.one;
+            grid.pivot = new Vector2(0.5f, 0.5f);
+            grid.offsetMin = new Vector2(Tuning.LevelSelectGridLeft, Tuning.LevelSelectGridBottom);
+            grid.offsetMax = new Vector2(-Tuning.LevelSelectGridRight, -Tuning.LevelSelectGridTop);
             Refresh();
+        }
+
+        /// <summary>The left column, on the title page's margin: title, red rule, difficulty, progress, legend, Retour.</summary>
+        private void BuildColumn(Action onBack)
+        {
+            var left = new Vector2(0f, 0.5f);
+            Text header = NewText(transform, "SelectTitle", Strings.TitleLevels, 120, TitleInk, display);
+            header.alignment = TextAnchor.MiddleLeft;
+            PlaceLeft(header.rectTransform, left, new Vector2(Margin, 352f), new Vector2(560f, 150f));
+            Image rule = NewImage(transform, "SelectRule", null, LevelMiniature.ChairRed);
+            PlaceLeft(rule.rectTransform, left, new Vector2(Margin + 4f, 268f), new Vector2(84f, 6f));
+            difficultyLine = NewText(transform, "SelectDifficulty", DifficultyText(), 34, TaglineInk, font);
+            difficultyLine.alignment = TextAnchor.MiddleLeft;
+            PlaceLeft(difficultyLine.rectTransform, left, new Vector2(Margin, 222f), new Vector2(460f, 48f));
+            progressLine = NewText(transform, "SelectProgress", ProgressText(), 28, SoftInk, font);
+            progressLine.alignment = TextAnchor.MiddleLeft;
+            PlaceLeft(progressLine.rectTransform, left, new Vector2(Margin, 178f), new Vector2(460f, 40f));
+
+            // The legend of the miniatures and the watcher icons, one row each.
+            float y = 92f;
+            LegendRow("SelectLegendYou", LevelMiniature.Dot, () => Strings.SelectLegendYou, y);
+            LegendRow("SelectLegendExit", LevelMiniature.ExitMark, () => Strings.SelectLegendExit, y -= 50f);
+            LegendRow("SelectLegendPeople", LevelMiniature.Person, () => Strings.SelectLegendPeople, y -= 50f);
+            LegendRow("SelectLegendPet", LevelMiniature.Pet, () => Strings.SelectLegendPet, y -= 50f);
+            LegendRow("SelectLegendRobot", LevelMiniature.Robot, () => Strings.SelectLegendRobot, y -= 50f);
+
+            BackButton = Hud.MenuButton(transform, "SelectBack", Strings.SelectBack, display, labels);
+            PlaceLeft((RectTransform)BackButton.transform, left, new Vector2(Margin, -366f), BackSize);
+            StyleWarm(BackButton);
+            if (labels != null && labels.TryGetValue("SelectBackLabel", out Text back))
+            {
+                back.fontSize = 44;
+                back.alignment = TextAnchor.MiddleLeft;
+                back.color = TitleInk;
+                back.rectTransform.offsetMin = new Vector2(36f, 0f);
+                back.rectTransform.offsetMax = new Vector2(-24f, 0f);
+            }
+            BackButton.onClick.AddListener(() => onBack?.Invoke());
+        }
+
+        private void LegendRow(string name, Sprite icon, Func<string> text, float y)
+        {
+            var left = new Vector2(0f, 0.5f);
+            Image image = NewImage(transform, name + "Icon", icon, Color.white);
+            image.preserveAspect = true;
+            PlaceLeft(image.rectTransform, left, new Vector2(Margin, y), new Vector2(36f, 36f));
+            Text label = NewText(transform, name, text(), 28, SoftInk, font);
+            label.alignment = TextAnchor.MiddleLeft;
+            PlaceLeft(label.rectTransform, left, new Vector2(Margin + 54f, y), new Vector2(400f, 40f));
+            legend.Add(new KeyValuePair<Text, Func<string>>(label, text));
+        }
+
+        private string DifficultyText() => string.Format(Strings.OptionsDifficulty, Strings.DifficultyName(SaveStore.Options.DifficultyId));
+
+        private string ProgressText()
+        {
+            int won = 0;
+            foreach (string id in order)
+            {
+                if (SaveStore.IsWon(id))
+                {
+                    won++;
+                }
+            }
+            return string.Format(Strings.SelectProgress, won, order.Count);
+        }
+
+        private void Start()
+        {
+            // "--levelshot <dir>" (a built player): a screenshot of this page, then quit.
+            string dir = Probe.ArgValue("--levelshot");
+            if (!Application.isEditor && !string.IsNullOrEmpty(dir))
+            {
+                StartCoroutine(Shot(dir));
+            }
         }
 
         /// <summary>Opens or closes the page; opening refreshes every card from the save first.</summary>
@@ -129,6 +235,7 @@ namespace Meuble
             if (open)
             {
                 Refresh();
+                EnsureArt();
             }
             IsOpen = open;
             if (canvas != null && canvas.enabled != open)
@@ -171,10 +278,71 @@ namespace Meuble
                 card.Best.text = SaveStore.TryGetBest(card.LevelId, SaveStore.Options.DifficultyId, out float seconds) // MUTATION:SELECT_DIFFICULTY_RECORD
                     ? string.Format(Strings.SelectBest, Strings.FormatSeconds(seconds))
                     : Strings.SelectNone;
-                card.Number.color = playable ? Color.white : DimInk;
-                card.Name.color = playable ? Color.white : DimInk;
+                // The name and the lock in the current language (the language may have changed since the cards were built).
+                card.Name.text = LevelName(card.LevelId);
+                card.Locked.text = Strings.SelectLocked;
+                card.Number.color = playable ? TitleInk : DimInk;
+                card.Name.color = playable ? TitleInk : DimInk;
+                card.Best.color = seconds > 0f && playable ? TitleInk : SoftInk;
+                // M7: the miniature dims under a lock; a won level wears the green check.
+                card.Miniature.color = playable ? Color.white : new Color(0.55f, 0.5f, 0.46f, 0.5f);
+                card.LockIcon.enabled = !playable;
+                card.WonBadge.enabled = playable && SaveStore.IsWon(card.LevelId);
+                Color iconTint = playable ? Color.white : new Color(1f, 1f, 1f, 0.45f);
+                foreach (Image icon in card.Watchers)
+                {
+                    icon.color = iconTint;
+                }
+                card.Furniture.color = iconTint;
+                card.MoreWatchers.color = playable ? TitleInk : DimInk;
+            }
+            if (difficultyLine != null)
+            {
+                difficultyLine.text = DifficultyText();
+                progressLine.text = ProgressText();
+            }
+            foreach (KeyValuePair<Text, Func<string>> row in legend)
+            {
+                row.Key.text = row.Value();
             }
             Navigate();
+        }
+
+        /// <summary>M7: draws (once, cached by LevelMiniature) the miniature, watchers and furniture of every card.</summary>
+        private void EnsureArt()
+        {
+            foreach (Card card in cards)
+            {
+                if (card.ArtReady)
+                {
+                    continue;
+                }
+                card.ArtReady = true;
+                Sprite miniature = LevelMiniature.MiniatureOf(card.LevelId);
+                card.Miniature.sprite = miniature;
+                card.Miniature.enabled = miniature != null;
+                LevelMiniature.Summary summary = LevelMiniature.SummaryOf(card.LevelId);
+                var kinds = new List<Sprite>();
+                for (int i = 0; i < summary.Humans; i++) kinds.Add(LevelMiniature.Person);
+                for (int i = 0; i < summary.Pets; i++) kinds.Add(LevelMiniature.Pet);
+                for (int i = 0; i < summary.Robots; i++) kinds.Add(LevelMiniature.Robot);
+                int shown = Mathf.Min(kinds.Count, Mathf.Max(1, Tuning.LevelSelectMaxWatcherIcons));
+                if (kinds.Count > shown)
+                {
+                    // Keep room for "+n": the last icon slot becomes the count, but the kinds that differ stay visible.
+                    shown--;
+                }
+                for (int i = 0; i < card.Watchers.Count; i++)
+                {
+                    bool on = i < shown;
+                    card.Watchers[i].enabled = on;
+                    card.Watchers[i].sprite = on ? kinds[i] : null;
+                }
+                card.MoreWatchers.enabled = kinds.Count > shown;
+                card.MoreWatchers.text = "+" + (kinds.Count - shown);
+                card.Furniture.sprite = LevelMiniature.Furniture(summary.PlayerKind);
+                card.Furniture.enabled = true;
+            }
         }
 
         private bool SameOrder(IReadOnlyList<string> levels)
@@ -211,39 +379,99 @@ namespace Meuble
             }
             int columns = Mathf.Max(1, Tuning.LevelSelectColumns);
             int rows = Mathf.Max(1, (order.Count + columns - 1) / columns);
-            // Rows of 6 hold 18 cards at full height; more rows shrink the cards to stay between the header and Retour.
-            float height = Mathf.Min(CardHeight, (GridTop - GridBottom - (rows - 1) * GapY) / rows);
-            float left = -(columns * CardWidth + (columns - 1) * GapX) * 0.5f + CardWidth * 0.5f;
             for (int i = 0; i < order.Count; i++)
             {
-                int row = i / columns;
-                int column = i % columns;
-                var at = new Vector2(left + column * (CardWidth + GapX), GridTop - height * 0.5f - row * (height + GapY));
-                cards.Add(NewCard(i, order[i], at, height));
+                cards.Add(NewCard(i, order[i], i / columns, i % columns, rows, columns));
+            }
+            if (IsOpen)
+            {
+                EnsureArt();
             }
         }
 
-        private Card NewCard(int index, string levelId, Vector2 at, float height)
+        /// <summary>
+        /// A portrait card, placed by anchors in the grid (so the grid fills the area right of the column on any aspect):
+        /// the miniature on top in its dark frame, then the number and the name, the watchers and the furniture, and the
+        /// record or the lock at the bottom.
+        /// </summary>
+        private Card NewCard(int index, string levelId, int row, int column, int rows, int columns)
         {
             string name = "Card" + (index + 1);
-            Button button = Hud.MenuButton(grid, name, (index + 1).ToString(), font, labels);
-            Place((RectTransform)button.transform, at, new Vector2(CardWidth, height));
+            Button button = Hud.MenuButton(grid, name, (index + 1).ToString(), display, labels);
+            var rect = (RectTransform)button.transform;
+            rect.anchorMin = new Vector2((float)column / columns, 1f - (float)(row + 1) / rows);
+            rect.anchorMax = new Vector2((float)(column + 1) / columns, 1f - (float)row / rows);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            float gap = Tuning.LevelSelectCardGap * 0.5f;
+            rect.offsetMin = new Vector2(gap, gap);
+            rect.offsetMax = new Vector2(-gap, -gap);
+            StyleWarm(button);
+
             var card = new Card { LevelId = levelId, Index = index, Button = button };
-            card.Number = button.transform.Find(name + "Label").GetComponent<Text>();
-            card.Number.fontSize = 50;
-            Band(card.Number.rectTransform, 0.64f, 1f);
-            card.Name = CardText(button.transform, name + "Name", LevelName(levelId), 28, Color.white);
+            Transform t = button.transform;
+            float top = 1f - Tuning.LevelSelectMiniatureShare;
+
+            // The miniature in its dark frame (dark paper whatever the plate colour, so it reads selected or not).
+            card.Frame = NewImage(t, name + "Frame", ProceduralArt.Rounded, LevelMiniature.Paper);
+            card.Frame.type = Image.Type.Sliced;
+            Anchor(card.Frame.rectTransform, new Vector2(0f, top), Vector2.one, new Vector2(8f, 0f), new Vector2(-8f, -8f));
+            card.Miniature = NewImage(card.Frame.transform, name + "Miniature", null, Color.white);
+            card.Miniature.preserveAspect = true;
+            card.Miniature.enabled = false;
+            Anchor(card.Miniature.rectTransform, Vector2.zero, Vector2.one, new Vector2(5f, 5f), new Vector2(-5f, -5f));
+            card.LockIcon = NewImage(card.Frame.transform, name + "Lock", LevelMiniature.Lock, Color.white);
+            card.LockIcon.preserveAspect = true;
+            Centered(card.LockIcon.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(64f, 64f), Vector2.zero);
+            card.WonBadge = NewImage(card.Frame.transform, name + "Won", LevelMiniature.Check, Color.white);
+            card.WonBadge.preserveAspect = true;
+            Centered(card.WonBadge.rectTransform, new Vector2(1f, 1f), new Vector2(38f, 38f), new Vector2(-6f, -6f), new Vector2(1f, 1f));
+
+            // The number, large in the display face, and the name beside it.
+            card.Number = t.Find(name + "Label").GetComponent<Text>();
+            card.Number.fontSize = 48;
+            card.Number.alignment = TextAnchor.MiddleLeft;
+            card.Number.color = TitleInk;
+            Anchor(card.Number.rectTransform, new Vector2(0f, 0.29f), new Vector2(0f, top), new Vector2(14f, 0f), new Vector2(76f, 0f));
+            card.Name = NewText(t, name + "Name", LevelName(levelId), 24, TitleInk, display);
+            card.Name.alignment = TextAnchor.MiddleLeft;
             // Long names ("Le fauteuil à bascule") wrap on two lines and shrink to fit the card.
             card.Name.horizontalOverflow = HorizontalWrapMode.Wrap;
             card.Name.verticalOverflow = VerticalWrapMode.Truncate;
             card.Name.resizeTextForBestFit = true;
-            card.Name.resizeTextMinSize = 16;
-            card.Name.resizeTextMaxSize = 28;
-            Band(card.Name.rectTransform, 0.3f, 0.66f);
-            card.Best = CardText(button.transform, name + "Best", Strings.SelectNone, 30, Color.white);
-            Band(card.Best.rectTransform, 0.04f, 0.32f);
-            card.Locked = CardText(button.transform, name + "Locked", Strings.SelectLocked, 28, LockedInk);
-            Band(card.Locked.rectTransform, 0.04f, 0.32f);
+            card.Name.resizeTextMinSize = 15;
+            card.Name.resizeTextMaxSize = 25;
+            card.Name.lineSpacing = 0.85f;
+            Anchor(card.Name.rectTransform, new Vector2(0f, 0.29f), new Vector2(1f, top), new Vector2(72f, 2f), new Vector2(-8f, -2f));
+
+            // The watchers, one icon each, and the player's furniture in a dark chip at the right.
+            for (int i = 0; i < Mathf.Max(1, Tuning.LevelSelectMaxWatcherIcons); i++)
+            {
+                Image icon = NewImage(t, name + "Watcher" + i, null, Color.white);
+                icon.preserveAspect = true;
+                icon.enabled = false;
+                Centered(icon.rectTransform, new Vector2(0f, 0.22f), new Vector2(26f, 26f), new Vector2(26f + i * 26f, 0f));
+                card.Watchers.Add(icon);
+            }
+            card.MoreWatchers = NewText(t, name + "More", "+0", 22, TitleInk, font);
+            card.MoreWatchers.alignment = TextAnchor.MiddleLeft;
+            card.MoreWatchers.enabled = false;
+            Centered(card.MoreWatchers.rectTransform, new Vector2(0f, 0.22f), new Vector2(40f, 28f),
+                new Vector2(30f + (Tuning.LevelSelectMaxWatcherIcons - 1) * 26f, 0f));
+            Image chip = NewImage(t, name + "Chip", ProceduralArt.Rounded, LevelMiniature.Paper);
+            chip.type = Image.Type.Sliced;
+            Centered(chip.rectTransform, new Vector2(1f, 0.18f), new Vector2(46f, 46f), new Vector2(-30f, 0f));
+            card.Furniture = NewImage(chip.transform, name + "Furniture", null, Color.white);
+            card.Furniture.preserveAspect = true;
+            card.Furniture.enabled = false;
+            Anchor(card.Furniture.rectTransform, Vector2.zero, Vector2.one, new Vector2(6f, 6f), new Vector2(-6f, -6f));
+
+            // The record of the current difficulty, or the lock line.
+            card.Best = NewText(t, name + "Best", Strings.SelectNone, 26, TitleInk, font);
+            card.Best.alignment = TextAnchor.MiddleLeft;
+            Anchor(card.Best.rectTransform, new Vector2(0f, 0.02f), new Vector2(1f, 0.14f), new Vector2(14f, 0f), new Vector2(-60f, 0f));
+            card.Locked = NewText(t, name + "Locked", Strings.SelectLocked, 24, LockedInk, font);
+            card.Locked.alignment = TextAnchor.MiddleLeft;
+            Anchor(card.Locked.rectTransform, new Vector2(0f, 0.02f), new Vector2(1f, 0.14f), new Vector2(14f, 0f), new Vector2(-60f, 0f));
             button.onClick.AddListener(() => Choose(index));
             return card;
         }
@@ -333,31 +561,68 @@ namespace Meuble
             return null;
         }
 
+        // ----- The screenshot run -----
+
+        /// <summary>
+        /// "--levelshot &lt;dir&gt;": opens this page over the title with a few records seeded in memory (the save is
+        /// pointed at the shot folder first, so the real one is never touched), selects the second card, writes
+        /// levels_page.png and quits. Nothing is written: the records live in memory only.
+        /// </summary>
+        private IEnumerator Shot(string dir)
+        {
+            Directory.CreateDirectory(dir);
+            SaveStore.PathOverride = Path.Combine(dir, "levelshot_save.json");
+            Menu menu = GetComponentInParent<Menu>();
+            float until = Time.realtimeSinceStartup + 20f;
+            while ((menu == null || !menu.TitleOpen) && Time.realtimeSinceStartup < until)
+            {
+                yield return null;
+            }
+            yield return new WaitForSecondsRealtime(2.5f);
+            string difficulty = SaveStore.Options.DifficultyId;
+            // A fresh save in memory (three levels won), so the shot shows won, open and locked cards together.
+            SaveStore.Current.Won?.Clear();
+            SaveStore.Current.Best?.Clear();
+            float[] times = { 21.4f, 38.9f, 47.2f };
+            for (int i = 0; i < times.Length && i < order.Count; i++)
+            {
+                SaveStore.Current.RecordWin(order[i], times[i], difficulty);
+            }
+            if (menu != null)
+            {
+                menu.OpenLevelSelect();
+            }
+            yield return new WaitForSecondsRealtime(0.5f);
+            if (cards.Count > 1 && EventSystem.current != null)
+            {
+                EventSystem.current.SetSelectedGameObject(cards[1].Button.gameObject);
+            }
+            yield return new WaitForSecondsRealtime(1f);
+            ScreenCapture.CaptureScreenshot(Path.Combine(dir, "levels_page.png"));
+            yield return new WaitForSecondsRealtime(1f);
+            Application.Quit();
+        }
+
         // ----- Construction helpers -----
 
-        private Text CardText(Transform parent, string name, string value, int size, Color color)
+        /// <summary>The title page's button colours: a warm translucent plate, lighter brown under the mouse, chair red selected.</summary>
+        private static void StyleWarm(Button button)
         {
-            Text text = NewText(parent, name, value, size, color);
-            text.horizontalOverflow = HorizontalWrapMode.Overflow;
-            return text;
+            ColorBlock colors = button.colors;
+            colors.normalColor = new Color(0.17f, 0.115f, 0.085f, 0.82f);
+            colors.highlightedColor = new Color(0.36f, 0.25f, 0.18f, 0.94f);
+            colors.selectedColor = new Color(0.8f, 0.2f, 0.16f, 0.97f);
+            colors.pressedColor = new Color(0.55f, 0.12f, 0.09f, 1f);
+            colors.disabledColor = new Color(0.12f, 0.08f, 0.06f, 0.62f);
+            button.colors = colors;
         }
 
-        /// <summary>Stretches a card text across the card, between two heights (fractions of the card, from the bottom).</summary>
-        private static void Band(RectTransform rect, float bottom, float top)
-        {
-            rect.anchorMin = new Vector2(0f, bottom);
-            rect.anchorMax = new Vector2(1f, top);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.offsetMin = new Vector2(8f, 0f);
-            rect.offsetMax = new Vector2(-8f, 0f);
-        }
-
-        private Text NewText(Transform parent, string name, string value, int size, Color color)
+        private Text NewText(Transform parent, string name, string value, int size, Color color, Font face)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var text = go.AddComponent<Text>();
-            text.font = font;
+            text.font = face != null ? face : font;
             text.fontSize = size;
             text.alignment = TextAnchor.MiddleCenter;
             text.color = color;
@@ -366,8 +631,8 @@ namespace Meuble
             text.horizontalOverflow = HorizontalWrapMode.Overflow;
             text.verticalOverflow = VerticalWrapMode.Overflow;
             var shadow = go.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.7f);
-            shadow.effectDistance = new Vector2(2f, -3f);
+            shadow.effectColor = new Color(0.05f, 0.03f, 0.02f, 0.6f);
+            shadow.effectDistance = new Vector2(2f, -2f);
             if (labels != null)
             {
                 labels[name] = text;
@@ -386,10 +651,30 @@ namespace Meuble
             return image;
         }
 
-        private static void Place(RectTransform rect, Vector2 offset, Vector2 size)
+        /// <summary>Places a rect by its left edge at <paramref name="offset"/> from <paramref name="anchor"/>.</summary>
+        private static void PlaceLeft(RectTransform rect, Vector2 anchor, Vector2 offset, Vector2 size)
         {
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.anchoredPosition = offset;
+            rect.sizeDelta = size;
+        }
+
+        /// <summary>Stretches a rect between two anchors, inset by pixel offsets.</summary>
+        private static void Anchor(RectTransform rect, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            rect.anchorMin = min;
+            rect.anchorMax = max;
             rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+        }
+
+        /// <summary>A fixed size rect centred on <paramref name="anchor"/> plus <paramref name="offset"/> (or on <paramref name="pivot"/>).</summary>
+        private static void Centered(RectTransform rect, Vector2 anchor, Vector2 size, Vector2 offset, Vector2? pivot = null)
+        {
+            rect.anchorMin = rect.anchorMax = anchor;
+            rect.pivot = pivot ?? new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = offset;
             rect.sizeDelta = size;
         }

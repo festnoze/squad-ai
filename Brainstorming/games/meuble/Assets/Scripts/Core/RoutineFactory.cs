@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 15.1): a planner that can restrict its paths to an area mask (the NavMesh areas of the

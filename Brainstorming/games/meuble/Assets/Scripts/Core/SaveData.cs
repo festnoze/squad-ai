@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>The outcome of recording a win (docs/CONTRACT_M5_v3.md section 6).</summary>
     public struct RecordResult
@@ -29,6 +29,10 @@ namespace Meuble.Core
         [JsonProperty("sensitivity")] public float Sensitivity = Tuning.SensitivityDefault;
         [JsonProperty("volume")] public int Volume = Tuning.VolumeDefault;
         [JsonProperty("cone")] public string Cone = ConeAlways;
+
+        // Audio overhaul (docs/audio/AUDIO_REPORT.md 5): the music's own level, a percentage under the Volume. A missing field
+        // (every save before it) is Tuning.MusicDefault: the version stays 1 and an older save loads as is.
+        [JsonProperty("music")] public int Music = Tuning.MusicDefault;
 
         // M7 (docs/CONTRACT_M7.md 1.4): the quality tier, "low" (Bas), "medium" (Moyen) or "high" (Haut). Null, a missing
         // field or an unknown value is the platform default (QualityFor): the version stays 1 and an M6 save loads as is.
@@ -58,6 +62,13 @@ namespace Meuble.Core
         /// <summary>M7 design: the saved difficulty id, Normal when there is none (or it is not a known id).</summary>
         [JsonIgnore] public string DifficultyId => DifficultyDef.Normalize(Difficulty);
 
+        // The language of every shown string, "en" (English) or "fr" (French). Null, a missing field or an unknown value is
+        // English: the version stays 1 and an older save loads as is.
+        [JsonProperty("language", NullValueHandling = NullValueHandling.Ignore)] public string Language;
+
+        /// <summary>The saved language, English when there is none (or it is not a known one).</summary>
+        [JsonIgnore] public string LanguageId => Strings.NormalizeLanguage(Language);
+
         /// <summary>"Jamais": VisionConeView hides the floor cones; the eye indicator and the screen edge pulse are unaffected.</summary>
         public bool HidesCone => Cone == ConeNever;
 
@@ -70,9 +81,11 @@ namespace Meuble.Core
             {
                 Sensitivity = ClampStep(Sensitivity, Tuning.SensitivityMin, Tuning.SensitivityMax, Tuning.SensitivityStep),
                 Volume = Mathf.RoundToInt(ClampStep(Volume, Tuning.VolumeMin, Tuning.VolumeMax, Tuning.VolumeStep)),
+                Music = Mathf.RoundToInt(ClampStep(Music, Tuning.MusicMin, Tuning.MusicMax, Tuning.MusicStep)),
                 Cone = Cone == ConeNever ? ConeNever : ConeAlways, // MUTATION:OPTIONS_CONE_FALLBACK
                 Quality = IsQuality(Quality) ? Quality : null,
                 Difficulty = DifficultyDef.Normalize(Difficulty) == Difficulty ? Difficulty : null, // MUTATION:OPTIONS_DIFFICULTY_FALLBACK
+                Language = Language == Strings.English || Language == Strings.French ? Language : null,
             };
         }
 
@@ -108,6 +121,11 @@ namespace Meuble.Core
             {
                 options.Volume = (int)v.Value<float>();
             }
+            JToken m = obj["music"];
+            if (m != null && (m.Type == JTokenType.Float || m.Type == JTokenType.Integer))
+            {
+                options.Music = (int)m.Value<float>();
+            }
             JToken c = obj["cone"];
             if (c != null && c.Type == JTokenType.String)
             {
@@ -122,6 +140,11 @@ namespace Meuble.Core
             if (d != null && d.Type == JTokenType.String)
             {
                 options.Difficulty = d.Value<string>();
+            }
+            JToken l = obj["language"];
+            if (l != null && l.Type == JTokenType.String)
+            {
+                options.Language = l.Value<string>();
             }
             return options.Clamped();
         }

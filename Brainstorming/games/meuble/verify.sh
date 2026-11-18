@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# UN, DEUX, TROIS, MEUBLE - the verification harness of docs/PRD.md section 10.
+# Out of Sight - the verification harness of docs/PRD.md section 10.
 #
 #   ./verify.sh            every stage, stops on the first red one
 #   ./verify.sh compile    project setup + scripts compile
@@ -97,11 +97,11 @@ killers_listed() {
 # Every probe step of PRD 10.2, plus the steps added since, plus the full name of every PlayMode mutation killer
 # (M5 5B.1: a prefix shared by two tests, such as Step37w_, would let one of them vanish). A missing or ignored
 # step is red.
-PROBE_STEPS="Step01_ Step02_ Step03_ Step04_ Step05_ Step06_ Step07_ Step08_ Step09_ Step10_ Step11_ Step12_ Step13_ Step14_ Step15_ Step16_ Step17_ Step18_ Step19_ Step20_ Step21_ Step13b_ Step13c_ Step14b_ Step19b_ Step20b_ Step21b_ Step13d_ Step13e_ Step14c_ Step22_ Step22b_ Step22c_ Step22d_ Step22e_ Step22f_ Step23_ Step24_ Step24f_ Step24g_ Step24h_ Step25_ Step26_ Step27_ Step27b_ Step27c_ Step27d_ Step27e_ Step27f_ Step27g_ Step27h_ Step28_ Step28b_ Step28c_ Step28d_ Step28e_ Step28f_ Step28g_ Step29_ Step29b_ Step29c_ Step29d_ Step29e_ Step29f_ Step29g_ Step29h_ Step29i_ Step29j_ Step29k_ Step29l_ Step29m_ Step29n_ Step30_ Step30b_ Step30c_ Step30d_ Step30e_ Step30f_ Step31_ Step32_ Step33_ Step33b_ Step33c_ Step33d_ Step35_ Step35a_ Step35b_ Step41_ Step41b_ Step41c_ Step41d_ Step41e_ Step41f_ Step41g_ Step36g_ Step36h_ Step36i_ Step36j_ Step36k_ Step36_ Step36b_ Step36c_ Step36d_ Step36e_ Step36f_ Step36l_ Step36m_ Step36n_ Step37_ Step37b_ Step37c_ Step37d_ Step37e_ Step37f_ Step37g_ Step38_ Step38b_ Step38c_ Step38d_ Step38e_ Step38f_ Step39_ Step39c_ Step39d_ Step39e_ Step39f_ Step39g_ Step39h_ Step39i_ Step39j_ Step40_ Step45_ Step45a_ Step45b_ Step45c_ Step45d_ Step45e_ Step45f_ Step45h_ Step45g_ Step39k_ Step38g_ Step37h_ Step36o_ Step37w_ConeFollowsThePlatformTop Step37x_ Step38w_ Step39l_ Step39m_ Step42b_ Step42c_ Step42d_ Step42e_ Step42f_ Step42g_ Step42w_ Step43b_ Step43r_ Step44b_ Step44c_ Step44d_ Step44e_ Step44f_ Step44g_ Step44w_ Step45i_ Step45j_ Step45k_ Step45l_ Step45m_ Step45n_ Step45o_ Step45p_ Step45q_ Step45r_ Step03_StillWhileSeen Step04_Caught Step05_Occluder Step06_OutOfCone Step22_ModelsReplaceTheProceduralVisuals Step24_LoopDrivesClipsHeadAndFootsteps Step26_PauseStopsEveryRuleAndHoldsVisuals Step27d_HopVariantsNeverRepeat Step02_MoveUnseen Step41_LockedLevelsUnlockThroughRealWins Step41f_CorruptSaveAtBootStartsFresh Step37_EachConeUsesItsWatchersRangeAndAngle Step38_DogConeColourWalkPatterAndFeet Step37_VisualEyeIsTheRoutineEye Step36_LeafPosesAndTheColliderAndOcclusionSwap Step36c_EOpensTheLeafInExactlyThirtyMovingSteps Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded Step38w_DogFanCoversWhatItSees Step42w_RobotVisualFollowsSetPoseWithoutCollider Step44w_LoadSitsOnTopTiltsAndBreaks Step39h_CombinedRenderersKeepCollidersMaterialsAndFades Step44x_ Step50a_NewSurfacesShowTheirDetailAndFinish Step50b_FallenLoadPlantShowsSoilAndFoliage Step53a_EnterAndLeaveTheWardrobe Step53b_HiddenCreakIsMuffled Step53c_RememberedSpotSeenEmpty Step54a_DoorMemoryPutsTheDoorBack Step55a_InhabitantOpensAnOptInDoor Step56a_Level18RouteWins Step51a_OptionsAppliedAtOnce Step51b_OptionsSurviveRestartAndReload Step52a_MenusNavigableWithInjectedGamepadAlone Step52b_EyeShapesEdgePatternAndConeOutline Step57a_ Step57b_"
+PROBE_STEPS="Step01_ Step02_ Step03_ Step04_ Step05_ Step06_ Step07_ Step08_ Step09_ Step10_ Step11_ Step12_ Step13_ Step14_ Step15_ Step16_ Step17_ Step18_ Step19_ Step20_ Step21_ Step13b_ Step13c_ Step14b_ Step19b_ Step20b_ Step21b_ Step13d_ Step13e_ Step14c_ Step22_ Step22b_ Step22c_ Step22d_ Step22e_ Step22f_ Step23_ Step24_ Step24f_ Step24g_ Step24h_ Step25_ Step26_ Step27_ Step27b_ Step27c_ Step27d_ Step27e_ Step27f_ Step27g_ Step27h_ Step28_ Step28b_ Step28c_ Step28d_ Step28e_ Step28f_ Step28g_ Step29_ Step29b_ Step29c_ Step29d_ Step29e_ Step29f_ Step29g_ Step29h_ Step29i_ Step29j_ Step29k_ Step29l_ Step29m_ Step29n_ Step30_ Step30b_ Step30c_ Step30d_ Step30e_ Step30f_ Step31_ Step32_ Step33_ Step33b_ Step33c_ Step33d_ Step35_ Step35a_ Step35b_ Step41_ Step41b_ Step41c_ Step41d_ Step41e_ Step41f_ Step41g_ Step36g_ Step36h_ Step36i_ Step36j_ Step36k_ Step36_ Step36b_ Step36c_ Step36d_ Step36e_ Step36f_ Step36l_ Step36m_ Step36n_ Step37_ Step37b_ Step37c_ Step37d_ Step37e_ Step37f_ Step37g_ Step38_ Step38b_ Step38c_ Step38d_ Step38e_ Step38f_ Step39_ Step39c_ Step39d_ Step39e_ Step39f_ Step39g_ Step39h_ Step39i_ Step39j_ Step40_ Step45_ Step45a_ Step45b_ Step45c_ Step45d_ Step45e_ Step45f_ Step45h_ Step45g_ Step39k_ Step38g_ Step37h_ Step36o_ Step37w_ConeFollowsThePlatformTop Step37x_ Step38w_ Step39l_ Step39m_ Step42b_ Step42c_ Step42d_ Step42e_ Step42f_ Step42g_ Step42w_ Step43b_ Step43r_ Step44b_ Step44c_ Step44d_ Step44e_ Step44f_ Step44g_ Step44w_ Step45i_ Step45j_ Step45k_ Step45l_ Step45m_ Step45n_ Step45o_ Step45p_ Step45q_ Step45r_ Step03_StillWhileSeen Step04_Caught Step05_Occluder Step06_OutOfCone Step22_ModelsReplaceTheProceduralVisuals Step24_LoopDrivesClipsHeadAndFootsteps Step26_PauseStopsEveryRuleAndHoldsVisuals Step27d_HopVariantsNeverRepeat Step02_MoveUnseen Step41_LockedLevelsUnlockThroughRealWins Step41f_CorruptSaveAtBootStartsFresh Step37_EachConeUsesItsWatchersRangeAndAngle Step38_DogConeColourWalkPatterAndFeet Step37_VisualEyeIsTheRoutineEye Step36_LeafPosesAndTheColliderAndOcclusionSwap Step36c_EOpensTheLeafInExactlyThirtyMovingSteps Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded Step38w_DogFanCoversWhatItSees Step42w_RobotVisualFollowsSetPoseWithoutCollider Step44w_LoadSitsOnTopTiltsAndBreaks Step39h_CombinedRenderersKeepCollidersMaterialsAndFades Step44x_ Step50a_NewSurfacesShowTheirDetailAndFinish Step50b_FallenLoadPlantShowsSoilAndFoliage Step53a_EnterAndLeaveTheWardrobe Step53b_HiddenCreakIsMuffled Step53c_RememberedSpotSeenEmpty Step54a_DoorMemoryPutsTheDoorBack Step55a_InhabitantOpensAnOptInDoor Step56a_Level18RouteWins Step51a_OptionsAppliedAtOnce Step51b_OptionsSurviveRestartAndReload Step52a_MenusNavigableWithInjectedGamepadAlone Step52b_EyeShapesEdgePatternAndConeOutline Step57a_ Step57b_ Step58C1_ Step58C2_ Step58C3_ Step58C4_ Step58a1_ Step58a2_ Step58a3_ Step58a4_ Step58b1_ Step58b2_ Step58b3_ Step58b4_"
 
 if want compile; then
   step "Setup du projet et compilation"
-  "$PROJECT/tools/unity.sh" run . --timeout 900 -- -executeMethod Meuble.Editor.Builder.SetupAndCompile -logFile "$RESULTS/compile.log" >"$RESULTS/compile.out" 2>&1
+  "$PROJECT/tools/unity.sh" run . --timeout 900 -- -executeMethod OutOfSight.Editor.Builder.SetupAndCompile -logFile "$RESULTS/compile.log" >"$RESULTS/compile.out" 2>&1
   code=$?
   if [ $code -ne 0 ]; then
     grep -E "error CS|Compilation failed|\[Builder\]" "$RESULTS/compile.log" | sort -u | head -40
@@ -143,7 +143,7 @@ if want audit; then
   ITEMS=$(( LEVEL_COUNT + FIXTURE_COUNT ))
   echo "  $LEVEL_COUNT niveaux et $FIXTURE_COUNT fixtures : limite de $(( ITEMS * 312 > 2400 ? ITEMS * 312 : 2400 )) s"
   AUDIT_TIMEOUT=$(( ITEMS * 312 > 2400 ? ITEMS * 312 : 2400 ))
-  "$PROJECT/tools/unity.sh" run . --timeout "$AUDIT_TIMEOUT" -- -executeMethod Meuble.Editor.LevelAudit.RunBatch -logFile "$RESULTS/audit.log" >"$RESULTS/audit.out" 2>&1
+  "$PROJECT/tools/unity.sh" run . --timeout "$AUDIT_TIMEOUT" -- -executeMethod OutOfSight.Editor.LevelAudit.RunBatch -logFile "$RESULTS/audit.log" >"$RESULTS/audit.out" 2>&1
   code=$?
   python - "$RESULTS/audit.log" <<'PY'
 import sys, io
@@ -164,9 +164,9 @@ fi
 if want player; then
   step "Le jeu dans un player construit (PRD 10.4)"
   rm -rf "$PROJECT/Build/Windows"
-  "$PROJECT/tools/unity.sh" run . --timeout 1800 -- -executeMethod Meuble.Editor.Builder.BuildWindows -logFile "$RESULTS/build.log" >"$RESULTS/build.out" 2>&1
+  "$PROJECT/tools/unity.sh" run . --timeout 1800 -- -executeMethod OutOfSight.Editor.Builder.BuildWindows -logFile "$RESULTS/build.log" >"$RESULTS/build.out" 2>&1
   code=$?
-  EXE="$PROJECT/Build/Windows/Meuble.exe"
+  EXE="$PROJECT/Build/Windows/OutOfSight.exe"
   if [ $code -ne 0 ] || [ ! -f "$EXE" ]; then
     grep -E "error CS|Build failed|\[Builder\]" "$RESULTS/build.log" | head -20
     red "build du player (code $code)"
@@ -177,7 +177,7 @@ if want player; then
 
   rm -rf "$SHOTS"; mkdir -p "$SHOTS"
   # M5 (CONTRACT_M5_v3 15.10): the real save must not change during a probe run.
-  REAL_SAVE="${USERPROFILE:-$HOME}/AppData/LocalLow/Meuble/UN, DEUX, TROIS, MEUBLE/meuble_save.json"
+  REAL_SAVE="${USERPROFILE:-$HOME}/AppData/LocalLow/OutOfSight/Out of Sight/outofsight_save.json"
   REAL_HASH_BEFORE="$( [ -f "$REAL_SAVE" ] && sha256sum "$REAL_SAVE" | cut -d" " -f1 || echo absent)"
   PLAYER_LOG="$RESULTS/Player.log"
   rm -f "$PLAYER_LOG"

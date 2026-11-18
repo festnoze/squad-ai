@@ -1,9 +1,9 @@
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.AI;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Path planner over the runtime NavMesh of one level (docs/CONTRACT_M2.md 6). Works in play mode and

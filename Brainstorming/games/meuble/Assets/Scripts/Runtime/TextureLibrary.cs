@@ -1,13 +1,14 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
-    /// M4.2: the detail a renderer slot shows over its palette colour. Plain shows none (skin, eyes, hair, metal,
-    /// books, leaves, the garden): its material's flat base map keeps the palette colour exactly.
+    /// M4.2: the detail a renderer slot shows over its palette colour. Plain shows none (skin, eyes, hair, books): its
+    /// material's flat base map keeps the palette colour exactly. M7 real colours (CONTRACT_M7 5): every other surface
+    /// shows its image in the image's own colours (the player furniture: the owner's red image).
     /// </summary>
     public enum Surface
     {
@@ -30,19 +31,28 @@ namespace Meuble
     }
 
     /// <summary>
-    /// M4.2 textures: the grayscale detail textures (CC0, ambientCG, docs/LICENSES.md), at
-    /// Assets/Resources/TextureLibrary.asset, built by Meuble.Editor.ModelCatalogBuilder. Being referenced from
-    /// Resources is what ships them in the player.
+    /// The environment textures (the product owner's images, docs/LICENSES.md), at Assets/Resources/TextureLibrary.asset,
+    /// built by OutOfSight.Editor.ModelCatalogBuilder. Being referenced from Resources is what ships them in the player.
     ///
-    /// The technique (URP Lit only, no custom shader, no keyword):
-    /// - one URP Lit material per palette colour, as before. Its base colour is the palette colour divided by
-    ///   <see cref="Tuning.DetailMean"/> (in linear), and its base map is <see cref="Flat"/>, a constant texture of
-    ///   that mean: a renderer without a detail shows its palette colour exactly;
-    /// - a renderer slot that shows a detail gets a MaterialPropertyBlock (<see cref="PrimitiveKit.Detail(Renderer, int, Surface)"/>)
-    ///   with the surface's texture as its base map and a tiling so one repeat spans the surface's tile in metres.
-    ///   Every detail texture has the same mean, so the palette colour is kept on average whatever the surface;
-    /// - so the same blue can be a woven sofa and a wooden counter without a second material (PRD 7.4: 24 per level).
+    /// M7 real colours (CONTRACT_M7 5, product owner decision of 2026-11-18): every textured surface shows its image in
+    /// the image's own colours, tiled as a visible repeating pattern (URP Lit only, no custom shader, no keyword):
+    /// - each surface has a seamless sRGB colour map (<see cref="ColourOf"/>, Assets/Art/Environment/Colour) and ONE
+    ///   URP Lit material (<see cref="PrimitiveKit.SurfaceMaterial"/>): white base colour, the colour map as base map,
+    ///   the surface's own finish (<see cref="ColourFinishOf"/>). <see cref="PrimitiveKit.Detail(Renderer, int, Surface)"/>
+    ///   puts that material in the slot and a MaterialPropertyBlock sets the tiling so one repeat spans the surface's
+    ///   tile in metres, plus the surface's normal map: one material per surface replaces one per palette colour;
+    /// - the one exception is the player's furniture (PRD 7.2: found instantly in any frame): its red slots take
+    ///   <see cref="PrimitiveKit.PlayerMaterial"/>, the owner's red image (<see cref="PlayerColour"/>) at its own
+    ///   painted metal finish;
+    /// - the inhabitants (their clothes belong to CharacterLook) keep the M4.2 rule: their palette material (its base
+    ///   colour the palette over <see cref="Tuning.DetailMean"/>, its base map <see cref="Flat"/>) with the grayscale
+    ///   detail of mean <see cref="Tuning.DetailMean"/> (<see cref="TextureOf"/>) in the property block.
     /// The URP Lit base map needs no shader keyword: no shader variant can be stripped from the player.
+    ///
+    /// M7 rug image (product owner, 2026-11-18): the rug and the doormat are a second exception, the opposite of
+    /// tiling: their own picture (<see cref="RugColour"/>) shows exactly once per rug, stretched over its own size
+    /// (<see cref="PrimitiveKit.RugDetail"/>), on the same shared <see cref="Surface.Carpet"/> material (<see cref="SurfaceOf"/>
+    /// resolves it too); the "soft" room floor keeps the tiled Carpet detail above, untouched.
     /// </summary>
     public sealed class TextureLibrary : ScriptableObject
     {
@@ -55,16 +65,46 @@ namespace Meuble
             public Texture2D texture;
             /// <summary>Mean texel of the source PNG (a linear multiplier), measured by the builder.</summary>
             public float mean;
-            /// <summary>The ambientCG asset the detail was derived from.</summary>
+            /// <summary>The source image the detail was derived from (its file stem in Assets/Art/Environment).</summary>
             public string source;
             /// <summary>
-            /// M7 (CONTRACT_M7 1.2): the 512 tangent space normal map derived from the same ambientCG material's
-            /// NormalGL map, or null (Plastic, Foliage, Soil: not in the 1.2 list, stay bump-free).
+            /// M7 (CONTRACT_M7 1.2): the 512 tangent space normal map derived from the same source (a gentle Sobel of
+            /// the detail), or null (Plastic, Foliage, Soil: not in the 1.2 list, stay bump-free).
             /// </summary>
             public Texture2D normal;
+            /// <summary>
+            /// M7 real colours (CONTRACT_M7 5): the seamless 512 sRGB colour map prepared from the same source image
+            /// (Assets/Art/Environment/Colour, tools/assets/derive_env_colours.py), in phase with <see cref="normal"/>.
+            /// </summary>
+            public Texture2D colour;
+            /// <summary>The mean texel of <see cref="colour"/> in linear (measured by the builder on the source PNG).</summary>
+            public Color colourMean;
         }
 
         public List<Entry> entries = new List<Entry>();
+
+        /// <summary>M7 real colours: the player furniture's colour map (the owner's red painted metal image), or null.</summary>
+        public Texture2D playerColour;
+
+        /// <summary>The mean texel of <see cref="playerColour"/> in linear.</summary>
+        public Color playerMean;
+
+        /// <summary>The source image of <see cref="playerColour"/> (its file stem in Assets/Art/Environment).</summary>
+        public string playerSource;
+
+        /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture (Assets/Art/Environment/
+        /// rug_modern_inset_border.png), shown exactly once per rug (<see cref="PrimitiveKit.RugDetail"/>: UV 0 to 1,
+        /// never tiled), never the "soft" room floor's tiled <see cref="Surface.Carpet"/> detail (<see cref="ColourOf"/>,
+        /// unchanged). Resolves as <see cref="Surface.Carpet"/> too (<see cref="SurfaceOf"/>): one shared material.
+        /// </summary>
+        public Texture2D rugColour;
+
+        /// <summary>The mean texel of <see cref="rugColour"/> in linear.</summary>
+        public Color rugMean;
+
+        /// <summary>The source image of <see cref="rugColour"/> (its file stem in Assets/Art/Environment).</summary>
+        public string rugSource;
 
         /// <summary>Every surface that shows a texture, in library order.</summary>
         public static readonly Surface[] Textured =
@@ -106,7 +146,10 @@ namespace Meuble
             return loaded;
         }
 
-        /// <summary>The detail texture of a surface, or null (Plain, or a library without it).</summary>
+        /// <summary>
+        /// The grayscale detail texture of a surface (linear, mean <see cref="Tuning.DetailMean"/>), or null (Plain, or a
+        /// library without it). M7 real colours: only a slot that keeps its palette colour (an inhabitant's) shows it.
+        /// </summary>
         public static Texture2D TextureOf(Surface surface)
         {
             if (surface == Surface.Plain)
@@ -118,7 +161,42 @@ namespace Meuble
             return e != null ? e.texture : null;
         }
 
-        /// <summary>The surface a texture is the detail of; Plain for the flat map, null or any other texture.</summary>
+        /// <summary>M7 real colours (CONTRACT_M7 5): the sRGB colour map of a surface, or null (Plain, or a library without it).</summary>
+        public static Texture2D ColourOf(Surface surface)
+        {
+            if (surface == Surface.Plain)
+            {
+                return null;
+            }
+            TextureLibrary library = Load();
+            Entry e = library != null ? library.Find(surface) : null;
+            return e != null ? e.colour : null;
+        }
+
+        /// <summary>M7 real colours (CONTRACT_M7 5): the player furniture's colour map (the owner's red image), or null.</summary>
+        public static Texture2D PlayerColour
+        {
+            get
+            {
+                TextureLibrary library = Load();
+                return library != null ? library.playerColour : null;
+            }
+        }
+
+        /// <summary>M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture, or null.</summary>
+        public static Texture2D RugColour
+        {
+            get
+            {
+                TextureLibrary library = Load();
+                return library != null ? library.rugColour : null;
+            }
+        }
+
+        /// <summary>
+        /// The surface a texture shows: the detail or the colour map of that surface; Lacquer for the player's own colour
+        /// map (it replaces the lacquer the player furniture showed); Plain for the flat map, null or any other texture.
+        /// </summary>
         public static Surface SurfaceOf(Texture texture)
         {
             TextureLibrary library = Load();
@@ -126,14 +204,93 @@ namespace Meuble
             {
                 return Surface.Plain;
             }
+            if (texture == library.playerColour)
+            {
+                return Surface.Lacquer;
+            }
+            if (texture == library.rugColour)
+            {
+                return Surface.Carpet;
+            }
             foreach (Entry e in library.entries)
             {
-                if (e != null && e.texture == texture)
+                if (e != null && (e.texture == texture || e.colour == texture))
                 {
                     return e.surface;
                 }
             }
             return Surface.Plain;
+        }
+
+        /// <summary>
+        /// The mean texel (linear) of a base map of the library: a colour map's measured mean, the detail mean (grey) for a
+        /// detail or the flat map, null for any other texture (null included).
+        /// </summary>
+        public static Color? MeanColourOf(Texture texture)
+        {
+            if (texture == null)
+            {
+                return null;
+            }
+            if (texture == flat)
+            {
+                return new Color(Tuning.DetailMean, Tuning.DetailMean, Tuning.DetailMean, 1f);
+            }
+            TextureLibrary library = Load();
+            if (library == null)
+            {
+                return null;
+            }
+            if (texture == library.playerColour)
+            {
+                return library.playerMean;
+            }
+            if (texture == library.rugColour)
+            {
+                return library.rugMean;
+            }
+            foreach (Entry e in library.entries)
+            {
+                if (e == null)
+                {
+                    continue;
+                }
+                if (e.colour == texture)
+                {
+                    return e.colourMean;
+                }
+                if (e.texture == texture)
+                {
+                    return new Color(e.mean, e.mean, e.mean, 1f);
+                }
+            }
+            return null;
+        }
+
+        /// <summary>True for a colour map of the library (a surface's or the player's), false for a detail or anything else.</summary>
+        public static bool IsColourMap(Texture texture)
+        {
+            TextureLibrary library = Load();
+            if (texture == null || library == null)
+            {
+                return false;
+            }
+            if (texture == library.playerColour)
+            {
+                return true;
+            }
+            if (texture == library.rugColour)
+            {
+                return true;
+            }
+            foreach (Entry e in library.entries)
+            {
+                if (e != null && e.colour == texture)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>The mean texel of a detail texture (the flat map: <see cref="Tuning.DetailMean"/>); NaN when unknown.</summary>
@@ -284,6 +441,46 @@ namespace Meuble
                     smoothness = 0f;
                     metallic = 0f;
                     return false;
+            }
+        }
+
+        // ----- M7 real colours (CONTRACT_M7 5) -----
+
+        /// <summary>
+        /// The one smoothness and metallic of a surface's colour material (<see cref="PrimitiveKit.SurfaceMaterial"/>,
+        /// one material per surface): the M4.2 surfaces, whose finish used to vary with the palette material drawing
+        /// them, get one fixed finish each, and Lacquer's colour material (the door leaves: the player furniture has its
+        /// own <see cref="PrimitiveKit.PlayerMaterial"/>) is painted wood, not glossy; every other surface keeps
+        /// <see cref="FinishOf"/>. False, both at 0, for Plain.
+        /// </summary>
+        public static bool ColourFinishOf(Surface surface, out float smoothness, out float metallic)
+        {
+            metallic = 0f;
+            switch (surface)
+            {
+                case Surface.Wood:
+                    smoothness = Tuning.ColourWoodSmoothness;
+                    return true;
+                case Surface.Parquet:
+                    smoothness = Tuning.ColourParquetSmoothness;
+                    return true;
+                case Surface.Plaster:
+                    smoothness = Tuning.ColourPlasterSmoothness;
+                    return true;
+                case Surface.Upholstery:
+                    smoothness = Tuning.ColourUpholsterySmoothness;
+                    return true;
+                case Surface.Linen:
+                    smoothness = Tuning.ColourLinenSmoothness;
+                    return true;
+                case Surface.Carpet:
+                    smoothness = Tuning.ColourCarpetSmoothness;
+                    return true;
+                case Surface.Lacquer:
+                    smoothness = Tuning.ColourDoorSmoothness;
+                    return true;
+                default:
+                    return FinishOf(surface, out smoothness, out metallic);
             }
         }
 

@@ -147,7 +147,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d2c57108fd8ca5745918aa25d24e9fa3, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Meuble.Runtime::Meuble.Main
+  m_EditorClassIdentifier: OutOfSight.Runtime::OutOfSight.Main
 --- !u!4 &2017915919
 Transform:
   m_ObjectHideFlags: 0

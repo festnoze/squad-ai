@@ -2,14 +2,14 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M6 (docs/CONTRACT_M6.md 2.1, 2.2 and 2.3), on the real Boot scene: options applied at once and surviving a
@@ -100,7 +100,7 @@ namespace Meuble.Tests
 
         private string NewTempDir()
         {
-            string dir = Path.Combine(Path.GetTempPath(), "meuble_options_tests_" + Guid.NewGuid().ToString("N"));
+            string dir = Path.Combine(Path.GetTempPath(), "outofsight_options_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             tempDirs.Add(dir);
             return dir;

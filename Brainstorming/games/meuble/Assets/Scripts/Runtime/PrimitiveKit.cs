@@ -1,8 +1,9 @@
 using System.Collections.Generic;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Procedural primitives (PRD 7.1): generated low poly meshes and one shared URP material per color.
@@ -13,8 +14,9 @@ namespace Meuble
     /// and checked for null before reuse, because a scene load may unload unreferenced runtime assets.
     ///
     /// M4.2 textures (<see cref="TextureLibrary"/>): every generated mesh carries UVs in metres (boxes and quads per
-    /// size, V along the longer side of each face), and <see cref="Detail(Renderer, int, Surface)"/> shows a grayscale
-    /// detail over the palette colour of one renderer slot, still one material per colour.
+    /// size, V along the longer side of each face). M7 real colours (CONTRACT_M7 5): <see cref="Detail(Renderer, int, Surface)"/>
+    /// shows a surface's image in its own colours on one renderer slot, through one material per surface
+    /// (<see cref="SurfaceMaterial"/>), the player furniture through its own red one (<see cref="PlayerMaterial"/>).
     /// </summary>
     public static class PrimitiveKit
     {
@@ -83,7 +85,66 @@ namespace Meuble
             return m;
         }
 
-        private static Material NewLit(Color color, float smoothness, float metallic, Surface? taggedSurface = null)
+        // ----- M7 real colours (CONTRACT_M7 5): one material per surface, and the player's own -----
+
+        private static readonly Dictionary<Surface, Material> ColourCache = new Dictionary<Surface, Material>();
+        private static readonly Dictionary<Color32, Material> PlayerCache = new Dictionary<Color32, Material>();
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): the one URP Lit material of a textured surface, whatever palette colour its
+        /// callers asked for: a white base colour, the surface's colour map as base map (TextureLibrary.ColourOf), so the
+        /// image shows in its own colours, at the surface's one finish (TextureLibrary.ColourFinishOf).
+        /// <see cref="Detail(Renderer, int, Surface)"/> puts it in the slot. Its <see cref="PaletteOf"/> is white (the image
+        /// carries the colour). Null for Plain or a surface the library has no colour map for.
+        /// </summary>
+        public static Material SurfaceMaterial(Surface surface)
+        {
+            if (ColourCache.TryGetValue(surface, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+            Texture2D colour = TextureLibrary.ColourOf(surface);
+            if (colour == null)
+            {
+                return null;
+            }
+            TextureLibrary.ColourFinishOf(surface, out float smoothness, out float metallic);
+            Material m = NewLit(Color.white, smoothness, metallic, surface, colour, "Colour " + surface);
+            ColourCache[surface] = m;
+            return m;
+        }
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5, PRD 7.2): the material of the player furniture's red slots: a white base
+        /// colour, the owner's red painted metal image as base map (TextureLibrary.PlayerColour), the painted metal finish
+        /// (Tuning.PlayerSmoothness, Tuning.PlayerMetallic). One per red (a level has one); its <see cref="PaletteOf"/> is
+        /// that red. Null when the library has no player image (the slot then keeps its red palette material).
+        /// </summary>
+        public static Material PlayerMaterial(Color red)
+        {
+            Color32 key = red;
+            if (PlayerCache.TryGetValue(key, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+            Texture2D colour = TextureLibrary.PlayerColour;
+            if (colour == null)
+            {
+                return null;
+            }
+            Material m = NewLit(red, Tuning.PlayerSmoothness, Tuning.PlayerMetallic, Surface.Lacquer, colour,
+                "Player " + ColorUtility.ToHtmlStringRGB(red));
+            PlayerCache[key] = m;
+            return m;
+        }
+
+        /// <summary>
+        /// A URP Lit material registered with its palette colour <paramref name="color"/>. Without a colour map: the M4.2
+        /// palette material (base colour compensated, the flat base map). With one (M7 real colours): a white base colour
+        /// and that map as base map, so the image's own colours show.
+        /// </summary>
+        private static Material NewLit(Color color, float smoothness, float metallic, Surface? taggedSurface = null,
+            Texture2D colourMap = null, string colourName = null)
         {
             Shader shader = Shader.Find(LitShaderName);
             if (shader == null)
@@ -91,10 +152,10 @@ namespace Meuble
                 Debug.LogError("[PrimitiveKit] URP Lit shader not found (is it in Always Included Shaders?)");
                 shader = Shader.Find("Hidden/InternalErrorShader");
             }
-            string name = "Lit " + ColorUtility.ToHtmlStringRGB(color) + (taggedSurface.HasValue ? " " + taggedSurface.Value : "");
+            string name = colourName ?? "Lit " + ColorUtility.ToHtmlStringRGB(color) + (taggedSurface.HasValue ? " " + taggedSurface.Value : "");
             var m = new Material(shader) { name = name, enableInstancing = true };
-            m.SetColor("_BaseColor", TextureLibrary.Compensate(color));
-            m.SetTexture(BaseMapId, TextureLibrary.Flat);
+            m.SetColor("_BaseColor", colourMap != null ? Color.white : TextureLibrary.Compensate(color));
+            m.SetTexture(BaseMapId, colourMap != null ? colourMap : TextureLibrary.Flat);
             m.SetFloat("_Smoothness", smoothness);
             m.SetFloat("_Metallic", metallic);
             // M6 polish: a smooth finish (Lacquer) needs its specular highlight and reflection probe to actually show;
@@ -113,6 +174,35 @@ namespace Meuble
         }
 
         private static readonly Dictionary<Material, Color32> Palette = new Dictionary<Material, Color32>();
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): the mean colour (sRGB) slot <paramref name="slot"/> of <paramref name="renderer"/>
+        /// is built with, before light: its material's base colour times the mean of the base map it shows (its property
+        /// block's, else its material's; TextureLibrary.MeanColourOf, white for a map the library does not know). Clear
+        /// for an empty slot or a material without a base colour. Tests read PRD 7.2 (the player furniture is the one
+        /// saturated red) off it.
+        /// </summary>
+        public static Color ShownColour(Renderer renderer, int slot)
+        {
+            Material[] materials = renderer != null ? renderer.sharedMaterials : null;
+            Material m = materials != null && slot >= 0 && slot < materials.Length ? materials[slot] : null;
+            if (m == null || !m.HasProperty("_BaseColor"))
+            {
+                return Color.clear;
+            }
+            Texture map = m.HasProperty(BaseMapId) ? m.GetTexture(BaseMapId) : null;
+            shownBlock ??= new MaterialPropertyBlock();
+            renderer.GetPropertyBlock(shownBlock, slot);
+            if (!shownBlock.isEmpty && shownBlock.GetTexture(BaseMapId) != null)
+            {
+                map = shownBlock.GetTexture(BaseMapId);
+            }
+            Color mean = TextureLibrary.MeanColourOf(map) ?? Color.white;
+            Color baseColour = m.GetColor("_BaseColor").linear;
+            return new Color(baseColour.r * mean.r, baseColour.g * mean.g, baseColour.b * mean.b, baseColour.a).gamma;
+        }
+
+        private static MaterialPropertyBlock shownBlock;
 
         /// <summary>M4.2: the palette colour a <see cref="Lit"/> material was made for (tests), or null for another material.</summary>
         public static Color? PaletteOf(Material material)
@@ -149,22 +239,91 @@ namespace Meuble
         }
 
         /// <summary>
-        /// M4.2: slot <paramref name="slot"/> of <paramref name="renderer"/> shows the detail texture of
-        /// <paramref name="surface"/> over its palette colour: a MaterialPropertyBlock on that slot sets the base map
-        /// and a tiling so one repeat spans <see cref="TextureLibrary.TileMetres"/> of the renderer as it stands now
-        /// (the metres per UV are measured on its mesh: procedural meshes carry UVs in metres, Kenney's are a planar
-        /// projection in inches of its native units, the humans' are generated by ModelKit). Plain does nothing.
-        /// Never touches the base colour: a renderer's property blocks also apply when the x-ray's RenderObjects passes
-        /// draw it with their override materials, and the stencil-only one must stay transparent. A missing texture or
-        /// unmeasurable UVs log one error (the built player's probe fails on it) and leave the slot flat.
+        /// Slot <paramref name="slot"/> of <paramref name="renderer"/> shows <paramref name="surface"/>. M7 real colours
+        /// (CONTRACT_M7 5, product owner decision of 2026-11-18), by what the slot's palette material stands for:
+        /// - the player furniture's red (PRD 7.2: the one red thing): <see cref="PlayerMaterial"/>, the owner's red image;
+        /// - any other palette colour: <see cref="SurfaceMaterial"/>, the surface's image in its own colours;
+        /// - an inhabitant (<paramref name="keepPalette"/>, or a renderer on the Inhabitant layer: CharacterLook owns the
+        ///   clothes) or a material that is not a PrimitiveKit Lit one: the M4.2 rule, its palette material kept with the
+        ///   grayscale detail over it.
+        /// A MaterialPropertyBlock on that slot sets the base map and a tiling so one repeat spans
+        /// <see cref="TextureLibrary.TileMetres"/> of the renderer as it stands now (the metres per UV are measured on its
+        /// mesh: procedural meshes carry UVs in metres, Kenney's are a planar projection in inches of its native units,
+        /// the humans' are generated by ModelKit), and the surface's normal map. Plain does nothing. Never touches the
+        /// base colour: a renderer's property blocks also apply when the x-ray's RenderObjects passes draw it with their
+        /// override materials, and the stencil-only one must stay transparent. A missing texture or unmeasurable UVs log
+        /// one error (the built player's probe fails on it) and leave the slot as it was.
         /// </summary>
         public static void Detail(Renderer renderer, int slot, Surface surface)
+        {
+            Detail(renderer, slot, surface, false);
+        }
+
+        /// <summary>
+        /// M7 real colours (CONTRACT_M7 5): the material <see cref="Detail(Renderer, int, Surface, bool)"/> puts in a slot
+        /// that holds <paramref name="material"/> to show <paramref name="surface"/>: the player's own for the player's red
+        /// (PRD 7.2), the surface's one for any other palette colour, or <paramref name="material"/> itself (Plain, the
+        /// textures off, a slot that keeps its palette, a material that is not a PrimitiveKit Lit one, or a library
+        /// without that colour map). LevelBuilder's combiner groups its parts by it, so two palette colours of one surface
+        /// draw as one renderer.
+        /// </summary>
+        public static Material ShownMaterial(Material material, Surface surface, bool keepPalette = false)
+        {
+            if (material == null || surface == Surface.Plain || TextureLibrary.Disabled || keepPalette)
+            {
+                return material;
+            }
+            Color? palette = PaletteOf(material);
+            if (!palette.HasValue)
+            {
+                return material;
+            }
+            if (ModelMath.IsRed(palette.Value)) // MUTATION:PLAYER_COLOUR
+            {
+                return PlayerMaterial(palette.Value) ?? material;
+            }
+            return SurfaceMaterial(surface) ?? material; // MUTATION:REAL_COLOUR
+        }
+
+        /// <summary><see cref="Detail(Renderer, int, Surface)"/>; <paramref name="keepPalette"/> keeps the slot's palette material (an inhabitant's).</summary>
+        public static void Detail(Renderer renderer, int slot, Surface surface, bool keepPalette)
         {
             if (renderer == null || surface == Surface.Plain || TextureLibrary.Disabled)
             {
                 return;
             }
-            Texture2D texture = TextureLibrary.TextureOf(surface);
+            Material[] materials = renderer.sharedMaterials;
+            Material current = slot >= 0 && slot < materials.Length ? materials[slot] : null;
+            keepPalette |= renderer.gameObject.layer == Layers.Inhabitant;
+            Material shown = ShownMaterial(current, surface, keepPalette);
+            Texture2D texture;
+            Texture2D normal;
+            float tile;
+            if (shown != null && PlayerCache.ContainsValue(shown))
+            {
+                texture = TextureLibrary.PlayerColour;
+                normal = null; // painted metal is optically flat: its finish is the material's
+                tile = TextureLibrary.TileMetres(Surface.Lacquer);
+            }
+            else if (shown != null && ColourCache.TryGetValue(surface, out Material colourMaterial) && shown == colourMaterial)
+            {
+                texture = TextureLibrary.ColourOf(surface);
+                normal = TextureLibrary.NormalOf(surface);
+                tile = TextureLibrary.TileMetres(surface);
+            }
+            else
+            {
+                Color? palette = PaletteOf(current);
+                if (!keepPalette && palette.HasValue)
+                {
+                    ReportOnce("colour " + surface, ModelMath.IsRed(palette.Value)
+                        ? $"[PrimitiveKit] no player colour map (Resources/{TextureLibrary.ResourcePath}): the player furniture keeps its palette red"
+                        : $"[PrimitiveKit] no colour map for {surface} (Resources/{TextureLibrary.ResourcePath}): the slot keeps its palette colour");
+                }
+                texture = TextureLibrary.TextureOf(surface);
+                normal = TextureLibrary.NormalOf(surface);
+                tile = TextureLibrary.TileMetres(surface);
+            }
             if (texture == null)
             {
                 ReportOnce("texture " + surface, $"[PrimitiveKit] no detail texture for {surface} (Resources/{TextureLibrary.ResourcePath}): the slot stays flat");
@@ -177,7 +336,12 @@ namespace Meuble
                     $"[PrimitiveKit] {renderer.name} slot {slot}: its mesh has no measurable UVs, {surface} cannot be shown");
                 return;
             }
-            float repeat = metresPerUv / TextureLibrary.TileMetres(surface);
+            if (shown != current)
+            {
+                materials[slot] = shown;
+                renderer.sharedMaterials = materials;
+            }
+            float repeat = metresPerUv / tile;
             if (detailBlock == null)
             {
                 detailBlock = new MaterialPropertyBlock();
@@ -186,13 +350,56 @@ namespace Meuble
             detailBlock.SetTexture(BaseMapId, texture); // MUTATION:DETAIL
             detailBlock.SetVector(BaseMapStId, new Vector4(repeat, repeat, 0f, 0f));
             // M7 textures (CONTRACT_M7 1.2): a surface with a derived normal map also shows it, at its own modest
-            // scale; a surface without one (Plastic, Foliage, Soil, Plain) leaves the material's own neutral default.
-            Texture2D normal = TextureLibrary.NormalOf(surface);
+            // scale; a surface without one (Plastic, Foliage, Soil, Plain, the player's painted metal) leaves the
+            // material's own neutral default.
             if (normal != null) // MUTATION:DETAIL_NORMAL
             {
                 detailBlock.SetTexture(BumpMapId, normal);
                 detailBlock.SetFloat(BumpScaleId, TextureLibrary.BumpScaleOf(surface));
             }
+            renderer.SetPropertyBlock(detailBlock, slot);
+        }
+
+        /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): slot <paramref name="slot"/> of <paramref name="renderer"/> shows
+        /// the rug's own picture (<see cref="TextureLibrary.RugColour"/>) exactly once over its own UV 0 to 1, never
+        /// tiled: unlike <see cref="Detail(Renderer, int, Surface)"/>, no <see cref="MetresPerUv"/> measurement and no
+        /// repeat, so the mesh must already carry UV0 in the 0 to 1 range over the whole visible surface (the literal
+        /// <see cref="QuadMesh"/>, scaled by the transform, never <see cref="QuadMeshSized"/> or a box: BuildRug and
+        /// BuildExit put the picture on its own quad, never the model's or the procedural border's own mesh, whose UVs
+        /// are not one coherent mapping across the whole rug). Drawn through the same shared Surface.Carpet material
+        /// (<see cref="SurfaceMaterial"/>) as the "soft" room floor (PRD 7.4: one material, not a second one for rugs);
+        /// no normal map (a stretched tiling bump would look wrong on a picture that is never tiled). Does nothing for
+        /// a null renderer, with <see cref="TextureLibrary.Disabled"/>, or when the library has no rug image (one error
+        /// logged, the slot keeps its palette colour, as every other <see cref="Detail(Renderer, int, Surface)"/> miss).
+        /// </summary>
+        public static void RugDetail(Renderer renderer, int slot)
+        {
+            if (renderer == null || TextureLibrary.Disabled)
+            {
+                return;
+            }
+            Texture2D texture = TextureLibrary.RugColour;
+            if (texture == null)
+            {
+                ReportOnce("rug texture", $"[PrimitiveKit] no rug colour map (Resources/{TextureLibrary.ResourcePath}): the rug keeps its palette colour");
+                return;
+            }
+            Material[] materials = renderer.sharedMaterials;
+            Material current = slot >= 0 && slot < materials.Length ? materials[slot] : null;
+            Material shown = ShownMaterial(current, Surface.Carpet);
+            if (shown != current)
+            {
+                materials[slot] = shown;
+                renderer.sharedMaterials = materials;
+            }
+            if (detailBlock == null)
+            {
+                detailBlock = new MaterialPropertyBlock();
+            }
+            detailBlock.Clear();
+            detailBlock.SetTexture(BaseMapId, texture);
+            detailBlock.SetVector(BaseMapStId, new Vector4(1f, 1f, 0f, 0f)); // UV 0 to 1 exactly once: the mesh's own unit UV.
             renderer.SetPropertyBlock(detailBlock, slot);
         }
 
@@ -366,7 +573,8 @@ namespace Meuble
 
         /// <summary>Number of distinct materials created so far (budget check, PRD 7.4).</summary>
         public static int MaterialCount =>
-            LitCache.Count + UnlitCache.Count + TransparentCache.Count + EmissiveCache.Count + SurfaceCache.Count;
+            LitCache.Count + UnlitCache.Count + TransparentCache.Count + EmissiveCache.Count + SurfaceCache.Count
+            + ColourCache.Count + PlayerCache.Count;
 
         // ----- Meshes (unit size, scaled by the transform) -----
 

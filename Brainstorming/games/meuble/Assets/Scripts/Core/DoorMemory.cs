@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>M6: what one sighting of a door leaf gave (docs/CONTRACT_M6.md 2.6).</summary>
     public enum DoorSighting

@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>PRD 10.1: unit tests of the pure logic.</summary>
     public sealed class VisionMathTests
@@ -345,9 +345,14 @@ namespace Meuble.Tests
         [Test]
         public void Strings_are_verbatim_from_the_prd()
         {
-            Assert.AreEqual("UN, DEUX, TROIS, MEUBLE", Strings.Get("title"));
-            Assert.AreEqual("ZQSD : avancer    Souris : caméra    R : recommencer    Échap : pause", Strings.Get("hud.controls"));
-            Assert.AreEqual("Temps : 37,4 s", string.Format(Strings.Get("win.body"), Strings.FormatSeconds(37.43f)));
+            // The game was renamed "Out of Sight"; English is the default language, French the second.
+            Assert.AreEqual(Strings.English, Strings.Language, "premise: English is the default");
+            Assert.AreEqual("Out of Sight", Strings.Get("title"));
+            Assert.AreEqual("Don't Get Caught Moving", Strings.Get("title.tagline"));
+            Assert.AreEqual("WASD/Arrows: move    Mouse: camera    R: restart    Esc: pause", Strings.Get("hud.controls"));
+            Assert.AreEqual("Time: 37.4 s", string.Format(Strings.Get("win.body"), Strings.FormatSeconds(37.43f)));
+            Assert.AreEqual("ZQSD/Flèches : avancer    Souris : caméra    R : recommencer    Échap : pause", Strings.Get("hud.controls", Strings.French));
+            Assert.AreEqual("Temps : {0} s", Strings.Get("win.body", Strings.French));
             foreach (string key in new[] { "title", "level1.name", "level1.hint", "hud.controls", "fail.title", "fail.body",
                          "fail.action", "win.title", "win.body", "win.action" })
             {

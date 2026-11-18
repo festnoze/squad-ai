@@ -39,7 +39,7 @@ v3 sections 1 to 13 and 15.9 are replaced by this document.
 As in M3 and M4:
 - own your files (section 11); never edit another owner's file, ask the integrator;
 - additive APIs: no M1 to M4 member renamed or removed;
-- `tools/unity.sh` for every Unity call, with `MEUBLE_AGENT=<agent>`;
+- `tools/unity.sh` for every Unity call, with `OUTOFSIGHT_AGENT=<agent>`;
 - tests that can fail, with premise guards; waits bounded by game time, never by frames;
 - every PlayMode TearDown calls `InputReader.ResetInjections()` and `SaveStore.ResetForTests()`;
 - no em-dash character anywhere; comments and docs in English;

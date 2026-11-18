@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// HUD sprites drawn in code at startup (no texture asset). The open and closed eyes differ by shape,
@@ -62,6 +62,14 @@ namespace Meuble
 
         /// <summary>M3: the red chair seen from the side, the title screen's emblem (the player is the red chair).</summary>
         public static Sprite Chair => chair != null ? chair : chair = Draw(128, 128, ChairGlyph, "Chair");
+
+        private static Sprite sideFade;
+
+        /// <summary>
+        /// M7 title: a horizontal white ramp, opaque on its left half and easing to clear on the right (a smoothstep), the
+        /// title page's translucent side panel once tinted and stretched over the left of the screen.
+        /// </summary>
+        public static Sprite SideFade => sideFade != null ? sideFade : sideFade = Draw(256, 8, SideFadeAlpha, "SideFade");
 
         private static Sprite chevron;
 
@@ -437,6 +445,14 @@ namespace Meuble
             return new Color(shade, shade, shade, cover);
         }
 
+        private static Color SideFadeAlpha(float u, float v, float pixel)
+        {
+            // u spans [-32, 32] on the 256 x 8 sprite: t runs 0 (left edge) to 1 (right edge).
+            float t = (u / 32f + 1f) * 0.5f;
+            float k = Mathf.Clamp01((t - 0.45f) / 0.55f);
+            return new Color(1f, 1f, 1f, 1f - k * k * (3f - 2f * k));
+        }
+
         /// <summary>A chair in profile: a backrest post, a seat, two legs, in the player red over the dark outline.</summary>
         private static Color ChairGlyph(float u, float v, float pixel)
         {
@@ -668,6 +684,167 @@ namespace Meuble
                 }
             }
             return inside ? -distance : distance;
+        }
+
+        /// <summary>Signed distance to a rounded box (negative inside), the same shape as <see cref="RoundedPlate"/> but
+        /// reusable at any size and corner radius: a mouse body, a speaker's driver box, a quality bar.</summary>
+        private static float RoundedBoxDistance(Vector2 p, Vector2 half, float radius)
+        {
+            Vector2 q = new Vector2(Mathf.Abs(p.x), Mathf.Abs(p.y)) - (half - new Vector2(radius, radius));
+            return new Vector2(Mathf.Max(q.x, 0f), Mathf.Max(q.y, 0f)).magnitude + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - radius;
+        }
+
+        // ----- M7 options page icons (Menu.OptionsRow): one small glyph per row, warm palette, 64 x 64. -----
+
+        private static Sprite optionMouse;
+        private static Sprite optionSpeaker;
+        private static Sprite optionSightCone;
+        private static Sprite optionQualityBars;
+        private static Sprite optionDifficultyGauge;
+        private static Sprite optionGlobe;
+
+        /// <summary>Sensitivity: a mouse seen from above (a capsule body, a scroll wheel notch, a button split).</summary>
+        public static Sprite OptionMouse => optionMouse != null ? optionMouse : optionMouse = Draw(64, 64, OptionMouseGlyph, "OptionMouse");
+
+        /// <summary>Volume: a speaker (driver box and cone) with two sound arcs.</summary>
+        public static Sprite OptionSpeaker => optionSpeaker != null ? optionSpeaker : optionSpeaker = Draw(64, 64, OptionSpeakerGlyph, "OptionSpeaker");
+
+        /// <summary>Audio overhaul, Music: two beamed eighth notes (two tilted heads, their stems, one thick beam).</summary>
+        public static Sprite OptionMusicNote => optionMusicNote != null ? optionMusicNote : optionMusicNote = Draw(64, 64, OptionMusicGlyph, "OptionMusicNote");
+
+        private static Sprite optionMusicNote;
+
+        private static Color OptionMusicGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float heads = float.MaxValue;
+            float stems = float.MaxValue;
+            Vector2[] at = { new Vector2(-0.42f, -0.5f), new Vector2(0.38f, -0.36f) };
+            foreach (Vector2 c in at)
+            {
+                // A head: an ellipse tilted up to the right, like engraved note heads.
+                Vector2 d = p - c;
+                float cos = Mathf.Cos(0.45f);
+                float sin = Mathf.Sin(0.45f);
+                Vector2 r = new Vector2(d.x * cos + d.y * sin, -d.x * sin + d.y * cos);
+                float head = (new Vector2(r.x / 0.24f, r.y / 0.16f).magnitude - 1f) * 0.16f;
+                heads = Mathf.Min(heads, head);
+                Vector2 top = new Vector2(c.x + 0.2f, c.y + 1.02f);
+                stems = Mathf.Min(stems, SegmentDistance(p, new Vector2(c.x + 0.2f, c.y + 0.05f), top) - 0.05f);
+            }
+            float beam = SegmentDistance(p, new Vector2(at[0].x + 0.2f, at[0].y + 0.94f), new Vector2(at[1].x + 0.2f, at[1].y + 0.94f)) - 0.1f;
+            float dist = Mathf.Min(heads, Mathf.Min(stems, beam));
+            return Glyph(dist, new Color(0.98f, 0.74f, 0.42f, 1f), pixel);
+        }
+
+        /// <summary>Vision cone: a spotlight cone opening upward from a small eye at its point.</summary>
+        public static Sprite OptionSightCone => optionSightCone != null ? optionSightCone : optionSightCone = Draw(64, 64, OptionSightConeGlyph, "OptionSightCone");
+
+        /// <summary>Quality: three ascending bars, like a level meter.</summary>
+        public static Sprite OptionQualityBars => optionQualityBars != null ? optionQualityBars : optionQualityBars = Draw(64, 64, OptionQualityGlyph, "OptionQualityBars");
+
+        /// <summary>Difficulty: a warning gauge (arc, three ticks, a needle toward the hard end).</summary>
+        public static Sprite OptionDifficultyGauge => optionDifficultyGauge != null ? optionDifficultyGauge : optionDifficultyGauge = Draw(64, 64, OptionDifficultyGlyph, "OptionDifficultyGauge");
+
+        /// <summary>Language: a globe (an outer ring, an equator, a meridian).</summary>
+        public static Sprite OptionGlobe => optionGlobe != null ? optionGlobe : optionGlobe = Draw(64, 64, OptionGlobeGlyph, "OptionGlobe");
+
+        private static Color OptionMouseGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            // A tall capsule (radius equal to the half width rounds both ends fully): the mouse's body.
+            float body = RoundedBoxDistance(p, new Vector2(0.44f, 0.8f), 0.44f);
+            Color c = Glyph(body, new Color(0.93f, 0.86f, 0.72f, 1f), pixel);
+            float wheel = SegmentDistance(p, new Vector2(0f, 0.5f), new Vector2(0f, 0.2f)) - 0.05f;
+            float divide = SegmentDistance(p, new Vector2(0f, 0.3f), new Vector2(0f, -0.68f)) - 0.025f;
+            c = Over(c, GlyphInk, Cover(wheel, pixel));
+            c = Over(c, GlyphInk, Cover(divide, pixel));
+            return c;
+        }
+
+        private static Color OptionSpeakerGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float box = RoundedBoxDistance(p - new Vector2(-0.42f, 0f), new Vector2(0.18f, 0.32f), 0.06f);
+            var cone = new[]
+            {
+                new Vector2(-0.24f, 0.32f), new Vector2(0.32f, 0.72f), new Vector2(0.32f, -0.72f), new Vector2(-0.24f, -0.32f),
+            };
+            float coneDist = PolygonDistance(p, cone);
+            Color fill = new Color(1f, 0.82f, 0.36f, 1f);
+            Color c = Glyph(Mathf.Min(box, coneDist), fill, pixel);
+            // Two sound arcs to the right, each only drawn on its forward-facing half.
+            Vector2 center = new Vector2(0.1f, 0f);
+            Vector2 d = p - center;
+            float angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+            float arc1 = Mathf.Abs(angle) < 55f ? Mathf.Abs(d.magnitude - 0.5f) - 0.045f : float.MaxValue;
+            float arc2 = Mathf.Abs(angle) < 42f ? Mathf.Abs(d.magnitude - 0.72f) - 0.045f : float.MaxValue;
+            Color arcs = Glyph(Mathf.Min(arc1, arc2), fill, pixel);
+            return Over(c, arcs, arcs.a);
+        }
+
+        private static readonly Vector2[] SightConeShape =
+        {
+            new Vector2(0f, -0.74f), new Vector2(0.52f, 0.68f), new Vector2(-0.52f, 0.68f),
+        };
+
+        private static Color OptionSightConeGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float cone = PolygonDistance(p, SightConeShape);
+            Color c = Glyph(cone, new Color(0.98f, 0.68f, 0.3f, 1f), pixel);
+            Vector2 eyeAt = new Vector2(0f, -0.74f);
+            float ring = (p - eyeAt).magnitude - 0.15f;
+            c = Over(c, GlyphInk, Cover(ring, pixel));
+            float pupil = (p - eyeAt).magnitude - 0.07f;
+            c = Over(c, new Color(0.97f, 0.95f, 0.9f, 1f), Cover(pupil, pixel));
+            return c;
+        }
+
+        private static Color OptionQualityGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float bar1 = RoundedBoxDistance(p - new Vector2(-0.44f, -0.52f), new Vector2(0.15f, 0.25f), 0.05f);
+            float bar2 = RoundedBoxDistance(p - new Vector2(0f, -0.28f), new Vector2(0.15f, 0.49f), 0.05f);
+            float bar3 = RoundedBoxDistance(p - new Vector2(0.44f, 0.04f), new Vector2(0.15f, 0.73f), 0.05f);
+            float dist = Mathf.Min(bar1, Mathf.Min(bar2, bar3));
+            return Glyph(dist, new Color(0.95f, 0.56f, 0.24f, 1f), pixel);
+        }
+
+        private static Color OptionDifficultyGlyph(float u, float v, float pixel)
+        {
+            // The same half dial as SlowGlyph, ticked at three stops and needled toward the hard (right) end.
+            Vector2 p = new Vector2(u, v);
+            Vector2 center = new Vector2(0f, -0.35f);
+            Vector2 d = p - center;
+            float arc = d.y >= 0f ? Mathf.Abs(d.magnitude - 0.72f) - 0.09f : float.MaxValue;
+            float baseLine = SegmentDistance(p, center + new Vector2(-0.81f, 0f), center + new Vector2(0.81f, 0f)) - 0.09f;
+            float ticks = float.MaxValue;
+            for (int i = 0; i < 3; i++)
+            {
+                float angle = Mathf.Lerp(20f, 160f, i / 2f);
+                Vector2 dir = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
+                ticks = Mathf.Min(ticks, (p - (center + dir * 0.72f)).magnitude - 0.06f);
+            }
+            Vector2 tip = center + new Vector2(Mathf.Cos(35f * Mathf.Deg2Rad), Mathf.Sin(35f * Mathf.Deg2Rad)) * 0.6f;
+            float needle = SegmentDistance(p, center, tip) - 0.08f;
+            float hub = (p - center).magnitude - 0.15f;
+            float dist = Mathf.Min(Mathf.Min(arc, baseLine), Mathf.Min(Mathf.Min(needle, hub), ticks));
+            return Glyph(dist, new Color(0.84f, 0.18f, 0.14f, 1f), pixel);
+        }
+
+        private static Color OptionGlobeGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float ring = Mathf.Abs(p.magnitude - 0.75f) - 0.07f;
+            float equator = SegmentDistance(p, new Vector2(-0.75f, 0f), new Vector2(0.75f, 0f)) - 0.035f;
+            // The meridian: a thin band around an ellipse through the poles, narrow across so it reads as a curve on each side.
+            float nx = p.x / 0.3f;
+            float ny = p.y / 0.75f;
+            float ellipse = (Mathf.Sqrt(nx * nx + ny * ny) - 1f) * 0.3f;
+            float meridian = Mathf.Abs(ellipse) - 0.035f;
+            float dist = Mathf.Min(ring, Mathf.Min(equator, meridian));
+            return Glyph(dist, new Color(0.46f, 0.64f, 0.86f, 1f), pixel);
         }
     }
 }

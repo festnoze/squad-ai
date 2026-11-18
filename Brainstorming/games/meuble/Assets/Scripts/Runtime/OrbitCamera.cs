@@ -1,7 +1,7 @@
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Third person orbit camera (PRD 3.1). No collision code: walls are single sided, so the camera may

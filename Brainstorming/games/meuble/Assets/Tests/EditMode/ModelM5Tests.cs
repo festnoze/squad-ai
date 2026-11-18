@@ -1,11 +1,11 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M5 watchers, EditMode (docs/CONTRACT_M5.md 3 and 16.11, CONTRACT_M5_v3.md 15.5): the catalog's character kinds, eye

@@ -1,4 +1,4 @@
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5.md 3 and 16.12, PRD 5.4): the per-inhabitant values of a personality, or of the dog. Data rows

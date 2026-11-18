@@ -2,7 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>
     /// M5 probe step 41 (docs/CONTRACT_M5_v3.md 6, 15.7 and 15.10, CONTRACT_M5 16.10): the level select and the save,
@@ -121,7 +121,7 @@ namespace Meuble.Tests
 
         private string NewTempDir()
         {
-            string dir = Path.Combine(Path.GetTempPath(), "meuble_ui_tests_" + Guid.NewGuid().ToString("N"));
+            string dir = Path.Combine(Path.GetTempPath(), "outofsight_ui_tests_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             tempDirs.Add(dir);
             return dir;
@@ -214,7 +214,9 @@ namespace Meuble.Tests
             float quit = ((RectTransform)Menu.QuitButton.transform).anchoredPosition.y;
             Assert.IsTrue(play > middle && middle > quit, $"Niveaux is not between Jouer and Quitter ({play}, {middle}, {quit})");
             Assert.AreEqual(Menu.LevelsButton, Menu.PlayButton.navigation.selectOnDown, "down from Jouer is not Niveaux");
-            Assert.AreEqual(Menu.QuitButton, Menu.LevelsButton.navigation.selectOnDown, "down from Niveaux is not Quitter");
+            // M7: Options sits between Niveaux and Quitter, so Quitter is last.
+            Assert.AreEqual(Menu.TitleOptionsButton, Menu.LevelsButton.navigation.selectOnDown, "down from Niveaux is not Options");
+            Assert.AreEqual(Menu.QuitButton, Menu.TitleOptionsButton.navigation.selectOnDown, "down from Options is not Quitter");
             Assert.AreEqual(Menu.PlayButton, Menu.LevelsButton.navigation.selectOnUp);
 
             OpenSelect();
@@ -360,7 +362,7 @@ namespace Meuble.Tests
                 SaveStore.RecordWin(id, 30f);
             }
             Menu.ShowTitle();
-            Assert.AreEqual(Order[0], Game.LevelId, "premise: the title is over the first level");
+            Assert.AreEqual(TitleCameraTour.LevelId, Game.LevelId, "premise: the title is not over the title house (M7 title camera)");
             Menu.PlayButton.onClick.Invoke();
             Assert.AreEqual(Order[Order.Count - 1], Game.LevelId, "Jouer with every level won does not start the last level");
             yield return Steps(2);

@@ -1,4 +1,4 @@
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Global pause flag (docs/CONTRACT_M3.md 6), set by GameState.Paused. Interpolated visuals hold their

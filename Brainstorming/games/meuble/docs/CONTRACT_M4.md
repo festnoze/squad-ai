@@ -191,7 +191,7 @@ Strings (the integrator adds them):
 ## 6. Binding API (the integrator lands stubs first)
 
 ```csharp
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     public sealed class BodyDef { public string Kind; public Vector3 Size; public float Radius, MaxSpeed, Accel, AccelHigh,
         TurnRate, CarryForward; public bool Glides, Tips, HasLight; public static BodyDef For(string kind); }
@@ -207,7 +207,7 @@ namespace Meuble.Core
     // InhabitantRoutine gains: bool IsSitting; bool SitTargetsPlayer; Vector3 SeatHome; event-free flags
     //   JustSat (one step), SitResult {OnPlayer, OnProp, Pratfall}; float EyeHeight (interpolated)
 }
-namespace Meuble
+namespace OutOfSight
 {
     // FurnitureController: BodyDef Body; bool Careful; bool Tipped; bool Pinned; bool ActionActive;
     //   void SetBody(BodyDef); void Pin(bool on); Vector3 PredictedStop (office chair)

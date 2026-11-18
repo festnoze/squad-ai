@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     public enum PlayState
     {
@@ -393,11 +393,11 @@ namespace Meuble
         public enum WardrobeStage
         {
             None,
-            /// <summary>The 0.5 s entry action (moving), still visible.</summary>
+            /// <summary>The Tuning.WardrobeActionTime entry action (moving), still visible.</summary>
             Entering,
             /// <summary>Hidden inside (FurnitureController.Hidden).</summary>
             Hidden,
-            /// <summary>The 0.5 s exit action (moving), visible again in front of the wardrobe.</summary>
+            /// <summary>The Tuning.WardrobeActionTime exit action (moving), visible again in front of the wardrobe.</summary>
             Leaving,
         }
 
@@ -470,6 +470,9 @@ namespace Meuble
             if (next != null)
             {
                 LoadLevel(next);
+                // M8 touch redesign: the win panel freed the mouse cursor for its buttons (Menu.OnWinScreen); back in
+                // a level, a player recaptures it (a no-op in the editor, same as every other CaptureCursor call).
+                Menu?.CaptureCursor();
             }
         }
 
@@ -577,6 +580,9 @@ namespace Meuble
             TeardownLevel();
             BuildLevel();
             Restarts++;
+            // M8 touch redesign: the fail or win panel may have freed the mouse cursor for its buttons; back in the
+            // level, a player recaptures it (a no-op in the editor, same as every other CaptureCursor call).
+            Menu?.CaptureCursor();
         }
 
         private void TeardownLevel()
@@ -771,7 +777,7 @@ namespace Meuble
                 {
                     people.Add(PersonalityOf(h));
                 }
-                Hud.ShowPeople(Hud.PeopleLines(people));
+                Hud.ShowPeopleOf(people);
                 GameRules rules = Rules ?? NoRules;
                 Hud.SetGauges(rules.Creak, rules.DisplacementMemory);
                 Hud.SetBodyHints(rules.Bodies, rules.Lamp && Level.Furniture.Body != null && Level.Furniture.Body.HasLight);
@@ -879,10 +885,13 @@ namespace Meuble
             FurnitureController furniture = Level.Furniture;
             if (furniture.Hidden)
             {
-                // M6 (CONTRACT_M6 2.5): E inside the wardrobe leaves it: visible again in front of it, a 0.5 s moving action.
+                // M6 (CONTRACT_M6 2.5): E inside the wardrobe leaves it: visible again in front of it, a brisk moving
+                // action (Tuning.WardrobeActionTime). M7 polish: the doors swing open at once (PlayWardrobeDoors),
+                // on this same step, instead of waiting for the action to end.
                 if (furniture.BeginExternalAction(Tuning.WardrobeActionTime))
                 {
                     furniture.SetHidden(false);
+                    PlayWardrobeDoors(WardrobeProp, false, furniture);
                     Wardrobe = WardrobeStage.Leaving;
                     LeaveCount++;
                 }
@@ -900,6 +909,7 @@ namespace Meuble
                 if (furniture.BeginExternalAction(Tuning.WardrobeActionTime))
                 {
                     WardrobeProp = wardrobe;
+                    PlayWardrobeDoors(wardrobe, true, furniture);
                     Wardrobe = WardrobeStage.Entering;
                 }
                 return true;
@@ -1136,7 +1146,7 @@ namespace Meuble
 
         /// <summary>
         /// The load of <c>player.load</c> (a known kind; never on the rocking chair nor the floor lamp, as the validator says):
-        /// a fresh <see cref="LoadBalance"/>, and its <see cref="Meuble.LoadView"/>, the one the level builder hung on the
+        /// a fresh <see cref="LoadBalance"/>, and its <see cref="OutOfSight.LoadView"/>, the one the level builder hung on the
         /// furniture's visual (LevelInstance.LoadView, CONTRACT_M5 18). A level with a load and no view is a builder defect:
         /// it is logged as an error, and the rule runs without a visual.
         /// </summary>
@@ -1148,7 +1158,7 @@ namespace Meuble
             FurnitureController furniture = Level.Furniture;
             string kind = Def.Player != null ? Def.Player.Load : null;
             BodyDef body = furniture.Body;
-            if (string.IsNullOrEmpty(kind) || !Meuble.LoadView.IsKind(kind) || (body != null && (body.Rocks || body.HasLight)))
+            if (string.IsNullOrEmpty(kind) || !OutOfSight.LoadView.IsKind(kind) || (body != null && (body.Rocks || body.HasLight)))
             {
                 return;
             }
@@ -2171,7 +2181,8 @@ namespace Meuble
             Ghost?.ShowRings(OutOfPlace && !lying, tolerance);
             if (OutOfPlace && !AtDecoy && !lying)
             {
-                Ghost?.Show(memories[Mathf.Clamp(lastSeer, 0, memories.Length - 1)].PlayerSlot, furniture.Size, tolerance);
+                // M8 (the product owner's 2026-11-18 report): the ghost copies the furniture's own visual, whatever its kind.
+                Ghost?.Show(memories[Mathf.Clamp(lastSeer, 0, memories.Length - 1)].PlayerSlot, furniture.Size, furniture.Visual, tolerance);
             }
             else
             {
@@ -2202,6 +2213,8 @@ namespace Meuble
         {
             State = PlayState.Won;
             Level.Furniture.CreakTremble = 0f;
+            // Audio overhaul: the win jingle (the music fades out under it, MusicPlayer).
+            Sfx?.PlayWin();
             if (IsLastLevel)
             {
                 // M3: after the last level of levels.json, the win panel is the end screen.
@@ -2211,6 +2224,8 @@ namespace Meuble
             else
             {
                 Hud?.ShowWin(Elapsed, HasNextLevel);
+                // M8 touch redesign: Next level/Replay/Menu need a visible mouse cursor to be clickable.
+                Menu?.OnWinScreen();
             }
             StateChanged?.Invoke(State);
         }
@@ -2227,6 +2242,9 @@ namespace Meuble
             }
             Sfx?.PlayCaught();
             Hud?.ShowFail(reason);
+            // M8 touch redesign: Retry/Menu need a visible mouse cursor to be clickable; Retry is selected on the
+            // next frame so Enter and gamepad A submit it too (docs/CONTRACT_M3.md 6, S2's pattern for the fail panel).
+            Menu?.OnFailScreen();
             StateChanged?.Invoke(State);
         }
 
@@ -2257,12 +2275,40 @@ namespace Meuble
         }
 
         /// <summary>
+        /// M7 polish, presentation only: starts <paramref name="wardrobe"/>'s door animation (<see
+        /// cref="WardrobeDoors.Begin"/>) the instant the entry or exit action starts, found by its index in
+        /// <see cref="wardrobes"/> (the same order <see cref="LevelDef.Wardrobes"/> built <see
+        /// cref="LevelInstance.Wardrobes"/> in). Does nothing for an index out of range or a wardrobe shown by a
+        /// model visual (its WardrobeDoors entry is null).
+        /// </summary>
+        private void PlayWardrobeDoors(PropDef wardrobe, bool entering, FurnitureController furniture)
+        {
+            int index = wardrobes.IndexOf(wardrobe);
+            if (index < 0 || Level == null || index >= Level.Wardrobes.Count)
+            {
+                return;
+            }
+            WardrobeDoors doors = Level.Wardrobes[index];
+            if (doors != null)
+            {
+                doors.Begin(entering, furniture);
+            }
+            // Audio overhaul: the doors swing open now; they shut when the action ends (StepWardrobe).
+            Sfx?.PlayWardrobe(PanToward(furniture.transform.position), true);
+        }
+
+        /// <summary>
         /// Step 1, after the furniture: the entry action ended (its 25 steps ran; ActionActive is false from the step after
         /// its last one): the furniture is hidden from this step on, before any vision. An entry cut short by a pin or a carry
         /// hides nothing. The exit action ended: the wardrobe is left.
         /// </summary>
         private void StepWardrobe(FurnitureController furniture)
         {
+            if (Wardrobe != WardrobeStage.None && Wardrobe != WardrobeStage.Hidden && !furniture.ActionActive)
+            {
+                // Audio overhaul: the entry or exit action ended, the wardrobe's doors shut.
+                Sfx?.PlayWardrobe(PanToward(furniture.transform.position), false);
+            }
             if (Wardrobe == WardrobeStage.Entering && !furniture.ActionActive)
             {
                 if (State == PlayState.Playing && !furniture.Carried && !furniture.Pinned)

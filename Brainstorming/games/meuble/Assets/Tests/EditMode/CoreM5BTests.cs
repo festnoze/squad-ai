@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Meuble.Core;
+using OutOfSight.Core;
 using NUnit.Framework;
 using UnityEngine;
 
-namespace Meuble.Tests
+namespace OutOfSight.Tests
 {
     /// <summary>Shared helpers of the wave 5B core tests (docs/CONTRACT_M5.md 4, 5, 6, 16.5, 16.8, 16.9).</summary>
     internal static class M5B

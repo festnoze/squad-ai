@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// The player furniture bodies of M4 (docs/CONTRACT_M4.md section 2, amendment 9.5). BodyDef.Size is

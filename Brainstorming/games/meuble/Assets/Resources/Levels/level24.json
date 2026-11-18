@@ -1,0 +1,1065 @@
+{
+  "id": "level24",
+  "nameKey": "level24.name",
+  "hintKey": "level24.hint",
+  "lesson": "final",
+  "doorMemory": false,
+  "rooms": [
+    {
+      "id": "chambre",
+      "x": 2.2,
+      "z": 11.45,
+      "sizeX": 4.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "couloir",
+      "x": 8.95,
+      "z": 11.45,
+      "sizeX": 8.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "bureau",
+      "x": 2.2,
+      "z": 6.7,
+      "sizeX": 4.4,
+      "sizeZ": 6.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "galerie",
+      "x": 8.95,
+      "z": 6.7,
+      "sizeX": 8.9,
+      "sizeZ": 6.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "salle",
+      "x": 8.95,
+      "z": 1.7,
+      "sizeX": 8.9,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "couloir_est",
+      "x": 14.45,
+      "z": 6.45,
+      "sizeX": 1.9,
+      "sizeZ": 12.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine",
+      "x": 17.7,
+      "z": 9.7,
+      "sizeX": 4.4,
+      "sizeZ": 6.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "entree",
+      "x": 17.7,
+      "z": 3.2,
+      "sizeX": 4.4,
+      "sizeZ": 6.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 4.45,
+      "z": 10.6,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte_chambre",
+      "swing": "couloir",
+      "hinge": "end"
+    },
+    {
+      "x": 7.25,
+      "z": 9.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 4.45,
+      "z": 5.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 13.45,
+      "z": 8.75,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 11.75,
+      "z": 3.45,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 13.45,
+      "z": 1.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 15.45,
+      "z": 10.75,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte_cuisine",
+      "swing": "cuisine",
+      "hinge": "end",
+      "openedByInhabitants": true
+    },
+    {
+      "x": 15.45,
+      "z": 2.75,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 18.25,
+      "z": 6.45,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [],
+  "platforms": [
+    {
+      "name": "Mezzanine",
+      "x": 9.25,
+      "z": 6.7,
+      "sizeX": 1.0,
+      "sizeZ": 6.4,
+      "height": 0.6,
+      "color": "#B07A4E"
+    }
+  ],
+  "ramps": [
+    {
+      "x": 7.75,
+      "z": 8.25,
+      "width": 1.5,
+      "length": 2.0,
+      "yaw": 90.0,
+      "platform": "Mezzanine"
+    },
+    {
+      "x": 10.75,
+      "z": 5.25,
+      "width": 1.5,
+      "length": 2.0,
+      "yaw": 270.0,
+      "platform": "Mezzanine"
+    }
+  ],
+  "rugs": [
+    {
+      "model": "kenney.rug",
+      "x": 6.0,
+      "z": 6.0,
+      "sizeX": 1.6,
+      "sizeZ": 2.4,
+      "yaw": 0.0,
+      "color": "#5B93D9"
+    }
+  ],
+  "player": {
+    "model": "kenney.stool",
+    "kind": "stool",
+    "yaw": 90.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D",
+    "x": 1.25,
+    "z": 11.25
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F",
+    "x": 19.25,
+    "z": 0.75
+  },
+  "props": [
+    {
+      "name": "Lit",
+      "kind": "sofa",
+      "x": 1.0,
+      "z": 12.1,
+      "yaw": 90.0,
+      "sizeX": 0.8,
+      "sizeY": 0.5,
+      "sizeZ": 1.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "BahutA",
+      "kind": "cabinet",
+      "x": 7.125,
+      "z": 11.25,
+      "yaw": 0.0,
+      "sizeX": 2.75,
+      "sizeY": 0.85,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "BahutB",
+      "kind": "cabinet",
+      "x": 9.875,
+      "z": 11.25,
+      "yaw": 0.0,
+      "sizeX": 2.75,
+      "sizeY": 0.85,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "Bureau",
+      "kind": "table",
+      "x": 2.2,
+      "z": 8.9,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "ArmoireBureau",
+      "kind": "wardrobe",
+      "x": 1.75,
+      "z": 4.05,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "ArmoireGalerie",
+      "kind": "wardrobe",
+      "x": 12.85,
+      "z": 4.05,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "FauteuilMamie",
+      "kind": "armchair",
+      "x": 5.0,
+      "z": 1.75,
+      "yaw": 90.0,
+      "sizeX": 0.9,
+      "sizeY": 0.95,
+      "sizeZ": 0.85,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE",
+      "model": "kenney.armchair"
+    },
+    {
+      "name": "Table",
+      "kind": "table",
+      "x": 9.25,
+      "z": 1.75,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 0.75,
+      "sizeZ": 0.9,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "ArmoireCouloir",
+      "kind": "wardrobe",
+      "x": 14.05,
+      "z": 6.25,
+      "yaw": 90.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 17.7,
+      "z": 12.5,
+      "yaw": 0.0,
+      "sizeX": 2.4,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Meuble",
+      "kind": "cabinet",
+      "x": 16.5,
+      "z": 6.1,
+      "yaw": 180.0,
+      "sizeX": 1.0,
+      "sizeY": 0.9,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    }
+  ],
+  "designerRoute": [
+    {
+      "x": 1.25,
+      "z": 10.75,
+      "at": 0.3,
+      "careful": true
+    },
+    {
+      "x": 2.25,
+      "z": 10.75,
+      "at": 0.8,
+      "careful": true
+    },
+    {
+      "x": 3.25,
+      "z": 10.75,
+      "at": 1.8,
+      "careful": true
+    },
+    {
+      "x": 3.75,
+      "z": 10.75,
+      "at": 2.8,
+      "careful": true
+    },
+    {
+      "x": 3.75,
+      "z": 10.75,
+      "at": 3.3,
+      "careful": true,
+      "action": "open",
+      "door": "porte_chambre"
+    },
+    {
+      "x": 4.75,
+      "z": 10.75,
+      "at": 3.9,
+      "careful": true
+    },
+    {
+      "x": 4.75,
+      "z": 10.25,
+      "at": 4.9,
+      "careful": true
+    },
+    {
+      "x": 5.75,
+      "z": 10.25,
+      "at": 5.4,
+      "careful": true
+    },
+    {
+      "x": 6.75,
+      "z": 10.25,
+      "at": 6.4,
+      "careful": true
+    },
+    {
+      "x": 7.25,
+      "z": 10.25,
+      "at": 7.4,
+      "careful": true
+    },
+    {
+      "x": 7.25,
+      "z": 9.25,
+      "at": 7.9,
+      "careful": true
+    },
+    {
+      "x": 6.25,
+      "z": 9.25,
+      "at": 8.9,
+      "careful": true
+    },
+    {
+      "x": 6.25,
+      "z": 8.25,
+      "at": 9.9,
+      "careful": true
+    },
+    {
+      "x": 6.75,
+      "z": 8.25,
+      "at": 10.9,
+      "careful": true
+    },
+    {
+      "x": 7.75,
+      "z": 8.25,
+      "at": 11.4,
+      "careful": true
+    },
+    {
+      "x": 8.75,
+      "z": 8.25,
+      "at": 12.4,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 8.25,
+      "at": 13.4,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 7.25,
+      "at": 13.9,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 6.25,
+      "at": 14.9,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 5.25,
+      "at": 15.9,
+      "careful": true
+    },
+    {
+      "x": 9.75,
+      "z": 5.25,
+      "at": 16.9,
+      "careful": true
+    },
+    {
+      "x": 10.75,
+      "z": 5.25,
+      "at": 17.4,
+      "careful": true
+    },
+    {
+      "x": 11.75,
+      "z": 5.25,
+      "at": 18.4,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 5.25,
+      "at": 19.4,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 6.25,
+      "at": 20.4,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 7.25,
+      "at": 21.4,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 8.25,
+      "at": 22.4,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 8.75,
+      "at": 23.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 8.75,
+      "at": 23.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 7.75,
+      "at": 24.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 7.25,
+      "at": 25.9,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 7.25,
+      "at": 26.4,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 6.25,
+      "at": 27.4,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 5.25,
+      "at": 28.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 5.25,
+      "at": 29.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 4.25,
+      "at": 30.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 3.25,
+      "at": 31.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 2.75,
+      "at": 32.4,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 2.75,
+      "at": 32.9,
+      "careful": true
+    },
+    {
+      "x": 15.75,
+      "z": 2.75,
+      "at": 33.9,
+      "careful": true
+    },
+    {
+      "x": 15.75,
+      "z": 1.75,
+      "at": 34.9,
+      "careful": true
+    },
+    {
+      "x": 15.75,
+      "z": 0.75,
+      "at": 35.9,
+      "careful": true
+    },
+    {
+      "x": 16.75,
+      "z": 0.75,
+      "at": 36.9,
+      "careful": true
+    },
+    {
+      "x": 17.75,
+      "z": 0.75,
+      "at": 37.9,
+      "careful": true
+    },
+    {
+      "x": 18.75,
+      "z": 0.75,
+      "at": 38.9,
+      "careful": true
+    },
+    {
+      "x": 19.25,
+      "z": 0.75,
+      "at": 39.9,
+      "careful": true
+    },
+    {
+      "x": 19.25,
+      "z": 0.75,
+      "at": 39.9,
+      "careful": true
+    }
+  ],
+  "designerRouteHard": [
+    {
+      "x": 1.25,
+      "z": 10.75,
+      "at": 0.8,
+      "careful": true
+    },
+    {
+      "x": 2.25,
+      "z": 10.75,
+      "at": 1.3,
+      "careful": true
+    },
+    {
+      "x": 3.25,
+      "z": 10.75,
+      "at": 2.3,
+      "careful": true
+    },
+    {
+      "x": 3.75,
+      "z": 10.75,
+      "at": 3.3,
+      "careful": true
+    },
+    {
+      "x": 3.75,
+      "z": 10.75,
+      "at": 3.8,
+      "careful": true,
+      "action": "open",
+      "door": "porte_chambre"
+    },
+    {
+      "x": 4.75,
+      "z": 10.75,
+      "at": 4.4,
+      "careful": true
+    },
+    {
+      "x": 4.75,
+      "z": 10.25,
+      "at": 5.4,
+      "careful": true
+    },
+    {
+      "x": 5.75,
+      "z": 10.25,
+      "at": 5.9,
+      "careful": true
+    },
+    {
+      "x": 6.75,
+      "z": 10.25,
+      "at": 6.9,
+      "careful": true
+    },
+    {
+      "x": 7.25,
+      "z": 10.25,
+      "at": 7.9,
+      "careful": true
+    },
+    {
+      "x": 7.25,
+      "z": 9.25,
+      "at": 8.4,
+      "careful": true
+    },
+    {
+      "x": 6.25,
+      "z": 9.25,
+      "at": 9.4,
+      "careful": true
+    },
+    {
+      "x": 6.25,
+      "z": 8.25,
+      "at": 10.4,
+      "careful": true
+    },
+    {
+      "x": 6.75,
+      "z": 8.25,
+      "at": 11.4,
+      "careful": true
+    },
+    {
+      "x": 7.75,
+      "z": 8.25,
+      "at": 11.9,
+      "careful": true
+    },
+    {
+      "x": 8.75,
+      "z": 8.25,
+      "at": 12.9,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 8.25,
+      "at": 13.9,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 7.25,
+      "at": 14.4,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 6.25,
+      "at": 15.4,
+      "careful": true
+    },
+    {
+      "x": 9.25,
+      "z": 5.25,
+      "at": 16.4,
+      "careful": true
+    },
+    {
+      "x": 9.75,
+      "z": 5.25,
+      "at": 17.4,
+      "careful": true
+    },
+    {
+      "x": 10.75,
+      "z": 5.25,
+      "at": 17.9,
+      "careful": true
+    },
+    {
+      "x": 11.75,
+      "z": 5.25,
+      "at": 18.9,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 5.25,
+      "at": 19.9,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 6.25,
+      "at": 20.9,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 7.25,
+      "at": 21.9,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 8.25,
+      "at": 22.9,
+      "careful": true
+    },
+    {
+      "x": 12.75,
+      "z": 8.75,
+      "at": 23.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 8.75,
+      "at": 24.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 7.75,
+      "at": 25.4,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 7.25,
+      "at": 26.4,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 7.25,
+      "at": 26.9,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 6.25,
+      "at": 27.9,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 5.25,
+      "at": 28.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 5.25,
+      "at": 29.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 4.25,
+      "at": 30.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 3.25,
+      "at": 31.9,
+      "careful": true
+    },
+    {
+      "x": 13.75,
+      "z": 2.75,
+      "at": 32.9,
+      "careful": true
+    },
+    {
+      "x": 14.75,
+      "z": 2.75,
+      "at": 33.4,
+      "careful": true
+    },
+    {
+      "x": 15.75,
+      "z": 2.75,
+      "at": 34.4,
+      "careful": true
+    },
+    {
+      "x": 15.75,
+      "z": 1.75,
+      "at": 35.4,
+      "careful": true
+    },
+    {
+      "x": 15.75,
+      "z": 0.75,
+      "at": 36.4,
+      "careful": true
+    },
+    {
+      "x": 16.75,
+      "z": 0.75,
+      "at": 37.4,
+      "careful": true
+    },
+    {
+      "x": 17.75,
+      "z": 0.75,
+      "at": 38.4,
+      "careful": true
+    },
+    {
+      "x": 18.75,
+      "z": 0.75,
+      "at": 39.4,
+      "careful": true
+    },
+    {
+      "x": 19.25,
+      "z": 0.75,
+      "at": 40.4,
+      "careful": true
+    },
+    {
+      "x": 19.25,
+      "z": 0.75,
+      "at": 40.4,
+      "careful": true
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Rex",
+      "kind": "dog",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 12.75,
+          "z": 12.25,
+          "facing": 270.0,
+          "dwell": 600.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Lea",
+      "personality": "watchful",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 12.75,
+          "z": 9.25,
+          "facing": 200.0,
+          "dwell": 6.0,
+          "glances": [
+            {
+              "offset": 2.5,
+              "yaw": -40.0,
+              "hold": 1.5
+            }
+          ]
+        },
+        {
+          "x": 8.25,
+          "z": 0.6,
+          "facing": 180.0,
+          "dwell": 7.0,
+          "glances": [
+            {
+              "offset": 3.0,
+              "yaw": 40.0,
+              "hold": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Theo",
+      "personality": "dreamer",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 17.75,
+          "z": 11.75,
+          "facing": 0.0,
+          "dwell": 7.0,
+          "glances": []
+        },
+        {
+          "x": 12.25,
+          "z": 0.75,
+          "facing": 270.0,
+          "dwell": 8.0,
+          "glances": [
+            {
+              "offset": 3.0,
+              "yaw": 40.0,
+              "hold": 1.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Mamie",
+      "personality": "granny",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 5.75,
+          "z": 1.75,
+          "facing": 90.0,
+          "dwell": 12.0,
+          "glances": [],
+          "sit": "FauteuilMamie"
+        },
+        {
+          "x": 6.25,
+          "z": 0.6,
+          "facing": 180.0,
+          "dwell": 4.0,
+          "glances": []
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "name": "Robot",
+      "loop": [
+        {
+          "x": 14.75,
+          "z": 4.75
+        },
+        {
+          "x": 14.75,
+          "z": 1.25
+        }
+      ]
+    }
+  ]
+}

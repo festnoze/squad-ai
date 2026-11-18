@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// One fixed step of input for <see cref="MotionProfile"/>: a planar world direction (x, z; zero is no input, as the

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// M5 (docs/CONTRACT_M5_v3.md 4 and 15.6): who sits on which seat. A seat is a prop name, or "player"

@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
 using UnityEngine;
 
-namespace Meuble.Core
+namespace OutOfSight.Core
 {
     /// <summary>
     /// A level as data (PRD 6.1, docs/CONTRACT_M2.md 4). Positions are in meters on the floor plane.

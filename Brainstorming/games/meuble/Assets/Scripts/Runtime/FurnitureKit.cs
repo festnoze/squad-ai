@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Globalization;
-using Meuble.Core;
+using OutOfSight.Core;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// Furniture compositions (PRD 7.1). Every part stays inside the box given by the level data, so the
@@ -602,7 +602,9 @@ namespace Meuble
             for (int i = 0; i < 2; i++)
             {
                 float x = (i == 0 ? -1f : 1f) * (doorW * 0.5f + 0.02f);
-                PrimitiveKit.Box(p, "Door" + i, new Vector3(x, (s.y - top) * 0.5f + 0.02f, -s.z * 0.5f + panel * 0.5f),
+                // The doors stand proud of the body by their own thickness: flush, their front face was coplanar with the
+                // body's and z-fought (the colour flickered as the camera moved, the product owner's 2026-11-18 report).
+                PrimitiveKit.Box(p, "Door" + i, new Vector3(x, (s.y - top) * 0.5f + 0.02f, -s.z * 0.5f - panel * 0.5f),
                     new Vector3(doorW, doorH, panel), doors, layer, false, visual, Surface.Wood);
             }
             if (col)

@@ -1,12 +1,12 @@
 using System;
 using UnityEngine;
 
-namespace Meuble
+namespace OutOfSight
 {
     /// <summary>
     /// The product owner's request: no sound while tests run. Muted in batch mode (every tools/unity.sh run, so the
     /// EditMode and PlayMode suites), in the player's probe (--probe, --look), with the "-mute" argument
-    /// (play.cmd -Mute) or the MEUBLE_MUTE=1 environment variable. Muting only sets AudioListener.volume to 0: every
+    /// (play.cmd -Mute) or the OUTOFSIGHT_MUTE=1 environment variable. Muting only sets AudioListener.volume to 0: every
     /// AudioSource still plays, so the tests that count sounds stay meaningful.
     /// </summary>
     public static class AudioMute
@@ -24,7 +24,7 @@ namespace Meuble
                         || Array.IndexOf(args, "--probe") >= 0
                         || Array.IndexOf(args, "--look") >= 0
                         || Array.IndexOf(args, "-mute") >= 0
-                        || Environment.GetEnvironmentVariable("MEUBLE_MUTE") == "1";
+                        || Environment.GetEnvironmentVariable("OUTOFSIGHT_MUTE") == "1";
                 }
                 return muted.Value;
             }
