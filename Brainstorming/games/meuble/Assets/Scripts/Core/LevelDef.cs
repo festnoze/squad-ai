@@ -542,6 +542,19 @@ namespace OutOfSight.Core
         /// <summary>M7 (docs/CONTRACT_M7.md 1.2): the one <see cref="FloorFinish"/> value, the kitchen and bathroom tile.</summary>
         public const string TileFinish = "tile";
 
+        // Wall finishes (product owner request, 2026-11-19): the <see cref="WallFinish"/> values.
+        /// <summary>Soft painted plaster in a muted sage.</summary>
+        public const string SageFinish = "sage";
+        /// <summary>Warm clay limewash.</summary>
+        public const string LimewashFinish = "limewash";
+        /// <summary>Woven grasscloth wallpaper in dusty blue.</summary>
+        public const string GrassclothFinish = "grasscloth";
+        /// <summary>A printed wallpaper: pale sage stripes and small botanical sprigs.</summary>
+        public const string WallpaperFinish = "wallpaper";
+
+        /// <summary>Every <see cref="WallFinish"/> value a level may give (null or empty: the cream crepi).</summary>
+        public static readonly string[] WallFinishes = { SageFinish, LimewashFinish, GrassclothFinish, WallpaperFinish };
+
         public string Id;
         public float X;
         public float Z;
@@ -558,6 +571,12 @@ namespace OutOfSight.Core
         /// a hard floor acoustically either way (<see cref="IsSoft"/> alone still drives PRD 4.5 silence).
         /// </summary>
         public string FloorFinish;
+        /// <summary>
+        /// Wall finishes (product owner request, 2026-11-19): null (default, the cream crepi) or one of
+        /// <see cref="WallFinishes"/>: visual only, shown on the room-facing side of the room's walls (the other side of
+        /// a shared wall belongs to the next room); caps and outside faces keep the crepi.
+        /// </summary>
+        public string WallFinish;
 
         [JsonIgnore] public float MinX => X - SizeX * 0.5f;
         [JsonIgnore] public float MaxX => X + SizeX * 0.5f;

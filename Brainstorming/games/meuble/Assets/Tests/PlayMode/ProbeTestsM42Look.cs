@@ -374,12 +374,27 @@ namespace OutOfSight.Tests
                 }
                 var walls = slots.Where(s => s.Renderer.name == "Face" || s.Renderer.name == "Cap").ToList();
                 Assert.Greater(walls.Count, 3, $"{id}: premise: no wall faces");
+                // Wall finishes (2026-11-19): a face shows the crepi or a finish one of the level's rooms asks for, and
+                // every finish asked for shows; caps stay plaster.
+                var finishes = new HashSet<Surface>(Game.Def.AllRooms().Select(r => TextureLibrary.WallSurface(r.WallFinish)));
                 foreach (Slot s in walls)
                 {
-                    Assert.AreEqual(Surface.Plaster, s.Surface, $"{id}: wall {Label(s)}");
+                    if (s.Renderer.name == "Cap")
+                    {
+                        Assert.AreEqual(Surface.Plaster, s.Surface, $"{id}: wall cap {Label(s)}");
+                    }
+                    else
+                    {
+                        Assert.IsTrue(s.Surface == Surface.Plaster || finishes.Contains(s.Surface), $"{id}: wall {Label(s)} shows {s.Surface}");
+                    }
+                }
+                foreach (Surface finish in finishes)
+                {
+                    Assert.IsTrue(walls.Any(s => s.Surface == finish), $"{id}: no wall face shows the {finish} finish");
                 }
 
-                // Rugs and the doormat.
+                // Rugs and the doormat: unchanged (every slot Surface.Carpet), plus the M7 rug image (product owner,
+                // 2026-11-18): BuildRugImage's own extra quad, the picture exactly once, also Surface.Carpet.
                 for (int i = 0; i < Game.Def.Rugs.Count; i++)
                 {
                     Transform rug = level.Root.transform.Find("Rug " + (i + 1));
@@ -542,6 +557,11 @@ namespace OutOfSight.Tests
             Color? playerMean = TextureLibrary.MeanColourOf(TextureLibrary.PlayerColour);
             Assert.IsTrue(playerMean.HasValue, "premise: the player colour map's mean colour was not measured");
             Assert.IsTrue(ModelMath.IsRed(playerMean.Value.gamma), $"the player's image does not read as red ({Hex(playerMean.Value.gamma)})");
+            // M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture, checked the same way
+            // as every other surface above: its mean colour, not any one of its pixels, must not read as the player's red.
+            Color? rugMean = TextureLibrary.MeanColourOf(TextureLibrary.RugColour);
+            Assert.IsTrue(rugMean.HasValue, "premise: the rug image's mean colour was not measured");
+            Assert.IsFalse(ModelMath.IsRed(rugMean.Value.gamma), $"the rug image reads as red ({Hex(rugMean.Value.gamma)})");
 
             int checkedMaterials = 0;
             foreach (string id in new[] { "level1", "level5" })
@@ -566,6 +586,7 @@ namespace OutOfSight.Tests
                 int width = 640;
                 int height = 360;
                 Rect player = default;
+                var rugBoxes = new List<Rect>();
                 foreach (bool flat in new[] { false, true })
                 {
                     TextureLibrary.Disabled = flat;
@@ -594,6 +615,35 @@ namespace OutOfSight.Tests
                     {
                         textured = pixels;
                         player = box;
+                        // M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture, like
+                        // every other surface's image, is only checked by its mean colour for PRD 7.2 (above:
+                        // TextureLibrary.RugColour's mean is not red), never pixel by pixel; a patch of it can still
+                        // read as red on its own (ModelMath.IsRed), so its own screen box is exempt below, same as
+                        // the player's.
+                        rugBoxes.Clear();
+                        for (int i = 0; i < Game.Def.Rugs.Count; i++)
+                        {
+                            Transform rug = Game.Level.Root.transform.Find("Rug " + (i + 1));
+                            if (rug != null)
+                            {
+                                rugBoxes.Add(ScreenBox(cam, rug, width, height));
+                            }
+                        }
+                        Transform doormat = Game.Level.Root.transform.Find("Doormat");
+                        if (doormat != null)
+                        {
+                            rugBoxes.Add(ScreenBox(cam, doormat, width, height));
+                        }
+                        // The heads wear the product owner's own wrap-around images (2026-11-18, auburn hair
+                        // included): like the rug's, that picture is the owner's, not a red prop, so each
+                        // inhabitant's screen box is exempt too.
+                        foreach (Inhabitant inhabitant in Game.Level.Inhabitants)
+                        {
+                            if (inhabitant != null)
+                            {
+                                rugBoxes.Add(ScreenBox(cam, inhabitant.transform, width, height));
+                            }
+                        }
                     }
                 }
                 TextureLibrary.Disabled = false;
@@ -602,7 +652,7 @@ namespace OutOfSight.Tests
                 Debug.Log($"[Step22d] {id}: fine detail textured / flat = {gain:0.000}");
                 Assert.Greater(gain, MinDetailGain, $"{id}: the textured view has hardly more fine detail than the flat one: the images do not show");
                 Assert.Less(gain, MaxDetailGain, $"{id}: the textured view is noisy ({gain:0.00} times the fine detail of the flat one)");
-                AssertPlayerIsTheRedOne(textured, width, height, player, id);
+                AssertPlayerIsTheRedOne(textured, width, height, player, rugBoxes, id);
             }
             Assert.Greater(checkedMaterials, 5, "premise: few colour materials checked");
             CollectionAssert.IsEmpty(errors, "no error logged");
@@ -616,9 +666,12 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// PRD 7.2 on the rendered frame: the red pixels (ModelMath.IsRed) are found on the player furniture's screen box
-        /// (<paramref name="box"/>), at least <see cref="MinPlayerRedShare"/> of all of them, and their mean is a saturated red.
+        /// (<paramref name="box"/>), at least <see cref="MinPlayerRedShare"/> of all of them, and their mean is a saturated
+        /// red. M7 rug image (product owner, 2026-11-18): a red pixel inside <paramref name="exempt"/> (the rug's or the
+        /// doormat's own screen box) counts neither for nor against the player: its picture is checked by its mean colour
+        /// only (above, like every other surface's), never pixel by pixel.
         /// </summary>
-        private static void AssertPlayerIsTheRedOne(Color32[] pixels, int width, int height, Rect box, string label)
+        private static void AssertPlayerIsTheRedOne(Color32[] pixels, int width, int height, Rect box, List<Rect> exempt, string label)
         {
             int inside = 0;
             int outside = 0;
@@ -632,12 +685,13 @@ namespace OutOfSight.Tests
                     {
                         continue;
                     }
-                    if (box.Contains(new Vector2(x + 0.5f, y + 0.5f)))
+                    var point = new Vector2(x + 0.5f, y + 0.5f);
+                    if (box.Contains(point))
                     {
                         inside++;
                         sum += p;
                     }
-                    else
+                    else if (!exempt.Any(r => r.Contains(point)))
                     {
                         outside++;
                     }
@@ -745,7 +799,10 @@ namespace OutOfSight.Tests
             foreach (string id in Game.LevelOrder.ToList())
             {
                 yield return LoadLevel(id);
-                foreach (Slot s in LitSlots(Game.Level.Root.transform).Where(s => s.Texture != null))
+                // M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture is stretched over
+                // their own quad (PrimitiveKit.QuadMesh, scaled up directly by its transform, like the Garden above),
+                // never tiled at a metres-per-repeat: it is never measured against Carpet's tile here.
+                foreach (Slot s in LitSlots(Game.Level.Root.transform).Where(s => s.Texture != null && s.Texture != TextureLibrary.RugColour))
                 {
                     Assert.That(s.St.y, Is.EqualTo(s.St.x).Within(1e-5f), $"{id}: {Label(s)}: anisotropic tiling");
                     Mesh mesh = ModelKit.MeshOf(s.Renderer);

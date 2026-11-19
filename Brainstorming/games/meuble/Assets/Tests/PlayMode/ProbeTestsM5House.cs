@@ -836,12 +836,29 @@ namespace OutOfSight.Tests
                         Assert.AreEqual(1, frames, $"{id}: bookshelf {prop.Name} draws its frame as one renderer");
                         Assert.Greater(bookMaterials.Count, 1, $"{id}: premise: bookshelf {prop.Name} has books of several colours");
                     }
+                    // M7 walls pass: the panes of the outer walls never fade, one renderer; a window on a line shared over part of
+                    // its length cuts with that line, so its pane combines with that line's (one more renderer per such line).
                     int panes = 0;
+                    var paneLines = new HashSet<string>();
+                    var paneFader = level.Root.GetComponent<WallFader>();
                     foreach (MeshRenderer r in level.Root.GetComponentsInChildren<MeshRenderer>(false))
                     {
-                        panes += r.name == "WindowPane" ? 1 : 0;
+                        if (r.name != "WindowPane")
+                        {
+                            continue;
+                        }
+                        if (paneFader.PlaneOf(r, out Vector3 panePoint, out Vector3 paneNormal))
+                        {
+                            Assert.IsTrue(paneLines.Add(panePoint.ToString("F3") + " " + paneNormal.ToString("F3")),
+                                $"{id}: two pane renderers cut with the same wall line");
+                        }
+                        else
+                        {
+                            panes++;
+                        }
                     }
-                    Assert.AreEqual(Game.Def.Windows.Count > 0 ? 1 : 0, panes, $"{id}: the window panes of the house are one renderer");
+                    Assert.LessOrEqual(panes, 1, $"{id}: the window panes of the outer walls are one renderer");
+                    Assert.AreEqual(Game.Def.Windows.Count > 0, panes + paneLines.Count > 0, $"{id}: the windows draw no pane");
 
                     // A shared wall's faces and baseboards fade with its centre plane (a wall root's plane), so the parts of one
                     // material on both sides of a wall line are one renderer: no two share a material and a plane.

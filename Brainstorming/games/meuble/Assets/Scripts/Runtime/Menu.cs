@@ -355,8 +355,6 @@ namespace OutOfSight
         // after Retour), or null.
         private Selectable pendingFocus;
 
-        private static readonly Color Cream = new Color(1f, 0.92f, 0.75f, 1f);
-
         // ----- M7 title redesign: the title page's warm palette and its column metrics (1920 x 1080 reference). -----
         private static readonly Color TitleDim = new Color(0.08f, 0.05f, 0.035f, 0.16f);
         private static readonly Color TitlePanel = new Color(0.1f, 0.066f, 0.05f, 0.84f);
@@ -368,6 +366,15 @@ namespace OutOfSight
         private const float TitleMargin = 150f;
         private const float TitleButtonStep = 92f;
         private static readonly Vector2 TitleButtonSize = new Vector2(420f, 78f);
+
+        // Pause menu consistency pass (the product owner's "blurry pause menu" report, 2026-11-18): the pause menu
+        // was never updated for the M7 title redesign, so it still used the plain built-in font, grey buttons and a
+        // flat dim with no panel behind the text, which read as soft/out of place next to the title. It now reuses
+        // the title's own warm palette, display face and column button style; only the dim is its own (stronger
+        // than TitleDim, which is tuned for the mostly static title house) but keeps the same warm tint. There is
+        // no blur or depth of field anywhere in this project (Main.BuildVolume never adds one): the level stays
+        // visible, only dimmed, behind the panel.
+        private static readonly Color PauseDim = new Color(0.05f, 0.035f, 0.025f, 0.55f);
 
         public void Init(GameState game, Hud hud, OrbitCamera camera, Sfx sfx)
         {
@@ -467,7 +474,10 @@ namespace OutOfSight
             Place(title.rectTransform, left, new Vector2(TitleMargin, 222f), new Vector2(585f, 300f));
             Image rule = NewImage(titleCanvas.transform, "Rule", null, ChairRed);
             Place(rule.rectTransform, left, new Vector2(TitleMargin + 4f, 66f), new Vector2(84f, 6f));
-            Text tagline = NewText(titleCanvas.transform, "Tagline", Strings.TitleTagline, 34, TaglineInk);
+            // The product owner's "blurry tagline" report (2026-11-19): this line used the plain built-in font
+            // while the headline right above it uses the display face, which read as soft/mismatched next to the
+            // crisp title. The display face at a smaller size and the warm accent ink keep it a subtitle.
+            Text tagline = NewText(titleCanvas.transform, "Tagline", Strings.TitleTagline, 34, TaglineInk, display);
             tagline.alignment = TextAnchor.MiddleLeft;
             SoftShadow(tagline);
             Place(tagline.rectTransform, left, new Vector2(TitleMargin, 22f), new Vector2(900f, 50f));
@@ -478,15 +488,14 @@ namespace OutOfSight
             TitleOptionsButton = TitleButton("TitleOptions", Strings.OptionsTitle, display, -84f - 2f * TitleButtonStep);
             QuitButton = TitleButton("Quit", Strings.TitleQuit, display, -84f - 3f * TitleButtonStep);
 
+            // Credits cleanup (2026-11-19, product owner): the title shows only the author line now; the music's CC BY
+            // 4.0 attribution moved to the bottom of the Options page (OptionsMusicCredits in BuildOptions), still
+            // required by the licence (docs/LICENSES.md) but less prominent. Centred in the margin the two lines
+            // used to share, so removing one line left no empty gap.
             Text credits = NewText(titleCanvas.transform, "Credits", Strings.TitleCredits, 24, CreditsInk);
             credits.alignment = TextAnchor.MiddleLeft;
             SoftShadow(credits);
-            Place(credits.rectTransform, new Vector2(0f, 0f), new Vector2(TitleMargin, 40f), new Vector2(900f, 36f));
-            // Audio overhaul: the music's attribution (CC BY 4.0 requires it in the game, docs/LICENSES.md), under the credits.
-            Text musicCredits = NewText(titleCanvas.transform, "MusicCredits", Strings.TitleMusicCredits, 17, CreditsInk);
-            musicCredits.alignment = TextAnchor.MiddleLeft;
-            SoftShadow(musicCredits);
-            Place(musicCredits.rectTransform, new Vector2(0f, 0f), new Vector2(TitleMargin, 16f), new Vector2(1500f, 24f));
+            Place(credits.rectTransform, new Vector2(0f, 0f), new Vector2(TitleMargin, 28f), new Vector2(900f, 36f));
             Chain(PlayButton, LevelsButton, TitleOptionsButton, QuitButton);
             PlayButton.onClick.AddListener(() =>
             {
@@ -510,21 +519,38 @@ namespace OutOfSight
             });
         }
 
+        /// <summary>
+        /// Pause menu consistency pass: the same warm side panel, display face and column buttons as the title
+        /// (<see cref="BuildTitle"/>), so Reprendre, Recommencer, Menu principal and Options read as one design with
+        /// Jouer, Niveaux, Options and Quitter. The level keeps rendering and shows through <see cref="PauseDim"/>
+        /// (dimmed, never blurred); the band gives the text a solid backdrop instead of floating directly over the
+        /// moving scene, which is what made the pre-M7 text look soft.
+        /// </summary>
         private void BuildPause()
         {
             pauseCanvas = Panel("Pause");
-            Stretch(NewImage(pauseCanvas.transform, "Dim", null, new Color(0.03f, 0.03f, 0.05f, 0.6f)).rectTransform);
-            Text title = NewText(pauseCanvas.transform, "PauseTitle", Strings.PauseTitle, 130, Cream);
-            Place(title.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, 220f), new Vector2(1600f, 170f));
-            ResumeButton = Hud.MenuButton(pauseCanvas.transform, "Resume", Strings.PauseResume, font, Labels);
-            Place((RectTransform)ResumeButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(520f, 96f));
-            RestartButton = Hud.MenuButton(pauseCanvas.transform, "Restart", Strings.PauseRestart, font, Labels);
-            Place((RectTransform)RestartButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -80f), new Vector2(520f, 96f));
-            MainMenuButton = Hud.MenuButton(pauseCanvas.transform, "MainMenu", Strings.PauseMenu, font, Labels);
-            Place((RectTransform)MainMenuButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -200f), new Vector2(520f, 96f));
+            Stretch(NewImage(pauseCanvas.transform, "Dim", null, PauseDim).rectTransform);
+            Image band = NewImage(pauseCanvas.transform, "Band", ProceduralArt.SideFade, TitlePanel);
+            band.rectTransform.anchorMin = new Vector2(0f, 0f);
+            band.rectTransform.anchorMax = new Vector2(0f, 1f);
+            band.rectTransform.pivot = new Vector2(0f, 0.5f);
+            band.rectTransform.anchoredPosition = Vector2.zero;
+            band.rectTransform.sizeDelta = new Vector2(TitlePanelWidth, 0f);
+
+            var left = new Vector2(0f, 0.5f);
+            Font display = Hud.DisplayFont;
+            Text title = NewText(pauseCanvas.transform, "PauseTitle", Strings.PauseTitle, 120, TitleInk, display);
+            title.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(title);
+            Place(title.rectTransform, left, new Vector2(TitleMargin, 220f), new Vector2(900f, 150f));
+            Image rule = NewImage(pauseCanvas.transform, "PauseRule", null, ChairRed);
+            Place(rule.rectTransform, left, new Vector2(TitleMargin + 4f, 130f), new Vector2(84f, 6f));
+
+            ResumeButton = ColumnButton(pauseCanvas.transform, "Resume", Strings.PauseResume, display, TitleMargin, 40f);
+            RestartButton = ColumnButton(pauseCanvas.transform, "Restart", Strings.PauseRestart, display, TitleMargin, 40f - TitleButtonStep);
+            MainMenuButton = ColumnButton(pauseCanvas.transform, "MainMenu", Strings.PauseMenu, display, TitleMargin, 40f - 2f * TitleButtonStep);
             // M6 (CONTRACT_M6 2.1): "Options", below Menu principal.
-            PauseOptionsButton = Hud.MenuButton(pauseCanvas.transform, "PauseOptions", Strings.OptionsTitle, font, Labels);
-            Place((RectTransform)PauseOptionsButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, -320f), new Vector2(520f, 96f));
+            PauseOptionsButton = ColumnButton(pauseCanvas.transform, "PauseOptions", Strings.OptionsTitle, display, TitleMargin, 40f - 3f * TitleButtonStep);
             Chain(ResumeButton, RestartButton, MainMenuButton, PauseOptionsButton);
             ResumeButton.onClick.AddListener(() =>
             {
@@ -588,6 +614,14 @@ namespace OutOfSight
 
             OptionsResetButton = OptionsPlainButton("OptionsReset", Strings.OptionsDefault, 7);
             OptionsBackButton = OptionsPlainButton("OptionsBack", Strings.SelectBack, 8);
+
+            // Credits cleanup (2026-11-19, product owner): the music's CC BY 4.0 attribution (docs/LICENSES.md), moved
+            // here from the title page, a small, less prominent line under Retour, clear of it on a 20:9 phone
+            // (Step28c_OptionsMusicRowCyclesSavesAndFits checks Retour's own clearance).
+            Text optionsCredits = NewText(optionsCanvas.transform, "OptionsMusicCredits", Strings.OptionsMusicCredits, 15, CreditsInk);
+            optionsCredits.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(optionsCredits);
+            Place(optionsCredits.rectTransform, new Vector2(0f, 0f), new Vector2(Tuning.OptionsMargin, 14f), new Vector2(1600f, 22f));
 
             Chain(OptionsSensitivityButton, OptionsVolumeButton, OptionsMusicButton, OptionsConeButton, OptionsQualityButton, OptionsDifficultyButton,
                 OptionsLanguageButton, OptionsResetButton, OptionsBackButton);
@@ -1141,15 +1175,23 @@ namespace OutOfSight
 
         // ----- Construction helpers -----
 
-        /// <summary>
-        /// M7 title redesign: a title page button, the shared menu button (<see cref="Hud.MenuButton"/>, so the same
-        /// navigation and label naming) restyled for the column: left aligned in the display face on a warm translucent
-        /// plate; under the mouse a lighter brown, selected the chair's red, so the two never look alike.
-        /// </summary>
+        /// <summary>A title page button (<see cref="ColumnButton"/>), on the title's own left margin.</summary>
         private Button TitleButton(string name, string label, Font display, float y)
         {
-            Button button = Hud.MenuButton(titleCanvas.transform, name, label, display, Labels);
-            Place((RectTransform)button.transform, new Vector2(0f, 0.5f), new Vector2(TitleMargin, y), TitleButtonSize);
+            return ColumnButton(titleCanvas.transform, name, label, display, TitleMargin, y);
+        }
+
+        /// <summary>
+        /// The shared column button of the title and the pause menu (pause reuses it for its own consistency pass):
+        /// the title column's button (<see cref="Hud.MenuButton"/>, so the same navigation and label naming)
+        /// restyled left aligned in the display face on a warm translucent plate; under the mouse a lighter brown,
+        /// selected the chair's red, so the two never look alike. <paramref name="x"/> and <paramref name="y"/> are
+        /// the anchored position on the panel's left edge, in <see cref="TitleButtonSize"/>.
+        /// </summary>
+        private Button ColumnButton(Transform parent, string name, string label, Font display, float x, float y)
+        {
+            Button button = Hud.MenuButton(parent, name, label, display, Labels);
+            Place((RectTransform)button.transform, new Vector2(0f, 0.5f), new Vector2(x, y), TitleButtonSize);
             ColorBlock colors = button.colors;
             colors.normalColor = new Color(0.17f, 0.115f, 0.085f, 0.62f);
             colors.highlightedColor = new Color(0.36f, 0.25f, 0.18f, 0.9f);

@@ -28,6 +28,12 @@ namespace OutOfSight
         Soil,
         // ----- M7 textures (CONTRACT_M7 1.2): the kitchen and bathroom floor tiles. -----
         Tile,
+        // ----- Wall finishes (product owner request, 2026-11-19): a room's "wallFinish" (RoomDef.WallFinishes), on the
+        // room-facing side of its walls only; every other wall face, the caps and the outside faces keep Plaster. -----
+        Sage,
+        Limewash,
+        Grasscloth,
+        Wallpaper,
     }
 
     /// <summary>
@@ -114,7 +120,31 @@ namespace OutOfSight
             Surface.Grass, Surface.Lacquer, Surface.Metal, Surface.Plastic, Surface.Foliage, Surface.Soil,
             // M7 textures (CONTRACT_M7 1.2): kitchen and bathroom floor tiles.
             Surface.Tile,
+            // Wall finishes (2026-11-19).
+            Surface.Sage, Surface.Limewash, Surface.Grasscloth, Surface.Wallpaper,
         };
+
+        /// <summary>
+        /// Wall finishes (product owner request, 2026-11-19): the surface the room-facing side of a room's walls shows,
+        /// by its "wallFinish" (<see cref="RoomDef.WallFinishes"/>): null or empty (the default) is the cream crepi,
+        /// <see cref="Surface.Plaster"/>; an unknown value too (LevelValidator rejects it).
+        /// </summary>
+        public static Surface WallSurface(string finish)
+        {
+            switch (finish)
+            {
+                case RoomDef.SageFinish:
+                    return Surface.Sage;
+                case RoomDef.LimewashFinish:
+                    return Surface.Limewash;
+                case RoomDef.GrassclothFinish:
+                    return Surface.Grasscloth;
+                case RoomDef.WallpaperFinish:
+                    return Surface.Wallpaper;
+                default:
+                    return Surface.Plaster;
+            }
+        }
 
         /// <summary>
         /// Tests only: when true, <see cref="PrimitiveKit.Detail(Renderer, int, Surface)"/> does nothing, so a level
@@ -345,6 +375,14 @@ namespace OutOfSight
                     return Tuning.DetailTileSoil;
                 case Surface.Tile:
                     return Tuning.DetailTileTile;
+                case Surface.Sage:
+                    return Tuning.DetailTileSage;
+                case Surface.Limewash:
+                    return Tuning.DetailTileLimewash;
+                case Surface.Grasscloth:
+                    return Tuning.DetailTileGrasscloth;
+                case Surface.Wallpaper:
+                    return Tuning.DetailTileWallpaper;
                 default:
                     return 0f;
             }
@@ -392,6 +430,11 @@ namespace OutOfSight
                     return Tuning.NormalScaleMetal;
                 case Surface.Tile:
                     return Tuning.NormalScaleTile;
+                case Surface.Sage:
+                case Surface.Limewash:
+                case Surface.Grasscloth:
+                case Surface.Wallpaper:
+                    return Tuning.NormalScaleWallFinish;
                 default:
                     return 0f;
             }
@@ -478,6 +521,12 @@ namespace OutOfSight
                     return true;
                 case Surface.Lacquer:
                     smoothness = Tuning.ColourDoorSmoothness;
+                    return true;
+                case Surface.Sage:
+                case Surface.Limewash:
+                case Surface.Grasscloth:
+                case Surface.Wallpaper:
+                    smoothness = Tuning.ColourWallFinishSmoothness;
                     return true;
                 default:
                     return FinishOf(surface, out smoothness, out metallic);

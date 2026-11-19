@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using OutOfSight.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -12,8 +13,11 @@ namespace OutOfSight
     /// <summary>
     /// M7 faces: <c>--charshots &lt;dir&gt;</c> (built player only) photographs the humans of the first level shown (the
     /// title page's house): a close-up of each face and of the back of its head, the whole body from the front and from
-    /// the back, a three-quarter view from above at play distance and one at the title tour's height, then quits.
-    /// <c>--charlevels a,b</c> adds the humans of those levels (files prefixed with the level id).
+    /// the back, a three-quarter view from above at play distance and one at the title tour's height, then quits. The
+    /// head is also shot as the game sees it (game_l, game_r): three quarters from either side, from above at the orbit
+    /// camera's default pitch, from afar through a narrow field, lit by the room only.
+    /// <c>--charlevels a,b</c> adds the humans of those levels (files prefixed with the level id). <c>--charobj</c> also
+    /// writes each posed skin as an OBJ in the face frame (metres, origin between the eyes, x right, y up, z forward).
     /// Only the Inhabitant layer is drawn (no wall or prop in the way), over a plain backdrop, with the game's own post
     /// processing. A review aid for the faces and clothes of <see cref="CharacterLook"/>; never runs in a normal game.
     /// </summary>
@@ -150,6 +154,17 @@ namespace OutOfSight
                     yield return Shoot(eye + profile * 0.68f + Vector3.up * 0.06f, eye - Vector3.up * 0.035f, 28f, $"profile_{name}.png");
                     // Slight elevation shows the rear projection over the hair and nape.
                     yield return Shoot(eye - look * 0.62f + Vector3.up * 0.12f, eye - Vector3.up * 0.04f, 30f, $"head_back_{name}.png");
+                    float pitch = Tuning.PitchDefault * Mathf.Deg2Rad;
+                    foreach (float turn in new[] { -55f, 55f })
+                    {
+                        Vector3 toward = Quaternion.Euler(0f, turn, 0f) * look * Mathf.Cos(pitch) + Vector3.up * Mathf.Sin(pitch);
+                        Vector3 head = eye - Vector3.up * 0.02f;
+                        yield return Shoot(head + toward * 3f, head, 7f, $"game_{(turn < 0f ? "l" : "r")}_{name}.png");
+                    }
+                    if (System.Environment.GetCommandLineArgs().Contains("--charobj") && rig.BrowPivot != null)
+                    {
+                        WriteObj(rig, Path.Combine(dir, $"mesh_{name}.obj"));
+                    }
                     Vector3 body = Planar(h.Visual != null ? h.Visual.forward : h.transform.forward);
                     Vector3 feet = h.transform.position;
                     yield return Shoot(feet + body * 3.0f + Vector3.up * 1.25f, feet + Vector3.up * 0.88f, 33f, $"body_front_{name}.png");
@@ -184,6 +199,37 @@ namespace OutOfSight
             return v.sqrMagnitude > 1e-6f ? v.normalized : Vector3.forward;
         }
 
+        /// <summary>The posed skin (vertices, UVs, one group per material slot) in the face frame of <c>--charobj</c>.</summary>
+        private static void WriteObj(InhabitantRig rig, string path)
+        {
+            var baked = new Mesh();
+            rig.Skin.BakeMesh(baked, true);
+            Matrix4x4 toFace = rig.BrowPivot.worldToLocalMatrix * rig.Skin.transform.localToWorldMatrix;
+            var text = new System.Text.StringBuilder();
+            var culture = System.Globalization.CultureInfo.InvariantCulture;
+            foreach (Vector3 v in baked.vertices)
+            {
+                Vector3 p = toFace.MultiplyPoint3x4(v);
+                text.Append(string.Format(culture, "v {0:0.#####} {1:0.#####} {2:0.#####}\n", p.x, p.y, p.z));
+            }
+            foreach (Vector2 t in rig.Skin.sharedMesh.uv)
+            {
+                text.Append(string.Format(culture, "vt {0:0.#####} {1:0.#####}\n", t.x, t.y));
+            }
+            Material[] slots = rig.Skin.sharedMaterials;
+            for (int s = 0; s < baked.subMeshCount; s++)
+            {
+                text.Append("g ").Append(s < slots.Length && slots[s] != null ? Safe(slots[s].name) : "slot" + s).Append('\n');
+                int[] tris = baked.GetTriangles(s);
+                for (int i = 0; i < tris.Length; i += 3)
+                {
+                    text.Append(string.Format(culture, "f {0}/{0} {1}/{1} {2}/{2}\n", tris[i] + 1, tris[i + 1] + 1, tris[i + 2] + 1));
+                }
+            }
+            File.WriteAllText(path, text.ToString());
+            Destroy(baked);
+        }
+
         private static string Safe(string s)
         {
             return new string((s ?? "x").Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray());
@@ -205,7 +251,7 @@ namespace OutOfSight
             cam.enabled = false;
             cam.GetUniversalAdditionalCameraData().renderPostProcessing = true;
             // A diffuse fill for the inspection angles, independent of which way the room light points.
-            if (!file.StartsWith("play_") && !file.StartsWith("tour_"))
+            if (!file.StartsWith("play_") && !file.StartsWith("tour_") && !file.StartsWith("game_"))
             {
                 var fillObject = new GameObject("Portrait fill");
                 fillObject.transform.SetParent(go.transform);

@@ -7,36 +7,127 @@ namespace OutOfSight
     /// <summary>
     /// The human head: the product owner's all-around head image of each gender (Art/Characters/man_head_around.png and
     /// woman_head_around.png, copied to Resources as CharacterManHeadWrap and CharacterWomanHeadWrap) wrapped once around
-    /// a sculpted head, joined to the original skin at its weighted neck boundary. The image is a 2:1 longitude by height
-    /// unwrap: u is the longitude (the face at u = 0.5, the ears near 0.25 and 0.75, the seam at the back of the head),
-    /// v runs from the crown (top row) through the eyes (45 %) and the chin (85 %) to the neck (bottom row). Hair, skin and
-    /// face all come from the image, in its own colours: the model's hair, eyebrows and eyes are cut away.
+    /// a sculpted head of that gender, joined to the original skin at its weighted neck boundary. The image is a 2:1
+    /// unwrap around the head: u goes once around (the face at u = 0.5, the ears near 0.23 and 0.77, the seam at the back
+    /// of the head), v runs from the crown (top row) through the eyes (45.7 %) and the chin (87 to 90 %) to the neck
+    /// (bottom row). Hair, skin and face all come from the image, in its own colours: the model's hair, eyebrows and eyes
+    /// are cut away.
+    /// <para>Each row of the mesh is one image row at one height; its plan contour is a superellipse, flat across the
+    /// face and round at the back. Along a row, the image is laid by arc length through landmarks measured on the image:
+    /// the pupils land at a natural eye span on the flat face front, the ears on the sides, the back of the head at the
+    /// seam. Below the image's jaw line the surface tucks into the neck, down to a ring on the original collar.
+    /// The nose, brow, cheeks and ears are sculpted where the image paints them.</para>
     /// </summary>
     internal static class CharacterHead
     {
-        private const int Sectors = 32;
-        private const float BackCentre = -0.112f;
         private const float Turn = 2f * Mathf.PI;
+        private const int ArcSamples = 241;
 
-        // The vertical coordinates follow the artwork: eyes at 45%, nose at 60%, mouth at 70%.
-        // Width, front and back are in metres in the rig's eye frame.
-        private static readonly (float v, float y, float width, float front, float back)[] Profile =
+        /// <summary>One plan section of the head: its height, half width, the z of its widest point, of its front and of
+        /// its back centre, and the superellipse exponents of its front and back halves (metres, eye frame).</summary>
+        private struct Section
         {
-            (0f,    0.119f, 0f,      -0.087f, -0.087f),
-            (0.08f, 0.111f, 0.043f, -0.039f, -0.131f),
-            (0.16f, 0.095f, 0.068f, -0.013f, -0.156f),
-            (0.24f, 0.072f, 0.083f,  0.008f, -0.176f),
-            (0.34f, 0.038f, 0.088f,  0.014f, -0.185f),
-            (0.42f, 0.009f, 0.088f,  0.012f, -0.188f),
-            (0.47f,-0.005f, 0.087f,  0.013f, -0.187f),
-            (0.53f,-0.021f, 0.086f,  0.017f, -0.185f),
-            (0.59f,-0.036f, 0.082f,  0.019f, -0.181f),
-            (0.64f,-0.047f, 0.076f,  0.019f, -0.176f),
-            (0.70f,-0.061f, 0.070f,  0.019f, -0.170f),
-            (0.78f,-0.078f, 0.062f,  0.012f, -0.168f),
-            (0.86f,-0.092f, 0.054f, -0.007f, -0.165f),
-            (0.94f,-0.106f, 0.046f, -0.036f, -0.160f),
+            public float V, Y, A, Zc, Zf, Zb, Nf, Nb;
+
+            public Section(float v, float y, float a, float zc, float zf, float zb, float nf, float nb)
+            {
+                V = v; Y = y; A = a; Zc = zc; Zf = zf; Zb = zb; Nf = nf; Nb = nb;
+            }
+        }
+
+        /// <summary>
+        /// One gender's head. The image landmarks are measured on its *_head_around.png (du = u - 0.5, v from the top);
+        /// the geometry is in metres in the rig's eye frame (origin between the eyes, x right, y up, z forward).
+        /// </summary>
+        private sealed class Shape
+        {
+            /// <summary>Image |du| of the pupils, of the end of the flat face front and of the ear centres.</summary>
+            public float PupilDu, FrontDu, EarDu;
+            /// <summary>Where the pupils land on the face front (x, metres): the eye span.</summary>
+            public float EyeHalfSpan;
+            /// <summary>The image's jaw line (|du|, v), from the chin to the nape: below it the surface tucks into the neck.</summary>
+            public (float du, float v)[] Jaw;
+            /// <summary>The mesh rows (image v): denser on the features; the last one is the ring on the collar.</summary>
+            public float[] Rows;
+            public Section[] Sections;
+            /// <summary>Per image v: how far the nose stands out of the face, and its half width (metres).</summary>
+            public (float v, float height, float sigma)[] Nose;
+            public float BrowHeight, BrowV, BrowSigma;
+            public float CheekHeight, CheekDu, CheekV, CheekSigmaX, CheekSigmaV;
+            public float EarHeight, EarV, EarSigmaDu, EarSigmaV;
+        }
+
+        // The man: a larger head, a square brow and jaw, a strong nose. Landmarks: pupils at u 0.434 and 0.565, v 0.457;
+        // nose tip v 0.60; mouth v 0.69; chin v 0.896; ears at u 0.234 and 0.767, v 0.40 to 0.65; nape hairline v 0.72.
+        private static readonly Shape Man = new Shape
+        {
+            PupilDu = 0.0655f, FrontDu = 0.11f, EarDu = 0.266f, EyeHalfSpan = 0.032f,
+            Jaw = new[] { (0f, 0.896f), (0.134f, 0.857f), (0.207f, 0.789f), (0.27f, 0.745f), (0.34f, 0.71f), (0.5f, 0.70f) },
+            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.225f, 0.30f, 0.37f, 0.415f, 0.457f, 0.51f, 0.555f, 0.60f, 0.635f, 0.69f, 0.76f, 0.83f, 0.896f, 0.925f, 0.96f },
+            Sections = new[]
+            {
+                new Section(0f, 0.122f, 0f, -0.085f, -0.085f, -0.085f, 2f, 2f),
+                new Section(0.06f, 0.118f, 0.042f, -0.085f, -0.040f, -0.130f, 2.2f, 2f),
+                new Section(0.12f, 0.107f, 0.064f, -0.083f, -0.012f, -0.158f, 2.6f, 2.1f),
+                new Section(0.18f, 0.090f, 0.078f, -0.081f, 0.004f, -0.174f, 3f, 2.2f),
+                new Section(0.225f, 0.073f, 0.084f, -0.079f, 0.010f, -0.181f, 3.3f, 2.2f),
+                new Section(0.30f, 0.050f, 0.088f, -0.078f, 0.014f, -0.186f, 3.6f, 2.3f),
+                new Section(0.37f, 0.022f, 0.089f, -0.078f, 0.016f, -0.188f, 3.6f, 2.3f),
+                new Section(0.457f, 0f, 0.088f, -0.078f, 0.012f, -0.188f, 3.6f, 2.3f),
+                new Section(0.53f, -0.018f, 0.088f, -0.078f, 0.015f, -0.185f, 3.5f, 2.3f),
+                new Section(0.60f, -0.036f, 0.086f, -0.078f, 0.017f, -0.180f, 3.3f, 2.3f),
+                new Section(0.69f, -0.058f, 0.081f, -0.079f, 0.020f, -0.172f, 3.1f, 2.3f),
+                new Section(0.76f, -0.076f, 0.075f, -0.081f, 0.019f, -0.167f, 3f, 2.3f),
+                new Section(0.83f, -0.093f, 0.064f, -0.085f, 0.017f, -0.163f, 2.9f, 2.3f),
+                new Section(0.896f, -0.108f, 0.050f, -0.090f, 0.011f, -0.160f, 2.9f, 2.3f),
+                new Section(1f, -0.112f, 0.045f, -0.098f, -0.040f, -0.158f, 2.6f, 2.3f),
+            },
+            Nose = new[] { (0.43f, 0f, 0.006f), (0.47f, 0.003f, 0.007f), (0.52f, 0.007f, 0.008f), (0.57f, 0.013f, 0.011f),
+                (0.60f, 0.022f, 0.013f), (0.615f, 0.018f, 0.014f), (0.63f, 0.007f, 0.015f), (0.65f, 0f, 0.015f) },
+            BrowHeight = 0.004f, BrowV = 0.37f, BrowSigma = 0.035f,
+            CheekHeight = 0.002f, CheekDu = 0.11f, CheekV = 0.58f, CheekSigmaX = 0.02f, CheekSigmaV = 0.06f,
+            EarHeight = 0.013f, EarV = 0.53f, EarSigmaDu = 0.03f, EarSigmaV = 0.09f,
         };
+
+        // The woman: a smaller head, round cheeks, a soft narrow chin, a small nose. Landmarks: pupils at u 0.428 and
+        // 0.569, v 0.457; nose tip v 0.60; mouth v 0.682; chin v 0.868; ears at u 0.231 and 0.769, v 0.40 to 0.65.
+        private static readonly Shape Woman = new Shape
+        {
+            PupilDu = 0.0705f, FrontDu = 0.115f, EarDu = 0.269f, EyeHalfSpan = 0.030f,
+            Jaw = new[] { (0f, 0.868f), (0.13f, 0.835f), (0.2f, 0.775f), (0.27f, 0.735f), (0.34f, 0.705f), (0.5f, 0.70f) },
+            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.235f, 0.30f, 0.36f, 0.41f, 0.457f, 0.51f, 0.555f, 0.60f, 0.632f, 0.682f, 0.745f, 0.81f, 0.868f, 0.9f, 0.94f },
+            Sections = new[]
+            {
+                new Section(0f, 0.115f, 0f, -0.086f, -0.086f, -0.086f, 2f, 2f),
+                new Section(0.06f, 0.111f, 0.040f, -0.086f, -0.044f, -0.128f, 2.2f, 2f),
+                new Section(0.12f, 0.101f, 0.060f, -0.084f, -0.016f, -0.155f, 2.5f, 2.1f),
+                new Section(0.18f, 0.085f, 0.074f, -0.082f, 0f, -0.171f, 2.9f, 2.2f),
+                new Section(0.24f, 0.066f, 0.081f, -0.080f, 0.008f, -0.180f, 3.1f, 2.2f),
+                new Section(0.33f, 0.036f, 0.084f, -0.079f, 0.012f, -0.186f, 3.2f, 2.3f),
+                new Section(0.39f, 0.016f, 0.084f, -0.079f, 0.013f, -0.187f, 3.2f, 2.3f),
+                new Section(0.457f, 0f, 0.084f, -0.079f, 0.010f, -0.187f, 3.2f, 2.3f),
+                new Section(0.53f, -0.017f, 0.085f, -0.079f, 0.013f, -0.184f, 3f, 2.3f),
+                new Section(0.60f, -0.033f, 0.083f, -0.079f, 0.015f, -0.178f, 2.8f, 2.3f),
+                new Section(0.682f, -0.052f, 0.077f, -0.080f, 0.017f, -0.172f, 2.5f, 2.3f),
+                new Section(0.745f, -0.067f, 0.070f, -0.082f, 0.016f, -0.169f, 2.3f, 2.3f),
+                new Section(0.81f, -0.083f, 0.059f, -0.086f, 0.013f, -0.167f, 2.2f, 2.3f),
+                new Section(0.868f, -0.097f, 0.045f, -0.091f, 0.006f, -0.165f, 2.1f, 2.3f),
+                new Section(1f, -0.108f, 0.042f, -0.100f, -0.045f, -0.165f, 2.2f, 2.3f),
+            },
+            Nose = new[] { (0.44f, 0f, 0.005f), (0.48f, 0.002f, 0.006f), (0.53f, 0.005f, 0.007f), (0.57f, 0.010f, 0.009f),
+                (0.60f, 0.015f, 0.011f), (0.615f, 0.012f, 0.012f), (0.63f, 0.005f, 0.013f), (0.65f, 0f, 0.013f) },
+            BrowHeight = 0.0015f, BrowV = 0.355f, BrowSigma = 0.035f,
+            CheekHeight = 0.006f, CheekDu = 0.11f, CheekV = 0.58f, CheekSigmaX = 0.022f, CheekSigmaV = 0.065f,
+            EarHeight = 0.011f, EarV = 0.525f, EarSigmaDu = 0.03f, EarSigmaV = 0.09f,
+        };
+
+        /// <summary>The mesh columns (image u, 0 to 1): dense over the face, sparser over the sides and the back.</summary>
+        private static readonly float[] Columns = BuildColumns();
+
+        // The half contour of the row being laid (x >= 0, from the front centre to the back centre) and its arc length.
+        private static readonly float[] ArcX = new float[ArcSamples];
+        private static readonly float[] ArcZ = new float[ArcSamples];
+        private static readonly float[] ArcS = new float[ArcSamples];
 
         private static readonly Texture2D[] Sources = new Texture2D[2];
         private static readonly Texture2D[] Wraps = new Texture2D[2];
@@ -229,31 +320,114 @@ namespace OutOfSight
             {
                 return null;
             }
-            collar.Sort((a, b) => Around(points[a]).CompareTo(Around(points[b])));
             return collar;
         }
 
-        private static float Around(Vector3 p) => 0.5f + Mathf.Atan2(-p.x, p.z - BackCentre) / Turn;
-
-        public static void Append(List<int> into, List<int> collar, Vector3[] points, bool female,
-            Func<Vector3, Vector3, Vector2, int> addHeadVertex, Func<int, Vector2, int> addCollarVertex)
+        private static Vector3 CentreOf(List<int> collar, Vector3[] points)
         {
-            int stride = Sectors + 1;
-            var grid = new int[Profile.Length * stride];
-            for (int row = 0; row < Profile.Length; row++)
+            Vector3 centre = Vector3.zero;
+            foreach (int i in collar)
             {
-                float v = Profile[row].v;
-                for (int col = 0; col <= Sectors; col++)
+                centre += points[i];
+            }
+            return centre / collar.Count;
+        }
+
+        /// <summary>The angle of a point around the neck's axis, as a fraction of a turn in [0, 1): 0.5 in front, 0 at the
+        /// back. A point right at the back may land just under 1 or at 0 depending on rounding: sort with one centre only.</summary>
+        private static float Around(Vector3 p, Vector3 centre) => Mathf.Repeat(0.5f + Mathf.Atan2(centre.x - p.x, p.z - centre.z) / Turn, 1f);
+
+        /// <summary>The collar ring, sorted around the neck by its own angles: where the head's lowest ring tucks in.</summary>
+        private sealed class Neck
+        {
+            public readonly Vector3 Centre;
+            /// <summary>The collar's vertex indices in increasing <see cref="Around(Vector3)"/>.</summary>
+            public readonly List<int> Order;
+            private readonly float[] angles;
+            private readonly Vector3[] ring;
+
+            public Neck(List<int> collar, Vector3[] points)
+            {
+                Vector3 centre = CentreOf(collar, points);
+                Centre = centre;
+                Order = new List<int>(collar);
+                Order.Sort((a, b) => CharacterHead.Around(points[a], centre).CompareTo(CharacterHead.Around(points[b], centre)));
+                angles = new float[Order.Count];
+                ring = new Vector3[Order.Count];
+                for (int i = 0; i < Order.Count; i++)
                 {
-                    float u = col / (float)Sectors;
-                    Vector3 p = Position(u, v, female);
-                    const float step = 0.002f;
-                    Vector3 du = Position(u + step, v, female) - Position(u - step, v, female);
-                    Vector3 dv = Position(u, Mathf.Min(0.94f, v + step), female) - Position(u, Mathf.Max(0f, v - step), female);
-                    // Normalize each derivative before crossing: the unscaled cross of metre-sized
-                    // samples falls below Unity's normalization epsilon.
-                    Vector3 n = row == 0 ? Vector3.up : Vector3.Cross(du.normalized, dv.normalized).normalized;
-                    grid[row * stride + col] = addHeadVertex(p, n, new Vector2(u, 1f - v));
+                    ring[i] = points[Order[i]];
+                    angles[i] = CharacterHead.Around(ring[i], Centre);
+                }
+            }
+
+            public float Around(Vector3 p) => CharacterHead.Around(p, Centre);
+
+            /// <summary>The collar point at that angle (linear between its vertices, across the back too).</summary>
+            public Vector3 At(float angle)
+            {
+                angle = Mathf.Repeat(angle, 1f);
+                int n = ring.Length;
+                int next = 0;
+                while (next < n && angles[next] < angle) { next++; }
+                int prev = next - 1;
+                float from = prev < 0 ? angles[n - 1] - 1f : angles[prev];
+                float to = next >= n ? angles[0] + 1f : angles[next];
+                Vector3 a = ring[(prev + n) % n];
+                Vector3 b = ring[next % n];
+                return Vector3.Lerp(a, b, Mathf.InverseLerp(from, to, angle));
+            }
+        }
+
+        /// <summary>
+        /// Adds the head grid (one vertex per column and row, its image coordinates as UVs) and the strip that sews its
+        /// lowest ring to the collar. <paramref name="addHeadVertex"/> receives the position and normal in the eye frame,
+        /// the UV and how far the vertex is tucked into the neck (0 on the head, 1 on the ring on the collar).
+        /// </summary>
+        public static void Append(List<int> into, List<int> collar, Vector3[] points, bool female,
+            Func<Vector3, Vector3, Vector2, float, int> addHeadVertex, Func<int, Vector2, int> addCollarVertex)
+        {
+            Shape shape = female ? Woman : Man;
+            var neck = new Neck(collar, points);
+            collar = neck.Order;
+            int rows = shape.Rows.Length;
+            int stride = Columns.Length;
+            var position = new Vector3[rows * stride];
+            var tucks = new float[position.Length];
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < stride; col++)
+                {
+                    position[row * stride + col] = Position(shape, Columns[col], shape.Rows[row], neck, out tucks[row * stride + col]);
+                }
+            }
+            var grid = new int[position.Length];
+            for (int row = 0; row < rows; row++)
+            {
+                for (int col = 0; col < stride; col++)
+                {
+                    // Columns 0 and stride - 1 are the same seam at the back of the head.
+                    int before = row * stride + (col == 0 ? stride - 2 : col - 1);
+                    int after = row * stride + (col == stride - 1 ? 1 : col + 1);
+                    Vector3 du = position[after] - position[before];
+                    Vector3 dv = position[Mathf.Min(row + 1, rows - 1) * stride + col] - position[Mathf.Max(row - 1, 0) * stride + col];
+                    // At the nape the lowest rows can all lie on the collar: take the column's slope further up.
+                    for (int up = row - 2; dv.sqrMagnitude < 1e-14f && up >= 0; up--)
+                    {
+                        dv = position[row * stride + col] - position[up * stride + col];
+                    }
+                    int i = row * stride + col;
+                    // Normalize each derivative before crossing (Vector3.normalized gives zero under 1e-5, and tucked
+                    // neighbours on the collar can be closer than that); where they still give no plane, face out of
+                    // the neck's axis.
+                    Vector3 n = row == 0 ? Vector3.up : Unit(Vector3.Cross(Unit(du), Unit(dv)));
+                    if (n.sqrMagnitude < 0.5f)
+                    {
+                        Vector3 outward = position[i] - neck.Centre;
+                        outward.y = 0f;
+                        n = outward.sqrMagnitude > 1e-12f ? outward.normalized : Vector3.up;
+                    }
+                    grid[i] = addHeadVertex(position[i], n, new Vector2(Columns[col], 1f - shape.Rows[row]), tucks[i]);
                 }
             }
             void Triangle(int a, int b, int c)
@@ -262,9 +436,9 @@ namespace OutOfSight
                 into.Add(b);
                 into.Add(c);
             }
-            for (int row = 0; row < Profile.Length - 1; row++)
+            for (int row = 0; row < rows - 1; row++)
             {
-                for (int col = 0; col < Sectors; col++)
+                for (int col = 0; col < stride - 1; col++)
                 {
                     int a = row * stride + col;
                     int b = a + 1;
@@ -279,59 +453,191 @@ namespace OutOfSight
 
             // Sew the two rings in angular order. Copy the exact original boundary vertices and weights,
             // so the opening stays closed when the head bone turns and the neck bends.
-            int ring = (Profile.Length - 1) * stride;
+            int ring = (rows - 1) * stride;
+            var around = new float[stride];
+            for (int col = 0; col < stride; col++)
+            {
+                around[col] = col == 0 ? 0f : col == stride - 1 ? 1f : neck.Around(position[ring + col]);
+            }
             var border = new int[collar.Count + 1];
             var fractions = new float[border.Length];
             int seam = collar.Count - 1;
-            if (Around(points[collar[0]]) < 1f - Around(points[collar[seam]]))
+            if (neck.Around(points[collar[0]]) < 1f - neck.Around(points[collar[seam]]))
             {
                 seam = 0;
             }
             for (int i = 0; i <= collar.Count; i++)
             {
                 int source = collar[(seam + i) % collar.Count];
-                float u = i == 0 ? 0f : i == collar.Count ? 1f : Around(points[source]);
+                float u = i == 0 ? 0f : i == collar.Count ? 1f : neck.Around(points[source]);
                 fractions[i] = u;
                 border[i] = addCollarVertex(source, new Vector2(u, 0f));
             }
-            int head = 0, neck = 0;
-            while (head < Sectors || neck < collar.Count)
+            int head = 0, low = 0, last = stride - 1;
+            while (head < last || low < collar.Count)
             {
-                if (head < Sectors && (neck == collar.Count || (head + 1f) / Sectors <= fractions[neck + 1]))
+                if (head < last && (low == collar.Count || around[head + 1] <= fractions[low + 1]))
                 {
-                    Triangle(grid[ring + head], grid[ring + head + 1], border[neck]);
+                    Triangle(grid[ring + head], grid[ring + head + 1], border[low]);
                     head++;
                 }
                 else
                 {
-                    Triangle(grid[ring + head], border[neck + 1], border[neck]);
-                    neck++;
+                    Triangle(grid[ring + head], border[low + 1], border[low]);
+                    low++;
                 }
             }
         }
 
-        private static Vector3 Position(float u, float v, bool female)
+        private static float[] BuildColumns()
         {
-            int hi = 1;
-            while (hi < Profile.Length - 1 && Profile[hi].v < v) { hi++; }
-            var a = Profile[hi - 1];
-            var b = Profile[hi];
-            float t = Mathf.InverseLerp(a.v, b.v, v);
-            float yaw = (0.5f - Mathf.Repeat(u, 1f)) * Turn;
-            float side = Mathf.Sin(yaw);
-            float front = Mathf.Cos(yaw);
-            float width = Mathf.Lerp(a.width, b.width, t) * (female ? 0.98f : 1f);
-            float y = Mathf.Lerp(a.y, b.y, t);
-            float near = Mathf.Lerp(a.front, b.front, t);
-            float far = Mathf.Lerp(a.back, b.back, t) - (female ? 0.005f * Mathf.Sin(Mathf.PI * v) : 0f);
-            // A small sculpted nose and ear silhouette under the already painted features.
-            float nose = 0.019f * Bump((u - 0.5f) / 0.031f, (v - 0.59f) / 0.064f);
-            float earU = female ? 0.237f : 0.235f;
-            float ear = 0.013f * Bump((Mathf.Min(u, 1f - u) - earU) / 0.054f, (v - 0.53f) / 0.123f);
-            float jaw = 0.026f * (1f - front) * Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.63f, 0.94f, v));
-            return new Vector3(side * (width + ear), y + jaw, Mathf.Lerp(far, near, 0.5f + 0.5f * front) + nose);
+            const int face = 20, side = 10;
+            const float faceEdge = 0.12f;
+            var u = new List<float>();
+            for (int i = side; i >= 1; i--)
+            {
+                u.Add(0.5f - Mathf.Lerp(faceEdge, 0.5f, i / (float)side));
+            }
+            for (int i = 0; i <= face; i++)
+            {
+                u.Add(0.5f + Mathf.Lerp(-faceEdge, faceEdge, i / (float)face));
+            }
+            for (int i = 1; i <= side; i++)
+            {
+                u.Add(0.5f + Mathf.Lerp(faceEdge, 0.5f, i / (float)side));
+            }
+            return u.ToArray();
         }
 
-        private static float Bump(float x, float y) => Mathf.Exp(-2f * (x * x + y * y));
+        /// <summary>The surface at image (u, v), tucked into the neck below the image's jaw line.</summary>
+        private static Vector3 Position(Shape shape, float u, float v, Neck neck, out float tuck)
+        {
+            Vector3 p = Surface(shape, u, v);
+            float jaw = Lookup(shape.Jaw, Mathf.Abs(u - 0.5f));
+            tuck = 0f;
+            if (v > jaw)
+            {
+                // On the collar itself: the strip that sews the lowest ring to it then has no visible width.
+                Vector3 target = neck.At(neck.Around(p));
+                // The collar rises toward the nape: there the head meets it where its sections come down to the
+                // collar's height, so the surface never dips below the collar and folds back up.
+                float end = Mathf.Clamp(HeightToV(shape.Sections, target.y), jaw + 0.04f, shape.Rows[shape.Rows.Length - 1]);
+                tuck = Smooth(jaw, end, v);
+                p = Vector3.Lerp(p, target, tuck);
+            }
+            return p;
+        }
+
+        /// <summary>The image v at which the head's sections come down to the height <paramref name="y"/>.</summary>
+        private static float HeightToV(Section[] table, float y)
+        {
+            for (int i = 1; i < table.Length; i++)
+            {
+                if (table[i].Y <= y)
+                {
+                    return Mathf.Lerp(table[i - 1].V, table[i].V, Mathf.InverseLerp(table[i - 1].Y, table[i].Y, y));
+                }
+            }
+            return table[table.Length - 1].V;
+        }
+
+        /// <summary>The head surface at image (u, v): the row's contour laid by arc length, then the sculpted features.</summary>
+        private static Vector3 Surface(Shape shape, float u, float v)
+        {
+            float du = u - 0.5f;
+            float ad = Mathf.Abs(du);
+            Section r = SectionAt(shape.Sections, v);
+            if (r.A < 1e-5f)
+            {
+                return new Vector3(0f, r.Y, r.Zc);
+            }
+            float widest = Trace(r);
+            float total = ArcS[ArcSamples - 1];
+            // The face front keeps the image's own proportions (x proportional to du), the pupils at the eye span; the
+            // cheeks and temples take the arc to the ears, the hair the rest to the back of the head.
+            float scale = shape.EyeHalfSpan / shape.PupilDu;
+            float ear = widest - 0.004f;
+            float front = Mathf.Min(scale * shape.FrontDu, 0.55f * ear);
+            float s = ad <= shape.FrontDu ? front * ad / shape.FrontDu
+                : ad <= shape.EarDu ? Mathf.Lerp(front, ear, (ad - shape.FrontDu) / (shape.EarDu - shape.FrontDu))
+                : Mathf.Lerp(ear, total, (ad - shape.EarDu) / (0.5f - shape.EarDu));
+            int i = 1;
+            while (i < ArcSamples - 1 && ArcS[i] < s) { i++; }
+            float k = Mathf.InverseLerp(ArcS[i - 1], ArcS[i], s);
+            float px = Mathf.Lerp(ArcX[i - 1], ArcX[i], k);
+            float pz = Mathf.Lerp(ArcZ[i - 1], ArcZ[i], k);
+            // Image left (u < 0.5) is the character's right (+x).
+            float sign = du > 0f ? -1f : 1f;
+            var p = new Vector3(sign * px, r.Y, pz);
+
+            // The face relief stays on the face: the contour's x is small again at the back of the head.
+            float face = 1f - Smooth(0.16f, 0.26f, ad);
+            var nose = shape.Nose;
+            if (v >= nose[0].v && v <= nose[nose.Length - 1].v)
+            {
+                p.z += face * Lookup(nose, v, out float sigma) * Mathf.Exp(-0.5f * Sq(px / sigma));
+            }
+            p.z += face * shape.BrowHeight * Mathf.Exp(-0.5f * Sq((v - shape.BrowV) / shape.BrowSigma)) * (1f - Smooth(0.03f, 0.065f, px));
+            float cheek = face * shape.CheekHeight * Mathf.Exp(-0.5f * Sq((px - scale * shape.CheekDu) / shape.CheekSigmaX)
+                - 0.5f * Sq((v - shape.CheekV) / shape.CheekSigmaV));
+            p += new Vector3(sign * px, 0f, pz - r.Zc).normalized * cheek;
+            p.x += sign * shape.EarHeight * Mathf.Exp(-0.5f * Sq((ad - shape.EarDu) / shape.EarSigmaDu)
+                - 0.5f * Sq((v - shape.EarV) / shape.EarSigmaV));
+            return p;
+        }
+
+        /// <summary>Samples the row's half contour into the arc buffers; returns the arc length to its widest point.</summary>
+        private static float Trace(Section r)
+        {
+            for (int i = 0; i < ArcSamples; i++)
+            {
+                float t = Mathf.PI * i / (ArcSamples - 1);
+                float cos = Mathf.Cos(t);
+                bool front = cos >= 0f;
+                float e = 2f / (front ? r.Nf : r.Nb);
+                ArcX[i] = r.A * Mathf.Pow(Mathf.Abs(Mathf.Sin(t)), e);
+                float c = Mathf.Pow(Mathf.Abs(cos), e);
+                ArcZ[i] = front ? r.Zc + (r.Zf - r.Zc) * c : r.Zc - (r.Zc - r.Zb) * c;
+                ArcS[i] = i == 0 ? 0f : ArcS[i - 1] + Mathf.Sqrt(Sq(ArcX[i] - ArcX[i - 1]) + Sq(ArcZ[i] - ArcZ[i - 1]));
+            }
+            return ArcS[(ArcSamples - 1) / 2];
+        }
+
+        private static Section SectionAt(Section[] table, float v)
+        {
+            int hi = 1;
+            while (hi < table.Length - 1 && table[hi].V < v) { hi++; }
+            Section a = table[hi - 1], b = table[hi];
+            float t = Mathf.Clamp01((v - a.V) / (b.V - a.V));
+            return new Section(v, Mathf.Lerp(a.Y, b.Y, t), Mathf.Lerp(a.A, b.A, t), Mathf.Lerp(a.Zc, b.Zc, t),
+                Mathf.Lerp(a.Zf, b.Zf, t), Mathf.Lerp(a.Zb, b.Zb, t), Mathf.Lerp(a.Nf, b.Nf, t), Mathf.Lerp(a.Nb, b.Nb, t));
+        }
+
+        private static float Lookup((float x, float y)[] table, float x)
+        {
+            int hi = 1;
+            while (hi < table.Length - 1 && table[hi].x < x) { hi++; }
+            return Mathf.Lerp(table[hi - 1].y, table[hi].y, Mathf.Clamp01((x - table[hi - 1].x) / (table[hi].x - table[hi - 1].x)));
+        }
+
+        private static float Lookup((float x, float y, float z)[] table, float x, out float z)
+        {
+            int hi = 1;
+            while (hi < table.Length - 1 && table[hi].x < x) { hi++; }
+            float t = Mathf.Clamp01((x - table[hi - 1].x) / (table[hi].x - table[hi - 1].x));
+            z = Mathf.Lerp(table[hi - 1].z, table[hi].z, t);
+            return Mathf.Lerp(table[hi - 1].y, table[hi].y, t);
+        }
+
+        private static float Smooth(float from, float to, float x) => Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(from, to, x));
+
+        private static float Sq(float x) => x * x;
+
+        /// <summary>The unit vector along <paramref name="v"/> (zero when it has no length at all).</summary>
+        private static Vector3 Unit(Vector3 v)
+        {
+            float length = v.magnitude;
+            return length > 1e-9f ? v / length : Vector3.zero;
+        }
     }
 }

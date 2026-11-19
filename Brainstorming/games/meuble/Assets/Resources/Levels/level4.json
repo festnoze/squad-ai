@@ -26,7 +26,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sage"
     }
   ],
   "doors": [

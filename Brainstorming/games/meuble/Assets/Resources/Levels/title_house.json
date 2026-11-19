@@ -11,7 +11,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EBDDC6"
+      "wallColor": "#EBDDC6",
+      "wallFinish": "grasscloth"
     },
     {
       "id": "chambre",
@@ -23,7 +24,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#9C6B45",
-      "wallColor": "#F2E3CF"
+      "wallColor": "#F2E3CF",
+      "wallFinish": "wallpaper"
     },
     {
       "id": "couloir",
@@ -47,7 +49,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#F3E2C8"
+      "wallColor": "#F3E2C8",
+      "wallFinish": "sage"
     },
     {
       "id": "cuisine",
@@ -60,7 +63,8 @@
       "floor": "hard",
       "floorFinish": "tile",
       "floorColor": "#EDE6DA",
-      "wallColor": "#F7F4EE"
+      "wallColor": "#F7F4EE",
+      "wallFinish": "limewash"
     },
     {
       "id": "entree",

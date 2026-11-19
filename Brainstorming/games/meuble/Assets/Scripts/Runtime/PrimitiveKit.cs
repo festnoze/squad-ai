@@ -364,14 +364,14 @@ namespace OutOfSight
         /// M7 rug image (product owner, 2026-11-18): slot <paramref name="slot"/> of <paramref name="renderer"/> shows
         /// the rug's own picture (<see cref="TextureLibrary.RugColour"/>) exactly once over its own UV 0 to 1, never
         /// tiled: unlike <see cref="Detail(Renderer, int, Surface)"/>, no <see cref="MetresPerUv"/> measurement and no
-        /// repeat, so the mesh must already carry UV0 in the 0 to 1 range over the whole visible surface (the literal
-        /// <see cref="QuadMesh"/>, scaled by the transform, never <see cref="QuadMeshSized"/> or a box: BuildRug and
-        /// BuildExit put the picture on its own quad, never the model's or the procedural border's own mesh, whose UVs
-        /// are not one coherent mapping across the whole rug). Drawn through the same shared Surface.Carpet material
-        /// (<see cref="SurfaceMaterial"/>) as the "soft" room floor (PRD 7.4: one material, not a second one for rugs);
-        /// no normal map (a stretched tiling bump would look wrong on a picture that is never tiled). Does nothing for
-        /// a null renderer, with <see cref="TextureLibrary.Disabled"/>, or when the library has no rug image (one error
-        /// logged, the slot keeps its palette colour, as every other <see cref="Detail(Renderer, int, Surface)"/> miss).
+        /// repeat, so the mesh must already carry UV0 in the 0 to 1 range over the whole visible surface (BuildRug and
+        /// BuildExit's own dedicated quad, the literal <see cref="QuadMesh"/> scaled by the transform, never
+        /// <see cref="QuadMeshSized"/> or a box). Drawn through the same shared Surface.Carpet material
+        /// (<see cref="SurfaceMaterial"/>) as the "soft" room floor and the rug's own tiled skirt or border below it,
+        /// unchanged (PRD 7.4: one material, not a second one for rugs); no normal map (a stretched tiling bump would
+        /// look wrong on a picture that is never tiled). Does nothing for a null renderer, with
+        /// <see cref="TextureLibrary.Disabled"/>, or when the library has no rug image (one error logged, the slot
+        /// keeps its palette colour, as every other <see cref="Detail(Renderer, int, Surface)"/> miss).
         /// </summary>
         public static void RugDetail(Renderer renderer, int slot)
         {
@@ -665,6 +665,38 @@ namespace OutOfSight
                 float x = (vertices[i].x + 0.5f) * size.x;
                 float y = (vertices[i].y + 0.5f) * size.y;
                 uv[i] = swap ? new Vector2(y, x) : new Vector2(x, y);
+            }
+            var mesh = new Mesh { name = "Quad" };
+            mesh.vertices = vertices;
+            mesh.normals = unit.normals;
+            mesh.uv = uv;
+            mesh.triangles = unit.triangles;
+            mesh.RecalculateBounds();
+            Keep(mesh);
+            MeshCache[key] = mesh;
+            return mesh;
+        }
+
+        /// <summary>
+        /// Wall finishes (2026-11-19): a wall face's quad, as <see cref="QuadMeshSized"/> (the unit quad scaled by its
+        /// transform to <paramref name="size"/>, UVs in metres, named "Quad") but always U along the wall and V up, whatever
+        /// side is longer (a wallpaper's stripes and a grasscloth's fibres must not turn with the face's proportions), and
+        /// shifted by <paramref name="uvOffset"/> metres so the pieces of one wall (beside and over a door) continue one
+        /// pattern. Cached by size and offset.
+        /// </summary>
+        public static Mesh WallQuadMesh(Vector2 size, Vector2 uvOffset)
+        {
+            string key = "wall quad" + SizeKey(new Vector3(size.x, size.y, 0f)) + "+" + SizeKey(new Vector3(uvOffset.x, uvOffset.y, 0f));
+            if (MeshCache.TryGetValue(key, out Mesh cached) && cached != null)
+            {
+                return cached;
+            }
+            Mesh unit = QuadMesh;
+            Vector3[] vertices = unit.vertices;
+            var uv = new Vector2[vertices.Length];
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                uv[i] = new Vector2((vertices[i].x + 0.5f) * size.x + uvOffset.x, (vertices[i].y + 0.5f) * size.y + uvOffset.y);
             }
             var mesh = new Mesh { name = "Quad" };
             mesh.vertices = vertices;

@@ -48,10 +48,6 @@ namespace OutOfSight.Core
             { "title.play", new[] { "Play", "Jouer" } },
             { "title.quit", new[] { "Quit", "Quitter" } },
             { "title.credits", new[] { "Created and designed by Etienne 2026", "Created and designed by Etienne 2026" } },
-            // Audio overhaul: the attribution CC BY 4.0 requires for the music (docs/LICENSES.md, section Music).
-            { "title.musicCredits", new[] {
-                "Music: \"Sneaky Snitch\", \"Investigations\" by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0 (creativecommons.org/licenses/by/4.0)",
-                "Musique : \"Sneaky Snitch\", \"Investigations\" de Kevin MacLeod (incompetech.com), sous licence CC BY 4.0 (creativecommons.org/licenses/by/4.0)" } },
             { "title.levels", new[] { "Levels", "Niveaux" } },
 
             { "hud.controls", new[] { "WASD/Arrows: move    Mouse: camera    R: restart    Esc: pause",
@@ -206,6 +202,12 @@ namespace OutOfSight.Core
             { "difficulty.normal", new[] { "Normal", "Normal" } },
             { "difficulty.difficile", new[] { "Hard", "Difficile" } },
             { "options.language", new[] { "Language / Langue: {0}", "Language / Langue : {0}" } },
+            // Credits cleanup (2026-11-19, product owner): the music's CC BY 4.0 attribution, moved off the title
+            // (which now shows only the author line) to a small line at the bottom of the Options page. The
+            // attribution requirement itself is unchanged (docs/LICENSES.md, section Music).
+            { "options.musicCredits", new[] {
+                "Music: \"Sneaky Snitch\", \"Investigations\" by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0 (creativecommons.org/licenses/by/4.0)",
+                "Musique : \"Sneaky Snitch\", \"Investigations\" de Kevin MacLeod (incompetech.com), sous licence CC BY 4.0 (creativecommons.org/licenses/by/4.0)" } },
 
             { "touch.action", new[] { "Action", "Action" } },
             { "touch.careful", new[] { "Careful", "Prudence" } },
@@ -305,10 +307,8 @@ namespace OutOfSight.Core
         public static string HudSuspicion => Get("hud.suspicion");
         public static string TitlePlay => Get("title.play");
         public static string TitleQuit => Get("title.quit");
-        /// <summary>The author line (the asset licences stay in docs/LICENSES.md).</summary>
+        /// <summary>The author line, the only credit left on the title page (credits cleanup, 2026-11-19).</summary>
         public static string TitleCredits => Get("title.credits");
-        /// <summary>Audio overhaul: the music's CC BY 4.0 attribution, under the credits of the title page.</summary>
-        public static string TitleMusicCredits => Get("title.musicCredits");
         public static string PauseTitle => Get("pause.title");
         public static string PauseResume => Get("pause.resume");
         public static string PauseRestart => Get("pause.restart");
@@ -421,6 +421,9 @@ namespace OutOfSight.Core
 
         /// <summary>The Language / Langue row of the Options page ("{0}" is the language's own name).</summary>
         public static string OptionsLanguage => Get("options.language");
+
+        /// <summary>Credits cleanup: the music's CC BY 4.0 attribution, a small line at the bottom of the Options page.</summary>
+        public static string OptionsMusicCredits => Get("options.musicCredits");
 
         /// <summary>The shown name of a difficulty id (DifficultyDef.Facile, Normal, Difficile); anything else is Normal.</summary>
         public static string DifficultyName(string id)

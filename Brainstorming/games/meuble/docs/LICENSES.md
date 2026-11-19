@@ -69,6 +69,11 @@ channel), the same rotations and the same 512 x 512 wrap-around resize as the de
 the colours are kept as they are (sRGB, no high pass, no remap). Every surface shows its colour map; the details still
 ship but are only shown on the inhabitants (CharacterLook keeps the palette rule).
 
+M7 rug image (product owner decision of 2026-11-18): `rug_modern_inset_border.png` is used as is (not derived, not
+seamless): every rug and the doormat show it exactly once, stretched over their own full size (UV 0 to 1,
+`PrimitiveKit.RugDetail`), never tiled; their model or procedural skirt below it keeps the tiled Carpet detail above,
+unchanged.
+
 | Asset | Files | Author | Source | Licence |
 |---|---|---|---|---|
 | Wood (furniture wood grain) | `wood.png`; derived: `Colour/colour_wood.png`, `Detail/detail_wood.png`, `Detail/normal_wood.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
@@ -76,7 +81,8 @@ ship but are only shown on the inhabitants (CharacterLook keeps the palette rule
 | Plaster (walls and caps) | `plaster.png` (from `crepi_cream_source.png`, 2026-11-18); derived: `Colour/colour_plaster.png`, `Detail/detail_plaster.png`, `Detail/normal_plaster.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Upholstery (upholstery weave) | `upholstery.png`; derived: `Colour/colour_upholstery.png`, `Detail/detail_upholstery.png`, `Detail/normal_upholstery.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Linen (linen: clothes, table cloths, lamp shade) | `linen.png`; derived: `Colour/colour_linen.png`, `Detail/detail_linen.png`, `Detail/normal_linen.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
-| Carpet (rugs, doormat, soft floors) | `carpet.png`; derived: `Colour/colour_carpet.png`, `Detail/detail_carpet.png`, `Detail/normal_carpet.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Carpet (rugs, doormat, soft floors: their tiled skirt or border, unchanged) | `carpet.png`; derived: `Colour/colour_carpet.png`, `Detail/detail_carpet.png`, `Detail/normal_carpet.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Rug picture (M7 rug image, 2026-11-18: the rug's and the doormat's own picture, stretched once per rug, never tiled, `PrimitiveKit.RugDetail`) | `rug_modern_inset_border.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Grass (the garden ground) | `grass.png`; derived: `Colour/colour_grass.png`, `Detail/detail_grass.png`, `Detail/normal_grass.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Lacquer (door leaves; until 2026-11-18 also the player furniture) | `lacquer.png`; derived: `Colour/colour_lacquer.png`, `Detail/detail_lacquer.png`, `Detail/normal_lacquer.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Metal (office chair frame, lamp pole and base, robot body) | `metal.png`; derived: `Colour/colour_metal.png`, `Detail/detail_metal.png`, `Detail/normal_metal.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
@@ -85,6 +91,16 @@ ship but are only shown on the inhabitants (CharacterLook keeps the palette rule
 | Soil (the fallen load's spilled soil) | `soil.png`; derived: `Colour/colour_soil.png`, `Detail/detail_soil.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Tile (kitchen and bathroom floor tile) | `tile.png`; derived: `Colour/colour_tile.png`, `Detail/detail_tile.png`, `Detail/normal_tile.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Red painted metal (the player furniture, PRD 7.2) | `red_metal_source.png`; derived: `Colour/colour_player.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Sage painted plaster (wall finish "sage") | `wall_sage.png`; derived: `Colour/colour_wall_sage.png`, `Detail/detail_wall_sage.png`, `Detail/normal_wall_sage.png` | Out of Sight team | Own creation, procedural (`tools/assets/make_wall_finishes.py`) | CC0 1.0 (own creation, dedicated to the public domain) |
+| Clay limewash (wall finish "limewash") | `wall_limewash.png`; derived: `Colour/colour_wall_limewash.png`, `Detail/detail_wall_limewash.png`, `Detail/normal_wall_limewash.png` | Out of Sight team | Own creation, procedural (`tools/assets/make_wall_finishes.py`) | CC0 1.0 (own creation, dedicated to the public domain) |
+| Dusty blue grasscloth (wall finish "grasscloth") | `wall_grasscloth.png`; derived: `Colour/colour_wall_grasscloth.png`, `Detail/detail_wall_grasscloth.png`, `Detail/normal_wall_grasscloth.png` | Out of Sight team | Own creation, procedural (`tools/assets/make_wall_finishes.py`) | CC0 1.0 (own creation, dedicated to the public domain) |
+| Printed sprig wallpaper (wall finish "wallpaper") | `wall_wallpaper.png`; derived: `Colour/colour_wall_wallpaper.png`, `Detail/detail_wall_wallpaper.png`, `Detail/normal_wall_wallpaper.png` | Out of Sight team | Own creation, procedural (`tools/assets/make_wall_finishes.py`) | CC0 1.0 (own creation, dedicated to the public domain) |
+
+Wall finishes (product owner request of 2026-11-19): the four `wall_*.png` sources above are our own procedural creation
+(periodic filtered noise and a wrapped drawing, no source image, no third party asset), made and derived in one pass by
+`tools/assets/make_wall_finishes.py`: the 1024 x 1024 sources (not shipped), their 512 x 512 colour maps (a 2 x 2 box
+average, seamless), grayscale details (mean 240/255) and normal maps (a periodic Sobel of each finish's own height).
+A room's `"wallFinish"` picks one; every other wall keeps the crepi.
 
 ## Audio (`Assets/ThirdParty/Audio`)
 
@@ -158,8 +174,9 @@ image wrapped once around each human head), copied unchanged to `Resources/Chara
 `Resources/CharacterWomanHeadWrap.png` for the game. The clothes files are derived from their sources (the shirt and
 trousers files: the garment cropped, in its real colours; `Resources/CharacterClothesAtlas.png` packs them). The earlier
 face and head-back files (`man_face*.png`, `woman_face*.png`, `man_head_back*.png`, `woman_head_back*.png`) and the
-fabric sources `cotton_source.png` and `twill_source.png` in the same folder are not used by the game.
+fabric sources `cotton_source.png` and `twill_source.png` were not used by the game; moved out of `Assets` on
+2026-11-19 (`docs/cleanup/unused_textures.md`) to `C:\Dev\outofsight_removed_assets`.
 
 | Asset | Files | Author | Source | Licence |
 |---|---|---|---|---|
-| Characters | `man_head_around.png`, `woman_head_around.png`, `man_face_source.png`, `woman_face_source.png`, `man_head_back_source.png`, `woman_head_back_source.png`, `shirt_front_source.png`, `shirt_back_source.png`, `trousers_front_source.png`, `trousers_back_source.png`; derived: `man_face.png`, `woman_face.png`, `man_head_back.png`, `woman_head_back.png`, `shirt_front.png`, `shirt_back.png`, `trousers_front.png`, `trousers_back.png`, `Resources/CharacterManHeadWrap.png`, `Resources/CharacterWomanHeadWrap.png`, `Resources/CharacterClothesAtlas.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Characters | `man_head_around.png`, `woman_head_around.png`, `shirt_front_source.png`, `shirt_back_source.png`, `trousers_front_source.png`, `trousers_back_source.png`; derived: `shirt_front.png`, `shirt_back.png`, `trousers_front.png`, `trousers_back.png`, `Resources/CharacterManHeadWrap.png`, `Resources/CharacterWomanHeadWrap.png`, `Resources/CharacterClothesAtlas.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |

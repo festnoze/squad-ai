@@ -104,6 +104,37 @@ MonoBehaviour:
     normal: {fileID: 2800000, guid: 617b0a213775b3e4f848f204a6aefff9, type: 3}
     colour: {fileID: 2800000, guid: 939519a2250260b448e0bd9b436232fb, type: 3}
     colourMean: {r: 0.8783, g: 0.5989, b: 0.373, a: 1}
+  - surface: 14
+    texture: {fileID: 2800000, guid: 91d8e25b71c655f479811abd4085f113, type: 3}
+    mean: 0.9411775
+    source: wall_sage
+    normal: {fileID: 2800000, guid: 3dd8f522bf4424e499884dd07290584f, type: 3}
+    colour: {fileID: 2800000, guid: 8f2745c55fae5f749a5d0f15f5830f79, type: 3}
+    colourMean: {r: 0.5878, g: 0.6928, b: 0.4924, a: 1}
+  - surface: 15
+    texture: {fileID: 2800000, guid: bb88db1f5e560bb4792925e15a2c91d9, type: 3}
+    mean: 0.94117993
+    source: wall_limewash
+    normal: {fileID: 2800000, guid: eafb2cd481e040047ba51e3595716fd4, type: 3}
+    colour: {fileID: 2800000, guid: bfaa9240a2b8eda498e414fd63b570d6, type: 3}
+    colourMean: {r: 0.8203, g: 0.6488, b: 0.478, a: 1}
+  - surface: 16
+    texture: {fileID: 2800000, guid: 38c640223c4ae0d4b8f3f49c93c5ee44, type: 3}
+    mean: 0.9411774
+    source: wall_grasscloth
+    normal: {fileID: 2800000, guid: 921211ee411c13846ac01d978dcd87bf, type: 3}
+    colour: {fileID: 2800000, guid: f4efa8c47c778394baeab1884f093518, type: 3}
+    colourMean: {r: 0.5681, g: 0.6748, b: 0.7592, a: 1}
+  - surface: 17
+    texture: {fileID: 2800000, guid: e17d0bc53fe053f49b60916b55f0b7a3, type: 3}
+    mean: 0.94117606
+    source: wall_wallpaper
+    normal: {fileID: 2800000, guid: 03d9cca897b405c438aac8bbb1a2551c, type: 3}
+    colour: {fileID: 2800000, guid: 31e954a5cdfe93e4699d96473d551f92, type: 3}
+    colourMean: {r: 0.8143, g: 0.7847, b: 0.6596, a: 1}
   playerColour: {fileID: 2800000, guid: 1ae5feb84193b50449600b6a2f11da09, type: 3}
   playerMean: {r: 0.8211, g: 0.0014, b: 0.0004, a: 1}
   playerSource: red_metal_source
+  rugColour: {fileID: 2800000, guid: 99e496eb267ef2c4fb0df2664b328f7e, type: 3}
+  rugMean: {r: 0.4957, g: 0.2497, b: 0.1744, a: 1}
+  rugSource: rug_modern_inset_border

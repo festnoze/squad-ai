@@ -188,7 +188,9 @@ namespace OutOfSight
     ///
     /// M4.2 textures: hard floors and thresholds show parquet, soft ones and rugs carpet, wall faces and caps plaster,
     /// door frames, leaves, baseboards and window frames (painted) wood; the procedural inhabitant's clothes linen.
-    /// The window pane stays plain (Surface.Plain). Quads and boxes use the sized meshes (UVs in metres).
+    /// The window pane stays plain (Surface.Plain). Quads and boxes use the sized meshes (UVs in metres). Wall finishes
+    /// (2026-11-19): a room's "wallFinish" (sage, limewash, grasscloth, wallpaper) replaces the plaster on the room-facing
+    /// faces of its walls (and their fills); caps and outside faces stay plaster.
     ///
     /// M6 (CONTRACT_M6 2.4): the garden now shows a grass detail (Surface.Grass) instead of staying plain; the window
     /// pane keeps no texture but gets its own smoothness (<see cref="Tuning.WindowPaneSmoothness"/>).
@@ -214,6 +216,10 @@ namespace OutOfSight
     /// <item>wave 5B (CONTRACT_M5 16.11 and 17, draw calls counted as material slots): a shared wall's faces and baseboards
     /// fade with its centre plane, as its door frames and its cap, so both sides of a line combine per material; the window
     /// panes combine across the house; a bookshelf combines its parts per material (FurnitureKit).</item>
+    /// <item>M7 walls pass (see-through walls, see <see cref="WallFader"/>): every wall line is one fade unit (a shared line by
+    /// its centre plane, an outer line whenever the camera is outside it), its cap, its door frames and its windows with it;
+    /// an outer line also gets its outside faces, with its cap; the room floors continue under every wall footprint,
+    /// combined with them; the fills and the closures keep a line solid where a crossing line is faded.</item>
     /// <item>wave 5B (CONTRACT_M5 4 to 6, 16.5, 16.8 and 16.12): one <see cref="Robot"/> per <see cref="RobotDef"/>, built
     /// after the NavMesh (no collider, Default layer: never a NavMesh source, an occluder or an obstacle) and listed in
     /// <see cref="LevelInstance.Robots"/>; the player's load view (the rule is GameState's, CONTRACT_M5 18) in
@@ -737,6 +743,7 @@ namespace OutOfSight
                 public WallFader Fader;
                 public Vector3 Point;
                 public Vector3 Normal;
+                public bool Outer;
                 public readonly List<PrimitiveKit.CombinePart> Parts = new List<PrimitiveKit.CombinePart>();
             }
 
@@ -753,11 +760,13 @@ namespace OutOfSight
 
             /// <summary>
             /// One part: <paramref name="mesh"/> at a local pose under <paramref name="parent"/>. With a <paramref name="fader"/>
-            /// it hides when the plane (<paramref name="point"/>, <paramref name="normal"/>) separates the camera from the player.
+            /// it hides when the plane (<paramref name="point"/>, <paramref name="normal"/>) separates the camera from the player,
+            /// or, <paramref name="outer"/> (M7 walls pass: an outer wall, <paramref name="normal"/> its inward normal), whenever
+            /// the camera is on the outer side of that plane.
             /// </summary>
             public void Add(Transform parent, string name, Mesh mesh, Vector3 localPosition, Quaternion localRotation, Vector3 localScale,
                 Material material, int layer, Surface surface, ShadowCastingMode shadow, string scope, string combinedName,
-                WallFader fader = null, Vector3 point = default, Vector3 normal = default)
+                WallFader fader = null, Vector3 point = default, Vector3 normal = default, bool outer = false)
             {
                 if (!enabled)
                 {
@@ -766,14 +775,14 @@ namespace OutOfSight
                     renderer.shadowCastingMode = shadow;
                     if (fader != null)
                     {
-                        fader.Add(renderer, point, normal);
+                        Register(fader, renderer, point, normal, outer);
                     }
                     return;
                 }
                 // M7 real colours (CONTRACT_M7 5): grouped by the material the part will show (one per surface), so two
                 // palette colours of one surface on one plane draw as one renderer.
                 material = PrimitiveKit.ShownMaterial(material, surface, layer == Layers.Inhabitant);
-                string key = Key(material, layer, surface, shadow, scope, fader != null, point, normal);
+                string key = Key(material, layer, surface, shadow, scope, fader != null, point, normal) + (fader != null && outer ? "|outer" : "");
                 if (!byKey.TryGetValue(key, out Group group))
                 {
                     group = new Group
@@ -786,6 +795,7 @@ namespace OutOfSight
                         Fader = fader,
                         Point = point,
                         Normal = normal,
+                        Outer = outer,
                     };
                     byKey[key] = group;
                     groups.Add(group);
@@ -821,11 +831,23 @@ namespace OutOfSight
                     renderer.shadowCastingMode = g.Shadow;
                     if (g.Fader != null)
                     {
-                        g.Fader.Add(renderer, g.Point, g.Normal);
+                        Register(g.Fader, renderer, g.Point, g.Normal, g.Outer);
                     }
                 }
                 groups.Clear();
                 byKey.Clear();
+            }
+
+            private static void Register(WallFader fader, Renderer renderer, Vector3 point, Vector3 normal, bool outer)
+            {
+                if (outer)
+                {
+                    fader.AddOuter(renderer, point, normal);
+                }
+                else
+                {
+                    fader.Add(renderer, point, normal);
+                }
             }
         }
 
@@ -957,7 +979,9 @@ namespace OutOfSight
                     To = Mathf.Max(a, b),
                     Side = facing,
                     Material = PrimitiveKit.Lit(LevelJson.ParseColor(r.WallColor, Color.white), 0.1f),
-                    Shared = shared && OverlapsOtherFacing(line, s),
+                    Floor = BandFloor(r, out Surface floorSurface),
+                    FloorSurface = floorSurface,
+                    Surface = TextureLibrary.WallSurface(r.WallFinish),
                 });
             }
 
@@ -978,12 +1002,45 @@ namespace OutOfSight
             }
             gaps.Sort((x, y) => x.from.CompareTo(y.from));
 
+            // M7 walls pass (see-through walls, WallFader): the whole line is one fade unit. A shared line fades when its centre
+            // plane separates the camera from the player; an outer line whenever the camera is on its outer side (its single
+            // inward face is then seen from behind anyway), so its cap, its door frames and its closures never stay solid over
+            // it. An outer line's inward faces need no entry: culled from outside, they are never drawn when the line fades;
+            // its outside faces (with its cap) show it see-through from there.
+            bool outerRule = !shared;
+            Vector3 ruleNormal = shared ? normal : -normal;
+            WallFader faceFader = shared ? fader : null;
+            var localRuns = new List<Vector2>();
             foreach (Vector2 run in runs)
             {
                 float ra = (run.x - mid) * sign;
                 float rb = (run.y - mid) * sign;
-                float runFrom = Mathf.Min(ra, rb);
-                float runTo = Mathf.Max(ra, rb);
+                localRuns.Add(new Vector2(Mathf.Min(ra, rb), Mathf.Max(ra, rb)));
+            }
+            localRuns.Sort((x, y) => x.x.CompareTo(y.x));
+            List<Vector2> spans = Spans(localRuns, t);
+            List<Face> fills = Fills(faces, spans, t, shared);
+            var surfaces = new List<Face>(faces);
+            surfaces.AddRange(fills);
+            void AddCap(Mesh mesh, Vector3 position, Quaternion rotation, Vector3 scale)
+            {
+                if (CombineRenderers)
+                {
+                    caps.Add(new PrimitiveKit.CombinePart { Mesh = mesh, Matrix = Matrix4x4.TRS(position, rotation, scale) });
+                }
+                else
+                {
+                    Cap(wt, mesh, position, rotation, scale, cap, occluder, fader, ruleNormal, outerRule);
+                }
+            }
+            // M7 walls pass (see-through): an outer line also gets its outside faces, with its cap (same material, same
+            // rule, no shadow): culled while it stands (the camera inside), they show its body once it fades from outside.
+            System.Action<Mesh, Vector3, Quaternion, Vector3> outside = shared ? null : new System.Action<Mesh, Vector3, Quaternion, Vector3>(AddCap);
+
+            foreach (Vector2 run in localRuns)
+            {
+                float runFrom = run.x;
+                float runTo = run.y;
                 float cursor = runFrom;
                 foreach ((float from, float to, OpeningDef door, bool interior) in gaps)
                 {
@@ -991,61 +1048,268 @@ namespace OutOfSight
                     {
                         continue;
                     }
-                    WallSegment(wt, cursor, from, 0f, h, t, faces, occluder, fader, wallRoot.transform, normal, boards, batch, name);
-                    WallSegment(wt, from, to, door.Top, h, t, faces, occluder, fader, wallRoot.transform, normal, boards, batch, name);
+                    WallSegment(wt, cursor, from, 0f, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside);
+                    WallSegment(wt, from, to, door.Top, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside);
                     // The face toward the outside of an outer door decides where its decorative leaf opens; a door with a
                     // real leaf (M5) has none.
                     float leafSide = interior || door.HasLeaf ? 0f : -FaceSideAt(faces, (from + to) * 0.5f);
-                    DoorDecor(wt, from, to, door, t, leafSide, interior && shared ? fader : null, normal, batch, name);
+                    DoorDecor(wt, from, to, door, t, leafSide, fader, ruleNormal, outerRule, batch, name);
                     if (interior)
                     {
                         Threshold(wt, from, to, t, rooms[line.Sides[0].Room], batch);
                     }
                     cursor = to;
                 }
-                WallSegment(wt, cursor, runTo, 0f, h, t, faces, occluder, fader, wallRoot.transform, normal, boards, batch, name);
+                WallSegment(wt, cursor, runTo, 0f, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside);
 
                 // Top cap: a thin strip that gives the dollhouse walls a readable thickness from above.
-                Mesh capMesh = PrimitiveKit.QuadMeshSized(new Vector2(runTo - runFrom, t));
-                var capPosition = new Vector3((runFrom + runTo) * 0.5f, h, 0f);
-                var capScale = new Vector3(runTo - runFrom, t, 1f);
-                if (CombineRenderers)
-                {
-                    caps.Add(new PrimitiveKit.CombinePart { Mesh = capMesh, Matrix = Matrix4x4.TRS(capPosition, Quaternion.Euler(90f, 0f, 0f), capScale) });
-                }
-                else
-                {
-                    Cap(wt, capMesh, capPosition, Quaternion.Euler(90f, 0f, 0f), capScale, cap, occluder, fader, normal);
-                }
+                AddCap(PrimitiveKit.QuadMeshSized(new Vector2(runTo - runFrom, t)), new Vector3((runFrom + runTo) * 0.5f, h, 0f),
+                    Quaternion.Euler(90f, 0f, 0f), new Vector3(runTo - runFrom, t, 1f));
             }
+            var doorways = new List<Vector2>();
+            foreach ((float from, float to, OpeningDef _, bool _) in gaps)
+            {
+                doorways.Add(new Vector2(from, to));
+            }
+            Closures(wt, localRuns, spans, doorways, fills, h, t, occluder, faceFader, normal, batch, AddCap);
             // M5 (CONTRACT_M5_v3 15.8): the caps of one wall line share its plane and its material: one renderer, still
-            // under the wall root and named "Cap", still fading with the wall plane (step 22b reads both).
+            // under the wall root and named "Cap", still fading with the wall plane (step 22b reads both). M7 walls pass: the
+            // line's closures (Closures) are part of it.
             if (caps.Count > 0)
             {
-                Cap(wt, PrimitiveKit.CombinedMesh(caps), Vector3.zero, Quaternion.identity, Vector3.one, cap, occluder, fader, normal);
+                Cap(wt, PrimitiveKit.CombinedMesh(caps), Vector3.zero, Quaternion.identity, Vector3.one, cap, occluder, fader, ruleNormal, outerRule);
             }
-            Baseboards(wt, boards, t, fader, batch);
+            Baseboards(wt, boards, faceFader, batch);
 
             for (int w = 0; w < line.Windows.Count; w++)
             {
                 (float alongWorld, OpeningDef window, RoomSide _) = line.Windows[w];
                 float local = (alongWorld - mid) * sign;
-                WindowDecor(wt, local, window, t, FaceSideAt(faces, local), batch, TrimScope);
+                // M7 walls pass: a window of a shared line (on its outer stretch) fades with the line. On an outer line its
+                // single sided strips face the room, culled from outside exactly when the line fades.
+                WindowDecor(wt, local, window, t, FaceSideAt(faces, local), batch, TrimScope, faceFader, normal);
             }
         }
 
         /// <summary>
-        /// A wall cap: M3.1 B1: EVERY cap fades with the wall plane, outer walls too. The camera sees through the back of an
-        /// outer wall's inward face, but its cap faces up: drawn, it would lie across the frame between the camera and the
-        /// chair (and mark the x-ray stencil). Renderer only: the collider stays.
+        /// A wall cap: M3.1 B1: EVERY cap fades with its wall, outer walls too. The camera sees through the back of an outer
+        /// wall's inward face, but its cap faces up: drawn, it would lie across the frame between the camera and the chair
+        /// (and mark the x-ray stencil). M7 walls pass: an outer wall's cap follows the outer rule (<paramref name="outer"/>,
+        /// <paramref name="normal"/> inward). Renderer only: the collider stays.
         /// </summary>
         private static void Cap(Transform wall, Mesh mesh, Vector3 localPosition, Quaternion rotation, Vector3 localScale, Material material,
-            int layer, WallFader fader, Vector3 normal)
+            int layer, WallFader fader, Vector3 normal, bool outer)
         {
             GameObject top = PrimitiveKit.Part(wall, "Cap", mesh, localPosition, rotation, localScale, material, layer, Surface.Plaster);
             MeshRenderer capRenderer = top.GetComponent<MeshRenderer>();
             capRenderer.shadowCastingMode = ShadowCastingMode.Off;
-            fader.Add(capRenderer, wall.position, normal);
+            if (outer)
+            {
+                fader.AddOuter(capRenderer, wall.position, normal);
+            }
+            else
+            {
+                fader.Add(capRenderer, wall.position, normal);
+            }
+        }
+
+        /// <summary>
+        /// M7 walls pass: the runs of a line (local, sorted) joined across every gap of at most one wall thickness, which is
+        /// the band of a crossing wall: the stretch the line must still close once that crossing wall is faded.
+        /// </summary>
+        private static List<Vector2> Spans(List<Vector2> runs, float t)
+        {
+            var spans = new List<Vector2>();
+            foreach (Vector2 r in runs)
+            {
+                if (spans.Count > 0 && r.x - spans[spans.Count - 1].y <= t + 1e-3f)
+                {
+                    Vector2 last = spans[spans.Count - 1];
+                    spans[spans.Count - 1] = new Vector2(last.x, Mathf.Max(last.y, r.y));
+                }
+                else
+                {
+                    spans.Add(r);
+                }
+            }
+            return spans;
+        }
+
+        /// <summary>
+        /// M7 walls pass: the fills of a line, on each side that has a face: every stretch of a span that no face of that side
+        /// covers, when it is at most one wall thickness (a crossing wall's band, a corner) or, on a shared line, whatever its
+        /// length (the outer stretch of a line shared over part of its length gets its missing face, so the whole line is
+        /// two faced and fades as one). Hidden inside the crossing wall while it stands, a fill keeps the line closed once that
+        /// wall is faded, where the garden or the inside of the wall used to show.
+        /// </summary>
+        private static List<Face> Fills(List<Face> faces, List<Vector2> spans, float t, bool shared)
+        {
+            var fills = new List<Face>();
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var covered = new List<Vector2>();
+                bool any = false;
+                Face first = default;
+                foreach (Face f in faces)
+                {
+                    if (f.Side == side)
+                    {
+                        covered.Add(new Vector2(f.From, f.To));
+                        if (!any)
+                        {
+                            first = f;
+                            any = true;
+                        }
+                    }
+                }
+                if (!any)
+                {
+                    continue;
+                }
+                covered = Merge(covered);
+                foreach (Vector2 span in spans)
+                {
+                    float cursor = span.x;
+                    foreach (Vector2 c in covered)
+                    {
+                        if (c.y <= cursor || c.x >= span.y)
+                        {
+                            continue;
+                        }
+                        AddFill(fills, cursor, c.x, first, t, shared, faces);
+                        cursor = Mathf.Max(cursor, c.y);
+                    }
+                    AddFill(fills, cursor, span.y, first, t, shared, faces);
+                }
+            }
+            return fills;
+        }
+
+        /// <summary>
+        /// A fill over [from, to] on the side of <paramref name="like"/>, in its wall and floor materials, showing
+        /// <see cref="FillSurface"/>.
+        /// </summary>
+        private static void AddFill(List<Face> fills, float from, float to, Face like, float t, bool shared, List<Face> faces)
+        {
+            if (to - from > 1e-3f && (shared || to - from <= t + 1e-3f))
+            {
+                like.From = from;
+                like.To = to;
+                like.Fill = true;
+                like.Surface = FillSurface(faces, like.Side, from, to, t);
+                fills.Add(like);
+            }
+        }
+
+        /// <summary>
+        /// Wall finishes (2026-11-19): the UV offset (metres) of a face piece over [from, to] of the wall's local x, from
+        /// <paramref name="bottom"/> up, on side <paramref name="side"/>: U grows to the right of a viewer facing the piece
+        /// (local +x on the -1 side, -x on the turned +1 side) and every piece of one side continues one U and one V.
+        /// </summary>
+        private static Vector2 WallUvOffset(float side, float from, float to, float bottom)
+        {
+            return new Vector2(side < 0f ? from : -to, bottom);
+        }
+
+        /// <summary>
+        /// Wall finishes (2026-11-19): what a fill shows. A band fill (at most one wall thickness, inside a crossing wall or a
+        /// corner) continues the finish of the face beside it on its side; a longer one is the outer stretch of a shared line,
+        /// the outside of the house, so it keeps the crepi like every outside face.
+        /// </summary>
+        private static Surface FillSurface(List<Face> faces, float side, float from, float to, float t)
+        {
+            if (to - from > t + 1e-3f)
+            {
+                return Surface.Plaster;
+            }
+            foreach (Face f in faces)
+            {
+                if (f.Side == side && Mathf.Abs(f.To - from) < 1e-3f)
+                {
+                    return f.Surface;
+                }
+            }
+            foreach (Face f in faces)
+            {
+                if (f.Side == side && Mathf.Abs(f.From - to) < 1e-3f)
+                {
+                    return f.Surface;
+                }
+            }
+            return Surface.Plaster;
+        }
+
+        /// <summary>
+        /// M7 walls pass: the floor material (and its surface) that continues under a wall of <paramref name="room"/>, as its
+        /// doorway threshold shows it: the parquet, the tile, or a soft room's darker border.
+        /// </summary>
+        private static Material BandFloor(RoomDef room, out Surface surface)
+        {
+            surface = room.IsTile ? Surface.Tile : room.IsSoft ? Surface.Carpet : Surface.Parquet;
+            Color color = LevelJson.ParseColor(room.FloorColor, Color.gray) * (room.IsSoft ? 0.82f : 1f);
+            return room.IsTile ? PrimitiveKit.LitSurface(color, Surface.Tile) : PrimitiveKit.Lit(color, room.IsSoft ? 0f : 0.35f);
+        }
+
+        /// <summary>
+        /// M7 walls pass: what keeps a line solid where a crossing line is faded, none of it a collider: its fills over the band
+        /// of a crossing wall between two of its runs (full height, with its faces), a cap over that band just under the
+        /// crossing wall's own (no z-fighting while both stand), and a closing quad at each end of a span, a hair inside the
+        /// wall (Tuning.WallClosureInset), facing out along the line, unless a doorway opens there. The caps and the ends go
+        /// with the line's cap.
+        /// </summary>
+        private static void Closures(Transform wall, List<Vector2> runs, List<Vector2> spans, List<Vector2> doorways, List<Face> fills, float h,
+            float t, int layer, WallFader faceFader, Vector3 normal, Batch batch, System.Action<Mesh, Vector3, Quaternion, Vector3> cap)
+        {
+            bool Open(float at)
+            {
+                foreach (Vector2 d in doorways)
+                {
+                    if (at > d.x - 0.01f && at < d.y + 0.01f)
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            float inset = Tuning.WallClosureInset;
+            for (int i = 0; i + 1 < runs.Count; i++)
+            {
+                float a = runs[i].y;
+                float b = runs[i + 1].x;
+                if (b - a <= 1e-3f || b - a > t + 1e-3f)
+                {
+                    continue;
+                }
+                cap(PrimitiveKit.QuadMeshSized(new Vector2(b - a, t)), new Vector3((a + b) * 0.5f, h - inset, 0f), Quaternion.Euler(90f, 0f, 0f),
+                    new Vector3(b - a, t, 1f));
+                foreach (Face f in fills)
+                {
+                    float from = Mathf.Max(a, f.From);
+                    float to = Mathf.Min(b, f.To);
+                    if (to - from <= 1e-3f)
+                    {
+                        continue;
+                    }
+                    Quaternion rotation = f.Side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
+                    // Wall finishes: U along the wall and V up, the pattern continued along the line (WallUvOffset).
+                    batch.Add(wall, "Fill", PrimitiveKit.WallQuadMesh(new Vector2(to - from, h), WallUvOffset(f.Side, from, to, 0f)),
+                        new Vector3((from + to) * 0.5f, h * 0.5f, f.Side * t * 0.5f),
+                        rotation, new Vector3(to - from, h, 1f), f.Material, layer, f.Surface, ShadowCastingMode.TwoSided, FaceScope, "Face",
+                        faceFader, wall.position, normal);
+                }
+            }
+            Mesh end = PrimitiveKit.QuadMeshSized(new Vector2(t, h));
+            foreach (Vector2 span in spans)
+            {
+                if (!Open(span.x + inset))
+                {
+                    cap(end, new Vector3(span.x + inset, h * 0.5f, 0f), Quaternion.Euler(0f, 90f, 0f), new Vector3(t, h, 1f));
+                }
+                if (!Open(span.y - inset))
+                {
+                    cap(end, new Vector3(span.y - inset, h * 0.5f, 0f), Quaternion.Euler(0f, -90f, 0f), new Vector3(t, h, 1f));
+                }
+            }
         }
 
         private struct Face
@@ -1055,20 +1319,16 @@ namespace OutOfSight
             /// <summary>-1: the face is on the local -z side and looks toward -z (the M1 inner face); +1 the other side.</summary>
             public float Side;
             public Material Material;
-            /// <summary>On a shared stretch: hidden by the <see cref="WallFader"/> when it stands between camera and player.</summary>
-            public bool Shared;
-        }
-
-        private static bool OverlapsOtherFacing(WallLine line, RoomSide side)
-        {
-            foreach (RoomSide o in line.Sides)
-            {
-                if (o.Outward != side.Outward && Mathf.Min(o.To, side.To) - Mathf.Max(o.From, side.From) > 1e-3f)
-                {
-                    return true;
-                }
-            }
-            return false;
+            /// <summary>M7 walls pass: a fill (<see cref="Fills"/>), not a room's face: drawn as a face, no baseboard.</summary>
+            public bool Fill;
+            /// <summary>M7 walls pass: the floor (<see cref="BandFloor"/>) that continues under the wall on this side.</summary>
+            public Material Floor;
+            public Surface FloorSurface;
+            /// <summary>
+            /// Wall finishes (2026-11-19): what the face shows, its room's "wallFinish" (TextureLibrary.WallSurface; Plaster,
+            /// the cream crepi, by default). A fill takes the finish of the face it continues.
+            /// </summary>
+            public Surface Surface;
         }
 
         /// <summary>The side of the face that covers a local abscissa (-1 when none does, the M1 inner side).</summary>
@@ -1119,10 +1379,15 @@ namespace OutOfSight
 
         /// <summary>
         /// One solid piece of wall between two local abscissas and two heights: a box collider on the
-        /// Occluder layer, and a single sided quad on each face that covers it (PRD 3.1 dollhouse walls).
+        /// Occluder layer, and a single sided quad on each face that covers it (PRD 3.1 dollhouse walls). M7 walls pass
+        /// (see-through walls): a piece standing on the floor also gets the floor under its footprint, the floor of the room on
+        /// each side (<paramref name="twoSided"/>) or of its one room, combined with the room floors (no draw call): hidden
+        /// while the wall stands, it keeps the floor whole under a faded wall, where the garden used to show. With
+        /// <paramref name="outside"/> (an outer line) the piece's outside face goes there.
         /// </summary>
         private static void WallSegment(Transform wall, float from, float to, float bottom, float top, float thickness,
-            List<Face> faces, int layer, WallFader fader, Transform frame, Vector3 normal, List<Board> boards, Batch batch, string wallName)
+            List<Face> faces, int layer, WallFader fader, Transform frame, Vector3 normal, List<Board> boards, Batch batch, bool twoSided,
+            System.Action<Mesh, Vector3, Quaternion, Vector3> outside)
         {
             if (to - from < 1e-3f || top - bottom < 1e-3f)
             {
@@ -1144,23 +1409,41 @@ namespace OutOfSight
                 }
                 Quaternion rotation = f.Side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
                 var faceCenter = new Vector3((vFrom + vTo) * 0.5f, (bottom + top) * 0.5f, f.Side * thickness * 0.5f);
-                // A single sided quad casts shadows from both sides only when asked to. A shared face fades with its wall line's
+                // A single sided quad casts shadows from both sides only when asked to. A shared line's faces fade with its
                 // centre plane (wave 5B, CONTRACT_M5 17): the faces of one material on both sides of a line combine
                 // (CONTRACT_M5_v3 15.8). The face plane and the centre plane separate the camera from the furniture alike: the
                 // furniture never stands in the wall, and a camera within the wall sees a face's back, which is culled.
-                batch.Add(wall, "Face", PrimitiveKit.QuadMeshSized(new Vector2(vTo - vFrom, top - bottom)), faceCenter, rotation,
-                    new Vector3(vTo - vFrom, top - bottom, 1f), f.Material, layer, Surface.Plaster, ShadowCastingMode.TwoSided,
-                    FaceScope, "Face", f.Shared ? fader : null, frame.position, normal); // MUTATION:FACE_PLANE
-                if (bottom < 1e-3f)
+                // Wall finishes (2026-11-19): U along the wall and V up whatever the piece's proportions, continued across the
+                // pieces of the line (beside and over a door), so a wallpaper's stripes stay upright and unbroken.
+                batch.Add(wall, f.Fill ? "Fill" : "Face", PrimitiveKit.WallQuadMesh(new Vector2(vTo - vFrom, top - bottom),
+                    WallUvOffset(f.Side, vFrom, vTo, bottom)), faceCenter, rotation,
+                    new Vector3(vTo - vFrom, top - bottom, 1f), f.Material, layer, f.Surface, ShadowCastingMode.TwoSided,
+                    FaceScope, "Face", fader, frame.position, normal); // MUTATION:FACE_PLANE
+                if (bottom < 1e-3f && !f.Fill)
                 {
                     boards.Add(new Board
                     {
                         Box = new Bounds(new Vector3((vFrom + vTo) * 0.5f, BaseboardHeight * 0.5f, f.Side * (thickness * 0.5f + BaseboardDepth * 0.5f)),
                             new Vector3(vTo - vFrom, BaseboardHeight, BaseboardDepth)),
                         Side = f.Side,
-                        Shared = f.Shared,
                     });
                 }
+                if (bottom < 1e-3f && f.Floor != null)
+                {
+                    // The floor under the wall: on a shared line each side's floor reaches the centre line; under an outer line
+                    // the room's floor spans the whole footprint.
+                    float width = twoSided ? thickness * 0.5f : thickness;
+                    float z = twoSided ? f.Side * thickness * 0.25f : 0f;
+                    batch.Add(wall, "WallFloor", PrimitiveKit.QuadMeshSized(new Vector2(vTo - vFrom, width)), new Vector3((vFrom + vTo) * 0.5f, 0.001f, z),
+                        Quaternion.Euler(90f, 0f, 0f), new Vector3(vTo - vFrom, width, 1f), f.Floor, Layers.Floor, f.FloorSurface, ShadowCastingMode.Off,
+                        FloorScope, FloorName);
+                }
+            }
+            if (outside != null)
+            {
+                // An outer line's outside face, local +z: with its cap (see BuildWallLine).
+                outside(PrimitiveKit.QuadMeshSized(new Vector2(to - from, top - bottom)), new Vector3((from + to) * 0.5f, (bottom + top) * 0.5f, thickness * 0.5f),
+                    Quaternion.Euler(0f, 180f, 0f), new Vector3(to - from, top - bottom, 1f));
             }
         }
 
@@ -1169,45 +1452,40 @@ namespace OutOfSight
         {
             public Bounds Box;
             public float Side;
-            public bool Shared;
         }
 
         /// <summary>
         /// M3 baseboards, standing on the floor against the faces, in the trim material. Decor only: no collider,
         /// layer Default, no shadow. M3.1 N5: one renderer per wall and face side (every stretch of the side in one
-        /// mesh, cached by geometry); the side of a shared wall fades with its face plane. Wave 5B (CONTRACT_M5 17): combined,
-        /// a shared wall's baseboards fade with its centre plane, as its faces, so both sides of a line are one renderer.
+        /// mesh, cached by geometry). Wave 5B (CONTRACT_M5 17): combined, a shared wall's baseboards (<paramref name="fader"/>
+        /// set) fade with its centre plane, as its faces, so both sides of a line are one renderer; an outer wall's never fade
+        /// and combine with the other trim decor (M5, CONTRACT_M5_v3 15.8).
         /// </summary>
-        private static void Baseboards(Transform wall, List<Board> boards, float thickness, WallFader fader, Batch batch)
+        private static void Baseboards(Transform wall, List<Board> boards, WallFader fader, Batch batch)
         {
             foreach (float side in new[] { -1f, 1f })
             {
-                foreach (bool shared in new[] { false, true })
+                var boxes = new List<Bounds>();
+                foreach (Board b in boards)
                 {
-                    var boxes = new List<Bounds>();
-                    foreach (Board b in boards)
+                    if (b.Side == side)
                     {
-                        if (b.Side == side && b.Shared == shared)
-                        {
-                            boxes.Add(b.Box);
-                        }
+                        boxes.Add(b.Box);
                     }
-                    if (boxes.Count == 0)
-                    {
-                        continue;
-                    }
-                    if (!shared)
-                    {
-                        // M5 (CONTRACT_M5_v3 15.8): a baseboard that never fades combines with the other trim decor; a shared
-                        // wall's baseboards combine per wall line, fading with its centre plane (wave 5B).
-                        batch.Add(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity, Vector3.one,
-                            PrimitiveKit.Lit(Trim, 0.3f), 0, Surface.Wood, ShadowCastingMode.Off, TrimScope, "Trim");
-                        continue;
-                    }
-                    batch.Add(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity, Vector3.one,
-                        PrimitiveKit.Lit(Trim, 0.3f), 0, Surface.Wood, ShadowCastingMode.Off, BaseboardScope, "Baseboards", fader, wall.position,
-                        wall.forward);
                 }
+                if (boxes.Count == 0)
+                {
+                    continue;
+                }
+                if (fader == null)
+                {
+                    batch.Add(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity, Vector3.one,
+                        PrimitiveKit.Lit(Trim, 0.3f), 0, Surface.Wood, ShadowCastingMode.Off, TrimScope, "Trim");
+                    continue;
+                }
+                batch.Add(wall, "Baseboards", PrimitiveKit.BoxesMesh(boxes), Vector3.zero, Quaternion.identity, Vector3.one,
+                    PrimitiveKit.Lit(Trim, 0.3f), 0, Surface.Wood, ShadowCastingMode.Off, BaseboardScope, "Baseboards", fader, wall.position,
+                    wall.forward);
             }
         }
 
@@ -1216,17 +1494,17 @@ namespace OutOfSight
         /// outside (<paramref name="leafSide"/> is the local z side of the outside), hinged on the far post.
         /// </summary>
         private static void DoorDecor(Transform wall, float from, float to, OpeningDef door, float t, float leafSide, WallFader fader, Vector3 normal,
-            Batch batch, string wallName)
+            bool outer, Batch batch, string wallName)
         {
             Material trim = PrimitiveKit.Lit(Trim, 0.3f);
             const float post = 0.06f;
-            // The frame of a shared doorway goes with its wall: hidden when the wall center plane stands between the camera
-            // and the player. The frames of one wall line combine (CONTRACT_M5_v3 15.8).
+            // The frame of a doorway goes with its wall (M7 walls pass: an outer doorway's too, with the outer rule, where it
+            // used to float over a wall the camera sees through). The frames of one wall line combine (CONTRACT_M5_v3 15.8).
             string scope = DoorFrameScope;
             void Frame(string name, Vector3 center, Vector3 size)
             {
                 batch.Add(wall, name, PrimitiveKit.BoxMeshSized(size), center, Quaternion.identity, size, trim, 0, Surface.Wood,
-                    ShadowCastingMode.On, scope, "DoorFrame", fader, wall.position, normal);
+                    ShadowCastingMode.On, scope, "DoorFrame", fader, wall.position, normal, outer);
             }
             Frame("DoorPostA", new Vector3(from + post * 0.5f, door.Top * 0.5f, 0f), new Vector3(post, door.Top, t + 0.03f));
             Frame("DoorPostB", new Vector3(to - post * 0.5f, door.Top * 0.5f, 0f), new Vector3(post, door.Top, t + 0.03f));
@@ -1237,7 +1515,7 @@ namespace OutOfSight
                 var size = new Vector3(0.05f, door.Top - 0.02f, width);
                 batch.Add(wall, "DoorLeaf", PrimitiveKit.BoxMeshSized(size),
                     new Vector3(to - post - 0.025f, (door.Top - 0.02f) * 0.5f, leafSide * (t * 0.5f + width * 0.5f)), Quaternion.identity, size,
-                    PrimitiveKit.Lit(DoorWood, 0.35f), 0, Surface.Wood, ShadowCastingMode.On, scope, "DoorLeaf");
+                    PrimitiveKit.Lit(DoorWood, 0.35f), 0, Surface.Wood, ShadowCastingMode.On, scope, "DoorLeaf", fader, wall.position, normal, outer);
             }
         }
 
@@ -1264,37 +1542,37 @@ namespace OutOfSight
         /// <summary>
         /// A decorative window on the face side <paramref name="side"/> (-1 is the M1 inner side). The frame is
         /// made of single sided strips facing the room, like the wall itself: from outside the dollhouse the
-        /// wall disappears and so does its window, instead of leaving a frame floating.
+        /// wall disappears and so does its window, instead of leaving a frame floating. M7 walls pass: on a shared line
+        /// (<paramref name="fader"/> set) the window fades with the line's centre plane (<paramref name="normal"/>).
         /// </summary>
-        private static void WindowDecor(Transform wall, float center, OpeningDef window, float t, float side, Batch batch, string scope)
+        private static void WindowDecor(Transform wall, float center, OpeningDef window, float t, float side, Batch batch, string scope,
+            WallFader fader, Vector3 normal)
         {
             float w = window.Width;
             float hgt = window.Top - window.Bottom;
             float y = (window.Top + window.Bottom) * 0.5f;
             Quaternion rotation = side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
             float z = side * (t * 0.5f + 0.004f);
-            // Wave 5B (CONTRACT_M5 17): the panes never fade and share one material: combined, every pane of the house is one
+            // Wave 5B (CONTRACT_M5 17): the panes of the outer walls never fade and share one material: combined, they are one
             // renderer. M6 (CONTRACT_M6 2.4): no texture (Surface.Plain), but its own smoothness (0.95).
             batch.Add(wall, "WindowPane", PrimitiveKit.QuadMeshSized(new Vector2(w, hgt)), new Vector3(center, y, z), rotation,
                 new Vector3(w, hgt, 1f), PrimitiveKit.Emissive(WindowPane, WindowPaneEmission, Tuning.WindowPaneSmoothness, 0f), 0, Surface.Plain,
-                ShadowCastingMode.Off, PaneScope, "WindowPane");
+                ShadowCastingMode.Off, PaneScope, "WindowPane", fader, wall.position, normal);
             Material trim = PrimitiveKit.Lit(Trim, 0.3f);
             const float f = 0.08f;
             float fz = side * (t * 0.5f + 0.008f);
-            Strip(batch, scope, wall, "FrameTop", new Vector3(center, window.Top, fz), new Vector2(w + f, f), trim, rotation);
-            Strip(batch, scope, wall, "FrameSill", new Vector3(center, window.Bottom, fz), new Vector2(w + 2.5f * f, f * 1.3f), trim, rotation);
-            Strip(batch, scope, wall, "FrameL", new Vector3(center - w * 0.5f, y, fz), new Vector2(f, hgt), trim, rotation);
-            Strip(batch, scope, wall, "FrameR", new Vector3(center + w * 0.5f, y, fz), new Vector2(f, hgt), trim, rotation);
-            Strip(batch, scope, wall, "Mullion", new Vector3(center, y, fz), new Vector2(0.045f, hgt), trim, rotation);
-            Strip(batch, scope, wall, "Transom", new Vector3(center, y + hgt * 0.15f, fz), new Vector2(w, 0.045f), trim, rotation);
-        }
-
-        /// <summary>A window frame strip; the strips of one window combine (CONTRACT_M5_v3 15.8).</summary>
-        private static void Strip(Batch batch, string scope, Transform wall, string name, Vector3 localCenter, Vector2 size, Material material,
-            Quaternion rotation)
-        {
-            batch.Add(wall, name, PrimitiveKit.QuadMeshSized(size), localCenter, rotation, new Vector3(size.x, size.y, 1f), material, 0, Surface.Wood,
-                ShadowCastingMode.Off, scope, "Trim");
+            void Strip(string name, Vector3 localCenter, Vector2 size)
+            {
+                // The strips of one window combine (CONTRACT_M5_v3 15.8).
+                batch.Add(wall, name, PrimitiveKit.QuadMeshSized(size), localCenter, rotation, new Vector3(size.x, size.y, 1f), trim, 0, Surface.Wood,
+                    ShadowCastingMode.Off, scope, "Trim", fader, wall.position, normal);
+            }
+            Strip("FrameTop", new Vector3(center, window.Top, fz), new Vector2(w + f, f));
+            Strip("FrameSill", new Vector3(center, window.Bottom, fz), new Vector2(w + 2.5f * f, f * 1.3f));
+            Strip("FrameL", new Vector3(center - w * 0.5f, y, fz), new Vector2(f, hgt));
+            Strip("FrameR", new Vector3(center + w * 0.5f, y, fz), new Vector2(f, hgt));
+            Strip("Mullion", new Vector3(center, y, fz), new Vector2(0.045f, hgt));
+            Strip("Transom", new Vector3(center, y + hgt * 0.15f, fz), new Vector2(w, 0.045f));
         }
 
         // ----- Exit -----
@@ -1304,8 +1582,8 @@ namespace OutOfSight
             ZoneDef e = def.Exit;
             Color color = LevelJson.ParseColor(e.Color, Color.green);
             // M3: the doormat model, its red carpet in the exit colour. No collider, as the procedural one. M7 rug
-            // image (product owner, 2026-11-18): same treatment as BuildRug/BuildRugImage, the model's own "carpet"
-            // slots stay a plain shaded skirt, the picture sits on its own nested quad.
+            // image (product owner, 2026-11-18): same treatment as BuildRug/BuildRugImage, unchanged underneath it,
+            // the picture sits on its own nested quad on top.
             GameObject group = PrimitiveKit.Group(root, "Doormat", new Vector3(e.X, def.FloorHeightAt(e.X, e.Z), e.Z));
             group.layer = 0;
             GameObject model = Model(level, e.Model, "exit doormat", group.transform, new Vector3(e.SizeX, DoormatHeight, e.SizeZ),
@@ -1316,9 +1594,9 @@ namespace OutOfSight
                 return;
             }
             GameObject mat = PrimitiveKit.Box(group.transform, "Mat", new Vector3(0f, DoormatHeight * 0.5f, 0f),
-                new Vector3(e.SizeX, DoormatHeight, e.SizeZ), PrimitiveKit.Lit(color, 0.05f), 0, false);
+                new Vector3(e.SizeX, DoormatHeight, e.SizeZ), PrimitiveKit.Lit(color, 0.05f), 0, false, Surface.Carpet);
             mat.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            BuildRugImage(group.transform, null, color, new Vector2(e.SizeX, e.SizeZ), DoormatHeight + 0.001f);
+            BuildRugImage(group.transform, null, color, new Vector2(e.SizeX, e.SizeZ), DoormatHeight + 0.002f);
         }
 
         private const float DoormatHeight = 0.012f;
@@ -1411,8 +1689,8 @@ namespace OutOfSight
         // ----- Rugs and decoys -----
 
         /// <summary>
-        /// A flat rug, no collider (it is a silent floor, not an obstacle): the model (or, as a fallback, a plain
-        /// shaded border) for the shape and the edge, plus <see cref="BuildRugImage"/>'s own quad for the picture.
+        /// A flat rug, no collider (it is a silent floor, not an obstacle): the model (or, as a fallback, a border
+        /// and a field), unchanged, plus <see cref="BuildRugImage"/>'s own picture quad on top of it.
         /// </summary>
         private static void BuildRug(LevelInstance level, LevelDef def, RugDef rug, int index, Transform root)
         {
@@ -1420,9 +1698,8 @@ namespace OutOfSight
             go.layer = 0;
             Color color = LevelJson.ParseColor(rug.Color, new Color32(0x5B, 0x93, 0xD9, 0xFF));
             // M3: the rug model, its red carpet in the rug colour. A rug has no collider either way. M7 rug image
-            // (product owner, 2026-11-18): the model's own "carpet" slots stay a plain shaded skirt (ModelKit.SurfaceOf),
-            // the picture itself goes on BuildRugImage's own quad, nested under the model root so no procedural
-            // renderer is left beside it (ProbeTestsM3Models).
+            // (product owner, 2026-11-18): BuildRugImage adds the picture, exactly once, on its own quad above
+            // whatever the model (or the procedural border and field) already draws underneath it, unchanged.
             GameObject model = Model(level, rug.Model, "rug " + (index + 1), go.transform, new Vector3(rug.SizeX, RugHeight, rug.SizeZ),
                 ModelFit.Box, new ModelPaint { Red = color });
             if (model != null)
@@ -1431,9 +1708,17 @@ namespace OutOfSight
                 return;
             }
             GameObject border = PrimitiveKit.Box(go.transform, "Border", new Vector3(0f, RugHeight * 0.5f, 0f),
-                new Vector3(rug.SizeX, RugHeight, rug.SizeZ), PrimitiveKit.Lit(color * 0.8f, 0f), 0, false);
+                new Vector3(rug.SizeX, RugHeight, rug.SizeZ), PrimitiveKit.Lit(color * 0.8f, 0f), 0, false, Surface.Carpet);
             border.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            BuildRugImage(go.transform, null, color, new Vector2(rug.SizeX, rug.SizeZ), RugHeight + 0.001f);
+            const float band = 0.1f;
+            if (rug.SizeX > 2f * band && rug.SizeZ > 2f * band)
+            {
+                var fieldSize = new Vector2(rug.SizeX - 2f * band, rug.SizeZ - 2f * band);
+                GameObject field = PrimitiveKit.Part(go.transform, "Field", PrimitiveKit.QuadMeshSized(fieldSize), new Vector3(0f, RugHeight + 0.001f, 0f),
+                    Quaternion.Euler(90f, 0f, 0f), new Vector3(fieldSize.x, fieldSize.y, 1f), PrimitiveKit.Lit(color, 0f), 0, Surface.Carpet);
+                field.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            }
+            BuildRugImage(go.transform, null, color, new Vector2(rug.SizeX, rug.SizeZ), RugHeight + 0.002f);
         }
 
         /// <summary>
@@ -1441,11 +1726,12 @@ namespace OutOfSight
         /// (Assets/Art/Environment/rug_modern_inset_border.png, <see cref="TextureLibrary.RugColour"/>), on a quad built
         /// at <paramref name="localHeight"/> above <paramref name="parent"/> (the rug's own unscaled group transform,
         /// never the model's: a non uniform fit scale would distort a size set directly here) and sized to
-        /// <paramref name="size"/> (its SizeX, SizeZ). The literal <see cref="PrimitiveKit.QuadMesh"/> keeps its own
-        /// unit UV (0 to 1), so <see cref="PrimitiveKit.RugDetail"/> shows the picture exactly once, stretched, never
-        /// tiled. When <paramref name="modelRoot"/> is not null (the model succeeded), the quad is reparented under it
-        /// keeping its world transform (its rotation here is always a right angle away from the model's own, so no
-        /// shear results), so it counts as part of the model rather than a stray renderer beside it.
+        /// <paramref name="size"/> (its SizeX, SizeZ), above everything else already drawn there. The literal
+        /// <see cref="PrimitiveKit.QuadMesh"/> keeps its own unit UV (0 to 1), so <see cref="PrimitiveKit.RugDetail"/>
+        /// shows the picture exactly once, stretched, never tiled. When <paramref name="modelRoot"/> is not null (the
+        /// model succeeded), the quad is reparented under it keeping its world transform (its rotation here is always
+        /// a right angle away from the model's own, so no shear results), so it counts as part of the model rather
+        /// than a stray renderer beside it (ProbeTestsM3Models).
         /// </summary>
         private static void BuildRugImage(Transform parent, Transform modelRoot, Color color, Vector2 size, float localHeight)
         {

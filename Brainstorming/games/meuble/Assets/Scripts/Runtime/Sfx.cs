@@ -226,7 +226,11 @@ namespace OutOfSight
         // M3.1: the whole mix sits 2.3 dB (1 / 1.3) under the M3 levels, so the loudest recorded role ("hein ?",
         // mix 1) never needs a volume above 1 and no volume is ever clamped. The synthesized cues take the same
         // scale, so their balance with the recordings holds.
-        private const float MixScale = 1f / 1.3f;
+        // Audio overhaul, Request 2 (docs/audio/AUDIO_REPORT.md 4): an additional -4 dB (/ 1.585, 10^0.2), matching the
+        // same cut applied to every Tuning.SfxXxxMix: every synthesized-only cue (the roll, the rattle, the pratfall, the
+        // bark, the sniff, the hum, the rock creak, the bump) and every library-less fallback moves down with the rest of
+        // the effects, music untouched.
+        private const float MixScale = 1f / 1.3f / 1.585f;
 
         // Volumes of the synthesized clips: the M2 values times the mix scale.
         private const float HopSynthVolume = 0.32f * MixScale;
@@ -1488,35 +1492,42 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// The bark: two "wouf", the second a little lower. Each is a voiced burst whose pitch falls from about 520 to
-        /// 330 Hz through an open vowel (a formant near 900 Hz), with a breathy noise attack.
+        /// The bark: two "wouf", the second a little lower. Each is a short, rough burst whose pitch falls from about
+        /// 300 to 170 Hz through a low, broad chest resonance, with a 35 Hz vocal fry growl and a noisy, percussive
+        /// attack (audio overhaul: the original 520 to 330 Hz sweep through a narrow 900 Hz formant read as a duck's
+        /// quack, not a dog; the fundamental is lower here, the formant lower and wider, and the texture noisier and
+        /// rougher than a quack's clean tone).
         /// </summary>
         private float BarkSample(float t, float d)
         {
-            return Wouf(t, 1f) + 0.8f * Wouf(t - 0.27f, 0.88f);
+            return Wouf(t, 1f) + 0.8f * Wouf(t - 0.22f, 0.88f);
         }
 
         private float Wouf(float local, float pitchScale)
         {
-            const float length = 0.2f;
+            const float length = 0.16f;
             if (local < 0f || local > length)
             {
                 return 0f;
             }
             float x = local / length;
-            float pitch = (520f - 190f * x) * pitchScale;
+            float pitch = (300f - 130f * x) * pitchScale;
             // The phase of a linearly falling pitch, integrated.
-            float phase = 2f * Mathf.PI * (520f * local - 190f * local * local / (2f * length)) * pitchScale;
+            float phase = 2f * Mathf.PI * (300f * local - 130f * local * local / (2f * length)) * pitchScale;
+            // Vocal fry: a fast amplitude buzz roughens the tone so it growls instead of ringing clean (a quack's tell).
+            float fry = 0.55f + 0.45f * Mathf.Sin(2f * Mathf.PI * 35f * local);
             float s = 0f;
             for (int k = 1; k <= 9; k++)
             {
                 float f = pitch * k;
-                float formant = Mathf.Exp(-Mathf.Pow((f - 900f) / 420f, 2f)) + 0.4f * Mathf.Exp(-Mathf.Pow((f - 2300f) / 600f, 2f)) + 0.05f;
+                float formant = Mathf.Exp(-Mathf.Pow((f - 650f) / 550f, 2f)) + 0.25f * Mathf.Exp(-Mathf.Pow((f - 2000f) / 700f, 2f)) + 0.05f;
                 s += Mathf.Sin(phase * k) * formant / Mathf.Sqrt(k);
             }
-            float breath = ((float)noise.NextDouble() * 2f - 1f) * Mathf.Exp(-local * 60f) * 0.6f;
-            float env = Mathf.Clamp01(local / 0.008f) * Mathf.Pow(1f - x, 1.5f);
-            return (s * 0.45f + breath) * env;
+            s *= fry;
+            // A fast, noisy burst (a dog's turbulent attack), not a smooth breathy onset.
+            float breath = ((float)noise.NextDouble() * 2f - 1f) * Mathf.Exp(-local * 35f) * 0.6f;
+            float env = Mathf.Clamp01(local / 0.004f) * Mathf.Pow(1f - x, 1.2f);
+            return (s * 0.35f + breath) * env;
         }
 
         /// <summary>The sniff: two quick bursts of airy noise through a nose (a band near 3 kHz), the second shorter.</summary>

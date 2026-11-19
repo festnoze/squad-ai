@@ -443,6 +443,7 @@ namespace OutOfSight.Tests
 
                 int caps = 0;
                 int hiddenCaps = 0;
+                var fader = Game.Level.Root.GetComponent<WallFader>();
                 foreach (MeshRenderer r in Game.Level.Root.GetComponentsInChildren<MeshRenderer>(true))
                 {
                     if (r.name != "Cap")
@@ -450,9 +451,14 @@ namespace OutOfSight.Tests
                         continue;
                     }
                     caps++;
-                    // The wall frame: origin on the centre line, +z toward the outside (LevelBuilder.BuildWallLine).
+                    // The wall frame: origin on the centre line, +z toward the outside (LevelBuilder.BuildWallLine). M7 walls
+                    // pass: a shared wall fades when its plane separates the camera from the chair, an outer wall whenever the
+                    // camera is outside it (its single inward face is then seen from behind).
                     Transform wall = r.transform.parent;
-                    bool separates = Vector3.Dot(eye - wall.position, wall.forward) * Vector3.Dot(target - wall.position, wall.forward) < 0f;
+                    bool outer = fader.IsOuter(r);
+                    bool separates = outer
+                        ? Vector3.Dot(eye - wall.position, wall.forward) > 0f
+                        : Vector3.Dot(eye - wall.position, wall.forward) * Vector3.Dot(target - wall.position, wall.forward) < 0f;
                     bool hidden = r.shadowCastingMode == UnityEngine.Rendering.ShadowCastingMode.ShadowsOnly;
                     Assert.AreEqual(separates, hidden, $"{level}: the cap of {wall.name} is {(hidden ? "hidden" : "drawn")} while its wall "
                         + $"{(separates ? "stands" : "does not stand")} between the camera and the chair");

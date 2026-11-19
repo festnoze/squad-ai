@@ -803,6 +803,13 @@ namespace OutOfSight
             int withoutMaterial = count.SlotsWithoutMaterial;
             long triangles = count.Triangles;
             HashSet<Material> materials = count.Materials;
+            // M7 walls pass: a faded wall is drawn through Graphics.RenderMesh with the one see-through material (no renderer
+            // of its own, its part's slot already counts its draw): that material counts while any wall is faded.
+            WallFader fader = Game != null && Game.Level != null && Game.Level.Root != null ? Game.Level.Root.GetComponent<WallFader>() : null;
+            if (fader != null && fader.AnyFaded)
+            {
+                materials.Add(WallFader.GhostMaterial);
+            }
             audit["renderers"] = renderers;
             audit["furnitureTriangles"] = FurnitureTriangles(id);
             audit["inhabitantTriangles"] = InhabitantTriangles(id);

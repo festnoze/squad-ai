@@ -9,7 +9,7 @@
     },
     {
       "id": "chambre", "x": -2.0, "z": -1.3, "sizeX": 5.0, "sizeZ": 4.4, "wallHeight": 2.7, "wallThickness": 0.1,
-      "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA"
+      "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA", "wallFinish": "wallpaper"
     }
   ],
   "doors": [

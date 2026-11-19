@@ -39,7 +39,8 @@
       "wallThickness": 0.1,
       "floor": "soft",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "wallpaper"
     },
     {
       "id": "cuisine",
@@ -52,7 +53,8 @@
       "floor": "hard",
       "floorFinish": "tile",
       "floorColor": "#EDE6DA",
-      "wallColor": "#F7F4EE"
+      "wallColor": "#F7F4EE",
+      "wallFinish": "limewash"
     }
   ],
   "doors": [

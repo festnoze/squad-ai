@@ -428,6 +428,8 @@ namespace OutOfSight.Tests
             {
                 Surface.Wood, Surface.Parquet, Surface.Plaster, Surface.Upholstery, Surface.Linen, Surface.Carpet,
                 Surface.Grass, Surface.Lacquer, Surface.Metal, Surface.Tile,
+                // Wall finishes (2026-11-19).
+                Surface.Sage, Surface.Limewash, Surface.Grasscloth, Surface.Wallpaper,
             };
             foreach (Surface s in withNormal)
             {

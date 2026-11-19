@@ -447,6 +447,11 @@ namespace OutOfSight.Core
                 {
                     issues.Add($"room {Name(r, i)} is both soft and tiled: a tile finish needs a hard floor");
                 }
+                // Wall finishes (2026-11-19): wallFinish is visual only; null or empty is the cream crepi.
+                if (!string.IsNullOrEmpty(r.WallFinish) && System.Array.IndexOf(RoomDef.WallFinishes, r.WallFinish) < 0)
+                {
+                    issues.Add($"room {Name(r, i)} wall finish '{r.WallFinish}' is not one of {string.Join(", ", RoomDef.WallFinishes)}"); // MUTATION:WALL_FINISH_VALUE
+                }
                 if (Mathf.Abs(r.WallThickness - t) > Eps)
                 {
                     issues.Add($"room {Name(r, i)} wall thickness {r.WallThickness} differs from {t}: all rooms share one wall thickness");

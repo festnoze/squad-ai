@@ -10,9 +10,9 @@ using Object = UnityEngine.Object;
 namespace OutOfSight
 {
     /// <summary>
-    /// M7 title logo: the player's red chair seen at a three-quarter angle, with a long shadow cast by a low sun, baked
-    /// ONCE into a small texture the first time the title page shows, then drawn by a RawImage above the title (it
-    /// replaces the flat chair icon, kept as the fallback if the bake fails).
+    /// M7 title logo: the player's red chair seen at a three-quarter angle, with a short shadow cast by a high
+    /// (about 11 am) sun, baked ONCE into a small texture the first time the title page shows, then drawn by a
+    /// RawImage above the title (it replaces the flat chair icon, kept as the fallback if the bake fails).
     ///
     /// - Isolation: a rig (the real level 1 chair model through ModelKit, or FurnitureKit's procedural chair) on an
     ///   unnamed layer (Tuning.TitleLogoLayer) that only the two logo cameras render, placed far sideways to the sun
@@ -20,8 +20,9 @@ namespace OutOfSight
     ///   nothing between it and the sun. It lives for two frames, then the rig, cameras and render textures are destroyed:
     ///   no per frame cost afterwards, nothing left in the scene for gameplay.
     /// - Lighting: the scene's own sun is the key light (no second directional light, which could take over as the main
-    ///   light). The rig is rotated so that sun arrives low (Tuning.TitleLogoSunElevation) in the rig's frame, so the
-    ///   chair's shading always matches its shadow; a small range limited rim light sits behind it.
+    ///   light). The rig is rotated so that the sun arrives high and a little to one side (Tuning.TitleLogoSunElevation,
+    ///   Tuning.TitleLogoSunHeading) in the rig's frame, so the chair's shading always matches its shadow; a small
+    ///   range limited rim light sits behind it.
     /// - The shadow: a second camera renders the same chair through its view matrix times the projection onto the ground
     ///   along the sun, which is exactly the chair's shadow (its alpha is the mask). It is then darkest at the foot,
     ///   fading and softening toward the tip, over the floor's own warm-to-amber tint (an orthographic camera maps

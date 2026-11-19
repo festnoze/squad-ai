@@ -9,7 +9,8 @@ namespace OutOfSight.Tests
     /// PRD 11 M3 gate: a licence file lists every imported model and sound. Every file under
     /// Assets/ThirdParty must be named in docs/LICENSES.md, with its licence.
     /// Audio overhaul: the music is CC BY 4.0 (Kevin MacLeod), the only attribution licence allowed; its rows must sit
-    /// under Music/ and every credited title must be in the game's own attribution line (title.musicCredits).
+    /// under Music/ and every credited title must be in the game's own attribution line (options.musicCredits, a
+    /// small line at the bottom of the Options page since the credits cleanup, 2026-11-19).
     /// </summary>
     public sealed class LicenseTests
     {
@@ -54,7 +55,7 @@ namespace OutOfSight.Tests
             Assert.GreaterOrEqual(rows.Length, 2, "premise: the two music loops are listed as CC BY 4.0");
             foreach (string language in new[] { Strings.English, Strings.French })
             {
-                string credits = Strings.Get("title.musicCredits", language);
+                string credits = Strings.Get("options.musicCredits", language);
                 StringAssert.Contains("Kevin MacLeod", credits, language + ": the in-game credit names no author");
                 StringAssert.Contains("incompetech.com", credits, language + ": the in-game credit names no source");
                 StringAssert.Contains("CC BY 4.0", credits, language + ": the in-game credit names no licence");

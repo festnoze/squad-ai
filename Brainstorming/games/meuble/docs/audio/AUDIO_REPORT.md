@@ -28,7 +28,7 @@ Audit of `Sfx.cs`, `FootstepAudio.cs`, `GameState.PlaySounds`, `Menu.cs` and eve
 | Dog patter | synthesized | unchanged, its gain corrected for the new footstep mix |
 | "hm ?" telegraph, dog sniff | synthesized | unchanged (no CC0 recording, gameplay-critical and tunable) |
 | "hein ?" discovery | synthesized (recorded vocal_huh off) | unchanged; vocal_huh re-made (DC, 150 Hz high pass) for the listening pass |
-| Dog bark | synthesized | unchanged: the only CC0 dog pack found ("Dog sounds", pauliuw, OGA) has 8 kHz barks with DC offset; rejected |
+| Dog bark | synthesized | **re-synthesized** (section 9.1): the old formula read as a duck's quack, not a dog; the only CC0 dog pack found ("Dog sounds", pauliuw, OGA) still has 8 kHz barks with DC offset, rejected |
 | Robot vacuum hum | synthesized seamless loop | unchanged (distance driven, already clean) |
 | Rocking chair creak, robot bump, pratfall, office chair roll, stool rattle | synthesized | unchanged |
 | Room door opening | synthesized latch and hinge | **recorded wooden door** (Kenney doorOpen_1) |
@@ -124,19 +124,24 @@ Each recorded role plays at `gain x mix`, where `gain = 10^((-12 - file loudness
 and `mix = 10^((target + 12) / 20)` (the Tuning constants). The M3.1 balance was kept: the old playback levels were
 re-measured in the new metric and rounded, except the UI click (+2 dB: music now plays under the menus).
 
+**Request 2 (2026-11-19, section 9.2): every row below is a further -4 dB from that M3.1 balance**, music untouched,
+so the default mix sits more forward on the music and less on the effects (the numbers below are current; section 9.2
+has the before and after).
+
 | Category | Roles | Playback target at Volume 100 % (LUFS) |
 |---|---|---|
-| Alert | creak | -13 |
-| Stingers | caught (both), win, recorded "hein ?" | -15, -15, -14 |
-| World impacts | thump -14, crash -14, topple -16, door -17 | -14 to -17 |
-| Footsteps (within 1 m, linear rolloff to 10 m) | footsteps | -18 |
-| Furniture's own moves | pick-up scrape -21, pivot scrape -24, wardrobe -20, warning creak -25, lamp -26, hop -28, soft hop -38 | -20 to -38 |
-| UI | click -28, selection tick -34 | -28, -34 |
-| Music (Music 100 %) | title -24 I, level **-33 I** | -24, -33 |
-| Ambience | room tone -45 I, clock -48 I | -45, -48 |
+| Alert | creak | -17 |
+| Stingers | caught (both), win, recorded "hein ?" | -19, -19, -18 |
+| World impacts | thump -18, crash -18, topple -20, door -21 | -18 to -21 |
+| Footsteps (within 1 m, linear rolloff to 10 m) | footsteps | -22 |
+| Furniture's own moves | pick-up scrape -25, pivot scrape -28, wardrobe -24, warning creak -29, lamp -30, hop -32, soft hop -42 | -24 to -42 |
+| UI | click -32, selection tick -38 | -32, -38 |
+| Music (Music 100 %, unchanged) | title -24 I, level **-33 I** | -24, -33 |
+| Ambience | room tone -49 I, clock -52 I | -49, -52 |
 
-The level music sits 15 dB under a near footstep and 8 dB under one 6 m away, 5 dB under the player's own hop: it is a
-bed, not a mask. Every `gain x mix` stays under 1 (no clamp), checked by `ProbeTestsM3Audio.Step27h` and
+The level music now sits 11 dB under a near footstep (was 15), 4 dB under one 6 m away (was 8), 1 dB under the
+player's own hop (was 5): still a bed, not a mask, but a more forward one. Every `gain x mix` stays under 1 (no clamp),
+checked by `ProbeTestsM3Audio.Step27h` and
 `ProbeTestsAudioOverhaul.Step27i`.
 
 ## 5. Music
@@ -213,10 +218,70 @@ All on Unity 6000.3.23f1, 2026-11-18, called directly (no other Unity process).
 
 ## 8. Left to do
 
-- **A listening pass** by the product owner: the music levels against the footsteps (Tuning.MusicLevelMix), the win
-  jingle, the wardrobe pair, the door, and whether the recorded crash and topple beat the synthesized ones.
-- The dog bark stays synthesized: a full-band CC0 bark is still missing (Freesound has many under CC0 but needs an
-  account to download).
+- **A listening pass** by the product owner: done in part on 2026-11-19 (section 9), finding the quack and asking for
+  the music to sit more forward. Still open: the win jingle, the wardrobe pair, the door, and whether the recorded
+  crash and topple beat the synthesized ones.
+- The dog bark's formula changed (section 9.1); it still has no recording. A full-band CC0 bark is still missing
+  (Freesound has many under CC0 but needs an account to download).
 - `*.wav` is ignored by the repository's root .gitignore, so the effect WAVs under Assets/ThirdParty/Audio are not in
   git (before and after this change); the music .ogg files, the pipeline and its report are. Rebuild with
   `python tools/audio/audio_pipeline.py sfx` from the staged downloads, or add an exception for that folder.
+
+## 9. Listening pass fixes (2026-11-19)
+
+The product owner's two findings from the first listening pass.
+
+### 9.1 The quack
+
+**Finding:** a noise described as "coin coin" (a quack). **Culprit: the dog bark synth** (`Sfx.BarkSample` /
+`Sfx.Wouf`), identified by rendering every synthesized vocal and alert cue in Python from the exact formulas of
+`Sfx.cs` and measuring each against the complaint's own signature (a short nasal tone, falling pitch, strong mid
+harmonics around 1-2 kHz):
+
+| Candidate | Duration | Pitch | Energy in 1-2 kHz | Verdict |
+|---|---|---|---|---|
+| **Dog bark synth (`Wouf`)** | 2 calls, 200 ms each | **falls** 520 -> 330 Hz (and 458 -> 290 Hz) | up to **38 %** of the spectrum, mid-call | matches: a clean falling tone through a narrow 900 Hz formant is a textbook quack synthesis recipe |
+| "hein ?" discovery (`HeinSample`) | 420 ms | rises 210 -> 360 Hz (by design, a surprised question) | up to 39 %, but while the pitch climbs | runner-up: real 1-2 kHz energy, but the pitch is wrong (a quack falls, "hein ?" rises on purpose) |
+| "hm ?" telegraph (`HmSample`) | 480 ms | rises 150 -> 220 Hz (by design) | under 15 % | not a match: rising pitch, almost no mid-band energy (a closed-mouth hum near 300 Hz) |
+| Creak gauge tension loop (`TensionSample`) | a 1 s loop, pitched externally by the gauge | flat within the loop (98/196/297/411 Hz) | under 4 % | not a match: a sustained drone, not a short tone, and its own pitch never changes |
+| Robot hum (`SynthesizeHum`) | a 1 s loop | flat (110 Hz motor) | negligible | not a match: a stationary drone, no onset, no pitch contour |
+| Recorded cues (hops, scrapes, footsteps, door, crash, topple, UI tick) | transients or room tone | n/a | n/a | not a match: percussive knocks or room noise, no tonal falling pitch |
+
+The render script and its numbers are not checked in (a throwaway analysis, not part of the pipeline); the method is
+reproducible from the formulas quoted above.
+
+**Fix:** rewrote `Sfx.Wouf` (so `BarkSample`, the two "wouf"s). Before: pitch fell 520 to 330 Hz through a narrow
+900 Hz + 2300 Hz formant, a clean breathy tone, exactly the quack recipe. After: pitch falls 300 to 170 Hz (a dog's
+range, not a duck's), through a lower, broader chest resonance (650 Hz + 2000 Hz, twice the bandwidth), a 35 Hz vocal
+fry amplitude buzz roughens the tone into a growl, and the attack is a noisy percussive burst instead of a smooth
+breathy onset. Re-measured the same way: peak energy in the 1-2 kHz band drops from 38 % to 22 %, and the spectral
+flatness (0 tonal, 1 noisy) roughly triples (0.07-0.4 before, 0.2-0.6 after): noisier, lower, broader, clearly not a
+clean falling tone through a narrow resonance any more. Peak and RMS amplitude were kept close to the original (peak
+0.81 -> 0.90, RMS 0.114 -> 0.101) so `Tuning.SfxBarkSynthVolume` did not need retuning.
+
+No CC0 recording was used: the only dog pack already downloaded ("Dog sounds", pauliuw, OGA) is still 8 kHz with a DC
+offset (section 1), and finding a new one is out of this fix's scope. **Runner-up if this is not it:** the
+synthesized "hein ?" (`HeinSample`), which also carries real energy in the 1-2 kHz band; it was left alone because
+its pitch rises by design (the interrogative "hein ?") and it is gameplay-critical (every discovery).
+
+Files: `Assets/Scripts/Runtime/Sfx.cs` (`BarkSample`, `Wouf`).
+
+### 9.2 The default mix: effects down, not music up
+
+**Finding:** "lower the sound effects relative to the music, by default." Every `Tuning.SfxXxxMix` constant (every
+recorded role) and `Sfx.MixScale` (every synthesized-only cue and every library-less fallback) moved down a uniform
+**-4 dB** (x0.631); `Tuning.MusicTitleMix` and `Tuning.MusicLevelMix` were left exactly as they were, per the request
+(lower the effects rather than push the music past its own headroom). Section 4 has the full before/after table.
+
+The cut is uniform, including the cues flagged as gameplay-critical (the creak alert, the footsteps, the caught and
+win stingers), because -4 dB left all four with a comfortable margin over the unmoved music: creak -17 LUFS vs the
+level loop's -33 (16 dB), footstep -22 at 1 m (11 dB, 4 dB at 6 m), caught and win -19 (14 dB). Singling them out for a
+smaller cut was not needed and would have made the mix harder to reason about and re-tune later.
+
+**Old saves:** this is a compile-time mix, not a saved value, so there is nothing to migrate. `SaveOptions` has no
+"effects" field, only `Volume` (the overall `AudioListener.volume`) and `Music` (the music bus, default 70 %, section
+5); neither default changed, so a player who already set either keeps exactly what they set, old save or new, and a
+save that never touched them keeps loading at the same defaults it always did. The rebalance changes what "100 %" on
+the existing sliders sounds like (more music, less effects), not which slider value a save holds.
+
+Files: `Assets/Scripts/Core/Tuning.cs` (every `SfxXxxMix` constant), `Assets/Scripts/Runtime/Sfx.cs` (`MixScale`).

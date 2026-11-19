@@ -181,7 +181,12 @@ namespace OutOfSight.Tests
             Assert.IsNotNull(EventSystem.current, "no EventSystem");
             Assert.AreNotEqual(Menu.PlayButton.gameObject, EventSystem.current.currentSelectedGameObject,
                 "Jouer is selected in the frame the title opened: that frame's Enter would submit it");
-            yield return Until(() => EventSystem.current.currentSelectedGameObject == Menu.PlayButton.gameObject, 5);
+            // Menu selects on its next Update, a rendered frame: the title house's heavy load runs several fixed steps in
+            // one long frame, so a wait in fixed steps can end before that frame (same as Step26_EndScreenEnter...).
+            for (int i = 0; i < 10 && EventSystem.current.currentSelectedGameObject != Menu.PlayButton.gameObject; i++)
+            {
+                yield return null;
+            }
             Assert.AreEqual(Menu.PlayButton.gameObject, EventSystem.current.currentSelectedGameObject, "Jouer is not selected for Enter");
 
             float elapsed = Game.Elapsed;

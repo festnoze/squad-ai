@@ -30,10 +30,11 @@ namespace OutOfSight
     /// the memory ring and the decoy rings take the tolerance of the seer that judges the furniture (tidy 0.4 m, watchful
     /// 0.5 m, default 0.75 m), passed by GameState to <see cref="Show(FurniturePose, Vector3, Transform, float)"/> and <see cref="ShowRings"/>.
     ///
-    /// M8 (the product owner's 2026-11-18 report): the memory ghost copies the real player furniture body's own meshes
-    /// (<see cref="Show(FurniturePose, Vector3, Transform, float)"/>, GameState passes FurnitureController.Visual), whatever
-    /// its kind, a model from the ModelCatalog or a procedural FurnitureKit body alike, skipping a carried load (LoadView);
-    /// only a bare size with no furniture behind it (direct callers, tests) still draws the chair's own boxes.
+    /// The memory ghost copies the real player furniture body's own meshes (the product owner's 2026-11-18 report: it
+    /// used to draw a chair for every kind), <see cref="Show(FurniturePose, Vector3, Transform, float)"/>, GameState
+    /// passing FurnitureController.Visual: whatever the kind, a model from the ModelCatalog or a procedural FurnitureKit
+    /// body alike, skipping a carried load (LoadView). Only a bare size with no furniture behind it (direct callers,
+    /// tests) still draws the chair's own boxes.
     /// </summary>
     public sealed class GhostView : MonoBehaviour
     {
@@ -72,7 +73,7 @@ namespace OutOfSight
         private Mesh ringsMesh;
         private MeshRenderer ringsRenderer;
         private Vector3 builtSize = new Vector3(-1f, -1f, -1f);
-        // M8: the furniture Visual the memory ghost's mesh was last copied from (null: the chair's own boxes).
+        // The furniture Visual the memory ghost's mesh was last copied from (null: the chair's own boxes).
         private Transform builtVisual;
         // The decoys' planar centres of the current level, kept so the rings can be rebuilt at another radius.
         private readonly List<Vector3> decoyCenters = new List<Vector3>();
@@ -146,7 +147,7 @@ namespace OutOfSight
 
         /// <summary>
         /// <see cref="Show(FurniturePose, Vector3, Transform, float)"/> with no real furniture to copy: the chair's own
-        /// boxes, as before M8 (direct callers with a bare size, no FurnitureController behind it).
+        /// boxes, as before the fix below (direct callers with a bare size, no FurnitureController behind it).
         /// </summary>
         public void Show(FurniturePose pose, Vector3 size, float tolerance = Tuning.DisplacementTolerance)
         {
@@ -158,7 +159,7 @@ namespace OutOfSight
         /// its own meshes, a model from the ModelCatalog or a procedural FurnitureKit body alike, a carried load skipped) at
         /// <paramref name="pose"/>, inside a ring of <paramref name="tolerance"/> (the seer's; DisplacementTolerance by
         /// default). Null, or a visual with no readable mesh under it, falls back to the chair's own boxes at
-        /// <paramref name="size"/> (M8, the product owner's 2026-11-18 report: the start ghost was always a chair).
+        /// <paramref name="size"/> (the product owner's 2026-11-18 report: the start ghost was always a chair).
         /// </summary>
         public void Show(FurniturePose pose, Vector3 size, Transform furnitureVisual, float tolerance = Tuning.DisplacementTolerance)
         {
@@ -517,7 +518,7 @@ namespace OutOfSight
             if ((size - seatBuiltSize).sqrMagnitude > 1e-6f)
             {
                 seatBuiltSize = size;
-                // The seat ghost keeps the chair's own boxes (M4.1's warm amber "someone will sit here", unaffected by M8).
+                // The seat ghost keeps the chair's own boxes (M4.1's warm amber "someone will sit here", unaffected by the fix above).
                 BuildGhost(seatMesh, size, Tuning.SeatHomeTolerance, null);
             }
             FurniturePose pose = seat.Value;

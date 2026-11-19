@@ -14,7 +14,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "grasscloth"
     },
     {
       "id": "couloir",
@@ -39,7 +40,8 @@
       "floor": "hard",
       "floorFinish": "tile",
       "floorColor": "#EDE6DA",
-      "wallColor": "#F7F4EE"
+      "wallColor": "#F7F4EE",
+      "wallFinish": "limewash"
     },
     {
       "id": "salon",
@@ -51,7 +53,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sage"
     },
     {
       "id": "entree",

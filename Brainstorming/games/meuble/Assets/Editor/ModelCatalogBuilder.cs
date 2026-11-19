@@ -178,8 +178,30 @@ namespace OutOfSight.Editor
         /// <summary>The owner's red image the player's colour map comes from (its file stem in Assets/Art/Environment).</summary>
         private const string PlayerSource = "red_metal_source";
 
+        /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture, used as is (not a
+        /// derived detail or colour map): Assets/Art/Environment/rug_modern_inset_border.png.
+        /// </summary>
+        private const string RugColourFile = "rug_modern_inset_border.png";
+
+        /// <summary>The source stem <see cref="TextureLibrary.rugSource"/> records for <see cref="RugColourFile"/>.</summary>
+        private const string RugSource = "rug_modern_inset_border";
+
+        /// <summary>
+        /// Assets/Art/Environment, the folder <see cref="DetailFolder"/>, <see cref="ColourFolder"/> and
+        /// <see cref="RugColourFile"/> all live under.
+        /// </summary>
+        private const string EnvironmentFolder = "Assets/Art/Environment/";
+
         /// <summary>Import size of every detail texture: they tile, so 512 is plenty at the game's camera distance.</summary>
         public const int DetailMaxSize = 512;
+
+        /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): import size of the rug's own picture. Unlike the tiling details
+        /// above, it is never tiled, stretched once over each rug's own full size instead, so it keeps more texels
+        /// than a single <see cref="DetailMaxSize"/> tile would give it.
+        /// </summary>
+        public const int RugMaxSize = 1024;
 
         /// <summary>
         /// The detail of each surface: a 512 x 512 grayscale derivative of the product owner's image of that surface
@@ -204,6 +226,11 @@ namespace OutOfSight.Editor
             (Surface.Soil, "detail_soil.png", "soil", null),
             // M7 textures (CONTRACT_M7 1.2): the kitchen and bathroom floor tiles.
             (Surface.Tile, "detail_tile.png", "tile", "normal_tile.png"),
+            // Wall finishes (2026-11-19): own creation, tools/assets/make_wall_finishes.py (sources wall_<name>.png).
+            (Surface.Sage, "detail_wall_sage.png", "wall_sage", "normal_wall_sage.png"),
+            (Surface.Limewash, "detail_wall_limewash.png", "wall_limewash", "normal_wall_limewash.png"),
+            (Surface.Grasscloth, "detail_wall_grasscloth.png", "wall_grasscloth", "normal_wall_grasscloth.png"),
+            (Surface.Wallpaper, "detail_wall_wallpaper.png", "wall_wallpaper", "normal_wall_wallpaper.png"),
         };
 
         /// <summary>
@@ -281,6 +308,16 @@ namespace OutOfSight.Editor
             string playerSource = playerColour != null ? PlayerSource : null;
             Color playerMean = playerColour != null ? MeanColour(ColourFolder + PlayerColourFile) : Color.clear;
 
+            // M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture, used as is, clamped
+            // (not seamless), stretched once per rug (PrimitiveKit.RugDetail), never the tiled Carpet detail above.
+            Texture2D rugColour = LoadRugImage(EnvironmentFolder + RugColourFile, log);
+            if (rugColour == null)
+            {
+                Debug.LogWarning($"[ModelCatalogBuilder] no rug image at {EnvironmentFolder}{RugColourFile}; rugs keep their palette colour at run time");
+            }
+            string rugSource = rugColour != null ? RugSource : null;
+            Color rugMean = rugColour != null ? MeanColour(EnvironmentFolder + RugColourFile) : Color.clear;
+
             var library = AssetDatabase.LoadAssetAtPath<TextureLibrary>(TextureLibraryPath);
             if (library == null)
             {
@@ -290,16 +327,22 @@ namespace OutOfSight.Editor
                 library.playerColour = playerColour;
                 library.playerSource = playerSource;
                 library.playerMean = playerMean;
+                library.rugColour = rugColour;
+                library.rugSource = rugSource;
+                library.rugMean = rugMean;
                 AssetDatabase.CreateAsset(library, TextureLibraryPath);
                 log.Append("  created ").Append(TextureLibraryPath).Append('\n');
             }
             else if (!SameDetails(library.entries, entries) || library.playerColour != playerColour || library.playerSource != playerSource
-                || library.playerMean != playerMean)
+                || library.playerMean != playerMean || library.rugColour != rugColour || library.rugSource != rugSource || library.rugMean != rugMean)
             {
                 library.entries = entries;
                 library.playerColour = playerColour;
                 library.playerSource = playerSource;
                 library.playerMean = playerMean;
+                library.rugColour = rugColour;
+                library.rugSource = rugSource;
+                library.rugMean = rugMean;
                 EditorUtility.SetDirty(library);
                 log.Append("  updated ").Append(TextureLibraryPath).Append('\n');
             }
@@ -351,6 +394,50 @@ namespace OutOfSight.Editor
         }
 
         /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): imports the rug's own picture (<see cref="ConfigureRugImporter"/>)
+        /// and loads it; null when there is no texture at that path.
+        /// </summary>
+        private static Texture2D LoadRugImage(string path, StringBuilder log)
+        {
+            if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
+            {
+                return null;
+            }
+            if (ConfigureRugImporter(importer))
+            {
+                importer.SaveAndReimport();
+                log.Append("  reimported ").Append(path).Append('\n');
+            }
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        /// <summary>
+        /// M7 rug image (product owner, 2026-11-18): sRGB, mipmaps, trilinear, not readable, high quality compression
+        /// and an Android ASTC override, exactly as every colour map (<see cref="ConfigureDetailImporter"/>), but
+        /// clamped rather than repeated (the picture is not seamless: it is stretched once per rug, never tiled) and
+        /// at its own, larger <see cref="RugMaxSize"/> (it is never shrunk to a single tile's worth of detail). True
+        /// when anything changed (a reimport is needed).
+        /// </summary>
+        private static bool ConfigureRugImporter(TextureImporter t)
+        {
+            bool changed = false;
+            if (t.textureType != TextureImporterType.Default) { t.textureType = TextureImporterType.Default; changed = true; }
+            if (t.textureShape != TextureImporterShape.Texture2D) { t.textureShape = TextureImporterShape.Texture2D; changed = true; }
+            if (!t.sRGBTexture) { t.sRGBTexture = true; changed = true; }
+            if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
+            if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
+            if (t.isReadable) { t.isReadable = false; changed = true; }
+            if (t.wrapMode != TextureWrapMode.Clamp) { t.wrapMode = TextureWrapMode.Clamp; changed = true; }
+            if (t.filterMode != FilterMode.Trilinear) { t.filterMode = FilterMode.Trilinear; changed = true; }
+            if (t.anisoLevel != 2) { t.anisoLevel = 2; changed = true; }
+            if (t.maxTextureSize != RugMaxSize) { t.maxTextureSize = RugMaxSize; changed = true; }
+            if (t.textureCompression != TextureImporterCompression.CompressedHQ) { t.textureCompression = TextureImporterCompression.CompressedHQ; changed = true; }
+            if (t.npotScale != TextureImporterNPOTScale.ToNearest) { t.npotScale = TextureImporterNPOTScale.ToNearest; changed = true; }
+            changed |= ConfigureAndroidOverride(t, RugMaxSize);
+            return changed;
+        }
+
+        /// <summary>
         /// M7 (CONTRACT_M7 1.2): sets a normal map's import settings (Unity's Normal map type, so the platform
         /// compressor and the shader's UnpackNormal pick the right encoding whatever the target); true when anything
         /// changed (a reimport is needed). The source PNG already encodes a tangent space normal (OpenGL convention,
@@ -375,19 +462,21 @@ namespace OutOfSight.Editor
         }
 
         /// <summary>
-        /// Compact APK: an Android only override (ASTC 6x6 at the 512 px source size) for the tiling detail and
-        /// normal maps. The default (PC) settings are untouched; on a phone screen 6x6 blocks are not visible on these
-        /// low contrast tiling maps, and they take less than half the bytes of the default 4x4.
+        /// Compact APK: an Android only override (ASTC 6x6 at <paramref name="maxSize"/>, <see cref="DetailMaxSize"/> for
+        /// the tiling detail and normal maps, <see cref="RugMaxSize"/> for the rug's own picture) for every environment
+        /// texture. The default (PC) settings are untouched; on a phone screen 6x6 blocks are not visible on these low
+        /// contrast tiling maps (or the rug's own busy pattern, seen no closer than any of them), and they take less
+        /// than half the bytes of the default 4x4.
         /// </summary>
-        private static bool ConfigureAndroidOverride(TextureImporter t)
+        private static bool ConfigureAndroidOverride(TextureImporter t, int maxSize = DetailMaxSize)
         {
             TextureImporterPlatformSettings android = t.GetPlatformTextureSettings("Android");
-            if (android.overridden && android.maxTextureSize == DetailMaxSize && android.format == TextureImporterFormat.ASTC_6x6)
+            if (android.overridden && android.maxTextureSize == maxSize && android.format == TextureImporterFormat.ASTC_6x6)
             {
                 return false;
             }
             android.overridden = true;
-            android.maxTextureSize = DetailMaxSize;
+            android.maxTextureSize = maxSize;
             android.format = TextureImporterFormat.ASTC_6x6;
             t.SetPlatformTextureSettings(android);
             return true;

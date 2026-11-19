@@ -9,7 +9,7 @@
     },
     {
       "id": "cuisine", "x": 3.1, "z": 0.0, "sizeX": 4.0, "sizeZ": 5.0, "wallHeight": 2.7, "wallThickness": 0.1,
-      "floor": "hard", "floorFinish": "tile", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE"
+      "floor": "hard", "floorFinish": "tile", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE", "wallFinish": "limewash"
     }
   ],
   "doors": [

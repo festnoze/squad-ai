@@ -5,8 +5,8 @@ namespace OutOfSight
 {
     /// <summary>
     /// The music (audio overhaul, docs/audio/AUDIO_REPORT.md 5): two seamless loops of <see cref="AudioLibrary"/>, the title
-    /// page's ("Sneaky Snitch") and the levels' ("Investigations"), both by Kevin MacLeod (CC BY 4.0, credited on the title
-    /// page). Built once by Main on its own child, with two 2D looping sources that never leave it (no GameObject is
+    /// page's ("Sneaky Snitch") and the levels' ("Investigations"), both by Kevin MacLeod (CC BY 4.0, credited at the
+    /// bottom of the Options page). Built once by Main on its own child, with two 2D looping sources that never leave it (no GameObject is
     /// created afterwards, probe step 09).
     ///
     /// Every frame (unscaled time, so it runs under the paused title and the pause menu) it reads the menus and the game:

@@ -278,11 +278,12 @@ namespace OutOfSight
                         return index;
                     }
                     CharacterHead.Append(indices, collar, face, female,
-                        (point, normal, coord) =>
+                        (point, normal, coord, tuck) =>
                         {
                             Vector3 vertexNormal = fromFace.MultiplyVector(normal).normalized;
                             Vector3 tv = Vector3.Cross(vertexNormal, fromFace.MultiplyVector(Vector3.up)).normalized;
-                            float neckShare = neckBone >= 0 ? 0.16f * (1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.06f, 0.20f, coord.y))) : 0f;
+                            // The face and the jaw follow the head; what tucks into the neck partly follows the neck.
+                            float neckShare = neckBone >= 0 ? 0.4f * tuck : 0f;
                             var weight = new BoneWeight
                             {
                                 boneIndex0 = head, weight0 = 1f - neckShare,

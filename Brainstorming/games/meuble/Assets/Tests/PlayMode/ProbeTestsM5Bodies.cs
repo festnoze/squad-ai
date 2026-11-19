@@ -1088,6 +1088,45 @@ namespace OutOfSight.Tests
             AssertClean();
         }
 
+        /// <summary>
+        /// The product owner's 2026-11-18 report: the memory ghost always drew a chair (6 boxes, 72 triangles), whatever
+        /// the player furniture's own kind. On test_rock (a procedural rocking_chair, no model, 20 boxes, 240 triangles:
+        /// not a chair) GhostView.Show now copies FurnitureController.Visual's own meshes, so the ghost's combined bounds
+        /// span the same world size as the real furniture body, and its mesh carries the rocking chair's own triangles
+        /// (240, plus the ring), not the chair's fallback (72, plus the ring: 168 total). A tiny ring tolerance keeps the
+        /// ring well inside the body's own footprint, so it cannot pad the bounds and hide a wrong body shape.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator GhostCombinedBoundsMatchANonChairFurnitureBody()
+        {
+            Game.LoadLevel("test_rock");
+            Assert.AreEqual("test_rock", Game.Def.Id, "premise: test_rock loaded");
+            yield return Steps(2);
+            FurnitureController furniture = Chair;
+            Assert.AreNotEqual(BodyKinds.Chair, furniture.Kind, "premise: the player furniture of test_rock is not a chair");
+            Assert.IsNotNull(furniture.Visual, "premise: the furniture has a visual");
+
+            Bounds furnitureBounds = LoadView.BoundsOf(furniture.Visual);
+            Assert.Greater(furnitureBounds.size.magnitude, 0.3f, "premise: the furniture body has a real size");
+
+            GhostView ghost = Game.Ghost;
+            ghost.Show(furniture.Pose, furniture.Size, furniture.Visual, 0.01f);
+            Assert.IsTrue(ghost.Visible, "premise: the ghost shows");
+            Bounds ghostBounds = ghost.GetComponent<MeshRenderer>().bounds;
+
+            const float tolerance = 0.05f;
+            Assert.AreEqual(furnitureBounds.size.x, ghostBounds.size.x, tolerance, "the ghost's width does not match the real rocking chair");
+            Assert.AreEqual(furnitureBounds.size.y, ghostBounds.size.y, tolerance, "the ghost's height does not match the real rocking chair");
+            Assert.AreEqual(furnitureBounds.size.z, ghostBounds.size.z, tolerance, "the ghost's depth does not match the real rocking chair");
+
+            // The chair's own boxes (the bug) would be 6 boxes and a ring, 168 triangles; the real rocking chair's 20
+            // boxes and the same ring are 336: well over the chair's fallback count either way.
+            int ghostTriangles = ghost.GetComponent<MeshFilter>().sharedMesh.triangles.Length / 3;
+            Assert.Greater(ghostTriangles, 200, "the ghost's mesh is too small to be the rocking chair's own shape (still the chair's boxes?)");
+            ghost.Hide();
+            AssertClean();
+        }
+
         // ----- 42g: the robot's shove, FurnitureController.BeginPush (CONTRACT_M5 4, 16.8, 18) -----
 
         private static int PushSteps => Mathf.RoundToInt(Tuning.RobotPushTime / Dt);

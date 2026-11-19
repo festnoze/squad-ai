@@ -338,6 +338,38 @@ namespace OutOfSight.Tests
             l.Room.FloorFinish = RoomDef.TileFinish;
             Assert.That(LevelValidator.Validate(l), Has.Some.Contains("both soft and tiled"));
         }
+
+        // ----- Wall finishes (2026-11-19): the wallFinish field. -----
+
+        [Test]
+        public void Validator_accepts_every_wall_finish_and_the_default()
+        {
+            LevelDef l = Level1();
+            Assert.IsEmpty(LevelValidator.Validate(l), "premise: level 1 is valid without a wall finish");
+            foreach (string finish in RoomDef.WallFinishes)
+            {
+                l.Room.WallFinish = finish;
+                Assert.IsEmpty(LevelValidator.Validate(l), $"the wall finish '{finish}' should be valid");
+            }
+        }
+
+        [Test]
+        public void Validator_rejects_an_unknown_wall_finish()
+        {
+            LevelDef l = Level1();
+            l.Room.WallFinish = "marble";
+            Assert.That(LevelValidator.Validate(l), Has.Some.Contains("wall finish"));
+        }
+
+        [Test]
+        public void Level_json_reads_the_wall_finish_and_omits_the_default()
+        {
+            LevelDef l = Level1();
+            Assert.IsFalse(LevelJson.Serialize(l).Contains("wallFinish"), "the default crepi writes no wallFinish");
+            l.Room.WallFinish = RoomDef.WallpaperFinish;
+            LevelDef back = LevelJson.Parse(LevelJson.Serialize(l));
+            Assert.AreEqual(RoomDef.WallpaperFinish, back.Room.WallFinish);
+        }
     }
 
     public sealed class StringsTests

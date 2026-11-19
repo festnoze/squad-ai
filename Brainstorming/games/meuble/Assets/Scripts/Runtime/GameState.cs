@@ -2181,7 +2181,7 @@ namespace OutOfSight
             Ghost?.ShowRings(OutOfPlace && !lying, tolerance);
             if (OutOfPlace && !AtDecoy && !lying)
             {
-                // M8 (the product owner's 2026-11-18 report): the ghost copies the furniture's own visual, whatever its kind.
+                // The product owner's 2026-11-18 report: the ghost copies the furniture's own visual, whatever its kind.
                 Ghost?.Show(memories[Mathf.Clamp(lastSeer, 0, memories.Length - 1)].PlayerSlot, furniture.Size, furniture.Visual, tolerance);
             }
             else

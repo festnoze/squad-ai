@@ -168,41 +168,51 @@ namespace OutOfSight.Core
         // AudioLibrary.ReferenceLufs) / 20), with ReferenceLufs -12. The playback target (at Volume 100 %) is the max
         // loudness over 100 ms for a one-shot and the integrated loudness for a loop, in LUFS, given after each value.
         // The M3.1 balance is kept (the old levels re-measured that way), the variants of a role are now matched by loudness.
-        public const float SfxHopMix = 0.158f;              // -28
+        //
+        // Audio overhaul, Request 2 (docs/audio/AUDIO_REPORT.md 4): every role below is a further -4 dB (x0.631) from the
+        // M3.1 balance, music untouched (MusicTitleMix, MusicLevelMix), so the default mix sits more forward on the music and
+        // less on the effects. The alert, the footsteps and the stingers are cut the same -4 dB as everything else and stay
+        // clearly readable over the music (creak -17 vs the level loop's -33, a 16 dB margin; footstep -22, an 11 dB margin
+        // at 1 m; caught and win -19, a 14 dB margin): the cut moves the whole effects bus, not the few cues that matter most.
+        public const float SfxHopMix = 0.0997f;             // -32
         /// <summary>A hop on a rug or in a soft room: the muffled variants, felt more than heard.</summary>
-        public const float SfxSoftHopMix = 0.05f;           // -38
-        public const float SfxPivotScrapeMix = 0.251f;      // -24
-        public const float SfxPickUpScrapeMix = 0.355f;     // -21
-        public const float SfxCreakMix = 0.891f;            // -13, the loudest cue: the alert every inhabitant in range hears
-        public const float SfxWarningCreakMix = 0.224f;     // -25
-        public const float SfxThumpMix = 0.794f;            // -14
-        public const float SfxCaughtMix = 0.708f;           // -15, both caught stings
-        public const float SfxHeinMix = 0.794f;             // -14
-        public const float SfxFootstepMix = 0.501f;         // -18 within a metre (linear rolloff to 10 m)
-        public const float SfxRoomToneMix = 0.0224f;        // -45 LUFS integrated
-        public const float SfxClockMix = 0.0158f;           // -48 LUFS integrated
-        public const float SfxUiClickMix = 0.158f;          // -28
+        public const float SfxSoftHopMix = 0.0316f;         // -42
+        public const float SfxPivotScrapeMix = 0.1584f;     // -28
+        public const float SfxPickUpScrapeMix = 0.224f;     // -25
+        public const float SfxCreakMix = 0.562f;            // -17, the loudest cue: the alert every inhabitant in range hears
+        public const float SfxWarningCreakMix = 0.1413f;    // -29
+        public const float SfxThumpMix = 0.501f;            // -18
+        public const float SfxCaughtMix = 0.4467f;          // -19, both caught stings
+        public const float SfxHeinMix = 0.501f;             // -18
+        public const float SfxFootstepMix = 0.3161f;        // -22 within a metre (linear rolloff to 10 m)
+        public const float SfxRoomToneMix = 0.01413f;       // -49 LUFS integrated
+        public const float SfxClockMix = 0.00997f;          // -52 LUFS integrated
+        public const float SfxUiClickMix = 0.0997f;         // -32
         /// <summary>The menu's selection tick, well under the click.</summary>
-        public const float SfxUiHoverMix = 0.079f;          // -34
+        public const float SfxUiHoverMix = 0.0499f;         // -38
         /// <summary>The win jingle, level with the caught stings.</summary>
-        public const float SfxWinMix = 0.708f;              // -15
+        public const float SfxWinMix = 0.4467f;             // -19
         /// <summary>A room door opening, a little under the put-down thump.</summary>
-        public const float SfxDoorMix = 0.562f;             // -17
+        public const float SfxDoorMix = 0.3546f;            // -21
         /// <summary>The wardrobe's doors opening and shutting (the furniture's own move, inside or in front of it).</summary>
-        public const float SfxWardrobeMix = 0.398f;         // -20
+        public const float SfxWardrobeMix = 0.2511f;        // -24
         /// <summary>The fallen load's crash: as loud as a caught sting (heard 6 m away).</summary>
-        public const float SfxCrashMix = 0.794f;            // -14
+        public const float SfxCrashMix = 0.501f;            // -18
         /// <summary>The stool's topple: about as loud as a caught sting (the M4 synthesized level).</summary>
-        public const float SfxToppleMix = 0.631f;           // -16
+        public const float SfxToppleMix = 0.3981f;          // -20
         /// <summary>The floor lamp's switch, near the hop.</summary>
-        public const float SfxLampClickMix = 0.2f;          // -26
+        public const float SfxLampClickMix = 0.1262f;       // -30
         /// <summary>The variation of a recorded one-shot without variants (door, wardrobe, crash, topple, lamp): pitch +- this.</summary>
         public const float SfxPitchJitter = 0.05f;
 
         // ----- Music (MusicPlayer.cs, docs/audio/AUDIO_REPORT.md 5) -----
         /// <summary>The title page loop at Music 100 %: -24 LUFS integrated, the cues of a menu are only clicks.</summary>
         public const float MusicTitleMix = 0.251f;
-        /// <summary>The in-level loop at Music 100 %: -33 LUFS integrated, 15 dB under a near footstep, under every cue.</summary>
+        /// <summary>
+        /// The in-level loop at Music 100 %: -33 LUFS integrated. Request 2 of the audio overhaul lowers the effects
+        /// instead of raising this past its headroom (AUDIO_REPORT.md 4): the level loop keeps this exact mix, and the
+        /// effects moved down to it.
+        /// </summary>
         public const float MusicLevelMix = 0.089f;
         /// <summary>Seconds of the crossfade between the title loop and the level loop.</summary>
         public const float MusicCrossfadeSeconds = 1.5f;
@@ -403,6 +413,24 @@ namespace OutOfSight.Core
         /// points). Metres.
         /// </summary>
         public const float LeafFadeMargin = 0.05f;
+        /// <summary>
+        /// M7 walls pass (see-through walls, product owner 2026-11-19): the opacity a wall between the camera and the player
+        /// fades to (WallFader): light enough to see the room through it, enough to see the whole wall. 0 to 1.
+        /// </summary>
+        public const float WallFadeAlpha = 0.2f;
+        /// <summary>M7 walls pass: seconds a wall takes to fade to <see cref="WallFadeAlpha"/> or to come back (WallFader).</summary>
+        public const float WallFadeSeconds = 0.25f;
+        /// <summary>
+        /// M7 walls pass: a camera that moves farther than this in one frame jumped (SetView, a restart): the wall fader
+        /// snaps instead of animating. Metres.
+        /// </summary>
+        public const float WallFadeSnapDistance = 1.5f;
+        /// <summary>
+        /// M7 walls pass: how far the closures at a wall line's ends and the caps over a crossing wall's band stand inside
+        /// the wall's own faces and cap, so a standing wall's faces always win the depth test over them (no z-fighting).
+        /// Metres.
+        /// </summary>
+        public const float WallClosureInset = 0.002f;
 
         // ----- M5 watchers (docs/CONTRACT_M5.md 3, 16.11; CONTRACT_M5_v3.md 4 and 15.5) -----
         /// <summary>
@@ -445,7 +473,9 @@ namespace OutOfSight.Core
         /// <summary>The dog's synthesized patter (FootstepAudio): two paw ticks this far apart (seconds), variants, gain.</summary>
         public const float DogPatterGap = 0.055f;
         public const int DogPatterVariants = 3;
-        // Audio overhaul: 0.55 x 0.69 / 0.501, so the patter keeps its level under the new SfxFootstepMix (it plays at gain x mix).
+        // Audio overhaul: 0.55 x 0.69 / 0.501 (SfxFootstepMix as it was before Request 2's -4 dB effects trim). Left as is:
+        // the patter plays at gain x SfxFootstepMix like a human step, so Request 2's cut moved it down with every footstep
+        // and the same gap under them holds.
         public const float DogPatterGain = 0.757f;
         /// <summary>
         /// The character palette (CONTRACT_M5 16.11), sRGB on ModelMath's 1/64 grid: every human and the dog map onto these
@@ -758,6 +788,19 @@ namespace OutOfSight.Core
         public const float PlayerSmoothness = 0.8f;
         public const float PlayerMetallic = 0.35f;
 
+        // ----- Wall finishes (product owner request, 2026-11-19; tools/assets/make_wall_finishes.py). -----
+        // Metres covered by one repeat, at a believable real scale: the two plasters' clouds and trowel or brush marks
+        // span tens of centimetres (2 m, as the crepi); the grasscloth repeats two hung panels of 0.9 m; the printed
+        // wallpaper's repeat is the 0.53 m width of a roll (two 26.5 cm stripes, 16 cm sprigs).
+        public const float DetailTileSage = 2.0f;
+        public const float DetailTileLimewash = 2.0f;
+        public const float DetailTileGrasscloth = 1.8f;
+        public const float DetailTileWallpaper = 0.53f;
+        /// <summary>The _BumpScale of the four finishes' normal maps: their relief is already set in the maps (xy rms 0.05 to 0.2).</summary>
+        public const float NormalScaleWallFinish = 1.0f;
+        /// <summary>The finishes are matte, as the crepi (ColourPlasterSmoothness).</summary>
+        public const float ColourWallFinishSmoothness = 0.1f;
+
         // ----- M7 design (docs/CONTRACT_M7.md 4.1): the difficulty table (DifficultyDef). Normal is the M6 game. -----
         // Facile only helps the player, Difficile only hinders (DifficultyM7Tests checks every knob both ways).
         /// <summary>Every watcher's view range is multiplied by this (the lamp factor applies on top).</summary>
@@ -820,12 +863,12 @@ namespace OutOfSight.Core
         /// <summary>Radius of the player start dot in a miniature, in metres (never under 3.5 final pixels).</summary>
         public const float LevelMiniaturePlayerRadius = 0.38f;
 
-        // ----- M7 title logo (TitleLogo): the red chair rendered once at a three-quarter angle, with a long low-sun shadow. -----
+        // ----- M7 title logo (TitleLogo): the red chair rendered once at a three-quarter angle, with a short high-sun shadow. -----
         /// <summary>Size of the baked logo texture, in pixels (rendered at twice this and averaged down).</summary>
-        public const int TitleLogoWidth = 640;
-        public const int TitleLogoHeight = 256;
-        /// <summary>Elevation of the low sun above the logo's ground, in degrees: the shadow is height / tan of it.</summary>
-        public const float TitleLogoSunElevation = 16f;
+        public const int TitleLogoWidth = 400;
+        public const int TitleLogoHeight = 300;
+        /// <summary>Elevation of the high (about 11 am) sun above the logo's ground, in degrees: the shadow is height / tan of it.</summary>
+        public const float TitleLogoSunElevation = 62f;
         /// <summary>Heading of the sun's travel on the logo's ground, in degrees from the camera's right toward its depth.</summary>
         public const float TitleLogoSunHeading = 24f;
         /// <summary>The chair's yaw in the logo's frame (180 faces the camera), in degrees.</summary>
@@ -833,30 +876,24 @@ namespace OutOfSight.Core
         /// <summary>Degrees the logo camera looks down.</summary>
         public const float TitleLogoPitch = 26f;
         /// <summary>Width of ground the orthographic logo camera frames, in metres, and the chair's distance from its left edge.</summary>
-        public const float TitleLogoFrameWidth = 4.0f;
-        public const float TitleLogoChairInset = 0.6f;
+        public const float TitleLogoFrameWidth = 1.8f;
+        public const float TitleLogoChairInset = 0.75f;
         /// <summary>Where the chair's foot sits, as a fraction of the frame height from the bottom.</summary>
-        public const float TitleLogoFootHeight = 0.18f;
+        public const float TitleLogoFootHeight = 0.15f;
         /// <summary>Distance of the logo rig from the world origin, sideways to the sun: far outside every camera's far plane and shadow cascades.</summary>
         public const float TitleLogoRigDistance = 600f;
         /// <summary>The unnamed layer only the two logo cameras render.</summary>
         public const int TitleLogoLayer = 30;
-        /// <summary>The sunlit pool on the ground: centre along the shadow and half axes, as fractions of the shadow length (across: metres).</summary>
-        public const float TitleLogoPoolCenter = 0.5f;
-        public const float TitleLogoPoolAlong = 0.66f;
-        public const float TitleLogoPoolAcross = 1.1f;
-        /// <summary>Opacity of the pool's centre, and the radius (fraction of the half axes) where its soft edge begins.</summary>
-        public const float TitleLogoPoolAlpha = 0.95f;
-        public const float TitleLogoPoolInner = 0.35f;
         /// <summary>Shadow darkness at the chair's foot and at the tip of the shadow.</summary>
         public const float TitleLogoShadowNear = 0.95f;
         public const float TitleLogoShadowFar = 0.6f;
-        /// <summary>The shadow's penumbra at its tip, in logo pixels (it starts sharp at the foot).</summary>
-        public const int TitleLogoShadowBlur = 10;
+        /// <summary>The shadow's penumbra at its tip, in logo pixels (it starts sharp at the foot). Scaled down with the
+        /// shorter midday shadow so it still reads as crisp near the feet.</summary>
+        public const int TitleLogoShadowBlur = 6;
         /// <summary>Size of the logo on the title page (1920 x 1080 reference) and the offset of its left centre.</summary>
-        public const float TitleLogoUiWidth = 540f;
-        public const float TitleLogoUiHeight = 216f;
-        public const float TitleLogoUiX = 116f;
+        public const float TitleLogoUiWidth = 240f;
+        public const float TitleLogoUiHeight = 180f;
+        public const float TitleLogoUiX = 80f;
         public const float TitleLogoUiY = 448f;
 
         // ----- M7 options page (Menu.BuildOptions, OptionsRow): the title page's left column style, reused. -----

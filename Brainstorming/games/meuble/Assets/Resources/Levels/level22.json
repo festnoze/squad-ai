@@ -27,7 +27,8 @@
       "wallThickness": 0.1,
       "floor": "soft",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "wallpaper"
     },
     {
       "id": "galerie",
@@ -198,9 +199,18 @@
   "rugs": [
     {
       "model": "kenney.rug",
-      "x": 12.0,
+      "x": 8.22,
       "z": 10.95,
-      "sizeX": 15.0,
+      "sizeX": 7.44,
+      "sizeZ": 1.2,
+      "yaw": 0.0,
+      "color": "#5B93D9"
+    },
+    {
+      "model": "kenney.rug",
+      "x": 15.78,
+      "z": 10.95,
+      "sizeX": 7.44,
       "sizeZ": 1.2,
       "yaw": 0.0,
       "color": "#5B93D9"
@@ -208,9 +218,18 @@
     {
       "model": "kenney.rug",
       "x": 20.95,
-      "z": 6.5,
+      "z": 4.22,
       "sizeX": 1.2,
-      "sizeZ": 9.0,
+      "sizeZ": 4.44,
+      "yaw": 0.0,
+      "color": "#5B93D9"
+    },
+    {
+      "model": "kenney.rug",
+      "x": 20.95,
+      "z": 8.78,
+      "sizeX": 1.2,
+      "sizeZ": 4.44,
       "yaw": 0.0,
       "color": "#5B93D9"
     }

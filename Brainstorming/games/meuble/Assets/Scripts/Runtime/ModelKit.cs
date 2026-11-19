@@ -565,11 +565,10 @@ namespace OutOfSight
 
         /// <summary>
         /// The surface a source material shows (by its name in the GLB, case ignored). Kenney: wood is wood, carpet is
-        /// upholstery on a seat; on a flat model (rug, doormat) it stays Plain (M7 rug image, 2026-11-18: its own mesh
-        /// mixes several disjoint UV ranges, not one coherent mapping across the whole rug, so the stretched picture
-        /// never samples it; it keeps a plain shaded skirt instead, and BuildRug/BuildExit put the picture on their own
-        /// dedicated quad). The lamp shade is linen. Quaternius: the clothes are linen; skin, eyes, hair and shoes stay
-        /// plain (nothing harsh on a face). Any other name stays plain.
+        /// upholstery on a seat and carpet on a flat model (rug, doormat: its own tiled skirt, unchanged by the M7 rug
+        /// image of 2026-11-18, which adds the picture on its own separate quad instead, see BuildRug/BuildRugImage),
+        /// the lamp shade is linen. Quaternius: the clothes are linen; skin, eyes, hair and shoes stay plain (nothing
+        /// harsh on a face). Any other name stays plain.
         /// M6 (CONTRACT_M6 2.4): metal (the floor lamp's pole and foot) is now Surface.Metal instead of staying plain.
         /// </summary>
         public static Surface SurfaceOf(string sourceMaterial, bool flat)
@@ -581,7 +580,7 @@ namespace OutOfSight
                 case "carpet":
                 case "carpetdarker":
                 case "carpetblue":
-                    return flat ? Surface.Plain : Surface.Upholstery;
+                    return flat ? Surface.Carpet : Surface.Upholstery;
                 case "lamp":
                     return Surface.Linen;
                 case "metal":
