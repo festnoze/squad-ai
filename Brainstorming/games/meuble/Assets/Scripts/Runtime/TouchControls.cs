@@ -7,7 +7,8 @@ namespace OutOfSight
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.5): the touch controls, on their own overlay canvas, shown while
-    /// <see cref="InputReader.TouchUIActive"/> holds and the game is not paused (the menus are uGUI, driven by tap through
+    /// <see cref="InputReader.TouchUIActive"/> holds, the game is not paused and no fail or win panel is up (the menus and
+    /// those panels are uGUI, driven by tap through
     /// the InputSystemUIInputModule). Left half of the screen: a floating stick that appears where the thumb lands and
     /// moves the furniture like the left stick. Right half: a drag orbits the camera. Bottom right: the action button (E)
     /// and the careful toggle; top right: the pause button.
@@ -86,7 +87,12 @@ namespace OutOfSight
 
         private void Update()
         {
-            bool show = InputReader.TouchUIActive && !GamePause.IsPaused;
+            // End panel emphasis (2026-11-19): hidden under the fail and win panels too. This overlay draws over the HUD
+            // (sorting 30 over 20), and on a 20:9 phone the idle stick sat over Next level and the careful toggle over
+            // Menu; a tap there also toggled careful, as the overlay reads every finger itself.
+            Hud hud = Main.Instance != null ? Main.Instance.Hud : null;
+            bool endPanel = hud != null && (hud.FailVisible || hud.WinVisible);
+            bool show = InputReader.TouchUIActive && !GamePause.IsPaused && !endPanel;
             if (show != overlay.activeSelf)
             {
                 overlay.SetActive(show);

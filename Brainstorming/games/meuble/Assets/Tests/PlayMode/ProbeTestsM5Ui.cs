@@ -117,7 +117,19 @@ namespace OutOfSight.Tests
             }
         }
 
-        private static GameObject Selected => EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+        /// <summary>
+        /// Waits whole frames, not fixed steps: Menu selects its default button in Update a frame after a page opens,
+        /// and on a slow frame several fixed steps run inside one frame, so a fixed-step wait could end before it.
+        /// </summary>
+        private static IEnumerator UntilFrames(Func<bool> until, int maxFrames)
+        {
+            for (int i = 0; i < maxFrames && !until(); i++)
+            {
+                yield return null;
+            }
+        }
+
+        private static GameObject Selected =>EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
 
         private string NewTempDir()
         {
@@ -216,7 +228,9 @@ namespace OutOfSight.Tests
             Assert.AreEqual(Menu.LevelsButton, Menu.PlayButton.navigation.selectOnDown, "down from Jouer is not Niveaux");
             // M7: Options sits between Niveaux and Quitter, so Quitter is last.
             Assert.AreEqual(Menu.TitleOptionsButton, Menu.LevelsButton.navigation.selectOnDown, "down from Niveaux is not Options");
-            Assert.AreEqual(Menu.QuitButton, Menu.TitleOptionsButton.navigation.selectOnDown, "down from Options is not Quitter");
+            // Credits page (2026-11-19): Crédits sits between Options and Quitter, so Quitter stays last.
+            Assert.AreEqual(Menu.TitleCreditsButton, Menu.TitleOptionsButton.navigation.selectOnDown, "down from Options is not Crédits");
+            Assert.AreEqual(Menu.QuitButton, Menu.TitleCreditsButton.navigation.selectOnDown, "down from Crédits is not Quitter");
             Assert.AreEqual(Menu.PlayButton, Menu.LevelsButton.navigation.selectOnUp);
 
             OpenSelect();
@@ -466,13 +480,13 @@ namespace OutOfSight.Tests
         public IEnumerator Step41e_BackReturnsToTheTitle()
         {
             Menu.ShowTitle();
-            yield return Until(() => Selected == Menu.PlayButton.gameObject, 5);
+            yield return UntilFrames(() => Selected == Menu.PlayButton.gameObject, 10);
             Assert.AreEqual(Menu.PlayButton.gameObject, Selected, "premise: Jouer is selected on the title");
 
             OpenSelect();
             Assert.IsFalse(Menu.TitlePageShown);
             Assert.AreEqual(Select.Cards[0].Button, Menu.DefaultButton, "the first unlocked card is not the default selection");
-            yield return Until(() => Selected == Select.Cards[0].Button.gameObject, 5);
+            yield return UntilFrames(() => Selected == Select.Cards[0].Button.gameObject, 10);
             Assert.AreEqual(Select.Cards[0].Button.gameObject, Selected, "the first unlocked card is not selected on open");
             Navigation nav = Select.Cards[0].Button.navigation;
             Assert.AreEqual(Navigation.Mode.Explicit, nav.mode, "the cards' navigation is not explicit");

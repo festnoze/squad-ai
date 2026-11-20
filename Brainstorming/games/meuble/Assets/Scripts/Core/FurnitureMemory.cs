@@ -182,6 +182,31 @@ namespace OutOfSight.Core
             return SeenOutOfPlace(dt);
         }
 
+        /// <summary>
+        /// CONTRACT_M5 20: what <see cref="Observe(bool, FurniturePose, float, bool)"/> would call out of place, as a pure
+        /// question with no grace and no state change: lying down, or beyond <see cref="Tolerance"/> of the player slot and
+        /// of every decoy of the player's kind. The human the dog calls asks it when it reaches the held furniture.
+        /// </summary>
+        public bool OutOfPlace(FurniturePose player, bool lyingDown)
+        {
+            if (lyingDown)
+            {
+                return true;
+            }
+            if (WithinTolerance(player, PlayerSlot, Tolerance))
+            {
+                return false;
+            }
+            for (int i = 0; i < decoys.Length; i++)
+            {
+                if (decoyOfPlayerKind[i] && WithinTolerance(player, decoys[i], Tolerance))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /// <summary>One step of the current incident: Suspect until the grace runs out, then Discovery once.</summary>
         private Observation SeenOutOfPlace(float dt)
         {

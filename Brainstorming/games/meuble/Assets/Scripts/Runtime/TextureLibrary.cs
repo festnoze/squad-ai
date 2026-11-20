@@ -34,6 +34,36 @@ namespace OutOfSight
         Limewash,
         Grasscloth,
         Wallpaper,
+        // ----- M8 floor finishes (docs/m8/ROOMS_PLAN.md 4, product owner request, 2026-11-19): a room's "floorFinish"
+        // (RoomDef.FloorFinishes). Marble and Herringbone are hard-floor-only looks. CarpetFinish is the soft-floor-only
+        // "carpet" value: a wall-to-wall look, distinct from the plain soft floor's own Carpet above (its border and
+        // field, and the rug's and doormat's own picture). -----
+        Marble,
+        Herringbone,
+        CarpetFinish,
+        // ----- M9 floors (2026-11-19, docs/m9/FLOORS_WALLS.md): the third parquet (wide light oak planks), the second
+        // marble (dark green verde) and the product owner's two bathroom tiles; all hard-floor-only looks. -----
+        LightOak,
+        Verde,
+        IvoryTile,
+        TealTile,
+        // ----- Tiled walls (2026-11-19, docs/m9/FLOORS_WALLS.md): the product owner's two wall images, a room's
+        // "wallFinish" "whitetile" (bathrooms) and "subwaytile" (kitchens): each spans the wall once, floor to top
+        // (TextureLibrary.ClampsVertically). Last, so the library's serialized surfaces keep their values. -----
+        WhiteTile,
+        SubwayTile,
+        // ----- Printed and stone walls (2026-11-19, docs/m9/FLOORS_WALLS.md section 6): the product owner's three
+        // all-over wall images, a room's "wallFinish" "travertine", "arches" and "pinstripe": each repeats both ways at
+        // its metric size, like the four procedural finishes. Last, so the library's serialized surfaces keep their
+        // values. -----
+        Travertine,
+        Arches,
+        Pinstripe,
+        // ----- Walls 4 (2026-11-19, docs/m9/FLOORS_WALLS.md section 7): two more all-over wall images of the product
+        // owner, a room's "wallFinish" "quatrefoil" and "sageribbed". Last, so the library's serialized surfaces keep their
+        // values. -----
+        Quatrefoil,
+        SageRibbed,
     }
 
     /// <summary>
@@ -112,6 +142,36 @@ namespace OutOfSight
         /// <summary>The source image of <see cref="rugColour"/> (its file stem in Assets/Art/Environment).</summary>
         public string rugSource;
 
+        // ----- Walls 4 (2026-11-19, docs/m9/FLOORS_WALLS.md section 7): one material for every wall finish. -----
+
+        /// <summary>
+        /// The colour maps of every wall finish (<see cref="WallArray.Slices"/>, in that order) as one sRGB Texture2DArray,
+        /// 512 x 512 per slice, mipmapped, repeating both ways (Assets/Art/Environment/Arrays/wall_colours.png, a vertical
+        /// flipbook built by ModelCatalogBuilder from the same colour maps as the entries'), or null.
+        /// </summary>
+        public Texture2DArray wallColours;
+
+        /// <summary>The matching normal maps (linear RGB, OpenGL convention), one slice per finish, or null.</summary>
+        public Texture2DArray wallNormals;
+
+        /// <summary>
+        /// The one opaque material every wall face, fill, cap and stub is drawn with (OutOfSight/Wall Finishes, the two
+        /// arrays above): each vertex names its finish (WallArray.Tag), so a level's walls cost one material whatever the
+        /// number of finishes it shows (PRD 7.4), and the two faces of a shared wall combine into one renderer even when
+        /// their rooms differ. Null when the library has none: the walls then keep one URP Lit material per finish.
+        /// </summary>
+        public Material wallMaterial;
+
+        /// <summary>
+        /// The one see-through material of the wall fader (OutOfSight/Wall See-through): a faded wall finish from the two
+        /// arrays, any other faded part (door frames, baseboards, windows, leaves) from the 2D maps of its property block.
+        /// Null when the library has none: the fader then builds its URP Lit see-through material.
+        /// </summary>
+        public Material wallSeeThrough;
+
+        /// <summary>The surfaces of the slices of <see cref="wallColours"/> and <see cref="wallNormals"/>, as built (a check of <see cref="WallArray.Slices"/>).</summary>
+        public List<Surface> wallSlices = new List<Surface>();
+
         /// <summary>Every surface that shows a texture, in library order.</summary>
         public static readonly Surface[] Textured =
         {
@@ -122,6 +182,16 @@ namespace OutOfSight
             Surface.Tile,
             // Wall finishes (2026-11-19).
             Surface.Sage, Surface.Limewash, Surface.Grasscloth, Surface.Wallpaper,
+            // M8 floor finishes (2026-11-19).
+            Surface.Marble, Surface.Herringbone, Surface.CarpetFinish,
+            // M9 floors (2026-11-19).
+            Surface.LightOak, Surface.Verde, Surface.IvoryTile, Surface.TealTile,
+            // Tiled walls (2026-11-19).
+            Surface.WhiteTile, Surface.SubwayTile,
+            // Printed and stone walls (2026-11-19).
+            Surface.Travertine, Surface.Arches, Surface.Pinstripe,
+            // Walls 4 (2026-11-19).
+            Surface.Quatrefoil, Surface.SageRibbed,
         };
 
         /// <summary>
@@ -141,8 +211,101 @@ namespace OutOfSight
                     return Surface.Grasscloth;
                 case RoomDef.WallpaperFinish:
                     return Surface.Wallpaper;
+                case RoomDef.WhiteTileFinish:
+                    return Surface.WhiteTile;
+                case RoomDef.SubwayTileFinish:
+                    return Surface.SubwayTile;
+                case RoomDef.TravertineFinish:
+                    return Surface.Travertine;
+                case RoomDef.ArchesFinish:
+                    return Surface.Arches;
+                case RoomDef.PinstripeFinish:
+                    return Surface.Pinstripe;
+                case RoomDef.QuatrefoilFinish:
+                    return Surface.Quatrefoil;
+                case RoomDef.SageRibbedFinish:
+                    return Surface.SageRibbed;
                 default:
                     return Surface.Plaster;
+            }
+        }
+
+        /// <summary>
+        /// Tiled walls (2026-11-19): true for a surface whose image is a whole wall, floor to top (tiles above a trim above
+        /// paint), mapped once up the wall (one repeat is <see cref="Tuning.TiledWallHeight"/>, every room's wall height;
+        /// a wall face's V is its height above the floor, LevelBuilder) and repeated only along it: its maps are imported
+        /// Repeat on U and Clamp on V (ModelCatalogBuilder), so neither the wall top nor the floor samples the other end.
+        /// </summary>
+        public static bool ClampsVertically(Surface surface)
+        {
+            return surface == Surface.WhiteTile || surface == Surface.SubwayTile;
+        }
+
+        /// <summary>
+        /// Walls 4 (docs/m9/FLOORS_WALLS.md section 7): how a tiled wall's image is laid up the wall by the wall material.
+        /// <paramref name="trimHeight"/> is the bottom of the trim above the floor (metres); <paramref name="paintTop"/> and
+        /// <paramref name="tilesBottom"/> are the image's V (0 at its bottom, the paint) of the top of the paint and of the
+        /// bottom of the tile field, the trim between them (measured on the 512 colour maps by make_wall_finishes.band_rows:
+        /// the bathroom's tile field is six whole rows, the kitchen's seven whole courses, each wrapping on its grout line);
+        /// <paramref name="rowShift"/> is the image U every other repeat of the field moves by (half a subway tile, so an odd
+        /// number of courses keeps the running bond). False, all 0, for any other surface.
+        /// </summary>
+        public static bool BandOf(Surface surface, out float trimHeight, out float paintTop, out float tilesBottom, out float rowShift)
+        {
+            switch (surface)
+            {
+                case Surface.WhiteTile:
+                    trimHeight = Tuning.WhiteTileTrimHeight;
+                    paintTop = 0.3672f;
+                    tilesBottom = 0.3789f;
+                    rowShift = 0f;
+                    return true;
+                case Surface.SubwayTile:
+                    trimHeight = Tuning.SubwayTileTrimHeight;
+                    paintTop = 0.4023f;
+                    tilesBottom = 0.4160f;
+                    rowShift = 0.125f;
+                    return true;
+                default:
+                    trimHeight = 0f;
+                    paintTop = 0f;
+                    tilesBottom = 0f;
+                    rowShift = 0f;
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// M8 floor finishes (docs/m8/ROOMS_PLAN.md 4, product owner request, 2026-11-19): the surface a room's floor
+        /// shows, by its "floorFinish" (<see cref="RoomDef.FloorFinishes"/>) and whether its "floor" is soft
+        /// (<paramref name="isSoft"/>): null or empty is the default (<see cref="Surface.Parquet"/> on a hard floor,
+        /// the plain border-and-field <see cref="Surface.Carpet"/> on a soft one, unchanged since M1); "tile",
+        /// "marble" and "herringbone" are hard-floor-only looks, "carpet" the soft-floor-only wall-to-wall one
+        /// (<see cref="Surface.CarpetFinish"/>); (M9 floors) "lightoak", "verde", "ivorytile" and "tealtile" are
+        /// hard-floor-only looks too; an unknown value too (LevelValidator rejects it, falls back here).
+        /// </summary>
+        public static Surface FloorSurface(string finish, bool isSoft)
+        {
+            switch (finish)
+            {
+                case RoomDef.TileFinish:
+                    return Surface.Tile;
+                case RoomDef.MarbleFinish:
+                    return Surface.Marble;
+                case RoomDef.HerringboneFinish:
+                    return Surface.Herringbone;
+                case RoomDef.CarpetFinish:
+                    return Surface.CarpetFinish;
+                case RoomDef.LightOakFinish:
+                    return Surface.LightOak;
+                case RoomDef.VerdeFinish:
+                    return Surface.Verde;
+                case RoomDef.IvoryTileFinish:
+                    return Surface.IvoryTile;
+                case RoomDef.TealTileFinish:
+                    return Surface.TealTile;
+                default:
+                    return isSoft ? Surface.Carpet : Surface.Parquet;
             }
         }
 
@@ -383,6 +546,34 @@ namespace OutOfSight
                     return Tuning.DetailTileGrasscloth;
                 case Surface.Wallpaper:
                     return Tuning.DetailTileWallpaper;
+                case Surface.Marble:
+                    return Tuning.DetailTileMarble;
+                case Surface.Herringbone:
+                    return Tuning.DetailTileHerringbone;
+                case Surface.CarpetFinish:
+                    return Tuning.DetailTileCarpetFinish;
+                case Surface.LightOak:
+                    return Tuning.DetailTileLightOak;
+                case Surface.Verde:
+                    return Tuning.DetailTileVerde;
+                case Surface.IvoryTile:
+                    return Tuning.DetailTileIvoryTile;
+                case Surface.TealTile:
+                    return Tuning.DetailTileTealTile;
+                case Surface.WhiteTile:
+                    return Tuning.DetailTileWhiteTile;
+                case Surface.SubwayTile:
+                    return Tuning.DetailTileSubwayTile;
+                case Surface.Travertine:
+                    return Tuning.DetailTileTravertine;
+                case Surface.Arches:
+                    return Tuning.DetailTileArches;
+                case Surface.Pinstripe:
+                    return Tuning.DetailTilePinstripe;
+                case Surface.Quatrefoil:
+                    return Tuning.DetailTileQuatrefoil;
+                case Surface.SageRibbed:
+                    return Tuning.DetailTileSageRibbed;
                 default:
                     return 0f;
             }
@@ -434,7 +625,22 @@ namespace OutOfSight
                 case Surface.Limewash:
                 case Surface.Grasscloth:
                 case Surface.Wallpaper:
+                case Surface.WhiteTile:
+                case Surface.SubwayTile:
+                case Surface.Travertine:
+                case Surface.Arches:
+                case Surface.Pinstripe:
+                case Surface.Quatrefoil:
+                case Surface.SageRibbed:
                     return Tuning.NormalScaleWallFinish;
+                case Surface.Marble:
+                case Surface.Herringbone:
+                case Surface.CarpetFinish:
+                case Surface.LightOak:
+                case Surface.Verde:
+                case Surface.IvoryTile:
+                case Surface.TealTile:
+                    return Tuning.NormalScaleFloorFinish;
                 default:
                     return 0f;
             }
@@ -445,14 +651,44 @@ namespace OutOfSight
         /// <summary>
         /// The one smoothness and metallic every renderer of <paramref name="surface"/> uses (a fixed finish per surface,
         /// unlike the six M4.2 details whose smoothness varies by what draws them): Grass, Lacquer, Metal, Plastic,
-        /// Foliage, Soil and (M7, CONTRACT_M7 1.2) Tile only. False, with both out params at 0, for any other surface
-        /// (the caller picks its own).
+        /// Foliage, Soil, (M7, CONTRACT_M7 1.2) Tile and (M8 floor finishes, docs/m8/ROOMS_PLAN.md 4) Marble,
+        /// Herringbone and CarpetFinish only. False, with both out params at 0, for any other surface (the caller
+        /// picks its own).
         /// </summary>
         public static bool FinishOf(Surface surface, out float smoothness, out float metallic)
         {
             switch (surface)
             {
                 case Surface.Tile:
+                    smoothness = Tuning.TileSmoothness;
+                    metallic = 0f;
+                    return true;
+                // M8 floor finishes (2026-11-19): polished marble is glossier than Tile, matte oak Herringbone as
+                // matte as Parquet's own colour finish, the wall-to-wall carpet as matte as the plain soft floor's.
+                case Surface.Marble:
+                    smoothness = Tuning.MarbleSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Herringbone:
+                    smoothness = Tuning.HerringboneSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.CarpetFinish:
+                    smoothness = Tuning.CarpetFinishSmoothness;
+                    metallic = 0f;
+                    return true;
+                // M9 floors (2026-11-19): the light oak as matte as the other parquets, the verde as polished as the
+                // white marble, the two bathroom tiles glazed as the kitchen Tile.
+                case Surface.LightOak:
+                    smoothness = Tuning.HerringboneSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.Verde:
+                    smoothness = Tuning.MarbleSmoothness;
+                    metallic = 0f;
+                    return true;
+                case Surface.IvoryTile:
+                case Surface.TealTile:
                     smoothness = Tuning.TileSmoothness;
                     metallic = 0f;
                     return true;
@@ -526,7 +762,25 @@ namespace OutOfSight
                 case Surface.Limewash:
                 case Surface.Grasscloth:
                 case Surface.Wallpaper:
+                // Printed and stone walls (2026-11-19): the two printed papers as matte as the other wallpapers.
+                case Surface.Arches:
+                case Surface.Pinstripe:
+                // Walls 4 (2026-11-19): the quatrefoil is a printed paper too.
+                case Surface.Quatrefoil:
                     smoothness = Tuning.ColourWallFinishSmoothness;
+                    return true;
+                // The fluted panel is painted wood in a satin paint.
+                case Surface.SageRibbed:
+                    smoothness = Tuning.SageRibbedSmoothness;
+                    return true;
+                // The travertine is honed stone: a soft sheen, between the matte papers and the glazed tiled walls.
+                case Surface.Travertine:
+                    smoothness = Tuning.TravertineSmoothness;
+                    return true;
+                // Tiled walls (2026-11-19): the glazed tiles and the paint share one material.
+                case Surface.WhiteTile:
+                case Surface.SubwayTile:
+                    smoothness = Tuning.TiledWallSmoothness;
                     return true;
                 default:
                     return FinishOf(surface, out smoothness, out metallic);

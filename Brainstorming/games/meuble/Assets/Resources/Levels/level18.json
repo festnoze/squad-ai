@@ -14,8 +14,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "soft",
+      "floorFinish": "carpet",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "quatrefoil"
     },
     {
       "id": "entree",
@@ -26,8 +28,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "verde",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "travertine"
     },
     {
       "id": "chambre",
@@ -38,9 +42,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "soft",
+      "floorFinish": "carpet",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "wallpaper"
+      "wallFinish": "sage"
     },
     {
       "id": "cuisine",
@@ -54,7 +59,7 @@
       "floorFinish": "tile",
       "floorColor": "#EDE6DA",
       "wallColor": "#F7F4EE",
-      "wallFinish": "limewash"
+      "wallFinish": "subwaytile"
     }
   ],
   "doors": [
@@ -131,7 +136,7 @@
     },
     {
       "name": "Lit",
-      "kind": "sofa",
+      "kind": "bed",
       "x": 1.55,
       "z": -1.25,
       "yaw": 0.0,
@@ -175,6 +180,26 @@
     { "x": 5.25, "z": 2.35, "at": 20.2, "careful": true },
     { "x": 5.25, "z": 3.35, "at": 20.7, "careful": true },
     { "x": 5.5, "z": 3.6, "at": 20.7, "careful": true }
+  ],
+  "designerRouteHard": [
+    { "x": 0.25, "z": -0.85, "at": 5.6, "careful": true },
+    { "x": 0.25, "z": -1.85, "at": 6.1, "careful": true },
+    { "x": 0.75, "z": -1.85, "at": 7.1, "careful": true },
+    { "x": 0.75, "z": -0.85, "at": 7.6, "careful": true },
+    { "x": 0.75, "z": -0.35, "at": 8.6, "careful": true },
+    { "x": 0.75, "z": 0.25, "at": 9.1, "careful": true },
+    { "x": 1.75, "z": 0.25, "at": 9.6, "careful": true },
+    { "x": 2.75, "z": 0.25, "at": 10.6, "careful": true },
+    { "x": 3.75, "z": 0.25, "at": 11.6, "careful": true },
+    { "x": 4.25, "z": 0.25, "at": 12.6, "careful": true },
+    { "x": 4.25, "z": 0.75, "at": 13.1, "careful": true },
+    { "x": 4.25, "z": 0.75, "at": 13.6, "careful": true, "action": "hide" },
+    { "x": 4.25, "z": 0.75, "at": 17.7, "careful": true, "action": "leave" },
+    { "x": 5.25, "z": 0.75, "at": 18.0, "careful": true },
+    { "x": 5.25, "z": 1.75, "at": 19.0, "careful": true },
+    { "x": 5.25, "z": 2.35, "at": 20.0, "careful": true },
+    { "x": 5.25, "z": 3.35, "at": 20.5, "careful": true },
+    { "x": 5.5, "z": 3.6, "at": 20.5, "careful": true }
   ],
   "inhabitants": [
     {

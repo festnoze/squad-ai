@@ -714,13 +714,60 @@ namespace OutOfSight.Core
         }
 
         /// <summary>
-        /// The common start of Investigate and BeginSwitchOn: accepted in Routine and Alerted only, and never by a
-        /// personality without memory (the dog never investigates nor switches on, CONTRACT_M5_v3 4). Drops the plan
-        /// and the saved alert plan, and records where to resume.
+        /// The dog's run (CONTRACT_M5 20): true from <see cref="BeginRun"/> until the routine resumes (a cancel, a pin, a
+        /// startle). The mode is Investigating all along, so the "!" marker shows.
         /// </summary>
-        private bool BeginApproach(Vector3 target)
+        public bool Running { get; private set; }
+
+        /// <summary>
+        /// CONTRACT_M5 20: the dog saw the furniture moving and barked: it runs to <paramref name="target"/> at
+        /// <see cref="Tuning.DogRunSpeed"/> with <see cref="InvestigatePlanner"/>, stops within
+        /// <see cref="Tuning.InvestigateReach"/> of it, faces it and sets <see cref="ReachedTarget"/>, then stands there
+        /// (the hold) until GameState calls <see cref="CancelInvestigation"/>, which resumes the routine as after an
+        /// investigation. Accepted in Routine and Alerted (no memory needed), and again while running (a new target).
+        /// Without a path, ReachedTarget at once. Turns are telegraphed as always.
+        /// </summary>
+        public void BeginRun(Vector3 target)
         {
-            if (IsStartled || IsFrozen || !personality.Memory)
+            if (Running && mode == InhabitantMode.Investigating && !IsStartled && !IsFrozen)
+            {
+                investigateTarget = YawMath.Planar(target);
+                ReachedTarget = false;
+                ClearPlan();
+                stampGoal = -1;
+            }
+            else if (!BeginApproach(target, true))
+            {
+                return;
+            }
+            Running = true;
+            Vector3 here = StandUpFirst();
+            if (!WithinReachFrom(here))
+            {
+                if (!OtherPlanner.TryPlan(here, investigateTarget, corners) || corners.Count == 0)
+                {
+                    ReachedTarget = queue.Count == 0;
+                    if (!ReachedTarget)
+                    {
+                        Enqueue(new Action { Kind = Kind.Reached });
+                    }
+                    return;
+                }
+                EnqueuePath(here, Tuning.DogRunSpeed, RoutineActivity.Walking, true);
+            }
+            Enqueue(new Action { Kind = Kind.FaceTarget, Target = investigateTarget });
+            Enqueue(new Action { Kind = Kind.Reached });
+        }
+
+        /// <summary>
+        /// The common start of Investigate and BeginSwitchOn: accepted in Routine and Alerted only, and never by a
+        /// personality without memory (the dog never investigates nor switches on, CONTRACT_M5_v3 4) unless
+        /// <paramref name="anyone"/> (the dog's run, CONTRACT_M5 20). Drops the plan and the saved alert plan, and records
+        /// where to resume.
+        /// </summary>
+        private bool BeginApproach(Vector3 target, bool anyone = false)
+        {
+            if (IsStartled || IsFrozen || (!personality.Memory && !anyone))
             {
                 return false;
             }
@@ -744,6 +791,7 @@ namespace OutOfSight.Core
 
             mode = InhabitantMode.Investigating;
             ReachedTarget = false;
+            Running = false;
             investigateTarget = YawMath.Planar(target);
             ClearPlan();
             stampGoal = -1;
@@ -1643,6 +1691,7 @@ namespace OutOfSight.Core
         {
             mode = InhabitantMode.Routine;
             ReachedTarget = false;
+            Running = false;
             IsCarrying = false;
             JustPickedUp = false;
             JustPutDown = false;
@@ -1747,6 +1796,7 @@ namespace OutOfSight.Core
         {
             mode = InhabitantMode.Routine;
             ReachedTarget = false;
+            Running = false;
             ClearPlan();
             stampGoal = -1;
             Vector3 here = StandUpFirst();

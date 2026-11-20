@@ -1,0 +1,66 @@
+{
+  "id": "test_lights",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    { "id": "sdb", "x": 2.0, "z": 2.0, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorFinish": "tile", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE" },
+    { "id": "cuisine", "x": 6.1, "z": 2.0, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorFinish": "tile", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE", "wallFinish": "limewash" },
+    { "id": "salle", "x": 10.2, "z": 2.0, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA", "wallFinish": "wallpaper" },
+    { "id": "couloir", "x": 6.1, "z": 4.8, "sizeX": 12.2, "sizeZ": 1.4, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" },
+    { "id": "chambre", "x": 2.0, "z": 7.6, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "soft", "floorColor": "#B07A4E", "wallColor": "#EDE6DA", "wallFinish": "grasscloth" },
+    { "id": "bureau", "x": 6.1, "z": 7.6, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" },
+    { "id": "atelier", "type": "living", "x": 10.2, "z": 7.6, "sizeX": 4.0, "sizeZ": 4.0, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA", "wallFinish": "sage" },
+    { "id": "entree", "x": 13.8, "z": 4.8, "sizeX": 3.0, "sizeZ": 9.6, "wallHeight": 2.7, "wallThickness": 0.1, "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA" }
+  ],
+  "doors": [
+    { "x": 2.0, "z": 4.05, "width": 1.0, "top": 2.1 },
+    { "x": 6.1, "z": 4.05, "width": 1.0, "top": 2.1 },
+    { "x": 10.2, "z": 4.05, "width": 1.0, "top": 2.1 },
+    { "x": 2.0, "z": 5.55, "width": 1.0, "top": 2.1 },
+    { "x": 6.1, "z": 5.55, "width": 1.0, "top": 2.1 },
+    { "x": 10.2, "z": 5.55, "width": 1.0, "top": 2.1 },
+    { "x": 12.25, "z": 4.8, "width": 1.0, "top": 2.1 }
+  ],
+  "windows": [
+    { "x": 2.0, "z": -0.05, "width": 1.0, "bottom": 0.9, "top": 2.1 },
+    { "x": 6.1, "z": -0.05, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 10.2, "z": -0.05, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 2.0, "z": 9.65, "width": 1.2, "bottom": 0.9, "top": 2.1 },
+    { "x": 6.1, "z": 9.65, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 10.2, "z": 9.65, "width": 1.6, "bottom": 0.9, "top": 2.1 },
+    { "x": 15.35, "z": 2.5, "width": 1.2, "bottom": 0.9, "top": 2.1 }
+  ],
+  "player": { "model": "kenney.chair", "kind": "chair", "x": 13.8, "z": 7.25, "yaw": 180.0, "sizeX": 0.45, "sizeY": 0.9, "sizeZ": 0.45, "color": "#D7263D" },
+  "exit": { "model": "kenney.doormat", "x": 13.8, "z": 1.0, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    { "name": "Baignoire", "kind": "bathtub", "x": 3.6, "z": 1.0, "yaw": 90.0, "sizeX": 1.7, "sizeY": 0.6, "sizeZ": 0.75, "occluder": true, "color": "#F7F4EE", "accentColor": "#5B93D9" },
+    { "name": "Lavabo", "kind": "washbasin", "x": 0.25, "z": 2.0, "yaw": 270.0, "sizeX": 0.6, "sizeY": 1.8, "sizeZ": 0.45, "occluder": true, "color": "#F7F4EE", "accentColor": "#5B93D9" },
+    { "name": "Plan", "kind": "counter", "x": 4.4, "z": 2.0, "yaw": 270.0, "sizeX": 2.6, "sizeY": 0.9, "sizeZ": 0.6, "occluder": true, "color": "#5B93D9", "accentColor": "#F7F4EE" },
+    { "name": "TableCuisine", "kind": "table", "x": 6.9, "z": 2.0, "yaw": 0.0, "sizeX": 1.2, "sizeY": 0.75, "sizeZ": 0.8, "occluder": true, "color": "#F7F4EE", "accentColor": "#8C5A36" },
+    { "name": "TableSalle", "kind": "table", "x": 10.2, "z": 2.0, "yaw": 0.0, "sizeX": 1.6, "sizeY": 0.75, "sizeZ": 0.9, "occluder": true, "color": "#8C5A36", "accentColor": "#6B4226" },
+    { "name": "Buffet", "kind": "cabinet", "x": 8.45, "z": 2.0, "yaw": 270.0, "sizeX": 1.4, "sizeY": 0.9, "sizeZ": 0.45, "occluder": true, "color": "#6B4226", "accentColor": "#8C5A36" },
+    { "name": "Lit", "kind": "bed", "x": 1.0, "z": 8.6, "yaw": 0.0, "sizeX": 1.6, "sizeY": 0.55, "sizeZ": 2.0, "occluder": true, "color": "#5B93D9", "accentColor": "#F7F4EE" },
+    { "name": "Chevet", "kind": "nightstand", "x": 2.05, "z": 9.35, "yaw": 0.0, "sizeX": 0.45, "sizeY": 0.5, "sizeZ": 0.4, "occluder": true, "color": "#8C5A36", "accentColor": "#6B4226" },
+    { "name": "Armoire", "kind": "cabinet", "x": 3.7, "z": 7.6, "yaw": 90.0, "sizeX": 1.2, "sizeY": 2.0, "sizeZ": 0.55, "occluder": true, "color": "#6B4226", "accentColor": "#8C5A36" },
+    { "name": "Bureau", "kind": "table", "x": 7.7, "z": 7.6, "yaw": 0.0, "sizeX": 0.8, "sizeY": 0.75, "sizeZ": 1.4, "occluder": true, "color": "#F7F4EE", "accentColor": "#8C5A36" },
+    { "name": "Bibliotheque", "kind": "bookshelf", "x": 4.25, "z": 7.6, "yaw": 270.0, "sizeX": 1.6, "sizeY": 2.0, "sizeZ": 0.3, "occluder": true, "color": "#6B4226", "accentColor": "#E3B23C" },
+    { "name": "Canape", "kind": "sofa", "x": 10.2, "z": 9.1, "yaw": 0.0, "sizeX": 2.0, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true, "color": "#2E6DB4", "accentColor": "#5B93D9", "model": "kenney.sofa" },
+    { "name": "TableBasse", "kind": "coffee_table", "x": 10.2, "z": 7.9, "yaw": 0.0, "sizeX": 1.0, "sizeY": 0.4, "sizeZ": 0.5, "occluder": true, "color": "#8C5A36", "accentColor": "#6B4226" },
+    { "name": "MeubleTele", "kind": "tv_unit", "x": 8.45, "z": 7.6, "yaw": 270.0, "sizeX": 1.4, "sizeY": 1.1, "sizeZ": 0.45, "occluder": true, "color": "#6B4226", "accentColor": "#8C5A36" },
+    { "name": "Console", "kind": "cabinet", "x": 15.05, "z": 6.0, "yaw": 90.0, "sizeX": 1.0, "sizeY": 0.85, "sizeZ": 0.4, "occluder": true, "color": "#8C5A36", "accentColor": "#E3B23C" },
+    { "name": "Plante", "kind": "plant", "x": 12.65, "z": 9.2, "yaw": 0.0, "sizeX": 0.5, "sizeY": 1.3, "sizeZ": 0.5, "occluder": true, "color": "#3F8F4F", "accentColor": "#8C5A36" }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": 5.0, "z": 8.6, "facing": 90.0, "dwell": 8.0, "glances": [] },
+        { "x": 9.0, "z": 3.2, "facing": 90.0, "dwell": 8.0, "glances": [] }
+      ]
+    }
+  ]
+}

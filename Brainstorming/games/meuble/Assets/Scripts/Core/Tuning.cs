@@ -127,6 +127,28 @@ namespace OutOfSight.Core
         public const int BudgetRenderers = 120;
         public const int BudgetMaterials = 24;
         public const int BudgetFurnitureTriangles = 400;
+
+        /// <summary>The width (metres along x) of a bookshelf that the plain furniture budget covers.</summary>
+        public const float BookshelfBudgetWidth = 1.6f;
+
+        /// <summary>
+        /// The triangle budget of one furniture piece of <paramref name="kind"/> and width <paramref name="sizeX"/>: the plain
+        /// <see cref="BudgetFurnitureTriangles"/>, except a bookshelf, which gets it per <see cref="BookshelfBudgetWidth"/>
+        /// of width (never less). Why: a bookshelf is a row of books along its whole width, so its content grows with its
+        /// length, while every other piece keeps one shape whatever its size. A 5 m shelf gets 1250 triangles, which keeps it
+        /// filled with books instead of stretching a 1.6 m shelf's few books over 5 m; the level budget
+        /// (<see cref="BudgetLevelTriangles"/>) still bounds the whole level for mobile. The audit, the probe and the tests
+        /// all read it here.
+        /// </summary>
+        public static int FurnitureTriangleBudget(string kind, float sizeX)
+        {
+            if (kind != "bookshelf" || sizeX <= BookshelfBudgetWidth)
+            {
+                return BudgetFurnitureTriangles;
+            }
+            return (int)System.Math.Floor(BudgetFurnitureTriangles * sizeX / BookshelfBudgetWidth);
+        }
+
         public const int BudgetInhabitantTriangles = 3000;
         public const int BudgetInhabitantBones = 40;
         public const int BudgetLevelTriangles = 60000;
@@ -222,6 +244,18 @@ namespace OutOfSight.Core
         public const float MusicStingFadeSeconds = 0.25f;
         /// <summary>Seconds for the music to come back after a duck (a retry, the next level, the pause closed).</summary>
         public const float MusicReturnSeconds = 1.5f;
+        /// <summary>
+        /// Seconds the music stays silent after a catch or a win (the stings last 1.1 s at most), before it comes back
+        /// under the end panel at <see cref="MusicPauseDuck"/>.
+        /// </summary>
+        public const float MusicStingHoldSeconds = 2.5f;
+        /// <summary>
+        /// Seconds a running music loop may go without its source playing before the watchdog restarts it (an audio
+        /// device change or an OS suspend stops every source behind the player's back).
+        /// </summary>
+        public const float MusicWatchdogSeconds = 1f;
+        /// <summary>A loop that stopped this close to its end restarts from the start, not from where it stopped.</summary>
+        public const float MusicRestartTailSeconds = 0.5f;
         public const float SfxPivotYawRate = 180f;
         public const float SfxPivotMaxSpeed = 0.75f;
         // Sfx.cs, M4 synthesized cues (volumes before the mix scale)
@@ -318,6 +352,12 @@ namespace OutOfSight.Core
         public const float DogEyeHeight = 0.35f;
         public const float BarkRadius = 6f;
         public const float BarkCooldown = 3f;
+        // The dog's hold (CONTRACT_M5 20): after its bark it runs to the furniture (faster than every body), pins it within
+        // InvestigateReach + CarryReachMargin, barks at it every DogHoldBarkInterval (a sound, not a noise event) until a
+        // human puts it back; DogHoldMaxWait with no human on the way and it gives up.
+        public const float DogRunSpeed = 2.6f;
+        public const float DogHoldBarkInterval = 0.8f;
+        public const float DogHoldMaxWait = 6f;
         public const float WakeTelegraph = 0.6f;
         public static readonly UnityEngine.Color DogConeColor = new UnityEngine.Color(0.25f, 0.85f, 0.85f, 1f);
         public const int BudgetPetBones = 46;
@@ -414,17 +454,37 @@ namespace OutOfSight.Core
         /// </summary>
         public const float LeafFadeMargin = 0.05f;
         /// <summary>
-        /// M7 walls pass (see-through walls, product owner 2026-11-19): the opacity a wall between the camera and the player
-        /// fades to (WallFader): light enough to see the room through it, enough to see the whole wall. 0 to 1.
+        /// M7 walls pass (product owner 2026-11-19): the default of the wall opacity option (SaveOptions.WallOpacity, percent):
+        /// the opacity a wall in the way fades to in the see-through and both modes (WallFader): light enough to see the
+        /// room through it, enough to see the whole wall.
         /// </summary>
-        public const float WallFadeAlpha = 0.2f;
-        /// <summary>M7 walls pass: seconds a wall takes to fade to <see cref="WallFadeAlpha"/> or to come back (WallFader).</summary>
+        public const int WallOpacityDefault = 20;
+        /// <summary>
+        /// M7 walls pass: the height of the solid stub every wall line keeps along its footprint (LevelBuilder), shown in the
+        /// lowered and both modes: a lowered wall shows only this stub (and its standing door frames). Below the top of every
+        /// player body, so a stub never hides the furniture's top from the camera. Metres.
+        /// </summary>
+        public const float WallStubHeight = 0.22f;
+        /// <summary>M7 walls pass: seconds a wall takes to fade or sink out of the way, or to come back (WallFader).</summary>
         public const float WallFadeSeconds = 0.25f;
         /// <summary>
         /// M7 walls pass: a camera that moves farther than this in one frame jumped (SetView, a restart): the wall fader
         /// snaps instead of animating. Metres.
         /// </summary>
         public const float WallFadeSnapDistance = 1.5f;
+        /// <summary>
+        /// M9 near walls (product owner 2026-11-19): in the see-through and both looks, an outer wall line between the camera
+        /// and the house whose quad covers more than this fraction of the screen (0 to 1) fades to nothing instead of the
+        /// wall opacity option: even translucent, it veils the whole view (WallFader).
+        /// </summary>
+        public const float NearWallEnterCoverage = 0.2f;
+        /// <summary>
+        /// M9 near walls: a vanished outer wall comes back to the wall opacity option only once it covers less than this
+        /// fraction of the screen (hysteresis under <see cref="NearWallEnterCoverage"/>: no flicker while the camera orbits).
+        /// </summary>
+        public const float NearWallExitCoverage = 0.14f;
+        /// <summary>M9 near walls: seconds a near outer wall takes to fade from the wall opacity option to nothing, or back.</summary>
+        public const float NearWallVanishSeconds = 0.3f;
         /// <summary>
         /// M7 walls pass: how far the closures at a wall line's ends and the caps over a crossing wall's band stand inside
         /// the wall's own faces and cap, so a standing wall's faces always win the depth test over them (no z-fighting).
@@ -784,9 +844,11 @@ namespace OutOfSight.Core
         /// <summary>
         /// The player furniture (PrimitiveKit.PlayerMaterial): the owner's "vivid red painted metal" image. Painted metal:
         /// glossy, partly metallic so the highlights move, but mostly diffuse so the red reads in any light (PRD 7.2).
+        /// Toned down from 0.8 / 0.35 (owner, 2026-11-19: "trop etincelant" while moving): the wider lobe of 0.7 and
+        /// the lower F0 of 0.2 roughly halve the moving glint and the environment reflection, which stay visible.
         /// </summary>
-        public const float PlayerSmoothness = 0.8f;
-        public const float PlayerMetallic = 0.35f;
+        public const float PlayerSmoothness = 0.7f;
+        public const float PlayerMetallic = 0.2f;
 
         // ----- Wall finishes (product owner request, 2026-11-19; tools/assets/make_wall_finishes.py). -----
         // Metres covered by one repeat, at a believable real scale: the two plasters' clouds and trowel or brush marks
@@ -796,10 +858,83 @@ namespace OutOfSight.Core
         public const float DetailTileLimewash = 2.0f;
         public const float DetailTileGrasscloth = 1.8f;
         public const float DetailTileWallpaper = 0.53f;
-        /// <summary>The _BumpScale of the four finishes' normal maps: their relief is already set in the maps (xy rms 0.05 to 0.2).</summary>
+        /// <summary>The _BumpScale of the wall finishes' normal maps: their relief is already set in the maps (xy rms 0.05 to 0.2).</summary>
         public const float NormalScaleWallFinish = 1.0f;
         /// <summary>The finishes are matte, as the crepi (ColourPlasterSmoothness).</summary>
         public const float ColourWallFinishSmoothness = 0.1f;
+        /// <summary>
+        /// Tiled walls (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md): the product owner's two wall images
+        /// are each a whole wall, tiles above a trim above paint, so each spans ONCE the height of every room's walls,
+        /// from the floor (V = 0) to the top, and repeats only along the wall (its maps are clamped vertically). Square
+        /// images, so the repeat along the wall is the same 2.7 m (never stretched): the white bathroom tiles are 27 cm
+        /// squares (ten per repeat) over a trim at 0.99 to 1.03 m; the ivory subway tiles are 67.5 x 22.5 cm (a 3:1
+        /// format, four per course) over a rounded trim at 1.09 to 1.13 m, just above a kitchen worktop.
+        /// </summary>
+        public const float TiledWallHeight = 2.7f;
+        /// <summary>
+        /// Walls 4 (docs/m9/FLOORS_WALLS.md section 7, found by the room by room check): mapped once over 2.7 m the tiles
+        /// were far too big (27 cm bathroom squares, 67.5 x 22.5 cm subway tiles that read as breeze blocks). The tiled
+        /// walls are now laid up the wall as bands (WallArray, shader OutOfSight/Wall Finishes): the paint from the floor to
+        /// the trim (mirrored up and down, never stretched), the trim at <see cref="WhiteTileTrimHeight"/> or
+        /// <see cref="SubwayTileTrimHeight"/>, then the image's tile field repeated in whole rows to the wall top. One
+        /// image width in metres: ten 15 cm bathroom squares (1.5 m); four 30 x 10 cm subway tiles (1.2 m, seven courses
+        /// per field, every other field shifted half a tile so the running bond never breaks).
+        /// </summary>
+        public const float DetailTileWhiteTile = 1.5f;
+        public const float DetailTileSubwayTile = 1.2f;
+        /// <summary>The bottom of the bathroom's trim above the floor: washbasin and bathtub rim height.</summary>
+        public const float WhiteTileTrimHeight = 0.99f;
+        /// <summary>The bottom of the kitchen's trim above the floor: just above a worktop.</summary>
+        public const float SubwayTileTrimHeight = 1.09f;
+        /// <summary>One material shows the glazed tiles and the paint under them: between the matte paint (0.1) and the glazed floor Tile (0.5).</summary>
+        public const float TiledWallSmoothness = 0.3f;
+        /// <summary>
+        /// Printed and stone walls (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md section 6): the product
+        /// owner's three all-over wall images repeat both ways, one square repeat in metres, at a believable real scale.
+        /// The travertine (no joint, cloudy, its pores in streaks) spans 1.2 m: pores of 1 to 4 cm, clouds of about 30 cm.
+        /// The arches wallpaper is a 4 x 4 lattice: at 1.8 m its arches are 26 cm tall, 45 cm apart both ways, so six rows
+        /// fill a 2.7 m wall exactly and every row sits at the same height in every room (a face's V is its height above
+        /// the floor). The linen pinstripe has eight stripe pairs per repeat: at 1.2 m, one pair every 15 cm.
+        /// </summary>
+        public const float DetailTileTravertine = 1.2f;
+        public const float DetailTileArches = 1.8f;
+        public const float DetailTilePinstripe = 1.2f;
+        /// <summary>The travertine is honed stone: a soft sheen, between the matte papers (0.1) and the glazed tiled walls (0.3).</summary>
+        public const float TravertineSmoothness = 0.2f;
+        /// <summary>
+        /// Walls 4 (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md section 7): two more all-over images. The
+        /// quatrefoil wallpaper is an 8 x 8 lattice: at 1.35 m a quatrefoil every 16.9 cm, so sixteen rows fill a 2.7 m
+        /// wall exactly. The sage fluted panel has 36 ribs per repeat: at 1.44 m, one rib every 4 cm (a real fluted panel).
+        /// </summary>
+        public const float DetailTileQuatrefoil = 1.35f;
+        public const float DetailTileSageRibbed = 1.44f;
+        /// <summary>The fluted panel is painted wood in a satin paint: the travertine's soft sheen.</summary>
+        public const float SageRibbedSmoothness = 0.2f;
+
+        // ----- M8 floor finishes (docs/m8/ROOMS_PLAN.md 4, product owner request, 2026-11-19;
+        // tools/assets/make_floor_finishes.py). -----
+        // Metres covered by one repeat, at a believable real scale: a marble slab is about 0.6 m; a herringbone
+        // board pattern repeats every 0.6 to 0.8 m (two board lengths across the zigzag); wall-to-wall carpet loop
+        // pile has no visible motif at 1 m (as DetailTileCarpet, the plain soft floor's own repeat).
+        public const float DetailTileMarble = 0.6f;
+        public const float DetailTileHerringbone = 0.7f;
+        public const float DetailTileCarpetFinish = 1.0f;
+        /// <summary>The _BumpScale of the three finishes' normal maps: their relief is already set in the maps (xy rms 0.06 to 0.18).</summary>
+        public const float NormalScaleFloorFinish = 1.0f;
+        /// <summary>Polished marble: glossier than a tiled floor (TileSmoothness 0.5).</summary>
+        public const float MarbleSmoothness = 0.65f;
+        /// <summary>Matte oak, as the default parquet's own colour finish (ColourParquetSmoothness).</summary>
+        public const float HerringboneSmoothness = 0.35f;
+        /// <summary>Matte, as the plain soft floor's own Carpet (ColourCarpetSmoothness).</summary>
+        public const float CarpetFinishSmoothness = 0f;
+        // M9 floors (2026-11-19, docs/m9/FLOORS_WALLS.md): metres per repeat, at a believable real scale. The light oak
+        // repeats eight 25 cm wide boards (2 m); the verde four 0.8 m slabs (1.6 m); the product owner's small ivory
+        // bathroom tiles are a 16 x 16 grid (7.5 cm tiles, 1.2 m) and the large teal ones a 4 x 4 grid (40 cm tiles,
+        // 1.6 m). Their smoothness and _BumpScale reuse the parquet, marble and tile ones (TextureLibrary.FinishOf).
+        public const float DetailTileLightOak = 2.0f;
+        public const float DetailTileVerde = 1.6f;
+        public const float DetailTileIvoryTile = 1.2f;
+        public const float DetailTileTealTile = 1.6f;
 
         // ----- M7 design (docs/CONTRACT_M7.md 4.1): the difficulty table (DifficultyDef). Normal is the M6 game. -----
         // Facile only helps the player, Difficile only hinders (DifficultyM7Tests checks every knob both ways).
@@ -866,7 +1001,7 @@ namespace OutOfSight.Core
         // ----- M7 title logo (TitleLogo): the red chair rendered once at a three-quarter angle, with a short high-sun shadow. -----
         /// <summary>Size of the baked logo texture, in pixels (rendered at twice this and averaged down).</summary>
         public const int TitleLogoWidth = 400;
-        public const int TitleLogoHeight = 300;
+        public const int TitleLogoHeight = 280;
         /// <summary>Elevation of the high (about 11 am) sun above the logo's ground, in degrees: the shadow is height / tan of it.</summary>
         public const float TitleLogoSunElevation = 62f;
         /// <summary>Heading of the sun's travel on the logo's ground, in degrees from the camera's right toward its depth.</summary>
@@ -876,10 +1011,24 @@ namespace OutOfSight.Core
         /// <summary>Degrees the logo camera looks down.</summary>
         public const float TitleLogoPitch = 26f;
         /// <summary>Width of ground the orthographic logo camera frames, in metres, and the chair's distance from its left edge.</summary>
-        public const float TitleLogoFrameWidth = 1.8f;
-        public const float TitleLogoChairInset = 0.75f;
-        /// <summary>Where the chair's foot sits, as a fraction of the frame height from the bottom.</summary>
-        public const float TitleLogoFootHeight = 0.15f;
+        // Widened from 1.8 for the pool of light (2026-11-19), which needs room to fade out inside the frame.
+        public const float TitleLogoFrameWidth = 2.1f;
+        public const float TitleLogoChairInset = 0.85f;
+        /// <summary>Where the chair's foot sits, as a fraction of the frame height from the bottom (raised so the pool's
+        /// near edge fades out above the frame's bottom).</summary>
+        public const float TitleLogoFootHeight = 0.29f;
+        /// <summary>The pool of light on the floor: its centre along the shadow from the chair's foot and its radius, in
+        /// metres, so it holds the whole short shadow; the fraction of the radius kept at full light before the falloff;
+        /// and its opacity at full light over the title band.</summary>
+        public const float TitleLogoPoolCentre = 0.12f;
+        // Radius raised from 0.9 and core lowered from 0.45 (2026-11-19): a slightly larger pool with a wider soft rim.
+        public const float TitleLogoPoolRadius = 1.0f;
+        public const float TitleLogoPoolCore = 0.25f;
+        // Lowered from 0.9 (2026-11-19): the pool read too bright; 70 % of the original opacity.
+        public const float TitleLogoPoolAlpha = 0.63f;
+        /// <summary>Intensity of the warm spot above the pool that lights the chair's seat (baked once, no runtime cost).</summary>
+        // Lowered from 1.5 (2026-11-19) together with the pool's opacity.
+        public const float TitleLogoSpotIntensity = 1.2f;
         /// <summary>Distance of the logo rig from the world origin, sideways to the sun: far outside every camera's far plane and shadow cascades.</summary>
         public const float TitleLogoRigDistance = 600f;
         /// <summary>The unnamed layer only the two logo cameras render.</summary>
@@ -891,10 +1040,12 @@ namespace OutOfSight.Core
         /// shorter midday shadow so it still reads as crisp near the feet.</summary>
         public const int TitleLogoShadowBlur = 6;
         /// <summary>Size of the logo on the title page (1920 x 1080 reference) and the offset of its left centre.</summary>
-        public const float TitleLogoUiWidth = 240f;
-        public const float TitleLogoUiHeight = 180f;
-        public const float TitleLogoUiX = 80f;
-        public const float TitleLogoUiY = 448f;
+        // The chair in its pool is taller than the first logo (240 x 180): a little smaller, so chair and pool fit between
+        // the top of a 20:9 phone and the title; the chair moved right (2026-11-19, the product owner's "a little to the right").
+        public const float TitleLogoUiWidth = 232f;
+        public const float TitleLogoUiHeight = 162f;
+        public const float TitleLogoUiX = 128f;
+        public const float TitleLogoUiY = 401f;
 
         // ----- M7 options page (Menu.BuildOptions, OptionsRow): the title page's left column style, reused. -----
         /// <summary>Left margin of the title and every row, in reference pixels (the title page's own margin).</summary>
@@ -906,6 +1057,9 @@ namespace OutOfSight.Core
         public const float OptionsIconInset = 14f;
         /// <summary>Left offset of a row's label text, clear of the icon, in reference pixels.</summary>
         public const float OptionsLabelOffset = 82f;
+        /// <summary>M7 walls pass: the label opacity of a row whose value the current choices do not use (Wall opacity while the
+        /// walls are lowered or off): dimmed, still selectable.</summary>
+        public const float OptionsUnusedAlpha = 0.45f;
         /// <summary>Size of a row's decorative cycle arrows, and their inset from the row's right edge.</summary>
         public const float OptionsArrowSize = 26f;
         public const float OptionsArrowInset = 20f;

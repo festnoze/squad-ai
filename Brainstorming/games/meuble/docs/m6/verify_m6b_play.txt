@@ -1,6 +1,0 @@
-
-=== Sonde PlayMode (PRD 10.2) ===
-  tous les tueurs PlayMode de mutation.sh sont exiges
-  PlayMode : 214 tests, 0 echecs
-
-=== VERT ===

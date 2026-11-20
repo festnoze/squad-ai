@@ -96,8 +96,13 @@ namespace OutOfSight
             // M7 (CONTRACT_M7 1.2): painted wood, not bare wood grain; reuses the lacquer detail (PaintedWood006C,
             // docs/LICENSES.md) at this leaf's own matte material (never through LitSurface, so it keeps its caller's
             // smoothness instead of Lacquer's glossy fixed finish) and now its normal map too.
-            GameObject visual = PrimitiveKit.Box(go.transform, "Leaf", Vector3.zero, size, material, occluder, false, Surface.Lacquer);
+            // Handles (2026-11-19): the leaf box carries a lever on each face as a second sub-mesh in the household's dark
+            // metal (Handles.LeafMesh): it swings and fades with the leaf, never a collider, never a material of its own.
+            GameObject visual = PrimitiveKit.Part(go.transform, "Leaf", Handles.LeafMesh(size), Vector3.zero, Quaternion.identity, size, material,
+                occluder);
             leaf.Renderer = visual.GetComponent<MeshRenderer>();
+            leaf.Renderer.sharedMaterials = new[] { material, Handles.Material };
+            PrimitiveKit.Detail(leaf.Renderer, 0, Surface.Lacquer);
             leaf.Renderer.shadowCastingMode = ShadowCastingMode.On;
             if (fader != null)
             {

@@ -69,6 +69,64 @@ namespace OutOfSight.Core
         /// <summary>The saved language, English when there is none (or it is not a known one).</summary>
         [JsonIgnore] public string LanguageId => Strings.NormalizeLanguage(Language);
 
+        // M7 walls pass (product owner, 2026-11-19): how a wall between the camera and the player gets out of the way:
+        // "lowered" (it sinks to a low stub, its doorways standing), "seethrough" (it fades to WallOpacity), "both" (the stub
+        // stays and the wall above it fades to WallOpacity) or "none" (the walls never change). WallOpacity is a percentage,
+        // one of WallOpacitySteps. A missing field or an unknown value is Lowered and Tuning.WallOpacityDefault: the version
+        // stays 1 and every older save loads lowered at 20 %. Product owner, 2026-11-19: the default briefly went from
+        // "lowered" to "both", then back to "lowered" the same day. The "walls" key is always written, so a save that holds
+        // it (even "both") keeps it as an explicit choice; only a save without the key (written before the walls pass)
+        // takes the default.
+        public const string WallsLowered = "lowered";
+        public const string WallsSeeThrough = "seethrough";
+        public const string WallsBoth = "both";
+        public const string WallsNone = "none";
+
+        /// <summary>The wall opacities the Opacité des murs / Wall opacity row cycles through, in percent.</summary>
+        public static readonly int[] WallOpacitySteps = { 10, 20, 35, 50 };
+
+        [JsonProperty("walls")] public string Walls = WallsLowered;
+        [JsonProperty("wallOpacity")] public int WallOpacity = Tuning.WallOpacityDefault;
+
+        /// <summary>True for "lowered", "seethrough", "both" and "none".</summary>
+        public static bool IsWalls(string value) => value == WallsLowered || value == WallsSeeThrough || value == WallsBoth || value == WallsNone;
+
+        /// <summary>The Murs / Walls row's cycle: Lowered, See-through, Both, None, then Lowered again.</summary>
+        public static string NextWalls(string walls) =>
+            walls == WallsLowered ? WallsSeeThrough : walls == WallsSeeThrough ? WallsBoth : walls == WallsBoth ? WallsNone : WallsLowered;
+
+        /// <summary>The Wall opacity row's cycle: the next of <see cref="WallOpacitySteps"/>, then the first again.</summary>
+        public static int NextWallOpacity(int percent)
+        {
+            for (int i = 0; i < WallOpacitySteps.Length; i++)
+            {
+                if (WallOpacitySteps[i] > percent)
+                {
+                    return WallOpacitySteps[i];
+                }
+            }
+            return WallOpacitySteps[0];
+        }
+
+        /// <summary>The step of <see cref="WallOpacitySteps"/> nearest to <paramref name="percent"/>.</summary>
+        public static int NearestWallOpacity(int percent)
+        {
+            int best = Tuning.WallOpacityDefault;
+            int gap = int.MaxValue;
+            foreach (int step in WallOpacitySteps)
+            {
+                if (Mathf.Abs(step - percent) < gap)
+                {
+                    gap = Mathf.Abs(step - percent);
+                    best = step;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>True when the walls' opacity is used: the see-through and the both modes.</summary>
+        [JsonIgnore] public bool WallOpacityApplies => Walls == WallsSeeThrough || Walls == WallsBoth;
+
         /// <summary>"Jamais": VisionConeView hides the floor cones; the eye indicator and the screen edge pulse are unaffected.</summary>
         public bool HidesCone => Cone == ConeNever;
 
@@ -86,6 +144,8 @@ namespace OutOfSight.Core
                 Quality = IsQuality(Quality) ? Quality : null,
                 Difficulty = DifficultyDef.Normalize(Difficulty) == Difficulty ? Difficulty : null, // MUTATION:OPTIONS_DIFFICULTY_FALLBACK
                 Language = Language == Strings.English || Language == Strings.French ? Language : null,
+                Walls = IsWalls(Walls) ? Walls : WallsLowered, // MUTATION:OPTIONS_WALLS_FALLBACK
+                WallOpacity = NearestWallOpacity(WallOpacity),
             };
         }
 
@@ -145,6 +205,16 @@ namespace OutOfSight.Core
             if (l != null && l.Type == JTokenType.String)
             {
                 options.Language = l.Value<string>();
+            }
+            JToken w = obj["walls"];
+            if (w != null && w.Type == JTokenType.String)
+            {
+                options.Walls = w.Value<string>();
+            }
+            JToken wo = obj["wallOpacity"];
+            if (wo != null && (wo.Type == JTokenType.Float || wo.Type == JTokenType.Integer))
+            {
+                options.WallOpacity = Mathf.RoundToInt(wo.Value<float>());
             }
             return options.Clamped();
         }

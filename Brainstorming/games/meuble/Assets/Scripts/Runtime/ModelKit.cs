@@ -581,6 +581,9 @@ namespace OutOfSight
                 case "carpetdarker":
                 case "carpetblue":
                     return flat ? Surface.Carpet : Surface.Upholstery;
+                // M8 (docs/m8/ROOMS_PLAN.md 3): the Kenney bed's sheets and pillows.
+                case "carpetwhite":
+                    return flat ? Surface.Carpet : Surface.Linen;
                 case "lamp":
                     return Surface.Linen;
                 case "metal":
@@ -596,6 +599,28 @@ namespace OutOfSight
                     return Surface.Linen;
                 default:
                     return Surface.Plain;
+            }
+        }
+
+        /// <summary>
+        /// M8 (docs/m8/ROOMS_PLAN.md 3): the plain material a static model's slot takes by its source material's name, instead
+        /// of its own quantised colour, or null: Kenney's "metalLight" (the fridge's enamel) is the room objects' white ceramic,
+        /// its "glass", "metalDark" and "_defaultMat" (behind a fridge door, the fridge's back, the back of a drawer) the
+        /// household's near-black ("metalDark" is a dark teal just above ModelMath.NearBlackMax, its own material otherwise). So
+        /// the Kenney room models add no material of their own. No M3 to M6 model uses these names.
+        /// </summary>
+        public static Material PropSlotMaterial(string sourceMaterial)
+        {
+            switch ((sourceMaterial ?? "").Trim().ToLowerInvariant())
+            {
+                case "metallight":
+                    return FurnitureKit.CeramicMaterial;
+                case "glass":
+                case "metaldark":
+                case "_defaultmat":
+                    return FurnitureKit.DarkMaterial;
+                default:
+                    return null;
             }
         }
 
@@ -732,6 +757,14 @@ namespace OutOfSight
             var sourceSurfaces = new Surface[sources.Count];
             for (int k = 0; k < sources.Count; k++)
             {
+                // M8: a static model's white enamel and dark glass take the room objects' own plain materials.
+                Material fixedMaterial = character || (lacquerMain && k == main) ? null : PropSlotMaterial(sources[k].name);
+                if (fixedMaterial != null)
+                {
+                    mapped[k] = fixedMaterial;
+                    sourceSurfaces[k] = Surface.Plain;
+                    continue;
+                }
                 Color color = character
                     ? CharacterColor(sources[k].name, colors[k], pet, paint.Main, redReference)
                     : ModelMath.MapColor(colors[k], k == main, redReference, paint);

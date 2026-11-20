@@ -204,7 +204,8 @@ As in M3 and M4:
 
 ## 7. Doors, the dog, the split level
 
-Unchanged rules: v3 15.1 to 15.6. The dog uses the `dog` row of `PersonalityDef`.
+Unchanged rules: v3 15.1 to 15.6. The dog uses the `dog` row of `PersonalityDef`. Since section 20, the
+bark also sends the dog to hold the furniture until a human puts it back.
 
 ## 8. Levels 8 to 17
 
@@ -803,3 +804,38 @@ agent prompts where they ask for more).** Do the smallest work that turns the ga
   rewrite and five to ten lines of section 11 5B notes) and a README 5B gate section of a few lines.
   The CONTRACT_M5 section 12, 13 and 16.12 cleanup is skipped.
 - Every agent: few Unity runs, short reports.
+
+---
+
+## 20. The dog's hold (binding; product owner, 2026-11-19: "the dog does nothing when it detects you")
+
+Amends v3 4 and 15.5 (the bark stays exactly as it was: 0.2 s grace, 6 m noise at the dog, 3 s cooldown,
+never a catch). What follows the bark is new:
+
+- **The run.** With the memory rule on, a bark sends its dog running to the furniture
+  (`InhabitantRoutine.BeginRun`): mode Investigating ("!" over the dog), `Tuning.DogRunSpeed` 2.6 m/s
+  (faster than every body), turns telegraphed as always, the investigate planner (current doors). One run
+  at a time. A furniture that moved on is chased again from where the dog stopped; one it cannot reach
+  ends the run. A hidden or carried furniture starts none.
+- **The hold.** Within `InvestigateReach + CarryReachMargin` (0.9 m) the dog holds it: the furniture is
+  **pinned** with the sat-on pin (no input, never moving, no action, the creak paused), the HUD shows
+  `hud.dogHold` ("Le chien te bloque : on vient te remettre en place.", the dog eye as its icon) instead
+  of the sat-on line, and the dog barks at it every `Tuning.DogHoldBarkInterval` 0.8 s (a sound only: no
+  bark of the rule, no noise event, `BarkCount` unchanged).
+- **The human, as always.** The nearest human free to come (memory, Routine or Alerted, not frozen, on no
+  lamp, clue or door errand) is sent with `Investigate`, "!" over him. On arrival, his memory decides,
+  exactly as a sighting would (`FurnitureMemory.OutOfPlace`, tolerance and same-kind decoys): out of
+  place, **one discovery** (his suspicion gain; suspicion 1 loses as usual), then the usual carry back
+  to his slot; in place, nothing. No path: he gives up and accepts the furniture where it stands (M2.1
+  11.4). Any other human who sees it out of place meanwhile discovers it and carries it as usual.
+- **The end.** The dog lets go on the put down, when the sent human goes back to his routine without a
+  carry, when nobody could be sent for `Tuning.DogHoldMaxWait` 6 s, or when the dog is interrupted; it
+  then resumes its routine as after an investigation.
+- **Decision: a setback, not a catch.** The dog never catches (v3 4 holds). Its hold costs what a human's
+  discovery costs: the ground gained (the carry back) and one discovery when the furniture is out of place,
+  never the level by itself (the same rule as a fallen load, open question 25).
+- **Audit.** Unchanged: a schedule the awake dog sees moving is already forbidden (v3 8), so an audited
+  schedule never starts a run, and the designer routes already assert 0 barks.
+- **Probe.** Step38h (out of place: run, pin, loop barks, call, one discovery, carry back, release) and
+  Step38i (in place: no discovery, no carry, release). Tests that freeze the dog with a pin keep the old
+  behaviour (a frozen dog never runs).

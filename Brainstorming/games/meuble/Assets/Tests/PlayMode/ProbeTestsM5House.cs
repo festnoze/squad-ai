@@ -18,8 +18,8 @@ namespace OutOfSight.Tests
     /// Boot scene with the house's test levels.
     /// <list type="bullet">
     /// <item>Step 36 and 36l to 36n (doors, test_m5_house_door): the leaf poses, the collider and occlusion swap, the samples
-    /// on all 30 steps of the swing, the fade with the wall's centre plane, the area-mask paths over the one NavMesh.</item>
-    /// <item>Step 36o (level 8, wave 5A.1): an open leaf between the camera and the chair is faded.</item>
+    /// on all 30 steps of the swing, the leaf never moving with its wall (M9 doors rule), the area-mask paths over the one NavMesh.</item>
+    /// <item>Step 36o (level 8, wave 5A.1; M9 doors rule): an open leaf between the camera and the chair stays drawn (doors never move).</item>
     /// <item>Step 39 and 39e to 39g (the split level, test_m5_house_split): the ramp is climbable and the railing blocks; eyes,
     /// samples and plans add the floor height; a chair on the platform behind its edge is hidden from a low eye below.</item>
     /// <item>Step 39h: the renderer combining of the level builder on every manifest level and the 8 room mock, before and
@@ -272,7 +272,7 @@ namespace OutOfSight.Tests
         }
 
         [UnityTest]
-        public IEnumerator Step36l_LeafFadesWithItsWallCentrePlane()
+        public IEnumerator Step36l_LeafNeverMovesWithItsWall()
         {
             yield return Load(DoorLevel);
             LevelInstance level = Game.Level;
@@ -284,25 +284,51 @@ namespace OutOfSight.Tests
             Assert.Less(Chair.transform.position.z, 2f, "premise: the player is in room b (z < 2.05)");
             ShadowCastingMode shown = ShadowCastingMode.On;
             Assert.AreEqual(Layers.Occluder, porte.Renderer.gameObject.layer, "premise: the leaf is drawn on the Occluder layer");
-
-            // The camera in a, the player in b: the wall centre plane x = 0 separates them, the leaf hides.
-            fader.Apply(new Vector3(-3f, 2.5f, 0.25f));
-            Assert.AreEqual(ShadowCastingMode.ShadowsOnly, porte.Renderer.shadowCastingMode, "the leaf fades when its wall is between");
-            fader.Apply(new Vector3(3f, 2.5f, 0.25f));
-            Assert.AreEqual(shown, porte.Renderer.shadowCastingMode, "the leaf shows when the camera is on the player's side");
-
-            // Open, it still fades with its wall's centre plane (not its own).
-            porte.BeginOpen();
-            Swing(porte);
-            fader.Apply(new Vector3(-3f, 2.5f, 3f));
-            Assert.AreEqual(ShadowCastingMode.ShadowsOnly, porte.Renderer.shadowCastingMode, "the open leaf fades with the wall plane x = 0");
-            fader.Apply(new Vector3(3.5f, 2.5f, -3f));
-            Assert.AreEqual(shown, porte.Renderer.shadowCastingMode);
-
-            // The other leaf's wall is z = 2.05.
-            fader.Apply(new Vector3(2f, 2.5f, 5f));
-            Assert.AreEqual(ShadowCastingMode.ShadowsOnly, ouverte.Renderer.shadowCastingMode, "the leaf of the wall z = 2.05 fades from room c");
-            Assert.AreEqual(shown, porte.Renderer.shadowCastingMode, "the leaf of the wall x = 0 does not, the camera is on the player's side of it");
+            SaveOptions o = SaveStore.Options;
+            // M9 doors rule (product owner, 2026-11-19): a door leaf never fades, sinks or hides, in any look, whatever side
+            // of its wall the camera stands on; only the wall around it moves.
+            Vector3[] eyes = { new Vector3(-3f, 2.5f, 0.25f), new Vector3(3f, 2.5f, 0.25f), new Vector3(-3f, 2.5f, 3f), new Vector3(2f, 2.5f, 5f) };
+            foreach (string walls in new[] { SaveOptions.WallsLowered, SaveOptions.WallsSeeThrough, SaveOptions.WallsBoth, SaveOptions.WallsNone })
+            {
+                SaveStore.SetOptions(new SaveOptions
+                {
+                    Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty,
+                    Language = o.Language, Walls = walls, WallOpacity = o.WallOpacity,
+                });
+                for (int open = 0; open < 2; open++)
+                {
+                    foreach (Vector3 eye in eyes)
+                    {
+                        fader.Apply(eye);
+                        Assert.AreEqual(shown, porte.Renderer.shadowCastingMode, $"{walls}: the leaf moved for the camera at {eye} (open {open})");
+                        Assert.AreEqual(shown, ouverte.Renderer.shadowCastingMode, $"{walls}: the open leaf moved for the camera at {eye}");
+                        Assert.AreEqual(1f, fader.LevelOf(porte.Renderer), 1e-4f, $"{walls}: the leaf does not stand whole");
+                    }
+                    if (open == 0 && !porte.Open)
+                    {
+                        porte.BeginOpen();
+                        Swing(porte);
+                    }
+                }
+            }
+            // The wall it stands in still moves: the camera in a, the player in b, the cap of the wall x = 0 is out of the way.
+            bool wallMoved = false;
+            SaveStore.SetOptions(new SaveOptions
+            {
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty,
+                Language = o.Language, Walls = SaveOptions.WallsSeeThrough, WallOpacity = o.WallOpacity,
+            });
+            foreach (MeshRenderer r in level.Root.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                if (r.name == "Cap" && fader.PlaneOf(r, out Vector3 point, out Vector3 normal) && Mathf.Abs(Mathf.Abs(normal.x) - 1f) < 1e-3f
+                    && Mathf.Abs(point.x) < 0.01f)
+                {
+                    fader.Apply(eyes[0]);
+                    wallMoved |= r.shadowCastingMode == ShadowCastingMode.ShadowsOnly;
+                }
+            }
+            Assert.IsTrue(wallMoved, "the wall x = 0 no longer gets out of the way around its leaf");
+            SaveStore.SetOptions(o);
             AssertClean();
         }
 
@@ -443,11 +469,11 @@ namespace OutOfSight.Tests
         /// <summary>
         /// Step 36o (wave 5A.1, critique m15): level 8, porte_cuisine open, the chair at the designer route point (1.25, 3.75)
         /// just past the doorway, the camera at the spawn's yaw (90): the open leaf stands between the camera and the chair.
-        /// It is faded (shadow only, still enabled), so it hides none of the chair's top samples. With the camera on the other
-        /// side of the chair the leaf shows again.
+        /// M9 doors rule (product owner, 2026-11-19): doors never fade, sink or hide, so the leaf stays drawn whole there
+        /// (it used to fade by its box rule), and with the camera on the other side of the chair too.
         /// </summary>
         [UnityTest]
-        public IEnumerator Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded()
+        public IEnumerator Step36o_OpenLeafBetweenTheCameraAndTheChairStaysDrawn()
         {
             yield return Load("level8");
             LevelInstance level = Game.Level;
@@ -484,15 +510,11 @@ namespace OutOfSight.Tests
             Assert.Less(eye.z, 4.45f, "premise: the camera is on the cuisine side of the leaf's wall (its plane does not fade it)");
             int behind = TopSamplesHiddenBy(porte.Collider, eye);
             Assert.Greater(behind, 0, "premise: the open leaf stands between the camera and the chair");
-            Assert.AreEqual(ShadowCastingMode.ShadowsOnly, porte.Renderer.shadowCastingMode,
-                $"the open leaf hides {behind} top sample(s) of the chair and is not faded");
-            Assert.IsTrue(porte.Renderer.enabled && porte.Renderer.gameObject.activeInHierarchy, "the faded leaf still casts its shadow");
-            List<string> blockers = Probe.ChairBlockers(cam, Chair);
-            TestContext.WriteLine("[Step36o] camera " + eye + ", leaf hides " + behind + " top samples, blockers: " + string.Join(" / ", blockers));
-            foreach (string b in blockers)
-            {
-                Assert.IsFalse(b.Contains(porte.name), "the open leaf hides the chair: " + b);
-            }
+            Assert.AreEqual(ShadowCastingMode.On, porte.Renderer.shadowCastingMode,
+                $"the open leaf in front of {behind} top sample(s) of the chair is faded (doors never move)");
+            Assert.IsTrue(porte.Renderer.enabled && porte.Renderer.gameObject.activeInHierarchy, "the leaf is no longer drawn");
+            Assert.AreEqual(1f, Game.Level.Root.GetComponent<WallFader>().LevelOf(porte.Renderer), 1e-4f, "the leaf does not stand whole");
+            TestContext.WriteLine("[Step36o] camera " + eye + ", the drawn leaf stands in front of " + behind + " top samples");
 
             // Control: the camera east of the chair (yaw 270), the leaf behind the chair: it shows.
             orbit.SetView(270f, Tuning.PitchDefault);
@@ -500,7 +522,7 @@ namespace OutOfSight.Tests
             eye = cam.transform.position;
             Assert.Greater(eye.x, routePoint.x, "premise: the camera stands east of the chair");
             Assert.AreEqual(0, TopSamplesHiddenBy(porte.Collider, eye), "premise: the leaf is behind the chair");
-            Assert.AreEqual(ShadowCastingMode.On, porte.Renderer.shadowCastingMode, "the leaf out of the way is faded");
+            Assert.AreEqual(ShadowCastingMode.On, porte.Renderer.shadowCastingMode, "the leaf behind the chair is faded");
 
             orbit.SetView(Game.Def.Player.Yaw, Tuning.PitchDefault);
             Chair.Teleport(Game.Def.Player.Position, Game.Def.Player.Yaw);
@@ -801,7 +823,21 @@ namespace OutOfSight.Tests
                             continue;
                         }
                         combined++;
+                        // Window picture (2026-11-19, WindowImage): the panes show the owner's window once per window, their
+                        // UVs in the picture's own 0 to 1 (sliced), never in metres; still the only unlit combined renderer.
+                        if (r.name == "WindowPane" && WindowImage.Texture != null)
+                        {
+                            Assert.IsNull(PrimitiveKit.PaletteOf(r.sharedMaterial), $"{id}: the window panes lost their unlit pane material");
+                            continue;
+                        }
                         Assert.AreEqual(1f, PrimitiveKit.MetresPerUv(r, 0), 1e-3f, $"{id}: {r.name}: combined UVs are not in metres");
+                        // Walls 4 (WallArray): a wall of the wall material shows the finishes its vertices name, no block.
+                        if (WallArray.IsWallMaterial(r.sharedMaterial))
+                        {
+                            Assert.IsNotEmpty(WallArray.SurfacesOf(f.sharedMesh), $"{id}: {r.name}: a combined wall names no finish");
+                            Assert.IsFalse(r.HasPropertyBlock(), $"{id}: {r.name}: a combined wall carries a property block");
+                            continue;
+                        }
                         if (PrimitiveKit.PaletteOf(r.sharedMaterial) == null)
                         {
                             Assert.AreEqual("WindowPane", r.name, $"{id}: only the window panes combine with an unlit material");
@@ -901,6 +937,12 @@ namespace OutOfSight.Tests
                     int drawCallBudget = house ? Tuning.BudgetHouseRenderers : Tuning.BudgetRenderers;
                     int materialBudget = house ? Tuning.BudgetHouseMaterials : Tuning.BudgetMaterials;
                     Assert.GreaterOrEqual(after.MaterialSlots, after.Renderers, $"{id}: premise: every renderer has a material slot");
+                    // M7 walls pass: the see-through walls' one material (drawn by the wall fader, no renderer of its own) counts
+                    // whatever the Walls option, as the probe counts it: the budget holds in the worst look.
+                    if (fadesAfter > 0)
+                    {
+                        after.Materials.Add(WallFader.GhostMaterial);
+                    }
                     if (id == MockLevel)
                     {
                         mockSlots = after.MaterialSlots;

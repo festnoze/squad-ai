@@ -1,0 +1,115 @@
+{
+  "id": "test_rooms",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "sdb", "x": -2.05, "z": 1.8, "sizeX": 4.0, "sizeZ": 3.5, "wallHeight": 2.7, "wallThickness": 0.1,
+      "floor": "hard", "floorFinish": "tile", "floorColor": "#B07A4E", "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "cuisine", "x": 2.05, "z": 1.8, "sizeX": 4.0, "sizeZ": 3.5, "wallHeight": 2.7, "wallThickness": 0.1,
+      "floor": "hard", "floorFinish": "tile", "floorColor": "#B07A4E", "wallColor": "#EDE6DA"
+    },
+    {
+      "id": "chambre", "x": -2.05, "z": -1.8, "sizeX": 4.0, "sizeZ": 3.5, "wallHeight": 2.7, "wallThickness": 0.1,
+      "floor": "soft", "floorColor": "#B07A4E", "wallColor": "#EDE6DA", "wallFinish": "wallpaper"
+    },
+    {
+      "id": "salon", "x": 2.05, "z": -1.8, "sizeX": 4.0, "sizeZ": 3.5, "wallHeight": 2.7, "wallThickness": 0.1,
+      "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    { "x": -0.6, "z": 0.0, "width": 1.0, "top": 2.1 },
+    { "x": 0.6, "z": 0.0, "width": 1.0, "top": 2.1 },
+    { "x": 0.0, "z": -2.6, "width": 1.0, "top": 2.1 },
+    { "x": 4.1, "z": -2.6, "width": 1.0, "top": 2.1 }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -1.0,
+    "z": -2.9,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": { "model": "kenney.doormat", "x": 3.5, "z": -2.6, "sizeX": 0.9, "sizeZ": 0.9, "color": "#3F8F4F" },
+  "props": [
+    {
+      "name": "Baignoire", "kind": "bathtub", "x": -3.15, "z": 3.17, "yaw": 0.0,
+      "sizeX": 1.7, "sizeY": 0.6, "sizeZ": 0.75, "occluder": true, "color": "#F7F4EE", "accentColor": "#5B93D9"
+    },
+    {
+      "name": "Lavabo", "kind": "washbasin", "x": -1.75, "z": 3.32, "yaw": 0.0,
+      "sizeX": 0.6, "sizeY": 1.8, "sizeZ": 0.45, "occluder": true, "color": "#8C5A36", "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "WC", "kind": "toilet", "x": -0.6, "z": 3.22, "yaw": 0.0,
+      "sizeX": 0.4, "sizeY": 0.8, "sizeZ": 0.65, "occluder": true, "color": "#F7F4EE", "accentColor": "#F7F4EE"
+    },
+    {
+      "model": "kenney.fridge",
+      "name": "Frigo", "kind": "fridge", "x": 0.5, "z": 3.19, "yaw": 0.0,
+      "sizeX": 0.7, "sizeY": 1.8, "sizeZ": 0.7, "occluder": true, "color": "#F7F4EE", "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Evier", "kind": "kitchen_sink", "x": 1.5, "z": 3.24, "yaw": 0.0,
+      "sizeX": 1.2, "sizeY": 1.08, "sizeZ": 0.6, "occluder": true, "color": "#8C5A36", "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Cuisiniere", "kind": "stove", "x": 2.45, "z": 3.24, "yaw": 0.0,
+      "sizeX": 0.6, "sizeY": 0.9, "sizeZ": 0.6, "occluder": true, "color": "#F7F4EE", "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Plan", "kind": "counter", "x": 3.25, "z": 3.24, "yaw": 0.0,
+      "sizeX": 0.9, "sizeY": 0.9, "sizeZ": 0.6, "occluder": true, "color": "#8C5A36", "accentColor": "#F7F4EE"
+    },
+    {
+      "model": "kenney.bed",
+      "name": "Lit", "kind": "bed", "x": -2.6, "z": -1.1, "yaw": 0.0,
+      "sizeX": 1.6, "sizeY": 0.55, "sizeZ": 2.0, "occluder": true, "color": "#5B93D9", "accentColor": "#F7F4EE"
+    },
+    {
+      "model": "kenney.nightstand",
+      "name": "ChevetG", "kind": "nightstand", "x": -3.7, "z": -0.32, "yaw": 0.0,
+      "sizeX": 0.45, "sizeY": 0.55, "sizeZ": 0.4, "occluder": true, "color": "#8C5A36", "accentColor": "#8C5A36"
+    },
+    {
+      "model": "kenney.nightstand",
+      "name": "ChevetD", "kind": "nightstand", "x": -1.5, "z": -0.32, "yaw": 0.0,
+      "sizeX": 0.45, "sizeY": 0.55, "sizeZ": 0.4, "occluder": true, "color": "#8C5A36", "accentColor": "#8C5A36"
+    },
+    {
+      "name": "MeubleTV", "kind": "tv_unit", "x": 2.1, "z": -0.32, "yaw": 0.0,
+      "sizeX": 1.4, "sizeY": 1.1, "sizeZ": 0.45, "occluder": true, "color": "#6B4226", "accentColor": "#F7F4EE"
+    },
+    {
+      "model": "kenney.coffee_table",
+      "name": "TableBasse", "kind": "coffee_table", "x": 2.1, "z": -1.45, "yaw": 0.0,
+      "sizeX": 1.0, "sizeY": 0.42, "sizeZ": 0.55, "occluder": true, "color": "#8C5A36", "accentColor": "#8C5A36"
+    },
+    {
+      "model": "kenney.sofa",
+      "name": "Canape", "kind": "sofa", "x": 2.1, "z": -2.45, "yaw": 180.0,
+      "sizeX": 1.8, "sizeY": 0.85, "sizeZ": 0.9, "occluder": true, "color": "#2E6DB4", "accentColor": "#5B93D9"
+    }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        { "x": 3.5, "z": -1.0, "facing": 0.0, "dwell": 6.0, "glances": [] },
+        { "x": 2.0, "z": 2.0, "facing": 0.0, "dwell": 6.0, "glances": [] }
+      ]
+    }
+  ]
+}

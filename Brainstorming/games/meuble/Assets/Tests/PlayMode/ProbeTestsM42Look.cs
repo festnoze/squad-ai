@@ -232,6 +232,7 @@ namespace OutOfSight.Tests
         /// <summary>
         /// The procedural parts that show no detail: the garden, books and leaves (small and saturated), the metal frames
         /// (the near-black), the procedural inhabitant's face and the brows of any inhabitant (on its skin's near-black).
+        /// M8 (docs/m8/ROOMS_PLAN.md 3): the room objects' white ceramic (glaze shows no grain).
         /// </summary>
         private bool PlainAllowed(Slot s)
         {
@@ -241,7 +242,7 @@ namespace OutOfSight.Tests
                 return true;
             }
             Color? palette = PrimitiveKit.PaletteOf(s.Material);
-            if (palette.HasValue && Same(palette.Value, FurnitureKit.FrameColor))
+            if (palette.HasValue && (Same(palette.Value, FurnitureKit.FrameColor) || Same(palette.Value, FurnitureKit.CeramicColor)))
             {
                 return true;
             }
@@ -265,6 +266,17 @@ namespace OutOfSight.Tests
             ["cabinet"] = new[] { Surface.Wood },
             ["counter"] = new[] { Surface.Wood, Surface.Plaster },
             ["plant"] = new[] { Surface.Plaster, Surface.Foliage },
+            // M8 room objects, procedural or with their Kenney model (ceramic and the near-black stay plain).
+            [PropKinds.Bathtub] = new[] { Surface.Metal },
+            [PropKinds.Washbasin] = new[] { Surface.Wood, Surface.Metal },
+            [PropKinds.Toilet] = new[] { Surface.Metal },
+            [PropKinds.KitchenSink] = new[] { Surface.Wood, Surface.Plaster, Surface.Metal },
+            [PropKinds.Stove] = new[] { Surface.Metal },
+            [PropKinds.Fridge] = new[] { Surface.Metal },
+            [PropKinds.CoffeeTable] = new[] { Surface.Wood },
+            [PropKinds.TvUnit] = new[] { Surface.Wood, Surface.Metal },
+            [PropKinds.Bed] = new[] { Surface.Wood, Surface.Linen, Surface.Upholstery },
+            [PropKinds.Nightstand] = new[] { Surface.Wood, Surface.Metal },
         };
 
         // M6 (CONTRACT_M6 2.4): the player's own furniture (never a decoy or a prop) shows the glossy lacquer finish
@@ -354,43 +366,67 @@ namespace OutOfSight.Tests
                     }
                 }
                 CollectionAssert.IsEmpty(missing, $"{id}: Lit slots without their detail texture");
-                Assert.Greater(detailed, slots.Count / 2, $"{id}: only {detailed} of {slots.Count} slots show a detail");
+                // Two fifths, not half (2026-11-20): walls and floors moved to the shared Texture2DArray shader and no
+                // longer count as Lit slots, while plain fixture and handle slots remain; the per-slot check above is
+                // the real guard, this ratio only catches a wholesale loss of textures.
+                Assert.Greater(detailed, slots.Count * 2 / 5, $"{id}: only {detailed} of {slots.Count} slots show a detail");
                 Assert.Greater(coloured, slots.Count / 3, $"{id}: only {coloured} of {slots.Count} slots show an image in real colours");
 
                 // Floors, walls, caps.
                 bool soft = Game.Def.AllRooms().Any(r => r.IsSoft);
                 // M7 (CONTRACT_M7 1.2): a room can also set its own "floorFinish": "tile" (kitchen, bathroom).
                 bool tiled = Game.Def.AllRooms().Any(r => r.IsTile);
-                var floors = slots.Where(s => s.Renderer.gameObject.layer == Layers.Floor && s.Renderer.name != "Garden").ToList();
+                // M8 floor finishes (docs/m8/ROOMS_PLAN.md 4): a floor may also show the marble, herringbone or carpet
+                // finish one of the level's rooms asks for.
+                var floorFinishes = new HashSet<Surface>(Game.Def.AllRooms().Select(r => TextureLibrary.FloorSurface(r.FloorFinish, r.IsSoft)));
+                // Walls 4 (WallArray): the floors are drawn with the one room surface material too, their looks named by
+                // their vertices; every look a room asks for shows.
+                var floors = level.Root.GetComponentsInChildren<Renderer>(false)
+                    .Where(r => r.enabled && r.gameObject.layer == Layers.Floor && r.name != "Garden").ToList();
                 Assert.Greater(floors.Count, 0, $"{id}: premise: no floor renderer");
-                foreach (Slot s in floors)
+                var floorShown = new HashSet<Surface>();
+                foreach (Renderer r in floors)
                 {
-                    Assert.IsTrue(s.Surface == Surface.Parquet || (soft && s.Surface == Surface.Carpet) || (tiled && s.Surface == Surface.Tile),
-                        $"{id}: floor {Label(s)} shows {s.Surface}");
+                    Assert.IsTrue(WallArray.IsWallMaterial(r.sharedMaterial), $"{id}: floor {r.name} is not drawn with the room surface material");
+                    Assert.IsFalse(r.HasPropertyBlock(), $"{id}: floor {r.name} carries a property block");
+                    floorShown.UnionWith(WallArray.SurfacesOf(ModelKit.MeshOf(r)));
                 }
-                if (!soft && !tiled)
+                foreach (Surface s in floorShown)
                 {
-                    Assert.IsTrue(floors.All(s => s.Surface == Surface.Parquet), $"{id}: a hard floor is not parquet");
+                    Assert.IsTrue(s == Surface.Parquet || (soft && s == Surface.Carpet) || (tiled && s == Surface.Tile) || floorFinishes.Contains(s),
+                        $"{id}: a floor shows {s}");
                 }
-                var walls = slots.Where(s => s.Renderer.name == "Face" || s.Renderer.name == "Cap").ToList();
-                Assert.Greater(walls.Count, 3, $"{id}: premise: no wall faces");
+                CollectionAssert.IsSubsetOf(floorFinishes, floorShown, $"{id}: a room's floor look does not show");
                 // Wall finishes (2026-11-19): a face shows the crepi or a finish one of the level's rooms asks for, and
-                // every finish asked for shows; caps stay plaster.
+                // every finish asked for shows; caps stay plaster. Walls 4 (WallArray): every face, cap and stub is drawn
+                // with the one wall material, its finishes named by its vertices (no property block, no URP Lit slot).
+                Material wallMaterial = WallArray.Material;
+                Assert.IsNotNull(wallMaterial, $"{id}: premise: the library has no wall material");
+                var walls = level.Root.GetComponentsInChildren<Renderer>(false)
+                    .Where(r => r.enabled && (r.name == "Face" || r.name == "Cap" || r.name == LevelBuilder.StubName)).ToList();
+                Assert.Greater(walls.Count, 3, $"{id}: premise: no wall faces");
                 var finishes = new HashSet<Surface>(Game.Def.AllRooms().Select(r => TextureLibrary.WallSurface(r.WallFinish)));
-                foreach (Slot s in walls)
+                var shown = new HashSet<Surface>();
+                foreach (Renderer r in walls)
                 {
-                    if (s.Renderer.name == "Cap")
+                    Assert.AreSame(wallMaterial, r.sharedMaterial, $"{id}: wall {r.name} is not drawn with the wall material");
+                    Assert.IsFalse(r.HasPropertyBlock(), $"{id}: wall {r.name} carries a property block");
+                    HashSet<Surface> named = WallArray.SurfacesOf(ModelKit.MeshOf(r));
+                    Assert.IsNotEmpty(named, $"{id}: wall {r.name}: its vertices name no finish");
+                    if (r.name != "Face")
                     {
-                        Assert.AreEqual(Surface.Plaster, s.Surface, $"{id}: wall cap {Label(s)}");
+                        CollectionAssert.AreEquivalent(new[] { Surface.Plaster }, named, $"{id}: wall {r.name} (cap, closure, stub)");
+                        continue;
                     }
-                    else
+                    foreach (Surface s in named)
                     {
-                        Assert.IsTrue(s.Surface == Surface.Plaster || finishes.Contains(s.Surface), $"{id}: wall {Label(s)} shows {s.Surface}");
+                        Assert.IsTrue(s == Surface.Plaster || finishes.Contains(s), $"{id}: wall face shows {s}");
                     }
+                    shown.UnionWith(named);
                 }
                 foreach (Surface finish in finishes)
                 {
-                    Assert.IsTrue(walls.Any(s => s.Surface == finish), $"{id}: no wall face shows the {finish} finish");
+                    Assert.IsTrue(shown.Contains(finish), $"{id}: no wall face shows the {finish} finish");
                 }
 
                 // Rugs and the doormat: unchanged (every slot Surface.Carpet), plus the M7 rug image (product owner,
@@ -602,7 +638,11 @@ namespace OutOfSight.Tests
                     }
                     else
                     {
-                        Assert.Greater(all.Count(s => s.Texture != null), 20, $"{id}: premise: few textured slots");
+                        // Walls 4 (WallArray): the walls and floors are a few renderers of the room surface material, their
+                        // images named per vertex; they count with the URP Lit slots that show an image.
+                        int roomSurfaces = Game.Level.Root.GetComponentsInChildren<Renderer>(false).Count(r => WallArray.IsWallMaterial(r.sharedMaterial));
+                        Assert.Greater(roomSurfaces, 0, $"{id}: premise: no wall or floor of the room surface material");
+                        Assert.Greater(all.Count(s => s.Texture != null) + roomSurfaces, 20, $"{id}: premise: few textured slots");
                     }
                     Camera cam = main.Camera;
                     Rect box = ScreenBox(cam, Game.Furniture.transform, width, height);
@@ -843,6 +883,57 @@ namespace OutOfSight.Tests
                     }
                     measured++;
                 }
+                // Walls 4 (WallArray): a wall of the wall material repeats each finish at its tile too: per finish named by
+                // its vertices (UV1), UV0's metres per unit (measured on its triangles as drawn) over the repeats per metre
+                // the vertices carry, the same on both axes (UV0 is metric both ways).
+                foreach (Renderer r in Game.Level.Root.GetComponentsInChildren<Renderer>(false).Where(r => r.enabled && WallArray.IsWallMaterial(r.sharedMaterial)))
+                {
+                    Mesh mesh = ModelKit.MeshOf(r);
+                    var finish = new List<Vector4>();
+                    mesh.GetUVs(WallArray.FinishChannel, finish);
+                    Assert.AreEqual(mesh.vertexCount, finish.Count, $"{id}: wall {r.name}: no finish per vertex");
+                    var uv = new List<Vector2>();
+                    mesh.GetUVs(0, uv);
+                    Vector3[] vertices = mesh.vertices;
+                    int[] t = mesh.triangles;
+                    var ratios = new Dictionary<Surface, List<float>>();
+                    for (int i = 0; i + 2 < t.Length; i += 3)
+                    {
+                        // Fixture housings (2026-11-19, RoomLights): a wall cap may carry the black frames of its wall's
+                        // fixtures, flat vertices (WallArray.Flat) that name a colour instead of a finish and tile nothing.
+                        if (r.name == LevelBuilder.CapName && finish[t[i]].x == WallArray.FlatFinish)
+                        {
+                            Assert.IsTrue(finish[t[i + 1]].x == WallArray.FlatFinish && finish[t[i + 2]].x == WallArray.FlatFinish,
+                                $"{id}: wall {r.name}: a triangle mixes a housing and a finish");
+                            continue;
+                        }
+                        Surface s = WallArray.SurfaceOf(finish[t[i]]);
+                        Assert.AreNotEqual(Surface.Plain, s, $"{id}: wall {r.name}: a triangle names no finish");
+                        Assert.That(finish[t[i]].y, Is.EqualTo(1f / TextureLibrary.TileMetres(s)).Within(1e-4f), $"{id}: wall {r.name}: {s} repeats per metre");
+                        for (int e = 0; e < 3; e++)
+                        {
+                            int a = t[i + e];
+                            int b = t[i + (e + 1) % 3];
+                            float du = (uv[b] - uv[a]).magnitude;
+                            float dw = r.transform.localToWorldMatrix.MultiplyVector(vertices[b] - vertices[a]).magnitude;
+                            if (du > 1e-6f && dw > 1e-6f)
+                            {
+                                (ratios.TryGetValue(s, out List<float> list) ? list : ratios[s] = new List<float>()).Add(dw / du);
+                            }
+                        }
+                    }
+                    foreach (KeyValuePair<Surface, List<float>> pair in ratios)
+                    {
+                        pair.Value.Sort();
+                        float metresPerUv = pair.Value[pair.Value.Count / 2];
+                        Assert.That(metresPerUv, Is.EqualTo(1f).Within(1e-3f), $"{id}: wall {r.name}: {pair.Key}: UV0 is not in metres");
+                        float tile = TextureLibrary.TileMetres(pair.Key);
+                        float repeat = metresPerUv * tile;
+                        float error = Mathf.Abs(repeat / tile - 1f);
+                        worst[pair.Key] = Mathf.Max(worst.TryGetValue(pair.Key, out float w) ? w : 0f, error);
+                        measured++;
+                    }
+                }
             }
             Debug.Log("[Step22e] worst relative error per surface: " + string.Join(", ", worst.Select(p => $"{p.Key} {p.Value:0.000}")));
             Assert.Greater(measured, 100, "premise: few detailed slots measured");
@@ -851,9 +942,13 @@ namespace OutOfSight.Tests
             Assert.Greater(skinnedSlots, 0, "premise: no skinned slot checked against its scale");
             // M6 (CONTRACT_M6 2.4): Soil is never level data (only LoadView's "plant" load reaches it, and no shipped
             // level sets player.load to "plant"; ProbeTestsM6Textures.Step50b_ exercises it directly), so it alone is
-            // never seen here.
-            int expectedSurfaces = TextureLibrary.Textured.Length - (worst.ContainsKey(Surface.Soil) ? 0 : 1);
-            Assert.AreEqual(expectedSurfaces, worst.Count, "premise: every surface but Soil was seen in the levels: " + string.Join(", ", worst.Keys));
+            // never seen here. M9 floors (docs/m9/FLOORS_WALLS.md, 2026-11-19): every floor finish (the M8 Marble,
+            // Herringbone and CarpetFinish, the new LightOak, Verde, IvoryTile and TealTile) is used by at least one of
+            // the 24 shipped levels, so all of them must be seen here, at their own repeat.
+            Surface[] neverShipped = { Surface.Soil };
+            int expectedSurfaces = TextureLibrary.Textured.Length - neverShipped.Count(s => !worst.ContainsKey(s));
+            Assert.AreEqual(expectedSurfaces, worst.Count,
+                "premise: every surface but Soil was seen in the levels: " + string.Join(", ", worst.Keys));
             CollectionAssert.IsEmpty(errors, "no error logged");
         }
 
@@ -891,14 +986,24 @@ namespace OutOfSight.Tests
 
         // ----- 22f -----
 
-        /// <summary>A shipped colour map: its own texture, sRGB, mipmapped, repeating, compressed, at most 512 px, not readable.</summary>
-        private static void AssertColourMap(Texture2D t, string label, HashSet<Texture2D> seen)
+        /// <summary>Repeat on U; on V Repeat, or Clamp for a tiled wall's map (<paramref name="clampV"/>, TextureLibrary.ClampsVertically).</summary>
+        private static void AssertWrap(Texture t, bool clampV, string label)
+        {
+            Assert.AreEqual(TextureWrapMode.Repeat, t.wrapModeU, $"{label}: wrap U");
+            Assert.AreEqual(clampV ? TextureWrapMode.Clamp : TextureWrapMode.Repeat, t.wrapModeV, $"{label}: wrap V");
+        }
+
+        /// <summary>
+        /// A shipped colour map: its own texture, sRGB, mipmapped, repeating (a tiled wall's, <paramref name="clampV"/>:
+        /// repeating along the wall, clamped up it), compressed, at most 512 px, not readable.
+        /// </summary>
+        private static void AssertColourMap(Texture2D t, string label, HashSet<Texture2D> seen, bool clampV = false)
         {
             Assert.IsNotNull(t, $"{label}: no colour map");
             Assert.IsTrue(seen.Add(t), $"{label}: its colour map is another texture of the library");
             Assert.LessOrEqual(Mathf.Max(t.width, t.height), 512, $"{label}: {t.width} px");
             Assert.Greater(t.mipmapCount, 5, $"{label}: colour map mipmaps");
-            Assert.AreEqual(TextureWrapMode.Repeat, t.wrapMode, $"{label}: colour map wrap");
+            AssertWrap(t, clampV, label + ": colour map");
             Assert.IsFalse(t.isReadable, $"{label}: colour map CPU readable (twice the memory)");
             Assert.IsTrue(GraphicsFormatUtility.IsSRGBFormat(t.graphicsFormat), $"{label}: the colour map is linear ({t.graphicsFormat}); its texels are sRGB colours");
             Assert.IsTrue(GraphicsFormatUtility.IsCompressedFormat(t.graphicsFormat), $"{label}: colour map not compressed ({t.graphicsFormat})");
@@ -926,7 +1031,13 @@ namespace OutOfSight.Tests
                 Assert.IsTrue(seen.Add(t), $"{s}: its texture is another surface's");
                 Assert.LessOrEqual(Mathf.Max(t.width, t.height), 512, $"{s}: {t.width} px");
                 Assert.Greater(t.mipmapCount, 5, $"{s}: mipmaps");
-                Assert.AreEqual(TextureWrapMode.Repeat, t.wrapMode, $"{s}: wrap");
+                // Tiled walls (2026-11-19): a whole wall image repeats along the wall and is clamped up it, its normal map too.
+                bool clampV = TextureLibrary.ClampsVertically(s);
+                AssertWrap(t, clampV, s.ToString());
+                if (e.normal != null)
+                {
+                    AssertWrap(e.normal, clampV, s + ": normal map");
+                }
                 Assert.IsFalse(t.isReadable, $"{s}: CPU readable (twice the memory)");
                 Assert.IsFalse(GraphicsFormatUtility.IsSRGBFormat(t.graphicsFormat), $"{s}: sRGB ({t.graphicsFormat}); a detail is a linear multiplier");
                 Assert.IsTrue(GraphicsFormatUtility.IsCompressedFormat(t.graphicsFormat), $"{s}: not compressed ({t.graphicsFormat})");
@@ -934,10 +1045,35 @@ namespace OutOfSight.Tests
                 Assert.IsFalse(string.IsNullOrEmpty(e.source), $"{s}: no source asset");
                 StringAssert.Contains(e.source, t.name, $"{s}: the texture is not derived from {e.source}");
                 // M7 real colours (CONTRACT_M7 5): the colour map, sRGB (it is a colour), otherwise shipped as the detail.
-                AssertColourMap(e.colour, s.ToString(), seen);
+                AssertColourMap(e.colour, s.ToString(), seen, clampV);
                 StringAssert.Contains(e.source, e.colour.name, $"{s}: the colour map is not prepared from {e.source}");
                 Assert.AreEqual(s, TextureLibrary.SurfaceOf(e.colour), $"{s}: its colour map is not recognised");
             }
+            // Walls 4 (WallArray): the wall finish arrays, one 512 slice per finish in WallArray.Slices order, mipmapped,
+            // repeating, compressed, sRGB for the colours and linear for the normals, and the two wall materials on them.
+            CollectionAssert.AreEqual(WallArray.Slices, library.wallSlices, "the wall arrays' slices");
+            foreach ((Texture2DArray array, bool srgb, string label) in new[] { (library.wallColours, true, "wall colours"), (library.wallNormals, false, "wall normals") })
+            {
+                Assert.IsNotNull(array, $"{label}: no array");
+                Assert.AreEqual(WallArray.Slices.Length, array.depth, $"{label}: slices");
+                Assert.AreEqual(512, array.width, $"{label}: width");
+                Assert.AreEqual(512, array.height, $"{label}: height");
+                Assert.Greater(array.mipmapCount, 5, $"{label}: mipmaps");
+                Assert.AreEqual(TextureWrapMode.Repeat, array.wrapModeU, $"{label}: wrap U");
+                Assert.AreEqual(TextureWrapMode.Repeat, array.wrapModeV, $"{label}: wrap V");
+                Assert.AreEqual(srgb, GraphicsFormatUtility.IsSRGBFormat(array.graphicsFormat), $"{label}: {array.graphicsFormat}");
+                Assert.IsTrue(GraphicsFormatUtility.IsCompressedFormat(array.graphicsFormat), $"{label}: not compressed ({array.graphicsFormat})");
+                Assert.IsFalse(array.isReadable, $"{label}: CPU readable");
+            }
+            foreach (Material m in new[] { library.wallMaterial, library.wallSeeThrough })
+            {
+                Assert.IsNotNull(m, "premise: a wall material is missing");
+                Assert.IsTrue(m.shader.isSupported, $"{m.name}: {m.shader.name} is not supported");
+                Assert.AreSame(library.wallColours, m.GetTexture("_WallColours"), $"{m.name}: colour array");
+                Assert.AreSame(library.wallNormals, m.GetTexture("_WallNormals"), $"{m.name}: normal array");
+            }
+            Assert.AreSame(library.wallMaterial, WallArray.Material, "the walls are drawn with the library's wall material");
+            Assert.AreSame(library.wallSeeThrough, WallFader.GhostMaterial, "the wall fader draws with the library's see-through material");
             AssertColourMap(library.playerColour, "player", seen);
             Assert.IsFalse(string.IsNullOrEmpty(library.playerSource), "player: no source asset");
             Assert.AreEqual(Surface.Lacquer, TextureLibrary.SurfaceOf(library.playerColour), "the player's image replaces its lacquer");

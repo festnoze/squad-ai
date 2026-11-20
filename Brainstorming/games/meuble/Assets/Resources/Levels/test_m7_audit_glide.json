@@ -1,0 +1,56 @@
+{
+  "id": "test_m7_audit_glide",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "couloir",
+      "x": 3.7,
+      "z": 0.7,
+      "sizeX": 7.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "props": [],
+  "player": {
+    "kind": "office_chair",
+    "x": 2.75,
+    "z": 0.75,
+    "yaw": 90.0,
+    "sizeX": 0.55,
+    "sizeY": 1.0,
+    "sizeZ": 0.55,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 6.75,
+    "z": 0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 0.75,
+          "z": 0.75,
+          "facing": 270.0,
+          "dwell": 300.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

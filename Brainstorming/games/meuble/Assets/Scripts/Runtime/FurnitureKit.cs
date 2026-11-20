@@ -28,15 +28,19 @@ namespace OutOfSight
     /// M5 wave 5B (docs/CONTRACT_M5.md 5, 16.11 and 17): the procedural rocking chair (<see cref="RockingChair"/>), and the
     /// budgets counted as material slots: a level build combines a bookshelf's visual parts per material (its frame, then
     /// its books colour by colour), the prop's one collider unchanged.
+    ///
+    /// M8 room variety (docs/m8/ROOMS_PLAN.md 3): the ten room objects (bathtub to nightstand) are in FurnitureKitRooms.cs.
     /// </summary>
-    public static class FurnitureKit
+    public static partial class FurnitureKit
     {
         // Book colors reuse colors already present in the room: every new color is a new material, and
-        // the level budget is 24 materials (PRD 7.4). Never red: red belongs to the player chair.
+        // the level budget is 24 materials (PRD 7.4). Never red: red belongs to the player chair. M7 walls pass: the last
+        // slot repeats the blue (it was a dark green of its own), one material fewer for the see-through walls' material; a
+        // shelf reaches that slot only when it also shows the blue's own slot (the first book after the accent, bottom row).
         private static readonly Color[] BookColors =
         {
             new Color32(0xE3, 0xB2, 0x3C, 0xFF), new Color32(0x5B, 0x93, 0xD9, 0xFF), new Color32(0xF7, 0xF4, 0xEE, 0xFF),
-            new Color32(0x3F, 0x8F, 0x4F, 0xFF), new Color32(0x8C, 0x5A, 0x36, 0xFF), new Color32(0x2F, 0x6E, 0x4E, 0xFF),
+            new Color32(0x3F, 0x8F, 0x4F, 0xFF), new Color32(0x8C, 0x5A, 0x36, 0xFF), new Color32(0x5B, 0x93, 0xD9, 0xFF),
         };
 
         /// <summary>The player chair: 6 boxes, 72 triangles (PRD 7.1). Facing +z, backrest on the -z side.</summary>
@@ -255,6 +259,25 @@ namespace OutOfSight
                 Bookshelf(parent, prop.Size, LevelJson.ParseColor(prop.Color, Color.gray), AccentOf(prop), layer, prop.Occluder, visual, combine);
                 return;
             }
+            // M8: a room object combines its visual parts per material, as the bookshelf.
+            if (RoomObject(prop, parent, layer, visual, combine))
+            {
+                return;
+            }
+            // Handles (2026-11-19): a cabinet and a wardrobe combine their wood and their handles too (Handles).
+            if (prop.Kind == "cabinet" || prop.Kind == WardrobeRule.Kind)
+            {
+                Color main = LevelJson.ParseColor(prop.Color, Color.gray);
+                if (prop.Kind == "cabinet")
+                {
+                    Cabinet(parent, prop.Size, main, AccentOf(prop), layer, prop.Occluder, visual, combine);
+                }
+                else
+                {
+                    Wardrobe(parent, prop.Size, main, AccentOf(prop), layer, prop.Occluder, visual, combine);
+                }
+                return;
+            }
             Build(prop, parent, layer, visual);
         }
 
@@ -266,6 +289,10 @@ namespace OutOfSight
         /// </summary>
         public static void Build(PropDef prop, Transform parent, int layer, bool visual)
         {
+            if (RoomObject(prop, parent, layer, visual, false))
+            {
+                return;
+            }
             Color main = LevelJson.ParseColor(prop.Color, Color.gray);
             Color accent = AccentOf(prop);
             bool col = prop.Occluder;
@@ -281,7 +308,7 @@ namespace OutOfSight
                     Table(parent, prop.Size, main, accent, layer, col, visual);
                     break;
                 case "cabinet":
-                    Cabinet(parent, prop.Size, main, accent, layer, col, visual);
+                    Cabinet(parent, prop.Size, main, accent, layer, col, visual, false);
                     break;
                 case "counter":
                     Counter(parent, prop.Size, main, accent, layer, col, visual);
@@ -293,7 +320,7 @@ namespace OutOfSight
                     Armchair(parent, prop.Size, main, accent, layer, col, visual);
                     break;
                 case WardrobeRule.Kind:
-                    Wardrobe(parent, prop.Size, main, accent, layer, col, visual);
+                    Wardrobe(parent, prop.Size, main, accent, layer, col, visual, false);
                     break;
                 default:
                     PrimitiveKit.Box(parent, "Body", new Vector3(0f, prop.SizeY * 0.5f, 0f), prop.Size, Mat(main, 0.25f, visual), layer, col, visual,
@@ -382,46 +409,26 @@ namespace OutOfSight
 
         /// <summary>
         /// A full occluder (PRD 6.3): one collider over the whole box, open shelves and books for the look. M5 wave 5B: with
-        /// <paramref name="combine"/>, its 24 boxes draw as one renderer per material ("Frame", then "Books" and the colour),
-        /// 7 draw calls instead of 24, the same triangles.
+        /// <paramref name="combine"/>, its parts draw as one renderer per material ("Frame", then "Books" and the colour).
+        /// M9 soft shapes (bookshelf pass, FurnitureKitShelf.cs): the frame is one mesh of its visible faces only, its front
+        /// edges shaded round (<see cref="ShelfFrameMesh"/>, 54 triangles), and the shelves stay as full as the M5 blocks made
+        /// them, each block now a row of books with rounded spines, varied heights and colours, a leaning book or two, and a
+        /// round jar and vase (<see cref="ShelfContents"/>), in the colours the books always had, within
+        /// Tuning.FurnitureTriangleBudget (400 per 1.6 m of width).
         /// </summary>
         private static void Bookshelf(Transform p, Vector3 s, Color wood, Color accent, int layer, bool col, bool visual, bool combine)
         {
             Material m = Mat(wood, 0.2f, visual);
             const float panel = 0.04f;
             const float shelf = 0.03f;
-            float innerW = s.x - 2f * panel;
-            var parts = new PartBatch(p, layer, combine && visual); // MUTATION:SHELF_COMBINE
-            parts.Box("SideL", "Frame", new Vector3(-s.x * 0.5f + panel * 0.5f, s.y * 0.5f, 0f), new Vector3(panel, s.y, s.z), m, visual, Surface.Wood);
-            parts.Box("SideR", "Frame", new Vector3(s.x * 0.5f - panel * 0.5f, s.y * 0.5f, 0f), new Vector3(panel, s.y, s.z), m, visual, Surface.Wood);
-            parts.Box("Back", "Frame", new Vector3(0f, s.y * 0.5f, s.z * 0.5f - 0.01f), new Vector3(innerW, s.y, 0.02f), m, visual, Surface.Wood);
             const int levels = 4;
+            float innerW = s.x - 2f * panel;
             float pitch = (s.y - shelf) / levels;
-            for (int i = 0; i <= levels; i++)
-            {
-                parts.Box("Shelf" + i, "Frame", new Vector3(0f, shelf * 0.5f + i * pitch, -0.01f), new Vector3(innerW, shelf, s.z - 0.02f), m, visual, Surface.Wood);
-            }
-            // Four books per level, deterministic widths and heights, so every build looks the same.
-            float[] widths = { 0.30f, 0.22f, 0.34f, 0.26f };
-            float[] heights = { 0.78f, 0.62f, 0.86f, 0.70f };
-            for (int level = 0; level < levels; level++)
-            {
-                float x = -innerW * 0.5f + 0.04f + 0.05f * (level % 2);
-                for (int b = 0; b < 4; b++)
-                {
-                    float w = widths[(b + level) % 4] * innerW / 1.52f * 0.95f;
-                    float h = (pitch - shelf) * heights[(b + 2 * level) % 4];
-                    if (x + w > innerW * 0.5f - 0.02f)
-                    {
-                        break;
-                    }
-                    Color c = b == 0 ? accent : BookColors[(b + level * 2) % BookColors.Length];
-                    parts.Box($"Books{level}_{b}", "Books " + ColorUtility.ToHtmlStringRGB(c),
-                        new Vector3(x + w * 0.5f, shelf + level * pitch + h * 0.5f, 0.0f),
-                        new Vector3(w - 0.01f, h, s.z * 0.7f), Mat(c, 0.3f, visual), visual, Surface.Plain);
-                    x += w + 0.03f;
-                }
-            }
+            var parts = new PartBatch(p, layer, combine && visual); // MUTATION:SHELF_COMBINE
+            Mesh frame = ShelfFrameMesh(s, panel, shelf, pitch, levels);
+            parts.Shape("Frame", "Frame", frame, Vector3.zero, Quaternion.identity, m, visual, Surface.Wood);
+            int budget = Tuning.FurnitureTriangleBudget(PropKinds.Bookshelf, s.x) - (int)ModelKit.Triangles(frame);
+            ShelfContents(parts, s, innerW, shelf, pitch, levels, accent, visual, budget);
             parts.Flush();
             if (col)
             {
@@ -476,6 +483,30 @@ namespace OutOfSight
                     groups.Add(g);
                 }
                 g.Parts.Add(new PrimitiveKit.CombinePart { Mesh = PrimitiveKit.BoxMeshSized(size), Matrix = Matrix4x4.TRS(center, Quaternion.identity, size) });
+            }
+
+            /// <summary>
+            /// M9 soft shapes: a visual-only mesh in metres (RoundedMesh), its origin at <paramref name="position"/> turned by
+            /// <paramref name="rotation"/>: <paramref name="name"/> on its own, or into the group named <paramref name="group"/>,
+            /// exactly as <see cref="Box"/>.
+            /// </summary>
+            public void Shape(string name, string group, Mesh mesh, Vector3 position, Quaternion rotation, Material material, bool visual, Surface surface)
+            {
+                if (!combine)
+                {
+                    if (visual)
+                    {
+                        PrimitiveKit.Part(parent, name, mesh, position, rotation, Vector3.one, material, layer, surface);
+                    }
+                    return;
+                }
+                Group g = groups.Find(x => x.Material == material && x.Surface == surface);
+                if (g == null)
+                {
+                    g = new Group { Material = material, Surface = surface, Name = group };
+                    groups.Add(g);
+                }
+                g.Parts.Add(new PrimitiveKit.CombinePart { Mesh = mesh, Matrix = Matrix4x4.TRS(position, rotation, Vector3.one) });
             }
 
             /// <summary>Draws every group as one renderer under the prop (nothing when not combined).</summary>
@@ -587,26 +618,46 @@ namespace OutOfSight
 
         /// <summary>
         /// A dresser or tall cupboard (M2): a full occluder up to its height, one collider over the whole box,
-        /// two door panels on the front (-z). 4 boxes, 48 triangles.
+        /// two door panels on the front (-z), each with a vertical bar pull by the middle (Handles). Combined (the level
+        /// builder's <paramref name="combine"/>), its wood draws as one renderer (the body, top and doors all show the Wood
+        /// image) and its handles as one more in the household's dark metal: 2 draw calls instead of 4. 10 boxes, 120
+        /// triangles.
         /// </summary>
-        private static void Cabinet(Transform p, Vector3 s, Color wood, Color accent, int layer, bool col, bool visual)
+        private static void Cabinet(Transform p, Vector3 s, Color wood, Color accent, int layer, bool col, bool visual, bool combine)
         {
             Material body = Mat(wood, 0.25f, visual);
             Material doors = Mat(accent, 0.3f, visual);
+            if (combine)
+            {
+                // Grouped by the material they show: one Wood renderer while the textures are on, the two palettes otherwise.
+                body = PrimitiveKit.ShownMaterial(body, Surface.Wood);
+                doors = PrimitiveKit.ShownMaterial(doors, Surface.Wood);
+            }
+            Material handle = visual ? Handles.Material : null;
             const float top = 0.04f;
             const float panel = 0.02f;
-            PrimitiveKit.Box(p, "Body", new Vector3(0f, (s.y - top) * 0.5f, 0f), new Vector3(s.x, s.y - top, s.z), body, layer, false, visual, Surface.Wood);
-            PrimitiveKit.Box(p, "Top", new Vector3(0f, s.y - top * 0.5f, 0f), new Vector3(s.x, top, s.z), doors, layer, false, visual, Surface.Wood);
+            var parts = new PartBatch(p, layer, combine && visual);
+            parts.Box("Body", "Wood", new Vector3(0f, (s.y - top) * 0.5f, 0f), new Vector3(s.x, s.y - top, s.z), body, visual, Surface.Wood);
+            parts.Box("Top", "Wood", new Vector3(0f, s.y - top * 0.5f, 0f), new Vector3(s.x, top, s.z), doors, visual, Surface.Wood);
             float doorW = s.x * 0.5f - 0.05f;
             float doorH = (s.y - top) * 0.82f;
+            float doorY = (s.y - top) * 0.5f + 0.02f;
+            float handleY = Handles.HeightOn(doorY - doorH * 0.5f, doorY + doorH * 0.5f, 0.1f);
+            float handleLength = Mathf.Min(0.2f, doorH * 0.3f);
             for (int i = 0; i < 2; i++)
             {
-                float x = (i == 0 ? -1f : 1f) * (doorW * 0.5f + 0.02f);
+                float side = i == 0 ? -1f : 1f;
+                float x = side * (doorW * 0.5f + 0.02f);
                 // The doors stand proud of the body by their own thickness: flush, their front face was coplanar with the
                 // body's and z-fought (the colour flickered as the camera moved, the product owner's 2026-11-18 report).
-                PrimitiveKit.Box(p, "Door" + i, new Vector3(x, (s.y - top) * 0.5f + 0.02f, -s.z * 0.5f - panel * 0.5f),
-                    new Vector3(doorW, doorH, panel), doors, layer, false, visual, Surface.Wood);
+                parts.Box("Door" + i, "Wood", new Vector3(x, doorY, -s.z * 0.5f - panel * 0.5f), new Vector3(doorW, doorH, panel), doors, visual,
+                    Surface.Wood);
+                // The pull by the doors' meeting edge, on the door's front face.
+                var onFace = new Vector3(side * (0.02f + Mathf.Min(0.07f, doorW * 0.25f)), handleY, -s.z * 0.5f - panel);
+                Handles.Bar((name, center, size) => parts.Box(name + i, "Handles", center, size, handle, visual, Surface.Plain), "Handle", onFace, -1f,
+                    handleLength);
             }
+            parts.Flush();
             if (col)
             {
                 var collider = new GameObject("Collider") { layer = layer };
@@ -621,22 +672,70 @@ namespace OutOfSight
         /// M6 gameplay (docs/CONTRACT_M6.md 2.5 and 2.4): the wardrobe, a full occluder with one collider over its whole box,
         /// its two doors on the front (local +z, WardrobeRule.Front), a cornice on top, all Wood (Wood049). 4 boxes, 48
         /// triangles, the prop's colour and its accent.
+        /// Handles (2026-11-19): each door carries a vertical bar pull by the middle (a child of the door, so it swings with
+        /// it). Combined (the level builder's <paramref name="combine"/>), the wardrobe at rest is drawn by "Closed" (its wood,
+        /// one renderer) and "ClosedHandles" (the household's dark metal): 2 draw calls instead of 4. The parts above are
+        /// built as before but their renderers wait disabled until WardrobeDoors swings the doors, and go back after. 22 boxes
+        /// built, 132 triangles drawn at rest.
         /// </summary>
-        private static void Wardrobe(Transform p, Vector3 s, Color wood, Color accent, int layer, bool col, bool visual)
+        private static void Wardrobe(Transform p, Vector3 s, Color wood, Color accent, int layer, bool col, bool visual, bool combine)
         {
             Material body = Mat(wood, 0.25f, visual);
             Material doors = Mat(accent, 0.3f, visual);
             const float top = 0.06f;
             const float panel = 0.02f;
-            PrimitiveKit.Box(p, "Body", new Vector3(0f, (s.y - top) * 0.5f, -panel * 0.5f), new Vector3(s.x, s.y - top, s.z - panel), body, layer, false, visual, Surface.Wood);
-            PrimitiveKit.Box(p, "Cornice", new Vector3(0f, s.y - top * 0.5f, 0f), new Vector3(s.x, top, s.z), doors, layer, false, visual, Surface.Wood);
+            var bodyCenter = new Vector3(0f, (s.y - top) * 0.5f, -panel * 0.5f);
+            var bodySize = new Vector3(s.x, s.y - top, s.z - panel);
+            var corniceCenter = new Vector3(0f, s.y - top * 0.5f, 0f);
+            var corniceSize = new Vector3(s.x, top, s.z);
+            GameObject bodyGo = PrimitiveKit.Box(p, "Body", bodyCenter, bodySize, body, layer, false, visual, Surface.Wood);
+            GameObject corniceGo = PrimitiveKit.Box(p, "Cornice", corniceCenter, corniceSize, doors, layer, false, visual, Surface.Wood);
             float doorW = s.x * 0.5f - 0.015f;
             float doorH = s.y - top - 0.06f;
+            float handleY = Handles.HeightOn(0.03f, 0.03f + doorH, 0.12f);
+            float handleLength = Mathf.Min(0.24f, doorH * 0.3f);
+            bool rest = combine && visual;
+            var closed = new PartBatch(p, layer, true);
+            Material closedBody = rest ? PrimitiveKit.ShownMaterial(body, Surface.Wood) : null;
+            Material closedDoors = rest ? PrimitiveKit.ShownMaterial(doors, Surface.Wood) : null;
+            if (rest)
+            {
+                closed.Box("Body", "Closed", bodyCenter, bodySize, closedBody, true, Surface.Wood);
+                closed.Box("Cornice", "Closed", corniceCenter, corniceSize, closedDoors, true, Surface.Wood);
+            }
+            var animated = new List<GameObject> { bodyGo, corniceGo };
             for (int i = 0; i < 2; i++)
             {
-                float x = (i == 0 ? -1f : 1f) * (doorW * 0.5f + 0.0075f);
-                PrimitiveKit.Box(p, "Door" + i, new Vector3(x, 0.03f + doorH * 0.5f, s.z * 0.5f - panel * 0.5f),
-                    new Vector3(doorW, doorH, panel), doors, layer, false, visual, Surface.Wood);
+                float side = i == 0 ? -1f : 1f;
+                float x = side * (doorW * 0.5f + 0.0075f);
+                var doorCenter = new Vector3(x, 0.03f + doorH * 0.5f, s.z * 0.5f - panel * 0.5f);
+                var doorSize = new Vector3(doorW, doorH, panel);
+                GameObject door = PrimitiveKit.Box(p, "Door" + i, doorCenter, doorSize, doors, layer, false, visual, Surface.Wood);
+                animated.Add(door);
+                if (!visual)
+                {
+                    continue;
+                }
+                // The pull by the doors' meeting edge, on the door's front face (+z).
+                var onFace = new Vector3(side * (0.0075f + 0.07f), handleY, s.z * 0.5f);
+                Handles.Bar((name, center, size) => Handles.ChildBox(door.transform, name, center, size, layer), "Handle", onFace, 1f, handleLength);
+                if (rest)
+                {
+                    closed.Box("Door" + i, "Closed", doorCenter, doorSize, closedDoors, true, Surface.Wood);
+                    Handles.Bar((name, center, size) => closed.Box(name + i, "ClosedHandles", center, size, Handles.Material, true, Surface.Plain), "Handle",
+                        onFace, 1f, handleLength);
+                }
+            }
+            if (rest)
+            {
+                closed.Flush();
+                foreach (GameObject part in animated)
+                {
+                    foreach (Renderer r in part.GetComponentsInChildren<Renderer>(true))
+                    {
+                        r.enabled = false;
+                    }
+                }
             }
             if (col)
             {
@@ -648,13 +747,24 @@ namespace OutOfSight
             }
         }
 
-        /// <summary>A kitchen counter (M2): a body and a worktop, solid up to its height. 2 boxes.</summary>
+        /// <summary>
+        /// A kitchen counter (M2): a body and a worktop, solid up to its height. M9 soft shapes: the two boxes stay as
+        /// collider-only objects (exactly as under a model) and the visual is two rounded meshes, the body's walls with
+        /// rounded corners and the worktop with rounded corners and edges, 106 triangles.
+        /// </summary>
         private static void Counter(Transform p, Vector3 s, Color main, Color top, int layer, bool col, bool visual)
         {
             const float worktop = 0.04f;
-            PrimitiveKit.Box(p, "Body", new Vector3(0f, (s.y - worktop) * 0.5f, 0.01f), new Vector3(s.x - 0.02f, s.y - worktop, s.z - 0.02f),
-                Mat(main, 0.2f, visual), layer, col, visual, Surface.Wood);
-            PrimitiveKit.Box(p, "Worktop", new Vector3(0f, s.y - worktop * 0.5f, 0f), new Vector3(s.x, worktop, s.z), Mat(top, 0.5f, visual), layer, col, visual, Surface.Plaster);
+            var bodySize = new Vector3(s.x - 0.02f, s.y - worktop, s.z - 0.02f);
+            PrimitiveKit.Box(p, "Body", new Vector3(0f, (s.y - worktop) * 0.5f, 0.01f), bodySize, null, layer, col, false, Surface.Wood);
+            PrimitiveKit.Box(p, "Worktop", new Vector3(0f, s.y - worktop * 0.5f, 0f), new Vector3(s.x, worktop, s.z), null, layer, col, false, Surface.Plaster);
+            if (visual)
+            {
+                PrimitiveKit.Part(p, "BodyShape", RoundedMesh.Slab(bodySize, 0.02f, 0f, 0, 0f, 0, 2, false, false), new Vector3(0f, 0f, 0.01f),
+                    Quaternion.identity, Vector3.one, Mat(main, 0.2f, true), layer, Surface.Wood);
+                PrimitiveKit.Part(p, "WorktopShape", RoundedMesh.Slab(new Vector3(s.x, worktop, s.z), 0.02f, 0.008f, 1, 0.015f, 1, 2, false, true),
+                    new Vector3(0f, s.y - worktop, 0f), Quaternion.identity, Vector3.one, Mat(top, 0.5f, true), layer, Surface.Plaster);
+            }
         }
 
         /// <summary>

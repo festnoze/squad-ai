@@ -49,7 +49,7 @@ earliest exit. Difficile ran with hearing x1.25 (since set back to 1).
 | 10 | rock | 8 | 18.1 | ok, 8 |
 | 11 | load | 15+ | 15.5 | ok, 15+ |
 | 12 | pet | 15+ | 14.3 | ok, 15+ |
-| 13 | load | 8 | 26.2 | FAIL: fidelity replay, Claire sees the chair at 6.1 s at (1.12, 5.25) |
+| 13 | load | 8 | 26.2 | FAIL: fidelity replay, Claire sees the chair at 6.1 s at (1.12, 5.25); fixed 2026-11-19 (see below): ok, 8, 36.6 s |
 | 14 | split | 7 | 27.0 | ok, 7 |
 | 15 | robot | 5 | 28.9 | ok, 5 |
 | 16 | dark | 15+ | 27.6 | FAIL at both: 25 materials over the 24 budget (not a design defect: the M7 texture or lighting work) |
@@ -59,6 +59,16 @@ earliest exit. Difficile ran with hearing x1.25 (since set back to 1).
 The curve is flat: margins 15+ on levels 6, 8, 11, 12 and 16, exits never above 29 s, level 17 easier than 15.
 No level file was changed by the design agent (the product owner stopped the work before a retune could be audited at
 both difficulties). The table "after" is therefore the table above.
+
+Level 13 at Difficile, 2026-11-19: an audit defect, not a level one. The sighting at (1.12, 5.25) is the office chair
+gliding into the hidden corner (0.75, 5.25): the replay releases early and the chair slides the last 0.37 m (the careful
+stop distance plus the 0.1 m release), but the search checked a stop at the cell it stops at only, whose ring misses a
+pose that far back. Six level variants (a shelf hiding the corner, Claire's dwell 3.5 and 4.5, Max's dwell 8, a narrower
+door, Claire's station moved) each left the same sighting or moved it to another glide-in pose ((3.38, 6.75), (2.25, 6.12),
+(1.85, 6.75)). The search now also checks the glide at the cell it comes from (LevelAudit.GlideCell, a moving node keeps
+that cell in its state; fixture test_m7_audit_glide, mutation audit_glide). level13.json is unchanged but for its new
+designerRouteHard: Normal margin 8, exit 26.2 s (same route); Difficile margin 8, exit 36.6 s, fidelity 0 sightings.
+Levels 7 and 21 (the other office chairs) still pass at both difficulties with their file routes.
 
 ## 3. Retune plan per level (for later; each needs an audit at Normal and Difficile, then -writeRoutes)
 
@@ -77,7 +87,7 @@ and Difficile, `-slack -skipFixtures`.
 | 9 | 10 / 12.3 | 8 / 20 | start Claire at station 1 (facing the route), glances +-45 -> +-80 |
 | 11 | 15+ / 15.5 | 8 / 22 | Lea starts at station 1 (couloir foot, facing up it) or her corner dwell 14 -> 5 |
 | 12 | 15+ / 14.3 | 7 / 22 | Paul station 2 faces north (0) over the salon |
-| 13 | 8 / 26.2 | 7 / 28, Difficile pass | Claire station 0 dwell 4 -> 5 (the Difficile sighting at 6.1 s), Max station 0 dwell 9 -> 7 |
+| 13 | 8 / 26.2 | 7 / 28 | Difficile passes since the glide fix (above); dwell retunes tried: Claire station 0 4 -> 5 (Normal regression), Max station 0 9 -> 7 (loitering) |
 | 16 | 15+ / 27.6 | 5 / 35 | the dog awake 6 s of 12; Claire station 2 at (3.25, 1.75) facing 45 over the couloir door; fix the material budget first |
 | 17 | 9 / 21.2 | 4 to 5 / 45+ | Lea station 0 faces north (0) over the sejour for her 25 s: the crossing waits for her canape and station 2 |
 | 18 | 6 / 21.7 | 4 to 5 | Odile's looks away 5 s -> 4.7 s |

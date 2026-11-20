@@ -35,7 +35,9 @@ namespace OutOfSight.Tests
         private const string DoorOpenLevel = "test_m6_gameplay_dooropen";
         private const string M5DoorLevel = "test_m5_game_door";
 
-        private static int WardrobeSteps => Mathf.RoundToInt(Tuning.WardrobeActionTime / Dt);
+        // Ceil, not round: the action runs whole fixed steps until its time is spent, and 0.25 s is 12.5 steps of 0.02 s
+        // (RoundToInt would round that half to the even 12).
+        private static int WardrobeSteps => Mathf.CeilToInt(Tuning.WardrobeActionTime / Dt - 1e-4f);
         private static int DoorSteps => Mathf.RoundToInt(Tuning.DoorOpenTime / Dt);
         private static int StopSteps => Mathf.RoundToInt(Tuning.InhabitantDoorStop / Dt);
         private static int GraceSteps => Mathf.RoundToInt(Tuning.CaughtGrace / Dt);

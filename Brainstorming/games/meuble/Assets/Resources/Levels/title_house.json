@@ -10,6 +10,7 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
       "wallColor": "#EBDDC6",
       "wallFinish": "grasscloth"
@@ -25,7 +26,7 @@
       "floor": "hard",
       "floorColor": "#9C6B45",
       "wallColor": "#F2E3CF",
-      "wallFinish": "wallpaper"
+      "wallFinish": "quatrefoil"
     },
     {
       "id": "couloir",
@@ -50,7 +51,7 @@
       "floor": "hard",
       "floorColor": "#B07A4E",
       "wallColor": "#F3E2C8",
-      "wallFinish": "sage"
+      "wallFinish": "arches"
     },
     {
       "id": "cuisine",
@@ -64,7 +65,7 @@
       "floorFinish": "tile",
       "floorColor": "#EDE6DA",
       "wallColor": "#F7F4EE",
-      "wallFinish": "limewash"
+      "wallFinish": "subwaytile"
     },
     {
       "id": "entree",
@@ -75,8 +76,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "marble",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "travertine"
     }
   ],
   "doors": [
@@ -186,7 +189,7 @@
     },
     {
       "name": "Lit",
-      "kind": "sofa",
+      "kind": "bed",
       "x": 0.85,
       "z": 7.85,
       "yaw": 0.0,
@@ -226,7 +229,7 @@
     },
     {
       "name": "Plan",
-      "kind": "counter",
+      "kind": "kitchen_sink",
       "x": 13.1,
       "z": 4.75,
       "yaw": 90.0,
@@ -239,7 +242,7 @@
     },
     {
       "name": "Frigo",
-      "kind": "cabinet",
+      "kind": "fridge",
       "x": 10.4,
       "z": 2.4,
       "yaw": 180.0,
@@ -268,7 +271,7 @@
       "kind": "bookshelf",
       "x": 0.9,
       "z": 4.6,
-      "yaw": 180.0,
+      "yaw": 0.0,
       "sizeX": 1.2,
       "sizeY": 1.8,
       "sizeZ": 0.4,
@@ -294,7 +297,7 @@
       "kind": "cabinet",
       "x": 3.95,
       "z": 5.35,
-      "yaw": 0.0,
+      "yaw": 180.0,
       "sizeX": 0.7,
       "sizeY": 0.9,
       "sizeZ": 0.45,

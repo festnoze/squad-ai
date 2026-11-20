@@ -122,7 +122,7 @@ namespace OutOfSight
             }
             if (glow != null)
             {
-                glow.enabled = true; // MUTATION:GLOW_FOLLOWS_ON
+                glow.enabled = On; // MUTATION:GLOW_FOLLOWS_ON
             }
             if (On)
             {

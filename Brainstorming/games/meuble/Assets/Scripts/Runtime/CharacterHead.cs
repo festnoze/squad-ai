@@ -17,11 +17,58 @@ namespace OutOfSight
     /// the pupils land at a natural eye span on the flat face front, the ears on the sides, the back of the head at the
     /// seam. Below the image's jaw line the surface tucks into the neck, down to a ring on the original collar.
     /// The nose, brow, cheeks and ears are sculpted where the image paints them.</para>
+    /// <para>M9 (docs/m9/heads/NOTES.md): a gender's <see cref="Sculpt"/> marks the features further (a larger head, a
+    /// longer nose with its wings, a brow ridge over shallow eye sockets, cheekbones, lips, a chin, the jaw angle, ears
+    /// that stand off the head toward their back rim), always at the image's own landmarks, so the painted eyes, nose,
+    /// mouth and ears stay on their relief. The head is one grid in the skin's own slot: no material, no renderer.</para>
     /// </summary>
     internal static class CharacterHead
     {
         private const float Turn = 2f * Mathf.PI;
         private const int ArcSamples = 241;
+
+        /// <summary>
+        /// How strongly a gender's features are sculpted on top of its <see cref="Shape"/> (metres unless noted; the
+        /// trials that chose these values are in docs/m9/heads/NOTES.md and Editor/HeadShots.cs).
+        /// </summary>
+        internal struct Sculpt
+        {
+            /// <summary>Uniform scale of the whole head about <see cref="Pivot"/> (1: the M7 size).</summary>
+            public float Scale;
+            /// <summary>Factor on the nose's height table, and on its width.</summary>
+            public float Nose, NoseWidth;
+            /// <summary>The nose wings beside the tip, the brow ridge, the eye sockets (a hollow), the cheekbones, the
+            /// hollow under them, the lips, the chin, the groove over it, the jaw angle (outward) and the ears' rim.</summary>
+            public float Alar, Brow, Socket, Cheekbone, CheekHollow, Lips, Chin, ChinGroove, Jaw, Ear;
+            /// <summary>0 to 1: how abruptly the surface turns under the jaw line into the neck (0: the M7 smooth step).</summary>
+            public float JawEdge;
+            /// <summary>0 to 1: the hollow of the ear's bowl, in front of its rim.</summary>
+            public float EarCup;
+            /// <summary>0 to 1: how far the flat face front rounds off toward an ellipse (the outer eye corners and the
+            /// mouth corners set back from the nose, as on a real face; 0: the M7 flat front).</summary>
+            public float FrontRound;
+        }
+
+        /// <summary>Where the head grows from (eye frame): low in the head, over the neck, so the chin barely moves.</summary>
+        private static readonly Vector3 Pivot = new Vector3(0f, -0.10f, -0.08f);
+
+        // The M9 heads (trial v7_refined): 14 % larger, a defined but short nose, a face front rounded toward the eye
+        // corners, a square jaw and firm brow for the man, a soft jaw and small chin for the woman, ears standing 14 to
+        // 16 mm off the head at their back rim. Read by Editor/HeadShots.cs (by name, to try other sculpts): keep the
+        // field names.
+        internal static Sculpt ManSculpt = new Sculpt
+        {
+            Scale = 1.14f, Nose = 1.35f, NoseWidth = 1.05f, Alar = 0.003f, Brow = 0.007f, Socket = 0.004f,
+            Cheekbone = 0.004f, CheekHollow = 0.0015f, Lips = 0.003f, Chin = 0.007f, ChinGroove = 0.002f, Jaw = 0.006f,
+            Ear = 0.016f, JawEdge = 0.5f, EarCup = 0.3f, FrontRound = 0.6f,
+        };
+
+        internal static Sculpt WomanSculpt = new Sculpt
+        {
+            Scale = 1.14f, Nose = 1.35f, NoseWidth = 1.05f, Alar = 0.0025f, Brow = 0.003f, Socket = 0.0035f,
+            Cheekbone = 0.003f, CheekHollow = 0f, Lips = 0.003f, Chin = 0.005f, ChinGroove = 0.002f, Jaw = 0.003f,
+            Ear = 0.014f, JawEdge = 0.3f, EarCup = 0.3f, FrontRound = 0.5f,
+        };
 
         /// <summary>One plan section of the head: its height, half width, the z of its widest point, of its front and of
         /// its back centre, and the superellipse exponents of its front and back halves (metres, eye frame).</summary>
@@ -52,9 +99,14 @@ namespace OutOfSight
             public Section[] Sections;
             /// <summary>Per image v: how far the nose stands out of the face, and its half width (metres).</summary>
             public (float v, float height, float sigma)[] Nose;
-            public float BrowHeight, BrowV, BrowSigma;
+            /// <summary>The nose wings: their centre's x (metres) and image v.</summary>
+            public float AlarX, AlarV;
+            public float BrowV, BrowSigma;
             public float CheekHeight, CheekDu, CheekV, CheekSigmaX, CheekSigmaV;
-            public float EarHeight, EarV, EarSigmaDu, EarSigmaV;
+            /// <summary>The mouth's image v, the chin's half width (metres) and the jaw angle's image v.</summary>
+            public float MouthV, ChinSigmaX, JawAngleV;
+            /// <summary>The painted ear: its centre's image v and its half extent in |du| and in v.</summary>
+            public float EarV, EarHalfDu, EarHalfV;
         }
 
         // The man: a larger head, a square brow and jaw, a strong nose. Landmarks: pupils at u 0.434 and 0.565, v 0.457;
@@ -63,7 +115,7 @@ namespace OutOfSight
         {
             PupilDu = 0.0655f, FrontDu = 0.11f, EarDu = 0.266f, EyeHalfSpan = 0.032f,
             Jaw = new[] { (0f, 0.896f), (0.134f, 0.857f), (0.207f, 0.789f), (0.27f, 0.745f), (0.34f, 0.71f), (0.5f, 0.70f) },
-            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.225f, 0.30f, 0.37f, 0.415f, 0.457f, 0.51f, 0.555f, 0.60f, 0.635f, 0.69f, 0.76f, 0.83f, 0.896f, 0.925f, 0.96f },
+            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.225f, 0.30f, 0.37f, 0.415f, 0.457f, 0.51f, 0.555f, 0.585f, 0.605f, 0.625f, 0.645f, 0.69f, 0.76f, 0.83f, 0.896f, 0.925f, 0.96f },
             Sections = new[]
             {
                 new Section(0f, 0.122f, 0f, -0.085f, -0.085f, -0.085f, 2f, 2f),
@@ -82,11 +134,15 @@ namespace OutOfSight
                 new Section(0.896f, -0.108f, 0.050f, -0.090f, 0.011f, -0.160f, 2.9f, 2.3f),
                 new Section(1f, -0.112f, 0.045f, -0.098f, -0.040f, -0.158f, 2.6f, 2.3f),
             },
-            Nose = new[] { (0.43f, 0f, 0.006f), (0.47f, 0.003f, 0.007f), (0.52f, 0.007f, 0.008f), (0.57f, 0.013f, 0.011f),
-                (0.60f, 0.022f, 0.013f), (0.615f, 0.018f, 0.014f), (0.63f, 0.007f, 0.015f), (0.65f, 0f, 0.015f) },
-            BrowHeight = 0.004f, BrowV = 0.37f, BrowSigma = 0.035f,
+            // A straight bridge and a round tip (a plateau over two rows), undercut to the lip.
+            Nose = new[] { (0.42f, 0f, 0.006f), (0.457f, 0.0035f, 0.0062f), (0.49f, 0.006f, 0.0066f), (0.525f, 0.009f, 0.0072f), (0.555f, 0.0125f, 0.008f),
+                (0.585f, 0.0175f, 0.010f), (0.60f, 0.0195f, 0.012f), (0.615f, 0.019f, 0.013f), (0.628f, 0.013f, 0.014f),
+                (0.642f, 0.004f, 0.015f), (0.655f, 0f, 0.015f) },
+            AlarX = 0.015f, AlarV = 0.615f,
+            BrowV = 0.37f, BrowSigma = 0.035f,
             CheekHeight = 0.002f, CheekDu = 0.11f, CheekV = 0.58f, CheekSigmaX = 0.02f, CheekSigmaV = 0.06f,
-            EarHeight = 0.013f, EarV = 0.53f, EarSigmaDu = 0.03f, EarSigmaV = 0.09f,
+            MouthV = 0.69f, ChinSigmaX = 0.021f, JawAngleV = 0.765f,
+            EarV = 0.53f, EarHalfDu = 0.036f, EarHalfV = 0.125f,
         };
 
         // The woman: a smaller head, round cheeks, a soft narrow chin, a small nose. Landmarks: pupils at u 0.428 and
@@ -95,7 +151,7 @@ namespace OutOfSight
         {
             PupilDu = 0.0705f, FrontDu = 0.115f, EarDu = 0.269f, EyeHalfSpan = 0.030f,
             Jaw = new[] { (0f, 0.868f), (0.13f, 0.835f), (0.2f, 0.775f), (0.27f, 0.735f), (0.34f, 0.705f), (0.5f, 0.70f) },
-            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.235f, 0.30f, 0.36f, 0.41f, 0.457f, 0.51f, 0.555f, 0.60f, 0.632f, 0.682f, 0.745f, 0.81f, 0.868f, 0.9f, 0.94f },
+            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.235f, 0.30f, 0.36f, 0.41f, 0.457f, 0.51f, 0.555f, 0.585f, 0.603f, 0.621f, 0.64f, 0.682f, 0.745f, 0.81f, 0.868f, 0.9f, 0.94f },
             Sections = new[]
             {
                 new Section(0f, 0.115f, 0f, -0.086f, -0.086f, -0.086f, 2f, 2f),
@@ -114,11 +170,14 @@ namespace OutOfSight
                 new Section(0.868f, -0.097f, 0.045f, -0.091f, 0.006f, -0.165f, 2.1f, 2.3f),
                 new Section(1f, -0.108f, 0.042f, -0.100f, -0.045f, -0.165f, 2.2f, 2.3f),
             },
-            Nose = new[] { (0.44f, 0f, 0.005f), (0.48f, 0.002f, 0.006f), (0.53f, 0.005f, 0.007f), (0.57f, 0.010f, 0.009f),
-                (0.60f, 0.015f, 0.011f), (0.615f, 0.012f, 0.012f), (0.63f, 0.005f, 0.013f), (0.65f, 0f, 0.013f) },
-            BrowHeight = 0.0015f, BrowV = 0.355f, BrowSigma = 0.035f,
+            Nose = new[] { (0.43f, 0f, 0.005f), (0.457f, 0.0025f, 0.0052f), (0.49f, 0.004f, 0.0056f), (0.525f, 0.006f, 0.006f), (0.555f, 0.0088f, 0.007f),
+                (0.585f, 0.0125f, 0.0085f), (0.60f, 0.0145f, 0.010f), (0.612f, 0.0135f, 0.011f), (0.625f, 0.009f, 0.012f),
+                (0.638f, 0.003f, 0.013f), (0.65f, 0f, 0.013f) },
+            AlarX = 0.014f, AlarV = 0.612f,
+            BrowV = 0.355f, BrowSigma = 0.035f,
             CheekHeight = 0.006f, CheekDu = 0.11f, CheekV = 0.58f, CheekSigmaX = 0.022f, CheekSigmaV = 0.065f,
-            EarHeight = 0.011f, EarV = 0.525f, EarSigmaDu = 0.03f, EarSigmaV = 0.09f,
+            MouthV = 0.682f, ChinSigmaX = 0.016f, JawAngleV = 0.755f,
+            EarV = 0.527f, EarHalfDu = 0.037f, EarHalfV = 0.125f,
         };
 
         /// <summary>The mesh columns (image u, 0 to 1): dense over the face, sparser over the sides and the back.</summary>
@@ -388,6 +447,7 @@ namespace OutOfSight
             Func<Vector3, Vector3, Vector2, float, int> addHeadVertex, Func<int, Vector2, int> addCollarVertex)
         {
             Shape shape = female ? Woman : Man;
+            Sculpt sculpt = female ? WomanSculpt : ManSculpt;
             var neck = new Neck(collar, points);
             collar = neck.Order;
             int rows = shape.Rows.Length;
@@ -398,7 +458,7 @@ namespace OutOfSight
             {
                 for (int col = 0; col < stride; col++)
                 {
-                    position[row * stride + col] = Position(shape, Columns[col], shape.Rows[row], neck, out tucks[row * stride + col]);
+                    position[row * stride + col] = Position(shape, sculpt, Columns[col], shape.Rows[row], neck, out tucks[row * stride + col]);
                 }
             }
             var grid = new int[position.Length];
@@ -491,28 +551,31 @@ namespace OutOfSight
 
         private static float[] BuildColumns()
         {
-            const int face = 20, side = 10;
+            const int face = 18;
             const float faceEdge = 0.12f;
+            // The side columns' |du| beyond the face (from the face edge to the seam): dense over the ears (|du| 0.23 to
+            // 0.30), sparser over the hair behind them. (A local: Columns is initialized before any field below it.)
+            float[] side = { 0.155f, 0.195f, 0.228f, 0.248f, 0.268f, 0.288f, 0.31f, 0.35f, 0.40f, 0.45f, 0.5f };
             var u = new List<float>();
-            for (int i = side; i >= 1; i--)
+            for (int i = side.Length - 1; i >= 0; i--)
             {
-                u.Add(0.5f - Mathf.Lerp(faceEdge, 0.5f, i / (float)side));
+                u.Add(0.5f - side[i]);
             }
             for (int i = 0; i <= face; i++)
             {
                 u.Add(0.5f + Mathf.Lerp(-faceEdge, faceEdge, i / (float)face));
             }
-            for (int i = 1; i <= side; i++)
+            for (int i = 0; i < side.Length; i++)
             {
-                u.Add(0.5f + Mathf.Lerp(faceEdge, 0.5f, i / (float)side));
+                u.Add(0.5f + side[i]);
             }
             return u.ToArray();
         }
 
         /// <summary>The surface at image (u, v), tucked into the neck below the image's jaw line.</summary>
-        private static Vector3 Position(Shape shape, float u, float v, Neck neck, out float tuck)
+        private static Vector3 Position(Shape shape, Sculpt sculpt, float u, float v, Neck neck, out float tuck)
         {
-            Vector3 p = Surface(shape, u, v);
+            Vector3 p = Surface(shape, sculpt, u, v);
             float jaw = Lookup(shape.Jaw, Mathf.Abs(u - 0.5f));
             tuck = 0f;
             if (v > jaw)
@@ -520,9 +583,13 @@ namespace OutOfSight
                 // On the collar itself: the strip that sews the lowest ring to it then has no visible width.
                 Vector3 target = neck.At(neck.Around(p));
                 // The collar rises toward the nape: there the head meets it where its sections come down to the
-                // collar's height, so the surface never dips below the collar and folds back up.
-                float end = Mathf.Clamp(HeightToV(shape.Sections, target.y), jaw + 0.04f, shape.Rows[shape.Rows.Length - 1]);
-                tuck = Smooth(jaw, end, v);
+                // collar's height, so the surface never dips below the collar and folds back up. The sections are
+                // before the sculpt's scale: compare the collar's height brought back to that size.
+                float sectionY = Pivot.y + (target.y - Pivot.y) / sculpt.Scale;
+                float end = Mathf.Clamp(HeightToV(shape.Sections, sectionY), jaw + 0.04f, shape.Rows[shape.Rows.Length - 1]);
+                // A sharper jaw leaves the head surface faster right under the jaw line (slope 2 instead of 0).
+                float t = Mathf.InverseLerp(jaw, end, v);
+                tuck = Mathf.Lerp(Mathf.SmoothStep(0f, 1f, t), 1f - Sq(1f - t), sculpt.JawEdge);
                 p = Vector3.Lerp(p, target, tuck);
             }
             return p;
@@ -541,15 +608,20 @@ namespace OutOfSight
             return table[table.Length - 1].V;
         }
 
-        /// <summary>The head surface at image (u, v): the row's contour laid by arc length, then the sculpted features.</summary>
-        private static Vector3 Surface(Shape shape, float u, float v)
+        /// <summary>The head surface at image (u, v): the row's contour laid by arc length, then the sculpted features,
+        /// then the sculpt's scale.</summary>
+        private static Vector3 Surface(Shape shape, Sculpt sculpt, float u, float v)
         {
             float du = u - 0.5f;
             float ad = Mathf.Abs(du);
             Section r = SectionAt(shape.Sections, v);
             if (r.A < 1e-5f)
             {
-                return new Vector3(0f, r.Y, r.Zc);
+                return Pivot + (new Vector3(0f, r.Y, r.Zc) - Pivot) * sculpt.Scale;
+            }
+            if (r.Nf > 2.2f)
+            {
+                r.Nf = Mathf.Lerp(r.Nf, 2.2f, sculpt.FrontRound);
             }
             float widest = Trace(r);
             float total = ArcS[ArcSamples - 1];
@@ -575,16 +647,55 @@ namespace OutOfSight
             var nose = shape.Nose;
             if (v >= nose[0].v && v <= nose[nose.Length - 1].v)
             {
-                p.z += face * Lookup(nose, v, out float sigma) * Mathf.Exp(-0.5f * Sq(px / sigma));
+                float height = sculpt.Nose * Lookup(nose, v, out float sigma);
+                p.z += face * height * Mathf.Exp(-0.5f * Sq(px / (sigma * sculpt.NoseWidth)));
             }
-            p.z += face * shape.BrowHeight * Mathf.Exp(-0.5f * Sq((v - shape.BrowV) / shape.BrowSigma)) * (1f - Smooth(0.03f, 0.065f, px));
-            float cheek = face * shape.CheekHeight * Mathf.Exp(-0.5f * Sq((px - scale * shape.CheekDu) / shape.CheekSigmaX)
-                - 0.5f * Sq((v - shape.CheekV) / shape.CheekSigmaV));
+            // The nose wings round off the base of the nose on either side of its tip.
+            p.z += face * sculpt.Alar * Bump(px - shape.AlarX, 0.0065f, v - shape.AlarV, 0.018f);
+            // The brow ridge over the painted brows, the eye sockets under it, toward the nose.
+            p.z += face * sculpt.Brow * Mathf.Exp(-0.5f * Sq((v - shape.BrowV) / shape.BrowSigma)) * (1f - Smooth(0.045f, 0.075f, px));
+            p.z -= face * sculpt.Socket * Bump(px - 0.8f * shape.EyeHalfSpan, 0.014f, v - 0.425f, 0.03f);
+            // The lips, the groove under them and the chin, which also reaches a little lower.
+            p.z += face * sculpt.Lips * Bump(px, 0.02f, v - shape.MouthV, 0.022f);
+            p.z -= face * sculpt.ChinGroove * Bump(px, 0.022f, v - (shape.MouthV + 0.07f), 0.02f);
+            float chin = face * sculpt.Chin * Bump(px, shape.ChinSigmaX, v - (shape.Jaw[0].v - 0.045f), 0.032f);
+            p.z += chin;
+            p.y -= 0.35f * chin;
+            // Round cheeks, the cheekbones under the outer eye corners and the hollow below them, out of the contour.
+            float cheek = face * (shape.CheekHeight * Mathf.Exp(-0.5f * Sq((px - scale * shape.CheekDu) / shape.CheekSigmaX)
+                - 0.5f * Sq((v - shape.CheekV) / shape.CheekSigmaV))
+                + sculpt.Cheekbone * Bump(px - 0.056f, 0.016f, v - 0.525f, 0.04f)
+                - sculpt.CheekHollow * Bump(px - 0.056f, 0.015f, v - 0.665f, 0.04f));
             p += new Vector3(sign * px, 0f, pz - r.Zc).normalized * cheek;
-            p.x += sign * shape.EarHeight * Mathf.Exp(-0.5f * Sq((ad - shape.EarDu) / shape.EarSigmaDu)
-                - 0.5f * Sq((v - shape.EarV) / shape.EarSigmaV));
-            return p;
+            // The jaw angle, between the cheek and the ear, just above the image's jaw line.
+            p.x += sign * sculpt.Jaw * Bump(ad - 0.205f, 0.04f, v - shape.JawAngleV, 0.05f);
+            p += Ear(shape, sculpt, ad, v, sign);
+            return Pivot + (p - Pivot) * sculpt.Scale;
         }
+
+        /// <summary>
+        /// The ear over its painting: an egg outline (the lobe narrower), standing off the head along a line swept back,
+        /// little at its front (where it joins the cheek) and most at its back rim, which drops steeply to the hair
+        /// behind; a shallow bowl in front of the rim.
+        /// </summary>
+        private static Vector3 Ear(Shape shape, Sculpt sculpt, float ad, float v, float sign)
+        {
+            float eu = (ad - shape.EarDu) / shape.EarHalfDu;
+            float ev = (v - shape.EarV) / shape.EarHalfV;
+            float width = 1f - 0.3f * Smooth(0f, 1f, ev);
+            float outline = 1f - Smooth(0.55f, 1.05f, Mathf.Sqrt(Sq(eu / width) + Sq(ev)));
+            if (outline <= 0f || sculpt.Ear <= 0f)
+            {
+                return Vector3.zero;
+            }
+            float rim = 0.25f + 0.75f * Smooth(-1f, 0.85f, eu);
+            float lobe = 1f - 0.4f * Smooth(0.35f, 1f, ev);
+            float bowl = 1f - sculpt.EarCup * Mathf.Exp(-0.5f * Sq((eu + 0.1f) / 0.35f) - 0.5f * Sq((ev + 0.05f) / 0.35f));
+            return new Vector3(sign * 0.94f, 0f, -0.34f) * (sculpt.Ear * outline * rim * lobe * bowl);
+        }
+
+        /// <summary>A unit bump: a Gaussian of half widths <paramref name="sx"/> and <paramref name="sy"/>.</summary>
+        private static float Bump(float x, float sx, float y, float sy) => Mathf.Exp(-0.5f * Sq(x / sx) - 0.5f * Sq(y / sy));
 
         /// <summary>Samples the row's half contour into the arc buffers; returns the arc length to its widest point.</summary>
         private static float Trace(Section r)

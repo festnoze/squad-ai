@@ -1,434 +1,0 @@
-=== Mutation cone (Assets/Scripts/Core/VisionMath.cs) ===
-  rouges : Step03_StillWhileSeen Step04_Caught Step05_Occluder Step06_OutOfCone
-  OK  Step03_StillWhileSeen rougit
-  OK  Step04_Caught rougit
-  OK  Step05_Occluder rougit
-  OK  Step06_OutOfCone rougit
-=== Mutation reset (Assets/Scripts/Core/CaughtRule.cs) ===
-  rouges : Seen_and_moving_018_then_hidden_is_not_caught_and_resets
-  OK  Seen_and_moving_018_then_hidden_is_not_caught_and_resets rougit
-=== Mutation grace (Assets/Scripts/Core/FurnitureMemory.cs) ===
-  rouges : Step13c_DiscoveryGraceNeedsAnUnbrokenSighting
-  OK  Step13c_ rougit
-=== Mutation decay (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step21b_SuspicionDecaysOnlyInRoutineOrAlerted
-  OK  Step21b_ rougit
-=== Mutation facing (Assets/Scripts/Runtime/ModelKit.cs) ===
-  rouges : Step22_ModelsReplaceTheProceduralVisuals
-  OK  Step22_ModelsReplaceTheProceduralVisuals rougit
-=== Mutation head (Assets/Scripts/Runtime/InhabitantRig.cs) ===
-  rouges : Step24_LoopDrivesClipsHeadAndFootsteps
-  OK  Step24_LoopDrivesClipsHeadAndFootsteps rougit
-=== Mutation pause (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step26_PauseStopsEveryRuleAndHoldsVisuals
-  OK  Step26_PauseStopsEveryRuleAndHoldsVisuals rougit
-=== Mutation variant (Assets/Scripts/Runtime/Sfx.cs) ===
-  rouges : Step27d_HopVariantsNeverRepeat
-  OK  Step27d_HopVariantsNeverRepeat rougit
-=== Mutation stool_tip (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step29i_StoolTipsLiesAndRightsOnAPress Step29j_StoolTipsOnAHeadOnWallHitButNotAtCarefulSpeed
-  OK  Step29i_ rougit
-  OK  Step29j_ rougit
-=== Mutation glide (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step29_OfficeChairGlidesToAStopInExactlyFourTenths Step29b_SeenDuringTheGlideIsCaught Step29c_PredictedStopPointIsWhereItStops Step29d_OppositeInputBrakesNoFaster
-  OK  Step29_ rougit
-  OK  Step29b_ rougit
-  OK  Step29c_ rougit
-  OK  Step29d_ rougit
-=== Mutation lamp_range (Assets/Scripts/Runtime/LampLight.cs) ===
-  rouges : Step29l_DarkLampIsSeenOnlyWithinTheShortRange
-  OK  Step29l_ rougit
-=== Mutation paused_gauge (Assets/Scripts/Core/CreakGauge.cs) ===
-  rouges : Paused_gauge_freezes_like_carried_and_resumes_where_it_stopped
-  OK  Paused_gauge_freezes_like_carried_and_resumes_where_it_stopped rougit
-=== Mutation chair_row (Assets/Scripts/Core/BodyDef.cs) ===
-  rouges : Step02_MoveUnseen
-  OK  Step02_MoveUnseen rougit
-=== Mutation saton_moving (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step32_SatOnFurnitureIsPinnedNotCaughtNotCreaking
-  OK  Step32_ rougit
-=== Mutation sit_check (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : 
-  ECHEC Step33d_ reste vert sous la mutation
-=== Mutation topple_noise (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : 
-  ECHEC Step28_ reste vert sous la mutation
-  ECHEC Step28b_ reste vert sous la mutation
-  ECHEC Step28d_ reste vert sous la mutation
-=== Mutation toggle_lit (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step29h_ActionPressIsLatchedAndConsumedInTheFixedStep Step29l_DarkLampIsSeenOnlyWithinTheShortRange
-  OK  Step29h_ rougit
-  OK  Step29l_ rougit
-=== Mutation tell_speed (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  ECHEC pas de rapport (voir /c/Dev/outofsight_mutation_mirror/TestResults/mutation/tell_speed.log)
-=== Mutation audit_sit_moment (Assets/Editor/LevelAudit.cs) ===
-  rouges : 
-  ECHEC level5 reste vert sous la mutation
-=== Mutation feet (Assets/Scripts/Runtime/InhabitantRig.cs) ===
-  rouges : Step24f_FeetKeepTheirShapeInEveryState Step24g_FeetKeepTheirShapeSittingAndStandingUp Step24h_FeetKeepTheirShapeThroughAPratfall
-  OK  Step24f_ rougit
-  OK  Step24g_ rougit
-  OK  Step24h_ rougit
-=== Mutation probe_real_save (Assets/Scripts/Runtime/SaveStore.cs) ===
-  rouges : ChoosePath_gives_the_real_file_only_to_a_plain_built_player Probe_save_never_points_at_the_real_file
-  OK  Probe_save_never_points_at_the_real_file rougit
-  OK  ChoosePath_gives_the_real_file_only_to_a_plain_built_player rougit
-=== Mutation locked_playable (Assets/Scripts/Runtime/LevelSelect.cs) ===
-  rouges : Step41_LockedLevelsUnlockThroughRealWins Step41f_CorruptSaveAtBootStartsFresh
-  OK  Step41_LockedLevelsUnlockThroughRealWins rougit
-  OK  Step41f_CorruptSaveAtBootStartsFresh rougit
-=== Mutation best_time (Assets/Scripts/Core/SaveData.cs) ===
-  rouges : RecordWin_replaces_a_best_time_only_with_a_strictly_lower_one A_slower_time_never_replaces_the_best
-  OK  A_slower_time_never_replaces_the_best rougit
-  OK  RecordWin_replaces_a_best_time_only_with_a_strictly_lower_one rougit
-=== Mutation external_still (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step36h_ExternalActionIsRefusedUnlessStillUprightAndFree
-  OK  Step36h_ rougit
-=== Mutation e_claim (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step36j_ClaimedActionKeyGoesToTheDoorNotTheLamp
-  OK  Step36j_ rougit
-=== Mutation personality_range (Assets/Scripts/Core/InhabitantRoutine.cs) ===
-  rouges : Each_personality_sees_with_its_own_range_and_angle_through_the_routine
-  OK  Each_personality_sees_with_its_own_range_and_angle_through_the_routine rougit
-=== Mutation tidy_tolerance (Assets/Scripts/Core/FurnitureMemory.cs) ===
-  rouges : Tidy_memory_notices_0_4_m_where_the_default_one_confirms
-  OK  Tidy_memory_notices_0_4_m_where_the_default_one_confirms rougit
-=== Mutation wander_seed (Assets/Scripts/Core/RoutinePatterns.cs) ===
-  rouges : Routine_visits_follow_the_pattern_over_20_visits("wander") StationOrder_draws_each_pattern_in_the_contract_order
-  OK  Routine_visits_follow_the_pattern_over_20_visits rougit
-  OK  StationOrder_draws_each_pattern_in_the_contract_order rougit
-=== Mutation wake (Assets/Scripts/Core/InhabitantRoutine.cs) ===
-  rouges : Sleep_station_closes_the_eye_for_the_dwell_and_the_wake_telegraph
-  OK  Sleep_station_closes_the_eye_for_the_dwell_and_the_wake_telegraph rougit
-=== Mutation dog_eye (Assets/Scripts/Core/InhabitantRoutine.cs) ===
-  rouges : Eye_height_follows_the_personality_through_every_reset The_dog_never_sits_never_hears_never_investigates
-  OK  Eye_height_follows_the_personality_through_every_reset rougit
-  OK  The_dog_never_sits_never_hears_never_investigates rougit
-=== Mutation detail (Assets/Scripts/Runtime/PrimitiveKit.cs) ===
-  rouges : Step22c_EveryMaterialHasItsDetailTexture Step22d_PaletteColourIsKept
-  OK  Step22c_ rougit
-  OK  Step22d_ rougit
-=== Mutation frozen_walk (Assets/Scripts/Core/InhabitantRoutine.cs) ===
-  rouges : Station_walks_are_frozen_with_the_station_planner_and_every_other_walk_uses_the_investigate_planner
-  OK  Station_walks_are_frozen_with_the_station_planner_and_every_other_walk_uses_the_investigate_planner rougit
-=== Mutation audit_separation (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_cross
-  OK  test_cross rougit
-=== Mutation pet_eye_target (Assets/Scripts/Runtime/ModelKit.cs) ===
-  rouges : The_dog_is_fitted_with_its_eyes_at_the_dog_eye_and_the_humans_at_theirs
-  OK  The_dog_is_fitted_with_its_eyes_at_the_dog_eye_and_the_humans_at_theirs rougit
-=== Mutation cone_range (Assets/Scripts/Runtime/VisionConeView.cs) ===
-  rouges : 
-  ECHEC Step37_EachConeUsesItsWatchersRangeAndAngle reste vert sous la mutation
-  ECHEC Step38_DogConeColourWalkPatterAndFeet reste vert sous la mutation
-=== Mutation visual_floor (Assets/Scripts/Runtime/Inhabitant.cs) ===
-  rouges : Step37_VisualEyeIsTheRoutineEye
-  OK  Step37_VisualEyeIsTheRoutineEye rougit
-=== Mutation floor_map (Assets/Scripts/Core/FloorMap.cs) ===
-  rouges : FloorMap_gives_the_platform_height_on_it_the_ramp_slope_along_it_and_0_elsewhere FloorMap_reads_the_level_live_and_the_flat_floor_is_0
-  OK  FloorMap_gives_the_platform_height_on_it_the_ramp_slope_along_it_and_0_elsewhere rougit
-  OK  FloorMap_reads_the_level_live_and_the_flat_floor_is_0 rougit
-=== Mutation leaf_collider (Assets/Scripts/Runtime/DoorLeaf.cs) ===
-  rouges : Step36_LeafPosesAndTheColliderAndOcclusionSwap
-  OK  Step36_LeafPosesAndTheColliderAndOcclusionSwap rougit
-=== Mutation leaf_samples (Assets/Scripts/Runtime/DoorLeaf.cs) ===
-  rouges : Step36_LeafPosesAndTheColliderAndOcclusionSwap
-  OK  Step36_LeafPosesAndTheColliderAndOcclusionSwap rougit
-=== Mutation bark_at (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step37e_EachPersonalityRangeAngleHearingGainAndToleranceApplied Step38b_DogSeesMovingBarksOnceAtTheDogAndAHumanLooks
-  OK  Step38b_ rougit
-  OK  Step37e_ rougit
-=== Mutation leaf_join (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step36e_LeafSeenSwingingIsCaughtWhileTheChairIsHidden
-  OK  Step36e_ rougit
-=== Mutation dog_catch (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step38b_DogSeesMovingBarksOnceAtTheDogAndAHumanLooks Step38c_NoSecondBarkWithinTheCooldown Step38e_DogNeverCatchesNorCountsForTheExit
-  OK  Step38e_ rougit
-  OK  Step38b_ rougit
-  OK  Step38c_ rougit
-=== Mutation floor_eye (Assets/Scripts/Core/InhabitantRoutine.cs) ===
-  rouges : Step39e_EyesSamplesAndPlansAddTheFloorHeight Step37_VisualEyeIsTheRoutineEye
-  OK  Step39e_ rougit
-  OK  Step37_VisualEyeIsTheRoutineEye rougit
-=== Mutation floor_y (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step39c_TeleportReleaseAndSamplesStandOnTheFloor
-  OK  Step39c_ rougit
-=== Mutation ghost_floor (Assets/Scripts/Runtime/GhostView.cs) ===
-  rouges : Step39d_GhostSeatStopRingAndDecoyRingsStandOnTheFloor
-  OK  Step39d_ rougit
-=== Mutation tmp_kept (Assets/Scripts/Runtime/SaveStore.cs) ===
-  rouges : A_locked_tmp_in_the_fallback_is_kept_and_restored_at_the_next_load
-  OK  A_locked_tmp_in_the_fallback_is_kept_and_restored_at_the_next_load rougit
-=== Mutation tmp_restore (Assets/Scripts/Runtime/SaveStore.cs) ===
-  rouges : A_locked_tmp_in_the_fallback_is_kept_and_restored_at_the_next_load A_missing_file_with_a_good_tmp_is_restored_from_it_before_the_bak
-  OK  A_missing_file_with_a_good_tmp_is_restored_from_it_before_the_bak rougit
-  OK  A_locked_tmp_in_the_fallback_is_kept_and_restored_at_the_next_load rougit
-=== Mutation missing_bak (Assets/Scripts/Runtime/SaveStore.cs) ===
-  rouges : Missing_file_without_tmp_is_restored_from_bak Missing_file_with_a_truncated_tmp_is_restored_from_bak Missing_file_with_an_empty_tmp_is_restored_from_bak Missing_file_with_a_newer_tmp_is_restored_from_bak
-  OK  Missing_file_ rougit
-=== Mutation leaf_last_step (Assets/Scripts/Runtime/DoorLeaf.cs) ===
-  rouges : Step36c_EOpensTheLeafInExactlyThirtyMovingSteps Step36_LeafPosesAndTheColliderAndOcclusionSwap
-  OK  Step36_LeafPosesAndTheColliderAndOcclusionSwap rougit
-  OK  Step36c_EOpensTheLeafInExactlyThirtyMovingSteps rougit
-=== Mutation leaf_fade (Assets/Scripts/Runtime/WallFader.cs) ===
-  rouges : Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded
-  OK  Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded rougit
-=== Mutation dog_asleep (Assets/Scripts/Runtime/Vision.cs) ===
-  rouges : Step38g_SleepingDogSeesNothing
-  OK  Step38g_ rougit
-=== Mutation draw_slots (Assets/Scripts/Runtime/Probe.cs) ===
-  rouges : Step22c_EveryMaterialHasItsDetailTexture
-  OK  Step22c_ rougit
-=== Mutation visual_slope (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step39k_FurnitureVisualFollowsTheRampSlope
-  OK  Step39k_ rougit
-=== Mutation audit_draw_calls (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m5_audit_drawcalls
-  OK  test_m5_audit_drawcalls rougit
-=== Mutation audit_cone_colours (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m5_audit_conecolours
-  OK  test_m5_audit_conecolours rougit
-=== Mutation audit_dark_memory (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m5_audit_darkpass
-  OK  test_m5_audit_darkpass rougit
-=== Mutation audit_dark_range (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m5_audit_darkpass
-  OK  test_m5_audit_darkpass rougit
-=== Mutation dog_alarm_hue (Assets/Scripts/Runtime/VisionConeView.cs) ===
-  rouges : Step38_DogConeColourWalkPatterAndFeet
-  OK  Step38_DogConeColourWalkPatterAndFeet rougit
-=== Mutation push_moving (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step42g_PushSlidesAQuarterMetreInHalfASecondStopsAtAColliderAndIsRefusedWhenBusy Step42b_ContactShovesAQuarterMetreInHalfASecondMoving
-  OK  Step42b_ rougit
-  ECHEC Step42c_ reste vert sous la mutation
-  OK  Step42g_ rougit
-=== Mutation lacquer_red (Assets/Scripts/Runtime/FurnitureKit.cs) ===
-  rouges : Step50a_NewSurfacesShowTheirDetailAndFinish
-  OK  Step50a_ rougit
-=== Mutation lit_surface_key (Assets/Scripts/Runtime/PrimitiveKit.cs) ===
-  rouges : Step50a_NewSurfacesShowTheirDetailAndFinish Step50b_FallenLoadPlantShowsSoilAndFoliage
-  OK  Step50a_ rougit
-  OK  Step50b_ rougit
-=== Mutation options_step_round (Assets/Scripts/Core/SaveData.cs) ===
-  rouges : Clamped_RoundsToTheNearestStep
-  OK  Clamped_RoundsToTheNearestStep rougit
-=== Mutation options_cone_fallback (Assets/Scripts/Core/SaveData.cs) ===
-  rouges : Clamped_InvalidConeFallsBackToAlways Parse_MalformedOptionsFallsBackFieldByField
-  OK  Clamped_InvalidConeFallsBackToAlways rougit
-  OK  Parse_MalformedOptionsFallsBackFieldByField rougit
-=== Mutation volume_scale (Assets/Scripts/Runtime/SaveStore.cs) ===
-  rouges : Step51a_OptionsAppliedAtOnce Step51b_OptionsSurviveRestartAndReload
-  OK  Step51a_OptionsAppliedAtOnce rougit
-  OK  Step51b_OptionsSurviveRestartAndReload rougit
-=== Mutation camera_sensitivity (Assets/Scripts/Runtime/OrbitCamera.cs) ===
-  rouges : Step51a_OptionsAppliedAtOnce
-  OK  Step51a_OptionsAppliedAtOnce rougit
-=== Mutation cone_hide (Assets/Scripts/Runtime/VisionConeView.cs) ===
-  rouges : Step51a_OptionsAppliedAtOnce
-  OK  Step51a_OptionsAppliedAtOnce rougit
-=== Mutation cone_outline_alarm (Assets/Scripts/Runtime/VisionConeView.cs) ===
-  rouges : Step52b_EyeShapesEdgePatternAndConeOutline
-  OK  Step52b_EyeShapesEdgePatternAndConeOutline rougit
-=== Mutation pulse_pattern_gate (Assets/Scripts/Runtime/Hud.cs) ===
-  rouges : Step52b_EyeShapesEdgePatternAndConeOutline
-  OK  Step52b_EyeShapesEdgePatternAndConeOutline rougit
-=== Mutation controls_gamepad_text (Assets/Scripts/Runtime/Hud.cs) ===
-  rouges : Step52b_EyeShapesEdgePatternAndConeOutline
-  OK  Step52b_EyeShapesEdgePatternAndConeOutline rougit
-=== Mutation door_memory (Assets/Scripts/Core/DoorMemory.cs) ===
-  rouges : DoorMemory_remembers_the_authored_leaves_and_a_mismatch_is_one_suspect
-  OK  DoorMemory_remembers_the_authored_leaves_and_a_mismatch_is_one_suspect rougit
-=== Mutation wardrobe_fit (Assets/Scripts/Core/LevelDefM5.cs) ===
-  rouges : Wardrobe_entry_zone_is_the_strip_in_front_of_its_front_face Wardrobe_fits_the_stool_and_the_floor_lamp_only
-  OK  Wardrobe_fits_the_stool_and_the_floor_lamp_only rougit
-  OK  Wardrobe_entry_zone_is_the_strip_in_front_of_its_front_face rougit
-=== Mutation empty_spot (Assets/Scripts/Core/FurnitureMemory.cs) ===
-  rouges : Empty_spot_is_a_suspect_then_one_discovery_until_the_furniture_is_seen
-  OK  Empty_spot_is_a_suspect_then_one_discovery_until_the_furniture_is_seen rougit
-=== Mutation hidden_samples (Assets/Scripts/Runtime/Vision.cs) ===
-  rouges : Step53a_EnterAndLeaveTheWardrobe
-  OK  Step53a_ rougit
-=== Mutation muffled_creak (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step53b_HiddenCreakIsMuffled
-  OK  Step53b_ rougit
-=== Mutation door_suspect (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step54a_DoorMemoryPutsTheDoorBack
-  OK  Step54a_ rougit
-=== Mutation household_cross (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step55a_InhabitantOpensAnOptInDoor
-  OK  Step55a_ rougit
-=== Mutation door_stop (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step55a_InhabitantOpensAnOptInDoor
-  OK  Step55a_ rougit
-=== Mutation audit_hide (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m6_audit_wardrobe
-  OK  test_m6_audit_wardrobe rougit
-=== Mutation audit_inhab_door (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m6_audit_inhabdoor
-  OK  test_m6_audit_inhabdoor rougit
-=== Mutation audit_door_memory (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m6_audit_doormemory
-  OK  test_m6_audit_doormemory rougit
-=== Mutation load_sway (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step44e_TheBalanceGaugeShowsAndTurnsRed
-  OK  Step44e_ rougit
-=== Mutation load_velocity (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step44b_TheFallMakesASixMetreCrashAndLeavesAClue Step44c_TheClueCostsOneDiscoveryAndTheFinderPutsItAway Step44d_TheDogNeverFindsTheClue Step44e_TheBalanceGaugeShowsAndTurnsRed
-  OK  Step44b_ rougit
-  OK  Step44c_ rougit
-  OK  Step44d_ rougit
-  OK  Step44e_ rougit
-=== Mutation robot_turn_cap (Assets/Scripts/Runtime/Robot.cs) ===
-  rouges : Step42w_RobotVisualFollowsSetPoseWithoutCollider
-  OK  Step42w_ rougit
-=== Mutation clue_surface (Assets/Scripts/Runtime/LoadView.cs) ===
-  rouges : Step44x_ClueLiesOnTheRampAndStaysOnThePlatform
-  OK  Step44x_ rougit
-=== Mutation hum_none (Assets/Scripts/Core/Hearing.cs) ===
-  rouges : The_hum_masks_a_hop_a_roll_and_a_click_within_2_5_m_only Topple_creak_crash_and_bark_are_never_masked
-  OK  The_hum_masks_a_hop_a_roll_and_a_click_within_2_5_m_only rougit
-  OK  Topple_creak_crash_and_bark_are_never_masked rougit
-=== Mutation hum_creak (Assets/Scripts/Core/Hearing.cs) ===
-  rouges : Topple_creak_crash_and_bark_are_never_masked
-  OK  Topple_creak_crash_and_bark_are_never_masked rougit
-=== Mutation load_fall (Assets/Scripts/Core/LoadBalance.cs) ===
-  rouges : A_90_deg_turn_at_full_chair_speed_drops_the_load Any_full_speed_reversal_drops_the_load Careful_U_turns_of_the_stool_and_the_office_chair_drop_the_load The_fall_is_at_the_threshold_latched_until_reset_and_ratio_is_the_gauge The_office_chair_full_start_and_full_glide_drop_the_load
-  OK  A_90_deg_turn_at_full_chair_speed_drops_the_load rougit
-  OK  Any_full_speed_reversal_drops_the_load rougit
-  OK  The_office_chair_full_start_and_full_glide_drop_the_load rougit
-  OK  Careful_U_turns_of_the_stool_and_the_office_chair_drop_the_load rougit
-  OK  The_fall_is_at_the_threshold_latched_until_reset_and_ratio_is_the_gauge rougit
-=== Mutation load_window (Assets/Scripts/Core/LoadBalance.cs) ===
-  rouges : A_90_deg_turn_at_full_chair_speed_drops_the_load Any_full_speed_reversal_drops_the_load DeltaV_compares_with_the_velocity_exactly_one_window_before
-  OK  DeltaV_compares_with_the_velocity_exactly_one_window_before rougit
-  OK  A_90_deg_turn_at_full_chair_speed_drops_the_load rougit
-  OK  Any_full_speed_reversal_drops_the_load rougit
-=== Mutation motion_glide (Assets/Scripts/Core/MotionProfile.cs) ===
-  rouges : Office_chair_glides_when_braked_against_its_motion_then_drives_back Release_is_the_instant_stop_the_glide_or_the_tip("office_chair") Stop_distance_and_slide_samples_per_body
-  OK  Stop_distance_and_slide_samples_per_body rougit
-  OK  Office_chair_glides_when_braked_against_its_motion_then_drives_back rougit
-  OK  Release_is_the_instant_stop_the_glide_or_the_tip rougit
-=== Mutation motion_careful (Assets/Scripts/Core/MotionProfile.cs) ===
-  rouges : Every_careful_straight_move_holds Straight_start_follows_the_body_table_full_and_careful("chair") Straight_start_follows_the_body_table_full_and_careful("stool") Straight_start_follows_the_body_table_full_and_careful("armchair") Straight_start_follows_the_body_table_full_and_careful("floor_lamp") Straight_start_follows_the_body_table_full_and_careful("office_chair") Straight_start_follows_the_body_table_full_and_careful("rocking_chair")
-  OK  Straight_start_follows_the_body_table_full_and_careful rougit
-  OK  Every_careful_straight_move_holds rougit
-=== Mutation robot_reverse (Assets/Scripts/Core/RobotPath.cs) ===
-  rouges : Reverse_travels_the_loop_backwards_from_where_it_is
-  OK  Reverse_travels_the_loop_backwards_from_where_it_is rougit
-=== Mutation put_away (Assets/Scripts/Core/InhabitantRoutine.cs) ===
-  rouges : A_clue_within_reach_is_put_away_without_walking Put_away_walks_to_the_clue_faces_it_bends_for_0_6_s_and_resumes
-  OK  Put_away_walks_to_the_clue_faces_it_bends_for_0_6_s_and_resumes rougit
-  OK  A_clue_within_reach_is_put_away_without_walking rougit
-=== Mutation rocks_row (Assets/Scripts/Core/BodyDef.cs) ===
-  rouges : Only_the_rocking_chair_rocks_and_every_kind_is_a_known_body Rocking_chair_row_matches_the_contract_member_by_member
-  OK  Rocking_chair_row_matches_the_contract_member_by_member rougit
-  OK  Only_the_rocking_chair_rocks_and_every_kind_is_a_known_body rougit
-=== Mutation cone_radial (Assets/Scripts/Runtime/VisionConeView.cs) ===
-  rouges : Step37w_ConeFollowsThePlatformTop
-  OK  Step37w_ConeFollowsThePlatformTop rougit
-=== Mutation fan_superset (Assets/Scripts/Runtime/VisionConeView.cs) ===
-  rouges : Step38w_DogFanCoversWhatItSees
-  OK  Step38w_DogFanCoversWhatItSees rougit
-=== Mutation robot_pose (Assets/Scripts/Runtime/Robot.cs) ===
-  rouges : Step42w_RobotVisualFollowsSetPoseWithoutCollider
-  OK  Step42w_RobotVisualFollowsSetPoseWithoutCollider rougit
-=== Mutation load_hide (Assets/Scripts/Runtime/LoadView.cs) ===
-  rouges : Step44w_LoadSitsOnTopTiltsAndBreaks
-  OK  Step44w_LoadSitsOnTopTiltsAndBreaks rougit
-=== Mutation robot_count (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : At_most_one_robot_per_level
-  OK  At_most_one_robot_per_level rougit
-=== Mutation robot_walls (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : House_robot_fixture_crosses_a_doorway_without_a_leaf Robot_loop_runs_into_no_wall_and_never_leaves_the_house
-  OK  Robot_loop_runs_into_no_wall_and_never_leaves_the_house rougit
-  OK  House_robot_fixture_crosses_a_doorway_without_a_leaf rougit
-=== Mutation robot_floor (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : Robot_loop_stays_on_the_floor_level
-  OK  Robot_loop_stays_on_the_floor_level rougit
-=== Mutation robot_sector (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : Robot_loop_runs_into_no_wall_and_never_leaves_the_house Robot_loop_stays_out_of_leaf_swing_sectors_and_off_the_leaf
-  OK  Robot_loop_stays_out_of_leaf_swing_sectors_and_off_the_leaf rougit
-  OK  Robot_loop_runs_into_no_wall_and_never_leaves_the_house rougit
-=== Mutation robot_clearance (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : Robot_loop_keeps_one_metre_from_the_spawn_the_seat_homes_and_the_exit
-  OK  Robot_loop_keeps_one_metre_from_the_spawn_the_seat_homes_and_the_exit rougit
-=== Mutation rocking_load (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : No_load_on_the_rocking_chair
-  OK  No_load_on_the_rocking_chair rougit
-=== Mutation lesson_final (Assets/Scripts/Core/LevelValidator.cs) ===
-  rouges : Lesson_final_needs_three_mechanics_and_mechanics_are_listed_in_order
-  OK  Lesson_final_needs_three_mechanics_and_mechanics_are_listed_in_order rougit
-=== Mutation shelf_combine (Assets/Scripts/Runtime/FurnitureKit.cs) ===
-  rouges : Step39h_CombinedRenderersKeepCollidersMaterialsAndFades
-  OK  Step39h_CombinedRenderersKeepCollidersMaterialsAndFades rougit
-=== Mutation face_plane (Assets/Scripts/Runtime/LevelBuilder.cs) ===
-  rouges : Step39h_CombinedRenderersKeepCollidersMaterialsAndFades
-  OK  Step39h_CombinedRenderersKeepCollidersMaterialsAndFades rougit
-=== Mutation robot_build (Assets/Scripts/Runtime/LevelBuilder.cs) ===
-  rouges : Step39l_RobotAndLoadBuildWithTheLevelAndTheRockingChairShowsItsVisual
-  OK  Step39l_ rougit
-=== Mutation load_target (Assets/Scripts/Runtime/LevelBuilder.cs) ===
-  rouges : Step39l_RobotAndLoadBuildWithTheLevelAndTheRockingChairShowsItsVisual
-  OK  Step39l_ rougit
-=== Mutation load_build (Assets/Scripts/Runtime/LevelBuilder.cs) ===
-  rouges : Step39l_RobotAndLoadBuildWithTheLevelAndTheRockingChairShowsItsVisual
-  OK  Step39l_ rougit
-=== Mutation game_hum_none (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step42f_TheHumMasksAHopAtTwoPointFourNotTwoPointSixNeverACreak
-  OK  Step42f_ rougit
-=== Mutation game_hum_creak (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step42f_TheHumMasksAHopAtTwoPointFourNotTwoPointSixNeverACreak
-  OK  Step42f_ rougit
-=== Mutation robot_contact (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step42b_ContactShovesAQuarterMetreInHalfASecondMoving Step42c_SeenWhileShovedIsCaught Step42d_TheRobotKeepsItsTimelineThenReverses Step42e_NoShoveWhilePinned
-  OK  Step42b_ rougit
-  OK  Step42c_ rougit
-  OK  Step42d_ rougit
-  OK  Step42e_ rougit
-=== Mutation rock_stop (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step43b_SeenRockingIsCaughtAndSatOnDoesNotRock
-  OK  Step43b_ rougit
-=== Mutation rock_careful (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step43b_SeenRockingIsCaughtAndSatOnDoesNotRock
-  OK  Step43b_ rougit
-=== Mutation clue_discovery (Assets/Scripts/Runtime/GameState.cs) ===
-  rouges : Step44c_TheClueCostsOneDiscoveryAndTheFinderPutsItAway
-  OK  Step44c_ rougit
-=== Mutation load_box (Assets/Scripts/Runtime/Vision.cs) ===
-  rouges : Step44f_TheLoadIsInsideTheSampleBox
-  OK  Step44f_ rougit
-=== Mutation balance_red (Assets/Scripts/Runtime/Hud.cs) ===
-  rouges : Step44e_TheBalanceGaugeShowsAndTurnsRed
-  OK  Step44e_ rougit
-=== Mutation push_free (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step42g_PushSlidesAQuarterMetreInHalfASecondStopsAtAColliderAndIsRefusedWhenBusy
-  OK  Step42g_ rougit
-=== Mutation push_slide (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step42g_PushSlidesAQuarterMetreInHalfASecondStopsAtAColliderAndIsRefusedWhenBusy
-  OK  Step42g_ rougit
-=== Mutation push_hop (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step42g_PushSlidesAQuarterMetreInHalfASecondStopsAtAColliderAndIsRefusedWhenBusy
-  OK  Step42g_ rougit
-=== Mutation push_still (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step42g_PushSlidesAQuarterMetreInHalfASecondStopsAtAColliderAndIsRefusedWhenBusy Step44g_MotionProfileMatchesTheControllerForFourBodies
-  OK  Step42g_ rougit
-  OK  Step44g_ rougit
-=== Mutation push_block (Assets/Scripts/Runtime/FurnitureController.cs) ===
-  rouges : Step42g_PushSlidesAQuarterMetreInHalfASecondStopsAtAColliderAndIsRefusedWhenBusy
-  OK  Step42g_ rougit
-=== Mutation ghost_slope (Assets/Scripts/Runtime/GhostView.cs) ===
-  rouges : Step39m_MemoryAndSeatGhostsLieOnTheRampSlope
-  OK  Step39m_ rougit
-=== Mutation audit_hum (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_robot
-  OK  test_robot rougit
-=== Mutation audit_robot_contact (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_m5_levels_robotblock
-  OK  test_m5_levels_robotblock rougit
-=== Mutation audit_rock (Assets/Editor/LevelAudit.cs) ===
-  rouges : test_rock
-  OK  test_rock rougit
-=== Mutation audit_load (Assets/Editor/LevelAudit.cs) ===
-marker not found: float threshold = Tuning.LoadFallDeltaV - LoadEpsilon; // MUTATION:AUDIT_LOAD
-  ECHEC marqueur introuvable
-=== UNE MUTATION A SURVECU ===

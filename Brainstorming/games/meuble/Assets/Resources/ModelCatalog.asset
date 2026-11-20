@@ -208,3 +208,55 @@ MonoBehaviour:
     targetEyeHeight: 0.35
     idleClip: Idle
     walkClip: Walk
+  - id: kenney.bed
+    prefab: {fileID: 2107409826236812522, guid: 731154180d93c114ca4b92c21ee8356a, type: 3}
+    nativeSize: {x: 0.9560001, y: 0.375, z: 1.125}
+    boundsCenter: {x: 0.47800004, y: 0.1875, z: 0.5625}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: kenney.fridge
+    prefab: {fileID: 2107409826236812522, guid: 45f018de5204bad408392dce9d73847e, type: 3}
+    nativeSize: {x: 0.43, y: 0.92, z: 0.2919339}
+    boundsCenter: {x: 0.215, y: 0.46, z: 0.13596694}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: kenney.coffee_table
+    prefab: {fileID: 2107409826236812522, guid: a47f5b78d9251ba49916e99b976db6a0, type: 3}
+    nativeSize: {x: 0.6609961, y: 0.23, z: 0.4}
+    boundsCenter: {x: -0.13049805, y: 0.115, z: 0.1}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 
+  - id: kenney.nightstand
+    prefab: {fileID: 2107409826236812522, guid: 381e6886468d36648b192759e2899918, type: 3}
+    nativeSize: {x: 0.266, y: 0.2632, z: 0.21730001}
+    boundsCenter: {x: 0.123, y: 0.1316, z: 0.09635001}
+    yawOffset: 0
+    rigged: 0
+    headBone: 
+    eyeLocal: {x: 0, y: 0, z: 0}
+    eyeHeight: 0
+    kind: 
+    targetEyeHeight: 0
+    idleClip: 
+    walkClip: 

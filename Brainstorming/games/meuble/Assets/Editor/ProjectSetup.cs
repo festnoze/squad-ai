@@ -77,7 +77,9 @@ namespace OutOfSight.Editor
 
         private static void EnsureRendererFeatures()
         {
-            Material silhouette = EnsureTransparentMaterial(SilhouetteMaterialPath, SilhouetteColor, CullMode.Back);
+            // M7 walls pass (product owner, 2026-11-19): a flat colour no renderer's property block can override (URP applies a
+            // renderer's block to an override material: the characters' prints showed their bodies through standing walls).
+            Material silhouette = EnsureFlatMaterial(SilhouetteMaterialPath, SilhouetteColor, CullMode.Back);
             Material cone = EnsureTransparentMaterial(ConeMaterialPath, ConeXRayColor, CullMode.Off);
             // Fully transparent: drawn only for its stencil write (URP Unlit has no ColorMask property).
             Material stencilOnly = EnsureTransparentMaterial(StencilMaterialPath, new Color(0f, 0f, 0f, 0f), CullMode.Back);
@@ -271,6 +273,35 @@ namespace OutOfSight.Editor
             return p;
         }
 
+        /// <summary>The shader of <see cref="EnsureFlatMaterial"/> (Assets/Settings/XRayFlat.shader).</summary>
+        public const string XRayFlatShaderName = "OutOfSight/XRay Flat";
+
+        /// <summary>
+        /// The x-ray silhouette's material asset: <see cref="XRayFlatShaderName"/>, one flat colour (_XRayColor) that no
+        /// renderer's MaterialPropertyBlock sets, alpha blended (it ships because the renderer references it).
+        /// </summary>
+        private static Material EnsureFlatMaterial(string path, Color color, CullMode cull)
+        {
+            Shader shader = Shader.Find(XRayFlatShaderName);
+            if (shader == null)
+            {
+                throw new InvalidOperationException("Shader not found in the editor: " + XRayFlatShaderName);
+            }
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader) { name = Path.GetFileNameWithoutExtension(path) };
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.shaderKeywords = new string[0];
+            m.SetColor("_XRayColor", color);
+            m.SetFloat("_Cull", (float)cull);
+            m.renderQueue = (int)RenderQueue.Transparent;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
         /// <summary>An alpha blended URP Unlit material asset (the x-ray overrides ship because the renderer references them).</summary>
         private static Material EnsureTransparentMaterial(string path, Color color, CullMode cull)
         {
@@ -447,7 +478,7 @@ namespace OutOfSight.Editor
             {
                 PlayerSettings.companyName = "OutOfSight";
             }
-            // The product owner's request (2026-11-18): full screen by default (play.cmd -Windowed still opens a window).
+            // The product owner's request (2026-11-18): full screen by default (-screen-fullscreen 0 still opens a window).
             PlayerSettings.fullScreenMode = FullScreenMode.FullScreenWindow;
             PlayerSettings.defaultIsNativeResolution = true;
             PlayerSettings.defaultScreenWidth = 1600;

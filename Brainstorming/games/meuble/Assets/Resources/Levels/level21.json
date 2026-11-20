@@ -14,7 +14,8 @@
       "wallThickness": 0.1,
       "floor": "soft",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "pinstripe"
     },
     {
       "id": "reunion",
@@ -26,7 +27,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sageribbed"
     },
     {
       "id": "openspace",
@@ -38,7 +40,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "grasscloth"
     },
     {
       "id": "couloir",
@@ -62,7 +65,8 @@
       "wallThickness": 0.1,
       "floor": "soft",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sageribbed"
     },
     {
       "id": "cafet",
@@ -75,7 +79,8 @@
       "floor": "hard",
       "floorFinish": "tile",
       "floorColor": "#F7F4EE",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "subwaytile"
     },
     {
       "id": "hall",
@@ -87,7 +92,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "travertine"
     }
   ],
   "doors": [
@@ -224,10 +230,10 @@
       "kind": "bookshelf",
       "x": 9.225,
       "z": 8.65,
-      "yaw": 0.0,
-      "sizeX": 0.45,
+      "yaw": 270.0,
+      "sizeX": 2.5,
       "sizeY": 1.9,
-      "sizeZ": 2.5,
+      "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
@@ -237,10 +243,10 @@
       "kind": "bookshelf",
       "x": 9.225,
       "z": 6.0,
-      "yaw": 0.0,
-      "sizeX": 0.45,
+      "yaw": 270.0,
+      "sizeX": 2.8,
       "sizeY": 1.9,
-      "sizeZ": 2.8,
+      "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
@@ -250,10 +256,10 @@
       "kind": "bookshelf",
       "x": 11.275,
       "z": 10.35,
-      "yaw": 0.0,
-      "sizeX": 0.45,
+      "yaw": 90.0,
+      "sizeX": 2.9,
       "sizeY": 1.9,
-      "sizeZ": 2.9,
+      "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
@@ -263,10 +269,10 @@
       "kind": "bookshelf",
       "x": 11.275,
       "z": 7.95,
-      "yaw": 0.0,
-      "sizeX": 0.45,
+      "yaw": 90.0,
+      "sizeX": 1.9,
       "sizeY": 1.9,
-      "sizeZ": 1.9,
+      "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
@@ -302,10 +308,10 @@
       "kind": "bookshelf",
       "x": 0.3,
       "z": 10.5,
-      "yaw": 0.0,
-      "sizeX": 0.45,
+      "yaw": 270.0,
+      "sizeX": 2.0,
       "sizeY": 1.2,
-      "sizeZ": 2.0,
+      "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
@@ -367,7 +373,7 @@
       "kind": "bookshelf",
       "x": 13.0,
       "z": 2.75,
-      "yaw": 0.0,
+      "yaw": 180.0,
       "sizeX": 3.0,
       "sizeY": 1.9,
       "sizeZ": 0.45,
@@ -377,15 +383,15 @@
     },
     {
       "name": "Comptoir",
-      "kind": "counter",
+      "kind": "kitchen_sink",
       "x": 18.7,
       "z": 11.6,
       "yaw": 0.0,
       "sizeX": 2.4,
-      "sizeY": 0.9,
+      "sizeY": 1.08,
       "sizeZ": 0.6,
       "occluder": true,
-      "color": "#5B93D9",
+      "color": "#8C5A36",
       "accentColor": "#F7F4EE"
     },
     {

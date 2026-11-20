@@ -27,6 +27,8 @@ namespace OutOfSight.Editor
                 // M3: the catalogs that ship the models and the clips (docs/CONTRACT_M3.md 3 and 7).
                 ModelCatalogBuilder.Build();
                 AudioLibraryBuilder.Build();
+                // HUD gauge redesign: the drawn UI icons present under Assets/Art/UI/Icons (UiIconLibrary).
+                UiIconLibraryBuilder.Build();
                 UnityEditor.AssetDatabase.SaveAssets();
                 Debug.Log("[Builder] Scripts compiled and project set up.");
                 EditorApplication.Exit(0);
@@ -95,6 +97,7 @@ namespace OutOfSight.Editor
                 ProjectSetup.Apply();
                 ModelCatalogBuilder.Build();
                 AudioLibraryBuilder.Build();
+                UiIconLibraryBuilder.Build();
                 AssetDatabase.SaveAssets();
                 // -development: a Development Build with script debugging, so Visual Studio can attach to the player
                 // (Debug > Attach Unity Debugger). -waitForDebugger also makes the player wait for it at startup.

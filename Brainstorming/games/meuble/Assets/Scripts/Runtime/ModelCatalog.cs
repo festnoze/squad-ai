@@ -129,12 +129,24 @@ namespace OutOfSight
         /// <summary>The Shiba Inu (the dog, a pet: 46 bones, eyes at Tuning.DogEyeHeight).</summary>
         public const string QuaterniusShiba = "quaternius.shiba";
 
-        /// <summary>Every id the catalog must resolve, in contract order (M5 appends the personalities' models and the dog).</summary>
+        // ----- M8 room objects (docs/m8/ROOMS_PLAN.md 3): optional looks of four prop kinds, named by the level's "model" -----
+
+        /// <summary>Kenney Bed Double, for a "bed" prop (headboard on +z, as the procedural bed).</summary>
+        public const string KenneyBed = "kenney.bed";
+        /// <summary>Kenney Kitchen Fridge, for a "fridge" prop (doors on -z).</summary>
+        public const string KenneyFridge = "kenney.fridge";
+        /// <summary>Kenney Coffee Table, for a "coffee_table" prop.</summary>
+        public const string KenneyCoffeeTable = "kenney.coffee_table";
+        /// <summary>Kenney Cabinet Bed Drawer Table, for a "nightstand" prop (drawer on -z).</summary>
+        public const string KenneyNightstand = "kenney.nightstand";
+
+        /// <summary>Every id the catalog must resolve, in contract order (M5 appends the personalities' models and the dog, M8 the room objects).</summary>
         public static readonly string[] Ids =
         {
             KenneyChair, KenneySofa, KenneyRug, KenneyDoormat, KenneyArmchair, KenneyStool, KenneyFloorLamp,
             QuaterniusMan, QuaterniusWoman,
             QuaterniusManShorts, QuaterniusManSuit, QuaterniusManTshirt, QuaterniusWomanJacket, QuaterniusWomanDress, QuaterniusShiba,
+            KenneyBed, KenneyFridge, KenneyCoffeeTable, KenneyNightstand,
         };
     }
 }

@@ -1012,6 +1012,13 @@ sections 16 and 17):
   - Seen moving by the awake dog for 0.2 s: a bark at the dog (6 m, turns the heads like a creak),
     then 3 s of cooldown. The bark is heard only through each human's hearing factor.
   - The dog never catches, has no memory, hears nothing and never opens doors.
+  - **The hold** (2026-11-19, the product owner: "the dog does nothing when it detects you"; docs/CONTRACT_M5.md
+    20): after its bark the dog runs to the furniture (2.6 m/s, a "!" over it), pins it next to itself as a
+    sitter does (HUD line "Le chien te bloque : on vient te remettre en place."), and barks at it in a loop.
+    The nearest free human is sent ("!") and, as always, finds it out of place (one discovery, then the carry
+    back to its spot) or in place (nothing). On the put down the dog lets go and both return to their
+    routines. A setback, never a catch: the dog costs the ground gained and one discovery, never the level
+    by itself.
   - It sleeps at sleep stations (eye closed, a "z" mark, cone hidden). It wakes with a 0.6 s
     telegraph, eye still closed.
   - Its cone is cyan. The HUD eye has a dog shape when only the dog sees the furniture.
@@ -1168,7 +1175,7 @@ its agent. Ctrl+F and F11 toggle full screen.
 19. **Door memory** (v1.7): an inhabitant noticing a door it remembers closed.
     Default: deferred to M6.
 20. **The bark** (v1.7): at the dog, 6 m, like a creak, 3 s cooldown. Default: as
-    written.
+    written. Decided 2026-11-19: the bark is followed by the dog's hold (M5 notes, The dog).
 21. **Stacked floors** (v1.7): not in M5, one split level per house at most.
     Default: deferred.
 22. **The wardrobe hiding prop** (v1.7): deferred to M6.

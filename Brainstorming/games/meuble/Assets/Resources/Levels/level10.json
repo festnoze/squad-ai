@@ -16,7 +16,7 @@
       "floor": "hard",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "wallpaper"
+      "wallFinish": "pinstripe"
     },
     {
       "id": "couloir",
@@ -28,7 +28,8 @@
       "wallThickness": 0.1,
       "floor": "hard",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "quatrefoil"
     },
     {
       "id": "salon",
@@ -39,9 +40,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "sage"
+      "wallFinish": "grasscloth"
     },
     {
       "id": "cuisine",
@@ -52,9 +54,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "tile",
+      "floorFinish": "marble",
       "floorColor": "#EDE6DA",
-      "wallColor": "#F7F4EE"
+      "wallColor": "#F7F4EE",
+      "wallFinish": "subwaytile"
     },
     {
       "id": "veranda",
@@ -65,8 +68,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "herringbone",
       "floorColor": "#EDE6DA",
-      "wallColor": "#F7F4EE"
+      "wallColor": "#F7F4EE",
+      "wallFinish": "limewash"
     }
   ],
   "doors": [
@@ -151,7 +156,7 @@
   "props": [
     {
       "name": "Lit",
-      "kind": "sofa",
+      "kind": "bed",
       "x": 0.85,
       "z": 7.85,
       "yaw": 0.0,
@@ -253,9 +258,39 @@
       "occluder": true,
       "color": "#3F8F4F",
       "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Evier",
+      "kind": "kitchen_sink",
+      "x": 11.05,
+      "z": 7.2,
+      "yaw": 270.0,
+      "sizeX": 1.2,
+      "sizeY": 1.08,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#F7F4EE"
     }
   ],
   "designerRoute": [
+    { "x": 6.25, "z": 6.25, "at": 6.6 },
+    { "x": 6.25, "z": 5.25, "at": 6.6 },
+    { "x": 6.25, "z": 4.25, "at": 6.6 },
+    { "x": 6.25, "z": 3.25, "at": 6.6 },
+    { "x": 6.25, "z": 2.25, "at": 6.6 },
+    { "x": 6.25, "z": 1.25, "at": 6.6 },
+    { "x": 7.25, "z": 1.25, "at": 6.6 },
+    { "x": 8.25, "z": 1.25, "at": 6.6 },
+    { "x": 9.25, "z": 1.25, "at": 6.6 },
+    { "x": 10.25, "z": 1.25, "at": 6.6 },
+    { "x": 11.25, "z": 1.25, "at": 6.6 },
+    { "x": 12.25, "z": 1.25, "at": 6.6 },
+    { "x": 13.25, "z": 1.25, "at": 6.6 },
+    { "x": 14.25, "z": 1.25, "at": 6.6 },
+    { "x": 14.25, "z": 1.25, "at": 6.6 }
+  ],
+  "designerRouteHard": [
     { "x": 6.25, "z": 6.25, "at": 6.6 },
     { "x": 6.25, "z": 5.25, "at": 6.6 },
     { "x": 6.25, "z": 4.25, "at": 6.6 },

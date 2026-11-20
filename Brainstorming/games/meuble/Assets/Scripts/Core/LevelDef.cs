@@ -539,8 +539,46 @@ namespace OutOfSight.Core
         public const string HardFloor = "hard";
         public const string SoftFloor = "soft";
 
-        /// <summary>M7 (docs/CONTRACT_M7.md 1.2): the one <see cref="FloorFinish"/> value, the kitchen and bathroom tile.</summary>
+        /// <summary>M7 (docs/CONTRACT_M7.md 1.2): the <see cref="FloorFinish"/> value of the kitchen and bathroom tile.</summary>
         public const string TileFinish = "tile";
+
+        // Floor finishes (M8 ROOMS_PLAN.md 4, product owner request, 2026-11-19): the other <see cref="FloorFinish"/>
+        // values, own creation (tools/assets/make_floor_finishes.py). "marble" and "herringbone" join "tile" as
+        // hard-floor-only looks; "carpet" is the opposite, a soft-floor-only look (a wall-to-wall carpet, distinct
+        // from the plain soft floor's own border-and-field Carpet look above it): a carpet always means quiet.
+        /// <summary>White-grey marble slabs with fine veins and a thin joint: hard floor only.</summary>
+        public const string MarbleFinish = "marble";
+        /// <summary>Darker oak herringbone parquet, a woven chevron: hard floor only.</summary>
+        public const string HerringboneFinish = "herringbone";
+        /// <summary>Wall-to-wall carpet, a warm grey-beige loop pile: soft floor only.</summary>
+        public const string CarpetFinish = "carpet";
+
+        // M9 floors (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md): a third parquet, a second marble
+        // (own creation, tools/assets/make_floor_finishes.py) and the product owner's two bathroom tiles. All hard
+        // floor only.
+        /// <summary>Wide light oak planks, the third parquet: hard floor only.</summary>
+        public const string LightOakFinish = "lightoak";
+        /// <summary>Dark green verde marble with pale veins, the second marble: hard floor only.</summary>
+        public const string VerdeFinish = "verde";
+        /// <summary>Small ivory bathroom tiles (tile_bathroom_small_ivory.png): hard floor only.</summary>
+        public const string IvoryTileFinish = "ivorytile";
+        /// <summary>Large teal bathroom tiles (tile_bathroom_large_teal.png): hard floor only.</summary>
+        public const string TealTileFinish = "tealtile";
+
+        /// <summary>Every <see cref="FloorFinish"/> value a level may give (null or empty: the default parquet, or on
+        /// a soft floor the plain Carpet look). Every value of <see cref="HardFloorFinishes"/> needs a hard floor;
+        /// "carpet" a soft one (LevelValidator).</summary>
+        public static readonly string[] FloorFinishes =
+        {
+            TileFinish, MarbleFinish, HerringboneFinish, CarpetFinish, LightOakFinish, VerdeFinish, IvoryTileFinish, TealTileFinish,
+        };
+
+        /// <summary>The hard-floor-only <see cref="FloorFinish"/> values: every one but "carpet" (a soft room already
+        /// has its own distinct carpet looks, so a hard look never hides a quiet floor).</summary>
+        public static readonly string[] HardFloorFinishes =
+        {
+            TileFinish, MarbleFinish, HerringboneFinish, LightOakFinish, VerdeFinish, IvoryTileFinish, TealTileFinish,
+        };
 
         // Wall finishes (product owner request, 2026-11-19): the <see cref="WallFinish"/> values.
         /// <summary>Soft painted plaster in a muted sage.</summary>
@@ -552,8 +590,40 @@ namespace OutOfSight.Core
         /// <summary>A printed wallpaper: pale sage stripes and small botanical sprigs.</summary>
         public const string WallpaperFinish = "wallpaper";
 
+        // Tiled walls (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md): the product owner's two wall images,
+        // each a whole wall from the floor to the top (tiles above a trim, paint below), mapped once up the wall.
+        /// <summary>White square tiles with black grout above a pastel blue paint (wall_bathroom_white_pastel_blue.png), for bathrooms.</summary>
+        public const string WhiteTileFinish = "whitetile";
+        /// <summary>Ivory subway tiles above a sage paint (wall_kitchen_ivory_sage.png), for kitchens.</summary>
+        public const string SubwayTileFinish = "subwaytile";
+
+        // Printed and stone walls (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md section 6): the product
+        // owner's three all-over wall images, each repeating both ways at its metric size (no band, so any wall height).
+        /// <summary>A honed greige travertine (wall_travertine_greige.png), for entrances, halls, living rooms and bathrooms.</summary>
+        public const string TravertineFinish = "travertine";
+        /// <summary>Slate blue triple arches printed on a cream linen (wall_deco_arches_blue.png), for living and dining rooms and bedrooms.</summary>
+        public const string ArchesFinish = "arches";
+        /// <summary>Olive and taupe pinstripes on a beige linen (wall_linen_pinstripe_olive.png), for bedrooms and offices.</summary>
+        public const string PinstripeFinish = "pinstripe";
+
+        // Walls 4 (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md section 7): two more all-over images.
+        /// <summary>Sage quatrefoils and terracotta stars printed on a cream paper (wall_quatrefoil.png), for bedrooms, entrances and corridors.</summary>
+        public const string QuatrefoilFinish = "quatrefoil";
+        /// <summary>A sage painted fluted panel, vertical ribs (wall_sage_ribbed.png), for living and dining rooms and offices.</summary>
+        public const string SageRibbedFinish = "sageribbed";
+
         /// <summary>Every <see cref="WallFinish"/> value a level may give (null or empty: the cream crepi).</summary>
-        public static readonly string[] WallFinishes = { SageFinish, LimewashFinish, GrassclothFinish, WallpaperFinish };
+        public static readonly string[] WallFinishes =
+        {
+            SageFinish, LimewashFinish, GrassclothFinish, WallpaperFinish, WhiteTileFinish, SubwayTileFinish,
+            TravertineFinish, ArchesFinish, PinstripeFinish, QuatrefoilFinish, SageRibbedFinish,
+        };
+
+        /// <summary>
+        /// The <see cref="WallFinishes"/> whose image spans the wall once, floor to top (Tuning.TiledWallHeight): their trim
+        /// sits at one height on every wall, so a room showing one may not have taller walls (LevelValidator).
+        /// </summary>
+        public static readonly string[] TiledWallFinishes = { WhiteTileFinish, SubwayTileFinish };
 
         public string Id;
         public float X;
@@ -567,8 +637,9 @@ namespace OutOfSight.Core
         public string FloorColor;
         public string WallColor;
         /// <summary>
-        /// M7 (docs/CONTRACT_M7.md 1.2): null (default, plain) or "tile" (kitchen and bathroom floors): visual only,
-        /// a hard floor acoustically either way (<see cref="IsSoft"/> alone still drives PRD 4.5 silence).
+        /// M7 (docs/CONTRACT_M7.md 1.2) and M8 floor finishes (docs/m8/ROOMS_PLAN.md 4): null (default) or one of
+        /// <see cref="FloorFinishes"/>: visual only, the room's "floor" (<see cref="IsSoft"/>) alone still drives
+        /// PRD 4.5 silence, whatever the finish.
         /// </summary>
         public string FloorFinish;
         /// <summary>
@@ -577,6 +648,37 @@ namespace OutOfSight.Core
         /// a shared wall belongs to the next room); caps and outside faces keep the crepi.
         /// </summary>
         public string WallFinish;
+
+        /// <summary>
+        /// M8 room types (docs/m8/ROOMS_PLAN.md 2): the type as the level gives it ("type", one of <see cref="RoomTypes.All"/>),
+        /// or null, written only when set. Read <see cref="Type"/>, which falls back to the type inferred from the id.
+        /// </summary>
+        [JsonProperty("type")]
+        public string DeclaredType;
+
+        /// <summary>
+        /// M8: the room type, presentation only (no rule reads it): <see cref="DeclaredType"/> when the level gives one, else
+        /// <see cref="RoomTypes.Infer"/> of the id ("cuisine" is a kitchen, "couloir_est" a corridor, an unknown id "other").
+        /// Setting it sets <see cref="DeclaredType"/>.
+        /// </summary>
+        [JsonIgnore]
+        public string Type
+        {
+            get => string.IsNullOrEmpty(DeclaredType) ? RoomTypes.Infer(Id) : DeclaredType;
+            set => DeclaredType = value;
+        }
+
+        /// <summary>M8 (docs/m8/ROOMS_PLAN.md 5): <see cref="LightWall"/> value that gives the room no secondary light.</summary>
+        public const string LightWallNone = "none";
+
+        /// <summary>Every <see cref="LightWall"/> value a level may give (null or empty: the automatic placement).</summary>
+        public static readonly string[] LightWalls = { "+x", "-x", "+z", "-z", LightWallNone };
+
+        /// <summary>
+        /// M8 (docs/m8/ROOMS_PLAN.md 5), visual only: null (default) places the room's secondary light fixtures automatically;
+        /// a side ("+x", "-x", "+z", "-z") puts its wall fixtures on that wall; "none" gives the room no fixture and no light.
+        /// </summary>
+        public string LightWall;
 
         [JsonIgnore] public float MinX => X - SizeX * 0.5f;
         [JsonIgnore] public float MaxX => X + SizeX * 0.5f;
@@ -690,7 +792,8 @@ namespace OutOfSight.Core
         public string Model;
 
         public string Name;
-        /// <summary>"sofa", "bookshelf", "table", "cabinet", "counter", "plant", "armchair" (M4), "wardrobe" (M6, <see cref="WardrobeRule"/>) or "box".</summary>
+        /// <summary>"sofa", "bookshelf", "table", "cabinet", "counter", "plant", "armchair" (M4), "wardrobe" (M6, <see cref="WardrobeRule"/>), "box",
+        /// or an M8 room object (<see cref="PropKinds.RoomObjects"/>).</summary>
         public string Kind;
         public float X;
         public float Z;

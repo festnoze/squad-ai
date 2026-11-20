@@ -556,12 +556,16 @@ namespace OutOfSight.Tests
                 var furniture = new List<Transform> { Game.Furniture.transform };
                 furniture.AddRange(Game.Level.Decoys.Select(d => d.transform));
                 furniture.AddRange(Game.Def.Props.Select(p => Child(p.Name)));
+                // M9 bookshelf pass: a bookshelf's budget grows with its width (its books fill the whole shelf), every other
+                // piece keeps 400 (Tuning.FurnitureTriangleBudget, as the audit and the probe).
+                var budgets = Game.Def.Props.GroupBy(p => p.Name).ToDictionary(g => g.Key, g => g.Min(p => Tuning.FurnitureTriangleBudget(p.Kind, p.SizeX)));
                 long worstFurniture = 0;
                 foreach (Transform f in furniture)
                 {
                     long t = Probe.TrianglesUnder(f);
+                    int budget = budgets.TryGetValue(f.name, out int own) ? own : Tuning.BudgetFurnitureTriangles;
                     worstFurniture = Math.Max(worstFurniture, t);
-                    Assert.LessOrEqual(t, Tuning.BudgetFurnitureTriangles, $"{level}: furniture {f.name} has {t} triangles");
+                    Assert.LessOrEqual(t, budget, $"{level}: furniture {f.name} has {t} triangles");
                 }
                 long worstInhabitant = 0;
                 int worstBones = 0;

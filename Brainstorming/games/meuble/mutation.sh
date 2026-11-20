@@ -73,7 +73,8 @@ MUTATIONS=(
   "tmp_restore|Assets/Scripts/Runtime/SaveStore.cs|SaveData fromTmp = tmpText != null ? SaveData.Parse(tmpText, out tmpProblem) : null; // MUTATION:TMP_RESTORE|SaveData fromTmp = null; // MUTATION:TMP_RESTORE|EditMode|A_missing_file_with_a_good_tmp_is_restored_from_it_before_the_bak A_locked_tmp_in_the_fallback_is_kept_and_restored_at_the_next_load"
   "missing_bak|Assets/Scripts/Runtime/SaveStore.cs|SaveData fromBak = bakText != null ? SaveData.Parse(bakText, out bakProblem) : null; // MUTATION:MISSING_BAK|SaveData fromBak = null; // MUTATION:MISSING_BAK|EditMode|Missing_file_"
   "leaf_last_step|Assets/Scripts/Runtime/DoorLeaf.cs|SwingProgress = 1f; // MUTATION:LEAF_LAST_STEP|SwingProgress = 1f; Swinging = false; // MUTATION:LEAF_LAST_STEP|PlayMode|Step36_LeafPosesAndTheColliderAndOcclusionSwap Step36c_EOpensTheLeafInExactlyThirtyMovingSteps"
-  "leaf_fade|Assets/Scripts/Runtime/WallFader.cs|bool crossed = CrossesBox(camera, points, count, e.Box, e.HalfSize); // MUTATION:LEAF_FADE|bool crossed = false; // MUTATION:LEAF_FADE|PlayMode|Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded"
+  # M9 doors rule: the leaf box rule (LEAF_FADE) no longer applies to any part (doors never move); DOORS_STAND guards the rule.
+  "doors_stand|Assets/Scripts/Runtime/WallFader.cs|hidden &= !e.Door; // MUTATION:DOORS_STAND|hidden &= true; // MUTATION:DOORS_STAND|PlayMode|Step36l_ Step36o_ Step70b_ Step70f_ Step90a_"
   "dog_asleep|Assets/Scripts/Runtime/Vision.cs|if (routine.Asleep) // MUTATION:DOG_ASLEEP|if (false) // MUTATION:DOG_ASLEEP|PlayMode|Step38g_"
   "draw_slots|Assets/Scripts/Runtime/Probe.cs|count.MaterialSlots++; // MUTATION:DRAW_SLOTS|// MUTATION:DRAW_SLOTS removed|PlayMode|Step22c_"
   "visual_slope|Assets/Scripts/Runtime/FurnitureController.cs|if (GroundFrame(position, yaw, ref ground, ref lift)) // MUTATION:VISUAL_SLOPE|if (false) // MUTATION:VISUAL_SLOPE|PlayMode|Step39k_"
@@ -133,6 +134,9 @@ MUTATIONS=(
   "lesson_final|Assets/Scripts/Core/LevelValidator.cs|if (mechanics.Count < FinalMechanics) // MUTATION:LESSON_FINAL|if (mechanics.Count < 1) // MUTATION:LESSON_FINAL|EditMode|Lesson_final_needs_three_mechanics_and_mechanics_are_listed_in_order"
   "shelf_combine|Assets/Scripts/Runtime/FurnitureKit.cs|var parts = new PartBatch(p, layer, combine && visual); // MUTATION:SHELF_COMBINE|var parts = new PartBatch(p, layer, false); // MUTATION:SHELF_COMBINE|PlayMode|Step39h_CombinedRenderersKeepCollidersMaterialsAndFades"
   "face_plane|Assets/Scripts/Runtime/LevelBuilder.cs|FaceScope, \"Face\", fader, frame.position, normal); // MUTATION:FACE_PLANE|FaceScope, \"Face\", fader, wall.TransformPoint(faceCenter), frame.TransformDirection(new Vector3(0f, 0f, f.Side))); // MUTATION:FACE_PLANE|PlayMode|Step39h_CombinedRenderersKeepCollidersMaterialsAndFades"
+  # M7 walls pass: the lowered doorways stand, and an unknown Walls option falls back to lowered.
+  "walls_keep_frames|Assets/Scripts/Runtime/WallFader.cs|bool hidden = !none && plane && !(lowered && e.KeepWhenLowered); // MUTATION:WALLS_KEEP_FRAMES|bool hidden = !none && plane; // MUTATION:WALLS_KEEP_FRAMES|PlayMode|Step70f_"
+  "options_walls_fallback|Assets/Scripts/Core/SaveData.cs|Walls = IsWalls(Walls) ? Walls : WallsLowered, // MUTATION:OPTIONS_WALLS_FALLBACK|Walls = Walls, // MUTATION:OPTIONS_WALLS_FALLBACK|EditMode|HandEditedValues_FallBackToLoweredAndTheNearestStep"
   "robot_build|Assets/Scripts/Runtime/LevelBuilder.cs|level.Robots.Add(Robot.Create(robotDef, root)); // MUTATION:ROBOT_BUILD|Robot.Create(robotDef, root); // MUTATION:ROBOT_BUILD|PlayMode|Step39l_"
   "load_target|Assets/Scripts/Runtime/LevelBuilder.cs|return body.Size.y - Tuning.SampleInset + load; // MUTATION:LOAD_TARGET|return body.Size.y - Tuning.SampleInset; // MUTATION:LOAD_TARGET|PlayMode|Step39l_"
   "load_build|Assets/Scripts/Runtime/LevelBuilder.cs|level.LoadView = ApplyLoad(furniture, spawn.Load); // MUTATION:LOAD_BUILD|level.LoadView = null; // MUTATION:LOAD_BUILD|PlayMode|Step39l_"
@@ -154,6 +158,15 @@ MUTATIONS=(
   "audit_robot_contact|Assets/Editor/LevelAudit.cs|bool inside = YawMath.Planar(robot - (pa + ab * f)).magnitude < zone; // MUTATION:AUDIT_ROBOT_CONTACT|bool inside = false; // MUTATION:AUDIT_ROBOT_CONTACT|Audit|test_m5_levels_robotblock"
   "audit_rock|Assets/Editor/LevelAudit.cs|int rock = w.RockSamples; // MUTATION:AUDIT_ROCK|int rock = 0; // MUTATION:AUDIT_ROCK|Audit|test_rock"
   "audit_load|Assets/Editor/LevelAudit.cs|float threshold = Tuning.LoadFallDeltaV - LoadEpsilon; // MUTATION:AUDIT_LOAD|float threshold = float.MaxValue; // MUTATION:AUDIT_LOAD|Audit|test_load"
+  # M7 (level 13 at Difficile): the office chair's glide is seen at the cell it comes from.
+  "audit_glide|Assets/Editor/LevelAudit.cs|bool glides = w.Body.Glides && o.GlideFrom && came >= 0; // MUTATION:AUDIT_GLIDE|bool glides = false; // MUTATION:AUDIT_GLIDE|Audit|test_m7_audit_glide"
+  # CONTRACT_M5 20: the dog's hold.
+  "dog_run|Assets/Scripts/Runtime/GameState.cs|dog.BeginRun(target); // MUTATION:DOG_RUN|dog.BeginRun(dog.Position); // MUTATION:DOG_RUN|PlayMode|Step38h_ Step38i_"
+  "dog_hold|Assets/Scripts/Runtime/GameState.cs|dogHolding = true; // MUTATION:DOG_HOLD|dogHolding = false; // MUTATION:DOG_HOLD|PlayMode|Step38h_ Step38i_"
+  "dog_call|Assets/Scripts/Runtime/GameState.cs|h.Investigate(at); // MUTATION:DOG_CALL|h.Investigate(h.Position); // MUTATION:DOG_CALL|PlayMode|Step38h_"
+  "dog_call_finds|Assets/Scripts/Runtime/GameState.cs|if (!memories[i].OutOfPlace(furniture.Pose, furniture.Tipped)) // MUTATION:DOG_CALL_FINDS|if (false) // MUTATION:DOG_CALL_FINDS|PlayMode|Step38i_"
+  # Music bug: a loop stopped behind the player's back (audio device change, OS suspend) must be restarted by the watchdog.
+  "music_loop|Assets/Scripts/Runtime/MusicPlayer.cs|if (due) // MUTATION:MUSIC_LOOP|if (false) // MUTATION:MUSIC_LOOP|PlayMode|Step28ma_ Step28mb_ Step28mc_ Step28md_"
 )
 
 # Refuse to start on a tree that still holds a mutation (an interrupted run), and snapshot the sources.

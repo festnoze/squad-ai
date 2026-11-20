@@ -63,7 +63,9 @@ namespace OutOfSight.Editor
     /// - every routine is built by RoutineFactory (personality, pattern, seats, frozen walks); the loop is the longest
     ///   routine's period, and a wanderer means no sweep;
     /// - sight is per watcher (its eye, range and half angle; a sleeping eye sees nothing): the moving table holds the humans
-    ///   and the awake dog (a bark is forbidden), the still tables only the humans, one per tolerance class with its own in
+    ///   and the awake dog (a bark is forbidden: since CONTRACT_M5 20 it also starts the dog's run and hold, a pin and a carry
+    ///   back, so a schedule the dog never sees moving stays exactly as the game plays it), the still tables only the
+    ///   humans, one per tolerance class with its own in
     ///   place and explained radii;
     /// - hearing is per listener (its hearing factor; the dog hears nothing);
     /// - doors: one table per mask of open closed leaves, walkability and moves per mask (the leaves posed by DoorLeaf.PoseAt:
@@ -113,6 +115,9 @@ namespace OutOfSight.Editor
     ///   and a cell reached more than a sample late is a defect;
     /// - M7 minimum, a fidelity replay of the found schedule with the game's own sight points (<see cref="FidelityReplay"/>),
     ///   whose first sighting is a defect (fixture test_m5_audit_fidelity, level 15 before its glance patch);
+    /// - M7 (level 13 at Difficile), the office chair's stop is seen at the cell its glide comes from as well as where it
+    ///   stops (<see cref="GlideCell"/>; a moving node keeps that cell in its state), so the search no longer proposes a glide
+    ///   into a hidden cell that the fidelity replay sees on the way in (fixture test_m7_audit_glide);
     /// - m9, the load is refused at Tuning.AuditLoadDeltaV (under the game's 1.8 m/s) and the margin is printed; m6, the sample
     ///   steps come from Tuning, the load epsilon from LoadBalance, the load history is derived (<see cref="DeriveLoadHistory"/>).
     ///
@@ -717,9 +722,12 @@ namespace OutOfSight.Editor
                 }
             }
             var furniture = new HashSet<string>();
+            // A bookshelf's budget grows with its width (Tuning.FurnitureTriangleBudget: its books fill the whole shelf).
+            var budgets = new Dictionary<string, int>();
             foreach (PropDef prop in def.Props)
             {
                 furniture.Add(prop.Name);
+                budgets[prop.Name] = Tuning.FurnitureTriangleBudget(prop.Kind, prop.SizeX);
             }
             foreach (Transform child in level.Root.transform)
             {
@@ -742,9 +750,10 @@ namespace OutOfSight.Editor
                         result.Failures.Add($"charge {load.Kind} : {carried} triangles, au dessus du budget de {BudgetFurnitureTriangles}");
                     }
                 }
-                if (triangles > BudgetFurnitureTriangles)
+                int budget = budgets.TryGetValue(child.name, out int own) ? own : BudgetFurnitureTriangles;
+                if (triangles > budget)
                 {
-                    result.Failures.Add($"meuble {child.name} : {triangles} triangles, au dessus du budget de {BudgetFurnitureTriangles}");
+                    result.Failures.Add($"meuble {child.name} : {triangles} triangles, au dessus du budget de {budget}");
                 }
             }
         }
@@ -783,7 +792,7 @@ namespace OutOfSight.Editor
             }
             if (count.Materials > budgetMaterials)
             {
-                failures.Add($"{count.Materials} materiaux, au dessus du budget de {budgetMaterials}");
+                failures.Add($"{count.Materials} materiaux, au dessus du budget de {budgetMaterials} : {string.Join(", ", count.Names)}");
             }
             return failures;
         }
@@ -796,6 +805,8 @@ namespace OutOfSight.Editor
             public int Slots;
             public int Materials;
             public long Triangles;
+            /// <summary>Walls 4: the counted materials' names, sorted (printed when the budget fails).</summary>
+            public List<string> Names = new List<string>();
         }
 
         /// <summary>
@@ -831,7 +842,26 @@ namespace OutOfSight.Editor
                 bool dog = coneColours && cone.Owner != null && cone.Owner.IsDog; // MUTATION:AUDIT_CONE_COLOURS
                 materials.Add(PrimitiveKit.UnlitTransparent(VisionConeView.ConeColor(dog, false, false)));
             }
-            return new DrawCount { Renderers = count.Renderers, Slots = count.MaterialSlots, Materials = materials.Count, Triangles = count.Triangles };
+            // M7 walls pass: the see-through walls' one material (drawn by the wall fader, no renderer of its own) counts
+            // whatever the Walls option, as the probe counts it.
+            // Walls 4 (WallArray, docs/m9/FLOORS_WALLS.md section 7): every wall face, fill, cap, closure and stub is drawn
+            // with ONE material (TextureLibrary.wallMaterial: the finishes are slices of two Texture2DArrays, each vertex
+            // names its own), counted here once like any material, and the see-through look's one material
+            // (TextureLibrary.wallSeeThrough, WallFader.GhostMaterial) draws every faded part, walls and frames alike. So the
+            // number of wall finishes a level shows no longer costs materials (it used to cost one URP Lit material each),
+            // and no special case is needed: the distinct materials counted are the real ones.
+            WallFader fader = level.Root.GetComponent<WallFader>();
+            if (fader != null && fader.Count > 0)
+            {
+                materials.Add(WallFader.GhostMaterial);
+            }
+            var names = new List<string>();
+            foreach (Material m in materials)
+            {
+                names.Add(m != null ? m.name : "null");
+            }
+            names.Sort(StringComparer.Ordinal);
+            return new DrawCount { Renderers = count.Renderers, Slots = count.MaterialSlots, Materials = materials.Count, Triangles = count.Triangles, Names = names };
         }
 
         // ----- 3. The schedule (amendment 11.7, CONTRACT_M4 5 and amendment 9.11) -----
@@ -4051,6 +4081,15 @@ namespace OutOfSight.Editor
                 StrictOptions = () => new SearchOptions(), RelaxedOptions = () => new SearchOptions { DoorMemory = false },
                 Premise = l => l.DoorMemory ? null : "la memoire des portes n'est pas activee",
             },
+            // ----- M7 (level 13 at Difficile): the glide of a stop is seen where it comes from -----
+            new FixtureRule
+            {
+                // The office chair crosses the cell before a niche in a window that holds the crossing but not the glide.
+                Rule = "glide", Id = "test_m7_audit_glide",
+                Strict = "la glissade de l'arret vue aussi a la case d'ou elle vient", Relaxed = "la glissade vue a la seule case d'arret",
+                Check = GlideCheck,
+                Premise = l => l.PlayerBody().Glides ? null : "le corps du joueur ne glisse pas",
+            },
         };
 
         /// <summary>
@@ -4110,6 +4149,81 @@ namespace OutOfSight.Editor
             }
             string sighting = FidelityReplay(w, fidelityPath, out _);
             return sighting != null ? new List<string> { sighting } : new List<string>();
+        }
+
+        private static World glideWorld;
+        // test_m7_audit_glide: the samples the cell before the niche is unseen (14: the crossing into the niche fits in the
+        // margin window, 12 at least, the crossing and the glide do not, 16 at least), and the first sample the exit is unseen.
+        private const int GlideWindowFrom = 30;
+        private const int GlideWindowTo = 43;
+        private const int GlideExitFrom = 75;
+
+        /// <summary>
+        /// The test_m7_audit_glide fixture (M7, level 13 at Difficile): a corridor whose room hides everything, edited as a
+        /// table (<see cref="GlideWindow"/>): the cell before the niche is seen but from GlideWindowFrom to GlideWindowTo and
+        /// the exit past the niche until GlideExitFrom, so the only schedule crosses into the niche in that window and stops
+        /// there. Strict, the stop's glide is seen at the cell it comes from (<see cref="GlideCell"/>): no schedule; relaxed,
+        /// at the niche only (the search before M7, which the fidelity replay caught gliding in on level 13): a schedule.
+        /// </summary>
+        private static List<string> GlideCheck(World w, bool strict)
+        {
+            if (glideWorld != w)
+            {
+                glideWorld = w;
+                GlideWindow(w);
+            }
+            Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy, GlideFrom = strict }, out int goal);
+            if (strict)
+            {
+                return goal < 0 ? new List<string> { "aucun horaire : la glissade dans la niche est vue a la case d'ou elle vient" } : new List<string>();
+            }
+            return goal >= 0 ? new List<string>() : new List<string> { "aucun horaire meme en ne voyant la glissade qu'a la niche" };
+        }
+
+        /// <summary>
+        /// test_m7_audit_glide's sight, written in the world's tables (moving, and the still ones when a class has its own),
+        /// then dilated again: the cell two before the exit (before the niche) seen at every sample but the glide window, the
+        /// exit seen before GlideExitFrom.
+        /// </summary>
+        private static void GlideWindow(World w)
+        {
+            var exit = new Vector3(w.Def.Exit.X, 0f, w.Def.Exit.Z);
+            int before = NearestCell(w, exit + Vector3.left * (2f * Tuning.AuditCellSize));
+            int last = NearestCell(w, exit);
+            var tables = new List<bool[][]> { w.MoveSeen };
+            foreach (ToleranceClass c in w.Classes)
+            {
+                if (!tables.Contains(c.Seen))
+                {
+                    tables.Add(c.Seen);
+                }
+            }
+            foreach (bool[][] table in tables)
+            {
+                foreach (bool[] seen in table)
+                {
+                    for (int s = 0; s < w.Samples; s++)
+                    {
+                        seen[s * w.Count + before] |= s < GlideWindowFrom || s > GlideWindowTo;
+                        seen[s * w.Count + last] |= s < GlideExitFrom;
+                    }
+                }
+            }
+            SetMargin(w, w.Margin);
+        }
+
+        /// <summary>The walkable cell whose center is nearest to <paramref name="p"/> on the floor plane.</summary>
+        private static int NearestCell(World w, Vector3 p)
+        {
+            int best = -1;
+            for (int k = 0; k < w.Count; k++)
+            {
+                if (w.Walkable[k] && (best < 0 || YawMath.Planar(w.Center[k] - p).sqrMagnitude < YawMath.Planar(w.Center[best] - p).sqrMagnitude))
+                {
+                    best = k;
+                }
+            }
+            return best;
         }
 
         /// <summary>
@@ -6309,16 +6423,18 @@ namespace OutOfSight.Editor
         /// The stop at the end of a run (CONTRACT_M4 5): the office chair glides <see cref="SearchOptions.StopSamples"/>
         /// samples (moving, rolling); the stool at full speed falls (moving) and the topple is heard on any floor; M5 wave 5B,
         /// the rocking chair rocks (moving, in place, silent: its creak is a sound, not a noise event). Out of every robot's
-        /// contact zone throughout.
+        /// contact zone throughout. M7: the glide is seen at <paramref name="came"/>, the cell the run came from, as well
+        /// (<see cref="GlideCell"/>).
         /// </summary>
-        private static bool CheckStop(World w, SearchOptions o, Ears ears, Node from, int k, int t, int shift, bool wide)
+        private static bool CheckStop(World w, SearchOptions o, Ears ears, Node from, int k, int t, int shift, bool wide, int came = -1)
         {
             int length = StopCost(w, o);
             bool hum = HumOn(w, o);
+            int glide = GlideCell(w, o, came, k);
             for (int q = 1; q <= length; q++)
             {
                 int s = t + q + shift;
-                if (!MovingOk(w, from.Off, s, k, k, wide, from.Mask) || !RobotFree(w, o, s, w.Center[k], w.Center[k], wide))
+                if (!MovingOk(w, from.Off, s, glide, k, wide, from.Mask) || !RobotFree(w, o, s, w.Center[k], w.Center[k], wide))
                 {
                     return false;
                 }
@@ -6336,6 +6452,20 @@ namespace OutOfSight.Editor
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// M7 (level 13 at Difficile): the cell a stop is seen at besides its own. The office chair glides into cell
+        /// <paramref name="k"/> along its last move, from MotionProfile.StopDistance plus the release back toward the cell it
+        /// came from (the replay's early release, the glide poses of <see cref="FidelityReplay"/>), out of reach of the ring
+        /// at <paramref name="k"/>: its glide is seen at the cell it came from as well, as that move was. <paramref name="k"/>
+        /// itself for every other stop, without the glide rule (its fixture), and when the cell it came from is not known
+        /// (<see cref="Reachable"/>, a relaxation that stays a superset of the schedules).
+        /// </summary>
+        private static int GlideCell(World w, SearchOptions o, int came, int k)
+        {
+            bool glides = w.Body.Glides && o.GlideFrom && came >= 0; // MUTATION:AUDIT_GLIDE
+            return glides ? came : k;
         }
 
         /// <summary>
@@ -6394,6 +6524,11 @@ namespace OutOfSight.Editor
             public bool Hide = true;
             /// <summary>M6: a leaf the player opened must stay unseen by the humans (false: no door memory, its fixture).</summary>
             public bool DoorMemory = true;
+            /// <summary>
+            /// M7: the office chair's glide at a stop is seen at the cell it came from too (<see cref="GlideCell"/>; false: at
+            /// the cell it stops at only, its fixture).
+            /// </summary>
+            public bool GlideFrom = true;
         }
 
         /// <summary>
@@ -6884,7 +7019,11 @@ namespace OutOfSight.Editor
             // M6 (CONTRACT_M6 2.5): the player may hide in a wardrobe (never with a load); hidden is part of the state.
             bool hides = options.Hide && w.HideFrom != null && load == null;
             // M5 wave 5B: a rocking body's direction in motion is part of the state; the other levels keep the M4 key exactly.
-            long Key(Node n) => (descriptors ? BaseKey(n) * 65536L + n.Load : BaseKey(n)) * (hides ? 2 : 1) + (n.Hidden ? 1 : 0);
+            // M7: a gliding body in motion keeps the cell it came from, which its stop's glide is checked at (GlideCell).
+            bool glideKey = w.Body.Glides && options.GlideFrom;
+            long Arrival(Node n) => glideKey ? (long)(w.Count + 1) * Key0(n) + (n.Motion && n.Parent >= 0 ? nodes[n.Parent].Cell + 1 : 0) : Key0(n);
+            long Key0(Node n) => descriptors ? BaseKey(n) * 65536L + n.Load : BaseKey(n);
+            long Key(Node n) => Arrival(n) * (hides ? 2 : 1) + (n.Hidden ? 1 : 0);
             // M5 wave 5B: with a load, a node dominates another of its state only if its load state is at least as free.
             bool Freer(Node a, Node b) => load == null || load.Dominates(a.Load, b.Load);
 
@@ -7074,7 +7213,8 @@ namespace OutOfSight.Editor
                                 if (n.Motion)
                                 {
                                     int stopLoad = 0;
-                                    if (t + stopCost <= horizon && n.Run + stopCost <= options.MaxRun && CheckStop(w, options, ears, n, k, t, 0, true)
+                                    if (t + stopCost <= horizon && n.Run + stopCost <= options.MaxRun
+                                        && CheckStop(w, options, ears, n, k, t, 0, true, n.Parent >= 0 ? nodes[n.Parent].Cell : -1)
                                         && (load == null || (stopLoad = load.Step(n.Load, LoadModel.ActStop)) >= 0))
                                     {
                                         Offer(new Node
@@ -7553,7 +7693,7 @@ namespace OutOfSight.Editor
                         }
                         continue;
                     case Act.Stop:
-                        if (!CheckStop(w, o, null, a, a.Cell, a.T, shift, false))
+                        if (!CheckStop(w, o, null, a, a.Cell, a.T, shift, false, i >= 2 ? path[i - 2].Cell : -1))
                         {
                             return false;
                         }

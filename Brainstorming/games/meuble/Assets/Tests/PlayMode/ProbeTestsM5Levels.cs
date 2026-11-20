@@ -1181,11 +1181,11 @@ namespace OutOfSight.Tests
         /// shows the end screen. Each run is capped at its route end + 30 s of game time by RouteReplayer.
         /// </summary>
         [UnityTest]
-        [Timeout(1800000)]
+        [Timeout(3600000)]
         public IEnumerator Step40_FullPlaythrough()
         {
             List<string> order = Game.LevelOrder.ToList();
-            Assert.AreEqual(18, order.Count, "premise: levels.json lists the 17 levels of M5 and level 18 of M6b (CONTRACT_M6 5): " + string.Join(", ", order));
+            Assert.AreEqual(24, order.Count, "premise: levels.json lists the 18 levels of M6b and levels 19 to 24 of M7: " + string.Join(", ", order));
             Assert.AreEqual(order[0], Game.LevelId, "premise: the editor boot starts the first level");
             Assert.AreEqual(PlayState.Playing, Game.State, "premise: the first level is playing");
             Assert.IsEmpty(SaveStore.Current.Won, "premise: the boot did not start on a fresh save");

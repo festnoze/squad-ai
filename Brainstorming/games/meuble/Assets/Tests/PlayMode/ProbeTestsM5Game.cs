@@ -30,6 +30,8 @@ namespace OutOfSight.Tests
     /// still chair seen by the dog changes nothing, the dog never catches nor counts for the exit, the Dog eye.</item>
     /// <item>38g (wave 5A.1, critique M3; the watchers' test_m5_watchers_dog, read only): a sleeping dog sees nothing, the
     /// awake one does.</item>
+    /// <item>38h and 38i (CONTRACT_M5 20, test_m5_game_dog): after its bark the dog runs to the chair and pins it, and the
+    /// human it calls puts it back (one discovery when out of place, nothing when in place).</item>
     /// <item>Wave 5B. 42b to 42f, the robot (test_m5_game_robot: Robi there and back along z = -2, a sitter on the chair, a
     /// witness): a contact shoves 0.25 m in 0.5 s (moving, input ignored), seen while shoved is caught (and bumps), the
     /// fixed timeline then the reversal, no shove while pinned, the hum masks a hop at 2.4 m but not at 2.6 m and never a
@@ -1740,6 +1742,151 @@ namespace OutOfSight.Tests
             Assert.IsTrue(controlByDog, "control: awake, SeenByDog is false");
             Assert.AreEqual(HudEye.Dog, controlEye, "control: awake, the eye is not the dog's");
             Assert.AreEqual(1, Game.BarkCount, "control: awake and seeing the chair move for the grace, the dog did not bark once");
+            AssertClean();
+        }
+
+        /// <summary>The human in a reactive pin far away, facing the north wall: it sees nothing but can be sent.</summary>
+        private Vector3 PinTheHumanAwayReactive()
+        {
+            var humanAt = new Vector3(-5.0f, 0f, 3.5f);
+            Human.Pin(humanAt, 0f, 0f, true);
+            return humanAt;
+        }
+
+        /// <summary>Moves the chair in the dog's view until the dog barks, then stops it; asserts the premise of one bark.</summary>
+        private IEnumerator MoveUntilTheDogBarks(Vector3 direction)
+        {
+            Assert.IsTrue(VisionOf(TheDog).SeesPlayer, "premise: the dog sees the chair");
+            Assert.IsFalse(Game.Seen, "premise: the human sees the chair");
+            Assert.AreEqual(InhabitantMode.Routine, TheDog.Routine.Mode, "premise: the dog is in its routine");
+            Assert.IsFalse(TheDog.Routine.Asleep, "premise: the dog is awake");
+            Chair.ScriptedDirection = direction;
+            yield return Until(() => Game.BarkCount > 0 || Game.State != PlayState.Playing, GraceSteps + 5);
+            Chair.ScriptedDirection = null;
+            Assert.AreEqual(PlayState.Playing, Game.State, "premise: the run was caught");
+            Assert.AreEqual(1, Game.BarkCount, "premise: the dog did not bark");
+        }
+
+        /// <summary>
+        /// Step 38h (CONTRACT_M5 20, the product owner's "the dog does nothing when it detects you"): the chair, far out of
+        /// place and in the awake dog's view only, moves for the grace. The dog barks and runs to it ("!" over it), pins it next
+        /// to itself (the move input does nothing, the dog hold line shows, not the sat-on one) and barks at it in a loop
+        /// (sounds only: no new bark of the rule, no new noise event). The human, the only one, is sent ("!" over him), finds it
+        /// out of place: one discovery, and carries it back to his slot as always. On the put down the dog lets go and both go
+        /// back to their routines; the move input works again; the level is still playing.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step38h_DogPinsTheChairAndAHumanPutsItBack()
+        {
+            yield return LoadDog();
+            Inhabitant dog = TheDog;
+            Inhabitant human = Human;
+            PinTheHumanAwayReactive();
+            Vector3 slot = Game.MemoryOf(human).PlayerSlot.Position;
+            var away = new Vector3(3.5f, 0f, 1.5f);
+            Chair.Teleport(away, 0f);
+            yield return Steps(3);
+            Assert.Greater(Planar(away, slot), Game.MemoryOf(human).Tolerance + 0.5f, "premise: the chair is not far out of place");
+            int barksPlayed = Game.Sfx.BarksPlayed;
+            yield return MoveUntilTheDogBarks(Vector3.forward);
+            yield return Steps(1);
+            Assert.AreSame(dog, Game.HoldingDog, "the bark did not send the dog to the chair");
+            Assert.IsTrue(dog.Routine.Running, "the dog is not running to the chair");
+            Assert.AreEqual(InhabitantMode.Investigating, dog.Routine.Mode, "the running dog is not in the investigating mode");
+            Assert.IsFalse(Game.HeldByDog, "the chair was held before the dog got there");
+            Assert.IsFalse(Chair.Pinned, "the chair was pinned before the dog got there");
+
+            Vector3 dogFrom = dog.Routine.Position;
+            int stepsRunning = fixedSteps;
+            yield return Until(() => Game.HeldByDog, StepsFor(5f));
+            stepsRunning = fixedSteps - stepsRunning;
+            Assert.IsTrue(Game.HeldByDog, "the dog never got to the chair");
+            float reach = Tuning.InvestigateReach + Tuning.CarryReachMargin;
+            Assert.LessOrEqual(Planar(dog.Routine.Position, Chair.transform.position), reach + 1e-3f, "the dog holds the chair from afar");
+            float run = Planar(dogFrom, dog.Routine.Position);
+            Assert.Greater(run / (stepsRunning * Dt), Tuning.ChairMaxSpeed, $"the dog ran {run:0.00} m in {stepsRunning * Dt:0.00} s: not faster than the chair");
+            Assert.IsTrue(Chair.Pinned, "the held chair is not pinned");
+            Assert.AreEqual(1, Game.DogHoldCount, "not one hold");
+            yield return null;
+            Assert.AreEqual(Inhabitant.MarkerKind.Exclamation, dog.Marker, "no \"!\" over the dog that holds the chair");
+
+            Vector3 heldAt = Chair.transform.position;
+            bool everMoving = false;
+            void Held() => everMoving |= Chair.IsMoving;
+            Game.FixedStepped += Held;
+            Chair.ScriptedDirection = Vector3.back;
+            yield return Steps(StepsFor(1f));
+            Chair.ScriptedDirection = null;
+            Game.FixedStepped -= Held;
+            Assert.Less(Planar(Chair.transform.position, heldAt), 1e-3f, "the held chair moved");
+            Assert.IsFalse(everMoving, "the held chair was moving");
+            Assert.IsTrue(Game.HeldByDog, "premise: the hold ended within a second");
+            Assert.IsTrue(Hud.DogHoldVisible, "the dog hold line does not show");
+            Assert.IsFalse(Hud.SatOnVisible, "the sat-on line shows for the dog's hold");
+            Assert.AreEqual(1, Game.BarkCount, "the hold's barks counted as barks of the rule");
+            Assert.AreEqual(1, CountNoises(NoiseKind.Bark), "the hold's barks are noise events");
+            Assert.GreaterOrEqual(Game.Sfx.BarksPlayed - barksPlayed, 2, "the dog does not bark at the chair it holds");
+            Assert.AreSame(human, Game.DogCaller, "the human was not sent to the held chair");
+            Assert.AreEqual(InhabitantMode.Investigating, human.Routine.Mode, "the sent human is not on his way");
+            Assert.AreEqual(Inhabitant.MarkerKind.Exclamation, human.Marker, "no \"!\" over the sent human");
+            Assert.AreEqual(0, Game.DiscoveryCount, "premise: a discovery before the human got there");
+
+            yield return Until(() => Game.HoldingDog == null || Game.State != PlayState.Playing, StepsFor(40f));
+            Assert.AreEqual(PlayState.Playing, Game.State, $"the hold lost the level ({Game.LoseReason})");
+            Assert.IsNull(Game.HoldingDog, "the hold never ended");
+            Assert.AreEqual(1, Game.CarryCount, "the human did not carry the chair back");
+            Assert.AreEqual(1, Game.DiscoveryCount, "the human's finding of the held chair out of place is not one discovery");
+            Assert.AreEqual(1, Game.DogHoldDiscoveryCount, "the discovery is not the hold's");
+            Assert.Greater(Game.SuspicionOf(human).Value, 0.2f, "the human's suspicion did not rise");
+            Assert.Less(Planar(Chair.transform.position, slot), 0.05f, "the chair is not back at the human's slot");
+            Assert.IsFalse(Chair.Carried, "the chair is still carried");
+            Assert.IsFalse(Chair.Pinned, "the dog did not let go");
+            Assert.IsFalse(Game.HeldByDog, "still held after the put down");
+            Assert.AreEqual(InhabitantMode.Routine, dog.Routine.Mode, "the dog did not go back to its routine");
+            Assert.IsFalse(dog.Routine.Running, "the dog still runs");
+            yield return Until(() => human.Routine.Mode == InhabitantMode.Routine, StepsFor(1f));
+            Assert.AreEqual(InhabitantMode.Routine, human.Routine.Mode, "the human did not go back to his routine");
+            yield return null;
+            Assert.IsFalse(Hud.DogHoldVisible, "the dog hold line still shows");
+
+            Vector3 back = Chair.transform.position;
+            Chair.ScriptedDirection = Vector3.back;
+            yield return Steps(GraceSteps - 2);
+            Chair.ScriptedDirection = null;
+            Assert.Greater(Planar(Chair.transform.position, back), 0.01f, "the chair stays stuck after the hold");
+            Assert.AreEqual(PlayState.Playing, Game.State);
+            AssertClean();
+        }
+
+        /// <summary>
+        /// Step 38i (CONTRACT_M5 20): the dog sees the chair move but it stays within the human's tolerance of its slot. The
+        /// dog runs and pins it, the human is sent, finds it in place: no discovery, no suspicion, no carry; the dog lets go
+        /// and both go back to their routines.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step38i_DogHoldOfAChairInPlaceCostsNothing()
+        {
+            yield return LoadDog();
+            Inhabitant dog = TheDog;
+            Inhabitant human = Human;
+            PinTheHumanAwayReactive();
+            Vector3 slot = Game.MemoryOf(human).PlayerSlot.Position;
+            yield return MoveUntilTheDogBarks(Vector3.right);
+            Assert.Less(Planar(Chair.transform.position, slot), Game.MemoryOf(human).Tolerance - 0.3f, "premise: the chair left its place");
+            yield return Until(() => Game.HeldByDog, StepsFor(5f));
+            Assert.IsTrue(Game.HeldByDog && Chair.Pinned, "the dog never held the chair");
+            Assert.AreSame(human, Game.DogCaller, "the human was not sent");
+            yield return Until(() => Game.HoldingDog == null || Game.State != PlayState.Playing, StepsFor(40f));
+            Assert.AreEqual(PlayState.Playing, Game.State, $"the hold lost the level ({Game.LoseReason})");
+            Assert.IsNull(Game.HoldingDog, "the hold never ended");
+            Assert.Less(Planar(human.Routine.Position, Chair.transform.position), Tuning.InvestigateReach + Tuning.CarryReachMargin + 1e-3f,
+                "the hold ended before the human got there");
+            Assert.AreEqual(0, Game.DiscoveryCount, "a chair in place cost a discovery");
+            Assert.AreEqual(0f, Game.MaxSuspicion, 1e-6f, "a chair in place raised a suspicion");
+            Assert.AreEqual(0, Game.CarryCount, "a chair in place was carried");
+            Assert.IsFalse(Chair.Pinned, "the dog did not let go");
+            Assert.AreEqual(InhabitantMode.Routine, dog.Routine.Mode, "the dog did not go back to its routine");
+            Assert.AreEqual(InhabitantMode.Routine, human.Routine.Mode, "the human did not go back to his routine");
             AssertClean();
         }
 

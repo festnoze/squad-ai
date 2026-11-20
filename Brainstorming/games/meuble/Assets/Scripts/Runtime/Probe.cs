@@ -460,6 +460,15 @@ namespace OutOfSight
         /// <summary>The URP shaders are the only ones a renderer may use (glTFast's shader graphs never render).</summary>
         public const string UrpShaderPrefix = "Universal Render Pipeline/";
 
+        /// <summary>
+        /// Walls 4 (WallArray): the project's own wall shaders (OutOfSight/Wall Finishes and Wall See-through), written for
+        /// URP (its passes, its lighting, Forward and Forward+), shipped by the library's material assets: no glTFast graph.
+        /// </summary>
+        public static bool IsProjectWallShader(Shader shader)
+        {
+            return shader != null && (shader.name == WallArray.ShaderName || shader.name == WallArray.SeeThroughShaderName);
+        }
+
         /// <summary>Counts the enabled, active renderers of <paramref name="renderers"/>.</summary>
         public static RenderCount CountRenderers(IEnumerable<Renderer> renderers)
         {
@@ -480,7 +489,8 @@ namespace OutOfSight
                         continue;
                     }
                     count.Materials.Add(m);
-                    if (!m.shader.name.StartsWith(UrpShaderPrefix, StringComparison.Ordinal) && count.NonUrp.Count < 10)
+                    if (!m.shader.name.StartsWith(UrpShaderPrefix, StringComparison.Ordinal) && !IsProjectWallShader(m.shader)
+                        && count.NonUrp.Count < 10)
                     {
                         count.NonUrp.Add($"{r.name}: {m.shader.name}");
                     }
@@ -804,9 +814,10 @@ namespace OutOfSight
             long triangles = count.Triangles;
             HashSet<Material> materials = count.Materials;
             // M7 walls pass: a faded wall is drawn through Graphics.RenderMesh with the one see-through material (no renderer
-            // of its own, its part's slot already counts its draw): that material counts while any wall is faded.
+            // of its own, its part's slot already counts its draw). The budget holds in the worst Walls look whatever the
+            // option and the view now: that material counts whenever the level has walls that fade.
             WallFader fader = Game != null && Game.Level != null && Game.Level.Root != null ? Game.Level.Root.GetComponent<WallFader>() : null;
-            if (fader != null && fader.AnyFaded)
+            if (fader != null && fader.Count > 0)
             {
                 materials.Add(WallFader.GhostMaterial);
             }
@@ -890,7 +901,8 @@ namespace OutOfSight
             return audit;
         }
 
-        /// <summary>PRD 7.4: each piece of furniture (props, decoys and the player) at most 400 triangles.</summary>
+        /// <summary>PRD 7.4: each piece of furniture (props, decoys and the player) at most 400 triangles (a bookshelf: 400 per
+        /// 1.6 m of width, Tuning.FurnitureTriangleBudget).</summary>
         private Dictionary<string, long> FurnitureTriangles(string id)
         {
             var result = new Dictionary<string, long>();
@@ -899,9 +911,11 @@ namespace OutOfSight
                 return result;
             }
             var names = new HashSet<string>();
+            var budgets = new Dictionary<string, int>();
             foreach (PropDef prop in Game.Def.Props)
             {
                 names.Add(prop.Name);
+                budgets[prop.Name] = Tuning.FurnitureTriangleBudget(prop.Kind, prop.SizeX);
             }
             var pieces = new List<Transform>();
             foreach (Transform child in Game.Level.Root.transform)
@@ -939,9 +953,10 @@ namespace OutOfSight
                 string key = result.ContainsKey(piece.name) ? piece.name + " " + index : piece.name;
                 result[key] = t;
                 index++;
-                if (t > Tuning.BudgetFurnitureTriangles)
+                int pieceBudget = budgets.TryGetValue(piece.name, out int own) ? own : Tuning.BudgetFurnitureTriangles;
+                if (t > pieceBudget)
                 {
-                    failures.Add($"{id}: furniture {piece.name} has {t} triangles, over the {Tuning.BudgetFurnitureTriangles} budget");
+                    failures.Add($"{id}: furniture {piece.name} has {t} triangles, over the {pieceBudget} budget");
                 }
             }
             return result;

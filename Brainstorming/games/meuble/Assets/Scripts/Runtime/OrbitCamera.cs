@@ -65,12 +65,33 @@ namespace OutOfSight
         private float savedPitch;
         private float savedDistance;
 
+        /// <summary>
+        /// Garden backdrop (2026-11-19): the ring of the target's level (GardenBackdrop.RingFor), null without a level. The
+        /// camera always stands inside it (<see cref="Apply"/> shortens the arm at its fence, which the ring's size keeps out
+        /// of reach in play) and the far clip always holds it.
+        /// </summary>
+        public GardenBackdrop.Ring? Fence { get; private set; }
+
         public void SetTarget(FurnitureController target, float yaw)
         {
             Target = target;
-            SetMaxDistance(MaxDistanceFor(target != null ? target.Floor.Level : null));
+            LevelDef level = target != null ? target.Floor.Level : null;
+            SetMaxDistance(MaxDistanceFor(level));
+            Fence = level != null ? GardenBackdrop.RingFor(level) : (GardenBackdrop.Ring?)null;
+            Camera view = GetComponent<Camera>();
+            if (view != null && Fence.HasValue)
+            {
+                view.farClipPlane = Mathf.Max(view.farClipPlane, Fence.Value.FarClip);
+            }
             Yaw = yaw;
             Pitch = Showcase ? ShowcasePitch : Tuning.PitchDefault;
+            Snap();
+        }
+
+        /// <summary>Garden backdrop: sets the zoom (tests and screenshots), clamped into the zoom range.</summary>
+        public void SetDistance(float distance)
+        {
+            Distance = Mathf.Clamp(distance, Tuning.OrbitDistanceMin, MaxDistance);
             Snap();
         }
 
@@ -168,7 +189,9 @@ namespace OutOfSight
         {
             Quaternion orbit = Quaternion.Euler(Pitch, Yaw, 0f);
             Quaternion view = Showcase ? Quaternion.Euler(Pitch - ShowcaseTilt, Yaw, 0f) : orbit;
-            transform.SetPositionAndRotation(focus - orbit * Vector3.forward * Distance, view);
+            Vector3 back = orbit * Vector3.back;
+            float arm = Fence.HasValue ? GardenBackdrop.ClampArm(Fence.Value, focus, back, Distance) : Distance;
+            transform.SetPositionAndRotation(focus + back * arm, view);
         }
     }
 }

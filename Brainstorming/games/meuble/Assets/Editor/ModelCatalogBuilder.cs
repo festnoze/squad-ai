@@ -116,6 +116,12 @@ namespace OutOfSight.Editor
             new Spec(ModelCatalog.QuaterniusWomanJacket, RoundedHumans + "quaternius_woman_jacket.glb", 0f, true),
             new Spec(ModelCatalog.QuaterniusWomanDress, RoundedHumans + "quaternius_woman_dress.glb", 0f, true),
             Spec.Pet(ModelCatalog.QuaterniusShiba, Quaternius + "quaternius_shiba.glb", Tuning.DogEyeHeight, "Idle", "Walk"),
+            // M8 room objects (docs/m8/ROOMS_PLAN.md 3): the Kenney bed's pillows are on +Z in glTF, the fridge's handles and the
+            // nightstand's knob on -Z, as the procedural bed (headboard +z) and the doors of every cabinet (-z): 0.
+            new Spec(ModelCatalog.KenneyBed, Kenney + "kenney_bed_double.glb", 0f, false),
+            new Spec(ModelCatalog.KenneyFridge, Kenney + "kenney_kitchen_fridge.glb", 0f, false),
+            new Spec(ModelCatalog.KenneyCoffeeTable, Kenney + "kenney_coffee_table.glb", 0f, false),
+            new Spec(ModelCatalog.KenneyNightstand, Kenney + "kenney_cabinet_bed_drawer_table.glb", 0f, false),
         };
 
         [MenuItem("OutOfSight/Build Model Catalog")]
@@ -231,7 +237,210 @@ namespace OutOfSight.Editor
             (Surface.Limewash, "detail_wall_limewash.png", "wall_limewash", "normal_wall_limewash.png"),
             (Surface.Grasscloth, "detail_wall_grasscloth.png", "wall_grasscloth", "normal_wall_grasscloth.png"),
             (Surface.Wallpaper, "detail_wall_wallpaper.png", "wall_wallpaper", "normal_wall_wallpaper.png"),
+            // M8 floor finishes (docs/m8/ROOMS_PLAN.md 4, 2026-11-19): own creation, tools/assets/make_floor_finishes.py
+            // (sources floor_<name>.png).
+            (Surface.Marble, "detail_floor_marble.png", "floor_marble", "normal_floor_marble.png"),
+            (Surface.Herringbone, "detail_floor_herringbone.png", "floor_herringbone", "normal_floor_herringbone.png"),
+            (Surface.CarpetFinish, "detail_floor_carpet.png", "floor_carpet", "normal_floor_carpet.png"),
+            // M9 floors (2026-11-19, docs/m9/FLOORS_WALLS.md): the light oak and the verde are own creation
+            // (floor_<name>.png); the two bathroom tiles are the product owner's images (tile_bathroom_*.png), their
+            // maps derived by the same script, tools/assets/make_floor_finishes.py.
+            (Surface.LightOak, "detail_floor_lightoak.png", "floor_lightoak", "normal_floor_lightoak.png"),
+            (Surface.Verde, "detail_floor_verde.png", "floor_verde", "normal_floor_verde.png"),
+            (Surface.IvoryTile, "detail_tile_bathroom_small_ivory.png", "tile_bathroom_small_ivory", "normal_tile_bathroom_small_ivory.png"),
+            (Surface.TealTile, "detail_tile_bathroom_large_teal.png", "tile_bathroom_large_teal", "normal_tile_bathroom_large_teal.png"),
+            // Tiled walls (2026-11-19, docs/m9/FLOORS_WALLS.md): the product owner's two wall images (wall_bathroom_*.png,
+            // wall_kitchen_*.png), their maps derived by tools/assets/make_wall_finishes.py; imported Repeat on U, Clamp
+            // on V (TextureLibrary.ClampsVertically: each spans the wall once, floor to top).
+            (Surface.WhiteTile, "detail_wall_bathroom_white_pastel_blue.png", "wall_bathroom_white_pastel_blue", "normal_wall_bathroom_white_pastel_blue.png"),
+            (Surface.SubwayTile, "detail_wall_kitchen_ivory_sage.png", "wall_kitchen_ivory_sage", "normal_wall_kitchen_ivory_sage.png"),
+            // Printed and stone walls (2026-11-19, docs/m9/FLOORS_WALLS.md section 6): the product owner's three all-over
+            // wall images, their maps derived by tools/assets/make_wall_finishes.py; Repeat on both axes.
+            (Surface.Travertine, "detail_wall_travertine_greige.png", "wall_travertine_greige", "normal_wall_travertine_greige.png"),
+            (Surface.Arches, "detail_wall_deco_arches_blue.png", "wall_deco_arches_blue", "normal_wall_deco_arches_blue.png"),
+            (Surface.Pinstripe, "detail_wall_linen_pinstripe_olive.png", "wall_linen_pinstripe_olive", "normal_wall_linen_pinstripe_olive.png"),
+            // Walls 4 (2026-11-19, docs/m9/FLOORS_WALLS.md section 7): two more all-over wall images of the product owner.
+            (Surface.Quatrefoil, "detail_wall_quatrefoil.png", "wall_quatrefoil", "normal_wall_quatrefoil.png"),
+            (Surface.SageRibbed, "detail_wall_sage_ribbed.png", "wall_sage_ribbed", "normal_wall_sage_ribbed.png"),
         };
+
+        // ----- Walls 4 (docs/m9/FLOORS_WALLS.md section 7): every wall finish in one material -----
+
+        /// <summary>Where the wall finish arrays (flipbook PNGs) and their two materials live.</summary>
+        private const string ArrayFolder = "Assets/Art/Environment/Arrays/";
+        private const string WallColoursPath = ArrayFolder + "wall_colours.png";
+        private const string WallNormalsPath = ArrayFolder + "wall_normals.png";
+        private const string WallMaterialPath = ArrayFolder + "WallFinishes.mat";
+        private const string WallSeeThroughPath = ArrayFolder + "WallSeeThrough.mat";
+
+        /// <summary>Every slice of the wall arrays: the 512 maps of the library, as they are.</summary>
+        public const int WallSliceSize = 512;
+
+        /// <summary>The import size limit of a flipbook (twenty-two 512 slices stacked are 11264 px tall): never downscaled.</summary>
+        private const int WallArrayMaxSize = 16384;
+
+        /// <summary>
+        /// Builds the wall finish arrays and their materials: for each map kind (colour, sRGB; normal, linear) the 512 maps of
+        /// <see cref="WallArray.Slices"/> (the same files as the library's entries) stacked top to bottom into one PNG,
+        /// imported as a Texture2DArray (one row per slice, mipmapped, Repeat both ways, compressed per platform, ASTC 6x6 on
+        /// Android); then the opaque wall material and the see-through one, both reading the two arrays. A slice that is not
+        /// 512 is resampled (bilinear), so every slice has the same size and format. Writes only what changed.
+        /// </summary>
+        private static void BuildWallArrays(StringBuilder log, out Texture2DArray colours, out Texture2DArray normals, out Material wall,
+            out Material seeThrough)
+        {
+            var colourFiles = new List<string>();
+            var normalFiles = new List<string>();
+            foreach (Surface s in WallArray.Slices)
+            {
+                int i = System.Array.FindIndex(Details, d => d.surface == s);
+                if (i < 0 || string.IsNullOrEmpty(Details[i].normalFile))
+                {
+                    throw new System.InvalidOperationException($"[ModelCatalogBuilder] wall slice {s} has no detail entry with a normal map");
+                }
+                colourFiles.Add(ColourFolder + "colour_" + Details[i].source + ".png");
+                normalFiles.Add(DetailFolder + Details[i].normalFile);
+            }
+            Directory.CreateDirectory(ArrayFolder);
+            colours = BuildFlipbook(colourFiles, WallColoursPath, true, log);
+            normals = BuildFlipbook(normalFiles, WallNormalsPath, false, log);
+            wall = EnsureWallMaterial(WallMaterialPath, WallArray.ShaderName, colours, normals, false, log);
+            seeThrough = EnsureWallMaterial(WallSeeThroughPath, WallArray.SeeThroughShaderName, colours, normals, true, log);
+        }
+
+        private static Texture2DArray BuildFlipbook(List<string> files, string path, bool srgb, StringBuilder log)
+        {
+            int n = files.Count;
+            int size = WallSliceSize;
+            var pixels = new Color32[size * size * n];
+            for (int i = 0; i < n; i++)
+            {
+                var image = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
+                try
+                {
+                    if (!image.LoadImage(File.ReadAllBytes(files[i])))
+                    {
+                        throw new System.InvalidOperationException("[ModelCatalogBuilder] cannot read " + files[i]);
+                    }
+                    Color32[] source = image.GetPixels32();
+                    if (image.width != size || image.height != size)
+                    {
+                        Debug.LogWarning($"[ModelCatalogBuilder] {files[i]} is {image.width} x {image.height}: resampled to {size} for the wall array");
+                        source = new Color32[size * size];
+                        for (int y = 0; y < size; y++)
+                        {
+                            for (int x = 0; x < size; x++)
+                            {
+                                source[y * size + x] = image.GetPixelBilinear((x + 0.5f) / size, (y + 0.5f) / size);
+                            }
+                        }
+                    }
+                    // A flipbook's first slice is its top row of cells; a texture's rows start at the bottom.
+                    int rowOffset = (n - 1 - i) * size;
+                    for (int y = 0; y < size; y++)
+                    {
+                        System.Array.Copy(source, y * size, pixels, (rowOffset + y) * size, size);
+                    }
+                }
+                finally
+                {
+                    Object.DestroyImmediate(image);
+                }
+            }
+            for (int p = 0; p < pixels.Length; p++)
+            {
+                pixels[p].a = 255;
+            }
+            var strip = new Texture2D(size, size * n, TextureFormat.RGBA32, false, true);
+            strip.SetPixels32(pixels);
+            strip.Apply(false);
+            byte[] png = strip.EncodeToPNG();
+            Object.DestroyImmediate(strip);
+            if (!File.Exists(path) || !System.Linq.Enumerable.SequenceEqual(File.ReadAllBytes(path), png))
+            {
+                File.WriteAllBytes(path, png);
+                AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+                log.Append("  wrote ").Append(path).Append('\n');
+            }
+            if (AssetImporter.GetAtPath(path) is TextureImporter importer && ConfigureArrayImporter(importer, srgb, n))
+            {
+                importer.SaveAndReimport();
+                log.Append("  reimported ").Append(path).Append('\n');
+            }
+            var array = AssetDatabase.LoadAssetAtPath<Texture2DArray>(path);
+            log.Append($"  wall array {path}: {(array != null ? array.width + " x " + array.height + " x " + array.depth + ", " + array.mipmapCount + " mips, " + array.graphicsFormat : "not loaded")}\n");
+            return array;
+        }
+
+        /// <summary>
+        /// A wall array's import: a 2D array of one column and <paramref name="slices"/> rows, sRGB or linear, mipmapped,
+        /// Repeat both ways, trilinear, never downscaled or rescaled to a power of two, high quality compression, ASTC 6x6
+        /// on Android. True when anything changed.
+        /// </summary>
+        private static bool ConfigureArrayImporter(TextureImporter t, bool srgb, int slices)
+        {
+            bool changed = false;
+            if (t.textureType != TextureImporterType.Default) { t.textureType = TextureImporterType.Default; changed = true; }
+            if (t.textureShape != TextureImporterShape.Texture2DArray) { t.textureShape = TextureImporterShape.Texture2DArray; changed = true; }
+            var settings = new TextureImporterSettings();
+            t.ReadTextureSettings(settings);
+            if (settings.flipbookRows != slices || settings.flipbookColumns != 1)
+            {
+                settings.flipbookRows = slices;
+                settings.flipbookColumns = 1;
+                t.SetTextureSettings(settings);
+                changed = true;
+            }
+            if (t.sRGBTexture != srgb) { t.sRGBTexture = srgb; changed = true; }
+            if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
+            if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
+            if (t.isReadable) { t.isReadable = false; changed = true; }
+            if (t.wrapModeU != TextureWrapMode.Repeat || t.wrapModeV != TextureWrapMode.Repeat) { t.wrapMode = TextureWrapMode.Repeat; changed = true; }
+            if (t.filterMode != FilterMode.Trilinear) { t.filterMode = FilterMode.Trilinear; changed = true; }
+            if (t.anisoLevel != 2) { t.anisoLevel = 2; changed = true; }
+            if (t.maxTextureSize != WallArrayMaxSize) { t.maxTextureSize = WallArrayMaxSize; changed = true; }
+            if (t.textureCompression != TextureImporterCompression.CompressedHQ) { t.textureCompression = TextureImporterCompression.CompressedHQ; changed = true; }
+            if (t.npotScale != TextureImporterNPOTScale.None) { t.npotScale = TextureImporterNPOTScale.None; changed = true; }
+            changed |= ConfigureAndroidOverride(t, WallArrayMaxSize);
+            return changed;
+        }
+
+        /// <summary>The wall material asset (opaque, or the see-through one), on its shader, reading both arrays. Null without the shader.</summary>
+        private static Material EnsureWallMaterial(string path, string shaderName, Texture2DArray colours, Texture2DArray normals, bool seeThrough,
+            StringBuilder log)
+        {
+            Shader shader = Shader.Find(shaderName);
+            if (shader == null)
+            {
+                Debug.LogError($"[ModelCatalogBuilder] shader {shaderName} not found: the walls keep one URP Lit material per finish");
+                return null;
+            }
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            bool created = m == null;
+            if (created)
+            {
+                m = new Material(shader);
+            }
+            bool changed = created;
+            if (m.shader != shader) { m.shader = shader; changed = true; }
+            if (m.GetTexture("_WallColours") != colours) { m.SetTexture("_WallColours", colours); changed = true; }
+            if (m.GetTexture("_WallNormals") != normals) { m.SetTexture("_WallNormals", normals); changed = true; }
+            if (m.GetColor("_BaseColor") != Color.white) { m.SetColor("_BaseColor", Color.white); changed = true; }
+            int queue = seeThrough ? (int)UnityEngine.Rendering.RenderQueue.Transparent - 1 : (int)UnityEngine.Rendering.RenderQueue.Geometry;
+            if (m.renderQueue != queue) { m.renderQueue = queue; changed = true; }
+            if (!m.enableInstancing) { m.enableInstancing = true; changed = true; }
+            if (created)
+            {
+                AssetDatabase.CreateAsset(m, path);
+                log.Append("  created ").Append(path).Append('\n');
+            }
+            else if (changed)
+            {
+                EditorUtility.SetDirty(m);
+                log.Append("  updated ").Append(path).Append('\n');
+            }
+            return m;
+        }
 
         /// <summary>
         /// Builds Assets/Resources/TextureLibrary.asset (what ships the textures in the player) and enforces the import
@@ -260,7 +469,8 @@ namespace OutOfSight.Editor
                     Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no texture at {path}; the surface stays flat at run time");
                     continue;
                 }
-                if (ConfigureDetailImporter(importer))
+                bool clampV = TextureLibrary.ClampsVertically(surface);
+                if (ConfigureDetailImporter(importer, false, clampV))
                 {
                     importer.SaveAndReimport();
                     log.Append("  reimported ").Append(path).Append('\n');
@@ -274,7 +484,7 @@ namespace OutOfSight.Editor
                     string normalPath = DetailFolder + normalFile;
                     if (AssetImporter.GetAtPath(normalPath) is TextureImporter normalImporter)
                     {
-                        if (ConfigureNormalImporter(normalImporter))
+                        if (ConfigureNormalImporter(normalImporter, clampV))
                         {
                             normalImporter.SaveAndReimport();
                             log.Append("  reimported ").Append(normalPath).Append('\n');
@@ -287,7 +497,7 @@ namespace OutOfSight.Editor
                     }
                 }
                 // M7 real colours (CONTRACT_M7 5): the surface's colour map, imported sRGB.
-                Texture2D colour = LoadColourMap(ColourFolder + "colour_" + source + ".png", log);
+                Texture2D colour = LoadColourMap(ColourFolder + "colour_" + source + ".png", log, clampV);
                 if (colour == null)
                 {
                     Debug.LogWarning($"[ModelCatalogBuilder] {surface}: no colour map at {ColourFolder}colour_{source}.png; the surface keeps its palette colour at run time");
@@ -318,6 +528,10 @@ namespace OutOfSight.Editor
             string rugSource = rugColour != null ? RugSource : null;
             Color rugMean = rugColour != null ? MeanColour(EnvironmentFolder + RugColourFile) : Color.clear;
 
+            // Walls 4 (docs/m9/FLOORS_WALLS.md section 7): the wall finish arrays and their two materials.
+            BuildWallArrays(log, out Texture2DArray wallColours, out Texture2DArray wallNormals, out Material wallMaterial, out Material wallSeeThrough);
+            var wallSlices = new List<Surface>(WallArray.Slices);
+
             var library = AssetDatabase.LoadAssetAtPath<TextureLibrary>(TextureLibraryPath);
             if (library == null)
             {
@@ -330,11 +544,15 @@ namespace OutOfSight.Editor
                 library.rugColour = rugColour;
                 library.rugSource = rugSource;
                 library.rugMean = rugMean;
+                SetWalls(library, wallColours, wallNormals, wallMaterial, wallSeeThrough, wallSlices);
                 AssetDatabase.CreateAsset(library, TextureLibraryPath);
                 log.Append("  created ").Append(TextureLibraryPath).Append('\n');
             }
             else if (!SameDetails(library.entries, entries) || library.playerColour != playerColour || library.playerSource != playerSource
-                || library.playerMean != playerMean || library.rugColour != rugColour || library.rugSource != rugSource || library.rugMean != rugMean)
+                || library.playerMean != playerMean || library.rugColour != rugColour || library.rugSource != rugSource || library.rugMean != rugMean
+                || library.wallColours != wallColours || library.wallNormals != wallNormals || library.wallMaterial != wallMaterial
+                || library.wallSeeThrough != wallSeeThrough || library.wallSlices == null
+                || !System.Linq.Enumerable.SequenceEqual(library.wallSlices, wallSlices))
             {
                 library.entries = entries;
                 library.playerColour = playerColour;
@@ -343,6 +561,7 @@ namespace OutOfSight.Editor
                 library.rugColour = rugColour;
                 library.rugSource = rugSource;
                 library.rugMean = rugMean;
+                SetWalls(library, wallColours, wallNormals, wallMaterial, wallSeeThrough, wallSlices);
                 EditorUtility.SetDirty(library);
                 log.Append("  updated ").Append(TextureLibraryPath).Append('\n');
             }
@@ -352,11 +571,21 @@ namespace OutOfSight.Editor
             }
         }
 
+        private static void SetWalls(TextureLibrary library, Texture2DArray colours, Texture2DArray normals, Material wall, Material seeThrough,
+            List<Surface> slices)
+        {
+            library.wallColours = colours;
+            library.wallNormals = normals;
+            library.wallMaterial = wall;
+            library.wallSeeThrough = seeThrough;
+            library.wallSlices = slices;
+        }
+
         /// <summary>
-        /// Sets the detail import settings (a colour map: the same, but <paramref name="srgb"/>); true when anything
-        /// changed (a reimport is needed).
+        /// Sets the detail import settings (a colour map: the same, but <paramref name="srgb"/>; a tiled wall's maps:
+        /// <paramref name="clampV"/>, see <see cref="ConfigureWrap"/>); true when anything changed (a reimport is needed).
         /// </summary>
-        private static bool ConfigureDetailImporter(TextureImporter t, bool srgb = false)
+        private static bool ConfigureDetailImporter(TextureImporter t, bool srgb = false, bool clampV = false)
         {
             bool changed = false;
             if (t.textureType != TextureImporterType.Default) { t.textureType = TextureImporterType.Default; changed = true; }
@@ -365,7 +594,7 @@ namespace OutOfSight.Editor
             if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
             if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
             if (t.isReadable) { t.isReadable = false; changed = true; }
-            if (t.wrapMode != TextureWrapMode.Repeat) { t.wrapMode = TextureWrapMode.Repeat; changed = true; }
+            changed |= ConfigureWrap(t, clampV);
             if (t.filterMode != FilterMode.Trilinear) { t.filterMode = FilterMode.Trilinear; changed = true; }
             if (t.anisoLevel != 2) { t.anisoLevel = 2; changed = true; }
             if (t.maxTextureSize != DetailMaxSize) { t.maxTextureSize = DetailMaxSize; changed = true; }
@@ -376,16 +605,33 @@ namespace OutOfSight.Editor
         }
 
         /// <summary>
+        /// Repeat on both axes, or, with <paramref name="clampV"/> (tiled walls, TextureLibrary.ClampsVertically: the image
+        /// spans the wall once, floor to top), Repeat on U along the wall and Clamp on V, so neither the wall top nor the
+        /// floor ever samples the other end of the image. True when anything changed.
+        /// </summary>
+        private static bool ConfigureWrap(TextureImporter t, bool clampV)
+        {
+            TextureWrapMode v = clampV ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
+            if (t.wrapModeU == TextureWrapMode.Repeat && t.wrapModeV == v)
+            {
+                return false;
+            }
+            t.wrapModeU = TextureWrapMode.Repeat;
+            t.wrapModeV = v;
+            return true;
+        }
+
+        /// <summary>
         /// M7 real colours (CONTRACT_M7 5): imports a colour map (sRGB, otherwise as a detail: mipmaps, repeat, trilinear,
         /// 512, high quality compression, not readable) and loads it; null when there is no texture at that path.
         /// </summary>
-        private static Texture2D LoadColourMap(string path, StringBuilder log)
+        private static Texture2D LoadColourMap(string path, StringBuilder log, bool clampV = false)
         {
             if (!(AssetImporter.GetAtPath(path) is TextureImporter importer))
             {
                 return null;
             }
-            if (ConfigureDetailImporter(importer, true))
+            if (ConfigureDetailImporter(importer, true, clampV))
             {
                 importer.SaveAndReimport();
                 log.Append("  reimported ").Append(path).Append('\n');
@@ -441,9 +687,10 @@ namespace OutOfSight.Editor
         /// M7 (CONTRACT_M7 1.2): sets a normal map's import settings (Unity's Normal map type, so the platform
         /// compressor and the shader's UnpackNormal pick the right encoding whatever the target); true when anything
         /// changed (a reimport is needed). The source PNG already encodes a tangent space normal (OpenGL convention,
-        /// derived offline by tools/assets/derive_env_textures.py): "create from grayscale" stays off.
+        /// derived offline by tools/assets/derive_env_textures.py): "create from grayscale" stays off. A tiled wall's
+        /// normal map is clamped on V as its colour map (<paramref name="clampV"/>, <see cref="ConfigureWrap"/>).
         /// </summary>
-        private static bool ConfigureNormalImporter(TextureImporter t)
+        private static bool ConfigureNormalImporter(TextureImporter t, bool clampV = false)
         {
             bool changed = false;
             if (t.textureType != TextureImporterType.NormalMap) { t.textureType = TextureImporterType.NormalMap; changed = true; }
@@ -451,7 +698,7 @@ namespace OutOfSight.Editor
             if (t.alphaSource != TextureImporterAlphaSource.None) { t.alphaSource = TextureImporterAlphaSource.None; changed = true; }
             if (!t.mipmapEnabled) { t.mipmapEnabled = true; changed = true; }
             if (t.isReadable) { t.isReadable = false; changed = true; }
-            if (t.wrapMode != TextureWrapMode.Repeat) { t.wrapMode = TextureWrapMode.Repeat; changed = true; }
+            changed |= ConfigureWrap(t, clampV);
             if (t.filterMode != FilterMode.Trilinear) { t.filterMode = FilterMode.Trilinear; changed = true; }
             if (t.anisoLevel != 2) { t.anisoLevel = 2; changed = true; }
             if (t.maxTextureSize != DetailMaxSize) { t.maxTextureSize = DetailMaxSize; changed = true; }

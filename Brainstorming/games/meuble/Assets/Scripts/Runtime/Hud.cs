@@ -136,11 +136,8 @@ namespace OutOfSight
         private Canvas creakCanvas;
         private Canvas suspicionCanvas;
         private Canvas winNextCanvas;
-        private RectTransform creakFill;
-        private Image creakFillImage;
-        private Image creakFrame;
-        private RectTransform suspicionFill;
-        private Image suspicionFillImage;
+        private Gauge creakGauge;
+        private Gauge suspicionGauge;
         private Text failTitle;
         private Text failBody;
         // The fail panel's and win panel's own hint lines (the ones that used to say "Press R"/"Press Enter"): kept so
@@ -199,6 +196,9 @@ namespace OutOfSight
         /// <summary>"Quelqu'un est assis sur toi." shows (the player furniture is pinned by a sitter).</summary>
         public bool SatOnVisible => satOnCanvas != null && satOnCanvas.enabled;
 
+        /// <summary>CONTRACT_M5 20: "Le chien te bloque : on vient te remettre en place." shows (the dog holds the furniture).</summary>
+        public bool DogHoldVisible => dogHoldCanvas != null && dogHoldCanvas.enabled;
+
         /// <summary>M4.1: "Renversé : appuie sur une direction pour te relever." shows (the stool lies on its side).</summary>
         public bool TippedVisible => tippedCanvas != null && tippedCanvas.enabled;
 
@@ -222,7 +222,21 @@ namespace OutOfSight
         public bool BalanceRed { get; private set; }
 
         /// <summary>The colour of the balance gauge's fill now (tests).</summary>
-        public Color BalanceFillColor => balanceFillImage != null ? balanceFillImage.color : Color.clear;
+        public Color BalanceFillColor => balanceGauge != null ? balanceGauge.Fill.color : Color.clear;
+
+        /// <summary>
+        /// HUD gauge redesign (tests and shots): the fill each gauge draws now, 0 to 1. It eases toward the value set by
+        /// GameState (<see cref="CreakShown"/>, <see cref="SuspicionShown"/>, <see cref="BalanceShown"/>), which stays exact.
+        /// </summary>
+        public float CreakFillDrawn => creakGauge != null ? creakGauge.Fill.fillAmount : 0f;
+        public float SuspicionFillDrawn => suspicionGauge != null ? suspicionGauge.Fill.fillAmount : 0f;
+
+        /// <summary>HUD gauge redesign: where each gauge's threshold marker stands (0 to 1 along its track; tests).</summary>
+        public float CreakThreshold => creakGauge != null ? creakGauge.Threshold : 1f;
+        public float SuspicionThreshold => suspicionGauge != null ? suspicionGauge.Threshold : 1f;
+
+        /// <summary>HUD gauge redesign: the suspicion gauge's screen rect in pixels, y up (empty when hidden; tests).</summary>
+        public Rect SuspicionScreenRect => SuspicionGaugeVisible ? WorldRect(suspicionRect) : Rect.zero;
 
         /// <summary>The balance gauge's screen rect in pixels, y up (empty when hidden; tests).</summary>
         public Rect BalanceScreenRect => BalanceVisible ? WorldRect(balanceRect) : Rect.zero;
@@ -241,9 +255,7 @@ namespace OutOfSight
 
         private Canvas balanceCanvas;
         private RectTransform balanceRect;
-        private RectTransform balanceFill;
-        private Image balanceFillImage;
-        private Image balanceFrame;
+        private Gauge balanceGauge;
         private bool balanceOn;
         private Canvas doorCanvas;
         private Canvas peopleCanvas;
@@ -259,11 +271,13 @@ namespace OutOfSight
         private Canvas carefulCanvas;
         private Canvas lampCanvas;
         private Canvas satOnCanvas;
+        private Canvas dogHoldCanvas;
         private Canvas tippedCanvas;
         private bool tippedOn;
         private bool carefulOn;
         private bool lampOn;
         private bool satOn;
+        private bool dogHoldOn;
 
         private Canvas endCanvas;
         private Text winTitle;
@@ -285,7 +299,9 @@ namespace OutOfSight
         // and the gauges above it.
         private const float ControlsY = 22f;
         private const float EyeY = 80f;
-        private const float GaugeY = 96f;
+        // HUD gauge redesign: 6 px lower and 8 px shorter than the M3.1 gauges, so their top (174) stays under the touch
+        // careful toggle's bottom (179 units on a 4:3 tablet, the narrowest canvas).
+        private const float GaugeY = 90f;
         private const float ActionY = -110f;
         private const float EndActionY = -150f;
         // M8 touch redesign: the fail, win and end panels' own button row, below every hint line and (on the win and
@@ -293,9 +309,20 @@ namespace OutOfSight
         // narrower than 16:9 window scales the canvas down (0.87 at 16:10, hence 170); the spacing is the
         // centre-to-centre distance of two adjacent buttons.
         private const float PanelButtonY = -300f;
-        private const float PanelButtonWidth = 480f;
+        private const float PanelButtonWidth = 450f;
         private const float PanelButtonHeight = 170f;
         private const float PanelButtonSpacing = 520f;
+        // End panel emphasis (2026-11-19): the panel's primary action (Retry on the fail panel, Next level on the win
+        // panel) is wider, taller and bold, first in its row, in the selection red even at rest (PrimaryRed). The
+        // secondary buttons got 30 px narrower for it, so the win row keeps its 1520 px (it fits a 4:3 tablet, whose
+        // canvas is 1663 units wide at this scaler, with a margin). PanelButtonGap is the gap between two plates.
+        private const float PanelPrimaryWidth = 540f;
+        private const float PanelPrimaryHeight = 186f;
+        private const int PanelPrimaryFontSize = 50;
+        private const float PanelButtonGap = 40f;
+        /// <summary>The menu button's selection red (<see cref="MenuButton"/>): the fail panel's selected Retry and the win panel's Next level at rest.</summary>
+        public static readonly Color PrimaryRed = new Color(0.78f, 0.16f, 0.15f, 0.97f);
+        private static readonly Color PrimaryRedHover = new Color(0.9f, 0.26f, 0.23f, 1f);
         // M4: the sat-on line, just above the eye backdrop (80 + 128 px).
         private const float SatOnY = 222f;
         private static readonly Color SatOnPlate = new Color(0.12f, 0.1f, 0.14f, 0.82f);
@@ -332,16 +359,42 @@ namespace OutOfSight
         // never bleeds through the plate during the intro card (CONTRACT_M6 polish); same dark tone as before.
         private static readonly Color PeoplePlate = new Color(0.08f, 0.07f, 0.1f, 0.95f);
         private const string PersonNameColor = "#FFD98C";
-        private static readonly Color GaugeBack = new Color(0.1f, 0.1f, 0.12f, 0.78f);
-        private static readonly Color GaugeRim = new Color(1f, 0.97f, 0.9f, 0.55f);
-        private static readonly Color CreakWood = new Color(0.86f, 0.62f, 0.34f, 1f);
+        // HUD gauge redesign (2026-11-19): each gauge's fill shifts from a calm colour (empty) to a warm one (at its threshold
+        // marker) to the hot red (full). Creak: wood, amber, red; suspicion: gold, orange, red.
+        private static readonly Color CreakWood = new Color(0.88f, 0.66f, 0.38f, 1f);
+        private static readonly Color CreakAmber = new Color(1f, 0.56f, 0.2f, 1f);
         private static readonly Color CreakHot = new Color(1f, 0.28f, 0.18f, 1f);
-        private static readonly Color SuspicionLow = new Color(1f, 0.8f, 0.25f, 1f);
+        private static readonly Color SuspicionLow = new Color(1f, 0.83f, 0.32f, 1f);
+        private static readonly Color SuspicionMid = new Color(1f, 0.55f, 0.2f, 1f);
         private static readonly Color SuspicionHigh = new Color(0.95f, 0.2f, 0.15f, 1f);
+        // The creak warning's flash alternates the hot red with this pale cream (the old white, warmer).
+        private static readonly Color GaugeFlashPale = new Color(1f, 0.95f, 0.84f, 1f);
+        // The gauge labels' cream (the menus' warm ink) and the threshold marker's.
+        private static readonly Color GaugeInk = new Color(1f, 0.94f, 0.82f, 1f);
+        private static readonly Color GaugeMarker = new Color(1f, 0.95f, 0.86f, 0.95f);
+        private static readonly Color GaugeTick = new Color(1f, 0.95f, 0.86f, 0.3f);
+        // The danger zone past the threshold: red stripes on the empty track.
+        private static readonly Color GaugeDanger = new Color(0.8f, 0.18f, 0.14f, 0.3f);
         // M5 wave 5B: the balance gauge, a calm sea green that is neither the creak's wood nor the suspicion's yellow; red (the
-        // creak's hot red, CreakHot) above the warning, on a dark red frame.
+        // creak's hot red, CreakHot) above the warning.
         private static readonly Color BalanceCalm = new Color(0.45f, 0.85f, 0.7f, 1f);
-        private static readonly Color BalanceHotFrame = new Color(0.55f, 0.08f, 0.06f, 0.85f);
+        // The capsule's geometry inside a gauge's 92 unit tall rect (reference pixels): the capsule at the bottom, the
+        // icon's badge over its left end, the label above, right of the badge; the track inset in the capsule, after the
+        // badge. GaugeLerpRate eases the drawn fill toward the value (per second), GaugeBumpRise is the rise in one
+        // update that shakes the gauge (a discovery's 0.34 does; the creak's steady fill never does).
+        private const float GaugeHeight = 84f;
+        private const float CapsuleHeight = 40f;
+        private const float CapsuleY = 10f;
+        private const float CapsuleX = 26f;
+        private const float BadgeSize = 60f;
+        private const float TrackInset = 6f;
+        private const float TrackLeft = BadgeSize + 2f;
+        private const float GlowHalo = 14f;
+        private const float GaugeLabelX = 70f;
+        private const int GaugeLabelSize = 28;
+        private const float GaugeLerpRate = 9f;
+        private const float GaugeBumpRise = 0.08f;
+        private const int GaugeTicks = 4;
         // The balance gauge's width and its gap to the creak gauge (reference pixels): narrower than the 330 of the creak and
         // suspicion gauges, so the band still fits a 5:4 screen.
         private const float BalanceWidth = 280f;
@@ -413,12 +466,12 @@ namespace OutOfSight
             failCanvas.gameObject.AddComponent<GraphicRaycaster>();
             Labels.TryGetValue("FailPanelTitle", out failTitle);
             Labels.TryGetValue("FailPanelAction", out failAction);
+            // End panel emphasis: Retry is the primary action, first and larger; it is red through the selection (it is
+            // selected by default), so it stays dark at rest and Menu turns red alone when the D-pad moves onto it.
             FailRetryButton = MenuButton(failCanvas.transform, "FailRetry", Strings.FailRetry, DisplayFont, Labels);
-            Place((RectTransform)FailRetryButton.transform, new Vector2(0.5f, 0.5f), new Vector2(-PanelButtonSpacing * 0.5f, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
             FailMenuButton = MenuButton(failCanvas.transform, "FailMenu", Strings.PauseMenu, DisplayFont, Labels);
-            Place((RectTransform)FailMenuButton.transform, new Vector2(0.5f, 0.5f), new Vector2(PanelButtonSpacing * 0.5f, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            MakePrimary(FailRetryButton, false);
+            PlaceRow(FailRetryButton, FailMenuButton);
             ChainLR(FailRetryButton, FailMenuButton);
 
             winCanvas = NewPanel("WinPanel", Strings.WinTitle, string.Format(Strings.WinBody, Strings.FormatSeconds(0f)), Strings.WinAction,
@@ -435,16 +488,14 @@ namespace OutOfSight
             winNext = NewText(nextGo.transform, "WinNext", Strings.WinNext, 38, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.6f, 1f));
             Place(winNext.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -170f), new Vector2(1600f, 60f));
             WinNextLevelButton = MenuButton(nextGo.transform, "WinNextLevel", Strings.WinNextButton, DisplayFont, Labels);
-            Place((RectTransform)WinNextLevelButton.transform, new Vector2(0.5f, 0.5f), new Vector2(-PanelButtonSpacing, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
             // Replay and Menu are not EventSystem-selected (WinButtonsVisible doc): Enter and gamepad A keep loading
             // the next level exactly as GameState already reads them, so no button here must also catch that press.
             WinReplayButton = MenuButton(winCanvas.transform, "WinReplay", Strings.WinReplay, DisplayFont, Labels);
-            Place((RectTransform)WinReplayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(0f, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
             WinMenuButton = MenuButton(winCanvas.transform, "WinMenu", Strings.PauseMenu, DisplayFont, Labels);
-            Place((RectTransform)WinMenuButton.transform, new Vector2(0.5f, 0.5f), new Vector2(PanelButtonSpacing, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            // End panel emphasis: Next level is the primary action, first and larger, and red at rest, since nothing
+            // selects it (the same red as the fail panel's selected Retry).
+            MakePrimary(WinNextLevelButton, true);
+            PlaceRow(WinNextLevelButton, WinReplayButton, WinMenuButton);
 
             BuildEndGroup();
             HidePanels();
@@ -463,12 +514,62 @@ namespace OutOfSight
             right.navigation = rn;
         }
 
-        /// <summary>Creak gauge (PRD 4.6), left of the eye: crack icon, "Grincement", a bar filling to the right.</summary>
+        /// <summary>
+        /// End panel emphasis: <paramref name="button"/> becomes its panel's primary action, a bold and larger label
+        /// (its plate is sized by <see cref="PlaceRow"/>). <paramref name="redAtRest"/> tints it the selection red with no
+        /// selection at all (the win panel's Next level, which nothing selects); the fail panel's Retry is red through
+        /// its default selection instead, so the D-pad never shows two red buttons at once.
+        /// </summary>
+        private static void MakePrimary(Button button, bool redAtRest)
+        {
+            Text label = button.GetComponentInChildren<Text>();
+            if (label != null)
+            {
+                label.fontSize = PanelPrimaryFontSize;
+                label.fontStyle = FontStyle.Bold;
+            }
+            if (redAtRest)
+            {
+                ColorBlock colors = button.colors;
+                colors.normalColor = PrimaryRed;
+                colors.highlightedColor = PrimaryRedHover;
+                colors.selectedColor = PrimaryRed;
+                button.colors = colors;
+            }
+        }
+
+        /// <summary>
+        /// End panel emphasis: one centred row of panel buttons at <see cref="PanelButtonY"/>, left to right,
+        /// <see cref="PanelButtonGap"/> apart; the first is the primary action (<see cref="PanelPrimaryWidth"/> x
+        /// <see cref="PanelPrimaryHeight"/>), the others secondary (<see cref="PanelButtonWidth"/> x <see cref="PanelButtonHeight"/>).
+        /// </summary>
+        private static void PlaceRow(Button primary, params Button[] secondary)
+        {
+            float total = PanelPrimaryWidth + secondary.Length * (PanelButtonWidth + PanelButtonGap);
+            float x = -total * 0.5f;
+            Place((RectTransform)primary.transform, new Vector2(0.5f, 0.5f), new Vector2(x + PanelPrimaryWidth * 0.5f, PanelButtonY),
+                new Vector2(PanelPrimaryWidth, PanelPrimaryHeight));
+            x += PanelPrimaryWidth + PanelButtonGap;
+            foreach (Button button in secondary)
+            {
+                Place((RectTransform)button.transform, new Vector2(0.5f, 0.5f), new Vector2(x + PanelButtonWidth * 0.5f, PanelButtonY),
+                    new Vector2(PanelButtonWidth, PanelButtonHeight));
+                x += PanelButtonWidth + PanelButtonGap;
+            }
+        }
+
+        /// <summary>
+        /// Creak gauge (PRD 4.6), left of the eye: crack icon, "Grincement", a capsule filling to the right. Its marker is
+        /// where the creak warning starts (the last <see cref="Tuning.CreakWarning"/> seconds before the creak).
+        /// </summary>
         private void BuildCreakGauge()
         {
-            creakCanvas = BuildBar("CreakGauge", new Vector2(1f, 0f), new Vector2(-GaugeOffsetX, GaugeY), ProceduralArt.Creak, "CreakLabel",
-                Strings.HudCreak, CreakWood, out creakFrame, out creakFill, out creakFillImage);
-            creakRect = (RectTransform)creakCanvas.transform;
+            creakGauge = BuildGauge("CreakGauge", new Vector2(1f, 0f), new Vector2(-GaugeOffsetX, GaugeY), UiIconLibrary.Creak, "CreakLabel",
+                Strings.HudCreak, GaugeWidth, CreakWood, CreakAmber, CreakHot);
+            creakGauge.TintIcon = UiIconLibrary.HasCreak;
+            creakCanvas = creakGauge.Canvas;
+            creakRect = creakGauge.Root;
+            SetGaugeThreshold(creakGauge, 1f - Tuning.CreakWarning / Tuning.CreakFillTime, 0f);
             SetCreak(0f, false);
         }
 
@@ -478,22 +579,39 @@ namespace OutOfSight
         /// </summary>
         private void BuildBalanceGauge()
         {
-            balanceCanvas = BuildBar("BalanceGauge", new Vector2(1f, 0f), new Vector2(-BalanceOffsetX, GaugeY), ProceduralArt.Balance,
-                "BalanceLabel", Strings.HudBalance, BalanceCalm, out balanceFrame, out balanceFill, out balanceFillImage, BalanceWidth);
-            balanceRect = (RectTransform)balanceCanvas.transform;
+            balanceGauge = BuildGauge("BalanceGauge", new Vector2(1f, 0f), new Vector2(-BalanceOffsetX, GaugeY), ProceduralArt.Balance,
+                "BalanceLabel", Strings.HudBalance, BalanceWidth, BalanceCalm, BalanceCalm, CreakHot);
+            // Two colours only, calm or red (BalanceRed), as Step 44e reads them; the marker is the red threshold.
+            balanceGauge.TwoTone = true;
+            balanceCanvas = balanceGauge.Canvas;
+            balanceRect = balanceGauge.Root;
+            SetGaugeThreshold(balanceGauge, Tuning.BalanceWarning, 0f);
             balanceOn = false;
             SetBalance(0f, false);
             SetEnabled(balanceCanvas, false);
         }
 
-        /// <summary>Suspicion bar (PRD 4.4), right of the eye: magnifier icon, "Soupçon", the highest suspicion.</summary>
+        /// <summary>
+        /// Suspicion bar (PRD 4.4), right of the eye: magnifier icon, "Soupçon", the highest suspicion. Its ticks count the
+        /// discoveries left down from the loss at 1 (<see cref="SuspicionStep"/> apart), its marker is the last of them:
+        /// past it, one more discovery loses the level.
+        /// </summary>
         private void BuildSuspicionGauge()
         {
-            suspicionCanvas = BuildBar("SuspicionGauge", new Vector2(0f, 0f), new Vector2(GaugeOffsetX, GaugeY), ProceduralArt.Magnifier,
-                "SuspicionLabel", Strings.HudSuspicion, SuspicionLow, out _, out suspicionFill, out suspicionFillImage);
-            suspicionRect = (RectTransform)suspicionCanvas.transform;
+            suspicionGauge = BuildGauge("SuspicionGauge", new Vector2(0f, 0f), new Vector2(GaugeOffsetX, GaugeY), UiIconLibrary.Suspicion,
+                "SuspicionLabel", Strings.HudSuspicion, GaugeWidth, SuspicionLow, SuspicionMid, SuspicionHigh);
+            suspicionGauge.TintIcon = UiIconLibrary.HasSuspicion;
+            suspicionCanvas = suspicionGauge.Canvas;
+            suspicionRect = suspicionGauge.Root;
+            SetGaugeThreshold(suspicionGauge, 1f - Tuning.SuspicionPerDiscovery, Tuning.SuspicionPerDiscovery);
             SetSuspicion(0f);
         }
+
+        /// <summary>
+        /// The suspicion one discovery adds at the current difficulty (a default tempered inhabitant): the gauge's ticks
+        /// stand this far apart down from <see cref="Tuning.SuspicionLose"/>.
+        /// </summary>
+        private float SuspicionStep => Tuning.SuspicionPerDiscovery * (Game != null && Game.Difficulty != null ? Game.Difficulty.SuspicionFactor : 1f);
 
         /// <summary>
         /// M4: the contextual hints of the current body, each in its own Canvas, on the controls line: the careful hint
@@ -507,6 +625,8 @@ namespace OutOfSight
             lampCanvas = BuildHint("LampHint", ProceduralArt.Bulb, Strings.HudLamp, new Vector2(1f, 0f), new Vector2(-36f, ControlsY - 6f));
 
             satOnCanvas = BuildLine("SatOn", ProceduralArt.SatOn, Strings.HudSatOn, 760f);
+            // CONTRACT_M5 20: the same row; the dog's hold with the dog eye as its icon.
+            dogHoldCanvas = BuildLine("DogHold", ProceduralArt.EyeDog, Strings.HudDogHold, 1180f);
             // M4.1 (CONTRACT_M4 10.3): the same row; a stool lying on its side is never sat on.
             tippedCanvas = BuildLine("Tipped", ProceduralArt.Tipped, Strings.HudTipped, 1180f);
             // M5 (CONTRACT_M5_v3 15.2): the same row again; a pinned or lying furniture opens no door, so they never meet.
@@ -673,6 +793,16 @@ namespace OutOfSight
             }
         }
 
+        /// <summary>CONTRACT_M5 20: the dog's hold line, shown while the dog pins the player furniture.</summary>
+        public void SetDogHold(bool on)
+        {
+            if (dogHoldOn != on)
+            {
+                dogHoldOn = on;
+                ApplyCanvases();
+            }
+        }
+
         /// <summary>M4.1: the tipped line, shown while the stool lies on its side (a move key rights it).</summary>
         public void SetTipped(bool on)
         {
@@ -728,7 +858,7 @@ namespace OutOfSight
             colors.normalColor = new Color(0.1f, 0.1f, 0.13f, 0.86f);
             // Under the mouse: lighter, but never the red of the selection, so the two never look alike.
             colors.highlightedColor = new Color(0.3f, 0.29f, 0.33f, 0.94f);
-            colors.selectedColor = new Color(0.78f, 0.16f, 0.15f, 0.97f);
+            colors.selectedColor = PrimaryRed;
             colors.pressedColor = new Color(0.5f, 0.08f, 0.08f, 1f);
             colors.disabledColor = new Color(0.2f, 0.2f, 0.2f, 0.5f);
             colors.colorMultiplier = 1f;
@@ -759,60 +889,252 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// A labelled bar in its own Canvas: icon and label on the first row, the bar (rim, background, fill
-        /// sized by its anchors) on the second. <paramref name="pivot"/> places the group beside the eye.
+        /// HUD gauge redesign (2026-11-19): one gauge of the bottom band, built once, then driven by its value
+        /// (<see cref="Target"/>, set by GameState) and animated in <see cref="Update"/> with no allocation.
         /// </summary>
-        private Canvas BuildBar(string name, Vector2 pivot, Vector2 offset, Sprite icon, string labelName, string label, Color fillColor,
-            out Image back, out RectTransform fill, out Image fillImage)
+        private sealed class Gauge
         {
-            return BuildBar(name, pivot, offset, icon, labelName, label, fillColor, out back, out fill, out fillImage, GaugeWidth);
+            public Canvas Canvas;
+            public RectTransform Root;
+            // Everything drawn hangs under Body, so the pulse and the shake never move Root (BandScreenRect, tests).
+            public RectTransform Body;
+            public Image Glow;
+            public Image Danger;
+            public Image Fill;
+            public Image Marker;
+            public Image[] Ticks;
+            public Image Badge;
+            public Image Icon;
+            public Text Label;
+            public Color Calm;
+            public Color Warm;
+            public Color Hot;
+            // Calm or hot only (the balance gauge, red above its warning), never the gradient.
+            public bool TwoTone;
+            // The icon is a drawn white one (UiIconLibrary): tinted cream, warming toward its level near the limit.
+            public bool TintIcon;
+            public float Target;
+            public float Threshold = -1f;
+            public float TickStep = -1f;
+            // 1 on a sudden rise, then down to 0: the shake.
+            public float Bump;
+
+            /// <summary>The fill's colour at <paramref name="t"/>: calm at 0, warm at the threshold, hot at 1.</summary>
+            public Color LevelColour(float t)
+            {
+                if (t <= Threshold)
+                {
+                    return Color.Lerp(Calm, Warm, Threshold > 0f ? t / Threshold : 1f);
+                }
+                return Color.Lerp(Warm, Hot, (t - Threshold) / Mathf.Max(1e-3f, 1f - Threshold));
+            }
         }
 
-        /// <summary>M5 wave 5B: the same labelled bar, <paramref name="width"/> reference pixels wide.</summary>
-        private Canvas BuildBar(string name, Vector2 pivot, Vector2 offset, Sprite icon, string labelName, string label, Color fillColor,
-            out Image back, out RectTransform fill, out Image fillImage, float width)
+        /// <summary>
+        /// HUD gauge redesign (2026-11-19): a gauge in its own Canvas, <paramref name="width"/> x <see cref="GaugeHeight"/>
+        /// reference pixels, <paramref name="pivot"/> placing it beside the eye. A dark translucent capsule with a cream rim
+        /// (readable over any floor) holds a recessed track; the icon sits on a round badge over the capsule's left end and
+        /// the label (the menus' display face, in cream) above, right of the badge. In the track, bottom to top: the recess,
+        /// the striped danger zone past the threshold, the fill (a pill Filled from the left, tinted by its level), the
+        /// ticks, the inner shadow, the threshold marker. A soft glow behind the capsule fades in near the limit.
+        /// </summary>
+        private Gauge BuildGauge(string name, Vector2 pivot, Vector2 offset, Sprite icon, string labelName, string label, float width,
+            Color calm, Color warm, Color hot)
         {
+            var g = new Gauge { Calm = calm, Warm = warm, Hot = hot };
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(transform, false);
-            var rect = (RectTransform)go.transform;
-            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
-            rect.pivot = pivot;
-            rect.anchoredPosition = offset;
-            rect.sizeDelta = new Vector2(width, 92f);
-            Canvas canvas = go.AddComponent<Canvas>();
-            Image iconImage = NewImage(go.transform, name + "Icon", icon, Color.white);
-            Place(iconImage.rectTransform, new Vector2(0f, 1f), Vector2.zero, new Vector2(46f, 46f));
-            Text text = NewText(go.transform, labelName, label, 32, TextAnchor.MiddleLeft, Color.white);
-            Place(text.rectTransform, new Vector2(0f, 1f), new Vector2(54f, 0f), new Vector2(width - 54f, 46f));
-            Image rim = NewImage(go.transform, name + "Rim", null, GaugeRim);
-            Place(rim.rectTransform, new Vector2(0f, 0f), Vector2.zero, new Vector2(width, 36f));
-            back = NewImage(rim.transform, name + "Back", null, GaugeBack);
-            var backRect = back.rectTransform;
-            backRect.anchorMin = Vector2.zero;
-            backRect.anchorMax = Vector2.one;
-            backRect.offsetMin = new Vector2(2f, 2f);
-            backRect.offsetMax = new Vector2(-2f, -2f);
-            fillImage = NewImage(Track(back.transform), name + "Fill", null, fillColor);
-            fill = fillImage.rectTransform;
-            fill.pivot = new Vector2(0f, 0.5f);
-            fill.anchorMin = Vector2.zero;
-            fill.anchorMax = new Vector2(0f, 1f);
-            fill.offsetMin = Vector2.zero;
-            fill.offsetMax = Vector2.zero;
-            return canvas;
+            g.Root = (RectTransform)go.transform;
+            g.Root.anchorMin = g.Root.anchorMax = new Vector2(0.5f, 0f);
+            g.Root.pivot = pivot;
+            g.Root.anchoredPosition = offset;
+            g.Root.sizeDelta = new Vector2(width, GaugeHeight);
+            g.Canvas = go.AddComponent<Canvas>();
+
+            var bodyGo = new GameObject(name + "Body", typeof(RectTransform));
+            bodyGo.transform.SetParent(go.transform, false);
+            g.Body = (RectTransform)bodyGo.transform;
+            Stretch(g.Body);
+            // The pulse scales about the capsule's centre (a stretched rect with no offsets stays put when its pivot moves).
+            g.Body.pivot = new Vector2((CapsuleX + width) * 0.5f / width, (CapsuleY + CapsuleHeight * 0.5f) / GaugeHeight);
+
+            float capsuleWidth = width - CapsuleX;
+            g.Glow = NewImage(g.Body, name + "Glow", GaugeArt.Glow, Color.clear);
+            g.Glow.type = Image.Type.Sliced;
+            g.Glow.pixelsPerUnitMultiplier = GaugeArt.GlowMultiplier(CapsuleHeight, GlowHalo);
+            Place(g.Glow.rectTransform, Vector2.zero, new Vector2(CapsuleX - GlowHalo, CapsuleY - GlowHalo),
+                new Vector2(capsuleWidth + 2f * GlowHalo, CapsuleHeight + 2f * GlowHalo));
+
+            Image plate = NewImage(g.Body, name + "Plate", GaugeArt.Plate, Color.white);
+            plate.type = Image.Type.Sliced;
+            plate.pixelsPerUnitMultiplier = GaugeArt.PillMultiplier(CapsuleHeight);
+            Place(plate.rectTransform, Vector2.zero, new Vector2(CapsuleX, CapsuleY), new Vector2(capsuleWidth, CapsuleHeight));
+
+            float trackWidth = width - TrackInset - TrackLeft;
+            float trackHeight = CapsuleHeight - 2f * TrackInset;
+            var trackGo = new GameObject(name + "Track", typeof(RectTransform));
+            trackGo.transform.SetParent(g.Body, false);
+            var track = (RectTransform)trackGo.transform;
+            Place(track, Vector2.zero, new Vector2(TrackLeft, CapsuleY + TrackInset), new Vector2(trackWidth, trackHeight));
+
+            Image recess = NewImage(track, name + "Recess", GaugeArt.Recess, Color.white);
+            recess.type = Image.Type.Sliced;
+            recess.pixelsPerUnitMultiplier = GaugeArt.PillMultiplier(trackHeight);
+            Stretch(recess.rectTransform);
+
+            g.Danger = NewImage(track, name + "Danger", GaugeArt.Hatch(trackWidth, trackHeight), GaugeDanger);
+            g.Danger.type = Image.Type.Filled;
+            g.Danger.fillMethod = Image.FillMethod.Horizontal;
+            g.Danger.fillOrigin = (int)Image.OriginHorizontal.Right;
+            g.Danger.fillAmount = 0f;
+            Stretch(g.Danger.rectTransform);
+
+            g.Fill = NewImage(track, name + "Fill", GaugeArt.Bar(trackWidth, trackHeight), calm);
+            g.Fill.type = Image.Type.Filled;
+            g.Fill.fillMethod = Image.FillMethod.Horizontal;
+            g.Fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+            g.Fill.fillAmount = 0f;
+            Stretch(g.Fill.rectTransform);
+
+            g.Ticks = new Image[GaugeTicks];
+            for (int i = 0; i < GaugeTicks; i++)
+            {
+                g.Ticks[i] = NewImage(track, name + "Tick" + i, null, GaugeTick);
+                g.Ticks[i].rectTransform.sizeDelta = new Vector2(2f, trackHeight - 8f);
+                g.Ticks[i].enabled = false;
+            }
+
+            Image shade = NewImage(track, name + "Shade", GaugeArt.Shade, Color.white);
+            shade.type = Image.Type.Sliced;
+            shade.pixelsPerUnitMultiplier = GaugeArt.PillMultiplier(trackHeight);
+            Stretch(shade.rectTransform);
+
+            g.Marker = NewImage(track, name + "Marker", null, GaugeMarker);
+            g.Marker.rectTransform.sizeDelta = new Vector2(4f, trackHeight + 10f);
+            var markerShadow = g.Marker.gameObject.AddComponent<Shadow>();
+            markerShadow.effectColor = new Color(0f, 0f, 0f, 0.55f);
+            markerShadow.effectDistance = new Vector2(1.5f, -1.5f);
+
+            g.Badge = NewImage(g.Body, name + "Badge", GaugeArt.Badge, Color.white);
+            Place(g.Badge.rectTransform, Vector2.zero, new Vector2(0f, CapsuleY + CapsuleHeight * 0.5f - BadgeSize * 0.5f),
+                new Vector2(BadgeSize, BadgeSize));
+            g.Icon = NewImage(g.Badge.transform, name + "Icon", icon, Color.white);
+            g.Icon.preserveAspect = true;
+            Place(g.Icon.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(BadgeSize * 0.62f, BadgeSize * 0.62f));
+
+            float labelY = CapsuleY + CapsuleHeight + 2f;
+            g.Label = NewText(g.Body, labelName, label, GaugeLabelSize, TextAnchor.LowerLeft, GaugeInk);
+            g.Label.font = DisplayFont;
+            Place(g.Label.rectTransform, Vector2.zero, new Vector2(GaugeLabelX, labelY), new Vector2(width - GaugeLabelX, GaugeHeight - labelY));
+            return g;
         }
 
-        /// <summary>An empty rect 3 px inside a gauge background: the fill is sized by its anchors only.</summary>
-        private static Transform Track(Transform background)
+        /// <summary>
+        /// Moves a gauge's threshold marker (and its danger zone) to <paramref name="threshold"/> along the track, and its
+        /// ticks to every <paramref name="tickStep"/> below the marker (none with 0). Nothing changes when both are already there.
+        /// </summary>
+        private static void SetGaugeThreshold(Gauge g, float threshold, float tickStep)
         {
-            var go = new GameObject("Track", typeof(RectTransform));
-            go.transform.SetParent(background, false);
-            var rect = (RectTransform)go.transform;
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(3f, 3f);
-            rect.offsetMax = new Vector2(-3f, -3f);
-            return go.transform;
+            threshold = Mathf.Clamp(threshold, 0.05f, 1f);
+            if (g == null || (Mathf.Abs(g.Threshold - threshold) < 1e-4f && Mathf.Abs(g.TickStep - tickStep) < 1e-4f))
+            {
+                return;
+            }
+            g.Threshold = threshold;
+            g.TickStep = tickStep;
+            g.Danger.fillAmount = 1f - threshold;
+            AlongTrack(g.Marker.rectTransform, threshold);
+            for (int i = 0; i < g.Ticks.Length; i++)
+            {
+                float at = threshold - (i + 1) * tickStep;
+                bool on = tickStep > 0.02f && at > 0.06f;
+                g.Ticks[i].enabled = on;
+                if (on)
+                {
+                    AlongTrack(g.Ticks[i].rectTransform, at);
+                }
+            }
+        }
+
+        /// <summary>Centres <paramref name="rect"/> on the track at <paramref name="t"/> (0 to 1, left to right), vertically centred.</summary>
+        private static void AlongTrack(RectTransform rect, float t)
+        {
+            rect.anchorMin = rect.anchorMax = new Vector2(t, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+        }
+
+        /// <summary>A new value for a gauge: a rise over <see cref="GaugeBumpRise"/> in one update, or <paramref name="burst"/>, shakes it.</summary>
+        private static void SetGaugeTarget(Gauge g, float value, bool burst)
+        {
+            if (g == null)
+            {
+                return;
+            }
+            if (!g.TwoTone && (burst || value - g.Target > GaugeBumpRise))
+            {
+                g.Bump = 1f;
+            }
+            g.Target = value;
+        }
+
+        /// <summary>
+        /// HUD gauge redesign: every gauge draws its value at once, with no easing and no shake (a new level, and the shots).
+        /// </summary>
+        public void SnapGauges()
+        {
+            SnapGauge(creakGauge);
+            SnapGauge(suspicionGauge);
+            SnapGauge(balanceGauge);
+        }
+
+        private static void SnapGauge(Gauge g)
+        {
+            if (g != null)
+            {
+                g.Fill.fillAmount = g.Target;
+                g.Bump = 0f;
+            }
+        }
+
+        /// <summary>
+        /// One frame of a gauge (no allocation): the drawn fill eases toward the value, its colour follows its level (or
+        /// flashes hot and pale with <paramref name="flash"/>, the creak warning), and near the limit (past the threshold,
+        /// or <paramref name="red"/> on a two tone gauge) the glow fades in, the badge's ring warms and the capsule
+        /// pulses; a sudden rise shakes it.
+        /// </summary>
+        private static void AnimateGauge(Gauge g, float dt, float time, bool flash, bool red)
+        {
+            if (g == null)
+            {
+                return;
+            }
+            float drawn = g.Fill.fillAmount;
+            drawn = Mathf.Abs(g.Target - drawn) < 1e-3f ? g.Target : drawn + (g.Target - drawn) * (1f - Mathf.Exp(-GaugeLerpRate * dt));
+            g.Fill.fillAmount = drawn;
+            Color level = g.TwoTone ? (red ? g.Hot : g.Calm) : g.LevelColour(drawn);
+            float near = g.TwoTone ? (red ? 1f : 0f) : Mathf.InverseLerp(g.Threshold - 0.1f, 1f, drawn);
+            float pulse = 0.5f + 0.5f * Mathf.Sin(time * 8f);
+            bool on = flash && Mathf.Repeat(time * 6f, 1f) < 0.5f;
+            if (flash)
+            {
+                level = on ? g.Hot : GaugeFlashPale;
+                near = 1f;
+                pulse = on ? 1f : 0.3f;
+            }
+            g.Fill.color = level;
+            Color glow = flash ? g.Hot : level;
+            glow.a = near * (0.3f + 0.5f * pulse);
+            g.Glow.color = glow;
+            g.Badge.color = Color.Lerp(Color.white, flash ? g.Hot : level, near * 0.85f);
+            if (g.TintIcon)
+            {
+                g.Icon.color = Color.Lerp(GaugeInk, flash ? g.Hot : level, 0.25f + 0.6f * near);
+            }
+            float scale = 1f + 0.035f * near * pulse;
+            g.Body.localScale = new Vector3(scale, scale, 1f);
+            g.Bump = Mathf.MoveTowards(g.Bump, 0f, dt * 2.2f);
+            g.Body.anchoredPosition = new Vector2(g.Bump * g.Bump * 6f * Mathf.Sin(time * 63f), 0f);
         }
 
         /// <summary>Shows or hides each M2 gauge (hidden when its rule is off, as in the M1 probe).</summary>
@@ -840,19 +1162,36 @@ namespace OutOfSight
         private void ApplyCanvases()
         {
             SetEnabled(rootCanvas, Visible);
-            SetEnabled(creakCanvas, Visible && creakOn);
-            SetEnabled(suspicionCanvas, Visible && suspicionOn);
+            // End panel emphasis (2026-11-19): the play band (eye, gauges, controls line, body hints) hides under the fail
+            // and win panels. Drawn under their translucent dim, on a 20:9 phone its labels showed between the panel
+            // buttons and the controls line ran through the record line.
+            bool band = !failOn && !winOn;
+            if (eyeBackdrop != null)
+            {
+                eyeBackdrop.enabled = band;
+            }
+            if (eye != null)
+            {
+                eye.enabled = band;
+            }
+            if (controls != null)
+            {
+                controls.enabled = band;
+            }
+            SetEnabled(creakCanvas, Visible && creakOn && band);
+            SetEnabled(suspicionCanvas, Visible && suspicionOn && band);
             SetEnabled(failCanvas, Visible && failOn);
             SetEnabled(winCanvas, Visible && winOn);
             SetEnabled(winNextCanvas, Visible && winOn && winNextOn);
             SetEnabled(endCanvas, Visible && winOn && endOn);
-            SetEnabled(carefulCanvas, Visible && carefulOn);
-            SetEnabled(lampCanvas, Visible && lampOn);
+            SetEnabled(carefulCanvas, Visible && carefulOn && band);
+            SetEnabled(lampCanvas, Visible && lampOn && band);
             SetEnabled(satOnCanvas, Visible && satOn && !failOn && !winOn);
-            SetEnabled(tippedCanvas, Visible && tippedOn && !satOn && !failOn && !winOn);
-            SetEnabled(doorCanvas, Visible && doorOn && !satOn && !tippedOn && !failOn && !winOn);
+            SetEnabled(dogHoldCanvas, Visible && dogHoldOn && !satOn && !failOn && !winOn);
+            SetEnabled(tippedCanvas, Visible && tippedOn && !satOn && !dogHoldOn && !failOn && !winOn);
+            SetEnabled(doorCanvas, Visible && doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
             SetEnabled(peopleCanvas, Visible && peopleOn);
-            SetEnabled(balanceCanvas, Visible && balanceOn);
+            SetEnabled(balanceCanvas, Visible && balanceOn && band);
         }
 
         private static void SetEnabled(Canvas canvas, bool enabled)
@@ -868,9 +1207,12 @@ namespace OutOfSight
         {
             CreakShown = Mathf.Clamp01(value);
             CreakFlashing = warning;
-            if (creakFill != null)
+            if (creakGauge != null)
             {
-                creakFill.anchorMax = new Vector2(CreakShown, 1f);
+                // The marker is where the warning starts, at the difficulty's fill time; the creak itself (full, then
+                // back to empty) shakes the gauge.
+                SetGaugeThreshold(creakGauge, Game != null ? Game.Creak.WarningStart : 1f - Tuning.CreakWarning / Tuning.CreakFillTime, 0f);
+                SetGaugeTarget(creakGauge, CreakShown, creakGauge.Target > 0.9f && CreakShown < 0.1f);
             }
         }
 
@@ -878,10 +1220,11 @@ namespace OutOfSight
         public void SetSuspicion(float value)
         {
             SuspicionShown = Mathf.Clamp01(value);
-            if (suspicionFill != null)
+            if (suspicionGauge != null)
             {
-                suspicionFill.anchorMax = new Vector2(SuspicionShown, 1f);
-                suspicionFillImage.color = Color.Lerp(SuspicionLow, SuspicionHigh, SuspicionShown);
+                float step = SuspicionStep;
+                SetGaugeThreshold(suspicionGauge, Tuning.SuspicionLose - step, step);
+                SetGaugeTarget(suspicionGauge, SuspicionShown, false);
             }
         }
 
@@ -985,11 +1328,10 @@ namespace OutOfSight
         {
             BalanceShown = Mathf.Clamp01(ratio);
             BalanceRed = visible && ratio > Tuning.BalanceWarning; // MUTATION:BALANCE_RED
-            if (balanceFill != null)
+            if (balanceGauge != null)
             {
-                balanceFill.anchorMax = new Vector2(BalanceShown, 1f);
-                balanceFillImage.color = BalanceRed ? CreakHot : BalanceCalm;
-                balanceFrame.color = BalanceRed ? BalanceHotFrame : GaugeBack;
+                SetGaugeTarget(balanceGauge, BalanceShown, false);
+                balanceGauge.Fill.color = BalanceRed ? CreakHot : BalanceCalm;
             }
             if (balanceOn != visible)
             {
@@ -1168,6 +1510,7 @@ namespace OutOfSight
             SetCreak(0f, false);
             SetSuspicion(0f);
             SetSatOn(false);
+            SetDogHold(false);
             SetTipped(false);
             // M5: a new level lists its own people (ShowPeople, after this) and starts with no door in reach. Wave 5B: and
             // with no balance gauge until GameState shows it (a load).
@@ -1175,6 +1518,8 @@ namespace OutOfSight
             peopleOn = false;
             doorOn = false;
             SetBalance(0f, false);
+            // A new level's gauges start empty at once, with no easing down from the last level and no shake.
+            SnapGauges();
             ApplyCanvases();
         }
 
@@ -1300,13 +1645,13 @@ namespace OutOfSight
             {
                 return;
             }
-            // Creak warning: the gauge flashes between wood and hot red, fast enough to catch the eye.
-            if (creakFillImage != null)
-            {
-                bool on = CreakFlashing && Mathf.Repeat(Time.unscaledTime * 6f, 1f) < 0.5f;
-                creakFillImage.color = CreakFlashing ? (on ? CreakHot : Color.white) : CreakWood;
-                creakFrame.color = CreakFlashing && on ? new Color(0.55f, 0.08f, 0.06f, 0.85f) : GaugeBack;
-            }
+            // HUD gauge redesign: the gauges ease, glow, pulse and shake; the creak warning flashes the creak gauge between
+            // hot red and pale cream, fast enough to catch the eye.
+            float gaugeDt = Time.unscaledDeltaTime;
+            float gaugeTime = Time.unscaledTime;
+            AnimateGauge(creakGauge, gaugeDt, gaugeTime, CreakFlashing, false);
+            AnimateGauge(suspicionGauge, gaugeDt, gaugeTime, false, false);
+            AnimateGauge(balanceGauge, gaugeDt, gaugeTime, false, BalanceRed);
             // PRD 4.3: the screen edge pulses red while seenMoving is above zero.
             float a = seenMoving > 0f ? 0.45f + 0.35f * Mathf.Sin(Time.unscaledTime * 18f) : 0f;
             Color c = pulse.color;

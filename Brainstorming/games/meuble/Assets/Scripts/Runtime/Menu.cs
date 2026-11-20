@@ -28,6 +28,8 @@ namespace OutOfSight
     /// (<see cref="InputReader.BackPressed"/>) come back to the title. Jouer starts the first level that is unlocked but
     /// not won (<see cref="SaveStore.FirstUnwonLevel"/>). The record line under the win panel (<see cref="RecordLine"/>)
     /// is built here too; it records every win in the save.
+    /// Credits page (2026-11-19): "Crédits" on the title, between Options and Quitter, opens a scrollable page of
+    /// <see cref="Credits.All"/> (the licence attributions of docs/LICENSES.md); Retour, Escape or gamepad B come back.
     /// </summary>
     public sealed class Menu : MonoBehaviour
     {
@@ -87,6 +89,10 @@ namespace OutOfSight
         /// <summary>Audio overhaul: the Music row, right under Volume (0 to 100 % by 10).</summary>
         public Button OptionsMusicButton { get; private set; }
         public Button OptionsConeButton { get; private set; }
+        /// <summary>M7 walls pass: Murs / Walls, cycling Lowered, See-through, Both, Off (applied at once).</summary>
+        public Button OptionsWallsButton { get; private set; }
+        /// <summary>M7 walls pass: the wall opacity of See-through and Both, cycling 10, 20, 35, 50 % (dimmed otherwise).</summary>
+        public Button OptionsWallOpacityButton { get; private set; }
         /// <summary>M7 (docs/CONTRACT_M7.md 1.4): Qualité, cycling Bas, Moyen, Haut.</summary>
         public Button OptionsQualityButton { get; private set; }
         /// <summary>M7 design (CONTRACT_M7 4.1): the Difficulté row (Facile, Normal, Difficile; applies at the next level load).</summary>
@@ -101,17 +107,84 @@ namespace OutOfSight
         private Text optionsVolumeText;
         private Text optionsMusicText;
         private Text optionsConeText;
+        private Text optionsWallsText;
+        private Text optionsWallOpacityText;
         private Text optionsQualityText;
         private Text optionsDifficultyText;
         private Text optionsLanguageText;
         // True when Options was opened from the pause menu (Retour then goes back there, not to the title).
         private bool optionsFromPause;
 
+        // ----- Credits page (2026-11-19): reachable from the title's main page only, its lines are Core.Credits. -----
+
+        /// <summary>The Credits page is open (a page of the title: <see cref="TitleOpen"/> stays true under it).</summary>
+        public bool CreditsOpen { get; private set; }
+
+        /// <summary>"Crédits" on the title, between Options and Quitter (Quitter stays last).</summary>
+        public Button TitleCreditsButton { get; private set; }
+
+        /// <summary>Retour on the Credits page, its only button (the default selection; up and down scroll the page).</summary>
+        public Button CreditsBackButton { get; private set; }
+
+        /// <summary>The Credits page's scroll view (mouse wheel, drag, touch swipe, its scrollbar, up and down).</summary>
+        public ScrollRect CreditsScroll { get; private set; }
+
+        private Canvas creditsCanvas;
+        // One label per Core.Credits.All entry, in order (relabelled in place when the language changes).
+        private readonly List<Text> creditsLines = new List<Text>();
+
+        /// <summary>Crédits: opens the Credits page over the title's main page, scrolled to the top (ignored otherwise).</summary>
+        public void OpenCredits()
+        {
+            if (!TitleOpen || LevelSelectOpen || OptionsOpen || CreditsOpen || creditsCanvas == null)
+            {
+                return;
+            }
+            CreditsOpen = true;
+            RefreshCreditsTexts();
+            CreditsScroll.StopMovement();
+            CreditsScroll.content.anchoredPosition = Vector2.zero;
+            Apply();
+            SelectLater(null);
+        }
+
+        /// <summary>Retour, Escape or gamepad B: from the Credits page back to the title's main page, on Crédits.</summary>
+        public void CloseCredits()
+        {
+            if (!CreditsOpen)
+            {
+                return;
+            }
+            CreditsOpen = false;
+            Apply();
+            SelectLater(TitleCreditsButton);
+        }
+
+        /// <summary>
+        /// Scrolls the Credits page by <paramref name="units"/> reference units (positive: down the list, toward the end),
+        /// clamped to its ends; nothing when the page is closed or its lines all fit.
+        /// </summary>
+        public void ScrollCredits(float units)
+        {
+            if (!CreditsOpen || CreditsScroll == null)
+            {
+                return;
+            }
+            Canvas.ForceUpdateCanvases();
+            float range = CreditsScroll.content.rect.height - CreditsScroll.viewport.rect.height;
+            if (range <= 0f)
+            {
+                return;
+            }
+            CreditsScroll.StopMovement();
+            CreditsScroll.verticalNormalizedPosition = Mathf.Clamp01(CreditsScroll.verticalNormalizedPosition - units / range);
+        }
+
         /// <summary>Opens Options over the title's main page or the pause menu; ignored otherwise (the level select open,
         /// already open, or neither menu up).</summary>
         public void OpenOptions()
         {
-            bool fromTitle = TitleOpen && !LevelSelectOpen;
+            bool fromTitle = TitleOpen && !LevelSelectOpen && !CreditsOpen;
             if (OptionsOpen || (!fromTitle && !PauseOpen))
             {
                 return;
@@ -143,7 +216,7 @@ namespace OutOfSight
             {
                 next = Tuning.SensitivityMin;
             }
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = next, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = next, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language, Walls = o.Walls, WallOpacity = o.WallOpacity });
             RefreshOptionsTexts();
         }
 
@@ -155,7 +228,7 @@ namespace OutOfSight
             {
                 next = Tuning.VolumeMin;
             }
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = next, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = next, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language, Walls = o.Walls, WallOpacity = o.WallOpacity });
             RefreshOptionsTexts();
         }
 
@@ -171,7 +244,7 @@ namespace OutOfSight
             SaveStore.SetOptions(new SaveOptions
             {
                 Sensitivity = o.Sensitivity, Volume = o.Volume, Music = next, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty,
-                Language = o.Language,
+                Language = o.Language, Walls = o.Walls, WallOpacity = o.WallOpacity,
             });
             RefreshOptionsTexts();
         }
@@ -180,7 +253,7 @@ namespace OutOfSight
         {
             SaveOptions o = SaveStore.Options;
             string next = o.Cone == SaveOptions.ConeAlways ? SaveOptions.ConeNever : SaveOptions.ConeAlways;
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = next, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = next, Quality = o.Quality, Difficulty = o.Difficulty, Language = o.Language, Walls = o.Walls, WallOpacity = o.WallOpacity });
             RefreshOptionsTexts();
         }
 
@@ -190,7 +263,7 @@ namespace OutOfSight
         {
             SaveOptions o = SaveStore.Options;
             string next = SaveOptions.NextQuality(o.QualityFor(Application.isMobilePlatform));
-            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = next, Difficulty = o.Difficulty, Language = o.Language });
+            SaveStore.SetOptions(new SaveOptions { Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = next, Difficulty = o.Difficulty, Language = o.Language, Walls = o.Walls, WallOpacity = o.WallOpacity });
             RefreshOptionsTexts();
         }
 
@@ -201,7 +274,7 @@ namespace OutOfSight
             SaveStore.SetOptions(new SaveOptions
             {
                 Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = DifficultyDef.Next(o.DifficultyId),
-                Language = o.Language,
+                Language = o.Language, Walls = o.Walls, WallOpacity = o.WallOpacity,
             });
             RefreshOptionsTexts();
         }
@@ -213,9 +286,41 @@ namespace OutOfSight
             string next = o.LanguageId == Strings.French ? Strings.English : Strings.French;
             SaveStore.SetOptions(new SaveOptions
             {
-                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = next,
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty, Language = next, Walls = o.Walls, WallOpacity = o.WallOpacity,
             });
             RefreshOptionsTexts();
+        }
+
+        // M7 walls pass (product owner, 2026-11-19): Lowered, See-through, Both, Off; the wall fader reads it every frame,
+        // so it applies at once over the level in play.
+        private void CycleWalls()
+        {
+            SaveOptions o = SaveStore.Options;
+            SaveStore.SetOptions(new SaveOptions
+            {
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty,
+                Language = o.Language, Walls = SaveOptions.NextWalls(o.Walls), WallOpacity = o.WallOpacity,
+            });
+            RefreshOptionsTexts();
+        }
+
+        // M7 walls pass: 10, 20, 35, 50 %, then 10 % again; used by See-through and Both (dimmed otherwise, still cycles).
+        private void CycleWallOpacity()
+        {
+            SaveOptions o = SaveStore.Options;
+            SaveStore.SetOptions(new SaveOptions
+            {
+                Sensitivity = o.Sensitivity, Volume = o.Volume, Music = o.Music, Cone = o.Cone, Quality = o.Quality, Difficulty = o.Difficulty,
+                Language = o.Language, Walls = o.Walls, WallOpacity = SaveOptions.NextWallOpacity(o.WallOpacity),
+            });
+            RefreshOptionsTexts();
+        }
+
+        private static string WallsLabel(string walls)
+        {
+            return walls == SaveOptions.WallsSeeThrough ? Strings.OptionsWallsSeeThrough
+                : walls == SaveOptions.WallsBoth ? Strings.OptionsWallsBoth
+                : walls == SaveOptions.WallsNone ? Strings.OptionsWallsNone : Strings.OptionsWallsLowered;
         }
 
         /// <summary>
@@ -233,6 +338,7 @@ namespace OutOfSight
                 }
             }
             RefreshOptionsTexts();
+            RefreshCreditsTexts();
             if (Hud != null)
             {
                 Hud.Relocalize();
@@ -285,6 +391,18 @@ namespace OutOfSight
                 optionsConeText.text = string.Format(Strings.OptionsCone,
                     o.Cone == SaveOptions.ConeAlways ? Strings.OptionsConeAlways : Strings.OptionsConeNever);
             }
+            if (optionsWallsText != null)
+            {
+                optionsWallsText.text = string.Format(Strings.OptionsWalls, WallsLabel(o.Walls));
+            }
+            if (optionsWallOpacityText != null)
+            {
+                optionsWallOpacityText.text = string.Format(Strings.OptionsWallOpacity, o.WallOpacity);
+                // Dimmed while the look in use ignores it (Lowered, Off): still selectable and cycling, so the chain stays whole.
+                Color ink = TitleInk;
+                ink.a = o.WallOpacityApplies ? 1f : Tuning.OptionsUnusedAlpha;
+                optionsWallOpacityText.color = ink;
+            }
             if (optionsDifficultyText != null)
             {
                 optionsDifficultyText.text = string.Format(Strings.OptionsDifficulty, Strings.DifficultyName(o.DifficultyId));
@@ -299,10 +417,19 @@ namespace OutOfSight
             }
         }
 
+        /// <summary>Every Credits line in the current language (Core.Credits, one label per entry).</summary>
+        private void RefreshCreditsTexts()
+        {
+            for (int i = 0; i < creditsLines.Count && i < Credits.All.Count; i++)
+            {
+                creditsLines[i].text = Credits.All[i].Text(Strings.Language);
+            }
+        }
+
         /// <summary>Niveaux: opens the level select over the title (ignored when the title is not up).</summary>
         public void OpenLevelSelect()
         {
-            if (!TitleOpen || LevelSelectOpen || LevelSelect == null)
+            if (!TitleOpen || LevelSelectOpen || CreditsOpen || LevelSelect == null)
             {
                 return;
             }
@@ -361,11 +488,20 @@ namespace OutOfSight
         private static readonly Color TitleInk = new Color(1f, 0.94f, 0.82f, 1f);
         private static readonly Color TaglineInk = new Color(0.96f, 0.8f, 0.58f, 0.95f);
         private static readonly Color CreditsInk = new Color(1f, 0.94f, 0.82f, 0.6f);
+        // The Credits page's detail lines (licences, sources): quieter than a main line, still easy to read on the band.
+        private static readonly Color CreditsDetailInk = new Color(1f, 0.94f, 0.82f, 0.78f);
         private static readonly Color ChairRed = new Color(0.82f, 0.2f, 0.16f, 1f);
         private const float TitlePanelWidth = 1240f;
         private const float TitleMargin = 150f;
         private const float TitleButtonStep = 92f;
         private static readonly Vector2 TitleButtonSize = new Vector2(420f, 78f);
+        // Credits page (2026-11-19): five title buttons now (Jouer, Niveaux, Options, Crédits, Quitter). They were four, 92
+        // apart and 78 high from -84; at that pitch the fifth would leave the bottom of a 20:9 phone (966 reference units
+        // high at match 0.5). The title column alone moved to 80 apart, 70 high, from -66: Quitter's bottom sits at -421,
+        // still clear of the author line (its top at -437 on a 20:9 phone). The pause menu keeps its own metrics.
+        private const float TitleColumnTop = -66f;
+        private const float TitleColumnStep = 80f;
+        private const float TitleColumnButtonHeight = 70f;
 
         // Pause menu consistency pass (the product owner's "blurry pause menu" report, 2026-11-18): the pause menu
         // was never updated for the M7 title redesign, so it still used the plain built-in font, grey buttons and a
@@ -399,6 +535,7 @@ namespace OutOfSight
             BuildTitle();
             BuildPause();
             BuildOptions();
+            BuildCredits();
             LevelSelect = LevelSelect.Create(transform, Game, font, Labels, id =>
             {
                 Click();
@@ -454,7 +591,7 @@ namespace OutOfSight
 
             // The column, every element left aligned on the same margin: emblem, title, a short red rule, the subtitle
             // ("Don't Get Caught Moving"),
-            // then the four buttons (top to bottom: Jouer, Niveaux, Options, Quitter), and the author line at the bottom.
+            // then the five buttons (top to bottom: Jouer, Niveaux, Options, Crédits, Quitter), and the author line at the bottom.
             var left = new Vector2(0f, 0.5f);
             Image chair = NewImage(titleCanvas.transform, "Emblem", ProceduralArt.Chair, Color.white);
             chair.preserveAspect = true;
@@ -482,11 +619,13 @@ namespace OutOfSight
             SoftShadow(tagline);
             Place(tagline.rectTransform, left, new Vector2(TitleMargin, 22f), new Vector2(900f, 50f));
 
-            PlayButton = TitleButton("Play", Strings.TitlePlay, display, -84f);
-            LevelsButton = TitleButton("Levels", Strings.TitleLevels, display, -84f - TitleButtonStep);
+            PlayButton = TitleButton("Play", Strings.TitlePlay, display, 0);
+            LevelsButton = TitleButton("Levels", Strings.TitleLevels, display, 1);
             // M6 (CONTRACT_M6 2.1): "Options", between Niveaux and Quitter (the product owner asked for Quitter last).
-            TitleOptionsButton = TitleButton("TitleOptions", Strings.OptionsTitle, display, -84f - 2f * TitleButtonStep);
-            QuitButton = TitleButton("Quit", Strings.TitleQuit, display, -84f - 3f * TitleButtonStep);
+            TitleOptionsButton = TitleButton("TitleOptions", Strings.OptionsTitle, display, 2);
+            // Credits page (2026-11-19): "Crédits", between Options and Quitter, so Quitter stays last.
+            TitleCreditsButton = TitleButton("TitleCredits", Strings.CreditsTitle, display, 3);
+            QuitButton = TitleButton("Quit", Strings.TitleQuit, display, 4);
 
             // Credits cleanup (2026-11-19, product owner): the title shows only the author line now; the music's CC BY
             // 4.0 attribution moved to the bottom of the Options page (OptionsMusicCredits in BuildOptions), still
@@ -496,11 +635,16 @@ namespace OutOfSight
             credits.alignment = TextAnchor.MiddleLeft;
             SoftShadow(credits);
             Place(credits.rectTransform, new Vector2(0f, 0f), new Vector2(TitleMargin, 28f), new Vector2(900f, 36f));
-            Chain(PlayButton, LevelsButton, TitleOptionsButton, QuitButton);
+            Chain(PlayButton, LevelsButton, TitleOptionsButton, TitleCreditsButton, QuitButton);
             PlayButton.onClick.AddListener(() =>
             {
                 Click();
                 Play();
+            });
+            TitleCreditsButton.onClick.AddListener(() =>
+            {
+                Click();
+                OpenCredits();
             });
             LevelsButton.onClick.AddListener(() =>
             {
@@ -605,15 +749,18 @@ namespace OutOfSight
             // Audio overhaul: the music's own level, next to Volume.
             OptionsMusicButton = OptionsRow("OptionsMusic", 2, ProceduralArt.OptionMusicNote, out optionsMusicText);
             OptionsConeButton = OptionsRow("OptionsCone", 3, ProceduralArt.OptionSightCone, out optionsConeText);
+            // M7 walls pass (product owner, 2026-11-19): the Murs / Walls row and its Wall opacity row.
+            OptionsWallsButton = OptionsRow("OptionsWalls", 4, ProceduralArt.OptionWalls, out optionsWallsText);
+            OptionsWallOpacityButton = OptionsRow("OptionsWallOpacity", 5, ProceduralArt.OptionWallOpacity, out optionsWallOpacityText);
             // M7 (CONTRACT_M7 1.4): the Qualité row.
-            OptionsQualityButton = OptionsRow("OptionsQuality", 4, ProceduralArt.OptionQualityBars, out optionsQualityText);
+            OptionsQualityButton = OptionsRow("OptionsQuality", 6, ProceduralArt.OptionQualityBars, out optionsQualityText);
             // M7 design (CONTRACT_M7 4.1): the Difficulté row.
-            OptionsDifficultyButton = OptionsRow("OptionsDifficulty", 5, ProceduralArt.OptionDifficultyGauge, out optionsDifficultyText);
+            OptionsDifficultyButton = OptionsRow("OptionsDifficulty", 7, ProceduralArt.OptionDifficultyGauge, out optionsDifficultyText);
             // Language / Langue, English or Français.
-            OptionsLanguageButton = OptionsRow("OptionsLanguage", 6, ProceduralArt.OptionGlobe, out optionsLanguageText);
+            OptionsLanguageButton = OptionsRow("OptionsLanguage", 8, ProceduralArt.OptionGlobe, out optionsLanguageText);
 
-            OptionsResetButton = OptionsPlainButton("OptionsReset", Strings.OptionsDefault, 7);
-            OptionsBackButton = OptionsPlainButton("OptionsBack", Strings.SelectBack, 8);
+            OptionsResetButton = OptionsPlainButton("OptionsReset", Strings.OptionsDefault, 9);
+            OptionsBackButton = OptionsPlainButton("OptionsBack", Strings.SelectBack, 10);
 
             // Credits cleanup (2026-11-19, product owner): the music's CC BY 4.0 attribution (docs/LICENSES.md), moved
             // here from the title page, a small, less prominent line under Retour, clear of it on a 20:9 phone
@@ -623,8 +770,18 @@ namespace OutOfSight
             SoftShadow(optionsCredits);
             Place(optionsCredits.rectTransform, new Vector2(0f, 0f), new Vector2(Tuning.OptionsMargin, 14f), new Vector2(1600f, 22f));
 
-            Chain(OptionsSensitivityButton, OptionsVolumeButton, OptionsMusicButton, OptionsConeButton, OptionsQualityButton, OptionsDifficultyButton,
-                OptionsLanguageButton, OptionsResetButton, OptionsBackButton);
+            Chain(OptionsSensitivityButton, OptionsVolumeButton, OptionsMusicButton, OptionsConeButton, OptionsWallsButton, OptionsWallOpacityButton,
+                OptionsQualityButton, OptionsDifficultyButton, OptionsLanguageButton, OptionsResetButton, OptionsBackButton);
+            OptionsWallsButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleWalls();
+            });
+            OptionsWallOpacityButton.onClick.AddListener(() =>
+            {
+                Click();
+                CycleWallOpacity();
+            });
             OptionsMusicButton.onClick.AddListener(() =>
             {
                 Click();
@@ -673,12 +830,14 @@ namespace OutOfSight
             RefreshOptionsTexts();
         }
 
-        // The Options rows: the first row's centre, the step between rows and a row's height (seven value rows, then Par
+        // The Options rows: the first row's centre, the step between rows and a row's height (nine value rows, then Par
         // défaut and Retour). Audio overhaul: the Music row made it nine rows; the step went from 90 to 80 and the rows from
         // 84 to 72 high so the last one still clears the bottom of a 20:9 phone (966 reference units high at match 0.5).
+        // M7 walls pass: the Walls and Wall opacity rows made it eleven; the step went to 68 and the rows to 62 high, so
+        // Retour still clears the music credits line at the bottom of a 20:9 phone (and of a 16:10 screen, taller).
         private const float OptionsTop = 270f;
-        private const float OptionsStep = 80f;
-        private const float OptionsRowHeight = 72f;
+        private const float OptionsStep = 68f;
+        private const float OptionsRowHeight = 62f;
 
         /// <summary>
         /// A value row of the Options page at <paramref name="index"/> (0 is the top one): the row's icon at its left
@@ -760,6 +919,202 @@ namespace OutOfSight
                 new Vector2(Tuning.OptionsArrowSize, Tuning.OptionsArrowSize * 2f));
         }
 
+        // ----- Credits page (2026-11-19) -----
+
+        // The Credits page's metrics (1920 x 1080 reference, left middle anchor). The scroll view runs from just under the
+        // red rule down to above Retour, which sits where the Options page's own Retour sits (so it clears the bottom of a
+        // 20:9 phone the same way).
+        private const float CreditsViewTop = OptionsTop + 60f;
+        private const float CreditsViewBottom = OptionsTop - 10f * OptionsStep + 50f;
+        // Wide enough that the longest source URL (one unbreakable word) stays on one line at the detail size.
+        private const float CreditsViewWidth = 960f;
+        private const float CreditsBackY = OptionsTop - 10f * OptionsStep;
+        private const float CreditsScrollbarWidth = 12f;
+        /// <summary>Reference units scrolled per up or down press (keyboard, D-pad, left stick).</summary>
+        public const float CreditsScrollStep = 110f;
+
+        /// <summary>
+        /// The Credits page, in the Options page's own style (the same dim, band, display face heading under the short red
+        /// rule, and the same plain Retour row). Its lines (<see cref="Credits.All"/>) sit in a vertical scroll view: the
+        /// mouse wheel, a drag or a touch swipe, its slim scrollbar, and up and down on the keyboard, D-pad or left stick
+        /// (<see cref="CreditsScrollKeys"/> on Retour, the page's only selectable) all scroll it.
+        /// </summary>
+        private void BuildCredits()
+        {
+            creditsCanvas = Panel("CreditsPage");
+            // The pause menu's stronger dim, not the title's: many small lines read better over a quieter scene.
+            Stretch(NewImage(creditsCanvas.transform, "Dim", null, PauseDim).rectTransform);
+            Image band = NewImage(creditsCanvas.transform, "Band", ProceduralArt.SideFade, TitlePanel);
+            band.rectTransform.anchorMin = new Vector2(0f, 0f);
+            band.rectTransform.anchorMax = new Vector2(0f, 1f);
+            band.rectTransform.pivot = new Vector2(0f, 0.5f);
+            band.rectTransform.anchoredPosition = Vector2.zero;
+            band.rectTransform.sizeDelta = new Vector2(Tuning.OptionsPanelWidth, 0f);
+
+            var left = new Vector2(0f, 0.5f);
+            Font display = Hud.DisplayFont;
+            Text title = NewText(creditsCanvas.transform, "CreditsTitle", Strings.CreditsTitle, 92, TitleInk, display);
+            title.alignment = TextAnchor.MiddleLeft;
+            SoftShadow(title);
+            Place(title.rectTransform, left, new Vector2(Tuning.OptionsMargin, OptionsTop + 155f), new Vector2(760f, 110f));
+            Image rule = NewImage(creditsCanvas.transform, "CreditsRule", null, ChairRed);
+            Place(rule.rectTransform, left, new Vector2(Tuning.OptionsMargin + 4f, OptionsTop + 95f), new Vector2(84f, 6f));
+
+            // The scroll view: a transparent viewport (it takes the wheel, the drag and the swipe) clipped by a RectMask2D.
+            var scrollGo = new GameObject("CreditsScroll", typeof(RectTransform));
+            scrollGo.transform.SetParent(creditsCanvas.transform, false);
+            var scrollRect = (RectTransform)scrollGo.transform;
+            scrollRect.anchorMin = scrollRect.anchorMax = left;
+            scrollRect.pivot = new Vector2(0f, 1f);
+            scrollRect.anchoredPosition = new Vector2(Tuning.OptionsMargin, CreditsViewTop);
+            scrollRect.sizeDelta = new Vector2(CreditsViewWidth + 20f + CreditsScrollbarWidth, CreditsViewTop - CreditsViewBottom);
+            ScrollRect scroll = scrollGo.AddComponent<ScrollRect>();
+
+            var viewportGo = new GameObject("CreditsViewport", typeof(RectTransform));
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewport = (RectTransform)viewportGo.transform;
+            viewport.anchorMin = new Vector2(0f, 0f);
+            viewport.anchorMax = new Vector2(0f, 1f);
+            viewport.pivot = new Vector2(0f, 1f);
+            viewport.anchoredPosition = Vector2.zero;
+            viewport.sizeDelta = new Vector2(CreditsViewWidth, 0f);
+            var catcher = viewportGo.AddComponent<Image>();
+            catcher.color = new Color(0f, 0f, 0f, 0f);
+            catcher.raycastTarget = true;
+            viewportGo.AddComponent<RectMask2D>();
+
+            var contentGo = new GameObject("CreditsContent", typeof(RectTransform));
+            contentGo.transform.SetParent(viewport, false);
+            var content = (RectTransform)contentGo.transform;
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+            var column = contentGo.AddComponent<VerticalLayoutGroup>();
+            column.padding = new RectOffset(4, 8, 4, 28);
+            column.spacing = 4f;
+            column.childAlignment = TextAnchor.UpperLeft;
+            column.childControlWidth = true;
+            column.childControlHeight = true;
+            column.childForceExpandWidth = true;
+            column.childForceExpandHeight = false;
+            var fitter = contentGo.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+            creditsLines.Clear();
+            for (int i = 0; i < Credits.All.Count; i++)
+            {
+                Credits.Entry entry = Credits.All[i];
+                if (entry.Kind == Credits.Kind.Heading && i > 0)
+                {
+                    // Air above every section but the first.
+                    var gap = new GameObject("CreditsGap" + i, typeof(RectTransform));
+                    gap.transform.SetParent(content, false);
+                    gap.AddComponent<LayoutElement>().minHeight = 22f;
+                }
+                bool heading = entry.Kind == Credits.Kind.Heading;
+                bool detail = entry.Kind == Credits.Kind.Detail;
+                Text line = NewText(content, "CreditsLine" + i, entry.Text(Strings.Language),
+                    heading ? 40 : detail ? 24 : 28,
+                    heading ? TaglineInk : detail ? CreditsDetailInk : TitleInk,
+                    heading ? display : font);
+                line.alignment = TextAnchor.UpperLeft;
+                line.horizontalOverflow = HorizontalWrapMode.Wrap;
+                line.verticalOverflow = VerticalWrapMode.Overflow;
+                line.lineSpacing = 1.05f;
+                // A lighter, closer shadow than SoftShadow: at 24 to 28 units the title's shadow smeared the glyphs.
+                Shadow shadow = line.GetComponent<Shadow>();
+                shadow.effectColor = new Color(0.05f, 0.03f, 0.02f, 0.5f);
+                shadow.effectDistance = new Vector2(1f, -1.5f);
+                creditsLines.Add(line);
+            }
+
+            // The slim scrollbar at the right of the viewport: draggable with the mouse, never on the keyboard path.
+            var barGo = new GameObject("CreditsScrollbar", typeof(RectTransform));
+            barGo.transform.SetParent(scrollGo.transform, false);
+            var barRect = (RectTransform)barGo.transform;
+            barRect.anchorMin = new Vector2(1f, 0f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot = new Vector2(1f, 0.5f);
+            barRect.anchoredPosition = Vector2.zero;
+            barRect.sizeDelta = new Vector2(CreditsScrollbarWidth, 0f);
+            Image track = barGo.AddComponent<Image>();
+            track.sprite = ProceduralArt.Rounded;
+            track.type = Image.Type.Sliced;
+            track.color = new Color(0.17f, 0.115f, 0.085f, 0.6f);
+            var slidingGo = new GameObject("SlidingArea", typeof(RectTransform));
+            slidingGo.transform.SetParent(barGo.transform, false);
+            Stretch((RectTransform)slidingGo.transform);
+            var handleGo = new GameObject("Handle", typeof(RectTransform));
+            handleGo.transform.SetParent(slidingGo.transform, false);
+            var handleRect = (RectTransform)handleGo.transform;
+            Stretch(handleRect);
+            Image handle = handleGo.AddComponent<Image>();
+            handle.sprite = ProceduralArt.Rounded;
+            handle.type = Image.Type.Sliced;
+            handle.color = new Color(TaglineInk.r, TaglineInk.g, TaglineInk.b, 0.85f);
+            Scrollbar bar = barGo.AddComponent<Scrollbar>();
+            bar.handleRect = handleRect;
+            bar.targetGraphic = handle;
+            bar.direction = Scrollbar.Direction.BottomToTop;
+            bar.navigation = new Navigation { mode = Navigation.Mode.None };
+
+            scroll.viewport = viewport;
+            scroll.content = content;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.inertia = true;
+            scroll.scrollSensitivity = 15f;
+            scroll.verticalScrollbar = bar;
+            scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            CreditsScroll = scroll;
+
+            CreditsBackButton = Hud.MenuButton(creditsCanvas.transform, "CreditsBack", Strings.SelectBack, font, Labels);
+            Place((RectTransform)CreditsBackButton.transform, left, new Vector2(Tuning.OptionsMargin, CreditsBackY), new Vector2(420f, OptionsRowHeight));
+            StyleOptionsButton(CreditsBackButton);
+            if (Labels.TryGetValue("CreditsBackLabel", out Text backLabel))
+            {
+                backLabel.color = TitleInk;
+            }
+            // Retour is the page's only selectable: up and down have nowhere to go, so they scroll the page instead.
+            CreditsBackButton.navigation = new Navigation { mode = Navigation.Mode.Explicit };
+            CreditsBackButton.gameObject.AddComponent<CreditsScrollKeys>().Menu = this;
+            CreditsBackButton.onClick.AddListener(() =>
+            {
+                Click();
+                CloseCredits();
+            });
+        }
+
+        /// <summary>
+        /// On the Credits page's Retour: a real keyboard, D-pad or left stick move (the UI input module's move event, repeated
+        /// while held) scrolls the page, up toward the top, down toward the end. Injected test input goes through
+        /// <see cref="Update"/> instead.
+        /// </summary>
+        private sealed class CreditsScrollKeys : MonoBehaviour, IMoveHandler
+        {
+            public Menu Menu;
+
+            public void OnMove(AxisEventData eventData)
+            {
+                if (Menu == null)
+                {
+                    return;
+                }
+                if (eventData.moveDir == MoveDirection.Down)
+                {
+                    Menu.ScrollCredits(CreditsScrollStep);
+                }
+                else if (eventData.moveDir == MoveDirection.Up)
+                {
+                    Menu.ScrollCredits(-CreditsScrollStep);
+                }
+            }
+        }
+
         private void Start()
         {
             // "--optionsshot <dir>" (a built player): a screenshot of this page over the title, then quit (the same
@@ -817,6 +1172,7 @@ namespace OutOfSight
             PauseOpen = false;
             TitleOpen = true;
             LevelSelectOpen = false;
+            CreditsOpen = false;
             string first = TitleCameraTour.LevelFor(Game); // M7 title camera: the title house, never played
             if (reload || Game.Level == null || Game.LevelId != first)
             {
@@ -858,7 +1214,7 @@ namespace OutOfSight
         /// </summary>
         public void Play()
         {
-            if (!TitleOpen || LevelSelectOpen)
+            if (!TitleOpen || LevelSelectOpen || CreditsOpen)
             {
                 return;
             }
@@ -991,6 +1347,7 @@ namespace OutOfSight
         /// and selecting a button here would make the same press submit it too.
         /// </summary>
         public Selectable DefaultButton => OptionsOpen ? OptionsSensitivityButton
+            : CreditsOpen ? CreditsBackButton
             : LevelSelectOpen && LevelSelect != null ? LevelSelect.DefaultSelectable
             : TitleOpen ? PlayButton
             : PauseOpen ? ResumeButton
@@ -1009,6 +1366,11 @@ namespace OutOfSight
                     Click();
                     CloseOptions();
                 }
+                else if (CreditsOpen)
+                {
+                    Click();
+                    CloseCredits();
+                }
                 else if (LevelSelectOpen)
                 {
                     Click();
@@ -1024,7 +1386,12 @@ namespace OutOfSight
             if (events != null)
             {
                 MenuDirection dir = InputReader.MenuMovePressed();
-                if (dir != MenuDirection.None)
+                if (CreditsOpen && (dir == MenuDirection.Up || dir == MenuDirection.Down))
+                {
+                    // The Credits page: up and down scroll it (CreditsScrollKeys does the same for a real device).
+                    ScrollCredits(dir == MenuDirection.Down ? CreditsScrollStep : -CreditsScrollStep);
+                }
+                else if (dir != MenuDirection.None)
                 {
                     Selectable current = events.currentSelectedGameObject != null
                         ? events.currentSelectedGameObject.GetComponent<Selectable>()
@@ -1097,9 +1464,15 @@ namespace OutOfSight
             {
                 LevelSelectOpen = false;
             }
-            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen && !(OptionsOpen && !optionsFromPause));
+            // The Credits page is a page of the title's main page: it closes with the title or under the level select.
+            if (CreditsOpen && (!TitleOpen || LevelSelectOpen))
+            {
+                CreditsOpen = false;
+            }
+            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen && !CreditsOpen && !(OptionsOpen && !optionsFromPause));
             SetEnabled(pauseCanvas, PauseOpen && !(OptionsOpen && optionsFromPause));
             SetEnabled(optionsCanvas, OptionsOpen);
+            SetEnabled(creditsCanvas, CreditsOpen);
             if (LevelSelect != null && LevelSelect.IsOpen != LevelSelectOpen)
             {
                 LevelSelect.SetOpen(LevelSelectOpen);
@@ -1175,10 +1548,15 @@ namespace OutOfSight
 
         // ----- Construction helpers -----
 
-        /// <summary>A title page button (<see cref="ColumnButton"/>), on the title's own left margin.</summary>
-        private Button TitleButton(string name, string label, Font display, float y)
+        /// <summary>
+        /// The title page's button at <paramref name="index"/> (0 is Jouer, the top one), a <see cref="ColumnButton"/> on the
+        /// title's own left margin, <see cref="TitleColumnStep"/> apart and <see cref="TitleColumnButtonHeight"/> high.
+        /// </summary>
+        private Button TitleButton(string name, string label, Font display, int index)
         {
-            return ColumnButton(titleCanvas.transform, name, label, display, TitleMargin, y);
+            Button button = ColumnButton(titleCanvas.transform, name, label, display, TitleMargin, TitleColumnTop - index * TitleColumnStep);
+            ((RectTransform)button.transform).sizeDelta = new Vector2(TitleButtonSize.x, TitleColumnButtonHeight);
+            return button;
         }
 
         /// <summary>

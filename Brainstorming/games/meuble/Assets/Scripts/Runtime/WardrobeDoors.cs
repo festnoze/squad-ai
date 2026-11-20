@@ -18,10 +18,18 @@ namespace OutOfSight
     /// not a fixed step rule).</item>
     /// <item>While it plays, <see cref="FurnitureController.WardrobeSlideOffset"/> nudges the furniture's visual
     /// along the wardrobe's own axis (inward entering, outward leaving) so it visibly slips through the doorway.</item>
+    /// <item>Handles (2026-11-19, PRD 7.4 budgets): a combined wardrobe is drawn at rest by its "Closed" and
+    /// "ClosedHandles" renderers (FurnitureKit.Wardrobe); its separate body, cornice and doors (their handles with them)
+    /// are drawn only while the doors swing, then hidden again.</item>
     /// </list>
     /// </summary>
     public sealed class WardrobeDoors : MonoBehaviour
     {
+        /// <summary>The renderers that draw the wardrobe at rest (empty when it was built without combining).</summary>
+        private Renderer[] still = new Renderer[0];
+        /// <summary>The renderers of the parts that swing (the body and cornice with them), drawn while the doors move.</summary>
+        private Renderer[] moving = new Renderer[0];
+
         /// <summary>Share of the animation spent easing the doors open.</summary>
         private const float OpenShare = 0.4f;
         /// <summary>Normalized time the doors start easing closed again.</summary>
@@ -60,7 +68,49 @@ namespace OutOfSight
             // PrimitiveKit.Box sets localScale to the box size: scale.x is the door's own width.
             doors.door0HalfWidth = d0.localScale.x * 0.5f;
             doors.door1HalfWidth = d1.localScale.x * 0.5f;
+            var still = new System.Collections.Generic.List<Renderer>();
+            var moving = new System.Collections.Generic.List<Renderer>();
+            foreach (Transform child in wardrobeRoot)
+            {
+                Renderer r = child.GetComponent<Renderer>();
+                if (r != null && (child.name == "Closed" || child.name == "ClosedHandles"))
+                {
+                    still.Add(r);
+                }
+                else if (child.name == "Body" || child.name == "Cornice" || child == d0 || child == d1)
+                {
+                    moving.AddRange(child.GetComponentsInChildren<Renderer>(true));
+                }
+            }
+            if (still.Count > 0)
+            {
+                doors.still = still.ToArray();
+                doors.moving = moving.ToArray();
+            }
             return doors;
+        }
+
+        /// <summary>Shows the swinging parts (<paramref name="swinging"/>) or the wardrobe at rest, never both.</summary>
+        private void ShowSwinging(bool swinging)
+        {
+            if (still.Length == 0)
+            {
+                return;
+            }
+            foreach (Renderer r in still)
+            {
+                if (r != null)
+                {
+                    r.enabled = !swinging;
+                }
+            }
+            foreach (Renderer r in moving)
+            {
+                if (r != null)
+                {
+                    r.enabled = swinging;
+                }
+            }
         }
 
         /// <summary>
@@ -73,6 +123,7 @@ namespace OutOfSight
             furniture = player;
             elapsed = 0f;
             animating = true;
+            ShowSwinging(true);
             Apply(0f);
         }
 
@@ -101,6 +152,7 @@ namespace OutOfSight
         private void EndAnimation()
         {
             animating = false;
+            ShowSwinging(false);
             if (furniture != null)
             {
                 furniture.WardrobeSlideOffset = Vector3.zero;

@@ -6,19 +6,17 @@ strings shown to the player are in French.
 
 ## Play
 
-- **Play without debugging: `run.cmd`** (double-click): launches the release build in `Build/Play/`, and builds it
-  first only if it does not exist yet.
-- **Build and play: `play.cmd`** (double-click, or from a terminal). It builds the Windows player into
-  `Build/Play/` through `tools/unity.sh` (it waits if verify.sh or an agent holds Unity), then launches it.
-  Options: `-NoBuild` (play the last build), `-Windowed`, `-Dev` (a Development Build in `Build/PlayDev/` that
-  Visual Studio can attach to), `-WaitForDebugger` (with `-Dev`, the game waits for the debugger at startup). The Unity Editor must
-  not have the project open while it builds.
+- **Play:** launch `Build/Play/OutOfSight.exe`. Command-line options: `-mute`, and Unity's
+  `-screen-fullscreen 0 -screen-width 1600 -screen-height 900` for a window.
+- **Build it** (PowerShell, waits its turn on the Unity lock; the Unity Editor must not have the project open):
+  `pwsh -NoProfile -File tools/unity.ps1 -Agent me -UnityArgs "run . --timeout 3000 -- -executeMethod OutOfSight.Editor.Builder.BuildWindows -output Build/Play/OutOfSight.exe -logFile Build/pc.log"`.
+  Android: the same with `OutOfSight.Editor.Builder.BuildAndroid` (output `Build/Android/OutOfSight.apk`).
 - In game, **Ctrl+F** or **F11** toggles full screen (Alt+Enter works too).
 - The probe's build: `Build/Windows/OutOfSight.exe` (produced by `./verify.sh player`).
 - Debugging in Visual Studio 2022: install the "Game development with Unity" workload (Visual Studio Installer;
   the project's `.vsconfig` lists it), set Unity's Preferences > External Tools > External Script Editor to
   Visual Studio 2022, open `OutOfSight.sln`, then Debug > Attach Unity Debugger: the Editor in Play mode (switch the
-  Editor to Debug mode with the bug icon in its status bar) or a player built with `play.cmd -Dev`.
+  Editor to Debug mode with the bug icon in its status bar) or a Development Build of the player.
 - In the editor: open the project with Unity 6000.3.23f1, open `Assets/Scenes/Boot.unity`, press Play.
 - Controls: ZQSD or the arrow keys move (camera relative, keys read by physical position), the
   mouse orbits the camera (click to capture the cursor), the wheel zooms, R restarts, Escape
@@ -238,5 +236,6 @@ Each one is written back into the PRD (v1.2) as an M1 note or an open question.
 ## M6 and M6b gate (2026-11-16)
 
 `./verify.sh` green: 448 EditMode, 214 PlayMode, 18 levels audited without defect, built player 101 MB.
-Level 10's rock lesson is advisory (docs/CONTRACT_M6.md 5). Logs in docs/m6/. The full `./mutation.sh` run
+Level 10's rock lesson is advisory (docs/CONTRACT_M6.md 5). The agents' reports are in docs/m6/ (run logs
+removed 2026-11-20; `./verify.sh` regenerates them). The full `./mutation.sh` run
 (with the 21 M6 rows) was skipped to save credits.

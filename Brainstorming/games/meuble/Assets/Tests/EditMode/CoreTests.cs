@@ -312,7 +312,8 @@ namespace OutOfSight.Tests
             Assert.Throws<Newtonsoft.Json.JsonSerializationException>(() => LevelJson.Parse("{\"id\":\"x\",\"typo\":1}"));
         }
 
-        // ----- M7 textures (docs/CONTRACT_M7.md 1.2): the floorFinish field. -----
+        // ----- M7 textures (docs/CONTRACT_M7.md 1.2) and M8 floor finishes (docs/m8/ROOMS_PLAN.md 4): the
+        // floorFinish field. -----
 
         [Test]
         public void Validator_accepts_a_tile_floor_finish_on_a_hard_floor()
@@ -323,10 +324,32 @@ namespace OutOfSight.Tests
         }
 
         [Test]
+        public void Validator_accepts_marble_and_herringbone_on_a_hard_floor()
+        {
+            LevelDef l = Level1();
+            Assert.IsEmpty(LevelValidator.Validate(l), "premise: level 1's room is hard");
+            // M9 floors (2026-11-19): the third parquet, the second marble and the two bathroom tiles too.
+            foreach (string finish in new[] { RoomDef.MarbleFinish, RoomDef.HerringboneFinish, RoomDef.LightOakFinish, RoomDef.VerdeFinish, RoomDef.IvoryTileFinish, RoomDef.TealTileFinish })
+            {
+                l.Room.FloorFinish = finish;
+                Assert.IsEmpty(LevelValidator.Validate(l), $"the floor finish '{finish}' should be valid on a hard floor");
+            }
+        }
+
+        [Test]
+        public void Validator_accepts_carpet_on_a_soft_floor()
+        {
+            LevelDef l = Level1();
+            l.Room.Floor = RoomDef.SoftFloor;
+            l.Room.FloorFinish = RoomDef.CarpetFinish;
+            Assert.IsEmpty(LevelValidator.Validate(l), "the carpet finish should be valid on a soft floor");
+        }
+
+        [Test]
         public void Validator_rejects_an_unknown_floor_finish()
         {
             LevelDef l = Level1();
-            l.Room.FloorFinish = "marble";
+            l.Room.FloorFinish = "shagpile";
             Assert.That(LevelValidator.Validate(l), Has.Some.Contains("floor finish"));
         }
 
@@ -337,6 +360,52 @@ namespace OutOfSight.Tests
             l.Room.Floor = RoomDef.SoftFloor;
             l.Room.FloorFinish = RoomDef.TileFinish;
             Assert.That(LevelValidator.Validate(l), Has.Some.Contains("both soft and tiled"));
+        }
+
+        [Test]
+        public void Validator_rejects_marble_and_herringbone_on_a_soft_floor()
+        {
+            LevelDef l = Level1();
+            l.Room.Floor = RoomDef.SoftFloor;
+            // M9 floors (2026-11-19): every hard-only look, the four new ones included, is rejected on a soft floor.
+            foreach (string finish in new[] { RoomDef.MarbleFinish, RoomDef.HerringboneFinish, RoomDef.LightOakFinish, RoomDef.VerdeFinish, RoomDef.IvoryTileFinish, RoomDef.TealTileFinish })
+            {
+                l.Room.FloorFinish = finish;
+                Assert.That(LevelValidator.Validate(l), Has.Some.Contains("needs a hard floor"), $"'{finish}' on a soft floor should be rejected");
+            }
+        }
+
+        [Test]
+        public void Validator_rejects_a_carpet_finish_on_a_hard_floor()
+        {
+            LevelDef l = Level1();
+            Assert.IsTrue(l.Room.Floor == null || l.Room.Floor == RoomDef.HardFloor, "premise: level 1's room is hard");
+            l.Room.FloorFinish = RoomDef.CarpetFinish;
+            Assert.That(LevelValidator.Validate(l), Has.Some.Contains("needs a soft floor"), "a carpet finish on a hard floor should be rejected");
+        }
+
+        [Test]
+        public void Every_floor_finish_but_carpet_is_hard_only_and_maps_to_its_own_surface()
+        {
+            // M9 floors (2026-11-19): nine floor looks, each its own surface (so its own material and image).
+            CollectionAssert.AreEquivalent(System.Linq.Enumerable.Where(RoomDef.FloorFinishes, f => f != RoomDef.CarpetFinish), RoomDef.HardFloorFinishes);
+            var surfaces = new System.Collections.Generic.HashSet<Surface> { TextureLibrary.FloorSurface(null, false), TextureLibrary.FloorSurface(null, true) };
+            foreach (string finish in RoomDef.FloorFinishes)
+            {
+                Assert.IsTrue(surfaces.Add(TextureLibrary.FloorSurface(finish, finish == RoomDef.CarpetFinish)), $"'{finish}' shares its surface");
+                Assert.Greater(TextureLibrary.TileMetres(TextureLibrary.FloorSurface(finish, finish == RoomDef.CarpetFinish)), 0f, $"'{finish}' has no repeat size");
+            }
+            Assert.AreEqual(RoomDef.FloorFinishes.Length + 2, surfaces.Count);
+        }
+
+        [Test]
+        public void Level_json_reads_a_floor_finish_and_omits_the_default()
+        {
+            LevelDef l = Level1();
+            Assert.IsFalse(LevelJson.Serialize(l).Contains("floorFinish"), "the default parquet writes no floorFinish");
+            l.Room.FloorFinish = RoomDef.HerringboneFinish;
+            LevelDef back = LevelJson.Parse(LevelJson.Serialize(l));
+            Assert.AreEqual(RoomDef.HerringboneFinish, back.Room.FloorFinish);
         }
 
         // ----- Wall finishes (2026-11-19): the wallFinish field. -----
@@ -362,9 +431,68 @@ namespace OutOfSight.Tests
         }
 
         [Test]
+        public void Every_wall_finish_maps_to_its_own_surface_and_only_the_tiled_walls_span_the_wall_once()
+        {
+            // Tiled walls, printed and stone walls and walls 4 (2026-11-19): eleven finishes besides the crepi, each its own
+            // surface (its own image, its own slice of the wall arrays); only the two tiled walls are laid as bands.
+            var surfaces = new System.Collections.Generic.HashSet<Surface> { TextureLibrary.WallSurface(null) };
+            foreach (string finish in RoomDef.WallFinishes)
+            {
+                Surface s = TextureLibrary.WallSurface(finish);
+                Assert.IsTrue(surfaces.Add(s), $"'{finish}' shares its surface");
+                Assert.Greater(TextureLibrary.TileMetres(s), 0f, $"'{finish}' has no repeat size");
+                bool tiled = System.Array.IndexOf(RoomDef.TiledWallFinishes, finish) >= 0;
+                Assert.AreEqual(tiled, TextureLibrary.ClampsVertically(s), $"'{finish}': clamped up the wall");
+                Assert.IsTrue(WallArray.Holds(s), $"'{finish}' has no slice in the wall arrays");
+                bool band = TextureLibrary.BandOf(s, out float trim, out float paintTop, out float tilesBottom, out float shift);
+                Assert.AreEqual(tiled, band, $"'{finish}': laid as bands up the wall");
+                if (tiled)
+                {
+                    // Walls 4: real tile sizes (one image width is ten 15 cm squares or four 30 cm subway tiles), the trim at
+                    // a fixed height, the paint under it and the tile field over it within the image.
+                    Assert.Less(TextureLibrary.TileMetres(s), Tuning.TiledWallHeight, $"'{finish}': tiles of real size");
+                    Assert.That(trim, Is.InRange(0.8f, 1.3f), $"'{finish}': trim height");
+                    Assert.That(paintTop, Is.InRange(0.2f, 0.6f), $"'{finish}': paint stretch");
+                    Assert.Greater(tilesBottom, paintTop, $"'{finish}': the trim lies between the paint and the tiles");
+                    Assert.That(shift, Is.InRange(0f, 0.5f), $"'{finish}': row shift");
+                }
+            }
+            Assert.AreEqual(RoomDef.WallFinishes.Length + 1, surfaces.Count);
+            Assert.AreEqual(11, RoomDef.WallFinishes.Length, "premise: four procedural finishes, two tiled walls, five all-over images");
+            CollectionAssert.IsSubsetOf(surfaces, WallArray.Slices, "one slice per wall finish and the crepi");
+            CollectionAssert.AllItemsAreUnique(WallArray.Slices, "a surface holds two slices");
+            foreach (string finish in RoomDef.FloorFinishes)
+            {
+                Assert.IsTrue(WallArray.Holds(TextureLibrary.FloorSurface(finish, finish == RoomDef.CarpetFinish)), $"floor '{finish}' has no slice");
+            }
+            Assert.IsTrue(WallArray.Holds(TextureLibrary.FloorSurface(null, false)) && WallArray.Holds(TextureLibrary.FloorSurface(null, true)),
+                "the default floors have no slice");
+            CollectionAssert.IsSubsetOf(RoomDef.TiledWallFinishes, RoomDef.WallFinishes);
+            Assert.AreEqual(2, RoomDef.TiledWallFinishes.Length, "premise: the bathroom and the kitchen tiled walls");
+        }
+
+        [Test]
+        public void Validator_rejects_a_tiled_wall_finish_on_walls_taller_than_its_image()
+        {
+            LevelDef l = Level1();
+            Assert.AreEqual(Tuning.TiledWallHeight, l.Room.WallHeight, 1e-4f, "premise: level 1's walls are the tiled walls' height");
+            foreach (string finish in RoomDef.TiledWallFinishes)
+            {
+                l.Room.WallFinish = finish;
+                l.Room.WallHeight = Tuning.TiledWallHeight;
+                Assert.IsEmpty(LevelValidator.Validate(l), $"'{finish}' on {Tuning.TiledWallHeight} m walls should be valid");
+                l.Room.WallHeight = Tuning.TiledWallHeight + 0.3f;
+                Assert.That(LevelValidator.Validate(l), Has.Some.Contains("too tall"), $"'{finish}' on taller walls should be rejected");
+            }
+            l.Room.WallFinish = RoomDef.SageFinish;
+            Assert.That(LevelValidator.Validate(l), Has.None.Contains("too tall"), "a repeating finish suits any wall height");
+        }
+
+        [Test]
         public void Level_json_reads_the_wall_finish_and_omits_the_default()
         {
             LevelDef l = Level1();
+            l.Room.WallFinish = null; // walls 4: level 1 shows the wallpaper; the default is the crepi
             Assert.IsFalse(LevelJson.Serialize(l).Contains("wallFinish"), "the default crepi writes no wallFinish");
             l.Room.WallFinish = RoomDef.WallpaperFinish;
             LevelDef back = LevelJson.Parse(LevelJson.Serialize(l));
@@ -380,7 +508,7 @@ namespace OutOfSight.Tests
             // The game was renamed "Out of Sight"; English is the default language, French the second.
             Assert.AreEqual(Strings.English, Strings.Language, "premise: English is the default");
             Assert.AreEqual("Out of Sight", Strings.Get("title"));
-            Assert.AreEqual("Don't Get Caught Moving", Strings.Get("title.tagline"));
+            Assert.AreEqual("Unseen, uncaught!", Strings.Get("title.tagline"));
             Assert.AreEqual("WASD/Arrows: move    Mouse: camera    R: restart    Esc: pause", Strings.Get("hud.controls"));
             Assert.AreEqual("Time: 37.4 s", string.Format(Strings.Get("win.body"), Strings.FormatSeconds(37.43f)));
             Assert.AreEqual("ZQSD/Flèches : avancer    Souris : caméra    R : recommencer    Échap : pause", Strings.Get("hud.controls", Strings.French));

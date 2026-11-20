@@ -13,8 +13,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sageribbed"
     },
     {
       "id": "chambre",
@@ -25,9 +27,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "grasscloth"
+      "wallFinish": "quatrefoil"
     },
     {
       "id": "couloir",
@@ -38,6 +41,7 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA"
     },
@@ -50,9 +54,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "sage"
+      "wallFinish": "grasscloth"
     },
     {
       "id": "cuisine",
@@ -66,7 +71,7 @@
       "floorFinish": "tile",
       "floorColor": "#EDE6DA",
       "wallColor": "#F7F4EE",
-      "wallFinish": "limewash"
+      "wallFinish": "subwaytile"
     },
     {
       "id": "entree",
@@ -77,8 +82,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "verde",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "travertine"
     }
   ],
   "doors": [
@@ -182,7 +189,7 @@
     },
     {
       "name": "Lit",
-      "kind": "sofa",
+      "kind": "bed",
       "x": 0.85,
       "z": 7.85,
       "yaw": 0.0,
@@ -222,7 +229,7 @@
     },
     {
       "name": "Plan",
-      "kind": "counter",
+      "kind": "kitchen_sink",
       "x": 13.1,
       "z": 4.75,
       "yaw": 90.0,
@@ -235,7 +242,7 @@
     },
     {
       "name": "Frigo",
-      "kind": "cabinet",
+      "kind": "fridge",
       "x": 10.4,
       "z": 2.4,
       "yaw": 180.0,
@@ -282,6 +289,34 @@
     { "x": 12.75, "z": 1.25, "at": 23.4 },
     { "x": 12.75, "z": 0.75, "at": 23.4 },
     { "x": 12.75, "z": 0.75, "at": 23.4 }
+  ],
+  "designerRouteHard": [
+    { "x": 2.25, "z": 3.25, "at": 5.9 },
+    { "x": 3.25, "z": 3.25, "at": 5.9 },
+    { "x": 4.25, "z": 3.25, "at": 5.9 },
+    { "x": 5.25, "z": 3.25, "at": 5.9 },
+    { "x": 6.25, "z": 3.25, "at": 5.9 },
+    { "x": 7.25, "z": 3.25, "at": 5.9 },
+    { "x": 7.25, "z": 2.75, "at": 5.9 },
+    { "x": 8.25, "z": 2.75, "at": 5.9 },
+    { "x": 8.25, "z": 1.75, "at": 5.9 },
+    { "x": 8.25, "z": 1.25, "at": 5.9 },
+    { "x": 7.25, "z": 1.25, "at": 5.9 },
+    { "x": 7.25, "z": 0.75, "at": 19.9 },
+    { "x": 6.75, "z": 0.75, "at": 19.9 },
+    { "x": 6.75, "z": 1.25, "at": 19.9 },
+    { "x": 7.25, "z": 1.25, "at": 19.9 },
+    { "x": 7.25, "z": 0.75, "at": 19.9 },
+    { "x": 6.75, "z": 0.75, "at": 19.9 },
+    { "x": 6.75, "z": 1.25, "at": 19.9 },
+    { "x": 7.75, "z": 1.25, "at": 19.9 },
+    { "x": 8.75, "z": 1.25, "at": 19.9 },
+    { "x": 9.75, "z": 1.25, "at": 19.9 },
+    { "x": 10.75, "z": 1.25, "at": 19.9 },
+    { "x": 11.75, "z": 1.25, "at": 19.9 },
+    { "x": 12.75, "z": 1.25, "at": 19.9 },
+    { "x": 12.75, "z": 0.75, "at": 19.9 },
+    { "x": 12.75, "z": 0.75, "at": 19.9 }
   ],
   "inhabitants": [
     {

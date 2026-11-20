@@ -120,11 +120,11 @@ MonoBehaviour:
     colourMean: {r: 0.8203, g: 0.6488, b: 0.478, a: 1}
   - surface: 16
     texture: {fileID: 2800000, guid: 38c640223c4ae0d4b8f3f49c93c5ee44, type: 3}
-    mean: 0.9411774
+    mean: 0.9411779
     source: wall_grasscloth
     normal: {fileID: 2800000, guid: 921211ee411c13846ac01d978dcd87bf, type: 3}
     colour: {fileID: 2800000, guid: f4efa8c47c778394baeab1884f093518, type: 3}
-    colourMean: {r: 0.5681, g: 0.6748, b: 0.7592, a: 1}
+    colourMean: {r: 0.5862, g: 0.6702, b: 0.723, a: 1}
   - surface: 17
     texture: {fileID: 2800000, guid: e17d0bc53fe053f49b60916b55f0b7a3, type: 3}
     mean: 0.94117606
@@ -132,9 +132,112 @@ MonoBehaviour:
     normal: {fileID: 2800000, guid: 03d9cca897b405c438aac8bbb1a2551c, type: 3}
     colour: {fileID: 2800000, guid: 31e954a5cdfe93e4699d96473d551f92, type: 3}
     colourMean: {r: 0.8143, g: 0.7847, b: 0.6596, a: 1}
+  - surface: 18
+    texture: {fileID: 2800000, guid: eb73baa4b6928f347a00447a022140c9, type: 3}
+    mean: 0.94117033
+    source: floor_marble
+    normal: {fileID: 2800000, guid: 6b80ec10e5754584fb17747d2c64029b, type: 3}
+    colour: {fileID: 2800000, guid: 628b8b97f389b9b4aaf2c4299d4d6220, type: 3}
+    colourMean: {r: 0.6733, g: 0.6505, b: 0.5973, a: 1}
+  - surface: 19
+    texture: {fileID: 2800000, guid: 913d56952e2585f4a8185fb4bac7d517, type: 3}
+    mean: 0.9411767
+    source: floor_herringbone
+    normal: {fileID: 2800000, guid: 8b0d566ca25710f4aa8f879e9a3e529f, type: 3}
+    colour: {fileID: 2800000, guid: 06e6bc4737eb8dd4fb6717a5994e82de, type: 3}
+    colourMean: {r: 0.0826, g: 0.0417, b: 0.0215, a: 1}
+  - surface: 20
+    texture: {fileID: 2800000, guid: d7257b17a88be7f44b7b12a5b9dc5969, type: 3}
+    mean: 0.94117355
+    source: floor_carpet
+    normal: {fileID: 2800000, guid: 4b08e598f054b3c458c7733dd4978088, type: 3}
+    colour: {fileID: 2800000, guid: 062a3c149c7314c419182a9d8a8db220, type: 3}
+    colourMean: {r: 0.3241, g: 0.2816, b: 0.2232, a: 1}
+  - surface: 21
+    texture: {fileID: 2800000, guid: c69f37393bdf6a242bc342330c9469d1, type: 3}
+    mean: 0.9411717
+    source: floor_lightoak
+    normal: {fileID: 2800000, guid: ae61073b2e01e9a499f961c25c77d072, type: 3}
+    colour: {fileID: 2800000, guid: 0700bd9220ed3fd45a966c7d67810a61, type: 3}
+    colourMean: {r: 0.5577, g: 0.4303, b: 0.2745, a: 1}
+  - surface: 22
+    texture: {fileID: 2800000, guid: 272397046fc48a740a78a9db876c1d39, type: 3}
+    mean: 0.9409923
+    source: floor_verde
+    normal: {fileID: 2800000, guid: 0e21c24114ff8d64480b29a3d8d9b6d8, type: 3}
+    colour: {fileID: 2800000, guid: eed26d5793633954e91055f012b38f2d, type: 3}
+    colourMean: {r: 0.0232, g: 0.0516, b: 0.0364, a: 1}
+  - surface: 23
+    texture: {fileID: 2800000, guid: 9c4145fed02910c42bb0026f5cb2fac1, type: 3}
+    mean: 0.941184
+    source: tile_bathroom_small_ivory
+    normal: {fileID: 2800000, guid: e31ee23ce01e4db4ca33787a4094f9d7, type: 3}
+    colour: {fileID: 2800000, guid: dea3de454c9157843941e26b126588ca, type: 3}
+    colourMean: {r: 0.7739, g: 0.6578, b: 0.5346, a: 1}
+  - surface: 24
+    texture: {fileID: 2800000, guid: 53e072325e449a84380d7945eeeb58af, type: 3}
+    mean: 0.9411793
+    source: tile_bathroom_large_teal
+    normal: {fileID: 2800000, guid: a2e010375b93ac746a959fe5ff326390, type: 3}
+    colour: {fileID: 2800000, guid: 008a2b028a4bf03468a9e0643c0f5495, type: 3}
+    colourMean: {r: 0.0505, g: 0.1239, b: 0.119, a: 1}
+  - surface: 25
+    texture: {fileID: 2800000, guid: c0b6745a3c90cdb449333f78e48395fd, type: 3}
+    mean: 0.94116503
+    source: wall_bathroom_white_pastel_blue
+    normal: {fileID: 2800000, guid: b4177c771df915c41b9d9f5574f8f03b, type: 3}
+    colour: {fileID: 2800000, guid: 07d2cf74dcffa924f8c5f3726c7d2e87, type: 3}
+    colourMean: {r: 0.5675, g: 0.6763, b: 0.734, a: 1}
+  - surface: 26
+    texture: {fileID: 2800000, guid: ca1677aa4d42ca142b90b932bfa5596a, type: 3}
+    mean: 0.94134796
+    source: wall_kitchen_ivory_sage
+    normal: {fileID: 2800000, guid: 1c0b6f334f2b19841bdbb28338bfd28c, type: 3}
+    colour: {fileID: 2800000, guid: c21c3edf89d85de46bcfc39003afffb4, type: 3}
+    colourMean: {r: 0.6143, g: 0.5718, b: 0.4376, a: 1}
+  - surface: 27
+    texture: {fileID: 2800000, guid: 9e3fbe68743c47341a95212ba4547e41, type: 3}
+    mean: 0.94117343
+    source: wall_travertine_greige
+    normal: {fileID: 2800000, guid: 50b90833e86520348aa56eb884e419a1, type: 3}
+    colour: {fileID: 2800000, guid: e3ccc03bde685d74cbda09ec29dd248d, type: 3}
+    colourMean: {r: 0.591, g: 0.4628, b: 0.3292, a: 1}
+  - surface: 28
+    texture: {fileID: 2800000, guid: 2322c21f94296eb45b26f0a70f707b1a, type: 3}
+    mean: 0.9411697
+    source: wall_deco_arches_blue
+    normal: {fileID: 2800000, guid: 01a44a7c4edf7ed4d8dcd0d15926e61a, type: 3}
+    colour: {fileID: 2800000, guid: 018aa7be2bff18f40b27e8b6899a3dee, type: 3}
+    colourMean: {r: 0.8501, g: 0.7995, b: 0.6747, a: 1}
+  - surface: 29
+    texture: {fileID: 2800000, guid: 99f18557cbe923f459dd5ffa554cbe09, type: 3}
+    mean: 0.94117963
+    source: wall_linen_pinstripe_olive
+    normal: {fileID: 2800000, guid: 3b99400b47d59744c86ae113bc09fda0, type: 3}
+    colour: {fileID: 2800000, guid: e1c88bc68f43e7a4fbb7cb2ed09a465c, type: 3}
+    colourMean: {r: 0.6721, g: 0.568, b: 0.4247, a: 1}
+  - surface: 30
+    texture: {fileID: 2800000, guid: 5b3abdf1921e91f44823027019f5ad77, type: 3}
+    mean: 0.9411496
+    source: wall_quatrefoil
+    normal: {fileID: 2800000, guid: dde2e59892d08da49aaea60f09667284, type: 3}
+    colour: {fileID: 2800000, guid: b06e24cffe1023b4883a074cc59b028e, type: 3}
+    colourMean: {r: 0.8081, g: 0.7174, b: 0.5442, a: 1}
+  - surface: 31
+    texture: {fileID: 2800000, guid: 4ed35fa87fae81241a17aebb206ae4ae, type: 3}
+    mean: 0.9411782
+    source: wall_sage_ribbed
+    normal: {fileID: 2800000, guid: fb99be5aeadae1f41ab16f97558141db, type: 3}
+    colour: {fileID: 2800000, guid: 719f77775e7054745bff21c172f2e952, type: 3}
+    colourMean: {r: 0.4563, g: 0.5111, b: 0.2715, a: 1}
   playerColour: {fileID: 2800000, guid: 1ae5feb84193b50449600b6a2f11da09, type: 3}
   playerMean: {r: 0.8211, g: 0.0014, b: 0.0004, a: 1}
   playerSource: red_metal_source
   rugColour: {fileID: 2800000, guid: 99e496eb267ef2c4fb0df2664b328f7e, type: 3}
   rugMean: {r: 0.4957, g: 0.2497, b: 0.1744, a: 1}
   rugSource: rug_modern_inset_border
+  wallColours: {fileID: 18700000, guid: eeb9869c5c829e041ba4767e01ed4c1a, type: 3}
+  wallNormals: {fileID: 18700000, guid: cb725da6ce462094191b66c48a0b0d5a, type: 3}
+  wallMaterial: {fileID: 2100000, guid: 6b07ca95187c3ca488ee8aa0e9ad5777, type: 2}
+  wallSeeThrough: {fileID: 2100000, guid: 060b00f622dcd984c91fedb8cf43838c, type: 2}
+  wallSlices: 030000000e0000000f0000001000000011000000190000001a0000001b0000001c0000001d0000001e0000001f00000002000000060000000d00000012000000130000001400000015000000160000001700000018000000

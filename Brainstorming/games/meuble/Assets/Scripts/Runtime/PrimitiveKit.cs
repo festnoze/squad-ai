@@ -294,6 +294,11 @@ namespace OutOfSight
             }
             Material[] materials = renderer.sharedMaterials;
             Material current = slot >= 0 && slot < materials.Length ? materials[slot] : null;
+            // Walls 4 (WallArray): the wall material shows the finish each vertex names; no property block, no detail.
+            if (WallArray.IsWallMaterial(current))
+            {
+                return;
+            }
             keepPalette |= renderer.gameObject.layer == Layers.Inhabitant;
             Material shown = ShownMaterial(current, surface, keepPalette);
             Texture2D texture;
@@ -365,8 +370,8 @@ namespace OutOfSight
         /// the rug's own picture (<see cref="TextureLibrary.RugColour"/>) exactly once over its own UV 0 to 1, never
         /// tiled: unlike <see cref="Detail(Renderer, int, Surface)"/>, no <see cref="MetresPerUv"/> measurement and no
         /// repeat, so the mesh must already carry UV0 in the 0 to 1 range over the whole visible surface (BuildRug and
-        /// BuildExit's own dedicated quad, the literal <see cref="QuadMesh"/> scaled by the transform, never
-        /// <see cref="QuadMeshSized"/> or a box). Drawn through the same shared Surface.Carpet material
+        /// BuildExit's own dedicated mesh, <see cref="RugNineSliceMesh"/>, never <see cref="QuadMeshSized"/> or a box).
+        /// Drawn through the same shared Surface.Carpet material
         /// (<see cref="SurfaceMaterial"/>) as the "soft" room floor and the rug's own tiled skirt or border below it,
         /// unchanged (PRD 7.4: one material, not a second one for rugs); no normal map (a stretched tiling bump would
         /// look wrong on a picture that is never tiled). Does nothing for a null renderer, with
@@ -677,6 +682,102 @@ namespace OutOfSight
             return mesh;
         }
 
+        // Rug nine-slice (product owner, 2026-11-19): rug_modern_inset_border.png's own border, measured once on the
+        // 1536x1024 source (a sharp cream-to-content brightness edge found on dozens of scan lines per side, median
+        // taken): left 93px, right 93px, bottom 96px, top 103px.
+        private const float RugImageWidthPx = 1536f;
+        private const float RugImageHeightPx = 1024f;
+        private const float RugBorderLeftPx = 93f;
+        private const float RugBorderRightPx = 93f;
+        private const float RugBorderBottomPx = 96f;
+        private const float RugBorderTopPx = 103f;
+
+        /// <summary>
+        /// M7 rug image, nine-slice (product owner, 2026-11-19): a 4x4 grid (9 quads, one mesh, one renderer) over the
+        /// unit quad <see cref="QuadMesh"/> occupies (-0.5 to 0.5, scaled by the transform to <paramref name="size"/>
+        /// exactly like the single quad it replaces), so <see cref="RugDetail"/>'s picture nine-slices instead of
+        /// stretching in one piece: the four corners keep the image's own border pixels (<see cref="RugBorderLeftPx"/>
+        /// and siblings) at their own undistorted ratio (never stretched, the same single local <c>scale</c>
+        /// applies to both axes), the four edge quads stretch only along their own length, and
+        /// the centre quad fills whatever is left (stretched: the field is not a repeatable pattern, so tiling it
+        /// would show a seam). <c>scale</c> is <c>min(size.x / 1536, size.y / 1024)</c>: on a rug whose
+        /// aspect is the image's own (1.5), this is exactly <c>size.x / 1536 == size.y / 1024</c>, so every one of
+        /// the nine quads is an undistorted piece of the plain stretched quad and the result is pixel identical to it
+        /// (CONTRACT: "a 1.5:1 rug looks exactly as today"); on any other aspect it is the tighter axis's own scale,
+        /// so corners never grow past half of either side. UVs keep <see cref="QuadMesh"/>'s own axes (U along x,
+        /// V along y, no swap: unlike <see cref="QuadMeshSized"/>, the rug's picture never rotates with the rug's own
+        /// proportions). Cached by size.
+        /// </summary>
+        public static Mesh RugNineSliceMesh(Vector2 size)
+        {
+            string key = "rug9" + SizeKey(new Vector3(size.x, size.y, 0f));
+            if (MeshCache.TryGetValue(key, out Mesh cached) && cached != null)
+            {
+                return cached;
+            }
+            float scale = Mathf.Min(size.x / RugImageWidthPx, size.y / RugImageHeightPx);
+            float left = Mathf.Clamp01(RugBorderLeftPx * scale / size.x);
+            float right = Mathf.Clamp01(RugBorderRightPx * scale / size.x);
+            float bottom = Mathf.Clamp01(RugBorderBottomPx * scale / size.y);
+            float top = Mathf.Clamp01(RugBorderTopPx * scale / size.y);
+            if (left + right > 1f)
+            {
+                float sum = left + right;
+                left /= sum;
+                right /= sum;
+            }
+            if (bottom + top > 1f)
+            {
+                float sum = bottom + top;
+                bottom /= sum;
+                top /= sum;
+            }
+            float[] xs = { -0.5f, -0.5f + left, 0.5f - right, 0.5f };
+            float[] ys = { -0.5f, -0.5f + bottom, 0.5f - top, 0.5f };
+            float[] us = { 0f, RugBorderLeftPx / RugImageWidthPx, 1f - RugBorderRightPx / RugImageWidthPx, 1f };
+            float[] vs = { 0f, RugBorderBottomPx / RugImageHeightPx, 1f - RugBorderTopPx / RugImageHeightPx, 1f };
+            var vertices = new Vector3[16];
+            var uv = new Vector2[16];
+            var normals = new Vector3[16];
+            for (int row = 0; row < 4; row++)
+            {
+                for (int col = 0; col < 4; col++)
+                {
+                    int i = row * 4 + col;
+                    vertices[i] = new Vector3(xs[col], ys[row], 0f);
+                    uv[i] = new Vector2(us[col], vs[row]);
+                    normals[i] = Vector3.back;
+                }
+            }
+            var triangles = new int[9 * 6];
+            int t = 0;
+            for (int row = 0; row < 3; row++)
+            {
+                for (int col = 0; col < 3; col++)
+                {
+                    int a = row * 4 + col;
+                    int b = a + 1;
+                    int c = a + 4;
+                    int d = c + 1;
+                    triangles[t++] = a;
+                    triangles[t++] = c;
+                    triangles[t++] = d;
+                    triangles[t++] = a;
+                    triangles[t++] = d;
+                    triangles[t++] = b;
+                }
+            }
+            var mesh = new Mesh { name = "RugNineSlice" };
+            mesh.vertices = vertices;
+            mesh.normals = normals;
+            mesh.uv = uv;
+            mesh.triangles = triangles;
+            mesh.RecalculateBounds();
+            Keep(mesh);
+            MeshCache[key] = mesh;
+            return mesh;
+        }
+
         /// <summary>
         /// Wall finishes (2026-11-19): a wall face's quad, as <see cref="QuadMeshSized"/> (the unit quad scaled by its
         /// transform to <paramref name="size"/>, UVs in metres, named "Quad") but always U along the wall and V up, whatever
@@ -910,6 +1011,17 @@ namespace OutOfSight
             var uvs = new List<Vector2>();
             var triangles = new List<int>();
             var partUvs = new List<Vector2>();
+            // Walls 4 (docs/m9/FLOORS_WALLS.md section 7): a wall part names its finish per vertex (WallArray.Tag, UV1 and
+            // UV2); kept, so the faces of several finishes combine into one renderer of the one wall material.
+            bool tagged = false;
+            foreach (CombinePart part in parts)
+            {
+                tagged |= part.Mesh.HasVertexAttribute(VertexAttribute.TexCoord1);
+            }
+            List<Vector4> finishes = tagged ? new List<Vector4>() : null;
+            List<Vector4> bands = tagged ? new List<Vector4>() : null;
+            var partFinishes = new List<Vector4>();
+            var partBands = new List<Vector4>();
             foreach (CombinePart part in parts)
             {
                 Mesh m = part.Mesh;
@@ -919,11 +1031,23 @@ namespace OutOfSight
                 Vector3[] n = m.normals;
                 partUvs.Clear();
                 m.GetUVs(0, partUvs);
+                partFinishes.Clear();
+                partBands.Clear();
+                if (tagged)
+                {
+                    m.GetUVs(WallArray.FinishChannel, partFinishes);
+                    m.GetUVs(WallArray.BandChannel, partBands);
+                }
                 for (int i = 0; i < v.Length; i++)
                 {
                     vertices.Add(part.Matrix.MultiplyPoint3x4(v[i]));
                     normals.Add(i < n.Length ? normalMatrix.MultiplyVector(n[i]).normalized : Vector3.up);
                     uvs.Add(i < partUvs.Count ? partUvs[i] : Vector2.zero);
+                    if (tagged)
+                    {
+                        finishes.Add(i < partFinishes.Count ? partFinishes[i] : Vector4.zero);
+                        bands.Add(i < partBands.Count ? partBands[i] : Vector4.zero);
+                    }
                 }
                 bool mirrored = part.Matrix.determinant < 0f;
                 for (int sub = 0; sub < m.subMeshCount; sub++)
@@ -945,6 +1069,11 @@ namespace OutOfSight
             mesh.SetVertices(vertices);
             mesh.SetNormals(normals);
             mesh.SetUVs(0, uvs);
+            if (tagged)
+            {
+                mesh.SetUVs(WallArray.FinishChannel, finishes);
+                mesh.SetUVs(WallArray.BandChannel, bands);
+            }
             mesh.SetTriangles(triangles, 0);
             mesh.RecalculateBounds();
             Keep(mesh);

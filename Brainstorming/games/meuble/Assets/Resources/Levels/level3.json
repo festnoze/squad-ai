@@ -5,11 +5,11 @@
   "rooms": [
     {
       "id": "salle", "x": -1.75, "z": 0.0, "sizeX": 5.5, "sizeZ": 5.0, "wallHeight": 2.7, "wallThickness": 0.1,
-      "floor": "hard", "floorColor": "#B07A4E", "wallColor": "#EDE6DA"
+      "floor": "hard", "floorFinish": "herringbone", "floorColor": "#B07A4E", "wallColor": "#EDE6DA", "wallFinish": "arches"
     },
     {
       "id": "cuisine", "x": 3.1, "z": 0.0, "sizeX": 4.0, "sizeZ": 5.0, "wallHeight": 2.7, "wallThickness": 0.1,
-      "floor": "hard", "floorFinish": "tile", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE", "wallFinish": "limewash"
+      "floor": "hard", "floorFinish": "tile", "floorColor": "#EDE6DA", "wallColor": "#F7F4EE", "wallFinish": "subwaytile"
     }
   ],
   "doors": [
@@ -54,12 +54,12 @@
       "color": "#6B4226", "accentColor": "#E3B23C"
     },
     {
-      "name": "Sideboard", "kind": "counter", "x": -3.75, "z": 2.25, "yaw": 0.0,
+      "name": "Sideboard", "kind": "cabinet", "x": -3.75, "z": 2.25, "yaw": 0.0,
       "sizeX": 1.4, "sizeY": 0.9, "sizeZ": 0.5, "occluder": true,
       "color": "#6B4226", "accentColor": "#E3B23C"
     },
     {
-      "name": "Counter", "kind": "counter", "x": 3.0, "z": 2.2, "yaw": 0.0,
+      "name": "Counter", "kind": "kitchen_sink", "x": 3.0, "z": 2.2, "yaw": 0.0,
       "sizeX": 2.4, "sizeY": 0.9, "sizeZ": 0.6, "occluder": true,
       "color": "#5B93D9", "accentColor": "#F7F4EE"
     },
@@ -67,9 +67,32 @@
       "name": "KitchenTable", "kind": "table", "x": 3.05, "z": -1.25, "yaw": 0.0,
       "sizeX": 1.0, "sizeY": 0.75, "sizeZ": 0.8, "occluder": true,
       "color": "#E3B23C", "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Fridge", "kind": "fridge", "x": 1.5, "z": -2.0, "yaw": 270.0,
+      "sizeX": 0.7, "sizeY": 1.8, "sizeZ": 0.7, "occluder": true,
+      "color": "#F7F4EE", "accentColor": "#6B4226"
     }
   ],
   "designerRoute": [
+    { "x": -3.25, "z": 0.75, "at": 3.5 },
+    { "x": -3.25, "z": 1.25, "at": 4.3 },
+    { "x": -2.25, "z": 1.25, "at": 4.7 },
+    { "x": -1.25, "z": 1.25, "at": 5.5 },
+    { "x": -0.25, "z": 1.25, "at": 6.3 },
+    { "x": 0.75, "z": 1.25, "at": 7.1 },
+    { "x": 1.35, "z": 1.25, "at": 13.4 },
+    { "x": 1.85, "z": 1.25, "at": 13.8 },
+    { "x": 1.85, "z": 0.25, "at": 14.2 },
+    { "x": 1.85, "z": -0.25, "at": 15.0 },
+    { "x": 2.85, "z": -0.25, "at": 15.4 },
+    { "x": 3.85, "z": -0.25, "at": 16.2 },
+    { "x": 4.35, "z": -0.25, "at": 17.0 },
+    { "x": 4.35, "z": -1.25, "at": 17.4 },
+    { "x": 4.35, "z": -1.75, "at": 18.2 },
+    { "x": 4.35, "z": -2.05, "at": 18.2 }
+  ],
+  "designerRouteHard": [
     { "x": -3.25, "z": 0.75, "at": 3.5 },
     { "x": -3.25, "z": 1.25, "at": 4.3 },
     { "x": -2.25, "z": 1.25, "at": 4.7 },

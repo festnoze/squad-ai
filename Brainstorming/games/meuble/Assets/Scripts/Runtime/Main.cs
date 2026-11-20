@@ -277,7 +277,8 @@ namespace OutOfSight
             go.tag = "MainCamera";
             Camera = go.AddComponent<Camera>();
             Camera.clearFlags = CameraClearFlags.SolidColor;
-            Camera.backgroundColor = new Color(0.15f, 0.16f, 0.19f);
+            // Garden backdrop (2026-11-19): the sky above the ring around the house continues its picture's top sky.
+            Camera.backgroundColor = GardenBackdrop.ClearColour;
             Camera.fieldOfView = 55f;
             Camera.nearClipPlane = 0.05f;
             Camera.farClipPlane = 80f;

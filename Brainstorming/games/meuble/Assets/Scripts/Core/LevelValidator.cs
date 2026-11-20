@@ -132,6 +132,11 @@ namespace OutOfSight.Core
                 {
                     issues.Add($"prop {prop.Name} is not inside a room");
                 }
+                // M8 (docs/m8/ROOMS_PLAN.md 3): a typo in a kind would build a plain box silently.
+                if (!PropKinds.IsKnown(prop.Kind))
+                {
+                    issues.Add($"prop {prop.Name} kind '{prop.Kind}' is not a prop kind ({string.Join(", ", PropKinds.All)})");
+                }
             }
 
             CheckDecoys(level, rooms, issues);
@@ -437,20 +442,47 @@ namespace OutOfSight.Core
                 {
                     issues.Add($"room {Name(r, i)} floor '{r.Floor}' is neither hard nor soft");
                 }
-                // M7 (CONTRACT_M7 1.2): floorFinish is visual only, and only meaningful on a hard floor (a soft one
-                // is already a distinct carpet look; tile and carpet together would be two floor treatments at once).
-                if (!string.IsNullOrEmpty(r.FloorFinish) && r.FloorFinish != RoomDef.TileFinish)
+                // M7 (CONTRACT_M7 1.2) and M8 floor finishes (docs/m8/ROOMS_PLAN.md 4): floorFinish is visual only.
+                // "tile", "marble", "herringbone" and (M9 floors) "lightoak", "verde", "ivorytile" and "tealtile"
+                // (RoomDef.HardFloorFinishes) are hard-floor-only looks (a soft room already has its own
+                // distinct carpet look); "carpet" is the opposite, a soft-floor-only look, so a carpet always means
+                // quiet.
+                if (!string.IsNullOrEmpty(r.FloorFinish) && System.Array.IndexOf(RoomDef.FloorFinishes, r.FloorFinish) < 0)
                 {
-                    issues.Add($"room {Name(r, i)} floor finish '{r.FloorFinish}' is not 'tile'"); // MUTATION:FLOOR_FINISH_VALUE
+                    issues.Add($"room {Name(r, i)} floor finish '{r.FloorFinish}' is not one of {string.Join(", ", RoomDef.FloorFinishes)}"); // MUTATION:FLOOR_FINISH_VALUE
                 }
                 else if (r.IsTile && r.IsSoft) // MUTATION:FLOOR_FINISH_SOFT_TILE
                 {
                     issues.Add($"room {Name(r, i)} is both soft and tiled: a tile finish needs a hard floor");
                 }
+                else if (System.Array.IndexOf(RoomDef.HardFloorFinishes, r.FloorFinish) >= 0 && r.IsSoft) // MUTATION:FLOOR_FINISH_SOFT_HARDONLY
+                {
+                    issues.Add($"room {Name(r, i)} is both soft and {r.FloorFinish}: a {r.FloorFinish} finish needs a hard floor");
+                }
+                else if (r.FloorFinish == RoomDef.CarpetFinish && !r.IsSoft) // MUTATION:FLOOR_FINISH_CARPET_HARD
+                {
+                    issues.Add($"room {Name(r, i)} floor finish 'carpet' needs a soft floor: a carpet always means quiet");
+                }
                 // Wall finishes (2026-11-19): wallFinish is visual only; null or empty is the cream crepi.
                 if (!string.IsNullOrEmpty(r.WallFinish) && System.Array.IndexOf(RoomDef.WallFinishes, r.WallFinish) < 0)
                 {
                     issues.Add($"room {Name(r, i)} wall finish '{r.WallFinish}' is not one of {string.Join(", ", RoomDef.WallFinishes)}"); // MUTATION:WALL_FINISH_VALUE
+                }
+                // Tiled walls (2026-11-19): the image spans the wall once, floor to Tuning.TiledWallHeight, and is clamped
+                // above it (its top row would stretch up a taller wall).
+                else if (System.Array.IndexOf(RoomDef.TiledWallFinishes, r.WallFinish) >= 0 && r.WallHeight > Tuning.TiledWallHeight + Eps)
+                {
+                    issues.Add($"room {Name(r, i)} wall finish '{r.WallFinish}' spans {Tuning.TiledWallHeight} m once: its walls of {r.WallHeight} m are too tall");
+                }
+                // M8 (docs/m8/ROOMS_PLAN.md 2 and 5): type and lightWall are visual only; null or empty is the inferred type
+                // and the automatic light placement.
+                if (!string.IsNullOrEmpty(r.DeclaredType) && !RoomTypes.IsKnown(r.DeclaredType))
+                {
+                    issues.Add($"room {Name(r, i)} type '{r.DeclaredType}' is not one of {string.Join(", ", RoomTypes.All)}");
+                }
+                if (!string.IsNullOrEmpty(r.LightWall) && System.Array.IndexOf(RoomDef.LightWalls, r.LightWall) < 0)
+                {
+                    issues.Add($"room {Name(r, i)} light wall '{r.LightWall}' is not one of {string.Join(", ", RoomDef.LightWalls)}");
                 }
                 if (Mathf.Abs(r.WallThickness - t) > Eps)
                 {

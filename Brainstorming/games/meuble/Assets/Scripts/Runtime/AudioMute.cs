@@ -6,7 +6,7 @@ namespace OutOfSight
     /// <summary>
     /// The product owner's request: no sound while tests run. Muted in batch mode (every tools/unity.sh run, so the
     /// EditMode and PlayMode suites), in the player's probe (--probe, --look), with the "-mute" argument
-    /// (play.cmd -Mute) or the OUTOFSIGHT_MUTE=1 environment variable. Muting only sets AudioListener.volume to 0: every
+    /// (OutOfSight.exe -mute) or the OUTOFSIGHT_MUTE=1 environment variable. Muting only sets AudioListener.volume to 0: every
     /// AudioSource still plays, so the tests that count sounds stay meaningful.
     /// </summary>
     public static class AudioMute

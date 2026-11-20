@@ -13,8 +13,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sageribbed"
     }
   ],
   "doors": [
@@ -101,7 +103,7 @@
     },
     {
       "name": "TV",
-      "kind": "counter",
+      "kind": "tv_unit",
       "x": 3.0,
       "z": -2.3,
       "yaw": 0.0,
@@ -111,6 +113,19 @@
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "CoffeeTable",
+      "kind": "coffee_table",
+      "x": 1.5,
+      "z": -1.5,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 0.42,
+      "sizeZ": 0.55,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#6B4226"
     }
   ],
   "designerRoute": [
@@ -121,9 +136,23 @@
     { "x": -3.25, "z": 0.75, "at": 10.7 },
     { "x": -2.25, "z": 0.75, "at": 11.3 },
     { "x": -1.25, "z": 0.75, "at": 12.5 },
-    { "x": -0.25, "z": 0.75, "at": 13.7 },
-    { "x": -0.25, "z": 1.75, "at": 14.9 },
-    { "x": 0.0, "z": 1.95, "at": 14.9 }
+    { "x": -1.25, "z": 1.25, "at": 13.7 },
+    { "x": -0.25, "z": 1.25, "at": 14.3 },
+    { "x": -0.25, "z": 1.75, "at": 15.5 },
+    { "x": 0.0, "z": 1.95, "at": 15.5 }
+  ],
+  "designerRouteHard": [
+    { "x": -3.25, "z": -0.75, "at": 1.8 },
+    { "x": -3.25, "z": -1.25, "at": 3.0 },
+    { "x": -3.25, "z": -0.25, "at": 3.6 },
+    { "x": -3.25, "z": 0.25, "at": 4.8 },
+    { "x": -3.25, "z": 0.75, "at": 10.7 },
+    { "x": -2.25, "z": 0.75, "at": 11.3 },
+    { "x": -1.25, "z": 0.75, "at": 12.5 },
+    { "x": -1.25, "z": 1.25, "at": 13.7 },
+    { "x": -0.25, "z": 1.25, "at": 14.3 },
+    { "x": -0.25, "z": 1.75, "at": 15.5 },
+    { "x": 0.0, "z": 1.95, "at": 15.5 }
   ],
   "inhabitants": [
     {

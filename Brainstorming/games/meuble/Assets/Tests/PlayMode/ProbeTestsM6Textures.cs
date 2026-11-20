@@ -308,12 +308,19 @@ namespace OutOfSight.Tests
             return block.isEmpty ? null : block.GetTexture(BaseMap);
         }
 
-        /// <summary>The window pane: no texture (Surface.Plain), but its own smoothness (CONTRACT_M6 2.4).</summary>
+        /// <summary>
+        /// The window pane: no library texture (Surface.Plain), but its own smoothness (CONTRACT_M6 2.4). Window picture
+        /// (product owner image of 2026-11-19): it shows the owner's window picture (WindowImage), through its block only,
+        /// on the pane's own material (no new material).
+        /// </summary>
         private static void AssertWindowPane(Transform root, string id)
         {
             Renderer pane = root.GetComponentsInChildren<Renderer>(false).FirstOrDefault(r => r.name == "WindowPane");
             Assert.IsNotNull(pane, $"{id}: premise: no WindowPane renderer");
-            Assert.AreEqual(Surface.Plain, TextureLibrary.SurfaceOf(ShownTexture(pane)), $"{id}: the window pane shows a texture");
+            Assert.AreEqual(Surface.Plain, TextureLibrary.SurfaceOf(ShownTexture(pane)), $"{id}: the window pane shows a library texture");
+            Assert.IsNotNull(WindowImage.Texture, $"{id}: premise: no window picture (Resources/{WindowImage.ResourcePath})");
+            Assert.AreSame(WindowImage.Texture, ShownTexture(pane), $"{id}: the window pane does not show the window picture");
+            Assert.IsNull(pane.sharedMaterial.GetTexture(BaseMap), $"{id}: the picture is on the shared pane material (the glows would show it)");
             Assert.That(pane.sharedMaterial.GetFloat("_Smoothness"), Is.EqualTo(Tuning.WindowPaneSmoothness).Within(1e-4f), $"{id}: window pane smoothness");
             Assert.That(pane.sharedMaterial.GetFloat("_Metallic"), Is.EqualTo(0f).Within(1e-4f), $"{id}: window pane metallic");
         }
@@ -430,6 +437,16 @@ namespace OutOfSight.Tests
                 Surface.Grass, Surface.Lacquer, Surface.Metal, Surface.Tile,
                 // Wall finishes (2026-11-19).
                 Surface.Sage, Surface.Limewash, Surface.Grasscloth, Surface.Wallpaper,
+                // M8 floor finishes (docs/m8/ROOMS_PLAN.md 4, 2026-11-19).
+                Surface.Marble, Surface.Herringbone, Surface.CarpetFinish,
+                // M9 floors (2026-11-19).
+                Surface.LightOak, Surface.Verde, Surface.IvoryTile, Surface.TealTile,
+                // Tiled walls (2026-11-19).
+                Surface.WhiteTile, Surface.SubwayTile,
+                // Printed and stone walls (2026-11-19).
+                Surface.Travertine, Surface.Arches, Surface.Pinstripe,
+                // Walls 4 (2026-11-19).
+                Surface.Quatrefoil, Surface.SageRibbed,
             };
             foreach (Surface s in withNormal)
             {
@@ -442,17 +459,23 @@ namespace OutOfSight.Tests
             }
 
             yield return LoadLevel("level3");
-            List<Slot> level3 = LitSlots(Game.Level.Root.transform);
-            List<Slot> tileFloor = level3.Where(s => s.Surface == Surface.Tile).ToList();
-            Assert.Greater(tileFloor.Count, 0, "level3: the kitchen floor shows no tile detail");
-            foreach (Slot s in tileFloor)
+            // Walls 4 (WallArray): the floors are drawn with the one room surface material; the kitchen's tile floor is
+            // named by its vertices, at the tile's finish and normal strength, its slice in the arrays the tile's own maps.
+            var tileVertices = new List<Vector4>();
+            foreach (Renderer r in Game.Level.Root.GetComponentsInChildren<Renderer>(false).Where(r => r.gameObject.layer == Layers.Floor && WallArray.IsWallMaterial(r.sharedMaterial)))
             {
-                // M7 real colours (CONTRACT_M7 5): the tile image in its own colours, at the tile's finish and normal map.
-                AssertRealColour(s, Surface.Tile, "level3 tile floor");
-                Assert.That(s.Material.GetFloat("_Smoothness"), Is.EqualTo(Tuning.TileSmoothness).Within(1e-4f), $"{Label(s)}: tile smoothness");
-                Assert.AreSame(TextureLibrary.NormalOf(Surface.Tile), ShownNormal(s.Renderer, s.Index), $"{Label(s)}: shows no tile normal map");
-                Assert.That(ShownBumpScale(s.Renderer, s.Index), Is.EqualTo(Tuning.NormalScaleTile).Within(1e-4f), $"{Label(s)}: wrong tile _BumpScale");
+                var finish = new List<Vector4>();
+                ModelKit.MeshOf(r).GetUVs(WallArray.FinishChannel, finish);
+                tileVertices.AddRange(finish.Where(f => WallArray.SurfaceOf(f) == Surface.Tile));
             }
+            Assert.Greater(tileVertices.Count, 0, "level3: the kitchen floor shows no tile");
+            foreach (Vector4 f in tileVertices)
+            {
+                Assert.That(f.z, Is.EqualTo(Tuning.TileSmoothness).Within(1e-4f), "level3 tile floor: smoothness");
+                Assert.That(f.w, Is.EqualTo(Tuning.NormalScaleTile).Within(1e-4f), "level3 tile floor: normal strength");
+                Assert.That(f.y, Is.EqualTo(1f / TextureLibrary.TileMetres(Surface.Tile)).Within(1e-4f), "level3 tile floor: repeats per metre");
+            }
+            Assert.AreEqual(Surface.Tile, library.wallSlices[WallArray.SliceOf(Surface.Tile)], "the tile's slice of the arrays");
             AssertMaterialBudget(Game, "level3");
 
             yield return LoadLevel("level9");

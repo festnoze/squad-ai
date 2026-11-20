@@ -63,6 +63,10 @@ namespace OutOfSight
     /// it is put away (<see cref="InhabitantRoutine.JustPutAway"/>); 7 every noise goes through the robot's hum
     /// (<see cref="Hearing.IsMasked"/>: hops, rolls and clicks within RobotHumRadius of a robot are not emitted), and the
     /// fall is a Crash at the clue; 9 the balance gauge.
+    ///
+    /// The dog's hold (docs/CONTRACT_M5.md 20): in step 6, after the carry, a dog that barked runs to the furniture, pins
+    /// it next to it (step 5 keeps the pin with a sitter's) and barks at it, and the nearest free human comes to put it
+    /// back as after a discovery (<see cref="StepDogHold"/>); 9 the hold line and the bark loop.
     /// </summary>
     public sealed class GameState : MonoBehaviour
     {
@@ -251,6 +255,24 @@ namespace OutOfSight
             int i = IndexOf(dog);
             return i >= 0 && i < barkCooldowns.Length ? barkCooldowns[i] : 0;
         }
+
+        // ----- CONTRACT_M5 20: the dog's hold -----
+
+        /// <summary>The dog running to the furniture after its bark, or holding it, or null.</summary>
+        public Inhabitant HoldingDog => holdDog >= 0 && Level != null && holdDog < Level.Inhabitants.Count ? Level.Inhabitants[holdDog] : null;
+
+        /// <summary>The dog stands next to the furniture and pins it, until a human puts it back.</summary>
+        public bool HeldByDog => dogHolding;
+
+        /// <summary>The human the dog's hold sent to put the furniture back, or null.</summary>
+        public Inhabitant DogCaller => holdCaller >= 0 && Level != null && holdCaller < Level.Inhabitants.Count ? Level.Inhabitants[holdCaller] : null;
+
+        /// <summary>Since the level started: runs begun after a bark, holds (the dog reached and pinned the furniture), humans
+        /// sent by a hold, and the discoveries those humans made on arrival.</summary>
+        public int DogRunCount { get; private set; }
+        public int DogHoldCount { get; private set; }
+        public int DogCallCount { get; private set; }
+        public int DogHoldDiscoveryCount { get; private set; }
 
         /// <summary>The watcher saw a sample of a swinging leaf on the last step (any watcher, the dog included).</summary>
         public bool SeesLeaf(Inhabitant inhabitant)
@@ -534,6 +556,18 @@ namespace OutOfSight
         private readonly List<int> barksThisStep = new List<int>();
         private DoorLeaf doorOpenedThisStep;
 
+        // CONTRACT_M5 20: the dog running to or holding the furniture (-1 when none), where it runs, whether it holds, the
+        // human it called (-1), the steps with nobody to call, the steps to the next bark of the hold, this step's bark,
+        // and whether a sitter pins the furniture (StepSitting).
+        private int holdDog = -1;
+        private Vector3 holdTarget;
+        private bool dogHolding;
+        private int holdCaller = -1;
+        private int holdWaitSteps;
+        private int holdBarkSteps;
+        private bool holdBarkThisStep;
+        private bool sitPinned;
+
         // M5 wave 5B: the robots, their planar positions this step (the hum) and whether each one touched the furniture on the
         // last step (a contact is the first step of an overlap); the fixed steps of the robot timeline.
         private readonly List<Robot> robots = new List<Robot>();
@@ -651,6 +685,18 @@ namespace OutOfSight
             LastBarkStep = -1;
             barksThisStep.Clear();
             doorOpenedThisStep = null;
+            // CONTRACT_M5 20: no hold yet.
+            holdDog = -1;
+            dogHolding = false;
+            holdCaller = -1;
+            holdWaitSteps = 0;
+            holdBarkSteps = 0;
+            holdBarkThisStep = false;
+            sitPinned = false;
+            DogRunCount = 0;
+            DogHoldCount = 0;
+            DogCallCount = 0;
+            DogHoldDiscoveryCount = 0;
             Level.Furniture.ActionKeyClaimed = ClaimActionKey;
             lastToppleCount = Level.Furniture.ToppleCount;
             lastToggleCount = Level.Furniture.ToggleCount;
@@ -987,6 +1033,183 @@ namespace OutOfSight
                 LastBarkAt = at;
                 LastBarkStep = Steps;
                 EmitUnlessMasked(new NoiseEvent(at, Hearing.RadiusOf(NoiseKind.Bark), NoiseKind.Bark));
+            }
+        }
+
+        // ----- 6. CONTRACT_M5 20: the dog's hold -----
+
+        /// <summary>
+        /// Step 6, after the investigations and the carry (CONTRACT_M5 20). A bark of this step (<see cref="StepBarks"/>) sends
+        /// its dog running to the furniture (<see cref="InhabitantRoutine.BeginRun"/>), one hold at a time, with the memory rule
+        /// on and the furniture neither hidden nor carried. A furniture that moved on before the dog got there is chased from
+        /// where the dog stopped; one the dog cannot reach ends the run. Within InvestigateReach + CarryReachMargin the dog
+        /// holds it: the furniture is pinned (<see cref="ApplyPin"/>, as when sat on), the dog barks at it every
+        /// <see cref="Tuning.DogHoldBarkInterval"/> (a sound, not a noise event), and the nearest human free to come (memory,
+        /// Routine or Alerted, not frozen, on no other errand) is sent to it with <see cref="InhabitantRoutine.Investigate"/>.
+        /// Its arrival is <see cref="StepInvestigations"/>': out of place for its memory, one discovery and the carry back to its
+        /// slot, as always; in place, nothing. The hold ends when the furniture is put down, when the called human goes back to
+        /// its routine without a carry (in place, or no path: it accepts the furniture where it stands), when nobody could be
+        /// sent for <see cref="Tuning.DogHoldMaxWait"/>, or when the dog is interrupted; the dog then resumes its routine.
+        /// </summary>
+        private void StepDogHold(GameRules rules, float dt)
+        {
+            FurnitureController furniture = Level.Furniture;
+            List<Inhabitant> inhabitants = Level.Inhabitants;
+            if (holdDog < 0)
+            {
+                if (!rules.DisplacementMemory || furniture.Hidden || furniture.Carried)
+                {
+                    return;
+                }
+                foreach (int i in barksThisStep)
+                {
+                    InhabitantRoutine dog = inhabitants[i].Routine;
+                    Vector3 target = YawMath.Planar(furniture.transform.position);
+                    dog.BeginRun(target); // MUTATION:DOG_RUN
+                    if (dog.Running)
+                    {
+                        holdDog = i;
+                        holdTarget = target;
+                        dogHolding = false;
+                        holdCaller = -1;
+                        holdWaitSteps = 0;
+                        DogRunCount++;
+                        return;
+                    }
+                }
+                return;
+            }
+            InhabitantRoutine d = holdDog < inhabitants.Count ? inhabitants[holdDog].Routine : null;
+            if (d == null || !d.Running || d.Mode != InhabitantMode.Investigating || furniture.Hidden)
+            {
+                // The dog was interrupted (a pin, a startle), or the furniture went into a wardrobe.
+                EndHold();
+                return;
+            }
+            Vector3 at = YawMath.Planar(furniture.transform.position);
+            float reach = Tuning.InvestigateReach + Tuning.CarryReachMargin;
+            if (!dogHolding)
+            {
+                if (furniture.Carried || !d.ReachedTarget)
+                {
+                    if (furniture.Carried)
+                    {
+                        // A human already carries it back: nothing left to hold.
+                        EndHold();
+                    }
+                    return;
+                }
+                if (YawMath.Planar(at - d.Position).magnitude > reach)
+                {
+                    if (YawMath.Planar(holdTarget - d.Position).magnitude > reach)
+                    {
+                        // No way to where it was: the dog gives up.
+                        EndHold();
+                        return;
+                    }
+                    // It moved on meanwhile: after it again.
+                    holdTarget = at;
+                    d.BeginRun(at);
+                    return;
+                }
+                dogHolding = true; // MUTATION:DOG_HOLD
+                DogHoldCount++;
+                holdBarkSteps = 0;
+                ApplyPin(furniture);
+            }
+            if (putDownThisStep)
+            {
+                // Put back where it belongs: the dog lets go.
+                EndHold();
+                return;
+            }
+            if (furniture.Carried || carrier >= 0)
+            {
+                // On its way back in a human's hands: the dog waits, quiet.
+                return;
+            }
+            if (--holdBarkSteps <= 0)
+            {
+                holdBarkThisStep = true;
+                holdBarkSteps = Mathf.Max(1, Mathf.RoundToInt(Tuning.DogHoldBarkInterval / dt));
+            }
+            if (holdCaller >= 0)
+            {
+                if (holdCaller < inhabitants.Count && inhabitants[holdCaller].Routine.Mode == InhabitantMode.Investigating)
+                {
+                    return;
+                }
+                // Back to its routine without a carry: it found the furniture in place, or could not reach it and accepted it.
+                EndHold();
+                return;
+            }
+            int best = -1;
+            float bestDistance = float.MaxValue;
+            for (int i = 0; i < inhabitants.Count; i++)
+            {
+                InhabitantRoutine h = inhabitants[i].Routine;
+                bool busy = (i < switchingOn.Length && switchingOn[i]) || i == clueFinder || (i < doorFixers.Length && doorFixers[i] >= 0);
+                if (h == null || !h.Personality.Memory || !CanObserve(h) || busy)
+                {
+                    continue;
+                }
+                float distance = YawMath.Planar(h.Position - at).magnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = i;
+                }
+            }
+            if (best >= 0)
+            {
+                InhabitantRoutine h = inhabitants[best].Routine;
+                h.Investigate(at); // MUTATION:DOG_CALL
+                if (h.Mode == InhabitantMode.Investigating)
+                {
+                    holdCaller = best;
+                    investigateTargets[best] = at;
+                    resolved[best] = false;
+                    holdWaitSteps = 0;
+                    DogCallCount++;
+                    return;
+                }
+            }
+            if (++holdWaitSteps >= Mathf.RoundToInt(Tuning.DogHoldMaxWait / dt))
+            {
+                // Nobody could come: the dog gives up.
+                EndHold();
+            }
+        }
+
+        /// <summary>CONTRACT_M5 20: the hold (or the run) is over: the dog resumes its routine and lets the furniture go.</summary>
+        private void EndHold()
+        {
+            if (holdDog >= 0 && holdDog < Level.Inhabitants.Count)
+            {
+                InhabitantRoutine d = Level.Inhabitants[holdDog].Routine;
+                if (d != null && d.Running)
+                {
+                    d.CancelInvestigation();
+                }
+            }
+            holdDog = -1;
+            dogHolding = false;
+            holdCaller = -1;
+            holdWaitSteps = 0;
+            ApplyPin(Level.Furniture);
+        }
+
+        /// <summary>
+        /// The furniture is pinned while a sitter sits on it (M4) or while the dog holds it and no human carries it
+        /// (CONTRACT_M5 20). Only a change calls <see cref="FurnitureController.Pin"/>.
+        /// </summary>
+        private void ApplyPin(FurnitureController furniture)
+        {
+            bool pinned = sitPinned || (dogHolding && !furniture.Carried);
+            if (furniture.Pinned != pinned)
+            {
+                // Pin(false) re-arms the neutral input wait (amendment 9.3): a key held through the pin is ignored.
+                furniture.Pin(pinned);
             }
         }
 
@@ -1431,6 +1654,7 @@ namespace OutOfSight
             switchedOnThisStep = false;
             pratfallThisStep = -1;
             barksThisStep.Clear();
+            holdBarkThisStep = false;
             doorOpenedThisStep = null;
             householdDoorThisStep = null;
             contactThisStep = false;
@@ -1553,6 +1777,11 @@ namespace OutOfSight
             if (State == PlayState.Playing)
             {
                 StepInvestigations();
+                // CONTRACT_M5 20: the dog's run and hold, after the carry (a put down ends it).
+                if (State == PlayState.Playing)
+                {
+                    StepDogHold(rules, dt);
+                }
                 StepLamp(rules);
                 StepPutAway();
                 StepDoorPutBack();
@@ -1605,7 +1834,9 @@ namespace OutOfSight
                 // M4: the hints of the current body only, and the sat-on line while pinned. M4.1 (10.3): the tipped line
                 // while the stool lies on its side.
                 Hud.SetBodyHints(rules.Bodies, rules.Lamp && furniture.Body != null && furniture.Body.HasLight);
-                Hud.SetSatOn(State == PlayState.Playing && furniture.Pinned);
+                Hud.SetSatOn(State == PlayState.Playing && furniture.Pinned && sitPinned);
+                // CONTRACT_M5 20: the dog's hold line.
+                Hud.SetDogHold(State == PlayState.Playing && dogHolding && furniture.Pinned && !sitPinned);
                 Hud.SetTipped(State == PlayState.Playing && furniture.LyingDown && !furniture.Carried);
                 // M5 (CONTRACT_M5_v3 15.2): E opens the door in reach.
                 Hud.ShowDoorHint(DoorHintWanted(furniture));
@@ -1834,11 +2065,9 @@ namespace OutOfSight
                 }
                 sitting |= routine.SittingOnPlayer;
             }
-            if (furniture.Pinned != sitting)
-            {
-                // Pin(false) re-arms the neutral input wait (amendment 9.3): a key held through the dwell is ignored.
-                furniture.Pin(sitting);
-            }
+            // CONTRACT_M5 20: the dog's hold pins it too.
+            sitPinned = sitting;
+            ApplyPin(furniture);
         }
 
         /// <summary>
@@ -1888,6 +2117,11 @@ namespace OutOfSight
             for (int i = 0; i < inhabitants.Count; i++)
             {
                 InhabitantRoutine routine = inhabitants[i].Routine;
+                if (!routine.Personality.Memory)
+                {
+                    // CONTRACT_M5 20: the dog's run is StepDogHold's, never an investigation.
+                    continue;
+                }
                 if (routine.Mode != InhabitantMode.Investigating)
                 {
                     resolved[i] = false;
@@ -1898,6 +2132,26 @@ namespace OutOfSight
                     float reach = Tuning.InvestigateReach + Tuning.CarryReachMargin;
                     float distance = YawMath.Planar(furniture.transform.position - routine.Position).magnitude;
                     bool free = carrier < 0 && !furniture.Carried && !furniture.Hidden;
+                    if (free && distance <= reach && i == holdCaller && dogHolding)
+                    {
+                        // CONTRACT_M5 20: the human the dog called finds the held furniture. Out of place for its memory: the
+                        // usual discovery (suspicion 1 loses as usual), then the carry back below. In place: nothing to put
+                        // back; it goes back to its routine and StepDogHold ends the hold.
+                        if (!memories[i].OutOfPlace(furniture.Pose, furniture.Tipped)) // MUTATION:DOG_CALL_FINDS
+                        {
+                            routine.CancelInvestigation();
+                            continue;
+                        }
+                        DiscoveryCount++;
+                        DogHoldDiscoveryCount++;
+                        meters[i].AddDiscovery();
+                        Sfx?.PlayHein(PanToward(inhabitants[i].transform.position));
+                        if (meters[i].Lost || meters[i].Value >= Tuning.SuspicionLose)
+                        {
+                            Lose(LoseReason.Suspicion, i);
+                            return;
+                        }
+                    }
                     if (free && distance <= reach)
                     {
                         // The furniture is still where it was found: carry it back to where it belongs.
@@ -2620,6 +2874,12 @@ namespace OutOfSight
                 {
                     Sfx.PlayBark(PanToward(Level.Inhabitants[i].transform.position));
                 }
+            }
+            // CONTRACT_M5 20: the dog barks at the furniture it holds (a sound only).
+            Inhabitant holding = HoldingDog;
+            if (holdBarkThisStep && holding != null)
+            {
+                Sfx.PlayBark(PanToward(holding.transform.position));
             }
             if (CreakedThisStep)
             {

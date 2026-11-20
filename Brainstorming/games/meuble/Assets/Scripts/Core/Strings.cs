@@ -44,10 +44,10 @@ namespace OutOfSight.Core
         private static readonly Dictionary<string, string[]> Table = new Dictionary<string, string[]>
         {
             { "title", new[] { "Out of Sight", "Out of Sight" } },
-            { "title.tagline", new[] { "Don't Get Caught Moving", "Ne te fais pas prendre à bouger" } },
+            { "title.tagline", new[] { "Unseen, uncaught!", "Pas vu, pas pris !" } },
             { "title.play", new[] { "Play", "Jouer" } },
             { "title.quit", new[] { "Quit", "Quitter" } },
-            { "title.credits", new[] { "Created and designed by Etienne 2026", "Created and designed by Etienne 2026" } },
+            { "title.credits", new[] { "Created by Etienne. Upskill 2026", "Crée par Etienne. Upskill 2026" } },
             { "title.levels", new[] { "Levels", "Niveaux" } },
 
             { "hud.controls", new[] { "WASD/Arrows: move    Mouse: camera    R: restart    Esc: pause",
@@ -62,6 +62,7 @@ namespace OutOfSight.Core
             { "hud.careful", new[] { "Shift: tiptoe", "Maj : au ralenti" } },
             { "hud.lamp", new[] { "E: lights off / on", "E : éteindre / allumer" } },
             { "hud.satOn", new[] { "Someone is sitting on you. Stay strong.", "Quelqu'un est assis sur toi." } },
+            { "hud.dogHold", new[] { "The dog has you. Someone is coming to put you back.", "Le chien te bloque : on vient te remettre en place." } },
             { "hud.tipped", new[] { "Knocked over: press a direction to get back on your feet.", "Renversé : appuie sur une direction pour te relever." } },
             { "hud.door", new[] { "E: open the door", "E : ouvrir la porte" } },
             { "hud.hide", new[] { "E: hide", "E : se cacher" } },
@@ -125,8 +126,8 @@ namespace OutOfSight.Core
             { "level11.hint", new[] { "No sharp turns with a vase aboard. Hold Shift to go gently.",
                 "Pas de virage brusque avec le vase. Maj pour aller doucement." } },
             { "level12.name", new[] { "The Dog", "Le chien" } },
-            { "level12.hint", new[] { "The dog sees low: the sofa hides you from him. Catch his eye moving and he barks.",
-                "Le chien voit bas : le canapé te cache de lui. S'il te voit bouger, il aboie." } },
+            { "level12.hint", new[] { "The dog sees low: the sofa hides you from him. Catch his eye moving and he pins you.",
+                "Le chien voit bas : le canapé te cache de lui. S'il te voit bouger, il te bloque." } },
             { "level13.name", new[] { "Wheels and a Vase", "Roulettes et vase" } },
             { "level13.hint", new[] { "Shift to start and to turn: every stop slides, and the vase falls at the slightest jolt.",
                 "Maj pour démarrer et tourner : chaque arrêt glisse, et le vase tombe au moindre à-coup." } },
@@ -170,7 +171,7 @@ namespace OutOfSight.Core
             { "person.tidy", new[] { "The Neat Freak", "La maniaque" } },
             { "person.tidy.trait", new[] { "Move one chair an inch and she'll notice.", "Le moindre meuble déplacé, elle le remarque." } },
             { "person.dog", new[] { "The Dog", "Le chien" } },
-            { "person.dog.trait", new[] { "Sees low, and barks the second you move.", "Il voit bas et aboie quand tu bouges." } },
+            { "person.dog.trait", new[] { "Sees low, barks and pins you the second you move.", "Il voit bas, aboie et te bloque si tu bouges." } },
             { "intro.here", new[] { "Here: {0}", "Ici : {0}" } },
 
             { "select.locked", new[] { "Locked", "Verrouillé" } },
@@ -192,6 +193,13 @@ namespace OutOfSight.Core
             { "options.cone", new[] { "Vision cones: {0}", "Cône de vision : {0}" } },
             { "options.coneAlways", new[] { "Always", "Toujours" } },
             { "options.coneNever", new[] { "Never", "Jamais" } },
+            // M7 walls pass (product owner, 2026-11-19): how the walls in the way get out of it, and their opacity.
+            { "options.walls", new[] { "Walls: {0}", "Murs : {0}" } },
+            { "options.wallsLowered", new[] { "Lowered", "Baissés" } },
+            { "options.wallsSeeThrough", new[] { "See-through", "Transparents" } },
+            { "options.wallsBoth", new[] { "Both", "Les deux" } },
+            { "options.wallsNone", new[] { "Off", "Aucun" } },
+            { "options.wallOpacity", new[] { "Wall opacity: {0}%", "Opacité des murs : {0} %" } },
             { "options.default", new[] { "Defaults", "Par défaut" } },
             { "options.quality", new[] { "Quality: {0}", "Qualité : {0}" } },
             { "options.qualityLow", new[] { "Low", "Bas" } },
@@ -208,6 +216,8 @@ namespace OutOfSight.Core
             { "options.musicCredits", new[] {
                 "Music: \"Sneaky Snitch\", \"Investigations\" by Kevin MacLeod (incompetech.com), licensed under CC BY 4.0 (creativecommons.org/licenses/by/4.0)",
                 "Musique : \"Sneaky Snitch\", \"Investigations\" de Kevin MacLeod (incompetech.com), sous licence CC BY 4.0 (creativecommons.org/licenses/by/4.0)" } },
+            // Credits page (2026-11-19): the title page's button and the page's own heading; the lines are Core.Credits.
+            { "credits.title", new[] { "Credits", "Crédits" } },
 
             { "touch.action", new[] { "Action", "Action" } },
             { "touch.careful", new[] { "Careful", "Prudence" } },
@@ -326,6 +336,7 @@ namespace OutOfSight.Core
         public static string HudCareful => Get("hud.careful");
         public static string HudLamp => Get("hud.lamp");
         public static string HudSatOn => Get("hud.satOn");
+        public static string HudDogHold => Get("hud.dogHold");
         public static string HudTipped => Get("hud.tipped");
         public static string Level8Name => Get("level8.name");
         public static string Level8Hint => Get("level8.hint");
@@ -396,6 +407,13 @@ namespace OutOfSight.Core
         public static string OptionsCone => Get("options.cone");
         public static string OptionsConeAlways => Get("options.coneAlways");
         public static string OptionsConeNever => Get("options.coneNever");
+        /// <summary>M7 walls pass: the Walls row ({0}: one of the four looks below) and the Wall opacity row ({0}: percent).</summary>
+        public static string OptionsWalls => Get("options.walls");
+        public static string OptionsWallsLowered => Get("options.wallsLowered");
+        public static string OptionsWallsSeeThrough => Get("options.wallsSeeThrough");
+        public static string OptionsWallsBoth => Get("options.wallsBoth");
+        public static string OptionsWallsNone => Get("options.wallsNone");
+        public static string OptionsWallOpacity => Get("options.wallOpacity");
         public static string OptionsDefault => Get("options.default");
         /// <summary>hud.controls when the last input came from a gamepad: the same four commands, gamepad names.</summary>
         public static string HudControlsGamepad => Get("hud.controlsGamepad");
@@ -424,6 +442,9 @@ namespace OutOfSight.Core
 
         /// <summary>Credits cleanup: the music's CC BY 4.0 attribution, a small line at the bottom of the Options page.</summary>
         public static string OptionsMusicCredits => Get("options.musicCredits");
+
+        /// <summary>"Crédits", the title page's button and the Credits page's heading (its lines are <see cref="Credits"/>).</summary>
+        public static string CreditsTitle => Get("credits.title");
 
         /// <summary>The shown name of a difficulty id (DifficultyDef.Facile, Normal, Difficile); anything else is Normal.</summary>
         public static string DifficultyName(string id)

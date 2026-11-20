@@ -15,7 +15,8 @@
       "wallThickness": 0.1,
       "floor": "soft",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "wallpaper"
     },
     {
       "id": "boudoir",
@@ -28,7 +29,7 @@
       "floor": "soft",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "wallpaper"
+      "wallFinish": "quatrefoil"
     },
     {
       "id": "galerie",
@@ -39,8 +40,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "travertine"
     },
     {
       "id": "salon",
@@ -51,8 +54,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "arches"
     },
     {
       "id": "bibliotheque",
@@ -64,7 +69,8 @@
       "wallThickness": 0.1,
       "floor": "soft",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "grasscloth"
     },
     {
       "id": "office",
@@ -75,9 +81,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "tile",
+      "floorFinish": "verde",
       "floorColor": "#F7F4EE",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "subwaytile"
     },
     {
       "id": "galerie_est",
@@ -88,8 +95,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
+      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#EDE6DA",
+      "wallFinish": "limewash"
     },
     {
       "id": "vestibule",
@@ -100,7 +109,7 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "tile",
+      "floorFinish": "verde",
       "floorColor": "#F7F4EE",
       "wallColor": "#EDE6DA"
     }
@@ -199,18 +208,9 @@
   "rugs": [
     {
       "model": "kenney.rug",
-      "x": 8.22,
+      "x": 12.0,
       "z": 10.95,
-      "sizeX": 7.44,
-      "sizeZ": 1.2,
-      "yaw": 0.0,
-      "color": "#5B93D9"
-    },
-    {
-      "model": "kenney.rug",
-      "x": 15.78,
-      "z": 10.95,
-      "sizeX": 7.44,
+      "sizeX": 15.0,
       "sizeZ": 1.2,
       "yaw": 0.0,
       "color": "#5B93D9"
@@ -218,18 +218,9 @@
     {
       "model": "kenney.rug",
       "x": 20.95,
-      "z": 4.22,
+      "z": 6.5,
       "sizeX": 1.2,
-      "sizeZ": 4.44,
-      "yaw": 0.0,
-      "color": "#5B93D9"
-    },
-    {
-      "model": "kenney.rug",
-      "x": 20.95,
-      "z": 8.78,
-      "sizeX": 1.2,
-      "sizeZ": 4.44,
+      "sizeZ": 9.0,
       "yaw": 0.0,
       "color": "#5B93D9"
     }
@@ -237,7 +228,7 @@
   "props": [
     {
       "name": "Lit",
-      "kind": "sofa",
+      "kind": "bed",
       "x": 1.95,
       "z": 11.1,
       "yaw": 0.0,
@@ -249,17 +240,56 @@
       "accentColor": "#F7F4EE"
     },
     {
+      "name": "ChevetChambre",
+      "kind": "nightstand",
+      "x": 0.85,
+      "z": 11.6,
+      "yaw": 0.0,
+      "sizeX": 0.45,
+      "sizeY": 0.55,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
       "name": "Paravent",
       "kind": "cabinet",
       "x": 1.6,
       "z": 9.2,
-      "yaw": 0.0,
-      "sizeX": 0.3,
+      "yaw": 270.0,
+      "sizeX": 1.2,
       "sizeY": 1.6,
-      "sizeZ": 1.2,
+      "sizeZ": 0.3,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
+    },
+    {
+      "name": "LitComtesse",
+      "kind": "bed",
+      "x": 1.05,
+      "z": 4.6,
+      "yaw": 270.0,
+      "sizeX": 1.6,
+      "sizeY": 0.55,
+      "sizeZ": 2.0,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "ChevetBoudoir",
+      "kind": "nightstand",
+      "x": 0.25,
+      "z": 3.5,
+      "yaw": 270.0,
+      "sizeX": 0.45,
+      "sizeY": 0.55,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
     },
     {
       "name": "ArmoireGalerie1",
@@ -302,26 +332,26 @@
     },
     {
       "name": "Console5",
-      "kind": "cabinet",
+      "kind": "nightstand",
       "x": 21.7,
       "z": 5.9,
-      "yaw": 0.0,
-      "sizeX": 0.4,
+      "yaw": 90.0,
+      "sizeX": 1.0,
       "sizeY": 0.9,
-      "sizeZ": 1.0,
+      "sizeZ": 0.4,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
     },
     {
       "name": "Console6",
-      "kind": "cabinet",
+      "kind": "nightstand",
       "x": 21.7,
       "z": 8.1,
-      "yaw": 0.0,
-      "sizeX": 0.4,
+      "yaw": 90.0,
+      "sizeX": 1.0,
       "sizeY": 0.9,
-      "sizeZ": 1.0,
+      "sizeZ": 0.4,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
@@ -371,25 +401,64 @@
       "kind": "bookshelf",
       "x": 19.6,
       "z": 8.0,
-      "yaw": 0.0,
-      "sizeX": 0.45,
+      "yaw": 90.0,
+      "sizeX": 2.4,
       "sizeY": 1.9,
-      "sizeZ": 2.4,
+      "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#E3B23C"
     },
     {
+      "name": "Evier",
+      "kind": "kitchen_sink",
+      "x": 16.9,
+      "z": 3.35,
+      "yaw": 180.0,
+      "sizeX": 1.2,
+      "sizeY": 1.08,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Cuisiniere",
+      "kind": "stove",
+      "x": 17.8,
+      "z": 3.35,
+      "yaw": 180.0,
+      "sizeX": 0.6,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    },
+    {
       "name": "Comptoir",
       "kind": "counter",
-      "x": 17.5,
+      "x": 18.4,
       "z": 3.35,
-      "yaw": 0.0,
-      "sizeX": 2.4,
+      "yaw": 180.0,
+      "sizeX": 0.6,
       "sizeY": 0.9,
       "sizeZ": 0.6,
       "occluder": true,
       "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Frigo",
+      "kind": "fridge",
+      "x": 19.45,
+      "z": 3.4,
+      "yaw": 180.0,
+      "sizeX": 0.7,
+      "sizeY": 1.8,
+      "sizeZ": 0.7,
+      "occluder": true,
+      "color": "#F7F4EE",
       "accentColor": "#F7F4EE"
     }
   ],

@@ -846,5 +846,39 @@ namespace OutOfSight
             float dist = Mathf.Min(ring, Mathf.Min(equator, meridian));
             return Glyph(dist, new Color(0.46f, 0.64f, 0.86f, 1f), pixel);
         }
+
+        // ----- M7 walls pass: the Walls and Wall opacity rows (Menu.OptionsRow) -----
+
+        private static Sprite optionWalls;
+        private static Sprite optionWallOpacity;
+
+        /// <summary>Walls: a standing wall beside a lowered one (its stub solid, its full height a thin outline).</summary>
+        public static Sprite OptionWalls => optionWalls != null ? optionWalls : optionWalls = Draw(64, 64, OptionWallsGlyph, "OptionWalls");
+
+        /// <summary>Wall opacity: a wall pane half solid, half faded, with a thin outline around the faded half.</summary>
+        public static Sprite OptionWallOpacity => optionWallOpacity != null ? optionWallOpacity : optionWallOpacity = Draw(64, 64, OptionWallOpacityGlyph, "OptionWallOpacity");
+
+        private static readonly Color WallGlyphFill = new Color(0.93f, 0.84f, 0.68f, 1f);
+
+        private static Color OptionWallsGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float standing = RoundedBoxDistance(p - new Vector2(-0.42f, 0f), new Vector2(0.3f, 0.78f), 0.04f);
+            float stub = RoundedBoxDistance(p - new Vector2(0.42f, -0.6f), new Vector2(0.3f, 0.18f), 0.04f);
+            Color c = Glyph(Mathf.Min(standing, stub), WallGlyphFill, pixel);
+            float outline = Mathf.Abs(RoundedBoxDistance(p - new Vector2(0.42f, 0f), new Vector2(0.3f, 0.78f), 0.04f)) - 0.03f;
+            return Over(c, WallGlyphFill, Cover(outline, pixel) * 0.8f);
+        }
+
+        private static Color OptionWallOpacityGlyph(float u, float v, float pixel)
+        {
+            Vector2 p = new Vector2(u, v);
+            float solid = RoundedBoxDistance(p - new Vector2(-0.38f, 0f), new Vector2(0.34f, 0.78f), 0.04f);
+            Color c = Glyph(solid, WallGlyphFill, pixel);
+            float faded = RoundedBoxDistance(p - new Vector2(0.38f, 0f), new Vector2(0.34f, 0.78f), 0.04f);
+            c = Over(c, WallGlyphFill, Cover(faded, pixel) * 0.35f);
+            float outline = Mathf.Abs(faded) - 0.03f;
+            return Over(c, WallGlyphFill, Cover(outline, pixel) * 0.9f);
+        }
     }
 }
