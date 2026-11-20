@@ -24,9 +24,14 @@ games/*/*.unity.queue
 games/*/scratchpad/
 games/*/smoke/
 games/*/.utmp/
-# Unity Test Framework / Performance Testing leftovers, regenerated on every test run
-games/*/Assets/InitTestScene*.unity
-games/*/Assets/Resources/PerformanceTestRun*.json
+# Unity .meta files hold each asset's GUID and import settings: without them a fresh clone gets new GUIDs
+# and every material, scene or prefab reference breaks. The root .gitignore ignores "*.meta" (Visual Studio
+# template) and "*.wav", so re-include both for the Unity projects.
+!games/*/**/*.meta
+!games/*/Assets/**/*.wav
+# Unity Test Framework / Performance Testing leftovers (and their .meta), regenerated on every test run
+games/*/Assets/InitTestScene*.unity*
+games/*/Assets/Resources/PerformanceTestRun*.json*
 # Generated benchmark projects with their own git repository
 Autospec/workspace_bench/2026-11-02/c/B1-131855/slugify-lib-c5307449/
 Autospec/workspace_bench/2026-11-02/c/B2-132947/todo-cli-5f23649b/
