@@ -16,6 +16,17 @@ namespace OutOfSight.Core
     public sealed class LevelDef
     {
         public string Id;
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7, D23): the record revision of a redesigned level, 0 (default, not written) for a level
+        /// never redesigned. Best times are keyed by <see cref="RecordId"/>, so a record made on an older version is not read.
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int Rev;
+
+        /// <summary>Levels v2: the id best times are stored under: "level6~1" for rev 1, the bare id for rev 0.</summary>
+        [JsonIgnore] public string RecordId => Rev > 0 ? Id + "~" + Rev : Id;
+
         public string NameKey;
         public string HintKey;
         public RoomDef Room;
@@ -148,8 +159,83 @@ namespace OutOfSight.Core
         // ----- M6 lesson (docs/CONTRACT_M6.md 2.5): a wardrobe the player body fits in. -----
         public const string LessonWardrobe = "wardrobe";
 
+        // ----- Levels v2 lessons (LEVELS_V2.md 6, C1 and C6): accepted in "requires" and as "lesson". -----
+        /// <summary>A rug or a soft room: the route needs the silent floor.</summary>
+        public const string LessonRug = "rug";
+        /// <summary>The robot's hum: the route needs the hum to cover its hops.</summary>
+        public const string LessonHum = "hum";
+        /// <summary>The robot's bumper: the route must dodge a contact with the robot.</summary>
+        public const string LessonContact = "contact";
+        /// <summary>A leaf an inhabitant opens (openedByInhabitants): the route needs the door someone else opens.</summary>
+        public const string LessonHousehold = "household";
+        /// <summary>A decoy of the player's kind: the route needs a decoy to explain a rest.</summary>
+        public const string LessonDecoy = "decoy";
+        /// <summary>A watched exit: the exit stands in a room a watcher keeps.</summary>
+        public const string LessonExitWatch = "exitwatch";
+        /// <summary>A lit zone (litZones) the floor lamp must cross: darkness does not hide it there.</summary>
+        public const string LessonLit = "lit";
+
+        /// <summary>
+        /// Every accepted <see cref="Lesson"/> value (null is accepted too: no lesson), and every id <see cref="RequiredLessons"/>
+        /// may list. The M4 lessons come first, then M5, M6 and the levels v2 ids, in that order.
+        /// </summary>
         public static readonly string[] Lessons = { LessonCareful, LessonSit, LessonDark, LessonGlide,
-            LessonDoor, LessonPet, LessonSplit, LessonRobot, LessonRock, LessonLoad, LessonFinal, LessonWardrobe };
+            LessonDoor, LessonPet, LessonSplit, LessonRobot, LessonRock, LessonLoad, LessonFinal, LessonWardrobe,
+            LessonRug, LessonHum, LessonContact, LessonHousehold, LessonDecoy, LessonExitWatch, LessonLit };
+
+        // ----- Levels v2 schema (LEVELS_V2.md 6, row C1). Every field is optional and written only when set. -----
+
+        /// <summary>
+        /// Levels v2: the lessons the audit must find binding, besides <see cref="Lesson"/> ("requires", ids of
+        /// <see cref="Lessons"/>, at most <see cref="LevelValidator.MaxRequires"/>). Named RequiredLessons because the
+        /// static <see cref="Lessons"/> array already names the accepted ids.
+        /// </summary>
+        [JsonProperty("requires")]
+        public List<string> RequiredLessons = new List<string>();
+        public bool ShouldSerializeRequiredLessons() => RequiredLessons != null && RequiredLessons.Count > 0;
+
+        /// <summary>Levels v2: the pace gate of the audit (waiting share and pauses), or null for the act's default.</summary>
+        public PaceDef Pace;
+
+        /// <summary>Levels v2: zones the audit must find a schedule through (or, with avoid, without). At most 2.</summary>
+        public List<ViaCheckDef> ViaChecks = new List<ViaCheckDef>();
+        public bool ShouldSerializeViaChecks() => ViaChecks != null && ViaChecks.Count > 0;
+
+        /// <summary>Levels v2: ceiling lit zones where a switched-off floor lamp gets no cover from the dark. At most 4.</summary>
+        public List<LitZoneDef> LitZones = new List<LitZoneDef>();
+        public bool ShouldSerializeLitZones() => LitZones != null && LitZones.Count > 0;
+
+        /// <summary>Levels v2 (D25): the lighting preset, "day" (null, default) or "night". Visual only, no rule reads it.</summary>
+        public string Lighting;
+
+        /// <summary><see cref="Lighting"/> values.</summary>
+        public const string LightingDay = "day";
+        public const string LightingNight = "night";
+        public static readonly string[] Lightings = { LightingDay, LightingNight };
+
+        /// <summary>
+        /// Levels v2: expands every station's <see cref="StationDef.GlanceEvery"/> into its <see cref="StationDef.Glances"/>
+        /// (merged and sorted with the explicit glances; generated glances from a previous call are replaced). LevelJson.Parse
+        /// calls it; a level built in code calls it after changing a glanceEvery or a dwell.
+        /// </summary>
+        public void ExpandGlances()
+        {
+            if (Inhabitants == null)
+            {
+                return;
+            }
+            foreach (InhabitantDef h in Inhabitants)
+            {
+                if (h?.Stations == null)
+                {
+                    continue;
+                }
+                foreach (StationDef s in h.Stations)
+                {
+                    s?.ExpandGlances();
+                }
+            }
+        }
 
         /// <summary>
         /// M4: resolves <see cref="StationDef.PropSeat"/> for every station whose Sit names a prop of the level (the prop
@@ -528,6 +614,104 @@ namespace OutOfSight.Core
             Manifest m = JsonConvert.DeserializeObject<Manifest>(json);
             return m?.Levels ?? new List<string>();
         }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): the whole manifest, rev, previous order and acts included. Unknown keys are ignored
+        /// (as in <see cref="Parse"/>); a missing list reads as empty, a missing rev as 1.
+        /// </summary>
+        public static ManifestDef ParseFull(string json)
+        {
+            ManifestDef m = JsonConvert.DeserializeObject<ManifestDef>(json) ?? new ManifestDef();
+            m.Levels = m.Levels ?? new List<string>();
+            m.Previous = m.Previous ?? new List<string>();
+            m.Acts = m.Acts ?? new List<ActDef>();
+            return m;
+        }
+    }
+
+    /// <summary>Levels v2 (LEVELS_V2.md 7): levels.json as a whole.</summary>
+    public sealed class ManifestDef
+    {
+        /// <summary>The order revision: 1 for the v1 flat list (missing), 2 for the levels v2 order.</summary>
+        public int Rev = 1;
+        /// <summary>The play order.</summary>
+        public List<string> Levels = new List<string>();
+        /// <summary>The play order of the previous revision, for the one-shot save migration (empty when none).</summary>
+        public List<string> Previous = new List<string>();
+        /// <summary>The acts, in play order.</summary>
+        public List<ActDef> Acts = new List<ActDef>();
+    }
+
+    /// <summary>Levels v2: an act of the play order, from its first level index.</summary>
+    public sealed class ActDef
+    {
+        /// <summary>Index in <see cref="ManifestDef.Levels"/> of the act's first level.</summary>
+        public int From;
+        /// <summary>Strings key of the act's name ("act1.name").</summary>
+        public string NameKey;
+    }
+
+    /// <summary>
+    /// Levels v2 (LEVELS_V2.md 1.3, C5): the audit's pace gate. Every key is optional (null: the act's default). Shares are
+    /// fractions of the schedule (0 to 1), pauses are runs of at least 0.5 s at one cell, seconds for the longest pause.
+    /// </summary>
+    public sealed class PaceDef
+    {
+        public float? MinShare;
+        public float? MaxShare;
+        public int? MinPauses;
+        public float? MaxPause;
+    }
+
+    /// <summary>
+    /// Levels v2 (C6): an axis aligned zone the audit must find a schedule through, no slower than <see cref="MaxRatio"/> x
+    /// the best exit; with <see cref="Avoid"/> the zone is barred instead (the route that skips it must not exist or be slower).
+    /// </summary>
+    public sealed class ViaCheckDef
+    {
+        public const float DefaultMaxRatio = 1.5f;
+
+        public string Name;
+        public float X;
+        public float Z;
+        public float SizeX;
+        public float SizeZ;
+
+        [System.ComponentModel.DefaultValue(DefaultMaxRatio)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public float MaxRatio = DefaultMaxRatio;
+
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Avoid;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+
+        /// <summary>True when the planar point lies in the zone, edges included.</summary>
+        public bool Contains(Vector3 point)
+        {
+            return Mathf.Abs(point.x - X) <= SizeX * 0.5f + LevelDef.Eps && Mathf.Abs(point.z - Z) <= SizeZ * 0.5f + LevelDef.Eps;
+        }
+    }
+
+    /// <summary>
+    /// Levels v2 (C4): an axis aligned lit zone under a ceiling light. A floor lamp whose centre stands in it is seen at the
+    /// full sight range, switched on or off.
+    /// </summary>
+    public sealed class LitZoneDef
+    {
+        public string Name;
+        public float X;
+        public float Z;
+        public float SizeX;
+        public float SizeZ;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+
+        /// <summary>True when the planar point lies in the zone, edges included.</summary>
+        public bool Contains(Vector3 point)
+        {
+            return Mathf.Abs(point.x - X) <= SizeX * 0.5f + LevelDef.Eps && Mathf.Abs(point.z - Z) <= SizeZ * 0.5f + LevelDef.Eps;
+        }
     }
 
     /// <summary>
@@ -730,6 +914,13 @@ namespace OutOfSight.Core
         [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
         public bool OpenedByInhabitants;
 
+        /// <summary>
+        /// Levels v2 (D27): a closed leaf the player may not open (E does nothing there); only an inhabitant's walk opens it,
+        /// so it needs <see cref="OpenedByInhabitants"/>. Opt-in, default false (written only when true).
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool PlayerLocked;
+
         /// <summary>M5: <see cref="Leaf"/> of a leaf standing open, and of a closed one.</summary>
         public const string LeafOpen = "open";
         public const string LeafClosed = "closed";
@@ -843,6 +1034,61 @@ namespace OutOfSight.Core
         public float Facing;
         public float Dwell;
         public List<GlanceDef> Glances = new List<GlanceDef>();
+
+        /// <summary>
+        /// Levels v2: periodic head glances, expanded into <see cref="Glances"/> by <see cref="ExpandGlances"/> (LevelJson.Parse
+        /// calls it). Null when the station has none.
+        /// </summary>
+        public GlanceEveryDef GlanceEvery;
+
+        /// <summary>
+        /// Levels v2: "glances" is not written when every glance was generated by <see cref="GlanceEvery"/>, so a file keeps
+        /// its compact form (LevelJson.Serialize writes only the explicit glances next to a glanceEvery).
+        /// </summary>
+        public bool ShouldSerializeGlances() => GlanceEvery == null || Glances == null || Glances.Exists(g => g != null && !g.Generated);
+
+        /// <summary>
+        /// Levels v2: replaces the glances generated by a previous call with those of <see cref="GlanceEvery"/> (glance k at
+        /// start + k x period, yaw flipped on every odd k when alternate), merged with the explicit glances and sorted by
+        /// offset (stable: an explicit glance stays before a generated one at the same offset).
+        /// </summary>
+        public void ExpandGlances()
+        {
+            if (Glances == null)
+            {
+                Glances = new List<GlanceDef>();
+            }
+            int generated = Glances.RemoveAll(g => g != null && g.Generated);
+            if (GlanceEvery == null)
+            {
+                return;
+            }
+            int n = GlanceEvery.ResolvedCount(Dwell);
+            if (n == 0 && generated == 0)
+            {
+                return;
+            }
+            for (int k = 0; k < n; k++)
+            {
+                float yaw = GlanceEvery.Alternate && k % 2 == 1 ? -GlanceEvery.Yaw : GlanceEvery.Yaw;
+                Glances.Add(new GlanceDef { Offset = GlanceEvery.Start + k * GlanceEvery.Period, Yaw = yaw, Hold = GlanceEvery.Hold, Generated = true });
+            }
+            // Stable insertion sort by offset (List.Sort is not stable).
+            for (int i = 1; i < Glances.Count; i++)
+            {
+                GlanceDef g = Glances[i];
+                int j = i - 1;
+                while (j >= 0 && Offset(Glances[j]) > Offset(g))
+                {
+                    Glances[j + 1] = Glances[j];
+                    j--;
+                }
+                Glances[j + 1] = g;
+            }
+        }
+
+        private static float Offset(GlanceDef g) => g != null ? g.Offset : float.MinValue;
+
         /// <summary>M4: a prop name, "player", or null (no sitting).</summary>
         public string Sit;
         /// <summary>M4: the seat home when Sit is "player".</summary>
@@ -871,6 +1117,45 @@ namespace OutOfSight.Core
         public float Offset;
         public float Yaw;
         public float Hold;
+
+        /// <summary>Levels v2: generated by <see cref="StationDef.GlanceEvery"/>, not data (never written).</summary>
+        [JsonIgnore] public bool Generated;
+    }
+
+    /// <summary>
+    /// Levels v2: periodic head glances of a station ("glanceEvery"). Glance k starts at <see cref="Start"/> + k x
+    /// <see cref="Period"/> into the dwell, turns the head by <see cref="Yaw"/> (sign flipped on every odd k when
+    /// <see cref="Alternate"/>) and holds <see cref="Hold"/> seconds. <see cref="Count"/> glances, or when it is not given as
+    /// many as fit: the largest n with start + n x period within the dwell.
+    /// </summary>
+    public sealed class GlanceEveryDef
+    {
+        /// <summary>A guard against a runaway count; the validator rejects such a station anyway.</summary>
+        public const int MaxGenerated = 1000;
+
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public float Start;
+        public float Period;
+        public float Hold;
+        public float Yaw;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Alternate;
+        /// <summary>The number of glances, or null to fill the dwell.</summary>
+        public int? Count;
+
+        /// <summary>The number of glances generated in a dwell of <paramref name="dwell"/> seconds.</summary>
+        public int ResolvedCount(float dwell)
+        {
+            if (Count.HasValue)
+            {
+                return Mathf.Clamp(Count.Value, 0, MaxGenerated);
+            }
+            if (Period <= 0f)
+            {
+                return 0;
+            }
+            return Mathf.Clamp(Mathf.FloorToInt((dwell - Start) / Period + 1e-4f), 0, MaxGenerated);
+        }
     }
 
     /// <summary>JSON reading and writing of levels (Newtonsoft, camelCase, unknown members rejected).</summary>
@@ -884,17 +1169,54 @@ namespace OutOfSight.Core
             Formatting = Formatting.Indented,
         };
 
-        /// <summary>Reads a level and resolves its derived data (M4: <see cref="LevelDef.ResolveSeats"/>).</summary>
+        /// <summary>
+        /// Reads a level and resolves its derived data (levels v2: <see cref="LevelDef.ExpandGlances"/>, then M4:
+        /// <see cref="LevelDef.ResolveSeats"/>).
+        /// </summary>
         public static LevelDef Parse(string json)
         {
             LevelDef level = JsonConvert.DeserializeObject<LevelDef>(json, Settings);
+            level?.ExpandGlances();
             level?.ResolveSeats();
             return level;
         }
 
+        /// <summary>
+        /// Writes a level. Levels v2: a station with a glanceEvery writes only its explicit glances (the generated ones are
+        /// taken out for the call and put back), so Parse(Serialize(level)) expands them once.
+        /// </summary>
         public static string Serialize(LevelDef level)
         {
-            return JsonConvert.SerializeObject(level, Settings);
+            var saved = new List<(StationDef station, List<GlanceDef> glances)>();
+            if (level?.Inhabitants != null)
+            {
+                foreach (InhabitantDef h in level.Inhabitants)
+                {
+                    if (h?.Stations == null)
+                    {
+                        continue;
+                    }
+                    foreach (StationDef s in h.Stations)
+                    {
+                        if (s?.GlanceEvery != null && s.Glances != null && s.Glances.Exists(g => g != null && g.Generated))
+                        {
+                            saved.Add((s, s.Glances));
+                            s.Glances = s.Glances.FindAll(g => g == null || !g.Generated);
+                        }
+                    }
+                }
+            }
+            try
+            {
+                return JsonConvert.SerializeObject(level, Settings);
+            }
+            finally
+            {
+                foreach ((StationDef station, List<GlanceDef> glances) in saved)
+                {
+                    station.Glances = glances;
+                }
+            }
         }
 
         /// <summary>Parses "#RRGGBB" or "#RRGGBBAA"; anything else returns <paramref name="fallback"/>.</summary>

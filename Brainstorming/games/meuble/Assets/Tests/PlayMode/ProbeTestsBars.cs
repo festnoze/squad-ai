@@ -17,12 +17,12 @@ namespace OutOfSight.Tests
     /// are capsules with their icon on a badge at the left end, a label in the menus' display face, a threshold marker
     /// where the consequence starts (the creak warning, the discovery that would lose), a fill that eases toward the
     /// value; they fit a 20:9 phone, 16:9 and a 4:3 tablet beside the eye and clear of the touch controls. It writes the
-    /// HUD at 0, 30, 70 and 100 percent, the creak warning and the touch layout to docs/m9/bars (the HUD canvas rendered
+    /// HUD at 0, 30, 70 and 100 percent, the creak warning and the touch layout to Build/shots/bars (the HUD canvas rendered
     /// through the camera, ProbeTestsEndPanel's way), each with a close-up of the bottom band.
     /// </summary>
     public sealed class ProbeTestsBars
     {
-        private const string ShotDir = "docs/m9/bars";
+        private const string ShotDir = "Build/shots/bars";
         private static readonly Vector2Int[] Screens = { new Vector2Int(2400, 1080), new Vector2Int(1920, 1080), new Vector2Int(1440, 1080) };
         private const float EdgeMargin = 16f;
 
@@ -153,7 +153,7 @@ namespace OutOfSight.Tests
                     yield return Shoot($"bars_{Mathf.RoundToInt(level * 100f):000}_{screen.x}x{screen.y}.png", screen.x, screen.y, false);
                 }
             }
-            // The creak warning (the flash) and the English labels.
+            // The creak warning (the danger animation) and the English labels.
             SetLevels(0.92f, 0.5f, true);
             yield return Shoot("bars_warning_1920x1080.png", 1920, 1080, false);
             Strings.SetLanguage(Strings.English);
@@ -174,6 +174,202 @@ namespace OutOfSight.Tests
             InputReader.ForceTouchUI = false;
             forcing = false;
             Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
+        }
+
+        /// <summary>
+        /// Step 75b (danger animation and eye redesign, 2026-11-20): past its threshold a gauge no longer flashes; its fill
+        /// keeps one colour while the danger look (GaugeFx) heats up, crossing in sends sparks, and below the threshold
+        /// nothing heats. The eye opens and closes through the half open frame and shows the new state's sprite at once.
+        /// The game is paused (no fixed step drives the HUD) and the HUD's clock steps 1/30 s per frame, so the frames
+        /// written under <see cref="ShotFolder"/> are the same on every run.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step75b_DangerAnimationAndEyeBlink()
+        {
+            Strings.SetLanguage(Strings.French);
+            Game.Paused = true;
+            Hud.ShotStep = 1f / 30f;
+            string dir = ShotFolder("hud");
+            try
+            {
+                float creakThreshold = Hud.CreakThreshold;
+                float suspicionThreshold = Hud.SuspicionThreshold;
+                Assert.Greater(creakThreshold, 0.75f, "premise: the creak marker is past 70 %");
+                Assert.Less(suspicionThreshold, 0.7f, "premise: the suspicion marker is before 70 %");
+
+                // Below its threshold a gauge stays cold.
+                yield return SettleAt(0.7f);
+                Assert.AreEqual(0f, Hud.CreakHeat, 1e-4f, "the creak gauge heats below its marker");
+                Assert.AreEqual(1f, Hud.SuspicionHeat, 1e-4f, "the suspicion gauge past its marker did not heat");
+
+                // Crossing in: sparks at once, full heat within half a second, one fill colour on every frame (no flash).
+                yield return SettleAt(0f);
+                SetLevels(0.9f, 0.9f, true);
+                yield return null;
+                Assert.Greater(Hud.CreakSparks, 3, "crossing into the creak warning sent no sparks");
+                Color first = Hud.CreakFillColour;
+                for (int i = 0; i < 15; i++)
+                {
+                    yield return null;
+                    Assert.AreEqual(first, Hud.CreakFillColour, "the creak fill changed colour at a constant level: it still flashes");
+                }
+                Assert.AreEqual(1f, Hud.CreakHeat, 1e-4f, "the creak gauge did not reach its full danger look in half a second");
+
+                foreach (Vector2Int screen in new[] { new Vector2Int(1920, 1080), new Vector2Int(2400, 1080) })
+                {
+                    foreach (float level in new[] { 0.7f, 0.9f, 1f })
+                    {
+                        yield return SettleAt(0f);
+                        SetLevels(level, level, level >= creakThreshold);
+                        yield return Sequence(dir, $"bars_{Mathf.RoundToInt(level * 100f):000}_{screen.x}x{screen.y}", screen.x, screen.y, 20, 2,
+                            level == 0.9f);
+                    }
+                }
+
+                // The creak itself: the full creak gauge empties at once and bursts where its fill stood.
+                yield return SettleAt(0f);
+                SetLevels(1f, 0.5f, true);
+                yield return SettleFrames(10);
+                Hud.SetCreak(0f, false);
+                yield return null;
+                Assert.Greater(Hud.CreakSparks, 8, "the creak (the full gauge emptying at once) did not burst");
+                yield return SettleAt(0f);
+                SetLevels(1f, 0.5f, true);
+                yield return SettleFrames(10);
+                Hud.SetCreak(0f, false);
+                yield return Sequence(dir, "bars_creak_burst_1920x1080", 1920, 1080, 12, 1, false);
+
+                // The eye: every state, then the blink from closed to open and back.
+                Hud.ShotStep = 1f / 60f;
+                foreach (Vector2Int screen in new[] { new Vector2Int(1920, 1080), new Vector2Int(2400, 1080) })
+                {
+                    foreach (HudEye state in new[] { HudEye.Closed, HudEye.Calm, HudEye.Alarm, HudEye.Dog })
+                    {
+                        Hud.SetEye(state, 0f);
+                        yield return SettleFrames(30);
+                        yield return Sequence(dir, $"eye_{state.ToString().ToLowerInvariant()}_{screen.x}x{screen.y}", screen.x, screen.y, 1, 1, true);
+                    }
+                }
+                Hud.SetEye(HudEye.Closed, 0f);
+                yield return SettleFrames(30);
+                Hud.SetEye(HudEye.Calm, 0f);
+                Assert.AreSame(ProceduralArt.EyeOpen, Hud.EyeSprite, "the open eye's sprite is not set at once");
+                yield return null;
+                Assert.IsTrue(Hud.EyeBlinkShowing, "opening the eye did not show the half open frame");
+                yield return SettleFrames(20);
+                Assert.IsFalse(Hud.EyeBlinkShowing, "the half open frame is still showing a third of a second later");
+                Hud.SetEye(HudEye.Closed, 0f);
+                yield return SettleFrames(30);
+                Hud.SetEye(HudEye.Calm, 0f);
+                yield return Sequence(dir, "eye_open_blink", 1920, 1080, 16, 1, false);
+                Hud.SetEye(HudEye.Closed, 0f);
+                yield return Sequence(dir, "eye_close_blink", 1920, 1080, 16, 1, false);
+            }
+            finally
+            {
+                Hud.ShotStep = 0f;
+                Game.Paused = false;
+                forcing = false;
+            }
+            Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
+        }
+
+        /// <summary>The folder the frame shots go to: $OUTOFSIGHT_SHOTS/topic, else Build/shots/topic (never under docs).</summary>
+        private static string ShotFolder(string topic)
+        {
+            string root = Environment.GetEnvironmentVariable("OUTOFSIGHT_SHOTS");
+            string dir = Path.Combine(string.IsNullOrEmpty(root) ? Path.Combine("Build", "shots") : root, topic);
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        /// <summary>Both gauges at <paramref name="level"/>, drawn at once, then held long enough for the danger look to settle.</summary>
+        private IEnumerator SettleAt(float level)
+        {
+            SetLevels(level, level, level >= Hud.CreakThreshold);
+            yield return SettleFrames(30);
+        }
+
+        private static IEnumerator SettleFrames(int frames)
+        {
+            for (int i = 0; i < frames; i++)
+            {
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Renders <paramref name="frames"/> frames, one every <paramref name="every"/> HUD frames, of the HUD canvas through
+        /// the camera at <paramref name="width"/> x <paramref name="height"/>, and writes the bottom band of each (and with
+        /// <paramref name="full"/> the whole first frame) as PNG files named from <paramref name="prefix"/>.
+        /// </summary>
+        private IEnumerator Sequence(string dir, string prefix, int width, int height, int frames, int every, bool full)
+        {
+            Camera cam = main.Camera;
+            Canvas root = Hud.GetComponent<Canvas>();
+            var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+            RenderTexture previousTarget = cam.targetTexture;
+            float previousPlane = root.planeDistance;
+            float previousStep = Hud.ShotStep;
+            cam.targetTexture = rt;
+            cam.aspect = width / (float)height;
+            root.renderMode = RenderMode.ScreenSpaceCamera;
+            root.worldCamera = cam;
+            root.planeDistance = cam.nearClipPlane + 0.02f;
+            var texture = new Texture2D(width, height, TextureFormat.RGB24, false);
+            try
+            {
+                // The layout settles on the new canvas size with the HUD clock held still.
+                Hud.ShotStep = 1e-6f;
+                yield return null;
+                yield return null;
+                Canvas.ForceUpdateCanvases();
+                Rect band = ScreenRect(cam, Part("CreakGauge"));
+                band = Rect.MinMaxRect(Mathf.Min(band.xMin, ScreenRect(cam, Part("SuspicionGauge")).xMin),
+                    band.yMin, Mathf.Max(band.xMax, ScreenRect(cam, Part("SuspicionGauge")).xMax), band.yMax);
+                float pad = height * 0.06f;
+                var crop = new RectInt(Mathf.Max(0, Mathf.RoundToInt(band.xMin - pad)), Mathf.Max(0, Mathf.RoundToInt(band.yMin - pad * 0.6f)), 0, 0);
+                crop.width = Mathf.Min(width - crop.x, Mathf.RoundToInt(band.width + 2f * pad));
+                crop.height = Mathf.Min(height - crop.y, Mathf.RoundToInt(band.height + 1.9f * pad));
+                Hud.ShotStep = previousStep;
+                var cropped = new Texture2D(crop.width, crop.height, TextureFormat.RGB24, false);
+                for (int f = 0; f < frames; f++)
+                {
+                    for (int k = 0; k < every; k++)
+                    {
+                        yield return null;
+                    }
+                    Canvas.ForceUpdateCanvases();
+                    cam.ResetProjectionMatrix();
+                    var request = new RenderPipeline.StandardRequest { destination = rt };
+                    RenderPipeline.SubmitRenderRequest(cam, request);
+                    RenderTexture previous = RenderTexture.active;
+                    RenderTexture.active = rt;
+                    texture.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    texture.Apply();
+                    RenderTexture.active = previous;
+                    if (full && f == 0)
+                    {
+                        File.WriteAllBytes(Path.Combine(dir, prefix + ".png"), texture.EncodeToPNG());
+                    }
+                    cropped.SetPixels(texture.GetPixels(crop.x, crop.y, crop.width, crop.height));
+                    cropped.Apply();
+                    File.WriteAllBytes(Path.Combine(dir, $"{prefix}_f{f:00}.png"), cropped.EncodeToPNG());
+                }
+                UnityEngine.Object.Destroy(cropped);
+            }
+            finally
+            {
+                Hud.ShotStep = previousStep;
+                root.renderMode = RenderMode.ScreenSpaceOverlay;
+                root.worldCamera = null;
+                root.planeDistance = previousPlane;
+                cam.targetTexture = previousTarget;
+                cam.ResetAspect();
+                rt.Release();
+                UnityEngine.Object.Destroy(rt);
+                UnityEngine.Object.Destroy(texture);
+            }
         }
 
         private void SetLevelsNoSnap(float creak, float suspicion)
@@ -223,7 +419,7 @@ namespace OutOfSight.Tests
         {
             Camera cam = main.Camera;
             Canvas root = Hud.GetComponent<Canvas>();
-            Canvas overlay = touch ? TouchControls.Instance.ActionButton.GetComponentInParent<Canvas>().rootCanvas : null;
+            Canvas overlay = touch ? TouchControls.Instance.CarefulButton.GetComponentInParent<Canvas>().rootCanvas : null;
             var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
             RenderTexture previousTarget = cam.targetTexture;
             float previousPlane = root.planeDistance;
@@ -269,8 +465,9 @@ namespace OutOfSight.Tests
                 }
                 if (overlay != null)
                 {
-                    Transform touchRoot = TouchControls.Instance.ActionButton.parent;
-                    var discs = new[] { TouchControls.Instance.ActionButton, TouchControls.Instance.CarefulButton, touchRoot.Find("StickBase") as RectTransform };
+                    // DOORAUTO: the action button is gone (a door is a push, the lamp a tap on itself).
+                    Transform touchRoot = TouchControls.Instance.CarefulButton.parent;
+                    var discs = new[] { TouchControls.Instance.CarefulButton, touchRoot.Find("StickBase") as RectTransform };
                     foreach (RectTransform gauge in new[] { Part("CreakGauge"), Part("SuspicionGauge") })
                     {
                         Rect g = ScreenRect(cam, gauge);

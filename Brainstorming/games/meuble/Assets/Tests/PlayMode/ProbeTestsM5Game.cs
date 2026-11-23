@@ -16,7 +16,8 @@ namespace OutOfSight.Tests
     /// real Boot scene under GameRules.M4, with the game agent's test levels (never in levels.json):
     /// <list type="bullet">
     /// <item>36b to 36f, doors (test_m5_game_door: rooms a, b, c and d in a ring, a and b joined only by the closed leaf
-    /// "porte" swinging into b): the hint in reach, E opens in exactly 30 moving steps, refused while moving, a leaf seen
+    /// "porte" swinging into b): the hint in reach, a door push (DOORAUTO, in place of E) opens in exactly 30 moving steps,
+    /// a real push toward the door only after its confirm time (36c2), refused while moving, a leaf seen
     /// swinging is a catch while the chair itself is hidden, a station walk unchanged by an opening and an investigation
     /// through the opened doorway.</item>
     /// <item>37b to 37g, people (test_m5_game_people: a dreamer who sits on the sofa, a watchful one, the dog): separate
@@ -278,9 +279,9 @@ namespace OutOfSight.Tests
             yield return Steps(1);
             Assert.IsTrue(Hud.DoorHintVisible, "the door hint did not come back in reach");
 
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => porte.Open, 3);
-            Assert.IsTrue(porte.Open, "premise: E opened porte");
+            Assert.IsTrue(porte.Open, "premise: the door push opened porte");
             Assert.IsFalse(Hud.DoorHintVisible, "the door hint shows during the opening");
             yield return Until(() => !porte.Swinging && !Chair.ActionActive, DoorSteps + 5);
             yield return Steps(2);
@@ -294,11 +295,12 @@ namespace OutOfSight.Tests
         }
 
         /// <summary>
-        /// Step 36c (CONTRACT_M5_v3 15.2): E in reach opens the leaf in exactly 30 moving steps, the press step being the first;
+        /// Step 36c (CONTRACT_M5_v3 15.2): a door push in reach (DOORAUTO: InputReader.InjectDoorPush, a push already held for
+        /// its confirm time, in place of the E press) opens the leaf in exactly 30 moving steps, the push step being the first;
         /// the furniture does not travel; the leaf is in the open mask from its first swing step, swings with its 4 samples on
         /// all 30 steps (wave 5A.1, critique m5: the 30th at the open angle), and is open, without samples, from the next step;
-        /// the swing sound plays once. With the floor lamp, E out of reach switches the lamp, and in reach it opens the door and
-        /// leaves the lamp alone.
+        /// the swing sound plays once. With the floor lamp, E switches the lamp out of reach and in reach alike (DOORAUTO: E is
+        /// only the lamp's, the door stays closed), and the door push in reach opens the door and leaves the lamp alone.
         /// </summary>
         [UnityTest]
         public IEnumerator Step36c_EOpensTheLeafInExactlyThirtyMovingSteps()
@@ -332,11 +334,11 @@ namespace OutOfSight.Tests
                 travel = Mathf.Max(travel, Planar(Chair.transform.position, at));
             }
             Game.FixedStepped += Watch;
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => moving.Count >= DoorSteps + 10, DoorSteps + 15);
             Game.FixedStepped -= Watch;
 
-            Assert.AreEqual(0, moving.IndexOf(true), "the opening did not start on the press step");
+            Assert.AreEqual(0, moving.IndexOf(true), "the opening did not start on the push step");
             int run = moving.TakeWhile(m => m).Count();
             Assert.AreEqual(DoorSteps, run, $"the opening is {run} moving steps, not {DoorSteps}");
             Assert.IsFalse(moving.Skip(run).Any(m => m), "the furniture still moves after the opening");
@@ -365,13 +367,14 @@ namespace OutOfSight.Tests
             Assert.AreEqual(0, CountNoises(NoiseKind.Hop) + CountNoises(NoiseKind.Creak), "the opening made a noise event");
             Assert.AreEqual(PlayState.Playing, Game.State);
 
-            // E by an open leaf: nothing (the chair has no body action).
-            InputReader.InjectAction();
+            // A push by an open leaf: nothing (no door to open, and the chair has no body action).
+            InputReader.InjectDoorPush();
             yield return Steps(3);
-            Assert.IsFalse(Chair.ActionActive, "E by an open leaf started an action");
+            Assert.IsFalse(Chair.ActionActive, "a push by an open leaf started an action");
             Assert.AreEqual(opens + 1, Game.DoorOpenCount);
 
-            // The floor lamp: E out of reach switches it; in reach of a closed leaf, E is the door's.
+            // The floor lamp: E switches it out of reach; DOORAUTO: in reach of a closed leaf too (E is the lamp's only), and
+            // the door push is the door's.
             yield return Restart();
             PinAwayFromTheDoor();
             porte = Porte();
@@ -391,17 +394,24 @@ namespace OutOfSight.Tests
             yield return Steps(2);
             Assert.IsTrue(porte.InReach(Chair), "premise: the lamp is in reach");
             InputReader.InjectAction();
+            yield return Until(() => Chair.ToggleCount != toggles + 1, 3);
+            Assert.AreEqual(toggles + 2, Chair.ToggleCount, "E in reach of a closed leaf did not switch the lamp");
+            Assert.IsFalse(porte.Open || porte.Swinging, "E opened the door: it is the lamp's only now");
+            yield return Until(() => !Chair.ActionActive, StepsFor(1f));
+            yield return Steps(2);
+            InputReader.InjectDoorPush();
             yield return Until(() => porte.Open, 3);
-            Assert.IsTrue(porte.Open, "E in reach did not open the door");
-            Assert.AreEqual(toggles + 1, Chair.ToggleCount, "E in reach of a closed leaf switched the lamp");
+            Assert.IsTrue(porte.Open, "the door push in reach did not open the door");
+            Assert.AreEqual(toggles + 2, Chair.ToggleCount, "the door push switched the lamp");
             Assert.AreEqual(FurnitureController.BodyAction.External, Chair.Action, "the opening is not the external action");
             yield return Until(() => !Chair.ActionActive, DoorSteps + 5);
             AssertClean();
         }
 
         /// <summary>
-        /// Step 36d (CONTRACT_M5_v3 15.2): E in reach while moving does nothing: the leaf stays closed, no action starts, the
-        /// furniture drives on (the press is the door's, so no body action either). Still in reach, E then opens it.
+        /// Step 36d (CONTRACT_M5_v3 15.2): a door push (injected, DOORAUTO) in reach while moving does nothing: the leaf stays
+        /// closed, no action starts, the furniture drives on (the push is the door's, so no body action either). Still in reach,
+        /// the push then opens it. A real push never comes to this: it brakes first (36c2).
         /// </summary>
         [UnityTest]
         public IEnumerator Step36d_EIsRefusedWhileMoving()
@@ -427,12 +437,12 @@ namespace OutOfSight.Tests
                 stillMoving &= Chair.IsMoving;
             }
             Game.FixedStepped += Watch;
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Steps(5);
             Game.FixedStepped -= Watch;
-            Assert.IsFalse(porte.Open || porte.Swinging, "E while moving opened the door");
-            Assert.IsFalse(action, "E while moving started an action");
-            Assert.IsTrue(stillMoving, "a refused E stopped the furniture");
+            Assert.IsFalse(porte.Open || porte.Swinging, "a push while moving opened the door");
+            Assert.IsFalse(action, "a push while moving started an action");
+            Assert.IsTrue(stillMoving, "a refused push stopped the furniture");
             Assert.AreEqual(opens, Game.DoorOpenCount);
             Assert.Greater(Planar(Chair.transform.position, before), 0.1f, "the furniture did not drive on");
 
@@ -440,10 +450,93 @@ namespace OutOfSight.Tests
             yield return Steps(3);
             Assert.IsFalse(Chair.IsMoving, "premise: stopped");
             Assert.IsTrue(porte.InReach(Chair), "premise: stopped in reach");
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => porte.Open, 3);
-            Assert.IsTrue(porte.Open, "control: still in reach, E did not open the door");
+            Assert.IsTrue(porte.Open, "control: still in reach, the push did not open the door");
             yield return Until(() => !Chair.ActionActive, DoorSteps + 5);
+            Assert.AreEqual(PlayState.Playing, Game.State);
+            AssertClean();
+        }
+
+        /// <summary>
+        /// Step 36c2 (task DOORAUTO): a real push of the move input (FurnitureController.ScriptedDirection, as a key or a stick
+        /// gives it) toward porte from its doorway opens it: GameState.DoorPushDirection points into porte's wall; a push along
+        /// the wall (90 degrees) or 60 degrees off never opens it; a push shorter than the confirm time opens nothing and the
+        /// chair never moved; a push held for the confirm steps holds the chair still (not moving, no travel, no turn) and the
+        /// opening begins on the next step, the same 30 step external action as the E press of M5.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step36c2_PushTowardTheDoorOpensItAfterTheConfirmTime()
+        {
+            yield return Load(DoorLevel);
+            PinAwayFromTheDoor();
+            DoorLeaf porte = Porte();
+            int confirm = FurnitureController.DoorPushConfirmSteps(Dt);
+            Assert.AreEqual(8, confirm, "premise: the confirm time is 8 fixed steps");
+            yield return Steps(2);
+            Assert.IsTrue(porte.InReach(Chair) && !Chair.IsMoving, "premise: the chair waits still in reach of porte");
+            Assert.IsTrue(Game.DoorPushDirection.HasValue, "no push direction in reach of a closed leaf");
+            Vector3 into = Game.DoorPushDirection.Value;
+            Assert.Less((into - Vector3.right).magnitude, 1e-4f, $"the push direction {into} does not point into porte's wall from room a");
+            int opens = Game.DoorOpenCount;
+
+            // Along the wall, and 60 degrees off: never an opening, whatever the hold.
+            foreach (float off in new[] { 90f, 60f })
+            {
+                Chair.Teleport(SpawnA, 90f);
+                yield return Steps(2);
+                Chair.ScriptedDirection = Quaternion.Euler(0f, -off, 0f) * into;
+                yield return Steps(confirm * 3);
+                Chair.ScriptedDirection = null;
+                yield return Steps(3);
+                Assert.IsFalse(porte.Open || porte.Swinging, $"a push {off} degrees off the door opened it");
+                Assert.AreEqual(opens, Game.DoorOpenCount, $"a push {off} degrees off counted an opening");
+            }
+
+            // Too short: nothing opens, and the held chair never moved.
+            Chair.Teleport(SpawnA, 90f);
+            yield return Steps(2);
+            Vector3 at = Chair.transform.position;
+            float yaw = Chair.Yaw;
+            bool moved = false;
+            void WatchShort() => moved |= Chair.IsMoving || Chair.ActionActive;
+            Game.FixedStepped += WatchShort;
+            Chair.ScriptedDirection = into;
+            yield return Steps(confirm - 3);
+            Chair.ScriptedDirection = null;
+            yield return Steps(3);
+            Game.FixedStepped -= WatchShort;
+            Assert.IsFalse(porte.Open || porte.Swinging, "a push shorter than the confirm time opened the door");
+            Assert.IsFalse(moved, "the chair moved or acted during a short push toward the door");
+            Assert.Less(Planar(Chair.transform.position, at), 1e-4f, "the short push moved the chair toward the door");
+
+            // Held: still for the confirm steps, then the opening on the next step, for exactly DoorOpenTime.
+            var moving = new List<bool>();
+            var acting = new List<bool>();
+            float travel = 0f;
+            void Watch()
+            {
+                moving.Add(Chair.IsMoving);
+                acting.Add(Chair.ActionActive && Chair.Action == FurnitureController.BodyAction.External);
+                travel = Mathf.Max(travel, Planar(Chair.transform.position, at));
+                if (Chair.ActionActive)
+                {
+                    Chair.ScriptedDirection = null;
+                }
+            }
+            Game.FixedStepped += Watch;
+            Chair.ScriptedDirection = into;
+            yield return Until(() => acting.Count >= confirm + DoorSteps + 5, confirm + DoorSteps + 10);
+            Game.FixedStepped -= Watch;
+            Chair.ScriptedDirection = null;
+            Assert.AreEqual(confirm, acting.IndexOf(true), $"the opening began on push step {acting.IndexOf(true) + 1}, not {confirm + 1}");
+            Assert.IsFalse(moving.Take(confirm).Any(m => m), "the chair moved while the push was being confirmed");
+            Assert.AreEqual(DoorSteps, acting.Skip(confirm).TakeWhile(a => a).Count(), "the pushed opening is not exactly DoorOpenTime");
+            Assert.IsTrue(porte.Open, "the held push did not open porte");
+            Assert.AreEqual(opens + 1, Game.DoorOpenCount, "the held push did not count one opening");
+            Assert.Less(travel, 1e-4f, "the chair travelled toward the door during the push or the opening");
+            Assert.AreEqual(yaw, Chair.Yaw, 1e-3f, "the chair turned during the push or the opening");
+            Assert.IsNull(Game.DoorPushDirection, "an open leaf still offers a push direction");
             Assert.AreEqual(PlayState.Playing, Game.State);
             AssertClean();
         }
@@ -487,7 +580,7 @@ namespace OutOfSight.Tests
                 states.Add(Game.State);
             }
             Game.FixedStepped += Watch;
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => Game.State != PlayState.Playing, DoorSteps + 10);
             Game.FixedStepped -= Watch;
             Assert.IsTrue(porte.Open, "premise: the opening began");
@@ -574,7 +667,7 @@ namespace OutOfSight.Tests
             DoorLeaf porte = Porte();
             yield return Steps(2);
             Assert.IsTrue(porte.InReach(Chair) && !Chair.IsMoving && !Game.Seen, "premise: the chair waits unseen in reach of porte");
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => porte.Open && !porte.Swinging && !Chair.ActionActive, DoorSteps + 5);
             Assert.IsTrue(porte.Open, "premise: porte did not open");
             Chair.ScriptedDirection = Vector3.left;
@@ -1031,12 +1124,16 @@ namespace OutOfSight.Tests
             Assert.AreEqual(1f, Hud.TitleCardAlpha, 1e-3f, "premise: the title card shows");
             IReadOnlyList<string> lines = Hud.PeopleShown;
             Assert.AreEqual(4, lines.Count, "the names line and one line per person");
-            string names = string.Join(", ", new[] { Strings.PersonDreamer, Strings.PersonWatchful, Strings.PersonDog });
-            Assert.AreEqual(string.Format(Strings.IntroHere, names), lines[0], "the names line");
+            // Levels v2 (C3b, LEVELS_V2 D22): the names line lists the data names; each person line is hud.person (the data
+            // name, then the personality label) and the trait.
+            string[] dataNames = Game.Def.Inhabitants.Select(h => h.Name).ToArray();
+            Assert.AreEqual(3, dataNames.Length, "premise: three inhabitants");
+            Assert.AreEqual(string.Format(Strings.IntroHere, string.Join(", ", dataNames)), lines[0], "the names line");
             (string name, string trait)[] people =
             {
-                (Strings.PersonDreamer, Strings.PersonDreamerTrait), (Strings.PersonWatchful, Strings.PersonWatchfulTrait),
-                (Strings.PersonDog, Strings.PersonDogTrait),
+                (Hud.PersonTitle(dataNames[0], Strings.PersonDreamer, false), Strings.PersonDreamerTrait),
+                (Hud.PersonTitle(dataNames[1], Strings.PersonWatchful, false), Strings.PersonWatchfulTrait),
+                (Hud.PersonTitle(dataNames[2], Strings.PersonDog, true), Strings.PersonDogTrait),
             };
             for (int i = 0; i < people.Length; i++)
             {
@@ -1768,15 +1865,17 @@ namespace OutOfSight.Tests
         }
 
         /// <summary>
-        /// Step 38h (CONTRACT_M5 20, the product owner's "the dog does nothing when it detects you"): the chair, far out of
-        /// place and in the awake dog's view only, moves for the grace. The dog barks and runs to it ("!" over it), pins it next
-        /// to itself (the move input does nothing, the dog hold line shows, not the sat-on one) and barks at it in a loop
-        /// (sounds only: no new bark of the rule, no new noise event). The human, the only one, is sent ("!" over him), finds it
-        /// out of place: one discovery, and carries it back to his slot as always. On the put down the dog lets go and both go
-        /// back to their routines; the move input works again; the level is still playing.
+        /// Step 38h (CONTRACT_M5 20, the product owner's "the dog does nothing when it detects you", then DOGCARRY's "when it
+        /// catches you, it brings you back like a human would"): the chair, far out of place and in the awake dog's view only,
+        /// moves for the grace. The dog barks and runs to it ("!" over it), pins it next to itself (the move input does nothing,
+        /// the dog hold line shows, not the sat-on one) and barks at it (sounds only: no new bark of the rule, no new noise
+        /// event). After Tuning.DogGripTime it grips it and drags it back itself: no human is called (the human, pinned far
+        /// away, never investigates), the dog is the carrier, the chair follows its carry anchor (the move input does nothing),
+        /// and the human makes his discovery (one, his suspicion rises) as if he had come. The chair is put down on the human's
+        /// slot; the dog barks once, wags, and goes back to its routine; the move input works again; the level is still playing.
         /// </summary>
         [UnityTest]
-        public IEnumerator Step38h_DogPinsTheChairAndAHumanPutsItBack()
+        public IEnumerator Step38h_DogPinsTheChairAndDragsItBackItself()
         {
             yield return LoadDog();
             Inhabitant dog = TheDog;
@@ -1796,6 +1895,10 @@ namespace OutOfSight.Tests
             Assert.IsFalse(Game.HeldByDog, "the chair was held before the dog got there");
             Assert.IsFalse(Chair.Pinned, "the chair was pinned before the dog got there");
 
+            bool humanSent = false;
+            void WatchHuman() => humanSent |= human.Routine.Mode == InhabitantMode.Investigating || Game.DogCaller != null;
+            Game.FixedStepped += WatchHuman;
+
             Vector3 dogFrom = dog.Routine.Position;
             int stepsRunning = fixedSteps;
             yield return Until(() => Game.HeldByDog, StepsFor(5f));
@@ -1807,45 +1910,79 @@ namespace OutOfSight.Tests
             Assert.Greater(run / (stepsRunning * Dt), Tuning.ChairMaxSpeed, $"the dog ran {run:0.00} m in {stepsRunning * Dt:0.00} s: not faster than the chair");
             Assert.IsTrue(Chair.Pinned, "the held chair is not pinned");
             Assert.AreEqual(1, Game.DogHoldCount, "not one hold");
+            Assert.IsFalse(Game.DraggedByDog, "the dog dragged the chair without gripping it first");
             yield return null;
             Assert.AreEqual(Inhabitant.MarkerKind.Exclamation, dog.Marker, "no \"!\" over the dog that holds the chair");
 
+            // The grip beat: pinned, the move input does nothing (shorter than DogGripTime, so the drag has not begun).
             Vector3 heldAt = Chair.transform.position;
             bool everMoving = false;
             void Held() => everMoving |= Chair.IsMoving;
             Game.FixedStepped += Held;
             Chair.ScriptedDirection = Vector3.back;
-            yield return Steps(StepsFor(1f));
+            yield return Steps(Mathf.Max(1, StepsFor(Tuning.DogGripTime * 0.4f)));
             Chair.ScriptedDirection = null;
             Game.FixedStepped -= Held;
+            Assert.IsTrue(Game.HeldByDog && !Game.DraggedByDog, "premise: the grip beat ended early");
             Assert.Less(Planar(Chair.transform.position, heldAt), 1e-3f, "the held chair moved");
             Assert.IsFalse(everMoving, "the held chair was moving");
-            Assert.IsTrue(Game.HeldByDog, "premise: the hold ended within a second");
             Assert.IsTrue(Hud.DogHoldVisible, "the dog hold line does not show");
             Assert.IsFalse(Hud.SatOnVisible, "the sat-on line shows for the dog's hold");
             Assert.AreEqual(1, Game.BarkCount, "the hold's barks counted as barks of the rule");
             Assert.AreEqual(1, CountNoises(NoiseKind.Bark), "the hold's barks are noise events");
             Assert.GreaterOrEqual(Game.Sfx.BarksPlayed - barksPlayed, 2, "the dog does not bark at the chair it holds");
-            Assert.AreSame(human, Game.DogCaller, "the human was not sent to the held chair");
-            Assert.AreEqual(InhabitantMode.Investigating, human.Routine.Mode, "the sent human is not on his way");
-            Assert.AreEqual(Inhabitant.MarkerKind.Exclamation, human.Marker, "no \"!\" over the sent human");
-            Assert.AreEqual(0, Game.DiscoveryCount, "premise: a discovery before the human got there");
+            Assert.AreEqual(0, Game.DiscoveryCount, "premise: a discovery before the dog gripped the chair");
 
-            yield return Until(() => Game.HoldingDog == null || Game.State != PlayState.Playing, StepsFor(40f));
-            Assert.AreEqual(PlayState.Playing, Game.State, $"the hold lost the level ({Game.LoseReason})");
-            Assert.IsNull(Game.HoldingDog, "the hold never ended");
-            Assert.AreEqual(1, Game.CarryCount, "the human did not carry the chair back");
-            Assert.AreEqual(1, Game.DiscoveryCount, "the human's finding of the held chair out of place is not one discovery");
+            // The drag: the dog is the carrier, nobody is called, the human's discovery is made at the grip.
+            yield return Until(() => Game.DraggedByDog || Game.State != PlayState.Playing, StepsFor(Tuning.DogGripTime + 1f));
+            Assert.AreEqual(PlayState.Playing, Game.State, $"the grip lost the level ({Game.LoseReason})");
+            Assert.IsTrue(Game.DraggedByDog, "the dog never dragged the chair");
+            Assert.AreSame(dog, Game.Carrier, "the dragging dog is not the carrier");
+            Assert.IsNull(Game.DogCaller, "a human was called although the dog drags the chair");
+            Assert.AreEqual(1, Game.DogDragCount, "not one drag");
+            Assert.AreEqual(0, Game.DogDragFallbackCount, "the dog fell back on a human in an open room");
+            Assert.AreEqual(1, Game.DiscoveryCount, "the drag is not the human's one discovery");
             Assert.AreEqual(1, Game.DogHoldDiscoveryCount, "the discovery is not the hold's");
             Assert.Greater(Game.SuspicionOf(human).Value, 0.2f, "the human's suspicion did not rise");
+
+            float worstFollow = 0f;
+            float highest = 0f;
+            int carriedSteps = 0;
+            void Drag()
+            {
+                if (!Chair.Carried || dog.Routine.LastActivity != RoutineActivity.Carrying)
+                {
+                    return;
+                }
+                carriedSteps++;
+                worstFollow = Mathf.Max(worstFollow, Planar(Chair.transform.position, dog.Routine.CarryAnchor));
+                highest = Mathf.Max(highest, Chair.transform.position.y - Game.Level.Floor.OnFloor(YawMath.Planar(Chair.transform.position)).y);
+            }
+            Game.FixedStepped += Drag;
+            Chair.ScriptedDirection = Vector3.left;
+            yield return Until(() => Game.HoldingDog == null || Game.State != PlayState.Playing, StepsFor(40f));
+            Chair.ScriptedDirection = null;
+            Game.FixedStepped -= Drag;
+            Game.FixedStepped -= WatchHuman;
+            Assert.AreEqual(PlayState.Playing, Game.State, $"the drag lost the level ({Game.LoseReason})");
+            Assert.IsNull(Game.HoldingDog, "the hold never ended");
+            Assert.Greater(carriedSteps, StepsFor(0.5f), "premise: the drag was too short to watch");
+            Assert.Less(worstFollow, 2f * Tuning.DogDragSpeed * Dt + 0.01f, "the dragged chair left the dog's mouth (the input or physics moved it)");
+            Assert.Less(highest, Tuning.CarryHeight, "the dog lifted the chair like a human instead of dragging it");
+            Assert.IsFalse(humanSent, "a human was sent to the chair the dog dragged");
+            Assert.AreEqual(1, Game.CarryCount, "the dog did not carry the chair back");
+            Assert.AreEqual(1, Game.DiscoveryCount, "the put back cost another discovery");
+            Assert.AreEqual(0, Game.DogCallCount, "a human was called");
             Assert.Less(Planar(Chair.transform.position, slot), 0.05f, "the chair is not back at the human's slot");
+            Assert.Less(Mathf.Abs(Mathf.DeltaAngle(Game.MemoryOf(human).PlayerSlot.Yaw, Chair.Yaw)), 0.5f, "the chair is not back at the slot's yaw");
             Assert.IsFalse(Chair.Carried, "the chair is still carried");
             Assert.IsFalse(Chair.Pinned, "the dog did not let go");
             Assert.IsFalse(Game.HeldByDog, "still held after the put down");
+            Assert.IsFalse(Game.DraggedByDog, "still dragged after the put down");
+            yield return Until(() => dog.Routine.Mode == InhabitantMode.Routine, StepsFor(Tuning.DogWagTime + 1f));
             Assert.AreEqual(InhabitantMode.Routine, dog.Routine.Mode, "the dog did not go back to its routine");
             Assert.IsFalse(dog.Routine.Running, "the dog still runs");
-            yield return Until(() => human.Routine.Mode == InhabitantMode.Routine, StepsFor(1f));
-            Assert.AreEqual(InhabitantMode.Routine, human.Routine.Mode, "the human did not go back to his routine");
+            Assert.AreNotEqual(InhabitantMode.Investigating, human.Routine.Mode, "the human investigates");
             yield return null;
             Assert.IsFalse(Hud.DogHoldVisible, "the dog hold line still shows");
 
@@ -1853,15 +1990,15 @@ namespace OutOfSight.Tests
             Chair.ScriptedDirection = Vector3.back;
             yield return Steps(GraceSteps - 2);
             Chair.ScriptedDirection = null;
-            Assert.Greater(Planar(Chair.transform.position, back), 0.01f, "the chair stays stuck after the hold");
+            Assert.Greater(Planar(Chair.transform.position, back), 0.01f, "the chair stays stuck after the drag");
             Assert.AreEqual(PlayState.Playing, Game.State);
             AssertClean();
         }
 
         /// <summary>
-        /// Step 38i (CONTRACT_M5 20): the dog sees the chair move but it stays within the human's tolerance of its slot. The
-        /// dog runs and pins it, the human is sent, finds it in place: no discovery, no suspicion, no carry; the dog lets go
-        /// and both go back to their routines.
+        /// Step 38i (CONTRACT_M5 20, DOGCARRY): the dog sees the chair move but it stays within the human's tolerance of its
+        /// slot. The dog runs and pins it; at the grip, the chair is in place for the human: no drag, nobody called, no
+        /// discovery, no suspicion, no carry; the dog lets go and goes back to its routine.
         /// </summary>
         [UnityTest]
         public IEnumerator Step38i_DogHoldOfAChairInPlaceCostsNothing()
@@ -1875,18 +2012,22 @@ namespace OutOfSight.Tests
             Assert.Less(Planar(Chair.transform.position, slot), Game.MemoryOf(human).Tolerance - 0.3f, "premise: the chair left its place");
             yield return Until(() => Game.HeldByDog, StepsFor(5f));
             Assert.IsTrue(Game.HeldByDog && Chair.Pinned, "the dog never held the chair");
-            Assert.AreSame(human, Game.DogCaller, "the human was not sent");
-            yield return Until(() => Game.HoldingDog == null || Game.State != PlayState.Playing, StepsFor(40f));
+            bool dragged = false;
+            void Watch() => dragged |= Game.DraggedByDog || Chair.Carried || Game.DogCaller != null;
+            Game.FixedStepped += Watch;
+            yield return Until(() => Game.HoldingDog == null || Game.State != PlayState.Playing, StepsFor(Tuning.DogGripTime + 2f));
+            Game.FixedStepped -= Watch;
             Assert.AreEqual(PlayState.Playing, Game.State, $"the hold lost the level ({Game.LoseReason})");
             Assert.IsNull(Game.HoldingDog, "the hold never ended");
-            Assert.Less(Planar(human.Routine.Position, Chair.transform.position), Tuning.InvestigateReach + Tuning.CarryReachMargin + 1e-3f,
-                "the hold ended before the human got there");
+            Assert.IsFalse(dragged, "a chair in place was dragged, carried, or a human was called");
+            Assert.AreEqual(0, Game.DogDragCount, "a chair in place was dragged");
+            Assert.AreEqual(0, Game.DogCallCount, "a human was called");
             Assert.AreEqual(0, Game.DiscoveryCount, "a chair in place cost a discovery");
             Assert.AreEqual(0f, Game.MaxSuspicion, 1e-6f, "a chair in place raised a suspicion");
             Assert.AreEqual(0, Game.CarryCount, "a chair in place was carried");
             Assert.IsFalse(Chair.Pinned, "the dog did not let go");
             Assert.AreEqual(InhabitantMode.Routine, dog.Routine.Mode, "the dog did not go back to its routine");
-            Assert.AreEqual(InhabitantMode.Routine, human.Routine.Mode, "the human did not go back to his routine");
+            Assert.AreNotEqual(InhabitantMode.Investigating, human.Routine.Mode, "the human was sent");
             AssertClean();
         }
 

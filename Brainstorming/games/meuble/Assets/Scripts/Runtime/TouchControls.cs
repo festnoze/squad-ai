@@ -10,8 +10,10 @@ namespace OutOfSight
     /// <see cref="InputReader.TouchUIActive"/> holds, the game is not paused and no fail or win panel is up (the menus and
     /// those panels are uGUI, driven by tap through
     /// the InputSystemUIInputModule). Left half of the screen: a floating stick that appears where the thumb lands and
-    /// moves the furniture like the left stick. Right half: a drag orbits the camera. Bottom right: the action button (E)
-    /// and the careful toggle; top right: the pause button.
+    /// moves the furniture like the left stick. Right half: a drag orbits the camera. Bottom right: the careful toggle;
+    /// top right: the pause button. Task DOORAUTO: there is no action button any more (doors and wardrobes open by pushing
+    /// the stick toward them); the floor lamp is switched by a tap on the player lamp itself (<see cref="OnPlayerLamp"/>),
+    /// which is the E key.
     ///
     /// Nothing here is a raycast target: the fingers are read through <see cref="InputReader.ReadTouches"/> (the real
     /// touchscreen plus the fingers a test injects) and hit tested here, so the overlay never takes a tap from a menu, and
@@ -26,7 +28,6 @@ namespace OutOfSight
         /// <summary>The overlay shows (tests).</summary>
         public bool Visible => overlay != null && overlay.activeSelf;
 
-        public RectTransform ActionButton { get; private set; }
         public RectTransform CarefulButton { get; private set; }
         public RectTransform PauseButton { get; private set; }
 
@@ -57,6 +58,20 @@ namespace OutOfSight
         private Vector2 stickOrigin;
         private int orbitFinger = int.MinValue;
         private Vector2 orbitLast;
+
+        // STARTFIX: a tap outside the buttons (a stick or orbit finger that lifts soon, having barely travelled) is a start
+        // press: it releases a held level without moving. A drag (orbit) or a stick push past the slop is never a tap.
+        private const float TapSlop = 20f; // pixels of a 1080 pixel high screen, under the stick dead zone (0.2 x 120)
+        private const float TapMaxSeconds = 0.35f;
+
+        private struct Tap
+        {
+            public Vector2 Origin;
+            public float Landed;
+            public bool Travelled;
+        }
+
+        private readonly Dictionary<int, Tap> taps = new Dictionary<int, Tap>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Create()
@@ -117,6 +132,23 @@ namespace OutOfSight
                     {
                         orbitFinger = int.MinValue;
                     }
+                    if (taps.TryGetValue(id, out Tap tap))
+                    {
+                        taps.Remove(id);
+                        if (!tap.Travelled && Time.unscaledTime - tap.Landed <= TapMaxSeconds) // MUTATION:TOUCH_TAP_START
+                        {
+                            // DOORAUTO: a tap on the player lamp switches it (the E key, also a start input); any other
+                            // tap is the start press.
+                            if (OnPlayerLamp(tap.Origin))
+                            {
+                                InputReader.PressTouchAction();
+                            }
+                            else
+                            {
+                                InputReader.PressTouchStart();
+                            }
+                        }
+                    }
                 }
             }
             known.Clear();
@@ -128,6 +160,7 @@ namespace OutOfSight
                 ignored.UnionWith(current);
                 stickFinger = int.MinValue;
                 orbitFinger = int.MinValue;
+                taps.Clear();
                 InputReader.SetTouchStick(Vector2.zero);
                 InputReader.SetTouchLook(Vector2.zero);
                 if (!InputReader.TouchUIActive)
@@ -145,6 +178,12 @@ namespace OutOfSight
                 if (ignored.Contains(p.Id))
                 {
                     continue;
+                }
+                if (taps.TryGetValue(p.Id, out Tap tracked) && !tracked.Travelled
+                    && (p.Position - tracked.Origin).sqrMagnitude > TapSlop * scale * TapSlop * scale)
+                {
+                    tracked.Travelled = true;
+                    taps[p.Id] = tracked;
                 }
                 if (p.Id == stickFinger)
                 {
@@ -179,15 +218,12 @@ namespace OutOfSight
             carefulImage.color = InputReader.TouchCareful ? CarefulOn : Idle;
         }
 
-        /// <summary>A finger lands: a button, else the stick on the left half or the orbit on the right half.</summary>
+        /// <summary>
+        /// A finger lands: a button, else the stick on the left half or the orbit on the right half (a short tap of either,
+        /// on lift: the player lamp's switch, or the start press).
+        /// </summary>
         private void Land(InputReader.TouchPoint p)
         {
-            if (Hit(ActionButton, p.Position))
-            {
-                ignored.Add(p.Id);
-                InputReader.PressTouchAction();
-                return;
-            }
             if (Hit(CarefulButton, p.Position))
             {
                 ignored.Add(p.Id);
@@ -205,11 +241,13 @@ namespace OutOfSight
             {
                 stickFinger = p.Id;
                 stickOrigin = p.Position;
+                taps[p.Id] = new Tap { Origin = p.Position, Landed = Time.unscaledTime };
             }
             else if (!left && orbitFinger == int.MinValue)
             {
                 orbitFinger = p.Id;
                 orbitLast = p.Position;
+                taps[p.Id] = new Tap { Origin = p.Position, Landed = Time.unscaledTime };
             }
             else
             {
@@ -220,6 +258,52 @@ namespace OutOfSight
         private static bool Hit(RectTransform button, Vector2 screen)
         {
             return RectTransformUtility.RectangleContainsScreenPoint(button, screen, null);
+        }
+
+        /// <summary>
+        /// Task DOORAUTO: the screen rectangle (pixels, origin bottom left) of the player furniture's box as the game camera
+        /// sees it, grown by <see cref="Tuning.TouchLampTapMargin"/> pixels of a 1080 pixel high screen, while the player body
+        /// is a floor lamp whose switch the rules allow (GameRules.Lamp) and the box is in front of the camera. False
+        /// otherwise (any other body, no level, no camera).
+        /// </summary>
+        public static bool PlayerLampScreenRect(out Rect rect)
+        {
+            rect = default;
+            Main main = Main.Instance;
+            GameState game = main != null ? main.Game : null;
+            FurnitureController f = game != null ? game.Furniture : null;
+            Camera view = main != null ? main.Camera : null;
+            if (f == null || view == null || f.Body == null || !f.Body.HasLight || f.Lamp == null || f.Hidden
+                || f.Rules == null || !f.Rules.Lamp)
+            {
+                return false;
+            }
+            Vector3 size = f.Size;
+            Vector3 c = f.transform.position + Vector3.up * (size.y * 0.5f);
+            Quaternion r = Quaternion.Euler(0f, f.Yaw, 0f);
+            float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+            for (int k = 0; k < 8; k++)
+            {
+                var corner = new Vector3((k & 1) == 0 ? -0.5f : 0.5f, (k & 2) == 0 ? -0.5f : 0.5f, (k & 4) == 0 ? -0.5f : 0.5f);
+                Vector3 s = view.WorldToScreenPoint(c + r * Vector3.Scale(corner, size));
+                if (s.z <= 0f)
+                {
+                    return false;
+                }
+                minX = Mathf.Min(minX, s.x);
+                minY = Mathf.Min(minY, s.y);
+                maxX = Mathf.Max(maxX, s.x);
+                maxY = Mathf.Max(maxY, s.y);
+            }
+            float margin = Tuning.TouchLampTapMargin * Mathf.Max(1f, Screen.height) / ReferenceHeight;
+            rect = Rect.MinMaxRect(minX - margin, minY - margin, maxX + margin, maxY + margin);
+            return true;
+        }
+
+        /// <summary>Task DOORAUTO: a tap at <paramref name="screen"/> (pixels) lands on the player lamp (<see cref="PlayerLampScreenRect"/>).</summary>
+        public static bool OnPlayerLamp(Vector2 screen)
+        {
+            return PlayerLampScreenRect(out Rect rect) && rect.Contains(screen); // MUTATION:TOUCH_LAMP_TAP
         }
 
         private void PlaceStick(Vector2 baseScreen, Vector2 knobScreen)
@@ -249,8 +333,6 @@ namespace OutOfSight
             stickBase = Disc("StickBase", new Vector2(0f, 0f), new Vector2(300f, 330f), stickSize, out stickBaseImage);
             stickKnob = Disc("StickKnob", new Vector2(0f, 0f), new Vector2(300f, 330f), stickSize * 0.45f, out stickKnobImage);
 
-            ActionButton = Disc("ActionButton", new Vector2(1f, 0f), new Vector2(-200f, 330f), Tuning.TouchActionSize, out _);
-            Label(ActionButton, Strings.TouchAction, 34, font);
             CarefulButton = Disc("CarefulButton", new Vector2(1f, 0f), new Vector2(-420f, 230f), Tuning.TouchButtonSize, out carefulImage);
             Label(CarefulButton, Strings.TouchCareful, 28, font);
             PauseButton = Disc("PauseButton", new Vector2(1f, 1f), new Vector2(-130f, -130f), Tuning.TouchButtonSize, out _);

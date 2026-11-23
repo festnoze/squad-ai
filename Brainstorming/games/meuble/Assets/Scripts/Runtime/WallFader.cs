@@ -168,10 +168,11 @@ namespace OutOfSight
                 {
                     return LookOverride.Value;
                 }
+                // Anything that is not a known look is the default, Both (SaveOptions.Clamped, product owner 2026-11-20).
                 string walls = SaveStore.Options.Walls;
-                return walls == SaveOptions.WallsSeeThrough ? WallLook.SeeThrough
-                    : walls == SaveOptions.WallsBoth ? WallLook.Both
-                    : walls == SaveOptions.WallsNone ? WallLook.None : WallLook.Lowered;
+                return walls == SaveOptions.WallsLowered ? WallLook.Lowered
+                    : walls == SaveOptions.WallsSeeThrough ? WallLook.SeeThrough
+                    : walls == SaveOptions.WallsNone ? WallLook.None : WallLook.Both;
             }
         }
 

@@ -1,0 +1,78 @@
+{
+  "id": "test_v2_audit_loiter_pinned",
+  "nameKey": "level5.name",
+  "hintKey": "level5.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.5,
+      "sizeX": 6.0,
+      "sizeZ": 5.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#E3B23C",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": -2.25,
+      "z": 3.05,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -2.25,
+    "z": -1.25,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": -2.25,
+    "z": 2.55,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 0.5,
+          "z": -1.25,
+          "facing": 270.0,
+          "dwell": 2.0,
+          "glances": []
+        },
+        {
+          "x": -1.75,
+          "z": -1.25,
+          "facing": 90.0,
+          "dwell": 10.0,
+          "sit": "player",
+          "seat": {
+            "x": -2.25,
+            "z": -1.25,
+            "yaw": 90.0
+          },
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

@@ -384,8 +384,8 @@ namespace OutOfSight.Tests
             Assert.Less(visual.Find("Backrest").localPosition.z, 0f, "office chair: the backrest is on -z, as the chair's");
             Assert.AreEqual(5, FurnitureKit.OfficeChairSpokes);
             Mesh frame = visual.Find("Frame").GetComponent<MeshFilter>().sharedMesh;
-            // Hub and post 24, column 24, 5 spokes 60, 5 wheels 180.
-            Assert.AreEqual(288, ModelKit.Triangles(frame), "office chair frame: hub, post, column, five spokes and five wheels");
+            // Soft movers (2026-11-20), the rounded frame: hub 22, column 16, post 16, 5 tapered spokes 80, 5 ball casters 120.
+            Assert.AreEqual(254, ModelKit.Triangles(frame), "office chair frame: hub, post, column, five spokes and five wheels");
             Assert.AreSame(frame, FurnitureKit.OfficeChairFrame(BodyDef.For(BodyKinds.OfficeChair).Size), "the frame mesh is cached by size");
 
             // Without models, every body builds its procedural visual within the budget and the box.

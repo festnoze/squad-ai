@@ -3,6 +3,7 @@
   "nameKey": "level11.name",
   "hintKey": "level11.hint",
   "lesson": "load",
+  "rev": 1,
   "rooms": [
     {
       "id": "chambre",
@@ -13,10 +14,9 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "sage"
+      "wallFinish": "sageribbed"
     },
     {
       "id": "couloir",
@@ -27,10 +27,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "lightoak",
-      "floorColor": "#B07A4E",
+      "floorFinish": "herringbone",
+      "floorColor": "#7A5236",
       "wallColor": "#EDE6DA",
-      "wallFinish": "limewash"
+      "wallFinish": "travertine"
     },
     {
       "id": "salon",
@@ -41,10 +41,9 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "arches"
+      "wallFinish": "sage"
     },
     {
       "id": "cuisine",
@@ -55,10 +54,10 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "tile",
+      "floorFinish": "marble",
       "floorColor": "#EDE6DA",
       "wallColor": "#F7F4EE",
-      "wallFinish": "subwaytile"
+      "wallFinish": "whitetile"
     }
   ],
   "doors": [
@@ -123,15 +122,6 @@
       "z": 6.1,
       "sizeX": 2.0,
       "sizeZ": 1.5,
-      "yaw": 0.0,
-      "color": "#2E6DB4"
-    },
-    {
-      "model": "kenney.rug",
-      "x": 8.75,
-      "z": 6.25,
-      "sizeX": 2.0,
-      "sizeZ": 1.4,
       "yaw": 0.0,
       "color": "#2E6DB4"
     }
@@ -199,7 +189,7 @@
     {
       "name": "Canape",
       "kind": "sofa",
-      "x": 9.25,
+      "x": 8.75,
       "z": 4.75,
       "yaw": 180.0,
       "sizeX": 2.0,
@@ -213,7 +203,7 @@
     {
       "name": "TableBasse",
       "kind": "coffee_table",
-      "x": 9.25,
+      "x": 8.75,
       "z": 5.8,
       "yaw": 0.0,
       "sizeX": 1.0,
@@ -258,21 +248,20 @@
     { "x": 4.75, "z": 7.75, "at": 3.4 },
     { "x": 5.25, "z": 7.75, "at": 3.8, "careful": true },
     { "x": 5.25, "z": 6.75, "at": 4.5 },
-    { "x": 5.25, "z": 5.75, "at": 5.3 },
-    { "x": 5.25, "z": 4.75, "at": 6.1 },
-    { "x": 5.25, "z": 3.75, "at": 6.9 },
-    { "x": 5.25, "z": 2.75, "at": 7.7 },
-    { "x": 5.25, "z": 1.75, "at": 8.5 },
-    { "x": 5.25, "z": 1.25, "at": 9.3 },
-    { "x": 5.75, "z": 1.25, "at": 9.7, "careful": true },
-    { "x": 6.75, "z": 1.25, "at": 10.4 },
-    { "x": 7.75, "z": 1.25, "at": 11.2 },
-    { "x": 8.75, "z": 1.25, "at": 12.0 },
-    { "x": 9.75, "z": 1.25, "at": 12.8 },
-    { "x": 10.75, "z": 1.25, "at": 13.6 },
-    { "x": 11.25, "z": 1.25, "at": 14.4 },
-    { "x": 11.25, "z": 1.75, "at": 14.8, "careful": true },
-    { "x": 11.25, "z": 1.75, "at": 14.8 }
+    { "x": 5.75, "z": 6.75, "at": 5.3, "careful": true },
+    { "x": 6.75, "z": 6.75, "at": 6.0 },
+    { "x": 7.75, "z": 6.75, "at": 6.8 },
+    { "x": 8.75, "z": 6.75, "at": 7.6 },
+    { "x": 9.75, "z": 6.75, "at": 8.4 },
+    { "x": 10.25, "z": 6.75, "at": 9.2, "careful": true },
+    { "x": 10.25, "z": 5.75, "at": 9.9 },
+    { "x": 10.25, "z": 4.75, "at": 10.7 },
+    { "x": 10.25, "z": 3.75, "at": 11.5 },
+    { "x": 10.25, "z": 2.75, "at": 12.3 },
+    { "x": 10.25, "z": 1.75, "at": 13.1 },
+    { "x": 10.75, "z": 1.75, "at": 13.9, "careful": true },
+    { "x": 11.25, "z": 1.75, "at": 14.6 },
+    { "x": 11.25, "z": 1.75, "at": 14.6 }
   ],
   "designerRouteHard": [
     { "x": 2.25, "z": 7.25, "at": 0.3 },
@@ -282,21 +271,20 @@
     { "x": 4.75, "z": 7.75, "at": 3.4 },
     { "x": 5.25, "z": 7.75, "at": 3.8, "careful": true },
     { "x": 5.25, "z": 6.75, "at": 4.5 },
-    { "x": 5.25, "z": 5.75, "at": 5.3 },
-    { "x": 5.25, "z": 4.75, "at": 6.1 },
-    { "x": 5.25, "z": 3.75, "at": 6.9 },
-    { "x": 5.25, "z": 2.75, "at": 7.7 },
-    { "x": 5.25, "z": 1.75, "at": 8.5 },
-    { "x": 5.25, "z": 1.25, "at": 9.3 },
-    { "x": 5.75, "z": 1.25, "at": 9.7, "careful": true },
-    { "x": 6.75, "z": 1.25, "at": 10.4 },
-    { "x": 7.75, "z": 1.25, "at": 11.2 },
-    { "x": 8.75, "z": 1.25, "at": 12.0 },
-    { "x": 9.75, "z": 1.25, "at": 12.8 },
-    { "x": 10.75, "z": 1.25, "at": 13.6 },
-    { "x": 11.25, "z": 1.25, "at": 14.4 },
-    { "x": 11.25, "z": 1.75, "at": 14.8, "careful": true },
-    { "x": 11.25, "z": 1.75, "at": 14.8 }
+    { "x": 5.75, "z": 6.75, "at": 5.3, "careful": true },
+    { "x": 6.75, "z": 6.75, "at": 6.0 },
+    { "x": 7.75, "z": 6.75, "at": 6.8 },
+    { "x": 8.75, "z": 6.75, "at": 7.6 },
+    { "x": 9.75, "z": 6.75, "at": 8.4 },
+    { "x": 10.25, "z": 6.75, "at": 9.2, "careful": true },
+    { "x": 10.25, "z": 5.75, "at": 9.9 },
+    { "x": 10.25, "z": 4.75, "at": 10.7 },
+    { "x": 10.25, "z": 3.75, "at": 11.5 },
+    { "x": 10.25, "z": 2.75, "at": 12.3 },
+    { "x": 10.25, "z": 1.75, "at": 13.1 },
+    { "x": 10.75, "z": 1.75, "at": 13.9, "careful": true },
+    { "x": 11.25, "z": 1.75, "at": 14.6 },
+    { "x": 11.25, "z": 1.75, "at": 14.6 }
   ],
   "inhabitants": [
     {

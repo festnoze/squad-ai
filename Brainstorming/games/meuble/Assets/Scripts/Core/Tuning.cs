@@ -13,7 +13,15 @@ namespace OutOfSight.Core
         public const float OrbitDistance = 4.0f;
         public const float OrbitDistanceMin = 2.5f;
         public const float OrbitDistanceMax = 6.0f;
-        public const float PitchMin = 15f;
+        /// <summary>
+        /// The view's lowest pitch (negative: above the horizon). Sky ceiling (2026-11-20, GardenBackdrop): was 15; the arm
+        /// stops at <see cref="OrbitArmPitchMin"/> and lower pitches only tilt the view up toward the sky (OrbitCamera.ArmPitchFor).
+        /// </summary>
+        public const float PitchMin = -10f;
+        /// <summary>The arm's lowest pitch: the camera never sinks lower toward the floor (OrbitCamera.ArmPitchFor).</summary>
+        public const float OrbitArmPitchMin = 5f;
+        /// <summary>The arm eases onto <see cref="OrbitArmPitchMin"/> over this many degrees either side (a smooth stop, no kink).</summary>
+        public const float OrbitArmPitchEase = 5f;
         public const float PitchMax = 75f;
         public const float PitchDefault = 40f;
         public const float MouseSensitivity = 0.12f;
@@ -340,6 +348,15 @@ namespace OutOfSight.Core
         public const float DoorReach = 0.85f;
         public const float DoorOpenTime = 0.6f;
         public const int MaxLeavesPerLevel = 2;
+        // Task DOORAUTO (docs/next/progress/DOORAUTO.md): pushing the move input toward a closed leaf in reach (into its
+        // wall), into a wardrobe's front from its entry zone, or out of it while hidden, replaces the E press. The push must
+        // stay within PushConeDegrees of that direction, at least PushMinInput strong, for PushConfirmTime (8 fixed steps,
+        // so sliding along a wall never opens a door). A push starts only with the furniture still (a moving one drives on
+        // into the leaf, stops there, and a push starts then); it holds the furniture still, then the same action as the E
+        // press begins (DoorOpenTime, WardrobeActionTime), so the audit's timings are unchanged.
+        public const float PushConfirmTime = 0.16f;
+        public const float PushConeDegrees = 45f;
+        public const float PushMinInput = 0.3f;
         // The split level (v3 15.4, v5 16.6).
         public const float PlatformMinHeight = 0.6f;
         public const float PlatformMaxHeight = 1.0f;
@@ -350,6 +367,76 @@ namespace OutOfSight.Core
         public const float PassageWidth = 1.2f;
         // The dog (v3 4, 15.5).
         public const float DogEyeHeight = 0.35f;
+        /// <summary>
+        /// DOGBIG (product owner, 2026-11-21: "the dog reads too small"): the dog's MODEL (the Quaternius Husky) is drawn this
+        /// many times the old Shiba's size, its eyes at <see cref="DogModelEyeHeight"/> (about 0.63 m tall at the ears, 0.76 m
+        /// from snout to tail). Presentation only: the gameplay eye (<see cref="DogEyeHeight"/>, the vision cone's origin),
+        /// the collider (<see cref="DogCapsuleRadius"/>, <see cref="DogCapsuleHeight"/>), the speeds and every reach stay as
+        /// they were.
+        /// </summary>
+        public const float DogModelScale = 1.5f;
+        /// <summary>DOGBIG: the eye height ModelKit fits the dog's model to (the catalog's target eye), metres.</summary>
+        public const float DogModelEyeHeight = DogEyeHeight * DogModelScale;
+        /// <summary>
+        /// DOGBIG: the Resources name of the dog's fur texture (a base colour map painted on the Husky's UV0 atlas,
+        /// Assets/Art/Characters/dog_fur_uv_template.png). While no such texture exists the dog keeps its plain tint; once it
+        /// is dropped in (Assets/Art/Characters/Resources/DogFur.png) every slot of the dog's model shows it
+        /// (ModelKit.ApplyPetFurMap), in game and in the title logo.
+        /// </summary>
+        public const string DogFurTextureResource = "DogFur";
+        /// <summary>
+        /// DOGBIG, presentation only: while the dog drags the furniture (and wags after the drop) its model steps back along
+        /// its facing so its snout, which now reaches past the near edge of the held furniture, stays on that edge; the step
+        /// eases in and out at this rate (1 per second).
+        /// </summary>
+        public const float DogHoldBackRate = 4f;
+        /// <summary>
+        /// GRIP (2026-11-22), presentation only (GripDef, GripMath): the dog's snout tip stands this far below its head bone
+        /// with the head level (metres at the fitted model's size, before Tuning.DogHeadScale; measured on the GLB's rest pose:
+        /// the tip 0.082 m ahead of the head bone and 0.010 m below it), and the head pitches down this many times the neck's
+        /// bend when it lowers its head onto the point it bites (1: the muzzle continues the neck's curve).
+        /// </summary>
+        public const float DogSnoutDrop = 0.010f;
+        public const float DogGripHeadFollow = 1f;
+        /// <summary>
+        /// GRIP, presentation only: how far the dog's model may step toward the furniture it bites while it is still on the
+        /// floor (the pin and the grip, before the pick up brings it to the carry anchor), metres.
+        /// </summary>
+        public const float DogGripReachIn = 0.35f;
+        /// <summary>
+        /// DOGBIG (black Labrador, 2026-11-21), presentation only: the Husky model's pricked ears and curled tail are posed as a
+        /// Labrador's every frame after its clip (InhabitantRig.PetPose): each ear hangs down beside the head, leaning out by
+        /// DogEarOut and forward by DogEarForward (per unit down, in the head's frame); the tail hangs back and down
+        /// (DogTailDroop down per unit back, in the body's frame), straightened DogTailWeight of the way so the clip's sway
+        /// still shows.
+        /// </summary>
+        public const float DogEarOut = 0.35f;
+        public const float DogEarForward = 0.15f;
+        public const float DogTailDroop = 0.6f;
+        public const float DogTailWeight = 0.85f;
+        /// <summary>
+        /// DOGBIG v3 (product owner, 2026-11-21: "the head is too small for its face to be seen"), presentation only: the dog's
+        /// head bone is scaled this much (head, muzzle, eyes and ears; the neck blends in through the skin weights). v4: 1.45, with
+        /// the rounder skull baked in the GLB (make_husky.py), about 1.5 times the original head.
+        /// </summary>
+        public const float DogHeadScale = 1.45f;
+        /// <summary>
+        /// DOGBIG v3, the bite (presentation only): from the pin to the drop the dog's head rolls DogBiteRollDegrees sideways
+        /// and dips DogBitePitchDegrees onto the furniture's edge, its jaw (the "Jaw" joint added to the Husky) opens
+        /// DogJawOpenDegrees; the pose eases in and out at DogBiteRate (1 per second).
+        /// DOGFACE: the jaw 45 deg (was 30, no gap readable): the GLB's lower jaw is longer (hinge behind the mouth's corner),
+        /// cut from the upper lip, and opens on the mouth's dark pink inside (make_husky.py v5).
+        /// </summary>
+        public const float DogBiteRollDegrees = 60f;
+        public const float DogBitePitchDegrees = 15f;
+        public const float DogJawOpenDegrees = 45f;
+        public const float DogBiteRate = 6f;
+        /// <summary>
+        /// DOGBIG v3 ("the fur is not visible"): the fur map material's smoothness (a black coat's sheen; the palette
+        /// characters use 0.25), and the fur map's mip bias (negative: a sharper mip at game distance, the strands kept).
+        /// </summary>
+        public const float DogFurSmoothness = 0.4f;
+        public const float DogFurMipBias = -0.6f;
         public const float BarkRadius = 6f;
         public const float BarkCooldown = 3f;
         // The dog's hold (CONTRACT_M5 20): after its bark it runs to the furniture (faster than every body), pins it within
@@ -358,9 +445,22 @@ namespace OutOfSight.Core
         public const float DogRunSpeed = 2.6f;
         public const float DogHoldBarkInterval = 0.8f;
         public const float DogHoldMaxWait = 6f;
+        // DOGCARRY (the product owner's "when it catches you, it brings you back like a human would"): after DogGripTime of
+        // its hold the dog itself drags the furniture back to the slot the nearest human remembers, by an edge in its mouth
+        // (lifted DogDragLift instead of CarryHeight, a DogDragWobbleDegrees / DogDragBob wobble at DogDragWobbleHz), at
+        // DogDragSpeed; it drops it, barks once and wags for DogWagTime, then resumes its routine.
+        public const float DogGripTime = 0.6f;
+        public const float DogDragSpeed = 0.8f;
+        public const float DogDragLift = 0.06f;
+        public const float DogDragWobbleDegrees = 6f;
+        public const float DogDragBob = 0.03f;
+        public const float DogDragWobbleHz = 2.5f;
+        public const float DogWagTime = 0.8f;
         public const float WakeTelegraph = 0.6f;
         public static readonly UnityEngine.Color DogConeColor = new UnityEngine.Color(0.25f, 0.85f, 0.85f, 1f);
-        public const int BudgetPetBones = 46;
+        // DOGBIG: 46 (the Shiba) to 50: the Husky's tail has 6 bones instead of 3 (same AnimalArmature rig otherwise), and
+        // DOGBIG v3 added a "Jaw" joint for the bite.
+        public const int BudgetPetBones = 50;
         // Several inhabitants.
         public const float WatcherSeparation = 0.6f;
         public const int MaxHumans = 3;
@@ -456,9 +556,10 @@ namespace OutOfSight.Core
         /// <summary>
         /// M7 walls pass (product owner 2026-11-19): the default of the wall opacity option (SaveOptions.WallOpacity, percent):
         /// the opacity a wall in the way fades to in the see-through and both modes (WallFader): light enough to see the
-        /// room through it, enough to see the whole wall.
+        /// room through it, enough to see the whole wall. Product owner, 2026-11-20: 10 % (was 20 %), with "both" as the default
+        /// Walls mode (SaveOptions.Walls).
         /// </summary>
-        public const int WallOpacityDefault = 20;
+        public const int WallOpacityDefault = 10;
         /// <summary>
         /// M7 walls pass: the height of the solid stub every wall line keeps along its footprint (LevelBuilder), shown in the
         /// lowered and both modes: a lowered wall shows only this stub (and its standing door frames). Below the top of every
@@ -496,9 +597,11 @@ namespace OutOfSight.Core
         /// <summary>
         /// Metres the dog walks per Walk clip cycle (InhabitantRig's stride for pets): the stance feet of the Shiba's
         /// "Walk" travel 2.7 native units per cycle (measured on the GLB from its IK foot bones), times its fit scale 0.130
-        /// (its eyes, 2.69 native units high in Idle, at DogEyeHeight). A small dog's quick patter: 4 cycles a second at 1.4 m/s.
+        /// (its eyes, 2.69 native units high in Idle, at DogEyeHeight): 0.35 m. DOGBIG: the Husky's Walk clip is the Shiba's
+        /// key for key (same IK foot tracks, same 1.042 s) and its eyes stand within 1 % of the Shiba's, so the stride grows
+        /// with the model: 0.525 m, a bigger dog's longer, slower trot (2.7 cycles a second at 1.4 m/s).
         /// </summary>
-        public const float DogWalkCycleMeters = 0.35f;
+        public const float DogWalkCycleMeters = 0.35f * DogModelScale;
         /// <summary>Normalized Walk clip time of the dog's first foot contact (its hind feet land at 0.83 and 0.33).</summary>
         public const float DogFootContactCycle = 0.83f;
         /// <summary>The sleep "z" and the wake telegraph marker of a sleeping watcher, metres (the "?" is 0.34).</summary>
@@ -604,10 +707,13 @@ namespace OutOfSight.Core
         public const float ClueProbeHeight = 0.3f;
         /// <summary>The rock's visual (GameState's rock): this many full swings, decaying to upright at the rock's end.</summary>
         public const float RockSwings = 1.5f;
-        /// <summary>The robot's hum, a 3D loop on the robot: its volume (times the mix scale) and its rolloff distances, metres.</summary>
+        /// <summary>
+        /// The robot's hum, a loop on the robot: its volume (times the mix scale) and its rolloff distances, metres. Levels v2
+        /// C8: silent from 3.5 m (it was 7 m), just past RobotHumRadius (2.5 m, the masking rule and the hum disc).
+        /// </summary>
         public const float SfxHumVolume = 0.16f;
         public const float SfxHumMinDistance = 0.6f;
-        public const float SfxHumMaxDistance = 7f;
+        public const float SfxHumMaxDistance = 3.5f;
         /// <summary>The fallen load's crash, as loud as the caught sting: it is heard 6 m away.</summary>
         public const float SfxCrashSynthVolume = 0.62f;
         /// <summary>The rocking chair's creak while it rocks, under the creak's 0.75.</summary>
@@ -776,10 +882,13 @@ namespace OutOfSight.Core
         public const float TouchOrbitDegPerPixel = 0.15f;
         /// <summary>How far the thumb travels from where it landed for a full stick.</summary>
         public const float TouchStickRadius = 120f;
-        /// <summary>The action button's diameter (1.5: at least 9 mm, about 140 px at 1080p).</summary>
-        public const float TouchActionSize = 190f;
         /// <summary>The careful and pause buttons' diameter (at least 140 px at 1080p too).</summary>
         public const float TouchButtonSize = 150f;
+        /// <summary>
+        /// Task DOORAUTO (the action button is gone; the lamp is switched by tapping it): a tap within this many pixels of
+        /// the player lamp's projected box switches it, so a thin lamp is easy to hit with a thumb.
+        /// </summary>
+        public const float TouchLampTapMargin = 60f;
 
         // ----- M7 android (docs/CONTRACT_M7.md 1.4): the quality tiers (QualityTier). -----
         /// <summary>Bas renders at this fraction of the screen resolution; Moyen at 1 (both on Mobile_RPAsset).</summary>
@@ -999,30 +1108,37 @@ namespace OutOfSight.Core
         public const float LevelMiniaturePlayerRadius = 0.38f;
 
         // ----- M7 title logo (TitleLogo): the red chair rendered once at a three-quarter angle, with a short high-sun shadow. -----
-        /// <summary>Size of the baked logo texture, in pixels (rendered at twice this and averaged down).</summary>
-        public const int TitleLogoWidth = 400;
-        public const int TitleLogoHeight = 280;
+        /// <summary>Size of the baked logo frame, in pixels (rendered at twice this and averaged down).</summary>
+        // Grown from 400 x 280 with the frame (2026-11-20, the wider pool of light) at the same 190.5 pixels per metre.
+        public const int TitleLogoWidth = 438;
+        public const int TitleLogoHeight = 290;
         /// <summary>Elevation of the high (about 11 am) sun above the logo's ground, in degrees: the shadow is height / tan of it.</summary>
         public const float TitleLogoSunElevation = 62f;
         /// <summary>Heading of the sun's travel on the logo's ground, in degrees from the camera's right toward its depth.</summary>
         public const float TitleLogoSunHeading = 24f;
         /// <summary>The chair's yaw in the logo's frame (180 faces the camera), in degrees.</summary>
-        public const float TitleLogoChairYaw = 220f;
+        // 220 faced left; 140 (2026-11-21, the product owner's "face right") is its mirror, three-quarter to the right:
+        // the same outline height (same gap above the title and below the top), the sun now on its side, not its front.
+        public const float TitleLogoChairYaw = 140f;
+        /// <summary>Intensity of the soft fill light in front of the chair (baked once): keeps the faces turned from the sun readable.</summary>
+        public const float TitleLogoFillIntensity = 0.5f;
         /// <summary>Degrees the logo camera looks down.</summary>
         public const float TitleLogoPitch = 26f;
         /// <summary>Width of ground the orthographic logo camera frames, in metres, and the chair's distance from its left edge.</summary>
-        // Widened from 1.8 for the pool of light (2026-11-19), which needs room to fade out inside the frame.
-        public const float TitleLogoFrameWidth = 2.1f;
-        public const float TitleLogoChairInset = 0.85f;
+        // Widened from 1.8 for the pool of light (2026-11-19), which needs room to fade out inside the frame; then from 2.1
+        // (inset 0.85, foot at 0.29) for the wider pool (2026-11-20): the chair keeps its place and size on screen.
+        public const float TitleLogoFrameWidth = 2.3f;
+        public const float TitleLogoChairInset = 1.02f;
         /// <summary>Where the chair's foot sits, as a fraction of the frame height from the bottom (raised so the pool's
         /// near edge fades out above the frame's bottom).</summary>
-        public const float TitleLogoFootHeight = 0.29f;
+        public const float TitleLogoFootHeight = 0.315f;
         /// <summary>The pool of light on the floor: its centre along the shadow from the chair's foot and its radius, in
         /// metres, so it holds the whole short shadow; the fraction of the radius kept at full light before the falloff;
         /// and its opacity at full light over the title band.</summary>
         public const float TitleLogoPoolCentre = 0.12f;
-        // Radius raised from 0.9 and core lowered from 0.45 (2026-11-19): a slightly larger pool with a wider soft rim.
-        public const float TitleLogoPoolRadius = 1.0f;
+        // Radius raised from 0.9 and core lowered from 0.45 (2026-11-19): a slightly larger pool with a wider soft rim;
+        // then from 1.0 (2026-11-20, the product owner's "a little wider"), same core fraction and opacity.
+        public const float TitleLogoPoolRadius = 1.15f;
         public const float TitleLogoPoolCore = 0.25f;
         // Lowered from 0.9 (2026-11-19): the pool read too bright; 70 % of the original opacity.
         public const float TitleLogoPoolAlpha = 0.63f;
@@ -1042,10 +1158,81 @@ namespace OutOfSight.Core
         /// <summary>Size of the logo on the title page (1920 x 1080 reference) and the offset of its left centre.</summary>
         // The chair in its pool is taller than the first logo (240 x 180): a little smaller, so chair and pool fit between
         // the top of a 20:9 phone and the title; the chair moved right (2026-11-19, the product owner's "a little to the right").
-        public const float TitleLogoUiWidth = 232f;
-        public const float TitleLogoUiHeight = 162f;
-        public const float TitleLogoUiX = 128f;
-        public const float TitleLogoUiY = 401f;
+        // Grown with the frame (2026-11-20, from 232 x 162 at 128, 401): same scale, the chair's foot at the same point.
+        // Raised by 1 unit (2026-11-20): the rounded chair's outline is a fraction of a unit taller, and its foot keeps
+        // its 2 unit gap above the title's letters.
+        public const float TitleLogoUiWidth = 254f;
+        public const float TitleLogoUiHeight = 168f;
+        public const float TitleLogoUiX = 109f;
+        public const float TitleLogoUiY = 399f;
+        // ----- Title logo loop (TitleLogo.Sample, 2026-11-20; reworked 2026-11-21): the chair hops off while the spot
+        // looks away, gets caught in the light, and the house dog drags it home. -----
+        /// <summary>Length of one loop of the title chair, in seconds, and the share of it spent perfectly still in the light.</summary>
+        // From 10 s at 0.85 (2026-11-21): an 11 s act (it was 1.5 s), then the still pose held 15 s (the product owner's
+        // minimum after the chair is back).
+        public const float TitleLogoCycleSeconds = 26f;
+        public const float TitleLogoStillFraction = 15f / 26f;
+        /// <summary>Where in the loop the logo starts when it appears: inside the still part, so the first act comes 2.5 s in.</summary>
+        public const float TitleLogoStartPhase = 12.5f / 26f;
+        /// <summary>The chair's gentle hops to the right while the spot is away: how many, the floor each covers and the
+        /// top of each (a lift of the chair's picture, no squash, no tilt), in metres; and the top of its single startled
+        /// jump when the light catches it.</summary>
+        // Low on purpose: the chair's top has about 8 reference units left under the top of a 20:9 phone.
+        public const int TitleLogoChairHops = 3;
+        public const float TitleLogoChairHopStride = 0.13f;
+        public const float TitleLogoChairHopHeight = 0.045f;
+        public const float TitleLogoChairStartle = 0.065f;
+        /// <summary>How far the pool of light slides away to the left, in metres of floor, and the light left when it is away.</summary>
+        public const float TitleLogoSpotDrift = 0.45f;
+        public const float TitleLogoSpotAway = 0.12f;
+        /// <summary>The dog dragging the chair home: the chair's tilt at the grab and in the tug's wobble (degrees), and its
+        /// lift off the floor (metres; the in-game drag lifts 0.06 m, Tuning.DogDragLift).</summary>
+        public const float TitleLogoDragWobble = 1.5f;
+        public const float TitleLogoDragLift = 0.02f;
+        /// <summary>The dog in the logo: where its body stands, sideways from the chair's foot, when it holds the chair on its
+        /// mark (its snout at the chair's left edge), in metres; its yaw (90 faces right; a little more turns it toward the
+        /// camera), in degrees.</summary>
+        // DOGBIG: from -0.62 (the Shiba, snout 0.30 m ahead of its body on screen) to -0.67: the Husky at
+        // TitleLogoDogScale reaches 0.355 m ahead, so its snout stays on the chair's left edge (0.32 m left of the foot).
+        public const float TitleLogoDogGrip = -0.67f;
+        public const float TitleLogoDogYaw = 110f;
+        /// <summary>
+        /// DOGBIG: the logo's dog at this share of its in-game size (the Husky at 1.5 times the Shiba): 0.8, so 1.2 times the
+        /// old logo dog. At full size its 0.72 m on screen would not fit between the frame's left edge and the chair (0.70 m)
+        /// with its rump inside the frame; at 0.8 its rump stays about 0.1 m inside while it holds the chair on its mark.
+        /// </summary>
+        public const float TitleLogoDogScale = 0.8f;
+        /// <summary>The dog's walk: the floor between two swaps of its two baked frames is half this stride; its bob, in
+        /// metres; the floor over which it fades in and out at the frame's left edge, in metres; its wag, in degrees; and
+        /// its shadow's darkness at full pool light.</summary>
+        // DOGBIG: from 0.24 for the Shiba, times the logo dog's 1.2 growth.
+        public const float TitleLogoDogStride = 0.29f;
+        public const float TitleLogoDogBob = 0.01f;
+        public const float TitleLogoDogFade = 0.35f;
+        public const float TitleLogoDogWag = 6f;
+        public const float TitleLogoDogShadow = 0.7f;
+        /// <summary>
+        /// GRIP (2026-11-22): the logo dog bites the chair's left back leg this high (metres above the floor; it lowers its
+        /// head to it, GripMath), the in-game dog's low grip instead of the old snout at its own height.
+        /// </summary>
+        public const float TitleLogoDogBiteHeight = 0.30f;
+        /// <summary>
+        /// GRIP (2026-11-22, product owner): the loops alternate, one with the dog, the next with a human who walks in from
+        /// the left, puts his hands on the top of the chair's backrest (the in-game grip, GripDef) and pulls it home. The
+        /// human at this share of his in-game size: at the full 1.74 m his head would leave the top of a 20:9 phone (the
+        /// frame has 1.04 m of floor above the chair's foot); at 0.6 his head stays about 5 units under it.
+        /// </summary>
+        public const float TitleLogoHumanScale = 0.6f;
+        /// <summary>The logo human's yaw (90 faces right; less turns him a little away from the camera, toward the chair's
+        /// back), and how far his feet stand behind the middle of his two hands, metres.</summary>
+        public const float TitleLogoHumanYaw = 85f;
+        public const float TitleLogoHumanReach = 0.30f;
+        /// <summary>Where the logo human's hands rest across the top rail of the chair's backrest (the chair's frame, x;
+        /// the height and depth are GripDef's chair wrists): the right hand on the rail's near end, the left further along.</summary>
+        public const float TitleLogoHumanRightX = 0.17f;
+        public const float TitleLogoHumanLeftX = 0.03f;
+        /// <summary>The logo human's walk bob, metres (none while he holds the chair: his picture then carries it).</summary>
+        public const float TitleLogoHumanBob = 0.006f;
 
         // ----- M7 options page (Menu.BuildOptions, OptionsRow): the title page's left column style, reused. -----
         /// <summary>Left margin of the title and every row, in reference pixels (the title page's own margin).</summary>
@@ -1077,5 +1264,23 @@ namespace OutOfSight.Core
         public const float ClothesHemBand = 0.08f;
         /// <summary>Clothes: how much of the fabric's shading the bands keep (an exponent on the luminance ratio).</summary>
         public const float ClothesBandContrast = 0.5f;
+
+        // ----- Stars (idea 5, docs/next/progress/STARS.md): three stars per level and difficulty (Stars.cs). -----
+        // The reference is the audit's earliest exit for the played difficulty: the "at" of the last point of the level's
+        // designerRoute (designerRouteHard at Difficile), plus StarsReferenceSlack. Why generous factors: the solver plays
+        // a perfect schedule from the first fixed step, while a human reads the room, waits for a safe look-away and
+        // arrives on the doormat 0.3 to 1.8 s after the last point's departure (docs/levels_v2/wave1/numbers.md 2).
+        // Level 1 (route 11.6 s): 3 stars at or under 20.4 s, 2 stars under 34.0 s, 1 star for any win.
+        /// <summary>Stars per level: the win panel's row and the level select's total (22 levels, 66 stars).</summary>
+        public const int StarsPerLevel = 3;
+        /// <summary>Seconds added to the route's last point before the factors (the doormat arrival, the first look).</summary>
+        public const float StarsReferenceSlack = 2f;
+        /// <summary>Three stars at or under the reference times this.</summary>
+        public const float StarsThreeFactor = 1.5f;
+        /// <summary>Two stars under the reference times this (three under <see cref="StarsThreeFactor"/>); one star otherwise.</summary>
+        public const float StarsTwoFactor = 2.5f;
+        /// <summary>The win panel's reveal: seconds between two stars popping in, and the pop's own length (StarRow).</summary>
+        public const float StarsRevealStagger = 0.22f;
+        public const float StarsRevealSeconds = 0.35f;
     }
 }

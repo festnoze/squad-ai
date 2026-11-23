@@ -1,0 +1,320 @@
+{
+  "agent": "code-features",
+  "date": "2026-11-20",
+  "features": [
+    {
+      "name": "Progression v2: play order, unlock rule and save migration",
+      "needed_by": ["all levels (new order)", "level15 moved to slot 10", "level18 before level17", "level21 before level20", "level25 Showroom (optional, new id)"],
+      "design": "WHAT EXISTS: levels.json is a flat list read by LevelManifest.Parse (LevelDef.cs:517-531, default JsonConvert settings, so unknown keys are ignored and safe to add). SaveData.IsUnlocked (SaveData.cs:285-292) opens index i when i == 0 or order[i-1] is in Won. Won and Best are keyed by level id (Best via DifficultyDef.RecordKey, 'levelN' at Normal, 'levelN@facile' / 'levelN@difficile'). FirstUnwonLevel (SaveStore.cs:567) and LevelSelect.IsPlayable (LevelSelect.cs:251) both go through IsUnlocked; the progress line (LevelSelect.cs:209-220) counts only listed ids, so cut ids left in Won do not inflate it. PROBLEM (C5, confirmed in code): after a reorder a level already won can lock (17 placed after 18), and a level that was playable can lock (level11 now behind level15). NEW levels.json: { 'rev': 2, 'previous': [the 24 current ids in current order], 'levels': ['level1','level2','level3','level4','level5','level6','level7','level8','level9','level15','level11','level12','level13','level14','level18','level17','level19','level21','level20','level22','level25','level24'], 'acts': [ {'from':0,'nameKey':'act1.name'}, {'from':7,'nameKey':'act2.name'}, {'from':16,'nameKey':'act3.name'} ] }. 22 entries with the optional Showroom (level25), 21 without it (drop 'level25' and nothing else changes). level10, level16 and level23 are unlisted, their files stay on disk (tests and fixtures load them by id; LevelAudit audits only the manifest unless given ids). LevelManifest: keep Parse(json) -> List<string> unchanged; add ParseFull(json) -> ManifestDef { int Rev = 1; List<string> Levels; List<string> Previous; List<ActDef> Acts } and LevelLoader.LoadManifestDef(). SAVE: SaveData gets [JsonProperty('unlocked')] List<string> Unlocked (missing = empty) and [JsonProperty('order')] int Order (missing = 1). Version stays 1 (same pattern as 'options': a missing key is a default, an old save loads unchanged). Parse: 'unlocked' must be a list of strings (else problem 'unlocked is not a list', like 'won'); a non-integer or < 1 'order' reads as 1. UNLOCK RULE: IsUnlocked(order, i) = valid index && (i == 0 || Won.Contains(order[i]) || Won.Contains(order[i-1]) || Unlocked.Contains(order[i])). A won level is always playable. MIGRATION: SaveData.MigrateOrder(int rev, IReadOnlyList<string> previous, IReadOnlyList<string> current) -> bool changed. If Order >= rev: nothing. Else, for every j of previous with (j == 0 || Won.Contains(previous[j-1])) and previous[j] listed in current: add previous[j] to Unlocked. Then Order = rev. A fresh save only gets Order = rev. SaveStore.Load calls it after a successful parse with LevelLoader.LoadManifestDef(); when it returns true the existing atomic write saves it and logs '[SaveStore] progress migrated to order rev 2: +N unlocked'. Migration is one-shot and persisted, so new players get the plain new-order rule with no legacy leak. WORKED CASES (order above): won 1 to 10: level15 (slot 10) open since level9 is won; level11 (slot 11) open through Unlocked (old predecessor level10 won); nothing lost. Won 1 to 17 not 18: 17 is won so open; 18 open through Unlocked; 19 open (predecessor 17 won). Won 1 to 14 not 15: 15 open (after 9), 18 open (after 14), 17 locked (old predecessor 16 never won), which matches what was playable before. Fresh save: only level1. FirstUnwonLevel needs no code change. HORIZON: LevelAudit.LegacyLevels (ids level1 to level7) keeps the 180 s horizon and the sweep; ids do not change, so act 1 keeps them. STRINGS: act1.name, act2.name, act3.name (+ one line per act if the act card lands), level25.name, level25.hint, EN and FR, no em-dash. MUTATION tags: UNLOCK_WON (drop the Won.Contains(order[i]) term), UNLOCK_MIGRATED (drop the Unlocked term), MIGRATE_PREDECESSOR (j-1 -> j). TESTS: CoreM5Tests.IsUnlocked_opens_a_level_once_the_one_before_it_is_won (CoreM5Tests.cs:1819-1836) must change: line 1833 asserts level8 locked right after RecordWin('level8') at 1829, which the new rule opens (won). Add EditMode tests: the three worked cases above, a fresh save, a migrated save re-loaded (idempotent, no second write), a save with 'unlocked' of the wrong type rejected, 'order' missing reads as 1, MigrateOrder never removes anything from Won or Best.",
+      "files": [
+        "Assets/Resources/Levels/levels.json",
+        "Assets/Scripts/Core/LevelDef.cs (LevelManifest, ManifestDef, ActDef)",
+        "Assets/Scripts/Core/SaveData.cs (Unlocked, Order, IsUnlocked, MigrateOrder, Parse)",
+        "Assets/Scripts/Runtime/SaveStore.cs (Load calls MigrateOrder, write back)",
+        "Assets/Scripts/Runtime/LevelLoader.cs (LoadManifestDef)",
+        "Assets/Scripts/Core/Strings.cs (act names, level25)",
+        "Assets/Tests/EditMode/CoreM5Tests.cs",
+        "Assets/Tests/EditMode/SaveM5Tests.cs",
+        "mutation.sh"
+      ],
+      "effort": "M",
+      "priority": "must"
+    },
+    {
+      "name": "Test suite updates for the new order and the cut levels",
+      "needed_by": ["all levels"],
+      "design": "Every test that hardcodes 24 levels, the number order, or requires a cut level to be listed. EDITMODE: (1) LevelDataM2Tests.PlayOrder (LevelDataM2Tests.cs:25-30): replace with the v2 list. (2) Manifest_lists_the_levels_in_play_order_and_each_is_valid (line 138, Assert.AreEqual(24, ids.Count)): 22 (or 21). (3) Wave5B_levels_follow_the_revised_level_table: the WaveB table (row for level10 at line 269, rows for level9, 11, 13, 15, 17) asserts body, rooms, lesson, people (personality:pattern), robots, closed leaves, platform, decoys; every retuned row must be rewritten from the final level data, the level10 row moved to an 'archived files still validate' test or deleted; the closing Assert.AreEqual(6, checkedLevels) follows. (4) Wave5B_levels_are_valid_and_played_in_number_order (line 329-345): fails on level10 (unlisted), level15 (now after level9) and level17 (now after level18): replace by one data-driven test 'the manifest is the v2 order and every listed level validates'. (5) line 222 'checkedRoutes >= PlayOrder.Length' follows PlayOrder. (6) CoreM4Tests.cs:1084 and LevelDataM8Tests.cs:42 iterate every json in Resources/Levels: the three unlisted files must keep validating (keep them untouched) or be moved with these tests updated. (7) DifficultyM7Tests: add RecordKey with a revised id (see record revision feature). (8) SaveM5Tests.cs:700-740 and CoreM5Tests.cs:1819: unlock rule (see progression feature). PLAYMODE: (9) ProbeTestsM5Levels.Step40_FullPlaythrough (line 1188, Assert.AreEqual(24, order.Count)): use the manifest count; with return-goal levels the per-run cap must be max(route end, deadline) + 30 s. (10) Step45a_WaveALevelsBoot... (line 547-556): WaveA lists level16 and asserts 'right after level n-1': drop level16, replace the adjacency premise with 'listed'. (11) Step45r_WaveBLevelsBoot... (line 1112-1127): asserts number order of level9/10/11/13/15/17 in the manifest: remove the order check, drop level10 or load it as an archived file. (12) ReplayDesignerRoute premise 'listed in levels.json' (line 126): the level16 replay (line 356) and level10 replay (line 675) fail: delete those steps (their lessons move to level15 and level20), or change the premise to 'file exists' for archived replays. LoadFresh('level10') steps at lines 957 and 975 (rock rule tests) can stay (they load by id) or move to level15 once it is the rocker lesson. (13) ProbeTestsM7Design Step64b_Level10Hard and Step64b_Level16Hard (lines 255, 261, premise 'listed' in ReplayHard line 211): delete; add Step64b for level25 if built. Line 123 uses level16 as 'a watchful, a hurried and a dog: every kind of watcher' for the difficulty scaling test: move it to a listed level with that cast after the redesign (it still loads unlisted, but it should test a played level). (14) ProbeTestsM7LevelsC Step58C1/C2 (level23, lines 160-167): delete, or retarget to level25 with new premises. (15) ProbeTestsM7Look.cs:113, ProbeTestsLightingShots.cs:91 use level16 as the night look: retarget to level20 when the night preset lands. (16) Tests that only load by id (ProbeTestsM7Walls.cs:208 level10, ProbeTestsM2.cs LoadLevel premise for level1 to 3, ProbeTestsM5House GetRange(0,7) = levels 1 to 7) keep working. (17) Content premises of retuned levels must be re-derived by the level implementers: files referencing level6/8/9/11/12/15/17/20/21/24: LevelDataM2Tests, LevelDataM4Tests (level6), CoreM5Tests (level8, level12), ProbeTestsM4Levels (level6), ProbeTestsM5House (level8), ProbeTestsM5Levels, ProbeTestsM6Levels (level11, level17), ProbeTestsM6Textures (level9), ProbeTestsM7Design, ProbeTestsM7LevelsA (level20), ProbeTestsM7LevelsB (level21), ProbeTestsM7LevelsC (level24), ProbeTestsM7Walls, ProbeTestsM8Lights (level12, level20), ProbeTestsM9Backdrop (level9, 12, 21), ProbeTestsM9FloorDust (level12, 15, 20, 21), ProbeTestsM9NearWalls (level8, level12). (18) ProbeTestsM5Ui Step41 (cards follow order) and Step41b (Jouer starts the first unwon level) pass unchanged; add a step where a migrated save opens the expected cards. (19) mutation.sh line 42 (audit_sit_moment on level5) unchanged.",
+      "files": [
+        "Assets/Tests/EditMode/LevelDataM2Tests.cs",
+        "Assets/Tests/EditMode/CoreM5Tests.cs",
+        "Assets/Tests/EditMode/SaveM5Tests.cs",
+        "Assets/Tests/EditMode/DifficultyM7Tests.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM5Levels.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM7Design.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM7LevelsC.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM7Look.cs",
+        "Assets/Tests/PlayMode/ProbeTestsLightingShots.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM5Ui.cs",
+        "Assets/Tests/PlayMode/RouteReplayer.cs"
+      ],
+      "effort": "M",
+      "priority": "must"
+    },
+    {
+      "name": "Start on first input (held start)",
+      "needed_by": ["all levels", "every return-goal deadline", "levels whose route acts at 0.3 s (6, 9, 11, 12, 16, 17, 20, 21, 24 today)"],
+      "design": "WHAT EXISTS: BuildLevel sets State = Playing at once (GameState.cs:645) and FixedUpdate steps inhabitants (1689-1692), robots and the clock (Steps++ at 1733) from the build, while the intro card is held 4 s then faded 1 s. The audit's t = 0 is the build, so a player who reads the card starts late (the audit already warns 'depart retarde' on 1, 2, 3, 5, 7). NEW: GameState.Started (bool). BuildLevel sets Started = !HoldStart. While !Started, FixedUpdate only reads input: the first step with a move input above the dead zone, or the action key (open, hide, toggle), sets Started = true and runs that same step in full (so the first input step is schedule step 1). Camera input and the careful key alone do not start. Before the start: no furniture motion, no inhabitant, robot, vision, creak or Steps; inhabitant rigs keep their idle pose at the start station (Update-driven animation only). Hud: the intro card stays fully visible until Started, with a line 'Move to start' / 'Bouge pour commencer' (hud.start, keyboard/pad/touch variants like the controls line), then the existing 1 s fade. Pause works while held. Restart and next level hold again. HoldStart is a static default: true in the player and in editor play mode, false when Probe.Requested or SaveStore.IsTestRun (so the existing 400+ steps keep t0 = build); RouteReplayer gets an explicit Game.ReleaseStart() at its first sample for the dedicated tests. AUDIT: no change (its t = 0 is now the player's real first input); the late-start sweep stays (a player can still wait at the spawn). RECORDS: Elapsed counts from the release, so records exclude the card time. TESTS: held 3 s with no input: Steps == 0, every routine at its start pose, creak 0, no robot motion; first move input: Steps advances from that step; a designer route replayed with hold on and ReleaseStart at sample 0 wins with the same exit step as with hold off. MUTATION: HOLD_START (start on any frame).",
+      "files": [
+        "Assets/Scripts/Runtime/GameState.cs (Started, HoldStart, FixedUpdate gate)",
+        "Assets/Scripts/Runtime/InputReader.cs (AnyStartInput)",
+        "Assets/Scripts/Runtime/Hud.cs (card held until start, start line)",
+        "Assets/Scripts/Core/Strings.cs (hud.start variants)",
+        "Assets/Tests/PlayMode/RouteReplayer.cs (ReleaseStart)",
+        "new PlayMode probe step",
+        "mutation.sh"
+      ],
+      "effort": "M",
+      "priority": "must"
+    },
+    {
+      "name": "Audit: pace metrics, dead rooms and a JSON report",
+      "needed_by": ["every retuned level (the four rules of the review)", "wave 2 gate"],
+      "design": "WHAT EXISTS: the audit prints the earliest exit, the longest single wait (Result.LongestWait), margins, and route samples per mechanic; it never prints total waiting, the number of pauses, or rooms nobody uses (the numbers agent rebuilt those in Python). NEW (1) PACE: from the found path (List<Node>), compute WaitSeconds = exit time minus travel time (each body's own cell travel, the office chair glide stops excluded), WaitShare, Pauses (runs of 5 or more samples at one cell, counting Still, Hidden, toggles, door openings and hide/leave as waiting), MidPauses (excluding the run at the spawn) and LongestPause. Print 'rythme : attente X s (Y %), N pauses (M en route), plus longue Z s' at every difficulty. Optional level field 'pace': { 'minShare': 0.25, 'maxShare': 0.40, 'minPauses': 3, 'maxPause': 6.0 } (all optional): outside it at Normal is a failure ('rythme hors cible : ...'), at Difficile a note. (2) DEAD ROOMS: per room, mark it used when the path (or any via-check path) has a cell in it, or a station stands in it, or a robot waypoint lies in it, or any inhabitant position sample (World.Position) lies in it, or a wardrobe in it is used on the path. Unused rooms give 'AVERTISSEMENT piece morte : <id>'; a run option -strictRooms turns them into failures (the wave 2 gate uses it). (3) ON THE ROUTE: one line per titled mechanic: closest approach to the robot and hum-covered samples (exists, DescribeMechanicsOnPath), samples in the dog's awake cone within 1 m, platform cells, lit-zone samples, hides, household doors crossed after they opened. (4) -json <file>: writes per level and difficulty { id, exit, waitShare, pauses, midPauses, longestPause, margin, deadRooms[], lessons{id: binds}, budgets } so the numbers pass is one audit run. Validator: 'pace' values in range (0 <= min <= max <= 1, minPauses >= 0, maxPause in (0, AuditMaxWait]). TESTS: an audit fixture whose pace fails, one that passes; the dead-room detector on a fixture with an empty room.",
+      "files": [
+        "Assets/Editor/LevelAudit.cs (Result fields, PaceReport, DeadRooms, RunOptions -strictRooms -json)",
+        "Assets/Scripts/Core/LevelDef.cs (PaceDef)",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Resources/Levels/test_*.json fixtures"
+      ],
+      "effort": "M",
+      "priority": "must"
+    },
+    {
+      "name": "Audit: 'requires' list and new lesson checks (hum, contact, household, decoy, exitwatch, lit)",
+      "needed_by": ["level24 finale (each verb once)", "level9 (ride in the hum)", "level15 (rocker + hum reward)", "level20 (household door, lit zone)", "level21 and level25 (decoys)", "level22 (household door, wardrobe)", "level17 exam"],
+      "design": "WHAT EXISTS: one 'lesson' per level (LevelDef.cs:124), checked by CheckLesson (LevelAudit.cs:1973-2154). 'final' only requires 3 of door/pet/split/robot/rock/load (2091-2114): wardrobe, decoys, the household door and the sit can never be required by the finale. Decoy necessity IS already checked (LevelAudit.cs:1935-1947: with decoys switched off no schedule may exist), which the mechanics report missed. RobotBinds (2755) already separates the hum ('ronronnement coupe') from contact. NEW: LevelDef 'requires': [ids] (field Requires; the static LevelDef.Lessons array name is taken). Every listed id must bind (failure, or a note under lessonAdvisory). 'lesson' stays for the single teaching lesson and 'final' stays accepted. Ids: every existing lesson id plus: 'hum' (Search with Hum = false has no schedule), 'contact' (the Robots = false schedule meets the robot, FirstContact), 'household' (BuildWorld(def, level, sitting, inhabitantDoors: false) has no schedule: the door someone else opens is required), 'decoy' (the existing NeedDecoy necessity check, as an id), 'exitwatch' (see the watched exit feature), 'lit' (see lit zones), 'return' (see the return goal: deadline binds). Validator: each id known; prerequisites per id (hum/contact: a robot; household: a leaf with openedByInhabitants; decoy: a decoy of the player's kind; lit: litZones and a lamp body; exitwatch: an exit; pet: a dog; wardrobe: a wardrobe the body fits; door: a closed leaf the player may open). Mechanics that need a mistake (lures, barks, carries) cannot be required: the solver never makes one (state in the doc). Cost: each id is one more search; level24 already takes 56 s, keep requires to 5 ids. TESTS: an audit fixture per new id that binds and one that does not.",
+      "files": [
+        "Assets/Editor/LevelAudit.cs (CheckLesson, CheckRequires, MechanicBinds additions)",
+        "Assets/Scripts/Core/LevelDef.cs (Requires, new lesson constants)",
+        "Assets/Scripts/Core/LevelValidator.cs (CheckLesson prerequisites)",
+        "Assets/Resources/Levels/test_m8_audit_*.json fixtures"
+      ],
+      "effort": "M",
+      "priority": "must"
+    },
+    {
+      "name": "Goal type: timed return (errand, then back home before the deadline)",
+      "needed_by": ["level14 (slot 14, 'be back in your spot for Granny': optional conversion to a no-exit errand)", "one act 3 level for goal variety (designers choose)", "generalizes level5"],
+      "design": "WHAT EXISTS: level5 is an exit level (exit at (0, 1.95)) whose time pressure comes from a sit:'player' station (Habitant station 2, seat (-3.25, 0.25)); the audit forces seat presence over the sit window (World.Forced/ForcedSeat, LevelAudit.cs:1210-1283) and a missed seat is a pratfall discovery. There is no goal other than the doormat. DATA: LevelDef 'goal': { 'type': 'return', 'errands': [ { 'x', 'z', 'sizeX', 'sizeZ', 'model'?, 'nameKey'? } ] (1 or 2), 'home': { 'x', 'z', 'yaw' } (optional, default the spawn pose), 'deadline': seconds (optional), 'sitter': inhabitant name (optional) }. Exactly one of deadline / sitter. 'exit' is absent on a return level. A missing goal (or type 'exit') is today's behaviour. RUNTIME (GameState step 4, where the exit is checked): errandsDone |= bit when the furniture centre is inside an errand zone, not carried, not hidden. Resolve moment: deadline = the first playing step with Elapsed >= deadline; sitter = that inhabitant's first sit:'player' sitting (StepSitting). At the resolve: every errand done && furniture centre within Tuning.SeatHomeTolerance (0.75 m) of home && upright && not carried, hidden or in an action && not seen moving this step -> Win; otherwise Lose(LoseReason.TooLate) ('TROP TARD !' / 'TOO LATE!'). With a sitter the existing pin happens first and a pratfall becomes the TooLate loss. The record is BackHomeAt (first step at home with every errand done), so faster errands rank better; the deadline itself is constant. Every Def.Exit consumer must accept null: GardenBackdrop.cs:200 and LevelMiniature.cs:296/435 already guard; LevelBuilder.BuildExit and BuildExitBlocker skip; Menu.cs:1807 and Probe.cs:159 scripted wins use home; LevelAudit 4190, 4513, 7902. HUD: a countdown in the clock area (red in the last 5 s with the existing clock tick sound), errand markers (floor ring plus the over-walls marker of the exit-marker feature, ticked when done), the home ring always shown (GhostView.ShowSeat ring, 0.75 m), a goal line on the intro card ('Touch the X, be home before 0:45'). AUDIT: World gets Return, Deadline (samples), Home[cell] (cells within SeatPresenceRadius of home, LevelAudit.cs:178) and Errand[cell] (bit per errand). Node gets byte Visit (bits), part of the state key (x2 or x4 states); Visit |= Errand[cell] on arrival when not hidden. Goal test (replacing the InExit test at 7159, 7417, 7568 when Return): t == Deadline && Home[cell] && Visit == all && !Hidden && !Motion. Horizon = Deadline + 1. Skip the Reachable shortcut (6998) for return goals or run it errand-then-home. Route() appends no exit step and ends on the home cell; notes 'retour : course faite a X s, de retour a Y s, echeance Z s, marge Z - Y s'; pace metrics use Y. Warning when Z - Y > 15 s (the deadline does not press). 'requires': ['return'] binds when the schedule that may arrive home at any time after the deadline (deadline + 10 s) exists but arrives after Z (the deadline is what forces the pace). VALIDATOR: type known; return: no exit, 1 or 2 errands, each inside a room, clear of props and decoys, 0.5 to 1.5 m per side, at least 2 m from home and spawn; home inside a room with the body footprint clear (reuse the seat-home checks, LevelValidator.cs:293-300); deadline in [10, 280] s, at most 170 s for ids level1 to level7 (180 s horizon); sitter names a human with a sit:'player' station whose seat equals home within 0.05 m; robot clearance 1 m from errands and home (like the exit, LevelValidator.cs:1548-1556). TESTS: EditMode parse and validate; PlayMode: the designer route wins at the deadline; staying home loses TooLate; home 0.8 m off loses; the sitter variant; RouteReplayer cap = max(route end, deadline) + 30 s. MUTATION: RETURN_ERRANDS, RETURN_HOME_RADIUS.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs (GoalDef)",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Scripts/Runtime/GameState.cs (errands, resolve, LoseReason.TooLate)",
+        "Assets/Scripts/Runtime/LevelBuilder.cs (errand markers, skip exit)",
+        "Assets/Scripts/Runtime/Hud.cs (countdown, goal line, TooLate panel)",
+        "Assets/Scripts/Runtime/GhostView.cs (home ring)",
+        "Assets/Scripts/Runtime/LevelMiniature.cs",
+        "Assets/Scripts/Runtime/RecordLine.cs",
+        "Assets/Scripts/Runtime/Menu.cs, Probe.cs (scripted win)",
+        "Assets/Editor/LevelAudit.cs (Visit bits, return goal, Route)",
+        "Assets/Scripts/Core/Strings.cs",
+        "Assets/Tests/PlayMode/RouteReplayer.cs",
+        "mutation.sh"
+      ],
+      "effort": "L",
+      "priority": "should"
+    },
+    {
+      "name": "Exit in a watched room: 'exitwatch' audit check and exit-seen cue",
+      "needed_by": ["level24 finale ('the last step is the puzzle')", "level8, level13 or any level where the exit room gets a station"],
+      "design": "WHAT EXISTS (data only): the exit only counts while no human sees the furniture (GameRules.ExitOnlyUnseen, GameState.cs:1736; audit goal at LevelAudit.cs:7159 uses HumanSeen). Putting a station that faces the exit is enough at runtime. Today the exit room holds no station in 9, 12, 13, 15, 17, 18, 19, 22, 23, 24. NEW AUDIT: SearchOptions.ExitSight (default true); 'exitwatch' binds when Search(ExitSight = false) reaches the exit at least 1.0 s (10 samples) before the strict schedule; the note names the human who watches the exit just before the strict arrival. NEW CUE (small): the exit marker (marker feature) shows an open-eye glyph while a human sees the furniture standing in the exit zone, so a player standing on the doormat understands why nothing happens. TESTS: an audit fixture with a watched exit (binds) and one with an unwatched exit (does not).",
+      "files": [
+        "Assets/Editor/LevelAudit.cs (SearchOptions.ExitSight, lesson exitwatch)",
+        "Assets/Scripts/Runtime/Hud.cs (exit marker eye state)",
+        "Assets/Resources/Levels/test fixtures"
+      ],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Lit zones (a ceiling light where darkness does not hide the lamp)",
+      "needed_by": ["level20 (slot 19, 'one lit zone to cross')"],
+      "design": "WHAT EXISTS: only the lamp's own light is a rule: FurnitureController.SightRangeFactor (FurnitureController.cs:241-252) returns LampLight.RangeFactor (0.4 when off) for a lamp body; Vision.Step scales the range by it and VisionConeView draws the shortened cone from Vision.RangeFactor. Room lights are visual (LampLight dims the room lights, LampLight.cs:186-206). INTERPRETATION of the review's 'a ceiling light the lamp must cross switched on': inside a lit zone a switched-off lamp gets no cover, it is seen at the full range; switching on there changes nothing, so the zone is crossed on a watcher's beat like any other body. DATA: LevelDef 'litZones': [ { 'name', 'x', 'z', 'sizeX', 'sizeZ' } ] (axis-aligned, max 4). RULE: SightRangeFactor returns 1 when the furniture centre lies in a lit zone (lamp on or off). The switch-on rule (StepLamp) is unchanged. BUILDER: per zone a ceiling fixture (visual), an unshadowed spot light and a soft floor pool decal; these lights carry a LitZone marker that LampLight.DimRoomLights skips (otherwise switching the lamp off in that room dims the pool). Budget about +2 renderers per zone; CheckBudgets counts them. HUD: body hint 'In the light: the dark does not hide you' while the lamp is off inside a zone; the cone already lengthens by itself. AUDIT: World.Lit[cell] (cell centre in a zone); right after ComputeSight (LevelAudit.cs:5520) and before the margin dilation, for lit cells copy MoveSeen into MoveDark and each class Seen into SeenDark for every mask and sample; FidelityReplay (3699) uses the full range when the item's centre is lit; DarkFreePass ignores lit cells. SearchOptions.Lit (default true); 'lit' binds when the schedule found with Lit = false is seen (moving, or still out of place) at a lit cell in the real tables (same pattern as the glide check, FirstSeenGlide). Note 'echantillons en zone eclairee : N'. VALIDATOR: each zone inside one room, not overlapping the exit, max 4, player body must be the floor lamp (otherwise the zone is decoration: issue). TESTS: EditMode factor; PlayMode: a dark lamp in a zone is seen at 8 m, outside at 4 m; the pool light is not dimmed by the lamp.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs (LitZoneDef)",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Scripts/Runtime/FurnitureController.cs (SightRangeFactor)",
+        "Assets/Scripts/Runtime/LampLight.cs (skip LitZone lights)",
+        "Assets/Scripts/Runtime/LevelBuilder.cs or RoomLights.cs (fixture, spot, pool)",
+        "Assets/Scripts/Runtime/Hud.cs (hint)",
+        "Assets/Editor/LevelAudit.cs (Lit cells, lesson lit, FidelityReplay)",
+        "Assets/Scripts/Runtime/LevelMiniature.cs",
+        "mutation.sh"
+      ],
+      "effort": "M",
+      "priority": "should"
+    },
+    {
+      "name": "Door only an inhabitant opens (player-locked leaf)",
+      "needed_by": ["level20 ('a door only Dad opens')"],
+      "design": "WHAT EXISTS: openedByInhabitants (OpeningDef.cs:731; GameState.StepHouseholdDoors 2754) makes a walker open a closed leaf, but the player can open the same leaf first (ClaimActionKey 925). The data-only approximation is door memory (opening it in view costs a discovery). Cap stays Tuning.MaxLeavesPerLevel = 2, so this leaf plus one player door fits. DATA: OpeningDef 'playerLocked': true (DefaultValueHandling.Ignore). RUNTIME: ClaimActionKey skips a closed playerLocked leaf (E does nothing there; no action begins); the door hint shows 'Locked' / 'Fermee a cle' (hud.door.locked) instead of 'E : ouvrir'. AUDIT: CollectLeaves/SetUpMasks give the leaf no Reach cells and no ReachBits, so its bit can only be set by AutoOpen (the household walk). Failure 'porte verrouillee jamais ouverte' when AutoFrom of that leaf is int.MaxValue (no walk crosses it). VALIDATOR: playerLocked needs leaf 'closed' and openedByInhabitants true. TESTS: E in reach does nothing; the household walk still opens it; audit fixture.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs (OpeningDef.PlayerLocked)",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Scripts/Runtime/GameState.cs (ClaimActionKey)",
+        "Assets/Scripts/Runtime/Hud.cs (locked hint)",
+        "Assets/Editor/LevelAudit.cs (CollectLeaves, SetUpMasks)",
+        "Assets/Scripts/Core/Strings.cs"
+      ],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Night lighting preset",
+      "needed_by": ["level20 (slot 19, look 'night')", "level25 Showroom (night guard)"],
+      "design": "WHAT EXISTS: lighting is global and identical for every level (no 'night' concept anywhere; IDEAS ART1 measured level16's start luminance equal to day). DATA: LevelDef 'lighting': 'day' (default) | 'night'. VISUAL ONLY (PRD 4.7 unchanged, no rule reads it): low cool moon key light, ambient about x0.35, every RoomLights fixture on at full, dark blue window emission, night tint of the garden backdrop. Keep the HUD contrast, the cone readability and the probe's luminance checks (ProbeTestsM8Lights, ProbeTestsLightingShots: add a night shot and a minimum luminance for the play area). COORDINATION: Main lighting, RoomLights, GardenBackdrop and WindowImage are being edited by the parallel visual-polish workflow; land this after it or hand it to that team. Validator: value known.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs",
+        "Assets/Scripts/Runtime/Main.cs",
+        "Assets/Scripts/Runtime/RoomLights.cs",
+        "Assets/Scripts/Runtime/GardenBackdrop.cs",
+        "Assets/Scripts/Runtime/WindowImage.cs",
+        "Assets/Tests/PlayMode/ProbeTestsLightingShots.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM8Lights.cs"
+      ],
+      "effort": "M",
+      "priority": "should"
+    },
+    {
+      "name": "Exit and goal markers over walls, optional opening glide",
+      "needed_by": ["act 3 houses (19, 21, 20, 22, 25, 24)", "return-goal errands and home", "second exit"],
+      "design": "WHAT EXISTS: the exit is a doormat model only (LevelBuilder.BuildExit 1736-1756); nothing points at it, no opening camera move (IDEAS QW9, CA2). NEW: a screen-space marker per goal zone (exit, second exit, errands, home), drawn over everything: door icon, clamped to the screen edge with an arrow when off screen, alpha fading to 0 within 3 m of the furniture, hidden under panels and pause. Colour white or amber, not green beside the red player (AX3). Eye glyph state for 'exitwatch' (see that feature). Optional opening glide for levels with 5 rooms or more: during the held start the camera shows the exit, then glides to the player in 2 s; the first input skips the glide (a second input starts the level). TESTS: the marker exists for every goal zone, clamps off screen, fades near; budgets unchanged (UI only).",
+      "files": [
+        "Assets/Scripts/Runtime/Hud.cs (GoalMarker)",
+        "Assets/Scripts/Runtime/OrbitCamera.cs (opening glide)",
+        "Assets/Scripts/Runtime/GameState.cs (goal zones list)",
+        "new PlayMode probe step"
+      ],
+      "effort": "M",
+      "priority": "should"
+    },
+    {
+      "name": "Routine authoring: periodic glances (patterns already exist)",
+      "needed_by": ["level18 and level19 sentinels", "level22 butler, level25 night guard, level24 dog patrol, level21 Kevin"],
+      "design": "ALREADY IN CODE, DATA ONLY: back-and-forth across a path = pattern 'pingpong' (RoutinePatterns.cs; used by Max 13/16, Kevin 21, 22); night guard random walk = pattern 'wander' with a 'seed' (3+ stations, deterministic, the audit solves the same draws; used by Lea 14, Hugo 15/17); dog patrol = a dog with 'pingpong' or 'wander' over several stations (no validator rule forbids it; dogs may not glance, LevelValidator.cs:1211); a body turn inside a dwell = consecutive stations at the same point with different facings (level 9's Claire does it); head turns = glances (+-80 deg, Tuning.HeadYawLimit). NEW (small): StationDef 'glanceEvery': { 'start', 'period', 'hold', 'yaw', 'alternate' (bool, sign flips each glance), 'count' (optional, default fills the dwell) }. LevelJson.Parse expands it into Glances right after deserializing (like ResolveSeats), merged and sorted with explicit glances; ShouldSerializeGlances returns false when every glance was generated, so files stay compact (the audit's -writeRoutes patches routes by regex and never re-serializes a level, LevelAudit.cs:7953-7985). Replaces the hand-written 34 to 65 glance lists of Odile 18/23, Maman 19/20, Bertrand and Sofia 21. VALIDATOR: period >= hold + 2 x (0.6 + |yaw|/200) so turns never overlap; |yaw| <= 80; start + count x period <= dwell; not on a dog. Warning: consecutive same-point stations with the same facing (a no-op). TESTS: expansion equals the hand-written list of level18's Odile; round trip keeps the compact form.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs (GlanceEveryDef, expansion in LevelJson.Parse)",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Tests/EditMode/RoutineM2Tests.cs or a new test file"
+      ],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Audit: via checks for real route alternatives",
+      "needed_by": ["level8 (fast door under watch or slow corridor door)", "level24 (two wings both viable)", "level19 and level22 (no dead room)", "level13 (cafeteria branch)"],
+      "design": "WHAT EXISTS: the audit returns one earliest schedule; Barred cells exist only for the split lesson. NEW: LevelDef 'viaChecks': [ { 'name', 'x', 'z', 'sizeX', 'sizeZ', 'maxRatio' (default 1.5) } ]. For each, Search with SearchOptions.MustVisit = the zone's cells (reuses the Visit bit of the return-goal feature; one bit per search); failure 'aucun horaire par <name>' when none; note the exit time; warning when it exceeds maxRatio x the best exit. Optional 'avoid': true bars the zone instead (the route that skips the titled obstacle must not exist or be slower). The via paths count as used for the dead-room check. Cost: one search per via (keep to 2 per level). Validator: zones inside rooms, names unique.",
+      "files": [
+        "Assets/Editor/LevelAudit.cs (SearchOptions.MustVisit / Barred zones, CheckVias)",
+        "Assets/Scripts/Core/LevelDef.cs (ViaCheckDef)",
+        "Assets/Scripts/Core/LevelValidator.cs"
+      ],
+      "effort": "M",
+      "priority": "should"
+    },
+    {
+      "name": "Audit: collapse in-place toggle runs (lamp flicker)",
+      "needed_by": ["level20 (17 toggles at the spawn, 0.3 to 5.1 s)", "level6"],
+      "design": "WHAT EXISTS: the search uses a lamp toggle in place as a free substitute for waiting (designerRoute of level20 toggles 17 times at (5.75, 1.25); designerRouteHard 15). NEW: after Route(), a run of back-to-back toggles at one cell becomes a wait when its length is even and a single toggle at the run's last time when odd; the collapsed route is checked with FidelityReplay and kept only if it passes (else the original is kept with a warning 'clignotement conserve'). The pace metric counts toggles as waiting either way. TESTS: an audit fixture where the collapsed route is written.",
+      "files": ["Assets/Editor/LevelAudit.cs (Route post-process)"],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Rush counter-route probe over every listed level",
+      "needed_by": ["every level, first level13 (owner 8.4 s vs 26.2 s audit) and the act closers 17 and 24"],
+      "design": "WHAT EXISTS: rush counter-routes only for level5 (Step35b) and level8 (Step45e); lesson counter-routes for 10, 11, 12, 17. NEW data-driven PlayMode step over levels.json at Normal: (a) the designer route with every wait removed (each waypoint departs when the previous one is reached) must not win; (b) on load levels, a full-speed start that drops the load at the spawn, then (a) must not win; (c) optional: the NavMesh straight path at body max speed must not win. Exemptions live in the test with a reason (levels 1 and 2 are gentle by design). The report lists every surviving rush with its time. Runtime is high (21 levels x up to 3 runs): mark it [Category('Slow')].",
+      "files": ["Assets/Tests/PlayMode/ProbeTestsRush.cs (new)", "Assets/Tests/PlayMode/RouteReplayer.cs (compressed replay)"],
+      "effort": "M",
+      "priority": "should"
+    },
+    {
+      "name": "Robot hum disc and matched audio rolloff",
+      "needed_by": ["level9 (travel inside the hum)", "level15 (hum as the reward)", "level24 (a ride in the hum)"],
+      "design": "WHAT EXISTS: the hum masks hops, rolls and clicks within Tuning.RobotHumRadius = 2.5 m (Hearing.cs:77) but nothing shows it; the hum loop is audible from 0.6 to 7 m. NEW: a faint floor ring of radius RobotHumRadius following the robot, pulsing with the hum; the hum AudioSource max distance set to about 3.5 m so the ear and the rule agree. +1 renderer per robot (budget check). TESTS: ring radius equals the rule constant; follows the robot.",
+      "files": ["Assets/Scripts/Runtime/Robot.cs", "Assets/Scripts/Runtime/Sfx.cs"],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Record revision per redesigned level",
+      "needed_by": ["every retuned level: 6, 8, 9, 11, 12, 15, 17, 20, 21, 24 (and 14, 19, 22 if touched)"],
+      "design": "WHAT EXISTS: records are keyed by id and survive a redesign, so a record made on an easier version stands (the owner's 8.4 s on level13). NEW: LevelDef 'rev' (int, default 0, written only when > 0). LevelDef.RecordId = Rev > 0 ? Id + '~' + Rev : Id. SaveData.RecordWin(levelId, recordId, seconds, difficulty): Won gets levelId (unlocking is unaffected), Best gets DifficultyDef.RecordKey(recordId, difficulty) ('level6~1@difficile'). RecordLine.cs:101 passes game.Def.RecordId; LevelSelect.cs:278 reads TryGetBest with the card's RecordId (LevelMiniature already parses each level, LevelMiniature.cs:64, so the rev is at hand). Old bare-id records stay in the file, unread. Validator: rev >= 0. TESTS: RecordKey format; an old 'level6' record is not shown for a rev 1 level6; Won still contains 'level6'.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs",
+        "Assets/Scripts/Core/SaveData.cs",
+        "Assets/Scripts/Runtime/SaveStore.cs",
+        "Assets/Scripts/Runtime/RecordLine.cs",
+        "Assets/Scripts/Runtime/LevelSelect.cs",
+        "Assets/Tests/EditMode/DifficultyM7Tests.cs",
+        "Assets/Tests/EditMode/SaveM5Tests.cs"
+      ],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Level select for the v2 line-up",
+      "needed_by": ["all levels"],
+      "design": "WHAT EXISTS: one card per manifest entry in rows of Tuning.LevelSelectColumns = 6 (22 cards = 4 rows, like 24 today), number = play order, the default selection is the first unlocked card (LevelSelect.cs:65-78, IDEAS bug 20). NEW: default selection = the card of SaveStore.FirstUnwonLevel; an act tag ('Acte 2') on the first card of each act from the manifest 'acts'; the miniature draws a second exit, errands and home, and lit zones (LevelMiniature.cs:296-299, 435-439). The Tuning comment '3 rows of 6 hold the 17 levels' is stale: fix it. TESTS: Step41 unchanged; a new step for the act tags and the default selection.",
+      "files": ["Assets/Scripts/Runtime/LevelSelect.cs", "Assets/Scripts/Runtime/LevelMiniature.cs", "Assets/Scripts/Core/Tuning.cs (comment)", "Assets/Tests/PlayMode/ProbeTestsM5Ui.cs"],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Intro card: inhabitant names and the goal line",
+      "needed_by": ["act 3 levels whose hints name people (Odile, Dad, Mum, the butler, the countess, Rex, Lea, Kevin)"],
+      "design": "WHAT EXISTS: Hud.PeopleLines lists personality labels only (Hud.cs:1480-1505); InhabitantDef.Name exists in every level. NEW: 'Lea, the Suspicious One' per human (Name + personality label), 'Rex, the dog'; a goal line (doormat, two exits, return). Hint tokens {action} and {careful} replaced per device (IDEAS QW2; levels 4, 6, 8, 11, 13, 18 hard-code Shift or E). Strings EN/FR. TESTS: the card lists the names of level22.",
+      "files": ["Assets/Scripts/Runtime/Hud.cs", "Assets/Scripts/Core/Strings.cs"],
+      "effort": "S",
+      "priority": "should"
+    },
+    {
+      "name": "Two exits",
+      "needed_by": ["level24 finale (two wings, optional)", "level21 (optional)"],
+      "design": "WHAT EXISTS: LevelDef.Exit is one ZoneDef (LevelDef.cs:25). DATA: 'exits': [ZoneDef] extra zones (at most 1, so 2 in total; Tuning.MaxExits = 2); LevelDef.AllExits() = [Exit] + Exits. RUNTIME: GameState.cs:1736 loops AllExits(); BuildExit and BuildExitBlocker per exit (each blocker at the outer door nearest its exit, LevelBuilder.cs:1789); GardenBackdrop reach and LevelMiniature include both; markers for both. AUDIT: InExit (4513) = any exit; Route() (7902) ends at the exit containing the last cell; check 'both exits viable': a Search restricted to each exit in turn; failure 'sortie morte : <n>' when one has no schedule; notes give each exit's time. VALIDATOR: each exit inside a room, clear of props/decoys, the two at least 4 m apart, robot clearance from both. TESTS: winning on the second exit; audit fixture with a dead second exit.",
+      "files": [
+        "Assets/Scripts/Core/LevelDef.cs",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Scripts/Runtime/GameState.cs",
+        "Assets/Scripts/Runtime/LevelBuilder.cs",
+        "Assets/Scripts/Runtime/LevelMiniature.cs",
+        "Assets/Scripts/Runtime/GardenBackdrop.cs",
+        "Assets/Editor/LevelAudit.cs"
+      ],
+      "effort": "M",
+      "priority": "could"
+    },
+    {
+      "name": "Seeded wander per attempt",
+      "needed_by": ["level25 Showroom night guard (optional)"],
+      "design": "WHAT EXISTS: 'wander' draws from one seed, so a retry replays exactly the same walk. NEW (optional): InhabitantDef 'seeds': [int] (2 to 4); attempt n uses seeds[Restarts mod count]. The audit searches every seed and fails naming the seed that has no schedule; the designer route is written for seeds[0] and the probe replays it with Restarts = 0. Validator: seeds only with wander, mutually exclusive with 'seed'.",
+      "files": ["Assets/Scripts/Core/LevelDef.cs", "Assets/Scripts/Core/RoutineFactory.cs", "Assets/Scripts/Runtime/GameState.cs", "Assets/Editor/LevelAudit.cs", "Assets/Scripts/Core/LevelValidator.cs"],
+      "effort": "M",
+      "priority": "could"
+    },
+    {
+      "name": "Validator: wall-backed props and rest spots on walk lines",
+      "needed_by": ["every level whose props move in the overhaul"],
+      "design": "WHAT EXISTS: furniture placed back to front was fixed by hand; only seat fronts are checked (CheckPropSeatFront). PropKinds.cs:10 states the rule (back on +z against a wall at yaw 0). NEW: a wall-backed kind (bookshelf, sofa, wardrobe, cabinet, counters, bed) within 0.15 m of a wall must have its back to that wall: validator issue. Audit warning when a route pause (>= 0.5 s) lies within 0.4 m of an inhabitant's walk while that inhabitant walks through it (inhabitants pass through the player furniture, Main.cs:69, IDEAS bug 1).",
+      "files": ["Assets/Scripts/Core/LevelValidator.cs", "Assets/Scripts/Core/PropKinds.cs", "Assets/Editor/LevelAudit.cs"],
+      "effort": "S",
+      "priority": "could"
+    },
+    {
+      "name": "Walk-in wardrobe that fits the chair",
+      "needed_by": ["level24 finale if the body stays the chair and a hide is required"],
+      "design": "WHAT EXISTS: the wardrobe fits bodies at most 0.40 m wide and deep (Tuning.WardrobeFitWidth): only the stool and the floor lamp; the chair is 0.45 m. The validator enforces 1.0 x 2.0 x 0.6 m. OPTION: a prop kind 'closet' 1.3 x 2.0 x 0.8 m with fit 0.62 m (chair and office chair fit; armchair and rocking chair do not). WardrobeRule parametrized by kind; LevelAudit.WardrobeFits(size, kind); validator size per kind; WardrobeDoors visual. DATA-ONLY ALTERNATIVE: give the chair finale its own hide, a rest among chair decoys (the rule of level 3), which needs no code. Product owner to choose.",
+      "files": ["Assets/Scripts/Core/LevelDefM5.cs (WardrobeRule)", "Assets/Scripts/Core/PropKinds.cs", "Assets/Scripts/Core/LevelValidator.cs", "Assets/Editor/LevelAudit.cs", "Assets/Scripts/Runtime/WardrobeDoors.cs", "Assets/Scripts/Runtime/FurnitureKit.cs"],
+      "effort": "M",
+      "priority": "could"
+    },
+    {
+      "name": "Relaxed audit (human par)",
+      "needed_by": ["all levels (difficulty measure, stars par)"],
+      "design": "WHAT EXISTS: the strict audit is an upper bound on a skilled run (0.3 m in place where the game accepts 0.75, decoys at 0.6 where it accepts 0.75, sight widened 0.3 s each way, grid moves at 1.25 m/s, zero discoveries). NEW run option -relaxed: InPlaceRadius and ExplainedRadius at the personality tolerance, MarginSamples 1, diagonal moves, up to (lose threshold - 1) discoveries per watcher. Report relaxed exit / strict exit; the feedback target is >= 60 % (65 % in act 3). Large change in the search state (a discovery counter): keep it optional.",
+      "files": ["Assets/Editor/LevelAudit.cs"],
+      "effort": "L",
+      "priority": "could"
+    },
+    {
+      "name": "House identity finishes",
+      "needed_by": ["level22 manor (dark green panelling)", "level21 office (grey hard floor, blue partitions)", "level20 night (dark wall)"],
+      "design": "WHAT EXISTS: floorColor/wallColor are not rendered in the textured game (LevelBuilder.cs:456-466, 1081: one Texture2DArray material); the look comes from 10 floor and 12 wall finishes, none dark, and carpet is allowed on soft floors only (so a grey office floor that stays noisy needs a hard grey slice). NEW slices in WallArray (art + RoomDef constants + validator lists + WallShots): 'darkpanel' (manor green panelling), 'nightplaster' (dark wall), 'linoleum' (grey hard floor), 'partition' (blue office partition). Try existing slices first (sage/sageribbed walls with verde/herringbone floors for the manor). Coordinate with the visual-polish workflow, which owns WallArray and the textures.",
+      "files": ["Assets/Scripts/Runtime/WallArray.cs", "Assets/Scripts/Core/LevelDef.cs (RoomDef finish constants)", "Assets/Scripts/Core/LevelValidator.cs", "Assets/Editor/WallShots.cs", "texture assets"],
+      "effort": "M",
+      "priority": "could"
+    }
+  ],
+  "progression": "NEW ORDER (levels.json, rev 2): level1, level2, level3, level4, level5, level6, level7 | level8, level9, level15, level11, level12, level13, level14, level18, level17 | level19, level21, level20, level22, level25 (Showroom, optional new id, a copy of level23's plan as a starting point), level24. 22 entries, 21 without level25. Acts: 'acts' from 0, 7, 16. Cut: level10, level16, level23 are removed from the list only; their files stay in Resources/Levels (tests load them by id, CoreM4Tests.cs:1084 and LevelDataM8Tests.cs:42 validate every file in the folder) and LevelAudit audits only listed levels. I recommend a new id (level25) for the Showroom instead of reusing level23: no stale records, no stale tests, and level24 keeps its own copy of the shared core. UNLOCK: IsUnlocked(order, i) = i == 0 || order[i] won || order[i-1] won || order[i] in save.unlocked. RECORDS: keyed by id as today; a level 'rev' gives redesigned levels fresh records ('level6~1', 'level6~1@difficile') while 'won' stays by bare id. SAVE MIGRATION: save gets 'unlocked' (ids) and 'order' (manifest rev applied, missing = 1), version stays 1. On load, if order < manifest rev: every id that was playable under the previous order (index 0, or previous predecessor won) and is still listed joins 'unlocked'; order = rev; the save is written once. Nothing is removed from won or best. Cut ids in 'won' are harmless (the progress line counts only listed ids). LEVEL SELECT: default selection on the first unwon card, act tags, miniature shows new goal elements; 22 cards fit the existing 6-column grid. TESTS TO UPDATE: LevelDataM2Tests (PlayOrder, count 24, WaveB table, number-order test, line 222), CoreM5Tests.IsUnlocked (line 1833 now contradicts the 'won is playable' rule), SaveM5Tests 700-740 plus migration tests, DifficultyM7Tests (rev record key), ProbeTestsM5Levels (Step40 count 24 at line 1188, Step45a adjacency with level16, Step45r number order, level16 and level10 replays need 'listed'), ProbeTestsM7Design (Step64b_Level10Hard, Step64b_Level16Hard; line 123 difficulty test on level16), ProbeTestsM7LevelsC (level23 Step58C1/C2), ProbeTestsM7Look and ProbeTestsLightingShots (level16 as night). Full list in the test-suite feature.",
+  "notes": "SCOPE AND ORDER OF LANDING. Every new JSON field needs code first: LevelJson uses MissingMemberHandling.Error (LevelDef.cs:882), so a level file with an unknown key fails to load. Suggested wave 2 order: (1) progression + tests + held start + audit pace/dead-room metrics (unblock the level edits and their measurement); (2) 'requires' + new lesson checks, via checks, toggle collapse, periodic glances (data cleanup); (3) lit zones, player-locked leaf, return goal, markers, hum disc, night preset; (4) the could items. Level implementers can start immediately on everything the brief calls data only: stations, facings, dwells, pingpong/wander, dog patrol (a dog with pingpong over several stations is accepted by the validator), exit in a watched room, finishes from existing slices. CORRECTIONS TO WAVE 1: (a) decoy necessity is already checked: LevelAudit.cs:1935-1947 searches with Decoys = false and fails the level if a schedule still exists (the mechanics report said nothing proves it); (b) level5 is an exit level, its deadline is a sit:'player' station (station 2, seat (-3.25, 0.25)); there is no deadline goal to generalize, the return goal is new code; (c) the night guard random walk exists ('wander' + 'seed', 3+ stations) and so do back-and-forth ('pingpong') and body turns within a dwell (same-point stations); (d) LessonFinal needs only 3 of 6 mechanics and cannot require wardrobe, decoys, sit or the household door, hence the 'requires' list for the finale's 'each verb once'. LIMITS THAT STAY: 2 leaves, 1 robot, 1 dog, 3 humans per level; the wardrobe fits only the stool and the lamp unless the walk-in closet lands; the solver never makes a mistake, so lures, barks, carries and creaks can never be audited as required. CONFLICT RISK: SaveData.cs, Tuning.cs, Hud.cs, LevelBuilder.cs, GameState-adjacent presentation (GhostView, OrbitCamera, Menu) are currently modified by the parallel visual-polish workflow (git status): merge on top of its changes; the night preset and new finishes should go through that team. Every new rule should get a MUTATION tag and a mutation.sh line (UNLOCK_WON, UNLOCK_MIGRATED, HOLD_START, RETURN_ERRANDS, RETURN_HOME_RADIUS, LIT_FACTOR, LOCKED_LEAF, EXITS_ANY). The audit prints French messages: keep that convention for new notes. No em-dash anywhere (strings, comments, docs)."
+}

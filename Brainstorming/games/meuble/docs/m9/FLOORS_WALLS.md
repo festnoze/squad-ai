@@ -60,12 +60,12 @@ is its own.
 | 9 | 3 | light oak (chambre, salon); tile (cuisine); marble (entree) | wallpaper (chambre); limewash (cuisine); crepi (salon); travertine (entree) | 23 / 24 |
 | 10 | 3 | parquet (chambre, couloir); herringbone (salon, veranda); marble (cuisine) | wallpaper (chambre); crepi (couloir); subway tile (cuisine); sage (salon); travertine (veranda) | 31 / 32 |
 | 11 | 3 | light oak (chambre, couloir); herringbone (salon); tile (cuisine) | crepi (all) | 23 / 24 |
-| 12 | 3 | parquet (chambre, couloir); marble (cuisine, entree); herringbone (salon) | grasscloth (chambre); crepi (couloir); subway tile (cuisine); travertine (entree); sage (salon) | 26 / 32 |
+| 12 | 3 | parquet (chambre); light oak (couloir, salon); marble (cuisine, entree) (levels v2, DOGFIX 2026-11-20) | grasscloth (chambre); crepi (couloir); subway tile (cuisine); travertine (entree); sage (salon) | 26 / 32 |
 | 13 | 3 | plain carpet (direction); herringbone (plateau, couloir); marble (cafeteria, accueil) | grasscloth (direction, plateau); crepi (couloir, cafeteria); limewash (accueil) | 31 / 32 |
 | 14 | 3 | parquet (sejour, chambre, couloir); ivory tile (salle, bathroom); marble (cuisine, entree) | sage (sejour); wallpaper (chambre); white tile (salle); crepi (cuisine, couloir, entree) | 31 / 32 |
-| 15 | 3 | light oak (bureau, chambre, couloir, salon); tile (cuisine); verde (entree) | grasscloth (bureau); pinstripe (chambre); crepi (couloir); sage (salon); subway tile (cuisine); limewash (entree) | 30 / 32 |
-| 16 | 1 | herringbone (salon, chambre, couloir, cuisine) | crepi (all) | 23 / 24 |
-| 17 | 3 | parquet (chambre, couloir); herringbone (sejour, bureau); marble (cuisine, entree) | pinstripe (chambre); crepi (the others) | 31 / 32 |
+| 15 | 3 | parquet (bureau, salon); ivory tile (cuisine); marble (entree) (levels v2 rebuild, DOGFIX 2026-11-20) | grasscloth (bureau); pinstripe (chambre); crepi (couloir); sage (salon); subway tile (cuisine); limewash (entree) | 30 / 32 |
+| 16 | 2 | parquet (salon, DOGBIG 2026-11-21); herringbone (chambre, couloir, cuisine) | crepi (all) | 23 / 24 |
+| 17 | 3 | parquet (chambre, couloir, sejour: DOGBIG 2026-11-21); herringbone (bureau); marble (cuisine, entree) | pinstripe (chambre); crepi (the others) | 31 / 32 |
 | 18 | 3 | carpet (couloir, chambre); verde (entree); tile (cuisine) | wallpaper (couloir, chambre); limewash (entree); subway tile (cuisine) | 21 / 24 |
 | 19 | 3 | carpet (chambre, salon, galerie); marble (entree, cuisine); teal tile (sdb) | grasscloth (chambre); sage (salon, entree); crepi (galerie); limewash (cuisine); travertine (sdb) | 32 / 32 |
 | 20 | 3 | herringbone (salon, bureau); marble (cuisine, entree, sdb); plain carpet (couloir, chambre) | sage (salon, entree); subway tile (cuisine); white tile (sdb); crepi (couloir); arches (chambre); grasscloth (bureau) | 29 / 32 |
@@ -81,6 +81,21 @@ Levels 12, 13, 14, 15, 17, 19, 20, 21 and 24 had four or five floor looks before
 24 dropped from their material cap to one under it (8 and 22 stay at their cap: swaps only). Two levels were over their
 cap by the audit, which counts the dog's cone colour (section 5): 23 (its new sage bedroom went back to the crepi) and
 16 (its kitchen tile went to the flat's herringbone). `title_house.json` (the menu backdrop) is unchanged.
+
+Dog levels (DOGFIX, 2026-11-20): a dog's floor keeps a light or warm look. The dog's tint `#4F6670` (a mid blue-grey)
+nearly vanishes on the teal tiles (image mean `#406361`, CIE76 9.3) and on the verde (`#2A4036`, 21.2), so no room of a
+level with a dog uses those two looks; marble (`#D6D3CB`, 45.0), the parquets, the tiles and the carpets all stand
+above the dE 30 bar of `ModelM5Tests.The_dog_stands_out_from_every_floor_it_walks_on` (which reads `floorColor`, the
+miniature tint: keep it near the finish's mean, `#D8D4CC` for marble). Herringbone (`#513A28`, 31.1) only just passes.
+
+DOGBIG (product owner, 2026-11-21): the dog became a black Labrador (fur map `Assets/Art/Characters/Resources/DogFur.png`, area weighted mean
+`#413F3F` since DOGBIG v3 lifted its strands, `#2A2929` before, docs/next/progress/DOGBIG.md). Against the floor images it
+stands out from every look of the dog levels but the herringbone (image mean `#513A28`, CIE76 16.3, 19.1 before;
+parquet 61.5, light oak 49.6, marble 57.9, ivory tile 59.9, plain carpet 47.3 and its 0.82 border 35.4). The two dog rooms on herringbone went to the default parquet (`floorFinish`
+removed, `floorColor` `#B07A4E` kept: it already is the parquet rooms' tint): level17 `sejour` (both dog stations)
+and level16 `salon` (both dog stations; level16 is not in the manifest). The other herringbone rooms of dog levels
+(level17 `bureau`, level20 `salon` and `bureau`, level16 `chambre`, `couloir`, `cuisine`) are off the dog's stations and paths
+and keep it; levels 12, 15, 23 and 24 have no herringbone.
 
 ## 4. Shots
 
@@ -438,3 +453,50 @@ Shots in `docs/m9/stretch/`: `before/` and `after/` (`WallShots.Shoot -wallInsid
 - Shots: `docs/m9/doors/before_doors.png` and `after_doors.png` (ProbeTestsM9NearWalls.Step91z): columns lowered,
   see-through 35 %, both, off; rows level12's first shared doorway, its first outer doorway seen from outside (a near
   outer wall), level8's leaf door porte_cuisine.
+
+## 10. Floor dust on the Haut tier (product owner request, 2026-11-20)
+
+The complaint: the floors looked artificially clean and square (a perfect image repeated to the walls). On the Haut tier
+only, the floors now carry a faint layer of dust, grime and wear; Bas and Moyen (the Android default, `SaveOptions.
+DefaultQuality(true)`) are drawn exactly as before and pay nothing.
+
+- `FloorDust` (runtime, static) builds one small top-down map per level, RGBA32 linear, bilinear, clamped, 12 texels per
+  metre (8 cm, at most 512 a side; a house about 0.3 to 0.5 MB), set as the global texture `_OosFloorDust` with its world
+  rectangle `_OosFloorDustRect`. No material, no renderer, no draw call: the budgets and `LevelAudit` are unchanged.
+  - R, grime: from every wall piece standing on the floor (the `Segment` box colliders of `LevelBuilder.WallSegment`, a
+    lintel excluded), `0.7 (1 - d / 0.4 m)^2` along a wall plus `0.7` times the product of the linear 1 m reaches of a
+    wall along x and a wall along z (the corners), made uneven by noise (drifts, not a ruled band). A doorway's gap has no
+    wall piece, so the threshold stays clean.
+  - G, wear: the traffic paths, 0.55 m half width, from each doorway's point 0.45 m into each room it opens on, joined
+    through the threshold, then every pair of a room's doorway points (one doorway: to the room's centre), uneven too.
+  - B, patches: three octaves of Perlin noise (2.8 m, 1.2 m, 0.5 m), contrast stretched around 0.5, at an offset hashed
+    from the level id (each level its own pattern).
+- When: `LevelBuilder.Build` calls `FloorDust.LevelBuilt` once the walls stand; `QualityTier.ApplyCore` calls
+  `FloorDust.SetTier(quality == high)` (`MUTATION:FLOOR_DUST_TIER`). The map is built only while the tier is Haut (at the
+  build, or at once when the player switches to Haut), never on Bas or Moyen.
+- The shader: `WallFinishes.shader`'s forward pass declares `#pragma multi_compile_fragment _ OOS_FLOOR_DUST` (a
+  multi_compile: never stripped by material use, so both variants ship on every platform; fragment only). `FloorDust`
+  turns the global keyword on only while the tier is Haut and the map belongs to the level on screen.
+  `WallFinishesForward.hlsl` (`WallFloorDust`) changes only a vertex that names a floor look (UV1.x above 12.5:
+  `FloorDust.FirstFloorSlice`, checked against `WallArray.Slices` by Step97a) and faces up, with one bilinear sample at LOD
+  0: a soft albedo variation of +-8 % from the patches (breaks the repeat of the images), a pale warm grey dust film where
+  the patches rise and along the walls (it greys a dark floor and dulls a pale one), the grime tint (down to 0.70, 0.63,
+  0.54 at a corner: darker and warmer), a hint of wear on the paths (the dust swept away; a hard floor a touch paler and
+  greyer, a carpet a touch darker), and less sheen and flatter grooves under dust. The see-through shader, walls, rugs,
+  furniture and the garden are untouched.
+- Cost: Bas and Moyen run the variant without the code (no sample, no branch) and build no map. On Haut, one bilinear
+  sample and about 30 ALU per floor pixel, inside a branch on vertex data (walls skip it); the map is built once per level
+  (a few milliseconds, no per-frame allocation).
+- Tests: `ProbeTestsM9FloorDust` Step97a (Haut: the keyword on, the map covers the house and reaches the shader; Moyen
+  and Bas: off at once, no map built even over a restart; back on Haut: built at once; level21 under the 512 cap; the
+  shader's first floor slice matches `WallArray.Slices`), Step97b (levels 1, 12, 21: room centres 0, along the walls
+  0.37 to 0.41, corners 0.85 to 0.89, open doorways 0; wear 0.82 to 0.93 in front of the doorways, 0 in the corners;
+  patches mean 0.42 to 0.45, sd 0.20 to 0.23), Step97c (levels 14 and 19, the same frame with and without the dust: the
+  game view changes on 14 to 22 % of its pixels by 0.5 to 0.9 / 255 on average; a view of a wall alone and of a rug
+  alone do not change), Step97z (shots, written to `OOS_SHOT_DIR` or `TestResults/floordust`, never under docs).
+  `mutation.sh`: `floor_dust_tier` (dust on Moyen too) must turn Step97a red.
+- Shots (not kept under docs, product owner rule): every room of levels 14, 19, 15 and 20 (parquet, light oak,
+  herringbone, kitchen and both bathroom tiles, marble, verde, both carpets), columns Haut with dust, Haut without, Moyen;
+  rows the game camera on the room and a close view into a corner. The corners and the baseboards read darker, warmer
+  and duller, the dark floors show faint lighter patches, the light ones soft variation; the images stay themselves, the
+  rugs are unchanged. The dust adds no "red" pixel (ModelMath.IsRed) to any frame.

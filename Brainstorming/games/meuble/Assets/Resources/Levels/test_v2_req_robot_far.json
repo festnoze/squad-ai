@@ -1,0 +1,73 @@
+{
+  "id": "test_v2_req_robot_far",
+  "nameKey": "level9.name",
+  "hintKey": "level9.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "props": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -3.25,
+    "z": -0.75,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 3.25,
+    "z": -0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 3.25,
+          "z": 1.0,
+          "facing": 0.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "name": "Robot",
+      "start": 1,
+      "loop": [
+        {
+          "x": 0.25,
+          "z": 1.25
+        },
+        {
+          "x": 0.25,
+          "z": 0.75
+        }
+      ]
+    }
+  ]
+}

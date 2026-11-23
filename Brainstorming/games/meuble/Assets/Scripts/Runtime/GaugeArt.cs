@@ -65,6 +65,36 @@ namespace OutOfSight
         /// <summary>The same pill cut in diagonal stripes: the danger zone past the threshold, never told by colour alone.</summary>
         public static Sprite Hatch(float width, float height) => Sized(Hatches, "GaugeHatch", width, height, HatchTexel);
 
+        // ----- Danger animation (2026-11-20, GaugeFx): white sprites, tinted per frame. -----
+
+        private static Sprite sheen;
+        private static Sprite flare;
+        private static Sprite spark;
+        private static Sprite ring;
+
+        /// <summary>A soft band leaning forward like the hatch stripes, with a bright core: the light that sweeps along the fill.</summary>
+        public static Sprite Sheen => sheen != null ? sheen : sheen = Draw("GaugeSheen", 64, 32, Vector4.zero, SheenTexel);
+
+        /// <summary>The hot spot at the fill's leading edge: a thin bright vertical core in a soft oval bloom.</summary>
+        public static Sprite Flare => flare != null ? flare : flare = Draw("GaugeFlare", 48, 96, Vector4.zero, FlareTexel);
+
+        /// <summary>A spark streak pointing right (+x): a round bright head and a tapering tail, rotated along its flight.</summary>
+        public static Sprite Spark => spark != null ? spark : spark = Draw("GaugeSpark", 64, 32, Vector4.zero, SparkTexel);
+
+        /// <summary>A thin soft ring: the shockwave when a gauge crosses into its danger zone.</summary>
+        public static Sprite Ring => ring != null ? ring : ring = Draw("GaugeRing", 128, 128, Vector4.zero, RingTexel);
+
+        private static Sprite bloom;
+
+        /// <summary>The border, in texels, of <see cref="Bloom"/>: a 28 texel pill radius plus a 36 texel soft halo.</summary>
+        public const float BloomBorder = 64f;
+
+        /// <summary>A wide, very soft halo around a pill (nine sliced like <see cref="Glow"/>): the breathing bloom of a gauge in danger.</summary>
+        public static Sprite Bloom => bloom != null ? bloom : bloom = Sliced("GaugeBloom", BloomBorder, BloomTexel);
+
+        /// <summary>The pixelsPerUnitMultiplier of <see cref="Bloom"/> for a pill <paramref name="height"/> units tall plus <paramref name="halo"/> units around it.</summary>
+        public static float BloomMultiplier(float height, float halo) => BloomBorder / Mathf.Max(1f, height * 0.5f + halo);
+
         private delegate Color TexelFn(float x, float y, int width, int height);
 
         private static Sprite Sliced(string name, float border, TexelFn fn)
@@ -242,6 +272,56 @@ namespace OutOfSight
             float s = Mathf.Repeat(x + y, 12f);
             float stripe = Mathf.Clamp01(Mathf.Min(s - 1f, 7f - s));
             return new Color(1f, 1f, 1f, a * Mathf.Lerp(0.3f, 1f, stripe));
+        }
+
+        private static float Gauss(float d, float sigma) => Mathf.Exp(-(d * d) / (sigma * sigma));
+
+        private static Color BloomTexel(float x, float y, int width, int height)
+        {
+            float d = Pill(x, y, width, height, BloomBorder - 28f, 28f);
+            return new Color(1f, 1f, 1f, d <= 0f ? 1f : Gauss(d, 14f));
+        }
+
+        private static Color SheenTexel(float x, float y, int width, int height)
+        {
+            // Leaning forward (the top ahead of the bottom), a sharp core in a wider soft band, faded at the very ends.
+            float dx = x - width * 0.5f - (y - height * 0.5f) * 0.45f;
+            float a = 0.85f * Gauss(dx, 4.5f) + 0.4f * Gauss(dx, 13f);
+            float edge = Mathf.Clamp01(Mathf.Min(x, width - x) / 6f);
+            return new Color(1f, 1f, 1f, Mathf.Clamp01(a) * edge);
+        }
+
+        private static Color FlareTexel(float x, float y, int width, int height)
+        {
+            float dx = x - width * 0.5f;
+            float dy = (y - height * 0.5f) / (height * 0.5f);
+            // The core: a two texel line, solid over the middle, rounded off at the top and bottom.
+            float core = Gauss(dx, 2.2f) * Mathf.Clamp01((1f - Mathf.Abs(dy)) * 3.2f);
+            // The bloom: an oval that fades to nothing at the sprite's border.
+            float r = new Vector2(dx / (width * 0.5f), dy).magnitude;
+            float bloom = Mathf.Clamp01(1f - r);
+            bloom = bloom * bloom * 0.55f;
+            return new Color(1f, 1f, 1f, Mathf.Clamp01(core + bloom));
+        }
+
+        private static Color SparkTexel(float x, float y, int width, int height)
+        {
+            float dy = y - height * 0.5f;
+            float head = width - 14f;
+            // The tail: from the left end (t = 0) to the head (t = 1), widening and brightening.
+            float t = Mathf.Clamp01((x - 4f) / (head - 4f));
+            float tail = x <= head ? t * Gauss(dy, 1.8f + 4f * t) : 0f;
+            float glow = Gauss(new Vector2(x - head, dy).magnitude, 6.5f);
+            float core = Gauss(new Vector2(x - head, dy).magnitude, 3.2f);
+            return new Color(1f, 1f, 1f, Mathf.Clamp01(Mathf.Max(tail, glow * 0.75f) + core * 0.5f));
+        }
+
+        private static Color RingTexel(float x, float y, int width, int height)
+        {
+            float r = new Vector2(x - width * 0.5f, y - height * 0.5f).magnitude;
+            // A crisp ring at 54 texels with a softer inner afterglow.
+            float a = Gauss(r - 54f, 4.5f) + 0.3f * Gauss(r - 46f, 8f) * Mathf.Clamp01((54f - r) / 8f);
+            return new Color(1f, 1f, 1f, Mathf.Clamp01(a) * Mathf.Clamp01((62f - r) / 2f));
         }
     }
 }

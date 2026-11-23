@@ -112,6 +112,8 @@ namespace OutOfSight
         private Text optionsQualityText;
         private Text optionsDifficultyText;
         private Text optionsLanguageText;
+        /// <summary>The Language row's icon: the flag of the chosen language (UiIconLibrary.LanguageFlag), swapped live.</summary>
+        public Image OptionsLanguageIcon { get; private set; }
         // True when Options was opened from the pause menu (Retour then goes back there, not to the title).
         private bool optionsFromPause;
 
@@ -414,6 +416,11 @@ namespace OutOfSight
             if (optionsLanguageText != null)
             {
                 optionsLanguageText.text = string.Format(Strings.OptionsLanguage, Strings.LanguageName(o.LanguageId));
+            }
+            if (OptionsLanguageIcon != null)
+            {
+                // The flag of the language the row shows (2026-11-20): French flag in French, US flag in English.
+                OptionsLanguageIcon.sprite = UiIconLibrary.LanguageFlag(o.LanguageId);
             }
         }
 
@@ -756,11 +763,15 @@ namespace OutOfSight
             OptionsQualityButton = OptionsRow("OptionsQuality", 6, ProceduralArt.OptionQualityBars, out optionsQualityText);
             // M7 design (CONTRACT_M7 4.1): the Difficulté row.
             OptionsDifficultyButton = OptionsRow("OptionsDifficulty", 7, ProceduralArt.OptionDifficultyGauge, out optionsDifficultyText);
-            // Language / Langue, English or Français.
-            OptionsLanguageButton = OptionsRow("OptionsLanguage", 8, ProceduralArt.OptionGlobe, out optionsLanguageText);
+            // Language / Langue, English or Français. Its icon is the chosen language's flag (2026-11-20), swapped live by
+            // RefreshOptionsTexts (the globe only while the flags do not ship).
+            OptionsLanguageButton = OptionsRow("OptionsLanguage", 8, UiIconLibrary.LanguageFlag(SaveStore.Options.LanguageId), out optionsLanguageText);
+            Transform languageIcon = OptionsLanguageButton.transform.Find("OptionsLanguageIcon");
+            OptionsLanguageIcon = languageIcon != null ? languageIcon.GetComponent<Image>() : null;
 
-            OptionsResetButton = OptionsPlainButton("OptionsReset", Strings.OptionsDefault, 9);
-            OptionsBackButton = OptionsPlainButton("OptionsBack", Strings.SelectBack, 10);
+            // 2026-11-20: Par défaut and Retour carry an icon too (a reset arrow, a back arrow), in the rows' column.
+            OptionsResetButton = OptionsPlainButton("OptionsReset", Strings.OptionsDefault, 9, UiIconLibrary.Reset);
+            OptionsBackButton = OptionsPlainButton("OptionsBack", Strings.SelectBack, 10, UiIconLibrary.Back);
 
             // Credits cleanup (2026-11-19, product owner): the music's CC BY 4.0 attribution (docs/LICENSES.md), moved
             // here from the title page, a small, less prominent line under Retour, clear of it on a 20:9 phone
@@ -868,16 +879,36 @@ namespace OutOfSight
             return row;
         }
 
-        /// <summary>M7 options redesign: a plain row (Par défaut, Retour) in the same left column, no icon.</summary>
-        private Button OptionsPlainButton(string name, string label, int index)
+        /// <summary>
+        /// M7 options redesign: a plain row (Par défaut, Retour) in the same left column, without the value rows' arrows.
+        /// 2026-11-20: with an <paramref name="icon"/> (white, tinted the label's cream), it sits where the value rows'
+        /// icons sit and the label starts where theirs start, so the column reads as one; without one (the icon does not
+        /// ship), the label stays centred as before.
+        /// </summary>
+        private Button OptionsPlainButton(string name, string label, int index, Sprite icon)
         {
             Button button = Hud.MenuButton(optionsCanvas.transform, name, label, font, Labels);
             Place((RectTransform)button.transform, new Vector2(0f, 0.5f), new Vector2(Tuning.OptionsMargin, OptionsTop - index * OptionsStep),
                 new Vector2(420f, OptionsRowHeight));
             StyleOptionsButton(button);
-            if (Labels.TryGetValue(name + "Label", out Text text))
+            Labels.TryGetValue(name + "Label", out Text text);
+            if (text != null)
             {
                 text.color = TitleInk;
+            }
+            if (icon != null)
+            {
+                Image glyph = NewImage(button.transform, name + "Icon", icon, TitleInk);
+                glyph.preserveAspect = true;
+                glyph.raycastTarget = false;
+                Place(glyph.rectTransform, new Vector2(0f, 0.5f), new Vector2(Tuning.OptionsIconInset, 0f),
+                    new Vector2(Tuning.OptionsIconSize, Tuning.OptionsIconSize));
+                if (text != null)
+                {
+                    text.alignment = TextAnchor.MiddleLeft;
+                    text.rectTransform.offsetMin = new Vector2(Tuning.OptionsLabelOffset, 0f);
+                    text.rectTransform.offsetMax = new Vector2(-Tuning.OptionsIconInset, 0f);
+                }
             }
             return button;
         }
@@ -1124,6 +1155,52 @@ namespace OutOfSight
             {
                 StartCoroutine(OptionsShot(dir));
             }
+            // LEVELNUM: "-autoShot <dir> [-autoLevel <id>]" (a built player): shots of a level's intro card, then quit.
+            string autoShot = Probe.ArgValue("-autoShot");
+            if (!Application.isEditor && !string.IsNullOrEmpty(autoShot))
+            {
+                StartCoroutine(AutoShot(autoShot, Probe.ArgValue("-autoLevel")));
+            }
+        }
+
+        /// <summary>
+        /// LEVELNUM: "-autoShot &lt;dir&gt; [-autoLevel &lt;id&gt;]" (a built player only, never without the argument): waits
+        /// for the title, plays the level (level13 by default) the way a level select card does, and writes screen
+        /// captures of its held intro card when the number's zoom reaches 0.1, 0.5 and 1.0 s and once it has settled
+        /// (&lt;id&gt;_t010.png, _t050, _t100, _settled), with a line per shot in the player log; then quits.
+        /// </summary>
+        private IEnumerator AutoShot(string dir, string levelId)
+        {
+            Directory.CreateDirectory(dir);
+            levelId = string.IsNullOrEmpty(levelId) ? "level13" : levelId;
+            float until = Time.realtimeSinceStartup + 20f;
+            while (!TitleOpen && Time.realtimeSinceStartup < until)
+            {
+                yield return null;
+            }
+            yield return new WaitForSecondsRealtime(1.5f);
+            PlayLevel(levelId);
+            Debug.Log($"[AutoShot] {levelId}: number {Hud.LevelNumberShown}, holes ready {Hud.LevelNumberHolesReady}, "
+                + $"screen {Screen.width} x {Screen.height}, held {Hud.CardHeld}");
+            float[] ages = { 0.1f, 0.5f, 1f, Hud.NumberZoomSeconds + 1f };
+            string[] names = { "t010", "t050", "t100", "settled" };
+            for (int i = 0; i < ages.Length; i++)
+            {
+                float guard = Time.realtimeSinceStartup + 15f;
+                while (Hud.LevelNumberAge < ages[i] && Time.realtimeSinceStartup < guard)
+                {
+                    yield return null;
+                }
+                yield return new WaitForEndOfFrame();
+                Texture2D shot = ScreenCapture.CaptureScreenshotAsTexture();
+                string path = Path.Combine(dir, $"{levelId}_{names[i]}.png");
+                File.WriteAllBytes(path, shot.EncodeToPNG());
+                Destroy(shot);
+                Debug.Log($"[AutoShot] {path}: age {Hud.LevelNumberAge:0.000} s, scale {Hud.LevelNumberScale:0.000} "
+                    + $"(final {Hud.LevelNumberFinalScale:0.000}), ink {Hud.LevelNumberInkRect}, card alpha {Hud.TitleCardAlpha:0.00}");
+            }
+            yield return new WaitForSecondsRealtime(0.5f);
+            Application.Quit();
         }
 
         /// <summary>

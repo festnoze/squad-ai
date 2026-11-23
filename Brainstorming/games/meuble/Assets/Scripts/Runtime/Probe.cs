@@ -399,7 +399,8 @@ namespace OutOfSight
         private Dictionary<string, object> Audit(Dictionary<string, object> startBudgets)
         {
             var audit = new Dictionary<string, object>();
-            foreach (string name in new[] { PrimitiveKit.LitShaderName, PrimitiveKit.UnlitShaderName })
+            // Cones look (2026-11-20): the vision cone shader is created from code too, so the built player checks it resolves.
+            foreach (string name in new[] { PrimitiveKit.LitShaderName, PrimitiveKit.UnlitShaderName, VisionConeView.ConeShaderName })
             {
                 Shader s = Shader.Find(name);
                 bool ok = s != null && s.isSupported;
@@ -463,10 +464,13 @@ namespace OutOfSight
         /// <summary>
         /// Walls 4 (WallArray): the project's own wall shaders (OutOfSight/Wall Finishes and Wall See-through), written for
         /// URP (its passes, its lighting, Forward and Forward+), shipped by the library's material assets: no glTFast graph.
+        /// Cones look (2026-11-20): the vision cone shader (VisionConeView.ConeShaderName) is a project URP shader too,
+        /// shipped through Always Included Shaders and XRay_Cone.mat.
         /// </summary>
         public static bool IsProjectWallShader(Shader shader)
         {
-            return shader != null && (shader.name == WallArray.ShaderName || shader.name == WallArray.SeeThroughShaderName);
+            return shader != null && (shader.name == WallArray.ShaderName || shader.name == WallArray.SeeThroughShaderName
+                || shader.name == VisionConeView.ConeShaderName);
         }
 
         /// <summary>Counts the enabled, active renderers of <paramref name="renderers"/>.</summary>

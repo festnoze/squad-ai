@@ -16,20 +16,26 @@ namespace OutOfSight.Tests
     /// <list type="bullet">
     /// <item>"careful" holds the careful key for the leg (FurnitureController.ScriptedCareful, CONTRACT_M4 9.3);</item>
     /// <item>a gliding body that stops at a waypoint releases at max(0.1, v * 0.2 + 0.1) m, so the glide ends there;</item>
-    /// <item>"toggle" presses E at "at" (InputReader.InjectAction) and the next leg waits for the switch to end;</item>
+    /// <item>"toggle" presses E at "at" (InputReader.InjectAction; DOORAUTO: the action key now only switches the lamp) and
+    /// the next leg waits for the switch to end;</item>
     /// <item>"rightup" presses a move key (InputReader.InjectMovePress) and waits for the stool to stand;</item>
-    /// <item>M5 "open" (with "door") waits for the furniture to be still (E acts only then, CONTRACT_M5_v3 15.2), presses
-    /// E, and waits for the opening (an External action) to end. A press that starts no action is pressed again, at most
-    /// <see cref="MaxOpenPresses"/> times; then the replay goes on and the result counts the failure.</item>
+    /// <item>M5 "open" (with "door") waits for the furniture to be still (a door acts only then, CONTRACT_M5_v3 15.2), then
+    /// (task DOORAUTO, in place of the E press) pushes toward the door (GameState.DoorPushDirection, through
+    /// FurnitureController.ScriptedDirection) from "at" minus Tuning.PushConfirmTime on, so the opening (an External
+    /// action) begins on the same step the E press made it begin, and waits for it to end. The push holds the furniture
+    /// still. A push that starts no action within its confirm steps and <see cref="PressWaitSteps"/> more is pushed again,
+    /// at most <see cref="MaxOpenPresses"/> pushes; then the replay goes on and the result counts the failure. With no push
+    /// target (no door in reach) each push is waited out with no input.</item>
     /// <item>M6 "hide" and "leave" (LevelAudit.RouteHide and RouteLeave, CONTRACT_M6 2.5) are played like "open": the
-    /// furniture still at (x, z), E is pressed at "at" and the next leg waits for the 0.5 s wardrobe action to end.</item>
+    /// furniture still at (x, z), the push into the wardrobe (out of it to leave) begins the 0.25 s wardrobe action on the
+    /// same step, and the next leg waits for it to end.</item>
     /// </list>
     /// CONTRACT_M4 9.8: no scripted input while the furniture is pinned (sat on), and for one step after.
     /// M5 wave 5B: the rocking chair's rock and the robot's shove are actions that ignore input; the replay keeps steering
     /// toward its waypoint through them, so the leg simply resumes when they end. The result counts the 5B events (crashes,
     /// shoves, robot contacts, rocks and noises the hum masked) and whether the load still rides at the end.
     /// The input is decided at the end of each fixed step (GameState.FixedStepped), so the replay does not depend on
-    /// timeScale. A run ends when the level is won or lost, or at the route end + <see cref="CapAfterRoute"/> s of game
+    /// timeScale. Levels v2 (C3a): a held start (GameState.Started false) is released at the replay's first sample. A run ends when the level is won or lost, or at the route end + <see cref="CapAfterRoute"/> s of game
     /// time (CONTRACT_M5 16.11). A real time guard only protects the test run if game time stops advancing.
     /// The result also records what the run showed, up to and including the step that ended it: the openings (when the
     /// first one started), a swinging leaf seen by a watcher that counts for the catch, the furniture seen before the
@@ -39,10 +45,12 @@ namespace OutOfSight.Tests
     {
         /// <summary>CONTRACT_M5 16.11: a run stops this many seconds of game time after the last "at" (plus the offset).</summary>
         public const float CapAfterRoute = 30f;
-        /// <summary>An "open" press that starts no action is pressed again, at most this many presses in all.</summary>
+        /// <summary>An "open" push (DOORAUTO; an E press before it) that starts no action is pushed again, at most this many pushes in all.</summary>
         public const int MaxOpenPresses = 5;
-        /// <summary>Fixed steps to wait for a press to start its action before pressing again.</summary>
+        /// <summary>Fixed steps to wait, after a push's confirm steps, for it to start its action before pushing again.</summary>
         public const int PressWaitSteps = 2;
+        /// <summary>DOORAUTO: the fixed steps a push is held before its action begins (FurnitureController.DoorPushConfirmSteps).</summary>
+        public static int PushSteps => FurnitureController.DoorPushConfirmSteps(Tuning.FixedStep);
         /// <summary>Real seconds after which a run stops even if game time did not reach the cap (a stalled game).</summary>
         public const float RealTimeGuard = 900f;
         /// <summary>M6: the route action that enters the wardrobe (LevelAudit.RouteHide).</summary>
@@ -50,7 +58,7 @@ namespace OutOfSight.Tests
         /// <summary>M6: the route action that leaves the wardrobe (LevelAudit.RouteLeave).</summary>
         public const string ActionLeave = "leave";
 
-        /// <summary>The route actions that press E and wait for an External action: "open", "hide" and "leave".</summary>
+        /// <summary>The route actions that push toward a door (DOORAUTO; E before) and wait for an External action: "open", "hide" and "leave".</summary>
         public static bool IsPress(string action) =>
             action == RouteStepDef.ActionOpen || action == ActionHide || action == ActionLeave;
 
@@ -82,9 +90,9 @@ namespace OutOfSight.Tests
             /// <summary>M5: External actions started (door openings) during the run. Wave 5B: a rock of the rocking chair (an
             /// External action GameState starts on its rest step) is not an opening.</summary>
             public int Opens;
-            /// <summary>M5: E presses made for "open" steps (retries included).</summary>
+            /// <summary>M5: pushes (DOORAUTO; E presses before) made for "open", "hide" and "leave" steps (retries included).</summary>
             public int OpenPresses;
-            /// <summary>M5: "open" steps given up after <see cref="MaxOpenPresses"/> presses that started nothing.</summary>
+            /// <summary>M5: "open" steps given up after <see cref="MaxOpenPresses"/> pushes that started nothing.</summary>
             public int OpenFailures;
             /// <summary>M5: doors GameState counts as opened by the player during the run (GameState.DoorOpenCount).</summary>
             public int DoorOpens;
@@ -158,9 +166,13 @@ namespace OutOfSight.Tests
         /// Replays the designerRoute of the level <paramref name="game"/> is playing, from its current state (load or restart
         /// the level first), at <paramref name="timeScale"/>, every "at" shifted by <paramref name="offset"/> seconds.
         /// Fills <paramref name="result"/>; the caller asserts.
+        /// Levels v2 (C7, the rush probe): <paramref name="waitsRemoved"/> plays the compressed route: every "at" counts as
+        /// 0, so each leg departs on the step the previous waypoint is reached (or its action ends), and a gliding body never
+        /// brakes at an intermediate waypoint. The cap still comes from the route's real "at" values, raised to at least
+        /// <paramref name="minCap"/> s of game time (a straight path the caller built has no meaningful "at").
         /// </summary>
         public static IEnumerator Replay(GameState game, float offset, Result result, float timeScale = Tuning.PlaythroughTimeScale,
-            List<RouteStepDef> routeOverride = null)
+            List<RouteStepDef> routeOverride = null, bool waitsRemoved = false, float minCap = 0f)
         {
             // M7 design (CONTRACT_M7 4.1): Step64b_ replays the level's designerRouteHard at Difficile through this override.
             List<RouteStepDef> route = routeOverride ?? game.Def.DesignerRoute ?? new List<RouteStepDef>();
@@ -168,12 +180,14 @@ namespace OutOfSight.Tests
             result.Level = game.LevelId;
             result.Offset = offset;
             result.Waypoints = route.Count;
-            result.Cap = CapOf(route, offset);
+            result.Cap = Mathf.Max(CapOf(route, offset), minCap);
+            // C7: the departure time of step i; 0 for every step when the waits are removed (a passed "at" departs at once).
+            float DepartAt(int i) => waitsRemoved ? 0f : route[i].At + offset; // MUTATION:RUSH_WAITS_REMOVED
             int k = 0;
             bool driving = false;
             bool acting = false;
             bool started = false;
-            int waited = 0;
+            int pushed = 0;
             int presses = 0;
             int afterPin = 0;
             bool wasExternal = false;
@@ -200,7 +214,7 @@ namespace OutOfSight.Tests
             bool rockedLastStep = false;
             result.TopY = furniture.transform.position.y;
 
-            // E acts on a door only when the furniture is still, upright, free and in no action (CONTRACT_M5_v3 15.2).
+            // A door acts only when the furniture is still, upright, free and in no action (CONTRACT_M5_v3 15.2).
             bool Still(FurnitureController f) => !f.IsMoving && !f.Gliding && !f.ActionActive && !f.Tipped && !f.Pinned && !f.Carried;
 
             void Drive()
@@ -268,19 +282,21 @@ namespace OutOfSight.Tests
                     }
                     if (!started && k < route.Count && IsPress(route[k].Action))
                     {
-                        // The press started nothing (refused or not claimed): wait a little, then press again when still.
-                        if (++waited < PressWaitSteps)
+                        // DOORAUTO: the push holds for its confirm steps, then its action begins; one that started nothing
+                        // after a little more (refused or not claimed) is pushed again when still.
+                        if (++pushed <= PushSteps + PressWaitSteps)
                         {
+                            f.ScriptedDirection = game.DoorPushDirection;
                             return;
                         }
                         if (presses < MaxOpenPresses)
                         {
                             if (Still(f))
                             {
-                                InputReader.InjectAction();
+                                f.ScriptedDirection = game.DoorPushDirection;
                                 presses++;
                                 result.OpenPresses++;
-                                waited = 0;
+                                pushed = 0;
                             }
                             return;
                         }
@@ -295,7 +311,10 @@ namespace OutOfSight.Tests
                     f.ScriptedCareful = w.Careful;
                     if (!driving)
                     {
-                        if (game.Elapsed < Mathf.Max(0f, w.At + offset) - 1e-4f)
+                        // DOORAUTO: a push begins PushConfirmTime before "at", so its action begins on the step the E press
+                        // made it begin (the step after "at").
+                        float lead = IsPress(w.Action) ? PushSteps * Tuning.FixedStep : 0f;
+                        if (game.Elapsed < Mathf.Max(0f, DepartAt(k) - lead) - 1e-4f)
                         {
                             f.ScriptedDirection = null;
                             return;
@@ -309,10 +328,10 @@ namespace OutOfSight.Tests
                         {
                             return;
                         }
-                        InputReader.InjectAction();
+                        f.ScriptedDirection = game.DoorPushDirection;
                         presses = 1;
                         result.OpenPresses++;
-                        waited = 0;
+                        pushed = 0;
                         started = false;
                         acting = true;
                         driving = false;
@@ -320,7 +339,8 @@ namespace OutOfSight.Tests
                     }
                     if (w.Action == RouteStepDef.ActionToggle || w.Action == RouteStepDef.ActionRightUp)
                     {
-                        // CONTRACT_M4 9.3, as in M4: pressed at "at", the next leg waits for the action to end.
+                        // CONTRACT_M4 9.3, as in M4: pressed at "at", the next leg waits for the action to end. DOORAUTO: the
+                        // lamp keeps the action key.
                         f.ScriptedDirection = null;
                         if (w.Action == RouteStepDef.ActionToggle)
                         {
@@ -336,7 +356,7 @@ namespace OutOfSight.Tests
                         return;
                     }
                     Vector3 to = YawMath.Planar(new Vector3(w.X, 0f, w.Z) - f.transform.position);
-                    bool stops = k + 1 >= route.Count || game.Elapsed < route[k + 1].At + offset - 1e-4f;
+                    bool stops = k + 1 >= route.Count || game.Elapsed < DepartAt(k + 1) - 1e-4f;
                     float release = f.Body.Glides && stops
                         ? Mathf.Max(0.1f, f.Velocity.magnitude * Tuning.OfficeChairStopTime * 0.5f + 0.1f)
                         : 0.1f;
@@ -351,6 +371,14 @@ namespace OutOfSight.Tests
                 f.ScriptedDirection = null;
             }
 
+            // Levels v2 (C3a): a test that turned the held start on (GameState.HoldStart) releases it at the first sample, so
+            // the next fixed step is step 1 of the schedule, as it is with the hold off (where the level started at its build).
+            // AUTOSTART: the world runs under the held card, so this keeps t = 0 only when the replay begins right after the
+            // build (GameState.WorldSteps == 0); a replay begun later runs the route against a world that is ahead of it.
+            if (!game.Started)
+            {
+                game.ReleaseStart();
+            }
             game.FixedStepped += Drive;
             var stalled = new bool[1];
             try

@@ -43,7 +43,8 @@ namespace OutOfSight
 
             /// <summary>
             /// The height ModelKit's Uniform fit puts the eyes at, metres above the root: 0 means Tuning.EyeHeight (the humans);
-            /// the dog's is Tuning.DogEyeHeight.
+            /// the dog's is Tuning.DogModelEyeHeight (DOGBIG: its model is drawn bigger than its gameplay eye, Tuning.DogEyeHeight,
+            /// which the routine, the cone and the collider keep).
             /// </summary>
             public float targetEyeHeight;
 
@@ -126,8 +127,11 @@ namespace OutOfSight
         public const string QuaterniusWomanJacket = "quaternius.woman_jacket";
         /// <summary>The woman in a dress (granny).</summary>
         public const string QuaterniusWomanDress = "quaternius.woman_dress";
-        /// <summary>The Shiba Inu (the dog, a pet: 46 bones, eyes at Tuning.DogEyeHeight).</summary>
-        public const string QuaterniusShiba = "quaternius.shiba";
+        /// <summary>
+        /// The Husky (the dog, a pet: 49 bones, its model's eyes at Tuning.DogModelEyeHeight). DOGBIG (2026-11-21): it replaced
+        /// the Shiba Inu (quaternius.shiba), a bigger breed drawn 1.5 times the Shiba's size, on the same rig and clips.
+        /// </summary>
+        public const string QuaterniusHusky = "quaternius.husky";
 
         // ----- M8 room objects (docs/m8/ROOMS_PLAN.md 3): optional looks of four prop kinds, named by the level's "model" -----
 
@@ -145,7 +149,7 @@ namespace OutOfSight
         {
             KenneyChair, KenneySofa, KenneyRug, KenneyDoormat, KenneyArmchair, KenneyStool, KenneyFloorLamp,
             QuaterniusMan, QuaterniusWoman,
-            QuaterniusManShorts, QuaterniusManSuit, QuaterniusManTshirt, QuaterniusWomanJacket, QuaterniusWomanDress, QuaterniusShiba,
+            QuaterniusManShorts, QuaterniusManSuit, QuaterniusManTshirt, QuaterniusWomanJacket, QuaterniusWomanDress, QuaterniusHusky,
             KenneyBed, KenneyFridge, KenneyCoffeeTable, KenneyNightstand,
         };
     }

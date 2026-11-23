@@ -68,9 +68,15 @@ namespace OutOfSight.Core
                 case Tidy:
                     return Look(Human(Tidy, 1.2f, 10f, 55f, 1.0f, 1.3f, 0.4f, 1.3f), "quaternius.woman", "#F4D35E");
                 case Dog:
+                    // DOGBIG (2026-11-21): the bigger Husky model, dressed as a black Labrador by its fur map
+                    // (Resources/DogFur.png, ModelKit.ApplyPetFurMap; mean #2A2929, a near-black a tint may not be). This tint
+                    // is the coat without the map, and the dog's colour wherever its tint is read: a
+                    // charcoal (its Main slot) over the white mask and belly (Main_Light, the palette white). A warm brown or tan cannot keep
+                    // the CIE76 distance 30 from both the #B07A4E wood (and its carpet border) and the cream floors of the dog
+                    // levels; #505458 stands 35.3 from the nearest (the level 20 and 24 carpet borders), 44.0 from the wood.
                     return new PersonalityDef
                     {
-                        Id = Dog, NameKey = "person.dog", TraitKey = "person.dog.trait", Model = "quaternius.shiba", Tint = "#4F6670",
+                        Id = Dog, NameKey = "person.dog", TraitKey = "person.dog.trait", Model = "quaternius.husky", Tint = "#505458",
                         WalkSpeed = 1.4f, ViewRange = 6f, HalfAngle = 70f, EyeHeight = Tuning.DogEyeHeight,
                         HearingFactor = 0f, SuspicionFactor = 0f, Tolerance = Tuning.DisplacementTolerance, CarryFactor = 0f,
                         Memory = false, Hears = false, CountsForCatch = false, CountsForExit = false, Sits = false, Barks = true,

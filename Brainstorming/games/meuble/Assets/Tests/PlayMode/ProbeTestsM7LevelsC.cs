@@ -18,7 +18,9 @@ namespace OutOfSight.Tests
     /// Step 58C1/C2: level 23 "Upstairs, Downstairs" (lesson wardrobe): the route hides in the wardrobe and comes out, and
     /// the household opens the hall door on its own; no remembered spot is ever seen empty.
     /// Step 58C3/C4: level 24 "The Great Escape" (lesson final): the route opens the bedroom door itself and wins.
-    /// A level does not need to be in levels.json to load: GameState.LoadLevel reads it by id from Resources/Levels.
+    /// Step 58C5/C6 (levels v2): level 25 "The Showroom" (requires decoy): the route wins and display chairs explain it.
+    /// A level does not need to be in levels.json to load: GameState.LoadLevel reads it by id from Resources/Levels, so the
+    /// level23 steps keep loading the cut level (LEVELS_V2 D2) by id.
     /// </summary>
     public sealed class ProbeTestsM7LevelsC
     {
@@ -177,6 +179,12 @@ namespace OutOfSight.Tests
 
         private IEnumerable<string> Level24Checks(RouteReplayer.Result r, int emptySpots0, int householdOpens0, string label)
         {
+            // Levels v2 (LEVELS_V2 3, slot 22): the finale plays the chair (was the stool). A failure, not a premise, so the
+            // replay of the file as it stands still runs and reports (LV13 escalated: level24.json is still the v1 stool).
+            if (BodyKinds.Of(Game.Def.Player.Kind) != BodyKinds.Chair)
+            {
+                yield return $"{label}: level 24 plays the {Game.Def.Player.Kind}, the v2 finale plays the chair (LEVELS_V2 3)";
+            }
             if (r.Opens < 1)
             {
                 yield return $"{label}: the route never opened a door (the bedroom door is closed)";
@@ -195,6 +203,44 @@ namespace OutOfSight.Tests
         public IEnumerator Step58C4_Level24RouteWinsHard()
         {
             yield return ReplayAt("level24", DifficultyDef.Difficile, "Step58C4", Level24Premise, Level24Checks);
+        }
+
+        // ----- level 25: The Showroom (levels v2, new; decoys) -----
+
+        /// <summary>LEVELS_V2 5 (level25): the showroom is full of display chairs; at least this many decoys of the chair.</summary>
+        private const int Level25MinDecoys = 10;
+
+        private void Level25Premise()
+        {
+            Assert.AreEqual(BodyKinds.Chair, BodyKinds.Of(Game.Def.Player.Kind), "premise: level 25 plays the chair");
+            int decoys = Game.Def.Decoys.Count(d => BodyKinds.Of(d.Kind) == BodyKinds.Chair);
+            Assert.GreaterOrEqual(decoys, Level25MinDecoys, "premise: level 25 is a showroom of display chairs");
+            CollectionAssert.Contains(Game.Def.RequiredLessons, LevelDef.LessonDecoy, "premise: level 25 requires its decoys");
+        }
+
+        private IEnumerable<string> Level25Checks(RouteReplayer.Result r, int emptySpots0, int householdOpens0, string label)
+        {
+            // LEVELS_V2 9 and 10.1: the route freezes where a chair belongs: decoys explain it at least once.
+            if (r.Explained < 1)
+            {
+                yield return $"{label}: no decoy ever explained the chair ({r.Explained} explained samples): the route ignores the display chairs";
+            }
+        }
+
+        /// <summary>Step 58C5/C6 (levels v2): level 25 "The Showroom": the route wins with no discovery at Normal and at
+        /// Difficile, and display chairs explain the chair at least once.</summary>
+        [UnityTest]
+        [Timeout(900000)]
+        public IEnumerator Step58C5_Level25RouteWins()
+        {
+            yield return ReplayAt("level25", DifficultyDef.Normal, "Step58C5", Level25Premise, Level25Checks);
+        }
+
+        [UnityTest]
+        [Timeout(900000)]
+        public IEnumerator Step58C6_Level25RouteWinsHard()
+        {
+            yield return ReplayAt("level25", DifficultyDef.Difficile, "Step58C6", Level25Premise, Level25Checks);
         }
     }
 }

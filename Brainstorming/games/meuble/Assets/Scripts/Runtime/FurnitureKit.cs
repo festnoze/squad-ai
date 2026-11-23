@@ -43,27 +43,24 @@ namespace OutOfSight
             new Color32(0x3F, 0x8F, 0x4F, 0xFF), new Color32(0x8C, 0x5A, 0x36, 0xFF), new Color32(0x5B, 0x93, 0xD9, 0xFF),
         };
 
-        /// <summary>The player chair: 6 boxes, 72 triangles (PRD 7.1). Facing +z, backrest on the -z side.</summary>
+        /// <summary>
+        /// The player chair (PRD 7.1), facing +z, backrest on the -z side. Soft movers (2026-11-20): the rounded design of
+        /// the Kenney chair it stands in for (SoftBodies.Chair: a cushion of a seat, tapered legs, the backrest's posts and
+        /// rails, an H of stretchers), still 6 renderers named as the M1 boxes were (the stretchers join the legs, the rails
+        /// the backrest), 342 triangles.
+        /// </summary>
         public static void Chair(Transform parent, Vector3 size, Color color, int layer)
         {
             Material m = MainMaterial(color, 0.35f);
             Surface wood = MainSurface(color, Surface.Wood);
-            float seatTop = size.y * 0.53f;
-            const float seat = 0.05f;
-            const float leg = 0.05f;
-            const float back = 0.05f;
-            float lx = size.x * 0.5f - leg * 0.5f - 0.01f;
-            float lz = size.z * 0.5f - leg * 0.5f - 0.01f;
-            float legHeight = seatTop - seat;
-            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegFL", new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegFR", new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegBL", new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegBR", new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            float backHeight = size.y - seatTop;
-            PrimitiveKit.Box(parent, "Backrest", new Vector3(0f, seatTop + backHeight * 0.5f, -size.z * 0.5f + back * 0.5f),
-                new Vector3(size.x, backHeight, back), m, layer, false, wood);
+            List<SoftBodies.Piece> pieces = SoftBodies.Chair(size);
+            foreach (string part in ChairParts)
+            {
+                SoftBodies.Build(parent, pieces, part, m, layer, wood);
+            }
         }
+
+        private static readonly string[] ChairParts = { "Seat", "LegFL", "LegFR", "LegBL", "LegBR", "Backrest" };
 
         /// <summary>
         /// M6 (CONTRACT_M6 2.4, PRD 7.2): only the player's own furniture is ever red (every level's player colour is
@@ -126,37 +123,38 @@ namespace OutOfSight
         /// </summary>
         public static Color FrameColor => ModelMath.NearBlack;
 
-        /// <summary>A stool (fallback of the Kenney bar stool): a seat on four legs, 5 boxes, 60 triangles.</summary>
+        /// <summary>
+        /// A stool (fallback of the Kenney bar stool). Soft movers (2026-11-20): the rounded design of the bar stool
+        /// (SoftBodies.Stool: a round plump cushion on four round legs splaying a little, a foot ring), in one colour, still
+        /// 5 renderers (the seat and the four legs, the ring's sides joining them), 268 triangles.
+        /// </summary>
         public static void Stool(Transform parent, Vector3 size, Color color, int layer)
         {
             Material m = MainMaterial(color, 0.35f);
             Surface wood = MainSurface(color, Surface.Wood);
-            const float seat = 0.06f;
-            const float leg = 0.04f;
-            float legHeight = size.y - seat;
-            float lx = size.x * 0.5f - leg * 0.5f - 0.02f;
-            float lz = size.z * 0.5f - leg * 0.5f - 0.02f;
-            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, size.y - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegFL", new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegFR", new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegBL", new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
-            PrimitiveKit.Box(parent, "LegBR", new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg), m, layer, false, wood);
+            List<SoftBodies.Piece> pieces = SoftBodies.Stool(size);
+            foreach (string part in StoolParts)
+            {
+                SoftBodies.Build(parent, pieces, part, m, layer, wood);
+            }
         }
 
-        /// <summary>A floor lamp (fallback of the Kenney lamp): a foot, a pole and the shade on top, 3 boxes, 36 triangles.</summary>
+        private static readonly string[] StoolParts = { "Seat", "LegFL", "LegFR", "LegBL", "LegBR" };
+
+        /// <summary>
+        /// A floor lamp (fallback of the Kenney lamp): a foot, a pole and the shade on top, 3 renderers. Soft movers
+        /// (2026-11-20): the rounded design of the round floor lamp (SoftBodies.FloorLamp: a domed round foot, a round pole,
+        /// a tapered round shade with rolled lips, its inside showing), 290 triangles.
+        /// </summary>
         public static void FloorLamp(Transform parent, Vector3 size, Color color, int layer)
         {
             Material shade = MainMaterial(color, 0.35f);
             // M6 (CONTRACT_M6 2.4): the pole and the foot are always metal (Metal009), player or decoy alike.
             Material frame = PrimitiveKit.LitSurface(FrameColor, Surface.Metal);
-            const float foot = 0.04f;
-            const float pole = 0.035f;
-            float shadeHeight = size.y * 0.22f;
-            float poleTop = size.y - shadeHeight;
-            PrimitiveKit.Box(parent, "Foot", new Vector3(0f, foot * 0.5f, 0f), new Vector3(size.x * 0.8f, foot, size.z * 0.8f), frame, layer, false, Surface.Metal);
-            PrimitiveKit.Box(parent, "Pole", new Vector3(0f, (foot + poleTop) * 0.5f, 0f), new Vector3(pole, poleTop - foot, pole), frame, layer, false, Surface.Metal);
-            PrimitiveKit.Box(parent, "Shade", new Vector3(0f, poleTop + shadeHeight * 0.5f, 0f), new Vector3(size.x, shadeHeight, size.z), shade, layer, false,
-                MainSurface(color, Surface.Linen));
+            List<SoftBodies.Piece> pieces = SoftBodies.FloorLamp(size);
+            SoftBodies.Build(parent, pieces, "Foot", frame, layer, Surface.Metal);
+            SoftBodies.Build(parent, pieces, "Pole", frame, layer, Surface.Metal);
+            SoftBodies.Build(parent, pieces, "Shade", shade, layer, MainSurface(color, Surface.Linen));
         }
 
         /// <summary>The number of spokes and wheels of the office chair base.</summary>
@@ -166,8 +164,9 @@ namespace OutOfSight
         /// The office chair (no model, CONTRACT_M4 2): a seat, a backrest on -z on its post, a gas column and a
         /// five-spoke base on wheels. Seat and back in <paramref name="color"/>; the metal (hub, spokes, wheels, column,
         /// post) is one mesh in <see cref="FrameColor"/>, so a chair is 3 renderers (level 7 has five of them).
-        /// 312 triangles: seat and backrest (24), and the frame: hub and post (24), 5 spokes (60), the column (24),
-        /// 5 wheels (180).
+        /// Soft movers (2026-11-20): a padded seat (rounded corners, a rolled top edge), a padded backrest panel (rounded
+        /// corners, its face toward the sitter rolled), and the rounded frame (<see cref="OfficeChairFrame"/>). 380 triangles:
+        /// the seat 58, the backrest 68, the frame 254.
         /// </summary>
         public static void OfficeChair(Transform parent, Vector3 size, Color color, int layer)
         {
@@ -179,11 +178,13 @@ namespace OutOfSight
             const float backDepth = 0.06f;
             float seatTop = size.y * 0.5f;
             float backBottom = seatTop + 0.12f;
-            float backZ = -size.z * 0.5f + backDepth * 0.5f;
+            float backHeight = size.y - backBottom;
             PrimitiveKit.Part(parent, "Frame", OfficeChairFrame(size), Vector3.zero, Quaternion.identity, Vector3.one, frame, layer, Surface.Metal);
-            PrimitiveKit.Box(parent, "Seat", new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z), m, layer, false, upholstery);
-            PrimitiveKit.Box(parent, "Backrest", new Vector3(0f, (backBottom + size.y) * 0.5f, backZ), new Vector3(size.x * 0.9f, size.y - backBottom, backDepth),
-                m, layer, false, upholstery);
+            PrimitiveKit.Part(parent, "Seat", RoundedMesh.Slab(new Vector3(size.x, seat, size.z), 0.09f, 0f, 0, 0.03f, 1, 2, false, true),
+                new Vector3(0f, seatTop - seat, 0f), Quaternion.identity, Vector3.one, m, layer, upholstery);
+            // The backrest is built lying (its rounded corners in plan) and stood up, its rolled face (the slab's top) toward +z.
+            PrimitiveKit.Part(parent, "Backrest", RoundedMesh.Slab(new Vector3(size.x * 0.9f, backDepth, backHeight), 0.08f, 0f, 0, 0.02f, 1, 2, true, true),
+                new Vector3(0f, backBottom + backHeight * 0.5f, -size.z * 0.5f), Quaternion.Euler(90f, 0f, 0f), Vector3.one, m, layer, upholstery);
         }
 
         private static readonly Dictionary<string, Mesh> FrameCache = new Dictionary<string, Mesh>();
@@ -191,7 +192,9 @@ namespace OutOfSight
         /// <summary>
         /// The metal of an office chair of <paramref name="size"/> as one mesh in the chair's frame (cached by size, kept
         /// across level rebuilds like PrimitiveKit's meshes): the hub, <see cref="OfficeChairSpokes"/> spokes with a wheel
-        /// under each tip, the gas column up to the seat, and the backrest post.
+        /// under each tip, the gas column up to the seat, and the backrest post. Soft movers (2026-11-20): a round hub with
+        /// a rolled top (22 triangles), a round column (16), a backrest post of round section (16), five tapered spokes of
+        /// round section arching down from the hub into their casters (80), five ball casters (120): 254 triangles.
         /// </summary>
         public static Mesh OfficeChairFrame(Vector3 size)
         {
@@ -202,45 +205,38 @@ namespace OutOfSight
             }
             float radius = Mathf.Min(size.x, size.z) * 0.5f;
             float wheel = Mathf.Min(0.06f, radius * 0.25f);
-            const float spokeHeight = 0.03f;
-            const float spokeWidth = 0.04f;
             const float seat = 0.07f;
             const float backDepth = 0.06f;
-            const float post = 0.05f;
             float seatTop = size.y * 0.5f;
-            float spokeY = wheel + spokeHeight * 0.5f;
+            float hubY = wheel + 0.015f;
             float reach = radius - wheel * 0.5f;
-            float columnBottom = spokeY + spokeHeight * 0.5f;
-            float columnHeight = Mathf.Max(0.06f, seatTop - seat - columnBottom);
             float backBottom = seatTop + 0.12f;
             float backZ = -size.z * 0.5f + backDepth * 0.5f;
-            Mesh box = PrimitiveKit.BoxMesh;
-            Mesh sphere = PrimitiveKit.SphereMesh(6, 4);
-            var parts = new List<CombineInstance>
+            var pieces = new List<SoftBodies.Piece>
             {
-                Piece(box, new Vector3(0f, spokeY, 0f), Quaternion.identity, new Vector3(0.08f, spokeHeight + 0.01f, 0.08f)),
-                Piece(PrimitiveKit.CapsuleMesh(0.025f, columnHeight, 6, 1), new Vector3(0f, columnBottom, 0f), Quaternion.identity, Vector3.one),
-                Piece(box, new Vector3(0f, (seatTop + backBottom) * 0.5f + 0.02f, backZ), Quaternion.identity,
-                    new Vector3(post, backBottom - seatTop + 0.04f, post * 0.6f)),
+                Soft(SoftBodies.Revolve(new[] { new Vector4(0.045f, hubY - 0.022f, 1f, 0f), new Vector4(0.04f, hubY + 0.018f, 0.6f, 0.8f) }, 2, false, true), Matrix4x4.identity),
+                Soft(SoftBodies.Revolve(new[] { new Vector4(0.025f, hubY, 1f, 0f), new Vector4(0.025f, seatTop - seat * 0.5f, 1f, 0f) }, 2, false, false), Matrix4x4.identity),
+                SoftBodies.Bar(SoftBodies.Metal, "Frame", new Vector3(0f, seatTop - seat * 0.5f, backZ), new Vector3(0f, backBottom + 0.08f, backZ), Vector3.right,
+                    new Vector2(0.025f, 0.014f), new Vector2(0.025f, 0.014f), 0.5f, 1, 0f, 0, 0f, 0, false, false),
             };
+            Mesh ball = PrimitiveKit.SphereMesh(4, 4);
             for (int i = 0; i < OfficeChairSpokes; i++)
             {
-                float yaw = 180f + i * 360f / OfficeChairSpokes;
-                Vector3 direction = YawMath.Forward(yaw);
-                parts.Add(Piece(box, direction * (reach * 0.5f) + Vector3.up * spokeY, Quaternion.Euler(0f, yaw, 0f), new Vector3(spokeWidth, spokeHeight, reach)));
-                parts.Add(Piece(sphere, direction * reach + Vector3.up * (wheel * 0.5f), Quaternion.identity, Vector3.one * wheel));
+                Vector3 direction = YawMath.Forward(180f + i * 360f / OfficeChairSpokes);
+                Vector3 caster = direction * reach + Vector3.up * (wheel * 0.5f);
+                // From inside the hub down into the caster, whose ball hides the tip.
+                pieces.Add(SoftBodies.Bar(SoftBodies.Metal, "Frame", direction * 0.02f + Vector3.up * hubY, caster - direction * 0.005f, Vector3.up,
+                    new Vector2(0.014f, 0.02f), new Vector2(0.009f, 0.013f), 0.5f, 1, 0f, 0, 0f, 0, false, false));
+                pieces.Add(Soft(ball, Matrix4x4.TRS(caster, Quaternion.identity, Vector3.one * wheel)));
             }
-            var mesh = new Mesh { name = "OfficeChairFrame" };
-            mesh.CombineMeshes(parts.ToArray(), true, true);
-            mesh.RecalculateBounds();
-            mesh.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            Mesh mesh = SoftBodies.Assemble(pieces, new[] { "Frame" }, true, Matrix4x4.identity, "OfficeChairFrame");
             FrameCache[key] = mesh;
             return mesh;
         }
 
-        private static CombineInstance Piece(Mesh mesh, Vector3 position, Quaternion rotation, Vector3 scale)
+        private static SoftBodies.Piece Soft(Mesh mesh, Matrix4x4 matrix)
         {
-            return new CombineInstance { mesh = mesh, transform = Matrix4x4.TRS(position, rotation, scale) };
+            return new SoftBodies.Piece { Source = SoftBodies.Metal, Part = "Frame", Mesh = mesh, Matrix = matrix };
         }
 
         public static void Build(PropDef prop, Transform parent, int layer)
@@ -380,14 +376,14 @@ namespace OutOfSight
         /// M4 armchair, the player body and the "armchair" prop (docs/CONTRACT_M4.md 2.2): a base up to the seat, a
         /// backrest on -z up to the full height, two arms, a cushion. Colliders (a prop) on the base, the backrest and
         /// the arms: a solid low block with a tall back, cover for a stool (top at 0.52 m) behind it or beside it.
-        /// 5 boxes, 60 triangles.
+        /// Soft movers (2026-11-20): the visual is the rounded lounge chair (SoftBodies.Armchair: soft upholstered blocks,
+        /// rolled arms and back, a cushion on the seat), 5 renderers, 372 triangles; the colliders stay these boxes, as
+        /// collider-only objects (exactly as under a model, M9's counter does the same), the visual parts next to them
+        /// named with "Shape" (the cushion, which has no collider, keeps its name). A body (no collider) names its parts
+        /// as before.
         /// </summary>
         private static void Armchair(Transform p, Vector3 s, Color main, Color accent, int layer, bool col, bool visual)
         {
-            Material body = Mat(main, 0.15f, visual);
-            Material cushion = Mat(accent, 0.15f, visual);
-            Surface bodySurface = MainSurface(main, Surface.Upholstery);
-            Surface cushionSurface = MainSurface(accent, Surface.Upholstery);
             float seatH = s.y * ArmchairSeat;
             float armH = s.y * ArmchairArm;
             float armW = s.x * ArmchairArmWidth;
@@ -395,17 +391,32 @@ namespace OutOfSight
             float armDepth = s.z - backD;
             // The arms and the cushion run from the front of the backrest to the front edge: centred at +backD / 2.
             float frontZ = backD * 0.5f;
-            PrimitiveKit.Box(p, "Base", new Vector3(0f, seatH * 0.5f, 0f), new Vector3(s.x, seatH, s.z), body, layer, col, visual, bodySurface);
-            PrimitiveKit.Box(p, "Backrest", new Vector3(0f, seatH + (s.y - seatH) * 0.5f, -s.z * 0.5f + backD * 0.5f),
-                new Vector3(s.x, s.y - seatH, backD), body, layer, col, visual, bodySurface);
-            PrimitiveKit.Box(p, "ArmL", new Vector3(-s.x * 0.5f + armW * 0.5f, seatH + (armH - seatH) * 0.5f, frontZ),
-                new Vector3(armW, armH - seatH, armDepth), body, layer, col, visual, bodySurface);
-            PrimitiveKit.Box(p, "ArmR", new Vector3(s.x * 0.5f - armW * 0.5f, seatH + (armH - seatH) * 0.5f, frontZ),
-                new Vector3(armW, armH - seatH, armDepth), body, layer, col, visual, bodySurface);
-            float cushionH = Mathf.Min(0.1f, armH - seatH - 0.02f);
-            PrimitiveKit.Box(p, "Cushion", new Vector3(0f, seatH + cushionH * 0.5f, frontZ),
-                new Vector3(s.x - 2f * armW - 0.02f, cushionH, armDepth - 0.04f), cushion, layer, false, visual, cushionSurface);
+            if (col)
+            {
+                PrimitiveKit.Box(p, "Base", new Vector3(0f, seatH * 0.5f, 0f), new Vector3(s.x, seatH, s.z), null, layer, true, false);
+                PrimitiveKit.Box(p, "Backrest", new Vector3(0f, seatH + (s.y - seatH) * 0.5f, -s.z * 0.5f + backD * 0.5f),
+                    new Vector3(s.x, s.y - seatH, backD), null, layer, true, false);
+                PrimitiveKit.Box(p, "ArmL", new Vector3(-s.x * 0.5f + armW * 0.5f, seatH + (armH - seatH) * 0.5f, frontZ),
+                    new Vector3(armW, armH - seatH, armDepth), null, layer, true, false);
+                PrimitiveKit.Box(p, "ArmR", new Vector3(s.x * 0.5f - armW * 0.5f, seatH + (armH - seatH) * 0.5f, frontZ),
+                    new Vector3(armW, armH - seatH, armDepth), null, layer, true, false);
+            }
+            if (!visual)
+            {
+                return;
+            }
+            Material body = Mat(main, 0.15f, true);
+            Surface bodySurface = MainSurface(main, Surface.Upholstery);
+            List<SoftBodies.Piece> pieces = SoftBodies.Armchair(s, false);
+            string suffix = col ? "Shape" : string.Empty;
+            foreach (string part in ArmchairParts)
+            {
+                SoftBodies.Build(p, part + suffix, pieces, part, SoftBodies.Pivot(pieces, part), body, layer, bodySurface);
+            }
+            SoftBodies.Build(p, pieces, "Cushion", Mat(accent, 0.15f, true), layer, MainSurface(accent, Surface.Upholstery));
         }
+
+        private static readonly string[] ArmchairParts = { "Base", "Backrest", "ArmL", "ArmR" };
 
         /// <summary>
         /// A full occluder (PRD 6.3): one collider over the whole box, open shelves and books for the look. M5 wave 5B: with
@@ -523,7 +534,7 @@ namespace OutOfSight
 
         // ----- M5 wave 5B: the rocking chair (docs/CONTRACT_M5.md 5) -----
 
-        /// <summary>The boxes of each curved runner of the procedural rocking chair.</summary>
+        /// <summary>The segments of each curved runner of the procedural rocking chair (an even number: a ring at the middle, where it touches the floor).</summary>
         public const int RockerSegments = 4;
 
         /// <summary>How far the runners' ends rise above their middle (metres): the curve the chair rocks on.</summary>
@@ -531,10 +542,13 @@ namespace OutOfSight
 
         /// <summary>
         /// The procedural rocking chair (CONTRACT_M5 5, used when no model exists): two curved runners along z (each
-        /// <see cref="RockerSegments"/> boxes on a parabola, lowest and touching the floor at the middle, <see cref="RockerRise"/>
-        /// higher at the ends), four legs from the runners to the seat, the seat, two back posts leaning back from the rear legs
-        /// and the back panel between them on -z, two arms on their front posts. Facing +z with its back on -z, within its box,
-        /// in one colour of wood and one mesh: one renderer (one draw call), 20 boxes, 240 triangles (PRD 7.4: 400).
+        /// <see cref="RockerSegments"/> segments on a parabola, lowest and touching the floor at the middle, <see cref="RockerRise"/>
+        /// higher at the ends), the seat, two back posts leaning back from the runners up past the seat to the full height and
+        /// the back panel between them on -z, two front legs from the runners up to the arms, two arms from the posts to the
+        /// front. Facing +z with its back on -z, within its box, in one colour of wood and one mesh: one renderer (one draw call).
+        /// Soft movers (2026-11-20): runners of round section bending along the curve with flat ends, a seat with rounded
+        /// corners and a rolled top edge, posts, legs and arms of round section, a back panel with rounded corners: 374
+        /// triangles (PRD 7.4: 400).
         /// </summary>
         public static void RockingChair(Transform parent, Vector3 size, Color color, int layer)
         {
@@ -542,78 +556,86 @@ namespace OutOfSight
                 MainMaterial(color, 0.35f), layer, MainSurface(color, Surface.Wood));
         }
 
-        /// <summary>The boxes of <see cref="RockingChair"/> as one mesh in the chair's frame (UVs in metres; cached by its parts).</summary>
+        /// <summary>The parts of <see cref="RockingChair"/> as one mesh in the chair's frame (UVs in metres; cached by its parts).</summary>
         public static Mesh RockingChairMesh(Vector3 size)
         {
             float w = size.x;
             float h = size.y;
             float d = size.z;
             const float runner = 0.04f;
-            const float leg = 0.04f;
             const float seat = 0.05f;
             const float post = 0.04f;
             const float lean = 12f;
-            var parts = new List<PrimitiveKit.CombinePart>();
-            void Add(Vector3 center, Quaternion rotation, Vector3 box)
-            {
-                parts.Add(new PrimitiveKit.CombinePart { Mesh = PrimitiveKit.BoxMeshSized(box), Matrix = Matrix4x4.TRS(center, rotation, box) });
-            }
-            // The runners: their centre line at y = runner / 2 + rise * (2 z / d)^2, ending a centimetre inside the box.
-            float half = d * 0.5f - 0.01f;
+            const string part = "RockingChair";
+            var pieces = new List<SoftBodies.Piece>();
+            // The runners: their centre line at y = runner / 2 + rise * (2 z / d)^2, ending just inside the box.
+            float half = d * 0.5f - 0.012f;
             float RunnerY(float z) => runner * 0.5f + RockerRise * (2f * z / d) * (2f * z / d);
             float sideX = w * 0.5f - runner * 0.5f;
+            var round = new Vector2(runner * 0.5f, runner * 0.5f);
             foreach (float side in new[] { -1f, 1f })
             {
-                for (int i = 0; i < RockerSegments; i++)
+                var path = new Vector3[RockerSegments + 1];
+                for (int i = 0; i <= RockerSegments; i++)
                 {
-                    float z0 = -half + 2f * half * i / RockerSegments;
-                    float z1 = -half + 2f * half * (i + 1) / RockerSegments;
-                    var a = new Vector3(side * sideX, RunnerY(z0), z0);
-                    var b = new Vector3(side * sideX, RunnerY(z1), z1);
-                    Vector3 along = b - a;
-                    // Each box overlaps its neighbour by a centimetre, so the bend shows no gap.
-                    Add((a + b) * 0.5f, Quaternion.LookRotation(along.normalized, Vector3.up), new Vector3(runner, runner, along.magnitude + 0.01f));
+                    float z = -half + 2f * half * i / RockerSegments;
+                    path[i] = new Vector3(side * sideX, RunnerY(z), z);
                 }
+                pieces.Add(new SoftBodies.Piece { Source = SoftBodies.Wood, Part = part, Mesh = SoftBodies.Tube(path, Vector3.right, round, 0.5f, 1, true, true),
+                    Matrix = Matrix4x4.identity });
             }
-            // The seat, and the four legs from the runners' tops up to it.
+            // The seat.
             float seatTop = h * 0.45f;
-            Add(new Vector3(0f, seatTop - seat * 0.5f, d * 0.05f), Quaternion.identity, new Vector3(w, seat, d * 0.6f));
+            pieces.Add(new SoftBodies.Piece { Source = SoftBodies.Wood, Part = part,
+                Mesh = RoundedMesh.Slab(new Vector3(w, seat, d * 0.6f), 0.06f, 0f, 0, 0.02f, 1, 2, false, true),
+                Matrix = Matrix4x4.Translate(new Vector3(0f, seatTop - seat, d * 0.05f)) });
             float legZ = d * 0.22f;
-            float legBottom = RunnerY(legZ) + runner * 0.5f;
             float legTop = seatTop - seat;
+            float armY = seatTop + 0.2f;
+            var stick = new Vector2(post * 0.5f, post * 0.5f);
+            // The front legs, from inside the runners up into the arms.
             foreach (float side in new[] { -1f, 1f })
             {
-                foreach (float z in new[] { -legZ, legZ })
-                {
-                    Add(new Vector3(side * sideX, (legBottom + legTop) * 0.5f, z), Quaternion.identity, new Vector3(leg, legTop - legBottom, leg));
-                }
+                var foot = new Vector3(side * sideX, RunnerY(legZ) + runner * 0.5f - 0.012f, legZ);
+                pieces.Add(SoftBodies.Bar(SoftBodies.Wood, part, foot, new Vector3(side * sideX, armY, legZ), Vector3.right, stick, stick, 0.5f, 1,
+                    0f, 0, 0f, 0, false, false));
             }
-            // The back posts lean back by `lean` degrees from the rear legs up to the full height; the panel spans their upper part.
+            // The back posts lean back by `lean` degrees through the seat's back corners (legTop at -legZ), from inside the
+            // runners up to the full height; the panel spans their upper part.
             Quaternion tilt = Quaternion.Euler(-lean, 0f, 0f);
             Vector3 up = tilt * Vector3.up;
             float postLength = (h - 0.01f - legTop) / up.y;
+            float bottom = legTop;
+            for (int i = 0; i < 2; i++)
+            {
+                float z = -legZ + (legTop - bottom) * Mathf.Tan(lean * Mathf.Deg2Rad);
+                bottom = RunnerY(z) + runner * 0.5f - 0.012f;
+            }
+            float below = (legTop - bottom) / up.y;
             foreach (float side in new[] { -1f, 1f })
             {
-                var start = new Vector3(side * sideX, legTop, -legZ);
-                Add(start + up * (postLength * 0.5f), tilt, new Vector3(post, postLength, post));
+                var through = new Vector3(side * sideX, legTop, -legZ);
+                pieces.Add(SoftBodies.Bar(SoftBodies.Wood, part, through - up * below, through + up * postLength, Vector3.right, stick, stick, 0.5f, 1,
+                    0f, 0, 0f, 0, false, true));
             }
             float panelFrom = (seatTop + 0.15f - legTop) / up.y;
             float panelTo = postLength - 0.03f;
             Vector3 panelCenter = new Vector3(0f, legTop, -legZ) + up * ((panelFrom + panelTo) * 0.5f);
-            Add(panelCenter, tilt, new Vector3(w - 2f * post, panelTo - panelFrom, 0.025f));
-            // The arms, from the back posts to the front, each on its front post.
-            float armY = seatTop + 0.2f;
+            const float panel = 0.025f;
+            // Built lying (its rounded corners in plan) and stood up along the posts, its sides just inside them.
+            pieces.Add(new SoftBodies.Piece { Source = SoftBodies.Wood, Part = part,
+                Mesh = RoundedMesh.Slab(new Vector3(w - 2f * post + 0.01f, panel, panelTo - panelFrom), 0.04f, 0f, 0, 0f, 0, 2, true, true),
+                Matrix = Matrix4x4.TRS(panelCenter + tilt * new Vector3(0f, 0f, -panel * 0.5f), tilt * Quaternion.Euler(90f, 0f, 0f), Vector3.one) });
+            // The arms, from inside the back posts to the front, over the front legs.
             float armBack = -legZ - (armY - legTop) / up.y * Mathf.Sin(lean * Mathf.Deg2Rad);
             float armFront = d * 0.3f;
-            float armX = w * 0.5f - 0.025f;
+            var arm = new Vector2(0.015f, post * 0.5f);
             foreach (float side in new[] { -1f, 1f })
             {
-                Add(new Vector3(side * armX, armY, (armBack + armFront) * 0.5f), Quaternion.identity, new Vector3(0.05f, 0.03f, armFront - armBack));
-                float supportTop = armY - 0.015f;
-                Add(new Vector3(side * armX, (seatTop + supportTop) * 0.5f, armFront - 0.04f), Quaternion.identity,
-                    new Vector3(0.03f, supportTop - seatTop, 0.03f));
+                pieces.Add(SoftBodies.Bar(SoftBodies.Wood, part, new Vector3(side * sideX, armY, armBack), new Vector3(side * sideX, armY, armFront), Vector3.up,
+                    arm, arm, 0.6f, 1, 0f, 0, 0f, 0, false, true));
             }
-            return PrimitiveKit.CombinedMesh(parts);
+            return SoftBodies.Assemble(pieces, new[] { part }, true, Matrix4x4.identity, "RockingChair");
         }
 
         /// <summary>

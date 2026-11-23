@@ -101,8 +101,8 @@ namespace OutOfSight.Core
             L("Kenney (kenney.nl): \"Furniture Kit\"", "Kenney (kenney.nl) : \"Furniture Kit\""),
             L("Quaternius: \"Animated Men Pack\", \"Animated Women Pack\", \"Animated Animal Pack\"",
                 "Quaternius : \"Animated Men Pack\", \"Animated Women Pack\", \"Animated Animal Pack\""),
-            D("The inhabitants are rounded versions of the Quaternius models.",
-                "Les habitants sont des versions arrondies des modèles de Quaternius."),
+            D("The inhabitants are rounded versions of the Quaternius models; the house dog is built on their Husky.",
+                "Les habitants sont des versions arrondies des modèles de Quaternius ; le chien de la maison est bâti sur leur Husky."),
 
             // docs/LICENSES.md, section Fonts: SIL OFL 1.1, its licence text ships next to the font.
             H("Fonts", "Polices"),

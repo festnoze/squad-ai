@@ -97,10 +97,27 @@ namespace OutOfSight
                 Hide();
                 return;
             }
-            // M7 design (CONTRACT_M7 4.1): under the difficulty the level was built and played with.
-            RecordResult result = SaveStore.RecordWin(game.Def.Id, game.Elapsed, game.Difficulty.Id);
+            // M7 design (CONTRACT_M7 4.1): under the difficulty the level was built and played with. Levels v2 (LEVELS_V2.md
+            // 7): the record is kept under the level's RecordId ("level6~1" once redesigned), the win under its bare id.
+            // Stars (idea 5, docs/next/progress/STARS.md): the win's stars against the audit's exit for this difficulty, kept in
+            // the save in memory first (only up), so the RecordWin write below carries them in the same file write.
+            LastStars = Stars.CountFor(game.Def, game.Elapsed, game.Difficulty.Id);
+            int before = SaveStore.Current.StarsOf(game.Def.RecordId, game.Difficulty.Id);
+            int now = SaveStore.Current.RecordStars(game.Def.RecordId, LastStars, game.Difficulty.Id);
+            LastStarsNew = now > before;
+            RecordResult result = SaveStore.RecordWin(game.Def.Id, game.Def.RecordId, game.Elapsed, game.Difficulty.Id);
             Show(result, game.IsLastLevel);
+            if (hud != null)
+            {
+                hud.ShowWinStars(LastStars, LastStarsNew, game.IsLastLevel);
+            }
         }
+
+        /// <summary>Stars: the stars of the last recorded win (1 to 3), 0 before any.</summary>
+        public int LastStars { get; private set; }
+
+        /// <summary>Stars: the last recorded win raised the level's saved star count at its difficulty.</summary>
+        public bool LastStarsNew { get; private set; }
 
         /// <summary>Shows the line for <paramref name="result"/>, placed for the win panel or the end screen.</summary>
         public void Show(RecordResult result, bool endScreen)

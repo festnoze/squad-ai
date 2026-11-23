@@ -9,7 +9,7 @@ namespace OutOfSight
     /// the top of the lamp body: PRD 7.4 and the M3 look keep exactly one shadowed light, the sun.
     ///
     /// Switched off, the light goes out and the lamp's room is dimmed by the lamp itself (rooms are visual
-    /// only, and Main is not involved): every point or spot light standing in that room drops to
+    /// only, and Main is not involved): every point or spot light standing in that room (but a lit zone's, LitZoneView) drops to
     /// <see cref="Tuning.LampOffLight"/> of its intensity, and the ambient light drops to
     /// <see cref="AmbientOffFactor"/>. The ambient is global in URP, so it is the nearest thing to "the room
     /// ambient"; it is restored exactly when the lamp is switched on again or destroyed (a restart, a new level).
@@ -25,6 +25,19 @@ namespace OutOfSight
         // A floor lamp lights its corner of a room, not the whole house.
         private const float LightRange = 4f;
         private const float LightIntensity = 1.6f;
+
+        /// <summary>
+        /// NIGHT pass (2026-11-22): under the night preset (<see cref="Main.Night"/>) the lamp is the brightest thing in its
+        /// room: a stronger, wider pool, so switching it off reads at once. Visual only: <see cref="RangeFactor"/>, the rule,
+        /// is the same by day and by night.
+        /// </summary>
+        public const float NightIntensity = 2.7f;
+
+        /// <summary>The night preset's light range (metres).</summary>
+        public const float NightRange = 5.5f;
+
+        // The preset the light's strength was set for last (LateUpdate follows a level rebuilt under another preset).
+        private bool builtNight;
         private static readonly Color LightColor = new Color(1f, 0.82f, 0.56f);
         // The share of the ambient light left while the lamp is off: dark enough to read, never black.
         private const float AmbientOffFactor = 0.6f;
@@ -72,8 +85,7 @@ namespace OutOfSight
             }
             Light.type = LightType.Point;
             Light.shadows = LightShadows.None;
-            Light.range = LightRange;
-            Light.intensity = LightIntensity;
+            SetStrength(Main.Night);
             Light.color = LightColor;
             Light.renderMode = LightRenderMode.ForcePixel;
             float bulbHeight = Mathf.Max(0.1f, height - BulbBelowTop);
@@ -134,8 +146,21 @@ namespace OutOfSight
             }
         }
 
+        /// <summary>The light's day or night strength (never touches On: the room dimming never reads the lamp's own light).</summary>
+        private void SetStrength(bool night)
+        {
+            builtNight = night;
+            Light.range = night ? NightRange : LightRange;
+            Light.intensity = night ? NightIntensity : LightIntensity; // MUTATION:NIGHT_LAMP
+        }
+
         private void LateUpdate()
         {
+            // The preset can change after Init (the level build order): follow it (a bool compare, no allocation).
+            if (Light != null && builtNight != Main.Night)
+            {
+                SetStrength(Main.Night);
+            }
             // The darkness follows the lamp: carried into another room while off, it dims that room instead.
             if (Dimming && RoomOf(transform.position) != dimmedRoom)
             {
@@ -196,6 +221,9 @@ namespace OutOfSight
                 {
                     continue;
                 }
+                // Levels v2 (C4): a lit zone's ceiling light is the rule made visible (the dark does not hide the lamp
+                // there), so the lamp never dims it.
+                if (LitZoneView.IsZoneLight(l)) continue; // MUTATION:LIT_SKIP
                 Vector3 p = l.transform.position;
                 if (dimmedRoom.Contains(p))
                 {

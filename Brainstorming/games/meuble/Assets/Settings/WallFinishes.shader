@@ -48,6 +48,9 @@ Shader "OutOfSight/Wall Finishes"
             #include_with_pragmas "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Fog.hlsl"
             #pragma multi_compile_instancing
             #pragma instancing_options renderinglayer
+            // Floor dust (FloorDust.cs, docs/m9/FLOORS_WALLS.md section 10): a global keyword, on only on the Haut tier. A
+            // multi_compile (never stripped by material use), fragment only: Bas and Moyen draw the variant without it.
+            #pragma multi_compile_fragment _ OOS_FLOOR_DUST
 
             #include "WallFinishesInput.hlsl"
             #include "WallFinishesForward.hlsl"

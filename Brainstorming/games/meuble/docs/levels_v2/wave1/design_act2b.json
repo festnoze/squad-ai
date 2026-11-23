@@ -1,0 +1,244 @@
+{
+  "group": "act2b",
+  "author": "levels_v2 wave 1 designer, group act2b (slots 12 to 16, plus the level16 decision)",
+  "levels": [
+    {
+      "id": "level12",
+      "slot": "12 (act 2)",
+      "status": "fix",
+      "title_en": "The Dog",
+      "title_fr": "Le chien",
+      "body": "stool (unchanged)",
+      "main_threat": "Rex, awake for the whole level, sees low; Paul (dreamer) sees over the sofas. Two heights of sight, two clocks.",
+      "plan_shape": "5-room flat, unchanged walls: chambre -> couloir -> salon strip behind a broken row of sofas -> entree. The salon crossing is the level.",
+      "exit_direction": "east (unchanged: spawn (3.75, 6.25), exit (11.75, 6.25))",
+      "look": "family flat, warm: chambre wallpaper + lightoak, couloir limewash + lightoak, salon grasscloth + herringbone, cuisine tealtile floor + limewash walls (no subway tile), entree verde + travertine",
+      "twist": "the sofas hide you from the dog but not from Paul: you hop from sofa shadow to sofa shadow on the dog's head turns, and hide behind the middle sofa and a plant while Paul checks the room",
+      "lesson": "low cover against a low eye, and the difference between the dog's sight (under the sofa backs) and a human's (over them). Lesson field stays 'pet'.",
+      "changes": [
+        "props CanapeOuest: x 6.225 -> 5.25, sizeX 1.85 -> 1.3 (footprint x 4.6..5.9, z 6.2..7.0), everything else unchanged (yaw 0, sizeY 0.6, sizeZ 0.8, model kenney.sofa)",
+        "props CanapeEst: rename to CanapeMilieu, x 8.075 -> 7.3, sizeX 1.85 -> 1.2 (footprint x 6.7..7.9). Result: gap 1 = x 5.9..6.7 (0.8 m), and the strip is open from x 7.9 to the east wall, so the run to the entree door is exposed",
+        "props add PlanteSalon: kind plant, x 7.75, z 5.9, yaw 0, sizeX 0.5, sizeY 1.3, sizeZ 0.5, occluder true, color #3F8F4F, accentColor #8C5A36 (same colours as Plante: no new material). It hides the rest spot (7.25, 7.25) from Paul's station 2 (checked: the rays from (9.25, 1.6 m, 2.5) to the stool's samples at (7.1..7.4, 7.1..7.4) cross x 7.76..7.88 at z 5.9, under 0.85 m)",
+        "Rex (dog): replace both stations by four, all at x 7.25, z 3.5 (1.0 m south of the old spot), no sleep: D0 facing 0 dwell 10.3; D1 facing 80 dwell 2.5; D0b facing 0 dwell 2.0; D2 facing 280 dwell 5.0. startStation 0. Cone check at Normal (half 70): facing 0 sees gap 1 (dir -17 deg), the strip east of the middle sofa (5..28 deg) and the descent to the door (42 deg); facing 80 frees gap 1 only (gap 1 is at 336..356 deg, 14 deg outside); facing 280 frees the east run only (5 deg and up, 15 deg outside; 10 deg at Difficile)",
+        "Paul: startStation 2 -> 1",
+        "Paul station 1 (2.75, 8.25): dwell 5.0 -> 2.0 (he leaves the bedroom ahead of the player and walks couloir -> salon -> station 2 with his back to the player)",
+        "Paul station 2 (9.25, 2.5): facing 90 -> 0 (north over the salon, the docs/m7/design.md lever), dwell 12.0 -> 4.0, glances [] (remove the 30 deg glance)",
+        "Paul station 3 (Canape sit, 7.25, 1.5, facing 180): dwell 7.0 -> 8.0, keep its glance",
+        "Intended schedule (estimates from walk speeds and turn costs, the audit decides): spawn wait about 3.5 s while Paul leaves the bedroom; enter the salon behind Paul at about 8.5 s and rest behind CanapeOuest (about 2.5 s); cross gap 1 in D1 (about 11.3 to 13.8 s, before Paul turns north at station 2); rest behind CanapeMilieu + PlanteSalon while Paul looks north (about 4.5 to 5 s); run the strip, the descent at x 9.25 and the entree door in D2 while Paul walks to and sits on the Canape; exit about 24 to 27 s",
+        "Phase knobs if the audit finds no schedule or a wait above 6 s, in this order: D0 dwell (10.3: moves the first D1), D0b dwell (2.0: moves the first D2), Paul station 2 dwell (4.0), Paul Canape dwell (8.0). Rule: D1 must open 1 to 2 s after the player reaches CanapeOuest and close before Paul's station 2 turn; D2 must open within 1 s after Paul's telegraph away from station 2",
+        "rooms look (finish fields only): chambre wallFinish quatrefoil -> wallpaper, add floorFinish lightoak; couloir add wallFinish limewash, floorFinish lightoak; salon wallFinish sageribbed -> grasscloth (keep herringbone); cuisine floorFinish marble -> tealtile, wallFinish subwaytile -> limewash; entree floorFinish marble -> verde (keep travertine)",
+        "hint (Strings.cs level12.hint): see hint_en / hint_fr; this also fixes the backwards English sentence (IDEAS bug 15)",
+        "after the edit: audit level12 at Normal and Difficile, then -writeRoutes"
+      ],
+      "code_needs": [
+        "Strings.cs: new level12.hint EN/FR (the text is in this entry)",
+        "ProbeTestsM5Levels.Step45b_Level12Routes: PointsTheDogCouldSeeWithoutASofa checks every awake station's cone at every route point, ignoring time. With a dog that turns its head, the route points in gap 1 and on the east run are inside the D0 cone (crossed only while the dog looks away) and the step will fail. Make it time-aware (only the station active at each route point's time, including the 0.6 s telegraph), or replace it by the audit's pet check (which already binds)",
+        "ProbeTestsM5Levels.Step45g_Level12UncoveredCrossingBarksAndLoses: redraw Level12UncoveredLine through gap 1 / the open floor south of the sofas for the new layout; its premise 'the dog starts awake' still holds; 'firstNap = dogStart.Dwell' becomes 'first head turn' (D0 dwell 10.3), the step's bark-before-it assertion stays meaningful",
+        "Optional: R4 start on first input (QW4) so the 3.5 s spawn wait is not spent under the intro card"
+      ],
+      "targets": "Normal strict exit 24 to 32 s (now 14.3); Difficile within +6 s of Normal; at least 3 pauses (spawn, behind CanapeOuest, behind CanapeMilieu), none above 6 s; waiting share 30 to 45 % (the ideal 25 to 40 % may be exceeded by up to 5 points on this small plan); pet check binds (no schedule with the dog's eye at 1.6 m); every salon route point lies within 6 m of the dog and is either behind a sofa from it or crossed while its cone points away; Paul's station 2 is within 8 m and 45 deg of the strip; route length stays about 14.5 m (no longer walk); margin 6 to 8 samples; rush counter-route (designer route with every wait removed) loses by a bark or a catch; no dead room (cuisine keeps Paul's station 0)",
+      "risks": [
+        "Two coupled clocks (Paul and Rex): if the phases slip by about 2 s, the earliest schedule may jump a whole Paul cycle (about 68 s) or need a wait above 8 s. The phase knobs are listed; expect 2 to 4 audit runs",
+        "Disagreement with the review: its lever (put the dog's awake station on the salon crossing, the sofas the only way across) is already true in the data: the route runs behind the sofas, the pet check binds, and Step45b proves a sofa between the dog and every watched route point. What is missing is pauses (0.3 s of waiting), not cover; this fix adds the waiting through the dog's head turns and Paul",
+        "The dog no longer sleeps in 12 (the review's 'a dog that is awake'); level16's false hint 'the dog never sleeps' becomes true here, and 17 keeps a sleeping dog",
+        "Paul walks through gap 1 on his way in and out of the salon (NavMesh); check the station walks stay valid with a 0.8 m gap (the human agent radius must fit), otherwise widen gap 1 to 0.9 m by moving CanapeMilieu to x 7.35",
+        "Waiting share may land at about 45 % because the plan is short; accept up to 45 % rather than lengthen the walk"
+      ],
+      "hint_en": "Rex sees low: the sofas hide you from him. Paul sees over them.",
+      "hint_fr": "Rex voit bas : les canapés te cachent de lui. Paul, lui, voit par-dessus."
+    },
+    {
+      "id": "level13",
+      "slot": "13 (act 2)",
+      "status": "keep",
+      "title_en": "Wheels and a Vase",
+      "title_fr": "Roulettes et vase",
+      "body": "office chair + vase (unchanged)",
+      "main_threat": "two office workers with different habits: Max (hurried, pingpong plateau <-> front desk) guards the direct door to the accueil; Claire (watchful loop) guards the cafeteria",
+      "plan_shape": "open-plan office with two loops, unchanged walls and doors: direction -> plateau -> accueil (direct) or -> cafeteria -> accueil (detour), plus the couloir branch into the cafeteria",
+      "exit_direction": "south-east (unchanged: spawn (2.25, 8.25), exit (13.25, 1.25))",
+      "look": "office: no parquet. plateau floorFinish herringbone -> tile, couloir herringbone -> tile; direction stays carpet (soft) + pinstripe; cafeteria marble + subwaytile; accueil marble + travertine",
+      "twist": "the exit is right behind the receptionist's back: when Max stands at the front desk watching the direct door, you take the cafeteria detour and roll past behind him",
+      "lesson": "a real route choice decided by two watchers' timings (the cafeteria branch now has a reason); decoys stay Max's only (office-chair decoys can never fool a watchful watcher)",
+      "changes": [
+        "Max station 1: (12.75, 5.25) facing 90 dwell 2.0 -> (11.75, 1.75) facing 270 dwell 3.5 (front desk, looking west at the plateau->accueil door (9.95, 1.25)). Checks: the Accueil counter spans x 10.45..12.05, z 0.05..0.65 (clear); the direct door is at 255 deg from him (inside 270 +-50); the cafeteria->accueil door (12.25, 2.95) is at 23 deg and the exit (13.25, 1.25) at 108 deg, both outside his cone; the detour cells (12.25, 2.95), (13.25, 2.25), (13.25, 1.25) are 1.3 to 1.6 m from him, outside his roll hearing (1.2 m x 0.5 + 0.25 margin = 0.85 m)",
+        "Max station 0 (1.25, 3.0): dwell 9.0 -> 8.0 (hurried habit; mean dwell 5.75 instead of 5.5, the warning stays a warning)",
+        "Claire station 1 (11.25, 6.25): facing 0 -> 180 (looks over the cafeteria's south half, the plateau door (9.95, 4.75) at 221 deg and the accueil door (12.25, 2.95) at 163 deg), dwell 6.0 -> 5.0, keep both glances (-40 and +40)",
+        "decoys: keep the four office-chair decoys at x 2.84 / 5.84 exactly. Evidence: an office chair cannot get its centre closer than about 0.555 m to a decoy's centre (collider half-width 0.275 + radius 0.30 - 0.02 skin); on-grid decoys (x 2.75) would leave no audit cell within the audit's 0.6 m decoy radius, while x 2.84 leaves cell (2.25, 2.25) at 0.59 m. The audit's warning 'explains nothing for the 0.5 m class' is a geometry fact (0.555 > 0.50), not a placement bug",
+        "rooms look: plateau floorFinish herringbone -> tile; couloir floorFinish herringbone -> tile (both stay hard)",
+        "hint (Strings.cs level13.hint): see hint_en / hint_fr (removes the keyboard word 'Shift')",
+        "after the edit: audit level13 at Normal and Difficile, then -writeRoutes. Prove both branches with two variant files audited by absolute path (outside Assets): level13_noDirect adds a blocking prop {name BlocDirect, kind cabinet, x 9.7, z 1.25, yaw 90, sizeX 1.0, sizeY 1.0, sizeZ 0.4, occluder true} in front of door (9.95, 1.25); level13_noCafe adds two blocking props at (9.7, 4.75) and (9.7, 6.75) with the same shape (couloir side: x 9.7 is inside the plateau / couloir rooms). Both variants must still have a schedule"
+      ],
+      "code_needs": [
+        "Strings.cs: new level13.hint EN/FR",
+        "R2 rush counter-routes for 13 (none exist today; the owner cleared the old version in 8.4 s against a 26.2 s audit): a PlayMode step with (a) the designer route with every wait removed, (b) the straight shortest path at full speed, (c) drop the vase at the spawn then full speed. All three must lose at Normal",
+        "Optional audit option 'barred region / must not use door' (R6, review rule 1 'two viable routes') so the two-branch proof does not need hand-made variant files",
+        "R13 record versioning: the owner's old 8.4 s record must not stand on the retuned level"
+      ],
+      "targets": "Normal strict exit 30 to 40 s (now 25.4); Difficile 38 to 50 s (now 36.6); at least 4 pauses at Normal, none above 6 s; waiting share 25 to 40 %; both branches viable (variant audits above); decoys explain at least 8 samples (as today); load check binds; margin 6 to 7 samples; all three R2 counter-routes lose",
+      "risks": [
+        "13 is the review's template and its Difficile route was hard won (glide-cell fix of 2026-11-19). Moving Max's far station changes his walk (now through door (9.95, 1.25) instead of (9.95, 4.75)) and can move the Difficile exit a lot; if Difficile exceeds 50 s, first try Max station 1 dwell 3.5 -> 2.5, then Claire station 1 dwell 5 -> 6",
+        "If the earliest schedule always takes the same branch, that is acceptable (the review asks for a reason to exist, and rule 1 asks for viability, not for the solver to use both); the variant audits are the proof",
+        "Claire facing south in the cafeteria may also see the plateau through door (9.95, 4.75) and constrain the plateau crossing near x 8 to 9.5; that is intended but watch the margin",
+        "The audit's habit warning on Max (hurried, mean dwell above 5 s) stays; not a defect"
+      ],
+      "hint_en": "Ease into every start and turn: the vase falls at the slightest jolt. Max watches the front door, not the cafeteria.",
+      "hint_fr": "Démarre et tourne en douceur : le vase tombe à la moindre secousse. Max surveille l'accueil, pas la cafétéria."
+    },
+    {
+      "id": "level14",
+      "slot": "14 (act 2)",
+      "status": "fix",
+      "title_en": "The Mezzanine",
+      "title_fr": "La mezzanine",
+      "body": "armchair (unchanged)",
+      "main_threat": "Mamie (granny) sits on you, then comes back to sit again: a deadline. Lea (tidy wander) watches the bridge through the kitchen doorway and owns the couloir and entree.",
+      "plan_shape": "S-shaped crossing: down the west half, up the south-west ramp, 4.5 m north along the top of a 2 m wide mezzanine, down the north-east ramp, then south through the couloir to the entree",
+      "exit_direction": "south-east (unchanged exit (17.25, 1.25)); the route itself turns south, north, then south",
+      "look": "granny's house: sejour wallFinish arches -> sage, floorFinish lightoak; chambre wallpaper (keep); salle ivorytile + whitetile (keep); cuisine subwaytile -> limewash, marble -> tile; couloir add wallFinish quatrefoil, floorFinish verde; entree limewash -> travertine (keep marble)",
+      "twist": "the mezzanine is the crossing, not a corner; and the be-in-your-spot rule of level 5 returns as a deadline: Granny sits on you at the start and will come back to sit again in about 50 s, so the slow armchair must be across before she does",
+      "lesson": "a long exposed walkway with the slowest wide body, under a deadline set by a sitter's cycle (data-only: the audit forces the player onto the seat at every sit sample, so the second sit is a hard limit)",
+      "changes": [
+        "platforms Mezzanine: sizeX 1.0 -> 2.0 (x 8.0..10.0); z 4.95, sizeZ 6.9, height 0.6 unchanged. Needed: on a 1.0 m top with railings at 8.55 / 9.45 the armchair (radius 0.45) fits no audit column; on 2.0 m it fits columns x 8.75 and 9.25. Its north and south edges stay on walls (no railing), so it still splits the sejour wall to wall",
+        "ramps: replace both. Ramp W: x 7.0, z 2.75, width 1.5, length 2.0, yaw 90, platform Mezzanine (foot x 6.0, head x 8.0 on the platform's west edge, z 2.0..3.5). Ramp E: x 11.0, z 7.25, width 1.5, length 2.0, yaw 270, platform Mezzanine (head x 10.0 on the east edge, foot x 12.0, z 6.5..8.0). Both axes are on audit cell lines of the sejour (minZ 1.5: 2.75 and 7.25), as the validator requires for the armchair",
+        "Lea station 1: (11.75, 7.25) facing 0 dwell 3.0 -> (14.25, 6.75) facing 270 dwell 4.0 (inside the cuisine, looking west through the 1.0 m door (13.45, 6.75) at the ramp E and the north half of the top; the old spot lies on the new ramp E). Lea's other stations unchanged (wander, seed 1234)",
+        "Mamie station 0 (5.25, 6.25): dwell 5.0 -> 3.0",
+        "Mamie station 1 (sit player, seat (5.75, 6.25, yaw 270)): dwell 0.5 -> 2.5 (readable pin; the docs/m7 lever for level 5 used the same value)",
+        "Mamie station 2 (FauteuilMamie, 2.25, 7.0): dwell 6.0 -> 12.0",
+        "Mamie station 3 (bathroom, 3.25, 2.25): dwell 5.0 -> 12.0. Her cycle becomes about 3 + 2.5 + 4.4 + 12 + 6 + 12 + 9.7 = about 50 s, so her second sit on the seat home comes at about 53 s; the audit forces the player onto the seat at that sample, so the exit must come first. Tune stations 2 and 3 so the second sit lands 6 to 10 s after the strict exit",
+        "intended route (about 25 m): spawn (5.75, 6.25) -> south on x 5.75 to z 2.75 (rug, then hard floor) -> east up ramp W -> (8.75, 2.75) -> north along the top to (8.75 or 9.25, 7.25) -> east down ramp E -> (12.25, 7.25) -> south on x 12.25 to z 3.75 -> door (13.45, 3.75) -> (16.75, 3.75) -> door (16.75, 2.95) -> (16.75, 1.25) -> exit",
+        "remove nothing else: Etagere (x 6.5..6.85, z 5.6..8.0), Canape (x 11.25..13.25, z 1.8..2.7), Plante and the rug are clear of both new ramps",
+        "rooms look: see 'look'",
+        "hint (Strings.cs level14.hint): see hint_en / hint_fr",
+        "after the edit: audit level14 at Normal and Difficile, then -writeRoutes"
+      ],
+      "code_needs": [
+        "Strings.cs: new level14.hint EN/FR",
+        "Optional UX: when a sitter starts walking back to a player seat the player has left, show the seat ghost and ring (exists) plus a short HUD line 'Mamie revient s'asseoir' so the deadline is read before the pratfall",
+        "ProbeTestsM5Levels.Step45c_Level14Routes keeps passing by design (first sit by 10 s, sat on, pinned, no pratfall); no change expected. Step45h's start-view check must be rerun (the bookshelf did not move)"
+      ],
+      "targets": "Normal strict exit 40 to 50 s (now 27.0); second sit 6 to 10 s after the exit; at least 4 pauses (sat on at the spawn; south-west ramp foot or top while Lea watches through the doorway; ramp E foot; before the couloir door for Lea's couloir station), none above 6 s; waiting share 25 to 40 %; route cells on the platform top at least 9 (now 2); split check binds; margin 5 to 7 samples; Difficile within +8 s; rush counter-route (no waits) loses; no dead room (cuisine, couloir, entree, chambre, salle all hold Lea's or Mamie's stations)",
+      "risks": [
+        "Disagreement with the review's line-up text 'height as cover': a body on a 0.6 m platform is never hidden from a standing (1.6 m) or seated (1.15 m) human, and is hidden from the dog only when the dog is within about 0.3 to 0.5 m of the platform edge (geometry of the 0.35 m eye). The mezzanine is a path and an exposure, not cover; the twist uses it that way",
+        "The second-sit deadline can make the level unsolvable at Difficile if the route is slow; the knob is Mamie's station 2 and 3 dwells (12 each), not the route",
+        "Lea's wander order is seeded: her doorway watch may come at different moments in the cycle than estimated; if the earliest schedule never meets it, set her seed so the doorway station is visited within the first 30 s, or give it dwell 6",
+        "The platform grows from 6.9 to 13.8 m2 and the west/east halves of the sejour shrink to 3.5 and 3.4 m: the validator's 1.5 m armchair passage rule is met, but check Lea's NavMesh walks still avoid the ramp E foot",
+        "Feedback warns the same platform recurs in 14, 17, 19, 21, 23, 24. Here it is a long walkway (along), in 17 it stays a short bridge (across): two different shapes in act 2"
+      ],
+      "hint_en": "Granny sits on you first, then comes back for more: be across the mezzanine before she does.",
+      "hint_fr": "Mamie s'assoit d'abord sur toi, puis elle revient : traverse la mezzanine avant son retour."
+    },
+    {
+      "id": "level18",
+      "slot": "15 (act 2)",
+      "status": "keep",
+      "title_en": "The Wardrobe",
+      "title_fr": "L'armoire",
+      "body": "stool (unchanged)",
+      "main_threat": "Odile (tidy), a fixed sentinel looking down the corridor, glancing away on a metronome",
+      "plan_shape": "tiny L: bedroom, carpeted corridor, wardrobe halfway, entree north (32 m2)",
+      "exit_direction": "north-east (unchanged: spawn (0.75, -0.85), exit (5.5, 3.6))",
+      "look": "unchanged (quatrefoil + carpet corridor, verde + travertine entree, sage bedroom, tile + subwaytile kitchen)",
+      "twist": "the only safe place in the corridor is inside the furniture",
+      "lesson": "hide in a wardrobe on a beat; first fixed sentinel with a metronome glance (kept special to this level and 19, as the review asks)",
+      "changes": [
+        "Odile station 1 (7.75, 0.5, dwell 320): every glance hold 5.0 -> 4.7 (all 34 entries, offsets 2, 11, ..., 299 unchanged, yaw -80 unchanged). This is the docs/m7/design.md lever: margin 6 -> 4 to 5 samples",
+        "no geometry change, no new prop (materials 16/24 and draw calls 60/120 leave room, but nothing is needed)",
+        "refresh the stale Normal designerRoute: audit level18 at Normal and Difficile, then -writeRoutes (the numbers report found the Normal route out of date)",
+        "hint (Strings.cs level18.hint): replace the hard-coded 'E' by the device-aware action token once it exists (see code_needs); text otherwise unchanged"
+      ],
+      "code_needs": [
+        "Hint tokens {action} / {careful} (IDEAS QW2) so the hint does not hard-code E",
+        "Optional: periodic glance field (period 9 s, hold 4.7 s, yaw -80) to replace the 34 hand-written glances (R7); data stays valid without it"
+      ],
+      "targets": "Normal strict exit 21 to 26 s; hide 3.5 to 5.5 s; spawn or doorway wait at most 5 s; waiting share 30 to 45 %; 2 pauses minimum (doorway, wardrobe), 3 if the audit splits the exit hop; margin 4 to 5 samples at Normal and Difficile; wardrobe check binds; Step56a (route wins, hides, household opens the kitchen door) stays green",
+      "risks": [
+        "Deviation from rule 3 ('3 or more pauses'): a 32 m2 lesson level keeps 2 to 3 pauses. Adding a midway cover in the 1.0 m passage (z 0..1 beside the Buffet) would block the corridor, and an alternating north glance makes the wardrobe hide exceed the 8 s audit cap (worked out: hop 4.25 s does not fit a 3.9 s north look, so the hide would span about 12 s). Not worth breaking a clean lesson",
+        "Disagreement with the review: the fixed sentinel is not new here (Claire never leaves her spot in 9 and 15, the dog in 12); what 18 introduces is the metronome glance",
+        "Placed after 14 in the new order, 18 is easier than its predecessor by margin; acceptable for a new-verb lesson, and 17 right after restores the curve"
+      ],
+      "hint_en": "The stool fits in the wardrobe: {action} to hide inside, {action} to come back out.",
+      "hint_fr": "Le tabouret tient dans l'armoire : {action} pour t'y cacher, {action} pour en sortir."
+    },
+    {
+      "id": "level17",
+      "slot": "16 (act 2 closer, the exam)",
+      "status": "fix",
+      "title_en": "The Whole House",
+      "title_fr": "La maison",
+      "body": "chair + vase (unchanged)",
+      "main_threat": "the whole household in sequence: Mamie sits on you and opens the bedroom-office door, Rex watches the bridge, Lea guards the entree door with her back turned, the robot's hum covers you past her",
+      "plan_shape": "6-room house, unchanged walls: two ways out of the bedroom (couloir north, or the office south once Mamie opens it), one bridge across the sejour, one door to the entree",
+      "exit_direction": "south-east (unchanged: spawn (2.25, 6.75), exit (17.25, 1.25))",
+      "look": "every room its own finish: chambre wallpaper + lightoak; couloir travertine + verde; sejour sageribbed + herringbone; bureau pinstripe + lightoak (was herringbone); cuisine subwaytile + tile (was marble); entree quatrefoil + marble",
+      "twist": "every act 2 rule once, in the order the house serves them: sat on, a door opened for you, low cover from the dog, the bridge with the vase, the robot's hum, a door you open yourself while Lea's back is turned",
+      "lesson": "exam of act 2: sit, household door, player door, pet, split, load, robot hum (lesson field stays 'final'; target: door, pet, split, robot and load all bind)",
+      "changes": [
+        "Mamie: replace her 4 stations by 5 (loop, startStation 0): s0 (2.75, 6.75) facing 90 dwell 2.0; s1 (2.75, 6.75) facing 90 dwell 2.5 sit 'player' seat {x 2.25, z 6.75, yaw 90} (the spawn pose; she stands in front of the chair as in level 14); s2 (3.15, 2.75) facing 270 dwell 10.0 sit 'FauteuilMamie'; s3 (5.25, 0.75) facing 180 dwell 6.0; s4 (1.75, 1.4) facing 180 dwell 20.0. Removes the 40 s wall-staring station (1.2, 5.45). Cycle about 62 s, so her second sit (about 64 s) comes after the target exit; she now sits twice per cycle (fixes the granny habit warning)",
+        "doors porte_bureau (2.25, 4.95): add \"openedByInhabitants\": true. Mamie's walk s1 -> s2 opens it (0.6 s pause) about 6 s in; the south branch (bureau -> door (4.45, 1.25) -> sejour) opens for the player. porte_entree stays closed and player-opened",
+        "props add CanapeBas: kind sofa, x 6.0, z 3.05, yaw 0, sizeX 1.8, sizeY 0.6, sizeZ 0.8, occluder true, color #2E6DB4, accentColor #5B93D9, model kenney.sofa (same material as Canape). Footprint x 5.1..6.9, z 2.65..3.45: clear of ramp W (z 3.5..5.0) and the rug (z 0.95..2.55)",
+        "Rex (dog): replace both stations: d0 (7.0, 1.0) facing 340 dwell 12.4 awake; d1 (7.0, 1.0) facing 340 dwell 6.0 sleep. startStation: set by the phase rule below. Checks at Normal (half 70, range 6): the lane from the couloir door (6.25, 7.25) down to the ramp W foot (6.5, 4.25) is behind CanapeBas from the dog's eye (rays cross x 6.65..6.84 at z 3.05); the climb from x 6.9 on, the top (9.0, 4.25) at 12 deg off his facing and the ramp E (10.5, 4.25) are exposed; the south branch (5.25, 2.25) is exposed (south of the sofa). So the north branch has a dog-safe wait at the ramp foot, the south branch needs a nap",
+        "Lea station 0 (11.75, 0.6): facing 180 -> 30, dwell 25.0 -> 12.0, glance {offset 5, yaw -40, hold 1} -> {offset 4, yaw -50, hold 1.5} (a short check toward the bridge top). Facing 30 she watches ramp E (341 deg) and the porte_entree approach (31 deg); the west half (305 deg and less) is outside her cone",
+        "Lea station 1 (Canape sit, 12.0, 6.0, facing 180): dwell 6 unchanged",
+        "Lea station 2 (12.75, 5.25, facing 90): dwell 5.0 -> 9.0 (the crossing window: descend ramp E, step to (12.75, 4.25), go south to (12.75, 2.25), open porte_entree (0.6 s; the swinging leaf is at 158 deg from her, outside 90 +-55), enter)",
+        "Phase rule (the exam's timing, to tune with the audit): Lea's cycle (about 12 + 4.5 + 6 + 1 + 9 + 4 + telegraphs) should be 2 dog cycles (d0 12.4 + d1 6.0 + 0.6 wake = 19.0 s, so 38.0 s): adjust Lea s0 dwell to make it exact, then pick Rex's startStation (0 or 1) and d0 dwell so his nap starts within 1 s of Lea reaching station 2. The climb + top + descent (about 5 m, careful at both foot turns because of the vase) must fit the nap",
+        "robots: keep the loop (11.25, 1.5) <-> (11.25, 3.0) at 0.4 m/s. Its 2.5 m hum covers the ramp E foot (11.5, 4.25) and the step to (12.75, 4.25) when it is in the north half (1.27 and 1.95 m), which are 1.0 to 1.6 m behind Lea at station 2, inside her hop hearing (2.0 + 0.25 m). The hum is therefore needed exactly at the crossing past her back",
+        "Hugo (teen wander, seed 777): unchanged; he keeps the couloir and the cuisine alive and makes the north branch a timed choice",
+        "rooms look: see 'look' (finish fields only)",
+        "hint (Strings.cs level17.hint): see hint_en / hint_fr (threats, not the route)",
+        "after the edit: audit level17 at Normal and Difficile, then -writeRoutes"
+      ],
+      "code_needs": [
+        "Strings.cs: new level17.hint EN/FR",
+        "ProbeTestsM6Levels.Step57b_Level17VaseDropIsHeard: its premise 'Mamie stands in the bedroom within her crash range of the spawn' still holds (s0 at (2.75, 6.75)), but the drop-then-rush rows (Level17DropAtSpawn, Level17OpenRow) must be redrawn if CanapeBas or the dog's new spot sits on them",
+        "ProbeTestsM5Levels row ('level17', Chair, Final, 3, 1, 1, Vase) stays valid (3 humans, 1 dog, 1 robot); the level17 route replay and Step64b_Level17Hard follow -writeRoutes",
+        "R2 rush counter-route (designer route with every wait removed) as a new step",
+        "Presentation (R7, optional but recommended for this beat): a floor disc for the robot's 2.5 m hum, because the exam asks the player to stay inside it past Lea"
+      ],
+      "targets": "Normal strict exit 34 to 44 s (now 20.4); Difficile within +8 s; at least 5 pauses (sat on at the spawn; couloir or bureau wait; ramp W foot behind CanapeBas; ramp E foot or top start; the door open), none above 6 s; waiting share 30 to 45 %; lesson 'final' with door, pet, split, robot and load all binding (pet does NOT bind today); the route passes within 2.5 m of the robot while within 2.25 m of Lea; margin 4 to 6 samples (act 2 closer, docs/m7 target 4 to 5); materials stay 29/32 (no new colour), draw calls about +2 for CanapeBas (now 112/160); no dead room (cuisine keeps Hugo, bureau keeps Mamie)",
+      "risks": [
+        "Disagreement with the review: the robot and the mezzanine are not bypassed today (the audit's final check binds door, split, robot by hum, and load; only the pet does not bind); the real gaps are the dog and Lea's timing. Also Lea's 25 s station is station 0 at (11.75, 0.6) facing 180 (the window), not the sofa (6 s)",
+        "Chair limits: the exam cannot include the wardrobe (the chair is 0.45 m wide, the fit is 0.40 m) nor the glide or the rock (other bodies). Decoys are left out to protect readability and budget; act 3 (Showroom, finale) brings decoys back",
+        "Three coupled clocks (Rex, Lea, robot period 7.5 s): expect several audit iterations. Knobs in order: Lea s2 dwell (9), Rex nap (6), Lea s0 dwell (12), robot start index (0 or 1)",
+        "Height is not cover from the dog here: the chair on the bridge is visible to Rex (its eye at 0.35 m sees up the ramp); the dog beat is the low sofa at the ramp foot plus the nap",
+        "Mamie opening porte_bureau makes the south branch viable mid-level; if the solver then never uses the north branch, Hugo's role shrinks to the couloir. Acceptable; prove the south branch with a variant that blocks the couloir door (6.25, 7.45) with a prop if the review's 'two viable routes' check is wanted",
+        "Mamie's second sit (about 64 s) is a soft deadline here; if the exit grows past 58 s, raise s4 dwell from 20 to 26"
+      ],
+      "hint_en": "Granny sits first. Rex sees the bridge. Lea hears everything the robot doesn't cover.",
+      "hint_fr": "Mamie s'assoit d'abord. Rex voit le pont. Léa entend tout ce que le robot ne couvre pas."
+    },
+    {
+      "id": "level16",
+      "slot": "none (cut from levels.json; file kept on disk)",
+      "status": "cut",
+      "title_en": "Night Shift",
+      "title_fr": "La nuit",
+      "body": "floor lamp",
+      "main_threat": "Claire (watchful), Max (hurried pingpong), Rex (dog, asleep 10 of 14 s)",
+      "plan_shape": "4 rooms: salon strip, chambre, couloir, cuisine",
+      "exit_direction": "east",
+      "look": "day look; 'night' does not exist in the code",
+      "twist": "none left: it repeats level 6's darkness at twice the size, and level 20 repeats it again with the same cast",
+      "lesson": "dark (already taught by 6, tested by 20)",
+      "changes": [
+        "levels.json: remove \"level16\" from the list (the new order is set by the synthesis; in this group's slots: ..., level11, level12, level13, level14, level18, level17, level19, ...)",
+        "keep Assets/Resources/Levels/level16.json on disk unchanged (tests load ids directly)",
+        "its closed-door beat does NOT need to move into level20: 20 already has the cap of 2 leaves (porte_cuisine opened by Papa, porte_entree). What is worth carrying into 20, for the level20 designer: Max's hurried pingpong as a second moving threat, and a dog asleep across the lamp's path"
+      ],
+      "code_needs": [
+        "Tests that require level16 in levels.json or the 24-level order: ProbeTestsM7Design.Step64b_Level16Hard, the ProbeTestsM5Levels level16 replay (Step45 family, row ('level16', FloorLamp, Dark, 2, 1)), LevelDataM2Tests PlayOrder and the WaveB/number-order checks. Retarget them to load the file by id without the listing premise, or drop the level16 rows",
+        "ProbeTestsM7Design line 123 uses level16 as 'every kind of watcher' fixture: it loads by id and can stay if it does not assert the listing",
+        "ProbeTestsLightingShots and ProbeTestsM7Look load level16 by id for visuals: unaffected if the file stays"
+      ],
+      "targets": "levels.json no longer lists level16; every test green after retargeting; level16.json unchanged on disk",
+      "risks": [
+        "Cutting 16 makes level 20 the second dark level right after 6: a jump from 52 m2 to 199 m2 for the lamp. The level20 designer should open 20 with one small room that re-teaches the switch (agree with the feedback report)",
+        "If the night lighting code (R12) lands later, 16 could return as a short night interlude; its hint 'The dog never sleeps' is false (Rex sleeps 10 of every 14 s) and must be fixed first",
+        "Material budget was 24/24 in 16; nothing to fix since it is cut"
+      ],
+      "hint_en": "",
+      "hint_fr": ""
+    }
+  ],
+  "notes": "LENGTH (PRD 2 to 6 min vs measured 10 to 57 s): I read PRD 1.3 as a first clear including retries (a clean 2 to 6 min route would break the 8 s wait cap or be a walk). For this half of act 2 the strict Normal exits go from 14 to 27 s today to: 12 = 24 to 32 s, 13 = 30 to 40 s, 14 = 40 to 50 s, 18 = 21 to 26 s, 17 = 34 to 44 s. That is about 1.5x to 2x, obtained by beats (head turns, sits, a deadline, a timed door) and not by floor: route lengths stay 14.5 m (12), about 20 m (13), 17.5 to 24 m (18 unchanged), about 24.5 m (17); only 14 grows (19.5 to about 25 m) because walking along the mezzanine is its lesson. Expected first clear with retries: 2 to 4 min. Caveat C1: a skilled human beats the strict audit (owner: 8.4 s on 13), so every level here also lists a rush counter-route that must lose (R2).\nORDER AND AXES (body / main threat / plan / exit / look), neighbours share at most two: 11 chair+vase, Lea / N-S spine / SE / family -> 12 stool, dog+Paul / salon behind sofas / E / warm flat (shares at most exit-ish) -> 13 office chair+vase, two office workers / open office two loops / SE / office tile (none shared with 12) -> 14 armchair, granny deadline / S over a long mezzanine / SE / granny sage-lightoak (shares exit with 13) -> 18 stool, metronome sentinel / tiny L / NE / carpet-quatrefoil (none) -> 17 chair+vase, whole household / 6-room house with a short bridge / SE / every room its own finish (none with 18) -> 19 stool, sentinel / long gallery / S / carpet family (17 and 19 share at most look family). The two mezzanine uses in act 2 differ in shape: 14 walks along it, 17 crosses it.\nWHERE I DEVIATE FROM THE REVIEW (evidence in each entry): 12's sofas already are the only cover (pet binds, Step45b) - the fix is pauses, not cover; 13's off-grid decoys are deliberate (0.555 m collision vs the audit's 0.6 m decoy radius); 'height as cover' (14) does not exist against humans and only within about 0.3 to 0.5 m of the edge against the dog; 17's robot and mezzanine are not bypassed (they bind), its missing pieces are the dog and Lea's timing, and Lea's 25 s station faces the window, not the sofa; 18 keeps 2 to 3 pauses (rule 3 would break the lesson or the 8 s cap); 18 is not the first fixed sentinel (Claire in 9 and 15, the dog in 12), only the first metronome.\nLEVEL16 AND LEVEL20 (coordinate with the act 3 group): cut 16 from levels.json, keep the file. Its closed-door beat is already in 20 (20 sits at the 2-leaf cap with porte_cuisine opened by Papa and porte_entree), so nothing needs moving; offer 20 Max's hurried pingpong and a dog asleep across the lamp's path, and an opening small room to re-teach darkness after 6 since 16 no longer bridges 52 m2 to 199 m2.\nCODE (summary, details per level): Strings.cs hints for 12, 13, 14, 17 (and the {action} token for 18, QW2); rewrite Step45b (time-aware dog cone) and Step45g (new uncovered line) for 12; redraw Step57b rows for 17 if the new sofa or dog sit on them; retarget level16 listing tests and the 24-level order tests; add R2 counter-route steps for 13, 12, 14, 17; optional: robot hum floor disc (17), sitter-returns HUD line (14), periodic glance field (18), barred-region audit option (13 two-branch proof), R13 record versioning (13's old 8.4 s record).\nDATA-ONLY BUT VERIFY: every change is a JSON edit (stations, facings, dwells, props, platform/ramp sizes, finishes, one openedByInhabitants flag). Nothing here was audited (wave 1 is read-only and only the numbers agent runs Unity); timings in 'changes' are hand estimates from walk 0.8 to 1.7 m/s, telegraph 0.6 s, body turns 180 deg/s and the audit's cell costs. Each level lists its phase knobs in the order to try. Budgets: no new material anywhere (new props reuse existing colours and the kenney.sofa model); +1 prop in 12, 17; 14 and 13 add none.\nSAVES: with this group's order (..., 14, 18, 17, 19 ...) a player who won 17 but not 18 finds 17 locked until 18 is won (SaveData.IsUnlocked follows the list). Recommend R13's 'won or at most one slot past the furthest won' rule before shipping the new order."
+}

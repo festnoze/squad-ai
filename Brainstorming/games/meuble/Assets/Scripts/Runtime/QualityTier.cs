@@ -113,6 +113,8 @@ namespace OutOfSight
                 lowAsset.renderScale = quality == SaveOptions.QualityLow ? Tuning.QualityLowRenderScale : Tuning.QualityMediumRenderScale;
             }
             SetBloomOff(quality == SaveOptions.QualityLow); // MUTATION:QUALITY_LOW_BLOOM
+            // Floor dust (docs/m9/FLOORS_WALLS.md section 10): Haut only; Bas and Moyen build no map and draw no dust.
+            FloorDust.SetTier(quality == SaveOptions.QualityHigh); // MUTATION:FLOOR_DUST_TIER
             if (Application.isMobilePlatform)
             {
                 Application.targetFrameRate = TargetFrameRate(quality);

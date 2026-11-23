@@ -94,6 +94,8 @@ MUTATIONS=(
   "camera_sensitivity|Assets/Scripts/Runtime/OrbitCamera.cs|float sens = SaveStore.Options.Sensitivity; // MUTATION:CAMERA_SENSITIVITY|float sens = 1f; // MUTATION:CAMERA_SENSITIVITY|PlayMode|Step51a_OptionsAppliedAtOnce"
   "cone_hide|Assets/Scripts/Runtime/VisionConeView.cs|bool coneHidden = SaveStore.Options.HidesCone; // MUTATION:CONE_HIDE|bool coneHidden = false; // MUTATION:CONE_HIDE|PlayMode|Step51a_OptionsAppliedAtOnce"
   "cone_outline_alarm|Assets/Scripts/Runtime/VisionConeView.cs|outline.enabled = !coneHidden && alarm; // MUTATION:CONE_OUTLINE_ALARM|outline.enabled = !coneHidden; // MUTATION:CONE_OUTLINE_ALARM|PlayMode|Step52b_EyeShapesEdgePatternAndConeOutline"
+  # Cones look (2026-11-20): the fan's pattern follows the watcher's state (calm, searching, seeing).
+  "cone_look|Assets/Scripts/Runtime/VisionConeView.cs|Look = alarm ? ConeLook.Seeing : searching ? ConeLook.Searching : ConeLook.Calm; // MUTATION:CONE_LOOK|Look = ConeLook.Calm; // MUTATION:CONE_LOOK|PlayMode|Cones_a_FanCarriesItsLookOnOneMaterialPerColour"
   "pulse_pattern_gate|Assets/Scripts/Runtime/Hud.cs|pc.a = seenMoving > 0f ? a : 0f; // MUTATION:PULSE_PATTERN_GATE|pc.a = seenMoving <= 0f ? a : 0f; // MUTATION:PULSE_PATTERN_GATE|PlayMode|Step52b_EyeShapesEdgePatternAndConeOutline"
   "controls_gamepad_text|Assets/Scripts/Runtime/Hud.cs|controls.text = gamepad ? Strings.HudControlsGamepad : Strings.HudControls; // MUTATION:CONTROLS_GAMEPAD_TEXT|controls.text = gamepad ? Strings.HudControls : Strings.HudControlsGamepad; // MUTATION:CONTROLS_GAMEPAD_TEXT|PlayMode|Step52b_EyeShapesEdgePatternAndConeOutline"
   "door_memory|Assets/Scripts/Core/DoorMemory.cs|if (open[leaf] == isOpen) // MUTATION:DOOR_MEMORY|if (leaf >= 0) // MUTATION:DOOR_MEMORY|EditMode|DoorMemory_remembers_the_authored_leaves_and_a_mismatch_is_one_suspect"
@@ -134,9 +136,9 @@ MUTATIONS=(
   "lesson_final|Assets/Scripts/Core/LevelValidator.cs|if (mechanics.Count < FinalMechanics) // MUTATION:LESSON_FINAL|if (mechanics.Count < 1) // MUTATION:LESSON_FINAL|EditMode|Lesson_final_needs_three_mechanics_and_mechanics_are_listed_in_order"
   "shelf_combine|Assets/Scripts/Runtime/FurnitureKit.cs|var parts = new PartBatch(p, layer, combine && visual); // MUTATION:SHELF_COMBINE|var parts = new PartBatch(p, layer, false); // MUTATION:SHELF_COMBINE|PlayMode|Step39h_CombinedRenderersKeepCollidersMaterialsAndFades"
   "face_plane|Assets/Scripts/Runtime/LevelBuilder.cs|FaceScope, \"Face\", fader, frame.position, normal); // MUTATION:FACE_PLANE|FaceScope, \"Face\", fader, wall.TransformPoint(faceCenter), frame.TransformDirection(new Vector3(0f, 0f, f.Side))); // MUTATION:FACE_PLANE|PlayMode|Step39h_CombinedRenderersKeepCollidersMaterialsAndFades"
-  # M7 walls pass: the lowered doorways stand, and an unknown Walls option falls back to lowered.
+  # M7 walls pass: the lowered doorways stand, and an unknown Walls option falls back to the default (both since 2026-11-20).
   "walls_keep_frames|Assets/Scripts/Runtime/WallFader.cs|bool hidden = !none && plane && !(lowered && e.KeepWhenLowered); // MUTATION:WALLS_KEEP_FRAMES|bool hidden = !none && plane; // MUTATION:WALLS_KEEP_FRAMES|PlayMode|Step70f_"
-  "options_walls_fallback|Assets/Scripts/Core/SaveData.cs|Walls = IsWalls(Walls) ? Walls : WallsLowered, // MUTATION:OPTIONS_WALLS_FALLBACK|Walls = Walls, // MUTATION:OPTIONS_WALLS_FALLBACK|EditMode|HandEditedValues_FallBackToLoweredAndTheNearestStep"
+  "options_walls_fallback|Assets/Scripts/Core/SaveData.cs|Walls = IsWalls(Walls) ? Walls : WallsBoth, // MUTATION:OPTIONS_WALLS_FALLBACK|Walls = Walls, // MUTATION:OPTIONS_WALLS_FALLBACK|EditMode|HandEditedValues_FallBackToBothAndTheNearestStep"
   "robot_build|Assets/Scripts/Runtime/LevelBuilder.cs|level.Robots.Add(Robot.Create(robotDef, root)); // MUTATION:ROBOT_BUILD|Robot.Create(robotDef, root); // MUTATION:ROBOT_BUILD|PlayMode|Step39l_"
   "load_target|Assets/Scripts/Runtime/LevelBuilder.cs|return body.Size.y - Tuning.SampleInset + load; // MUTATION:LOAD_TARGET|return body.Size.y - Tuning.SampleInset; // MUTATION:LOAD_TARGET|PlayMode|Step39l_"
   "load_build|Assets/Scripts/Runtime/LevelBuilder.cs|level.LoadView = ApplyLoad(furniture, spawn.Load); // MUTATION:LOAD_BUILD|level.LoadView = null; // MUTATION:LOAD_BUILD|PlayMode|Step39l_"
@@ -163,10 +165,25 @@ MUTATIONS=(
   # CONTRACT_M5 20: the dog's hold.
   "dog_run|Assets/Scripts/Runtime/GameState.cs|dog.BeginRun(target); // MUTATION:DOG_RUN|dog.BeginRun(dog.Position); // MUTATION:DOG_RUN|PlayMode|Step38h_ Step38i_"
   "dog_hold|Assets/Scripts/Runtime/GameState.cs|dogHolding = true; // MUTATION:DOG_HOLD|dogHolding = false; // MUTATION:DOG_HOLD|PlayMode|Step38h_ Step38i_"
-  "dog_call|Assets/Scripts/Runtime/GameState.cs|h.Investigate(at); // MUTATION:DOG_CALL|h.Investigate(h.Position); // MUTATION:DOG_CALL|PlayMode|Step38h_"
-  "dog_call_finds|Assets/Scripts/Runtime/GameState.cs|if (!memories[i].OutOfPlace(furniture.Pose, furniture.Tipped)) // MUTATION:DOG_CALL_FINDS|if (false) // MUTATION:DOG_CALL_FINDS|PlayMode|Step38i_"
+  # DOGCARRY: the dog drags the furniture home itself. DOG_CALL and DOG_CALL_FINDS now mark the fallback only (the dog has
+  # no path home), which no fixture reaches: their rows are parked until a no-path dog fixture exists (docs/next/progress/DOGCARRY.md).
+  # "dog_call|Assets/Scripts/Runtime/GameState.cs|h.Investigate(at); // MUTATION:DOG_CALL|h.Investigate(h.Position); // MUTATION:DOG_CALL|PlayMode|Step38h_"
+  # "dog_call_finds|Assets/Scripts/Runtime/GameState.cs|if (!memories[i].OutOfPlace(furniture.Pose, furniture.Tipped)) // MUTATION:DOG_CALL_FINDS|if (false) // MUTATION:DOG_CALL_FINDS|PlayMode|Step38i_"
+  "dog_drag|Assets/Scripts/Runtime/GameState.cs|dog.BeginCarry(slot); // MUTATION:DOG_DRAG|dog.CancelInvestigation(); // MUTATION:DOG_DRAG|PlayMode|Step38h_"
+  "dog_drag_finds|Assets/Scripts/Runtime/GameState.cs|if (!memories[owner].OutOfPlace(furniture.Pose, furniture.Tipped)) // MUTATION:DOG_DRAG_FINDS|if (false) // MUTATION:DOG_DRAG_FINDS|PlayMode|Step38i_"
+  # GRIP: the dog bites the stool by a leg low down, never its seat (product owner, 2026-11-22).
+  "grip_stool_low|Assets/Scripts/Core/GripDef.cs|Snout = new Vector3(-0.075f, 0.28f, -0.10f), // MUTATION:GRIP_STOOL_LOW|Snout = new Vector3(-0.075f, 0.52f, -0.10f), // MUTATION:GRIP_STOOL_LOW|EditMode|The_dog_bites_the_stool_by_a_leg_below_its_seat"
   # Music bug: a loop stopped behind the player's back (audio device change, OS suspend) must be restarted by the watchdog.
   "music_loop|Assets/Scripts/Runtime/MusicPlayer.cs|if (due) // MUTATION:MUSIC_LOOP|if (false) // MUTATION:MUSIC_LOOP|PlayMode|Step28ma_ Step28mb_ Step28mc_ Step28md_"
+  # Floor dust (docs/m9/FLOORS_WALLS.md section 10): Haut only; Moyen (the Android default) must pay nothing.
+  "floor_dust_tier|Assets/Scripts/Runtime/QualityTier.cs|FloorDust.SetTier(quality == SaveOptions.QualityHigh); // MUTATION:FLOOR_DUST_TIER|FloorDust.SetTier(quality != SaveOptions.QualityLow); // MUTATION:FLOOR_DUST_TIER|PlayMode|Step97a_"
+  # CHIN (docs/m9/heads/NOTES.md): the woman's under chin lit like the neck, not by its own normals (the dark band).
+  "chin_tuck_normal|Assets/Scripts/Runtime/CharacterHead.cs|if (sculpt.TuckNormal > 0f && row > 0 && underJaw) // MUTATION:CHIN_TUCK_NORMAL|if (false) // MUTATION:CHIN_TUCK_NORMAL|PlayMode|ChinLook_"
+  # AUTOSTART (docs/next/progress/AUTOSTART.md): the world runs under the held title card; the first input only starts the
+  # clock, and until then the player's furniture is out of play (unseen, never shoved).
+  "hold_start|Assets/Scripts/Runtime/GameState.cs|bool release = InputReader.AnyStartInput(); // MUTATION:HOLD_START|bool release = true; // MUTATION:HOLD_START|PlayMode|HeldStart01_ FocusPause03_ Tips_07_"
+  "unseen_before_start|Assets/Scripts/Runtime/GameState.cs|started /*MUTATION:UNSEEN_BEFORE_START*/|true /*MUTATION:UNSEEN_BEFORE_START*/|PlayMode|HeldStart04_"
+  "shove_before_start|Assets/Scripts/Runtime/GameState.cs|playing && started /*MUTATION:SHOVE_BEFORE_START*/|playing /*MUTATION:SHOVE_BEFORE_START*/|PlayMode|HeldStart06_"
 )
 
 # Refuse to start on a tree that still holds a mutation (an interrupted run), and snapshot the sources.

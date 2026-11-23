@@ -1,0 +1,84 @@
+{
+  "id": "test_v2_loaded_sit",
+  "nameKey": "level17.name",
+  "hintKey": "level17.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.5,
+      "sizeX": 6.0,
+      "sizeZ": 5.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": -2.25,
+      "z": 3.05,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -1.0,
+    "z": -0.5,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D",
+    "load": "vase"
+  },
+  "exit": {
+    "x": -2.25,
+    "z": 2.55,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [],
+  "inhabitants": [
+    {
+      "name": "Mamie",
+      "personality": "granny",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": -0.5,
+          "z": -0.5,
+          "facing": 90.0,
+          "dwell": 1.5,
+          "glances": []
+        },
+        {
+          "x": -0.5,
+          "z": -0.5,
+          "facing": 90.0,
+          "dwell": 3.0,
+          "glances": [],
+          "sit": "player",
+          "seat": {
+            "x": -1.0,
+            "z": -0.5,
+            "yaw": 90.0
+          }
+        },
+        {
+          "x": 2.0,
+          "z": 1.5,
+          "facing": 180.0,
+          "dwell": 30.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

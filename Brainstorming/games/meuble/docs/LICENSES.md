@@ -39,6 +39,7 @@ list. Adding a third party asset means a row here and, when its licence or autho
 | `Quaternius/quaternius_woman_jacket.glb` | Woman (jacket) | Quaternius (Animated Women Pack) | https://poly.pizza/m/AQsd9ngvKU | CC0 1.0 |
 | `Quaternius/quaternius_woman_dress.glb` | Woman in Dress | Quaternius (Animated Women Pack) | https://poly.pizza/m/zMyPlQXBzq | CC0 1.0 |
 | `Quaternius/quaternius_shiba.glb` | Shiba Inu | Quaternius (Animated Animal Pack) | https://poly.pizza/m/y4wdQpg767 | CC0 1.0 |
+| `Quaternius/quaternius_husky.glb` | Husky | Quaternius (Animated Animal Pack) | https://poly.pizza/m/wcWiuEqwzq | CC0 1.0 |
 | `Kenney/kenney_bed_double.glb` | Bed Double | Kenney (Furniture Kit) | https://poly.pizza/m/wcmbCZ63mg | CC0 1.0 |
 | `Kenney/kenney_kitchen_fridge.glb` | Kitchen Fridge | Kenney (Furniture Kit) | https://poly.pizza/m/36ODvl4CIy | CC0 1.0 |
 | `Kenney/kenney_coffee_table.glb` | Coffee Table | Kenney (Furniture Kit) | https://poly.pizza/m/y4ZU5S7RuD | CC0 1.0 |
@@ -57,6 +58,13 @@ pages with `tools/assets/polypizza.py`, each page reading "Public Domain (CC0)",
 Kit" bundle listing all its models as CC0 1.0 on the same day. The GLBs are the pages' files unchanged, except
 `kenney_bed_double.glb`: the UVs of its cover (x 0.5) and pillows (x 0.6973) were rescaled in place to the kit's 39.37 UV
 per native unit (Tuning.KenneyUvPerNativeUnit, the premise of probe step 22e), geometry untouched (CC0 allows it).
+DOGBIG (2026-11-21): the house dog is now the Quaternius Husky (Animated Animal Pack), from
+`ThirdParty_staging/poly.pizza/alternates/pets/pet_dog__quaternius_husky__wcWiuEqwzq.glb` (sha256 a1e107ec...77eb, checked
+against its `manifest.json`, whose page record reads "Public Domain (CC0)", licence CC0 1.0). `quaternius_husky.glb` is
+that file with its five materials renamed to the Shiba's names (Main, Main_Light, Black, Eyes_White, Eyes_Black), its mesh
+named "Husky", a UV0 atlas added and, since DOGBIG v3 and v4, a "Jaw" joint, a subdivided and smoothed body and a rounder head
+with a shorter muzzle (rig, weights and clips otherwise kept; CC0 allows it). The Shiba GLB stays in
+the project but no catalog entry uses it any more.
 
 ## Textures (`Assets/ThirdParty/Textures`)
 
@@ -127,7 +135,8 @@ unchanged.
 | Sage fluted wall panel (wall finish "sageribbed", walls 4) | `wall_sage_ribbed.png`; derived (`tools/assets/make_wall_finishes.py`): `Colour/colour_wall_sage_ribbed.png`, `Detail/detail_wall_sage_ribbed.png`, `Detail/normal_wall_sage_ribbed.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 | Wall finish arrays (walls 4) | `Arrays/wall_colours.png`, `Arrays/wall_normals.png`: the colour and normal maps of the crepi and every wall finish above, stacked as they are by `ModelCatalogBuilder` (no new image) | As their sources | As their sources | As their sources |
 | Window picture (every wall window: wood frame, four panes, blurred garden, 2026-11-19, `WindowImage`) | `window_wood_blurred_garden.png`; derived (`tools/assets/make_window_image.py`): `Assets/Resources/WindowImage.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
-| Garden backdrop (the ring round every house and the title house, 2026-11-19, `GardenBackdrop`) | `garden_open_horizontal_tile.png`; derived (`tools/assets/make_garden_backdrop.py`): `Assets/Resources/GardenBackdrop.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Garden backdrop (the ring round every house and the title house, 2026-11-20, `GardenBackdrop`; the 2026-11-19 `garden_open_horizontal_tile.png` is retired, no longer shipped) | `garden_open_horizontal_tile_wide.png`; derived (`tools/assets/make_garden_backdrop.py`): `Assets/Resources/GardenBackdrop.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Sky ceiling (the round ceiling closing the garden ring, 2026-11-20, `GardenBackdrop`) | `sky_disc_sun_glow.png`; derived (`tools/assets/make_garden_backdrop.py`): `Assets/Resources/GardenSky.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
 
 Wall finishes (product owner request of 2026-11-19): the four `wall_*.png` sources above are our own procedural creation
 (periodic filtered noise and a wrapped drawing, no source image, no third party asset), made and derived in one pass by
@@ -171,11 +180,16 @@ as given apart from its framing: `tools/assets/make_window_image.py` crops it to
 transparent margin and the sill's small overhang go) into `Assets/Resources/WindowImage.png` (1024 x 1024, opaque). Every
 wall window shows it in place of the former plain pane and trim strips, sliced so it is never stretched (`WindowImage`).
 
-Garden backdrop (product owner request of 2026-11-19, docs/m9/backdrop/NOTES.md): `garden_open_horizontal_tile.png` is the
-product owner's image, a garden panorama that repeats horizontally, used as given apart from its preparation by
-`tools/assets/make_garden_backdrop.py` into `Assets/Resources/GardenBackdrop.png` (1024 x 1024: its duplicate last column
-dropped, resampled with the wrap kept, the top of the sky made one uniform colour). It is shown on the inside of the ring
-round every house, repeated round the circle at its own aspect (`GardenBackdrop`).
+Garden backdrop (product owner requests of 2026-11-19 and 2026-11-20, docs/m9/backdrop/NOTES.md):
+`garden_open_horizontal_tile_wide.png` (2026-11-20, replacing `garden_open_horizontal_tile.png` of 2026-11-19, which stays
+in the folder but no longer ships) is the product owner's image, a wide garden panorama that repeats horizontally, used as
+given apart from its preparation by `tools/assets/make_garden_backdrop.py` into `Assets/Resources/GardenBackdrop.png`
+(4096 x 1024: its duplicate last column dropped, resampled with the wrap kept, the top of the sky made one uniform colour,
+the lawn strip's mean matched to the grass plane, a light haze). It is shown on the inside of the ring round every house,
+repeated round the circle at its own aspect (`GardenBackdrop`). `sky_disc_sun_glow.png` (2026-11-20) is the product
+owner's image, a round overhead sky, prepared by the same script into `Assets/Resources/GardenSky.png` (1024 x 1024:
+cropped to its disc, the sun moved off centre by a conformal map of the disc so it stands toward the scene's light, the rim
+band made exactly the garden's top colour) and shown once on the round ceiling closing the ring (`GardenBackdrop`).
 
 ## Audio (`Assets/ThirdParty/Audio`)
 
@@ -256,11 +270,20 @@ fabric sources `cotton_source.png` and `twill_source.png` were not used by the g
 | Asset | Files | Author | Source | Licence |
 |---|---|---|---|---|
 | Characters | `man_head_around.png`, `woman_head_around.png`, `shirt_front_source.png`, `shirt_back_source.png`, `trousers_front_source.png`, `trousers_back_source.png`; derived: `shirt_front.png`, `shirt_back.png`, `trousers_front.png`, `trousers_back.png`, `Resources/CharacterManHeadWrap.png`, `Resources/CharacterWomanHeadWrap.png`, `Resources/CharacterClothesAtlas.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+| Dog (black Labrador, DOGBIG 2026-11-21) | `labrador_black_face_front.png`, `labrador_black_fur_albedo.png`; derived (`tools/assets/dog/compose_dogfur.py`, sources unchanged): `Resources/DogFur.png` | Product owner | Provided by the product owner | Provided by the product owner for this game |
+
+DOGBIG (2026-11-21): the dog's fur map `Resources/DogFur.png` is laid out on the UV0 atlas that
+`tools/assets/dog/make_husky.py` adds to the Quaternius Husky (its layout, `dog_fur_uv_template.png`, is our own
+drawing). It is made from the product owner's two images: the fur tiled (a rotated copy where the strands must run head
+to tail) and the front face picture placed over the head, its edge feathered into the fur.
 
 ## UI icons (`Assets/Art/UI/Icons`)
 
-Not third party: original work made for this game on 2026-11-19 (HUD gauge icons, see `docs/m9/icons/NOTES.md`).
+Not third party: original work made for this game on 2026-11-19 (HUD gauge icons) and 2026-11-20 (Options icons), see
+`docs/m9/icons/NOTES.md`. The two flags are drawn from scratch (flat bands, stripes and stars); national flags are not
+copyrighted designs.
 
 | Asset | Files | Author | Source | Licence |
 |---|---|---|---|---|
 | HUD gauge icons (Creak, Suspicion) | `creak.svg`, `suspicion.svg`, `creak.png`, `suspicion.png` | Out of Sight team (made with Claude Code) | Original, `docs/m9/icons/final.py` | Original work for this game |
+| Options icons (Defaults, Back, French and US flags) | `reset.svg`, `back.svg`, `flag_fr.svg`, `flag_us.svg`, `reset.png`, `back.png`, `flag_fr.png`, `flag_us.png` | Out of Sight team (made with Claude Code) | Original, `docs/m9/icons/options_icons.py` | Original work for this game |

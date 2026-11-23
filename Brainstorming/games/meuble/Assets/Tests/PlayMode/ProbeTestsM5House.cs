@@ -1112,7 +1112,8 @@ namespace OutOfSight.Tests
                 Assert.AreEqual(Layers.Player, renderers[0].gameObject.layer);
                 Assert.AreEqual(0, holder.GetComponentsInChildren<Collider>(true).Length, "a body visual has no collider");
                 Mesh mesh = renderers[0].GetComponent<MeshFilter>().sharedMesh;
-                Assert.AreEqual(20 * 12, ModelKit.Triangles(mesh), "20 boxes");
+                // Soft movers (2026-11-20): runners 2 x 76, seat 58, front legs 2 x 16, posts 2 x 22, back panel 44, arms 2 x 22.
+                Assert.AreEqual(374, ModelKit.Triangles(mesh), "the rounded rocking chair");
                 Assert.LessOrEqual(Probe.TrianglesUnder(holder.transform), Tuning.BudgetFurnitureTriangles, "PRD 7.4 furniture triangles");
                 Assert.AreEqual(1f, PrimitiveKit.MetresPerUv(renderers[0], 0), 1e-3f, "UVs in metres");
                 var block = new MaterialPropertyBlock();

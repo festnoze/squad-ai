@@ -1,0 +1,82 @@
+{
+  "id": "test_v2_req_exit_free",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 4.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "props": [
+    {
+      "name": "Cloison_nord",
+      "kind": "box",
+      "x": 0.0,
+      "z": 1.1,
+      "yaw": 0.0,
+      "sizeX": 0.2,
+      "sizeY": 2.2,
+      "sizeZ": 1.8,
+      "occluder": true,
+      "color": "#8C5A36"
+    },
+    {
+      "name": "Cloison_sud",
+      "kind": "box",
+      "x": 0.0,
+      "z": -1.1,
+      "yaw": 0.0,
+      "sizeX": 0.2,
+      "sizeY": 2.2,
+      "sizeZ": 1.8,
+      "occluder": true,
+      "color": "#8C5A36"
+    }
+  ],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": 0.75,
+    "z": 1.25,
+    "yaw": 180.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 0.75,
+    "z": 0.0,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Guetteur",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -2.75,
+          "z": -0.5,
+          "facing": 270.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

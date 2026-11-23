@@ -120,7 +120,9 @@ namespace OutOfSight.Tests
         [Timeout(300000)]
         public IEnumerator Step64a_DifficultyAppliesAtTheNextLevelLoad()
         {
-            const string id = "level16"; // a watchful, a hurried and a dog: every kind of watcher
+            // A watchful, a hurried and a dog: every kind of watcher. Levels v2 cuts level16 from the play order (D2); the
+            // archived file still loads by id, which is all this rules check needs.
+            const string id = "level16";
             SetDifficulty(DifficultyDef.Normal);
             yield return LoadFresh(id);
             Assert.AreEqual(DifficultyDef.Normal, Game.Difficulty.Id, "premise: the default difficulty is Normal");
@@ -252,14 +254,15 @@ namespace OutOfSight.Tests
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level07Hard() { yield return ReplayHard("level7"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level08Hard() { yield return ReplayHard("level8"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level09Hard() { yield return ReplayHard("level9"); }
-        [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level10Hard() { yield return ReplayHard("level10"); }
+        // Levels v2 (LEVELS_V2 9): Step64b_Level10Hard and Step64b_Level16Hard are deleted (level10 and level16 are cut, D2);
+        // Step64b_Level25Hard replays the new Showroom's Difficile route.
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level11Hard() { yield return ReplayHard("level11"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level12Hard() { yield return ReplayHard("level12"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level13Hard() { yield return ReplayHard("level13"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level14Hard() { yield return ReplayHard("level14"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level15Hard() { yield return ReplayHard("level15"); }
-        [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level16Hard() { yield return ReplayHard("level16"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level17Hard() { yield return ReplayHard("level17"); }
         [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level18Hard() { yield return ReplayHard("level18"); }
+        [UnityTest, Timeout(900000)] public IEnumerator Step64b_Level25Hard() { yield return ReplayHard("level25"); }
     }
 }

@@ -92,6 +92,28 @@ namespace OutOfSight
             return problems;
         }
 
+        /// <summary>
+        /// Cones look (2026-11-20): the override material of the <see cref="ConeFeature"/> pass on the renderer in use (the
+        /// vision cone shader in its hatched x-ray mode, XRay_Cone.mat), or null when the pass is missing (tests).
+        /// </summary>
+        public static Material ConeOverrideMaterial()
+        {
+            var asset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            ScriptableRendererData data = asset != null && asset.rendererDataList.Length > 0 ? asset.rendererDataList[0] : null;
+            if (data == null)
+            {
+                return null;
+            }
+            foreach (ScriptableRendererFeature f in data.rendererFeatures)
+            {
+                if (f is RenderObjects r && f.name == ConeFeature)
+                {
+                    return r.settings.overrideMaterial;
+                }
+            }
+            return null;
+        }
+
         private static void Check(ScriptableRendererData data, string name, int layerMask, CompareFunction depth, bool material,
             CompareFunction? stencil, List<string> problems)
         {
@@ -166,6 +188,14 @@ namespace OutOfSight
     /// fan and chevron are cyan (CONTRACT_M5 17): <see cref="Tuning.DogConeColor"/> while calm,
     /// <see cref="Tuning.DogConeAlarmColor"/> while it sees the furniture. A sleeping watcher's fan and chevron are hidden
     /// (its eye is closed; the inhabitant shows a "z" instead).
+    /// Cones look (product owner request, 2026-11-20): the fan is drawn by <see cref="ConeShaderName"/>
+    /// (Assets/Settings/VisionCone.shader), a fan of light whose opacity fades with distance and toward its sides, with faint
+    /// streaks and a thin crisp line on its true edge; still one material per colour (<see cref="ConeMaterial"/>). What the
+    /// shader needs per watcher rides the mesh (UV0 the watcher's frame in ranges, UV1 the rim fraction, the half angle, a
+    /// phase seed and the <see cref="Look"/>), never a property block. The look tells the states apart by pattern as well as
+    /// by colour: calm (a still gradient), searching (a sweeping band) and seeing (waves running outward, a quick pulse); the
+    /// part a wall hides is the x-ray pass's blue hatching (XRay_Cone.mat, the same shader). The outline of the fan, its
+    /// rays and every rule above are unchanged: only the fill's look is new.
     /// </summary>
     [DefaultExecutionOrder(100)]
     public sealed class VisionConeView : MonoBehaviour
@@ -175,6 +205,68 @@ namespace OutOfSight
 
         /// <summary>Height the rays aim at: the top sample height of the player furniture.</summary>
         public float TargetHeight = 0.87f;
+
+        /// <summary>Cones look: the fan's shader (Assets/Settings/VisionCone.shader; it ships with XRay_Cone.mat and in Always Included Shaders).</summary>
+        public const string ConeShaderName = "OutOfSight/Vision Cone";
+
+        /// <summary>Cones look: the watcher's state as the fan's pattern shows it (UV1.w of the fan mesh).</summary>
+        public enum ConeLook
+        {
+            /// <summary>Watching calmly: a still soft gradient with a slow shimmer.</summary>
+            Calm = 0,
+            /// <summary>Alerted or investigating, without seeing the furniture: a bright band sweeps across the fan.</summary>
+            Searching = 1,
+            /// <summary>Seeing the furniture (the red fan): waves run outward from the eye, a quick pulse.</summary>
+            Seeing = 2,
+        }
+
+        /// <summary>Cones look: the pattern the fan showed on the last frame (tests).</summary>
+        public ConeLook Look { get; private set; } = ConeLook.Calm;
+
+        private static readonly Dictionary<Color32, Material> ConeMaterials = new Dictionary<Color32, Material>();
+        private static Shader coneShader;
+        private static bool coneShaderMissing;
+
+        /// <summary>
+        /// Cones look: the one fan material of <paramref name="color"/> (cached by colour, so every cone of a colour shares
+        /// it: the "one material per cone colour" rule of the budgets), drawn by <see cref="ConeShaderName"/>. Without that
+        /// shader (never expected: it ships with XRay_Cone.mat) it logs one error and falls back to the flat URP Unlit fan.
+        /// </summary>
+        public static Material ConeMaterial(Color color)
+        {
+            Color32 key = color;
+            if (ConeMaterials.TryGetValue(key, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+            if (coneShader == null && !coneShaderMissing)
+            {
+                coneShader = Shader.Find(ConeShaderName);
+                if (coneShader == null || !coneShader.isSupported)
+                {
+                    coneShader = null;
+                    coneShaderMissing = true;
+                    Debug.LogError($"[VisionConeView] Shader '{ConeShaderName}' not found or unsupported: the cones fall back to the flat fan.");
+                }
+            }
+            Material m;
+            if (coneShader == null)
+            {
+                m = PrimitiveKit.UnlitTransparent(color);
+            }
+            else
+            {
+                m = new Material(coneShader)
+                {
+                    name = "VisionCone " + ColorUtility.ToHtmlStringRGBA(color),
+                    renderQueue = (int)RenderQueue.Transparent,
+                    hideFlags = HideFlags.DontUnloadUnusedAsset,
+                };
+                m.SetColor(BaseColorId, color);
+            }
+            ConeMaterials[key] = m;
+            return m;
+        }
 
         private static readonly Color Calm = new Color(1f, 0.93f, 0.55f, 0.20f);
         private static readonly Color Alarm = new Color(1f, 0.35f, 0.25f, 0.30f);
@@ -217,6 +309,10 @@ namespace OutOfSight
         private int radial;
         private float spacing;
         private float rayStep;
+        // Cones look: per mesh vertex, the shader's two UV channels (see the class summary), and this watcher's phase seed.
+        private Vector2[] meshLocal;
+        private Vector4[] meshData;
+        private float seed;
         // M5B m14: a sample is raised to the floor of any other sample this many spacings away (diagonal neighbours included).
         private const float DrapeReach = Tuning.ConeDrapeReach;
 
@@ -229,10 +325,12 @@ namespace OutOfSight
             mesh = new Mesh { name = "VisionCone" };
             mesh.MarkDynamic();
             vertices = new Vector3[Tuning.ConeRayCount + 1];
+            // Cones look: each watcher's own phase, so two fans never pulse or sweep in step.
+            seed = Mathf.Repeat(GetInstanceID() * 0.618034f, 1f);
             EnsureTopology(1);
             gameObject.AddComponent<MeshFilter>().sharedMesh = mesh;
             meshRenderer = gameObject.AddComponent<MeshRenderer>();
-            meshRenderer.sharedMaterial = PrimitiveKit.UnlitTransparent(Calm);
+            meshRenderer.sharedMaterial = ConeMaterial(Calm);
             meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
             meshRenderer.receiveShadows = false;
             gameObject.layer = XRay.ConeLayer;
@@ -369,12 +467,16 @@ namespace OutOfSight
                 }
                 return;
             }
-            Rebuild();
             bool alarm = Vision != null && Vision.SeesPlayer;
+            // Cones look: the pattern rides the mesh (UV1.w), so it is set before the rebuild writes it.
+            InhabitantMode mode = Owner.Routine.Mode;
+            bool searching = mode == InhabitantMode.Alerted || mode == InhabitantMode.Investigating;
+            Look = alarm ? ConeLook.Seeing : searching ? ConeLook.Searching : ConeLook.Calm; // MUTATION:CONE_LOOK
+            Rebuild();
             bool dark = RangeFactor < 1f;
             bool dog = Owner.IsDog;
             Color = ConeColor(dog, alarm, dark);
-            meshRenderer.sharedMaterial = PrimitiveKit.UnlitTransparent(Color);
+            meshRenderer.sharedMaterial = ConeMaterial(Color);
             if (facingImage != null)
             {
                 facingImage.color = FacingColor(dog, alarm);
@@ -436,6 +538,8 @@ namespace OutOfSight
             meshVertices = new Vector3[count];
             rawHeights = new float[count];
             sampleDistances = new float[count];
+            meshLocal = new Vector2[count];
+            meshData = new Vector4[count];
             var triangles = new List<int>((n - 1) * (2 * radial - 1) * 3);
             for (int i = 0; i < n - 1; i++)
             {
@@ -465,6 +569,8 @@ namespace OutOfSight
             mesh.indexFormat = count > 65000 ? IndexFormat.UInt32 : IndexFormat.UInt16;
             mesh.vertices = meshVertices;
             mesh.normals = normals;
+            mesh.SetUVs(0, meshLocal);
+            mesh.SetUVs(1, meshData);
             mesh.SetTriangles(triangles, 0);
         }
 
@@ -530,11 +636,22 @@ namespace OutOfSight
             // neighbour rays with the same index are neighbours on the floor too.
             spacing = Owner.Routine.ViewRange / radial;
             rayStep = 2f * half / (n - 1) * Mathf.Deg2Rad;
+            // Cones look: the shader's per vertex data. UV0 is the sample in the watcher's frame (across, along the gaze) in
+            // units of the fan's range; UV1 its fraction of its own ray's reach (1 on the rim), the half angle in radians,
+            // the phase seed and the look.
+            float unit = 1f / Mathf.Max(range, 1e-3f);
+            float halfRadians = half * Mathf.Deg2Rad;
+            float look = (float)Look;
+            meshLocal[0] = Vector2.zero;
+            meshData[0] = new Vector4(0f, halfRadians, seed, look);
             for (int i = 0; i < n; i++)
             {
                 float a = yaw - half + 2f * half * i / (n - 1);
                 Vector3 h = YawMath.Forward(a);
                 float reach = RayReach(eye, h, range, floor);
+                float relative = (a - yaw) * Mathf.Deg2Rad;
+                float across = Mathf.Sin(relative) * unit;
+                float along = Mathf.Cos(relative) * unit;
                 for (int s = 1; s <= radial; s++)
                 {
                     float d = s == radial ? reach : Mathf.Min(s * spacing, reach);
@@ -543,6 +660,8 @@ namespace OutOfSight
                     rawHeights[k] = floor.HeightAt(p.x, p.z);
                     sampleDistances[k] = d;
                     meshVertices[k] = p;
+                    meshLocal[k] = new Vector2(across * d, along * d);
+                    meshData[k] = new Vector4(reach > 1e-4f ? d / reach : 1f, halfRadians, seed, look);
                 }
             }
             bool flat = floor.IsFlat;
@@ -557,6 +676,8 @@ namespace OutOfSight
             }
             vertices[0] = meshVertices[0];
             mesh.vertices = meshVertices;
+            mesh.SetUVs(0, meshLocal);
+            mesh.SetUVs(1, meshData);
             mesh.RecalculateBounds();
             if (Facing != null)
             {

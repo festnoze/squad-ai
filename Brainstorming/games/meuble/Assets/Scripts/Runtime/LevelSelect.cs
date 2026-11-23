@@ -14,12 +14,15 @@ namespace OutOfSight
     /// by "Niveaux". One card per entry of <see cref="GameState.LevelOrder"/> (never a fixed count), laid out in rows of
     /// <see cref="Tuning.LevelSelectColumns"/>: the level number in play order, its name (levelN.name), its best time
     /// ("{0} s", one decimal) or "-"; a locked card shows "Verrouillé" instead of the time and is not interactable.
-    /// Unlocking is the save's rule (<see cref="SaveStore.IsUnlocked"/>): index 0, or the previous level won; every
-    /// level under UnlockAll. An unlocked card loads its level and closes the menus; "Retour" (and Escape, gamepad B,
-    /// read by <see cref="Menu"/>) goes back to the title.
+    /// Unlocking is the save's rule (<see cref="SaveStore.IsUnlocked"/>): index 0, the level won, the previous level won,
+    /// or opened by the levels v2 order migration; every level under UnlockAll. An unlocked card loads its level and
+    /// closes the menus; "Retour" (and Escape, gamepad B, read by <see cref="Menu"/>) goes back to the title.
     /// Navigation is explicit and runs over the playable cards and "Retour" only (a locked card can never take the
     /// selection): left and right follow the play order, up and down keep the column as well as they can, and "Retour"
-    /// closes the loop. The first unlocked card is the default selection (<see cref="DefaultSelectable"/>).
+    /// closes the loop. The card of Jouer's level (<see cref="SaveStore.FirstUnwonLevel"/>) is the default selection
+    /// (<see cref="DefaultSelectable"/>).
+    /// Levels v2 (docs/levels_v2/LEVELS_V2.md 7): the best time is read under the level's RecordId, and the first card of
+    /// each act of levels.json wears an act tag with the act's name.
     /// The page has its own Canvas, enabled only while it is open (never its GameObject, PRD 8.4).
     /// M7 level select redesign: the title page's look. A left column (the page title in the display face, the red rule,
     /// the difficulty and the progress, a legend of the miniatures, Retour) over the warm translucent side panel, and a
@@ -50,7 +53,29 @@ namespace OutOfSight
             public Text MoreWatchers;
             public Image Furniture;
             public bool ArtReady;
+            /// <summary>
+            /// Levels v2 (LEVELS_V2.md 7): the key the card reads its best time under, the level's
+            /// <see cref="LevelDef.RecordId"/> ("level6~1"); null until the page first opens (the level is parsed then).
+            /// </summary>
+            public string RecordId;
+            /// <summary>Levels v2: the act tag over the miniature of the first card of each act (null on the other cards).</summary>
+            public Image ActTag;
+            public Text Act;
+            /// <summary>Levels v2: the act this card opens, 1 for the first; 0 when it opens none.</summary>
+            public int ActNumber;
+            public string ActNameKey;
+            /// <summary>Stars (idea 5): the three small stars at the right of the record line, the saved count at the current difficulty lit.</summary>
+            public StarRow Stars;
         }
+
+        /// <summary>Stars: the stars earned over the line-up at the current difficulty, as the total line shows them.</summary>
+        public int StarsEarned { get; private set; }
+
+        /// <summary>Stars: the stars the line-up can hold (levels times <see cref="Tuning.StarsPerLevel"/>).</summary>
+        public int StarsPossible => Stars.Possible(order.Count);
+
+        /// <summary>Stars: the total line's text ("12 / 66 étoiles"), or null before the column is built.</summary>
+        public string StarsLineText => starsLine != null ? starsLine.text : null;
 
         public bool IsOpen { get; private set; }
 
@@ -61,11 +86,22 @@ namespace OutOfSight
         /// <summary>"Retour".</summary>
         public Button BackButton { get; private set; }
 
-        /// <summary>The first unlocked card (the default selection while the page is open), or Retour.</summary>
+        /// <summary>
+        /// The default selection while the page is open. Levels v2 (LEVELS_V2.md 7, IDEAS bug 20): the card of
+        /// <see cref="SaveStore.FirstUnwonLevel"/> (Jouer's level), else the first playable card, else Retour.
+        /// </summary>
         public Selectable DefaultSelectable
         {
             get
             {
+                string target = SaveStore.FirstUnwonLevel(order);
+                foreach (Card card in cards)
+                {
+                    if (card.LevelId == target && IsPlayable(card.Index))
+                    {
+                        return card.Button;
+                    }
+                }
                 foreach (Card card in cards)
                 {
                     if (IsPlayable(card.Index))
@@ -88,7 +124,11 @@ namespace OutOfSight
         private Dictionary<string, Text> labels;
         private Text difficultyLine;
         private Text progressLine;
+        private Text starsLine;
         private readonly List<KeyValuePair<Text, Func<string>>> legend = new List<KeyValuePair<Text, Func<string>>>();
+        // True while SetOpen(true) refreshes the page: the cards may then parse their level for its RecordId.
+        private bool opening;
+        private static readonly Color ActPlate = new Color(0.8f, 0.2f, 0.16f, 0.94f);
 
         // ----- The title page's palette and column (Menu's M7 title redesign), 1920 x 1080 reference pixels. -----
         private static readonly Color PageDim = new Color(0.07f, 0.045f, 0.032f, 0.62f);
@@ -101,6 +141,14 @@ namespace OutOfSight
         private const float Margin = 150f;
         private const float SidePanelWidth = 1240f;
         private static readonly Vector2 BackSize = new Vector2(420f, 78f);
+        // Stars (idea 5): the total line under the progress line (y 178, 40 tall) and above the legend (its first row at
+        // y 92, 36 tall), a gold star where the legend puts its icons; on a card, three 16 px stars in the 60 px the record
+        // line leaves free at its right (its rect ends 60 px before the card's edge), centred 33 px from that edge.
+        private const float StarsLineY = 136f;
+        private const float CardStarSize = 16f;
+        private const float CardStarGap = 3f;
+        private const float CardStarsInset = 33f;
+        private const float CardStarsAnchorY = 0.08f;
 
         /// <summary>
         /// Builds the page under <paramref name="parent"/> (the Menu's root Canvas). <paramref name="onChoose"/> receives
@@ -169,6 +217,13 @@ namespace OutOfSight
             progressLine = NewText(transform, "SelectProgress", ProgressText(), 28, SoftInk, font);
             progressLine.alignment = TextAnchor.MiddleLeft;
             PlaceLeft(progressLine.rectTransform, left, new Vector2(Margin, 178f), new Vector2(460f, 40f));
+            // Stars: the total at the current difficulty, a gold star then "12 / 66 étoiles", laid out like a legend row.
+            Image starsIcon = NewImage(transform, "SelectStarsIcon", Stars.Star, Stars.Gold);
+            starsIcon.preserveAspect = true;
+            PlaceLeft(starsIcon.rectTransform, left, new Vector2(Margin, StarsLineY), new Vector2(36f, 36f));
+            starsLine = NewText(transform, "SelectStars", StarsText(), 28, SoftInk, font);
+            starsLine.alignment = TextAnchor.MiddleLeft;
+            PlaceLeft(starsLine.rectTransform, left, new Vector2(Margin + 54f, StarsLineY), new Vector2(400f, 40f));
 
             // The legend of the miniatures and the watcher icons, one row each.
             float y = 92f;
@@ -219,6 +274,22 @@ namespace OutOfSight
             return string.Format(Strings.SelectProgress, won, order.Count);
         }
 
+        /// <summary>
+        /// Stars: the total line, the saved stars of every card's level at the current difficulty over the line-up's
+        /// possible stars. The record ids resolve only while the page opens (<see cref="RecordIdOf"/>), as the records do.
+        /// </summary>
+        private string StarsText()
+        {
+            string difficulty = SaveStore.Options.DifficultyId;
+            int earned = 0;
+            foreach (Card card in cards)
+            {
+                earned += SaveStore.Current.StarsOf(RecordIdOf(card, IsOpen || opening), difficulty);
+            }
+            StarsEarned = earned;
+            return string.Format(Strings.StarsTotal, earned, StarsPossible);
+        }
+
         private void Start()
         {
             // "--levelshot <dir>" (a built player): a screenshot of this page, then quit.
@@ -234,8 +305,16 @@ namespace OutOfSight
         {
             if (open)
             {
-                Refresh();
-                EnsureArt();
+                opening = true;
+                try
+                {
+                    Refresh();
+                    EnsureArt();
+                }
+                finally
+                {
+                    opening = false;
+                }
             }
             IsOpen = open;
             if (canvas != null && canvas.enabled != open)
@@ -274,8 +353,9 @@ namespace OutOfSight
                 card.Button.interactable = playable;
                 card.Best.enabled = playable;
                 card.Locked.enabled = !playable;
-                // M7 design (CONTRACT_M7 4.1): the record of the current difficulty.
-                card.Best.text = SaveStore.TryGetBest(card.LevelId, SaveStore.Options.DifficultyId, out float seconds) // MUTATION:SELECT_DIFFICULTY_RECORD
+                // M7 design (CONTRACT_M7 4.1): the record of the current difficulty. Levels v2: under the level's RecordId.
+                string recordId = RecordIdOf(card, IsOpen || opening);
+                card.Best.text = SaveStore.TryGetBest(recordId, SaveStore.Options.DifficultyId, out float seconds) // MUTATION:SELECT_DIFFICULTY_RECORD
                     ? string.Format(Strings.SelectBest, Strings.FormatSeconds(seconds))
                     : Strings.SelectNone;
                 // The name and the lock in the current language (the language may have changed since the cards were built).
@@ -284,6 +364,12 @@ namespace OutOfSight
                 card.Number.color = playable ? TitleInk : DimInk;
                 card.Name.color = playable ? TitleInk : DimInk;
                 card.Best.color = seconds > 0f && playable ? TitleInk : SoftInk;
+                // Stars: the saved count at the current difficulty, lit at once (no reveal on a card); hidden under a lock.
+                if (card.Stars != null)
+                {
+                    card.Stars.Set(SaveStore.Current.StarsOf(recordId, SaveStore.Options.DifficultyId), false);
+                    card.Stars.SetVisible(playable);
+                }
                 // M7: the miniature dims under a lock; a won level wears the green check.
                 card.Miniature.color = playable ? Color.white : new Color(0.55f, 0.5f, 0.46f, 0.5f);
                 card.LockIcon.enabled = !playable;
@@ -295,11 +381,22 @@ namespace OutOfSight
                 }
                 card.Furniture.color = iconTint;
                 card.MoreWatchers.color = playable ? TitleInk : DimInk;
+                // Levels v2: the act tag, in the current language, dimmed under a lock like the rest of the card.
+                if (card.ActTag != null)
+                {
+                    card.Act.text = ActLabel(card.ActNumber, card.ActNameKey);
+                    card.ActTag.color = playable ? ActPlate : new Color(ActPlate.r, ActPlate.g, ActPlate.b, 0.45f);
+                    card.Act.color = playable ? TitleInk : DimInk;
+                }
             }
             if (difficultyLine != null)
             {
                 difficultyLine.text = DifficultyText();
                 progressLine.text = ProgressText();
+            }
+            if (starsLine != null)
+            {
+                starsLine.text = StarsText();
             }
             foreach (KeyValuePair<Text, Func<string>> row in legend)
             {
@@ -379,9 +476,26 @@ namespace OutOfSight
             }
             int columns = Mathf.Max(1, Tuning.LevelSelectColumns);
             int rows = Mathf.Max(1, (order.Count + columns - 1) / columns);
+            // Levels v2 (LEVELS_V2.md 7): the acts of levels.json, matched by the id of each act's first level (so a play
+            // order that differs from the manifest still tags the right cards, and an act whose level is not shown is skipped).
+            var actStarts = new Dictionary<string, KeyValuePair<int, string>>();
+            ManifestDef manifest = LevelLoader.LoadManifestDef();
+            for (int a = 0; a < manifest.Acts.Count; a++)
+            {
+                ActDef act = manifest.Acts[a];
+                if (act != null && act.From >= 0 && act.From < manifest.Levels.Count && !actStarts.ContainsKey(manifest.Levels[act.From]))
+                {
+                    actStarts[manifest.Levels[act.From]] = new KeyValuePair<int, string>(a + 1, act.NameKey);
+                }
+            }
             for (int i = 0; i < order.Count; i++)
             {
-                cards.Add(NewCard(i, order[i], i / columns, i % columns, rows, columns));
+                Card card = NewCard(i, order[i], i / columns, i % columns, rows, columns);
+                if (actStarts.TryGetValue(order[i], out KeyValuePair<int, string> act))
+                {
+                    AddActTag(card, act.Key, act.Value);
+                }
+                cards.Add(card);
             }
             if (IsOpen)
             {
@@ -397,7 +511,7 @@ namespace OutOfSight
         private Card NewCard(int index, string levelId, int row, int column, int rows, int columns)
         {
             string name = "Card" + (index + 1);
-            Button button = Hud.MenuButton(grid, name, (index + 1).ToString(), display, labels);
+            Button button = Hud.MenuButton(grid, name, CardNumber(index).ToString(), display, labels);
             var rect = (RectTransform)button.transform;
             rect.anchorMin = new Vector2((float)column / columns, 1f - (float)(row + 1) / rows);
             rect.anchorMax = new Vector2((float)(column + 1) / columns, 1f - (float)row / rows);
@@ -472,8 +586,85 @@ namespace OutOfSight
             card.Locked = NewText(t, name + "Locked", Strings.SelectLocked, 24, LockedInk, font);
             card.Locked.alignment = TextAnchor.MiddleLeft;
             Anchor(card.Locked.rectTransform, new Vector2(0f, 0.02f), new Vector2(1f, 0.14f), new Vector2(14f, 0f), new Vector2(-60f, 0f));
+            // Stars: three small stars at the right end of the record line (Refresh lights the saved count).
+            card.Stars = new StarRow(t, name + "Stars", CardStarSize, CardStarGap);
+            card.Stars.Place(new Vector2(1f, CardStarsAnchorY), new Vector2(-CardStarsInset, 0f));
+            card.Stars.SetVisible(false);
             button.onClick.AddListener(() => Choose(index));
             return card;
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): the act tag of the first card of an act, a chair-red plate across the top of the
+        /// miniature (clear of the won badge in its top right corner) with the act's name.
+        /// </summary>
+        private void AddActTag(Card card, int number, string nameKey)
+        {
+            string name = "Card" + (card.Index + 1);
+            card.ActNumber = number;
+            card.ActNameKey = nameKey;
+            card.ActTag = NewImage(card.Frame.transform, name + "ActTag", ProceduralArt.Rounded, ActPlate);
+            card.ActTag.type = Image.Type.Sliced;
+            Anchor(card.ActTag.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(6f, -38f), new Vector2(-48f, -6f));
+            card.Act = NewText(card.ActTag.transform, name + "Act", ActLabel(number, nameKey), 20, TitleInk, font);
+            card.Act.alignment = TextAnchor.MiddleLeft;
+            card.Act.horizontalOverflow = HorizontalWrapMode.Wrap;
+            card.Act.verticalOverflow = VerticalWrapMode.Truncate;
+            card.Act.resizeTextForBestFit = true;
+            card.Act.resizeTextMinSize = 11;
+            card.Act.resizeTextMaxSize = 20;
+            Anchor(card.Act.rectTransform, Vector2.zero, Vector2.one, new Vector2(10f, 0f), new Vector2(-8f, 0f));
+        }
+
+        /// <summary>LEVELNUM: the number a card shows for the level at <paramref name="index"/> of the play order (1 based).</summary>
+        public static int CardNumber(int index) => index + 1;
+
+        /// <summary>
+        /// LEVELNUM: the number the level select shows for <paramref name="levelId"/> (its card position in the levels.json
+        /// "levels" order, never the file name: level19 is 17), or 0 when the level is not in that order (a test level).
+        /// The intro card shows the same number (Hud.ShowLevel).
+        /// </summary>
+        public static int DisplayNumber(IReadOnlyList<string> order, string levelId)
+        {
+            if (order == null || string.IsNullOrEmpty(levelId))
+            {
+                return 0;
+            }
+            for (int i = 0; i < order.Count; i++)
+            {
+                if (order[i] == levelId)
+                {
+                    return CardNumber(i);
+                }
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Levels v2: the text of an act tag, the act's name from Strings (act2.name: "La maisonnée"). When Strings has a
+        /// "select.act" format ({0} the act number, {1} its name), the tag uses it instead.
+        /// </summary>
+        public static string ActLabel(int number, string nameKey)
+        {
+            string name = string.IsNullOrEmpty(nameKey) ? string.Empty : Strings.Get(nameKey);
+            const string formatKey = "select.act";
+            string format = Strings.Get(formatKey);
+            return format != formatKey ? string.Format(format, number, name) : name;
+        }
+
+        /// <summary>
+        /// Levels v2: the key the card's best time is read under, its level's <see cref="LevelDef.RecordId"/>. The level is
+        /// parsed (once, cached by LevelMiniature) only when <paramref name="resolve"/> is true, that is while the page
+        /// opens; before that the bare id stands in (the page is closed, nobody reads it).
+        /// </summary>
+        private static string RecordIdOf(Card card, bool resolve)
+        {
+            if (card.RecordId == null && resolve)
+            {
+                LevelDef def = LevelMiniature.Def(card.LevelId);
+                card.RecordId = def != null && !string.IsNullOrEmpty(def.RecordId) ? def.RecordId : card.LevelId;
+            }
+            return card.RecordId ?? card.LevelId;
         }
 
         /// <summary>The level's name: its levelN.name string, or the id itself when Strings has none.</summary>
@@ -584,9 +775,11 @@ namespace OutOfSight
             SaveStore.Current.Won?.Clear();
             SaveStore.Current.Best?.Clear();
             float[] times = { 21.4f, 38.9f, 47.2f };
-            for (int i = 0; i < times.Length && i < order.Count; i++)
+            for (int i = 0; i < times.Length && i < order.Count && i < cards.Count; i++)
             {
-                SaveStore.Current.RecordWin(order[i], times[i], difficulty);
+                SaveStore.Current.RecordWin(order[i], RecordIdOf(cards[i], true), times[i], difficulty);
+                // Stars: three, two and one, so the shot shows every count and a total.
+                SaveStore.Current.RecordStars(RecordIdOf(cards[i], true), Tuning.StarsPerLevel - i, difficulty);
             }
             if (menu != null)
             {

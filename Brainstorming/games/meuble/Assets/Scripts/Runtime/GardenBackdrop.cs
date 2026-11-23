@@ -6,46 +6,81 @@ using UnityEngine.Rendering;
 namespace OutOfSight
 {
     /// <summary>
-    /// Garden backdrop (product owner image of 2026-11-19, Assets/Art/Environment/garden_open_horizontal_tile.png,
-    /// docs/LICENSES.md, docs/m9/backdrop/NOTES.md): a ring around every house (and the title house), an open cylinder
-    /// showing the owner's garden panorama on its inside, repeated around the circle, so the horizon closes on a garden
-    /// instead of grass running into the dark void.
+    /// Garden backdrop (product owner images, docs/LICENSES.md, docs/m9/backdrop/NOTES.md): a ring around every house (and
+    /// the title house), a cylinder showing the owner's garden panorama on its inside, repeated around the circle, closed
+    /// at its top by a round sky ceiling, so the horizon closes on a garden and the sky above it instead of grass running
+    /// into the void. 2026-11-19: the ring and Assets/Art/Environment/garden_open_horizontal_tile.png; 2026-11-20: the wide
+    /// panorama garden_open_horizontal_tile_wide.png and the ceiling showing sky_disc_sun_glow.png.
     ///
     /// <list type="bullet">
     /// <item>Size (<see cref="RingFor"/>): centred on the house's interior centre (as the garden quad); its radius is the
     /// farthest point the camera's focus can reach (the interior, the props, the exit zone, plus
-    /// <see cref="FootprintMargin"/>) plus the camera's longest horizontal arm (OrbitCamera.MaxDistanceFor at
-    /// Tuning.PitchMin) plus <see cref="CameraClearance"/>; its height is at least the camera's highest eye (the highest
-    /// floor, half the player's body, Tuning.CameraTargetHeight, the arm at Tuning.PitchMax) plus <see cref="HeadRoom"/>, so
-    /// the camera never sees over it. The picture keeps its aspect: the repeat count is the circumference over the wanted
-    /// height times the picture's aspect, rounded down, and the height then follows from it (never lower than wanted).
+    /// <see cref="FootprintMargin"/>) plus the camera's longest horizontal arm (OrbitCamera.MaxDistanceFor at the arm's
+    /// lowest pitch, Tuning.OrbitArmPitchMin) plus <see cref="CameraClearance"/>; its height is at least the camera's
+    /// highest eye (the highest floor, half the player's body, Tuning.CameraTargetHeight, the arm at Tuning.PitchMax) plus
+    /// <see cref="HeadRoom"/>, so the camera always stands inside the closed volume. The picture keeps its aspect: its
+    /// repeat count is the circumference over <see cref="PictureRatio"/> of the radius times the picture's aspect, rounded
+    /// (three on every level), its height then follows (<see cref="Ring.PictureHeight"/>, 0.52 of the radius); the straight
+    /// wall is at least the picture's height, and where it is taller the band above the picture shows its uniform top sky
+    /// (the texture is clamped in V).
     /// OrbitCamera keeps the camera inside (<see cref="ClampArm"/>) and its far clip past the ring (<see cref="Ring.FarClip"/>).</item>
-    /// <item>Look: unlit (no shadow cast or received, no dark side), the picture's sky made uniform at its top
-    /// (<see cref="SkyTop"/>, tools/assets/make_garden_backdrop.py), which is also the camera's clear colour
-    /// (<see cref="ClearColour"/>, Main), so the ring's top edge melts into the sky.</item>
-    /// <item>Budget (PRD 7.4): one renderer of one slot, drawn with the window pane's own material (the cached unlit
-    /// PrimitiveKit.Emissive one every level already has for its windows) through a property block (<see cref="Block"/>),
-    /// as <see cref="WindowImage"/>: no level gains a material, one draw call.</item>
+    /// <item>Ceiling (<see cref="SkyMesh"/>): a flat disc whose rim rounds down onto the ring's top edge (a quarter circle of
+    /// <see cref="Fillet"/>: no crease for the screen space ambient occlusion, which URP's Unlit shader also applies, to
+    /// darken), seen from below, its lowest vertices the ring's own top vertices (no gap), the sky picture projected once
+    /// over its diameter (no stretch). The picture's sun is moved
+    /// toward image right (tools/assets/make_garden_backdrop.py), which the mapping turns toward the scene's directional
+    /// light (<see cref="SunAzimuth"/>).</item>
+    /// <item>Look: unlit (no shadow cast or received, no dark side). The garden's top sky and the disc's rim are one
+    /// uniform colour (<see cref="SkyTop"/>), so the seam between the ring and its ceiling does not show; the camera's
+    /// clear colour (<see cref="ClearColour"/>, Main) is that colour too.</item>
+    /// <item>Budget (PRD 7.4): two renderers of one slot each (the ring and its ceiling), both drawn with the window
+    /// pane's own material (the cached unlit PrimitiveKit.Emissive one every level already has for its windows) through a
+    /// property block each (<see cref="Block"/>, <see cref="SkyBlock"/>), as <see cref="WindowImage"/>: no level gains a
+    /// material, two draw calls.</item>
     /// <item>Gameplay: no collider, the Default layer (no occluder, chair blocker or NavMesh source), never registered
     /// with the wall fader: vision, raycasts and navigation never see it.</item>
     /// </list>
     ///
-    /// Shipped file: Assets/Resources/GardenBackdrop.png (1024 x 1024, wraps horizontally, repeat in U and clamp in V).
-    /// With TextureLibrary.Disabled or without the picture there is no ring.
+    /// Shipped files: Assets/Resources/GardenBackdrop.png (4096 x 1024, wraps horizontally, repeat in U and clamp in V)
+    /// and Assets/Resources/GardenSky.png (1024 x 1024, the disc filling the square, clamped). With TextureLibrary.Disabled
+    /// or without the garden picture there is no ring; without the sky picture the ring stands open (the clear colour).
     /// </summary>
     public static class GardenBackdrop
     {
-        /// <summary>The picture's path under Resources.</summary>
+        /// <summary>The garden picture's path under Resources.</summary>
         public const string ResourcePath = "GardenBackdrop";
+
+        /// <summary>The sky picture's path under Resources.</summary>
+        public const string SkyResourcePath = "GardenSky";
 
         /// <summary>The ring's renderer name under the level root.</summary>
         public const string RendererName = "GardenBackdrop";
 
-        /// <summary>Facets around the circle (one mesh: 2 x (Segments + 1) vertices, 2 x Segments triangles).</summary>
+        /// <summary>The ceiling's renderer name (a child of the ring).</summary>
+        public const string SkyRendererName = "GardenBackdropSky";
+
+        /// <summary>Facets around the circle (the ring: 2 x (Segments + 1) vertices; the ceiling: rings of Segments + 1, same angles).</summary>
         public const int Segments = 72;
 
-        /// <summary>The picture's width over its height (1024 x 1024).</summary>
-        public const float ImageAspect = 1f;
+        /// <summary>
+        /// The radius of the ceiling's rounded rim, in metres: the wall ends this far below the ceiling and a quarter circle
+        /// joins them. A right angle there was a concave crease, which the screen space ambient occlusion (0.3 m) drew as a
+        /// dark band all round the sky (2026-11-20, docs/m9/backdrop/NOTES.md v8); a 2.5 m round leaves it nothing to darken.
+        /// </summary>
+        public const float Fillet = 2.5f;
+
+        /// <summary>Facets along the rounded rim's quarter circle.</summary>
+        public const int FilletSegments = 6;
+
+        /// <summary>The garden picture's width over its height (4096 x 1024).</summary>
+        public const float ImageAspect = 4f;
+
+        /// <summary>
+        /// The garden picture's wanted height over the ring's radius: with the wide panorama, three repeats round every
+        /// ring (twelve garden stretches, never the same one twice in a view), the picture 0.52 of the radius high, so every
+        /// house sees its garden at the same angle (the 2026-11-19 rings stood 0.52 to 0.57 of their radius high).
+        /// </summary>
+        public const float PictureRatio = 0.5f;
 
         /// <summary>Added around the focus footprint (walls, the chair stepping out on the exit, the smoothing lag).</summary>
         public const float FootprintMargin = 1.5f;
@@ -59,23 +94,53 @@ namespace OutOfSight
         /// <summary>The ring's foot below y = 0 (under the garden quad at -0.02, so no gap shows).</summary>
         public const float Sink = 0.06f;
 
-        /// <summary>The picture's colour factor (sRGB, the base colour through the block): at most 1, never in the bloom.</summary>
+        /// <summary>The pictures' colour factor (sRGB, the base colour through the blocks): at most 1, never in the bloom.</summary>
         public const float Intensity = 1f;
 
         /// <summary>
-        /// The picture's uniform sky at its top (sRGB, tools/assets/make_garden_backdrop.py SKY), times
-        /// <see cref="Intensity"/> the camera's clear colour.
+        /// The garden picture's uniform sky at its top and the sky picture's rim (sRGB, tools/assets/make_garden_backdrop.py
+        /// SKY, the sky source's own rim colour), times <see cref="Intensity"/> the camera's clear colour.
         /// </summary>
-        public static readonly Color SkyTop = new Color32(127, 190, 253, 255);
+        public static readonly Color SkyTop = new Color32(130, 191, 253, 255);
 
-        /// <summary>The camera's clear colour: the ring's top sky as the unlit ring draws it.</summary>
+        /// <summary>
+        /// The light the sky picture's sun goes toward without a sun in the scene (edit mode tools): Main's sun of
+        /// 2026-11-20 (Euler 44, 32), whose light comes from this direction.
+        /// </summary>
+        public static Vector3 DefaultSunDirection
+        {
+            get
+            {
+                // -(Quaternion.Euler(44, 32, 0) * forward), written out (no engine call in a static initializer).
+                float pitch = 44f * Mathf.Deg2Rad;
+                float yaw = 32f * Mathf.Deg2Rad;
+                return new Vector3(-Mathf.Sin(yaw) * Mathf.Cos(pitch), Mathf.Sin(pitch), -Mathf.Cos(yaw) * Mathf.Cos(pitch));
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (D25, C10): the night preset's tint of the garden picture (sRGB factor, the base colour through the
+        /// block instead of a neutral <see cref="Intensity"/>): a dark blue garden under the moon. Visual only.
+        /// </summary>
+        public static readonly Color NightTint = new Color(0.2f, 0.27f, 0.48f, 1f);
+
+        /// <summary>The night preset's tint of the sky ceiling (darker than the garden: the sky picture is bright).</summary>
+        public static readonly Color NightSkyTint = new Color(0.12f, 0.16f, 0.33f, 1f);
+
+        /// <summary>The garden picture's colour factor under the preset applied last (<see cref="Main.Night"/>).</summary>
+        public static Color Tint => Main.Night ? NightTint : new Color(Intensity, Intensity, Intensity, 1f); // MUTATION:NIGHT_BACKDROP
+
+        /// <summary>The sky ceiling's colour factor under the preset applied last.</summary>
+        public static Color SkyTint => Main.Night ? NightSkyTint : new Color(Intensity, Intensity, Intensity, 1f);
+
+        /// <summary>The camera's clear colour: the ring's top sky as the unlit ring draws it (night: tinted as the ring).</summary>
         public static Color ClearColour
         {
             get
             {
-                float k = new Color(Intensity, Intensity, Intensity).linear.r;
+                Color k = Tint.linear;
                 Color sky = SkyTop.linear;
-                return new Color(sky.r * k, sky.g * k, sky.b * k, 1f).gamma;
+                return new Color(sky.r * k.r, sky.g * k.g, sky.b * k.b, 1f).gamma;
             }
         }
 
@@ -86,7 +151,10 @@ namespace OutOfSight
         private static readonly Dictionary<string, Mesh> Meshes = new Dictionary<string, Mesh>();
         private static Texture2D texture;
         private static bool loaded;
+        private static Texture2D skyTexture;
+        private static bool skyLoaded;
         private static MaterialPropertyBlock block;
+        private static MaterialPropertyBlock skyBlock;
 
         /// <summary>The size of one level's ring (see <see cref="RingFor"/>).</summary>
         public readonly struct Ring
@@ -94,28 +162,45 @@ namespace OutOfSight
             /// <summary>The ring's axis at the ground (y = 0).</summary>
             public readonly Vector3 Center;
             public readonly float Radius;
-            /// <summary>From the foot (y = -<see cref="Sink"/>) to the top.</summary>
+            /// <summary>From the foot (y = -<see cref="Sink"/>) to the top (the ceiling).</summary>
             public readonly float Height;
+            /// <summary>The garden picture's height from the foot (at most <see cref="Height"/>; its aspect is exact).</summary>
+            public readonly float PictureHeight;
             public readonly int Repeats;
             /// <summary>The camera may stand this far from the axis at most (OrbitCamera's clamp).</summary>
             public readonly float CameraRadius;
             /// <summary>The camera's eye may stand this high at most.</summary>
             public readonly float CameraTop;
 
-            public Ring(Vector3 center, float radius, float height, int repeats, float cameraRadius, float cameraTop)
+            public Ring(Vector3 center, float radius, float height, float pictureHeight, int repeats, float cameraRadius, float cameraTop)
             {
                 Center = center;
                 Radius = radius;
                 Height = height;
+                PictureHeight = pictureHeight;
                 Repeats = repeats;
                 CameraRadius = cameraRadius;
                 CameraTop = cameraTop;
             }
 
-            /// <summary>The top edge's height (y).</summary>
+            /// <summary>The ceiling's height (y), its flat part.</summary>
             public float Top => Height - Sink;
 
-            /// <summary>A far clip that holds the whole ring from any camera inside it.</summary>
+            /// <summary>Where the straight wall ends and the ceiling's rounded rim begins (y).</summary>
+            public float WallTop => Top - Fillet;
+
+            /// <summary>The closed volume's inside radius at height <paramref name="y"/>: the ring's up to the wall's top, then the rounded rim's.</summary>
+            public float InnerRadiusAt(float y)
+            {
+                if (y <= WallTop)
+                {
+                    return Radius;
+                }
+                float up = Mathf.Min(y - WallTop, Fillet);
+                return Radius - Fillet + Mathf.Sqrt(Mathf.Max(0f, Fillet * Fillet - up * up));
+            }
+
+            /// <summary>A far clip that holds the whole ring and its ceiling from any camera inside it.</summary>
             public float FarClip => Mathf.Sqrt(4f * Radius * Radius + Height * Height) + 2f;
 
             /// <summary>True when <paramref name="point"/> lies inside the ring's camera space (radius and top).</summary>
@@ -127,8 +212,8 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// The ring of <paramref name="def"/>: centre, radius, height and repeats (see the class summary). Pure: the same
-        /// level always gives the same ring (LevelBuilder builds it, OrbitCamera fences the camera with it).
+        /// The ring of <paramref name="def"/>: centre, radius, height, picture height and repeats (see the class summary).
+        /// Pure: the same level always gives the same ring (LevelBuilder builds it, OrbitCamera fences the camera with it).
         /// </summary>
         public static Ring RingFor(LevelDef def)
         {
@@ -136,15 +221,18 @@ namespace OutOfSight
             Vector2 c = interior.center;
             float reach = FocusReach(def, c);
             float arm = OrbitCamera.MaxDistanceFor(def);
-            float horizontal = arm * Mathf.Cos(Tuning.PitchMin * Mathf.Deg2Rad);
+            // The arm's lowest pitch gives its longest horizontal reach (the view may tilt higher, the camera does not move).
+            float horizontal = arm * Mathf.Cos(Mathf.Clamp(Tuning.OrbitArmPitchMin, 0f, Tuning.PitchMax) * Mathf.Deg2Rad);
             float radius = reach + horizontal + CameraClearance;
             float eye = FocusTop(def) + arm * Mathf.Sin(Tuning.PitchMax * Mathf.Deg2Rad);
             float wanted = eye + HeadRoom + Sink;
             float circumference = 2f * Mathf.PI * radius;
-            // Rounded down, so the height that keeps the aspect is never below the wanted one.
-            int repeats = Mathf.Max(3, Mathf.FloorToInt(circumference / (wanted * ImageAspect))); // MUTATION:BACKDROP_REPEATS
-            float height = circumference / (repeats * ImageAspect);
-            return new Ring(new Vector3(c.x, 0f, c.y), radius, height, repeats, reach + horizontal + 0.5f * CameraClearance, eye + 0.5f * HeadRoom);
+            int repeats = Mathf.Max(1, Mathf.RoundToInt(circumference / (PictureRatio * radius * ImageAspect))); // MUTATION:BACKDROP_REPEATS
+            float picture = circumference / (repeats * ImageAspect);
+            // The straight wall holds the whole picture (its uniform top sky meets the rounded rim), the ceiling the highest eye.
+            float height = Mathf.Max(picture + Fillet, wanted);
+            return new Ring(new Vector3(c.x, 0f, c.y), radius, height, picture, repeats, reach + horizontal + 0.5f * CameraClearance,
+                eye + 0.5f * HeadRoom);
         }
 
         /// <summary>The farthest the camera's focus can be from <paramref name="c"/> (horizontal), margin included.</summary>
@@ -214,7 +302,7 @@ namespace OutOfSight
             return arm;
         }
 
-        /// <summary>The picture, or null with <see cref="TextureLibrary.Disabled"/> or when it is missing (one error logged).</summary>
+        /// <summary>The garden picture, or null with <see cref="TextureLibrary.Disabled"/> or when it is missing (one error logged).</summary>
         public static Texture2D Texture
         {
             get
@@ -243,6 +331,33 @@ namespace OutOfSight
             }
         }
 
+        /// <summary>The sky picture, or null with <see cref="TextureLibrary.Disabled"/> or when it is missing (one error logged).</summary>
+        public static Texture2D SkyTexture
+        {
+            get
+            {
+                if (TextureLibrary.Disabled)
+                {
+                    return null;
+                }
+                if (!skyLoaded || skyTexture == null)
+                {
+                    bool first = !skyLoaded;
+                    skyLoaded = true;
+                    skyTexture = Resources.Load<Texture2D>(SkyResourcePath);
+                    if (skyTexture == null && first)
+                    {
+                        Debug.LogError($"[GardenBackdrop] no sky picture at Resources/{SkyResourcePath}: the rings stand open");
+                    }
+                    else if (skyTexture != null)
+                    {
+                        skyTexture.wrapMode = TextureWrapMode.Clamp;
+                    }
+                }
+                return skyTexture;
+            }
+        }
+
         /// <summary>The ring's property block: the picture (its repeats are in the mesh's UVs), a neutral colour of <see cref="Intensity"/>.</summary>
         public static MaterialPropertyBlock Block
         {
@@ -257,20 +372,66 @@ namespace OutOfSight
                 {
                     block = new MaterialPropertyBlock();
                 }
-                block.Clear();
-                block.SetTexture(BaseMapId, t); // MUTATION:BACKDROP_IMAGE
-                block.SetVector(BaseMapStId, new Vector4(1f, 1f, 0f, 0f));
-                block.SetColor(BaseColorId, new Color(Intensity, Intensity, Intensity, 1f));
+                Fill(block, t, Tint);
                 return block;
             }
         }
 
+        /// <summary>The ceiling's property block: the sky picture, a neutral colour of <see cref="Intensity"/>.</summary>
+        public static MaterialPropertyBlock SkyBlock
+        {
+            get
+            {
+                Texture2D t = SkyTexture;
+                if (t == null)
+                {
+                    return null;
+                }
+                if (skyBlock == null)
+                {
+                    skyBlock = new MaterialPropertyBlock();
+                }
+                Fill(skyBlock, t, SkyTint);
+                return skyBlock;
+            }
+        }
+
+        private static void Fill(MaterialPropertyBlock properties, Texture2D t, Color tint)
+        {
+            properties.Clear();
+            properties.SetTexture(BaseMapId, t); // MUTATION:BACKDROP_IMAGE
+            properties.SetVector(BaseMapStId, new Vector4(1f, 1f, 0f, 0f));
+            properties.SetColor(BaseColorId, tint);
+        }
+
+        /// <summary>
+        /// The azimuth (radians, from +x toward +z) the scene's directional light comes from: RenderSettings.sun, else
+        /// Main's sun, else <see cref="DefaultSunDirection"/>.
+        /// </summary>
+        public static float SunAzimuth()
+        {
+            Light sun = RenderSettings.sun;
+            if (sun == null && Main.Instance != null)
+            {
+                sun = Main.Instance.Sun;
+            }
+            Vector3 toward = sun != null ? -sun.transform.forward : DefaultSunDirection;
+            if (new Vector2(toward.x, toward.z).sqrMagnitude < 1e-6f)
+            {
+                toward = DefaultSunDirection;
+            }
+            return Mathf.Atan2(toward.z, toward.x);
+        }
+
         /// <summary>
         /// Builds the ring of <paramref name="def"/> under <paramref name="root"/> with <paramref name="material"/> (the window
-        /// pane's unlit one) and the picture's block; null without the picture.
+        /// pane's unlit one) and the picture's block, and its sky ceiling as a child; null without the garden picture.
         /// </summary>
         public static MeshRenderer Build(LevelDef def, Transform root, Material material)
         {
+            // Levels v2 (C10): the level's lighting preset is applied here, the first level build step that sees the level
+            // (LevelBuilder.BuildFloors, before the walls), so the windows, the ring and the sky all read the right one.
+            Main.ApplyLighting(def);
             MaterialPropertyBlock properties = Block;
             if (properties == null || material == null)
             {
@@ -281,6 +442,20 @@ namespace OutOfSight
             go.transform.SetParent(root, false);
             go.transform.localPosition = ring.Center;
             go.AddComponent<MeshFilter>().sharedMesh = Mesh(ring);
+            MeshRenderer renderer = Unlit(go, material, properties);
+            MaterialPropertyBlock sky = SkyBlock;
+            if (sky != null)
+            {
+                var ceiling = new GameObject(SkyRendererName) { layer = 0 };
+                ceiling.transform.SetParent(go.transform, false);
+                ceiling.AddComponent<MeshFilter>().sharedMesh = SkyMesh(ring, SunAzimuth());
+                Unlit(ceiling, material, sky);
+            }
+            return renderer;
+        }
+
+        private static MeshRenderer Unlit(GameObject go, Material material, MaterialPropertyBlock properties)
+        {
             var renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
             renderer.SetPropertyBlock(properties);
@@ -292,15 +467,30 @@ namespace OutOfSight
             return renderer;
         }
 
+        private static string Key(string kind, Ring ring)
+        {
+            System.Globalization.CultureInfo ci = System.Globalization.CultureInfo.InvariantCulture;
+            return kind + ring.Radius.ToString("0.###", ci) + "x" + ring.Height.ToString("0.###", ci) + "x"
+                + ring.PictureHeight.ToString("0.###", ci) + "x" + ring.Repeats;
+        }
+
+        /// <summary>The angle of the rim vertex <paramref name="i"/> (ring and ceiling share them, so their edges meet).</summary>
+        private static Vector3 RimDirection(int i)
+        {
+            float angle = 2f * Mathf.PI * i / Segments;
+            return new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+        }
+
         /// <summary>
         /// The ring's mesh around its own axis: a cylinder of <see cref="Segments"/> facets from y = -<see cref="Sink"/>
-        /// to its top, its faces toward the axis (seen from inside only), U running <see cref="Ring.Repeats"/> times round
-        /// left to right as seen from inside, V from 0 at the foot to 1 at the top. Cached by size.
+        /// to the wall's top (<see cref="Ring.WallTop"/>), its faces toward the axis (seen from inside only), U running
+        /// <see cref="Ring.Repeats"/> times round left to right as seen from inside, V from 0 at the foot to 1 at the
+        /// picture's top (above 1 up the band over the picture: the clamped texture repeats its uniform top sky there).
+        /// Cached by size.
         /// </summary>
         public static Mesh Mesh(Ring ring)
         {
-            System.Globalization.CultureInfo ci = System.Globalization.CultureInfo.InvariantCulture;
-            string key = ring.Radius.ToString("0.###", ci) + "x" + ring.Height.ToString("0.###", ci) + "x" + ring.Repeats;
+            string key = Key("ring", ring);
             if (Meshes.TryGetValue(key, out Mesh cached) && cached != null)
             {
                 return cached;
@@ -311,11 +501,11 @@ namespace OutOfSight
             var uvs = new Vector2[vertices.Length];
             var triangles = new int[6 * n];
             float bottom = -Sink;
-            float top = ring.Height - Sink;
+            float top = ring.WallTop;
+            float vTop = (top + Sink) / Mathf.Max(1e-3f, ring.PictureHeight);
             for (int i = 0; i <= n; i++)
             {
-                float angle = 2f * Mathf.PI * i / n;
-                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                Vector3 dir = RimDirection(i);
                 // Angles grow toward +z, the viewer's left from inside: U runs the other way so the picture is not mirrored.
                 float u = ring.Repeats * (float)(n - i) / n;
                 vertices[2 * i] = dir * ring.Radius + Vector3.up * bottom;
@@ -323,7 +513,7 @@ namespace OutOfSight
                 normals[2 * i] = -dir;
                 normals[2 * i + 1] = -dir;
                 uvs[2 * i] = new Vector2(u, 0f);
-                uvs[2 * i + 1] = new Vector2(u, 1f);
+                uvs[2 * i + 1] = new Vector2(u, vTop);
             }
             for (int i = 0; i < n; i++)
             {
@@ -337,6 +527,85 @@ namespace OutOfSight
                 triangles[6 * i + 5] = b1;
             }
             var mesh = new Mesh { name = "GardenBackdrop" };
+            mesh.vertices = vertices;
+            mesh.normals = normals;
+            mesh.uv = uvs;
+            mesh.triangles = triangles;
+            mesh.RecalculateBounds();
+            mesh.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            Meshes[key] = mesh;
+            return mesh;
+        }
+
+        /// <summary>
+        /// The ceiling's mesh around the ring's axis, seen from inside only: from the ring's own top vertices (the wall's
+        /// top) a quarter circle of <see cref="Fillet"/> in <see cref="FilletSegments"/> rings rounds up and in onto a flat
+        /// fan at <see cref="Ring.Top"/>, its normals the surface's own (they feed the depth normals the ambient occlusion
+        /// reads). The sky picture is projected from below over the ring's diameter (UV 0 to 1 from the horizontal position:
+        /// exact on the flat part, no stretch), image right turned toward <paramref name="sunAzimuth"/> (radians from +x
+        /// toward +z), where the picture's sun stands. Cached by size and azimuth.
+        /// </summary>
+        public static Mesh SkyMesh(Ring ring, float sunAzimuth)
+        {
+            System.Globalization.CultureInfo ci = System.Globalization.CultureInfo.InvariantCulture;
+            string key = Key("sky", ring) + "@" + (sunAzimuth * Mathf.Rad2Deg).ToString("0.0", ci);
+            if (Meshes.TryGetValue(key, out Mesh cached) && cached != null)
+            {
+                return cached;
+            }
+            int n = Segments;
+            int rings = FilletSegments + 1;
+            int centre = rings * (n + 1);
+            var vertices = new Vector3[centre + 1];
+            var normals = new Vector3[vertices.Length];
+            var uvs = new Vector2[vertices.Length];
+            var triangles = new int[6 * n * FilletSegments + 3 * n];
+            float fillet = Mathf.Min(Fillet, ring.Radius);
+            for (int j = 0; j < rings; j++)
+            {
+                // Ring 0 is the wall's top (outward normal angle 0), the last ring the flat part's edge (90 degrees).
+                float theta = 0.5f * Mathf.PI * j / FilletSegments;
+                float radial = ring.Radius - fillet + fillet * Mathf.Cos(theta);
+                float y = ring.WallTop + fillet * Mathf.Sin(theta);
+                for (int i = 0; i <= n; i++)
+                {
+                    Vector3 dir = RimDirection(i);
+                    // The angle measured from the sun's azimuth: image right (+U) points at the sun.
+                    float a = 2f * Mathf.PI * i / n - sunAzimuth;
+                    float r = 0.5f * radial / ring.Radius;
+                    int k = j * (n + 1) + i;
+                    vertices[k] = dir * radial + Vector3.up * y;
+                    normals[k] = -(dir * Mathf.Cos(theta) + Vector3.up * Mathf.Sin(theta));
+                    uvs[k] = new Vector2(0.5f + r * Mathf.Cos(a), 0.5f + r * Mathf.Sin(a));
+                }
+            }
+            vertices[centre] = Vector3.up * ring.Top;
+            normals[centre] = Vector3.down;
+            uvs[centre] = new Vector2(0.5f, 0.5f);
+            int t = 0;
+            for (int j = 0; j < FilletSegments; j++)
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    // As the ring's facets (lower ring b, upper ring t): clockwise as seen from inside, Unity's front face.
+                    int b0 = j * (n + 1) + i, b1 = b0 + 1, t0 = b0 + n + 1, t1 = t0 + 1;
+                    triangles[t++] = t1;
+                    triangles[t++] = t0;
+                    triangles[t++] = b0;
+                    triangles[t++] = t1;
+                    triangles[t++] = b0;
+                    triangles[t++] = b1;
+                }
+            }
+            int last = FilletSegments * (n + 1);
+            for (int i = 0; i < n; i++)
+            {
+                // Clockwise as seen from below (Unity's front face): the underside shows, the top is culled.
+                triangles[t++] = centre;
+                triangles[t++] = last + i;
+                triangles[t++] = last + i + 1;
+            }
+            var mesh = new Mesh { name = "GardenBackdropSky" };
             mesh.vertices = vertices;
             mesh.normals = normals;
             mesh.uv = uvs;

@@ -14,3 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: OutOfSight.Runtime::OutOfSight.UiIconLibrary
   creak: {fileID: 21300000, guid: b47a0ffcfdb045d69cc4f8d3466a1104, type: 3}
   suspicion: {fileID: 21300000, guid: bdb8cab8bb0840c181d590e0acc6853d, type: 3}
+  reset: {fileID: 21300000, guid: 729457af9bd854a4d83e5d2a6418ea05, type: 3}
+  back: {fileID: 21300000, guid: e508ebc90ed714f47a8c4b06fe83573c, type: 3}
+  flagFrench: {fileID: 21300000, guid: 597381f4d78f8ab4e80f8569c96cd742, type: 3}
+  flagEnglish: {fileID: 21300000, guid: 78c5141039c8db14a9d9e1e64784ae8b, type: 3}

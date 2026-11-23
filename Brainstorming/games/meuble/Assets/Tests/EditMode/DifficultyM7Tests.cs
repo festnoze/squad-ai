@@ -328,6 +328,73 @@ namespace OutOfSight.Tests
             Assert.AreEqual(30f, save.RecordWin("level2", 31f).Best, "the two argument RecordWin is Normal");
         }
 
+        // ----- levels v2: the record revision (docs/levels_v2/LEVELS_V2.md 7) -----
+
+        [Test]
+        public void RecordKey_WithARevisedRecordId()
+        {
+            Assert.AreEqual("level6~1", new LevelDef { Id = "level6", Rev = 1 }.RecordId, "premise: a rev 1 level's record id");
+            Assert.AreEqual("level6", new LevelDef { Id = "level6" }.RecordId, "premise: rev 0 keeps the bare id");
+            Assert.AreEqual("level6~1@difficile", DifficultyDef.RecordKey("level6~1", DifficultyDef.Difficile));
+            Assert.AreEqual("level6~1@facile", DifficultyDef.RecordKey("level6~1", DifficultyDef.Facile));
+            Assert.AreEqual("level6~1", DifficultyDef.RecordKey("level6~1", DifficultyDef.Normal), "Normal keeps the record id bare");
+            Assert.AreEqual("level6~2@difficile", DifficultyDef.RecordKey(new LevelDef { Id = "level6", Rev = 2 }.RecordId, DifficultyDef.Difficile));
+        }
+
+        [Test]
+        public void RecordWin_AnOldBareRecordIsNotShownForARevisedLevelButTheWinStays()
+        {
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "outofsight_record_rev_tests_" + System.Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(dir);
+            try
+            {
+                SaveStore.ResetForTests();
+                string path = System.IO.Path.Combine(dir, SaveStore.FileName);
+                SaveStore.PathOverride = path;
+                System.IO.File.WriteAllText(path, "{ \"version\": 1, \"order\": 2, \"won\": [\"level6\"], \"best\": { \"level6\": 12.5, \"level6@difficile\": 20.0 } }");
+                SaveStore.Load();
+                Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the save loads");
+                var level6 = new LevelDef { Id = "level6", Rev = 1 };
+                Assert.IsTrue(SaveStore.TryGetBest("level6", DifficultyDef.Normal, out _), "premise: the old bare record is in the save");
+
+                // The old records of level6 are not the records of level6 rev 1, at any difficulty; its win stays.
+                Assert.IsFalse(SaveStore.TryGetBest(level6.RecordId, DifficultyDef.Normal, out _), "an old bare record shows for a rev 1 level");
+                Assert.IsFalse(SaveStore.TryGetBest(level6.RecordId, DifficultyDef.Difficile, out _), "an old Difficile record shows for a rev 1 level");
+                Assert.IsTrue(SaveStore.IsWon("level6"), "the revision lost the win");
+                var order = new List<string> { "level5", "level6", "level7" };
+                Assert.IsTrue(SaveStore.IsUnlocked(order, 2), "the revision changed unlocking");
+
+                // The first win on rev 1 is a record of its own, kept beside the old one (never read again, never deleted).
+                RecordResult first = SaveStore.RecordWin(level6.Id, level6.RecordId, 30f, DifficultyDef.Normal);
+                Assert.IsTrue(first.NewBest, "a slower first win on rev 1 is not a record (the old record was read)");
+                Assert.Less(first.PreviousBest, 0f, "the old record was taken for the previous best");
+                Assert.IsTrue(SaveStore.TryGetBest(level6.RecordId, DifficultyDef.Normal, out float best));
+                Assert.AreEqual(30f, best, 1e-4f);
+                SaveData disk = SaveData.Parse(System.IO.File.ReadAllText(path), out string problem);
+                Assert.IsNotNull(disk, problem);
+                Assert.AreEqual(12.5f, disk.Best["level6"], 1e-4f, "the old bare record was removed from the file");
+                Assert.AreEqual(30f, disk.Best["level6~1"], 1e-4f, "the rev 1 record is not on disk under level6~1");
+                CollectionAssert.AreEqual(new[] { "level6" }, disk.Won, "Won must keep the bare id once");
+                SaveStore.RecordWin(level6.Id, level6.RecordId, 25f, DifficultyDef.Difficile);
+                Assert.IsTrue(SaveStore.TryGetBest(level6.RecordId, DifficultyDef.Difficile, out best));
+                Assert.AreEqual(25f, best, 1e-4f, "the rev 1 Difficile record");
+                Assert.IsTrue(SaveStore.Current.Best.ContainsKey("level6~1@difficile"));
+                Assert.AreEqual(20f, SaveStore.Current.Best["level6@difficile"], 1e-4f, "the old Difficile record changed");
+            }
+            finally
+            {
+                SaveStore.ResetForTests();
+                try
+                {
+                    System.IO.Directory.Delete(dir, true);
+                }
+                catch (System.Exception)
+                {
+                    // A leftover temp folder is harmless.
+                }
+            }
+        }
+
         [Test]
         public void RecordWin_OldSaveRecordsStayNormalAndRoundTrip()
         {

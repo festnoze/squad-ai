@@ -428,7 +428,7 @@ namespace OutOfSight.Tests
                 Human(PersonalityDef.Granny, "quaternius.woman_dress", "#A88BC7", 0.8f, 7f, 55f, 0.6f, 1.0f, 0.75f, 0.8f),
                 Human(PersonalityDef.Teen, "quaternius.man_tshirt", "#8DBF3F", 1.1f, 6f, 35f, 0.4f, 0.8f, 0.75f, 1.0f),
                 Human(PersonalityDef.Tidy, "quaternius.woman", "#F4D35E", 1.2f, 10f, 55f, 1.0f, 1.3f, 0.4f, 1.3f),
-                Row(PersonalityDef.Dog, "person.dog", "person.dog.trait", "quaternius.shiba", "#4F6670", 1.4f, 6f, 70f, 0.35f, 0f, 0f, 0.75f, 0f,
+                Row(PersonalityDef.Dog, "person.dog", "person.dog.trait", "quaternius.husky", "#505458", 1.4f, 6f, 70f, 0.35f, 0f, 0f, 0.75f, 0f,
                     false, false, false, false, false, true),
             };
             foreach (Dictionary<string, object> row in rows)
@@ -473,7 +473,7 @@ namespace OutOfSight.Tests
                 "a dog kind must win over its personality");
             PersonalityDef dog = PersonalityDef.ForInhabitant(new InhabitantDef { Kind = "dog" });
             Assert.AreEqual(Tuning.DogEyeHeight, dog.EyeHeight);
-            Assert.AreEqual("quaternius.shiba", dog.Model);
+            Assert.AreEqual("quaternius.husky", dog.Model);
 
             PersonalityDef dressed = PersonalityDef.ForInhabitant(new InhabitantDef
             {
@@ -485,7 +485,7 @@ namespace OutOfSight.Tests
             Assert.AreEqual(0.8f, dressed.WalkSpeed, "the row values stay the personality's");
             Assert.AreEqual("quaternius.woman_dress", PersonalityDef.For(PersonalityDef.Granny).Model, "premise: the row has its own model");
             Assert.AreEqual("quaternius.man", PersonalityDef.ForInhabitant(new InhabitantDef { Kind = "dog", Model = "quaternius.man" }).Model);
-            Assert.AreEqual("quaternius.shiba", PersonalityDef.ForInhabitant(new InhabitantDef { Kind = "dog", Model = "" }).Model,
+            Assert.AreEqual("quaternius.husky", PersonalityDef.ForInhabitant(new InhabitantDef { Kind = "dog", Model = "" }).Model,
                 "an empty model is not explicit");
         }
 
@@ -1815,24 +1815,44 @@ namespace OutOfSight.Tests
             Assert.AreEqual(2, save.Best.Count);
         }
 
+        /// <summary>
+        /// Levels v2 (docs/levels_v2/LEVELS_V2.md 7): index i is playable when i is 0, the level itself is won, the level
+        /// before it is won, or the order migration listed it in Unlocked. The mutation killer of UNLOCK_WON (a won level
+        /// locked by a reorder) and UNLOCK_MIGRATED (a level the migration opened stays locked).
+        /// </summary>
         [Test]
         public void IsUnlocked_opens_a_level_once_the_one_before_it_is_won()
         {
-            var order = new List<string> { "level1", "level2", "level8" };
+            var order = new List<string> { "level1", "level2", "level8", "level9" };
             var save = new SaveData();
             Assert.IsTrue(save.IsUnlocked(order, 0), "the first level is always open");
             Assert.IsFalse(save.IsUnlocked(order, 1));
             Assert.IsFalse(save.IsUnlocked(order, 2));
             Assert.IsFalse(save.IsUnlocked(order, -1));
-            Assert.IsFalse(save.IsUnlocked(order, 3));
+            Assert.IsFalse(save.IsUnlocked(order, 4));
             Assert.IsFalse(save.IsUnlocked(null, 0));
+
+            // A won level is playable wherever the play order puts it (a reorder never locks a level already won).
             save.RecordWin("level8", 10f);
-            Assert.IsFalse(save.IsUnlocked(order, 1), "winning a later level opened an earlier one");
+            Assert.IsTrue(save.IsUnlocked(order, 2), "a won level is locked because the level before it is not won");
+            Assert.IsTrue(save.IsUnlocked(order, 3), "the level after a won level is locked");
+            Assert.IsFalse(save.IsUnlocked(order, 1), "winning a later level opened the unwon level before it");
+
+            // The level after a won one opens.
             save.RecordWin("level1", 10f);
             Assert.IsTrue(save.IsUnlocked(order, 1));
-            Assert.IsFalse(save.IsUnlocked(order, 2), "level 8 is open before level 2 is won");
-            save.RecordWin("level2", 10f);
-            Assert.IsTrue(save.IsUnlocked(order, 2));
+
+            // The migration's Unlocked list opens a level whose predecessor is not won.
+            var migrated = new SaveData();
+            migrated.Unlocked.Add("level8");
+            Assert.IsTrue(migrated.IsUnlocked(order, 2), "a level the migration opened is locked");
+            Assert.IsFalse(migrated.IsUnlocked(order, 1), "Unlocked opened a level it does not list");
+            Assert.IsFalse(migrated.IsUnlocked(order, 3), "a level the migration opened counts as won for the next one");
+            migrated.Unlocked = null;
+            Assert.IsFalse(migrated.IsUnlocked(order, 2), "a null Unlocked list must read as empty");
+            migrated.Won = null;
+            Assert.IsFalse(migrated.IsUnlocked(order, 1), "a null Won list must read as empty");
+            Assert.IsTrue(migrated.IsUnlocked(order, 0));
         }
 
         [Test]

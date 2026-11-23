@@ -151,6 +151,7 @@ namespace OutOfSight.Core
             CheckLoad(level, body, issues);
             CheckRobots(level, rooms, issues);
             CheckM6Gameplay(level, rooms, issues);
+            CheckV2Schema(level, rooms, body, issues);
 
             if (level.Inhabitants == null || level.Inhabitants.Count == 0)
             {
@@ -341,64 +342,115 @@ namespace OutOfSight.Core
                 issues.Add($"lesson '{lesson}' is not one of {string.Join(", ", LevelDef.Lessons)}");
                 return;
             }
+            string needs = LessonNeeds(level, body, lesson);
+            if (needs != null)
+            {
+                issues.Add($"lesson {lesson} {needs}");
+            }
+        }
+
+        /// <summary>
+        /// What a known lesson id is about, as the tail of an issue ("needs a dog"), or null when the level has it. Shared by
+        /// the lesson and by every id of "requires" (levels v2: rug a rug or a soft room, hum and contact a robot, household a
+        /// leaf an inhabitant opens, decoy a decoy of the player's kind, exitwatch an exit, lit lit zones and the floor lamp;
+        /// door a closed leaf the player may open).
+        /// </summary>
+        private static string LessonNeeds(LevelDef level, BodyDef body, string lesson)
+        {
             if (lesson == LevelDef.LessonCareful && !body.Tips)
             {
-                issues.Add($"lesson careful needs a body that tips (the stool), not the {body.Kind}");
+                return $"needs a body that tips (the stool), not the {body.Kind}";
             }
             else if (lesson == LevelDef.LessonDark && !body.HasLight)
             {
-                issues.Add($"lesson dark needs a body with a light (the floor lamp), not the {body.Kind}");
+                return $"needs a body with a light (the floor lamp), not the {body.Kind}";
             }
             else if (lesson == LevelDef.LessonGlide && !body.Glides)
             {
-                issues.Add($"lesson glide needs a body that glides (the office chair), not the {body.Kind}");
+                return $"needs a body that glides (the office chair), not the {body.Kind}";
             }
             else if (lesson == LevelDef.LessonSit
                 && (level.Inhabitants == null || !level.Inhabitants.Exists(h => h.Stations != null && h.Stations.Exists(st => st.SitsOnPlayer))))
             {
-                issues.Add("lesson sit needs a station that sits on the player");
+                return "needs a station that sits on the player";
             }
             // M5 (CONTRACT_M5_v3 15.10, CONTRACT_M5 16.6): what the door, pet and split lessons are about.
             else if (lesson == LevelDef.LessonDoor && !level.Doors.Exists(d => d != null && d.Leaf == OpeningDef.LeafClosed))
             {
-                issues.Add("lesson door needs a closed leaf");
+                return "needs a closed leaf";
+            }
+            // Levels v2 (D27): a player-locked leaf is no door lesson, the player never opens it.
+            else if (lesson == LevelDef.LessonDoor && !level.Doors.Exists(d => d != null && d.Leaf == OpeningDef.LeafClosed && !d.PlayerLocked))
+            {
+                return "needs a closed leaf the player may open (every closed leaf is playerLocked)";
             }
             else if (lesson == LevelDef.LessonPet && (level.Inhabitants == null || !level.Inhabitants.Exists(h => h != null && h.Kind == PersonalityDef.Dog)))
             {
-                issues.Add("lesson pet needs a dog");
+                return "needs a dog";
             }
             else if (lesson == LevelDef.LessonSplit && (level.Platforms == null || level.Platforms.Count == 0))
             {
-                issues.Add("lesson split needs a platform");
+                return "needs a platform";
             }
             // M5 wave 5B (CONTRACT_M5 4 to 6, 8, 10): what the robot, rock, load and final lessons are about.
             else if (lesson == LevelDef.LessonRobot && (level.Robots == null || level.Robots.Count == 0))
             {
-                issues.Add("lesson robot needs a robot");
+                return "needs a robot";
             }
             else if (lesson == LevelDef.LessonRock && !body.Rocks)
             {
-                issues.Add($"lesson rock needs a body that rocks (the rocking chair), not the {body.Kind}");
+                return $"needs a body that rocks (the rocking chair), not the {body.Kind}";
             }
             else if (lesson == LevelDef.LessonLoad && string.IsNullOrEmpty(level.Player?.Load))
             {
-                issues.Add("lesson load needs a load on the player");
+                return "needs a load on the player";
             }
             // M6 (CONTRACT_M6 2.5): the wardrobe lesson needs a wardrobe the player body fits in.
             else if (lesson == LevelDef.LessonWardrobe
                 && (level.Wardrobes().Count == 0 || !WardrobeRule.Fits(body.Size, string.IsNullOrEmpty(level.Player?.Load) ? 0f : Tuning.LoadHeight)))
             {
-                issues.Add($"lesson wardrobe needs a wardrobe and a body that fits in it (the stool or the floor lamp), not the {body.Kind}");
+                return $"needs a wardrobe and a body that fits in it (the stool or the floor lamp), not the {body.Kind}";
             }
             else if (lesson == LevelDef.LessonFinal)
             {
                 List<string> mechanics = MechanicsOf(level);
                 if (mechanics.Count < FinalMechanics) // MUTATION:LESSON_FINAL
                 {
-                    issues.Add($"lesson final needs at least {FinalMechanics} of door, pet, split, robot, rock and load; the level has "
-                        + (mechanics.Count == 0 ? "none" : string.Join(", ", mechanics)));
+                    return $"needs at least {FinalMechanics} of door, pet, split, robot, rock and load; the level has "
+                        + (mechanics.Count == 0 ? "none" : string.Join(", ", mechanics));
                 }
             }
+            // Levels v2 (LEVELS_V2.md 6, C1): what the new ids are about.
+            else if (lesson == LevelDef.LessonRug && (level.Rugs == null || level.Rugs.Count == 0) && !level.AllRooms().Exists(r => r != null && r.IsSoft))
+            {
+                return "needs a rug or a soft room";
+            }
+            else if ((lesson == LevelDef.LessonHum || lesson == LevelDef.LessonContact) && (level.Robots == null || level.Robots.Count == 0))
+            {
+                return "needs a robot";
+            }
+            else if (lesson == LevelDef.LessonHousehold && level.HouseholdLeafMask() == 0)
+            {
+                return "needs a door leaf that inhabitants open (openedByInhabitants)";
+            }
+            else if (lesson == LevelDef.LessonDecoy
+                && (level.Decoys == null || level.Player == null || !level.Decoys.Exists(d => d != null && BodyKinds.Of(d.Kind) == BodyKinds.Of(level.Player.Kind))))
+            {
+                return $"needs a decoy of the player's kind ({BodyKinds.Of(level.Player?.Kind)})";
+            }
+            else if (lesson == LevelDef.LessonExitWatch && level.Exit == null)
+            {
+                return "needs an exit zone";
+            }
+            else if (lesson == LevelDef.LessonLit && (level.LitZones == null || level.LitZones.Count == 0))
+            {
+                return "needs lit zones (litZones)";
+            }
+            else if (lesson == LevelDef.LessonLit && body.Kind != BodyKinds.FloorLamp)
+            {
+                return $"needs the floor lamp body, not the {body.Kind}";
+            }
+            return null;
         }
 
         private static bool SameSize(Vector3 a, Vector3 b)
@@ -594,6 +646,91 @@ namespace OutOfSight.Core
                 }
             }
             return sides;
+        }
+
+        // ----- Door approach (DOORS, product owner report on level11, 2026-11-23) -----
+
+        /// <summary>
+        /// How deep, from the wall face into each room, the approach area of a door reaches: the square a 1 m leaf sweeps,
+        /// kept clear on both sides whether the door has a leaf or not.
+        /// </summary>
+        public const float DoorApproachDepth = 1.0f;
+
+        /// <summary>
+        /// DOORS: no furniture stands in front of a door. For every door and every room it opens into, the approach area is
+        /// the rectangle of the opening's width that runs from the wall face <see cref="DoorApproachDepth"/> into the room
+        /// (clipped to the room interior); no prop and no decoy footprint overlaps it (touching edges do not count). Flat
+        /// things (rugs, the exit mat) and the leaf swing sector (<see cref="CheckLeaves"/>) are left to their own rules.
+        /// Not part of <see cref="Validate"/> yet: the EditMode test DoorwayTests holds every shipped level to it.
+        /// </summary>
+        public static List<string> DoorwayIssues(LevelDef level)
+        {
+            var issues = new List<string>();
+            if (level?.Doors == null)
+            {
+                return issues;
+            }
+            List<RoomDef> rooms = level.AllRooms();
+            for (int k = 0; k < level.Doors.Count; k++)
+            {
+                OpeningDef door = level.Doors[k];
+                if (door == null || door.Width <= 0f)
+                {
+                    continue;
+                }
+                foreach (RoomSide s in level.SidesOf(door, out float along))
+                {
+                    RoomDef r = rooms[s.Room];
+                    if (!DoorApproachArea(r, s, along, door.Width, out Vector2 center, out Vector2 half))
+                    {
+                        continue;
+                    }
+                    string label = $"door {k + 1} approach in room {Name(r, s.Room)}";
+                    if (level.Props != null)
+                    {
+                        foreach (PropDef prop in level.Props)
+                        {
+                            if (prop != null && Overlaps(center.x, center.y, half.x, half.y, 0f, prop))
+                            {
+                                issues.Add($"{label} is blocked by prop {prop.Name}: keep {DoorApproachDepth} m in front of the opening clear");
+                            }
+                        }
+                    }
+                    if (level.Decoys != null)
+                    {
+                        for (int i = 0; i < level.Decoys.Count; i++)
+                        {
+                            DecoyDef d = level.Decoys[i];
+                            Vector3 size = level.DecoySize(d);
+                            if (RectsOverlap(center, half, 0f, new Vector2(d.X, d.Z), new Vector2(size.x, size.z) * 0.5f, d.Yaw))
+                            {
+                                issues.Add($"{label} is blocked by decoy {i + 1}: keep {DoorApproachDepth} m in front of the opening clear");
+                            }
+                        }
+                    }
+                }
+            }
+            return issues;
+        }
+
+        /// <summary>
+        /// The approach area of a door on side <paramref name="s"/> of room <paramref name="r"/> (planar x, z centre and half
+        /// sizes): the opening's span along the wall, from the wall face <see cref="DoorApproachDepth"/> into the room,
+        /// clipped to the interior. False when nothing is left.
+        /// </summary>
+        public static bool DoorApproachArea(RoomDef r, RoomSide s, float along, float width, out Vector2 center, out Vector2 half)
+        {
+            float from = Mathf.Max(along - width * 0.5f, s.From);
+            float to = Mathf.Min(along + width * 0.5f, s.To);
+            float face = s.Line - s.Outward * r.WallThickness * 0.5f;
+            float roomDepth = s.AlongX ? r.SizeZ : r.SizeX;
+            float depth = Mathf.Min(DoorApproachDepth, roomDepth);
+            float mid = face - s.Outward * depth * 0.5f;
+            float spanMid = (from + to) * 0.5f;
+            float spanHalf = (to - from) * 0.5f;
+            center = s.AlongX ? new Vector2(spanMid, mid) : new Vector2(mid, spanMid);
+            half = s.AlongX ? new Vector2(spanHalf, depth * 0.5f) : new Vector2(depth * 0.5f, spanHalf);
+            return spanHalf > Eps && depth > Eps;
         }
 
         // ----- Decoys, rugs, designer route -----
@@ -1373,6 +1510,253 @@ namespace OutOfSight.Core
             if (level.DoorMemory && level.LeafDoors().Count == 0)
             {
                 issues.Add("doorMemory needs at least one door leaf");
+            }
+        }
+
+        // ----- Levels v2 schema (docs/levels_v2/LEVELS_V2.md 6, row C1) -----
+
+        /// <summary>Levels v2: at most this many "requires" ids (each is one more audit search; level24 already takes 56 s).</summary>
+        public const int MaxRequires = 5;
+        /// <summary>Levels v2: at most this many via checks per level (one audit search each).</summary>
+        public const int MaxViaChecks = 2;
+        /// <summary>Levels v2: at most this many lit zones per level.</summary>
+        public const int MaxLitZones = 4;
+
+        /// <summary>
+        /// Levels v2: the shortest period of a glanceEvery whose turns never overlap: the hold plus, twice (out and back), the
+        /// telegraph and the head turn at Tuning.HeadTurnRate.
+        /// </summary>
+        public static float GlanceEveryMinPeriod(float hold, float yaw)
+        {
+            return hold + 2f * (Tuning.TelegraphDuration + Mathf.Abs(yaw) / Tuning.HeadTurnRate);
+        }
+
+        /// <summary>
+        /// Levels v2 data only (the audit and the runtime read these fields in their own tasks): rev not negative; requires
+        /// ids known, at most <see cref="MaxRequires"/>, each with what it is about (<see cref="LessonNeeds"/>); pace ranges;
+        /// via checks named, unique, inside a room, at most <see cref="MaxViaChecks"/>; lit zones inside one room, clear of the
+        /// exit, at most <see cref="MaxLitZones"/>, on a floor lamp level; lighting known; playerLocked only on a closed leaf
+        /// inhabitants open (never a window); glanceEvery sane, within the dwell, never on a dog.
+        /// </summary>
+        private static void CheckV2Schema(LevelDef level, List<RoomDef> rooms, BodyDef body, List<string> issues)
+        {
+            if (level.Rev < 0)
+            {
+                issues.Add($"rev {level.Rev} is negative: a record revision is 0 or more");
+            }
+            CheckRequires(level, body, issues);
+            CheckPace(level.Pace, issues);
+            CheckViaChecks(level, rooms, issues);
+            CheckLitZones(level, rooms, body, issues);
+            if (level.Lighting != null && System.Array.IndexOf(LevelDef.Lightings, level.Lighting) < 0)
+            {
+                issues.Add($"lighting '{level.Lighting}' is not one of {string.Join(", ", LevelDef.Lightings)}");
+            }
+            for (int k = 0; k < level.Doors.Count; k++)
+            {
+                OpeningDef d = level.Doors[k];
+                if (d != null && d.PlayerLocked && (d.Leaf != OpeningDef.LeafClosed || !d.OpenedByInhabitants))
+                {
+                    issues.Add($"door {k + 1} is playerLocked: it needs a closed leaf (leaf '{d.Leaf}') that inhabitants open (openedByInhabitants)"); // MUTATION:V2_PLAYER_LOCKED
+                }
+            }
+            for (int k = 0; k < level.Windows.Count; k++)
+            {
+                if (level.Windows[k] != null && level.Windows[k].PlayerLocked)
+                {
+                    issues.Add($"window {k + 1} is playerLocked: only a door with a leaf is");
+                }
+            }
+            CheckGlanceEvery(level, issues);
+        }
+
+        private static void CheckRequires(LevelDef level, BodyDef body, List<string> issues)
+        {
+            List<string> ids = level.RequiredLessons;
+            if (ids == null || ids.Count == 0)
+            {
+                return;
+            }
+            if (ids.Count > MaxRequires)
+            {
+                issues.Add($"requires lists {ids.Count} ids: at most {MaxRequires}");
+            }
+            var seen = new HashSet<string>();
+            foreach (string id in ids)
+            {
+                if (id == null || System.Array.IndexOf(LevelDef.Lessons, id) < 0)
+                {
+                    issues.Add($"requires id '{id}' is not one of {string.Join(", ", LevelDef.Lessons)}");
+                    continue;
+                }
+                if (!seen.Add(id))
+                {
+                    issues.Add($"requires id '{id}' is listed twice");
+                    continue;
+                }
+                string needs = LessonNeeds(level, body, id);
+                if (needs != null)
+                {
+                    issues.Add($"requires {id} {needs}"); // MUTATION:V2_REQUIRES_NEEDS
+                }
+            }
+        }
+
+        private static void CheckPace(PaceDef pace, List<string> issues)
+        {
+            if (pace == null)
+            {
+                return;
+            }
+            if (pace.MinShare.HasValue && (pace.MinShare.Value < 0f || pace.MinShare.Value > 1f))
+            {
+                issues.Add($"pace minShare {pace.MinShare.Value} is outside 0 to 1");
+            }
+            if (pace.MaxShare.HasValue && (pace.MaxShare.Value < 0f || pace.MaxShare.Value > 1f))
+            {
+                issues.Add($"pace maxShare {pace.MaxShare.Value} is outside 0 to 1");
+            }
+            if (pace.MinShare.HasValue && pace.MaxShare.HasValue && pace.MinShare.Value > pace.MaxShare.Value + Eps)
+            {
+                issues.Add($"pace minShare {pace.MinShare.Value} is above maxShare {pace.MaxShare.Value}");
+            }
+            if (pace.MinPauses.HasValue && pace.MinPauses.Value < 0)
+            {
+                issues.Add($"pace minPauses {pace.MinPauses.Value} is negative");
+            }
+            if (pace.MaxPause.HasValue && (pace.MaxPause.Value <= 0f || pace.MaxPause.Value > Tuning.AuditMaxWait + Eps))
+            {
+                issues.Add($"pace maxPause {pace.MaxPause.Value} is outside (0, {Tuning.AuditMaxWait}] s");
+            }
+        }
+
+        private static void CheckViaChecks(LevelDef level, List<RoomDef> rooms, List<string> issues)
+        {
+            if (level.ViaChecks == null || level.ViaChecks.Count == 0)
+            {
+                return;
+            }
+            if (level.ViaChecks.Count > MaxViaChecks)
+            {
+                issues.Add($"{level.ViaChecks.Count} via checks: at most {MaxViaChecks} per level");
+            }
+            var names = new HashSet<string>();
+            for (int i = 0; i < level.ViaChecks.Count; i++)
+            {
+                ViaCheckDef v = level.ViaChecks[i];
+                string label = $"via check {v?.Name ?? "#" + (i + 1)}";
+                if (v == null || v.SizeX <= 0f || v.SizeZ <= 0f)
+                {
+                    issues.Add($"{label} has a non positive size");
+                    continue;
+                }
+                if (string.IsNullOrEmpty(v.Name))
+                {
+                    issues.Add($"{label} has no name");
+                }
+                else if (!names.Add(v.Name))
+                {
+                    issues.Add($"via check name {v.Name} is used twice");
+                }
+                if (!FootprintInsideRoom(rooms, v.X, v.Z, v.SizeX, v.SizeZ, 0f))
+                {
+                    issues.Add($"{label} ({v.X}, {v.Z}) is not inside a room");
+                }
+                if (v.MaxRatio < 1f - Eps)
+                {
+                    issues.Add($"{label} maxRatio {v.MaxRatio} is below 1");
+                }
+            }
+        }
+
+        private static void CheckLitZones(LevelDef level, List<RoomDef> rooms, BodyDef body, List<string> issues)
+        {
+            if (level.LitZones == null || level.LitZones.Count == 0)
+            {
+                return;
+            }
+            if (level.LitZones.Count > MaxLitZones)
+            {
+                issues.Add($"{level.LitZones.Count} lit zones: at most {MaxLitZones} per level");
+            }
+            if (body.Kind != BodyKinds.FloorLamp)
+            {
+                issues.Add($"lit zones on a {body.Kind} level: only the floor lamp hides in the dark, a lit zone would be decoration");
+            }
+            for (int i = 0; i < level.LitZones.Count; i++)
+            {
+                LitZoneDef z = level.LitZones[i];
+                string label = $"lit zone {z?.Name ?? "#" + (i + 1)}";
+                if (z == null || z.SizeX <= 0f || z.SizeZ <= 0f)
+                {
+                    issues.Add($"{label} has a non positive size");
+                    continue;
+                }
+                if (!FootprintInsideRoom(rooms, z.X, z.Z, z.SizeX, z.SizeZ, 0f))
+                {
+                    issues.Add($"{label} ({z.X}, {z.Z}) is not inside one room");
+                }
+                ZoneDef e = level.Exit;
+                if (e != null && RectsOverlap(new Vector2(z.X, z.Z), new Vector2(z.SizeX, z.SizeZ) * 0.5f, 0f,
+                        new Vector2(e.X, e.Z), new Vector2(e.SizeX, e.SizeZ) * 0.5f, 0f))
+                {
+                    issues.Add($"{label} overlaps the exit zone");
+                }
+            }
+        }
+
+        private static void CheckGlanceEvery(LevelDef level, List<string> issues)
+        {
+            if (level.Inhabitants == null)
+            {
+                return;
+            }
+            foreach (InhabitantDef h in level.Inhabitants)
+            {
+                if (h?.Stations == null)
+                {
+                    continue;
+                }
+                for (int i = 0; i < h.Stations.Count; i++)
+                {
+                    GlanceEveryDef ge = h.Stations[i]?.GlanceEvery;
+                    if (ge == null)
+                    {
+                        continue;
+                    }
+                    StationDef s = h.Stations[i];
+                    string label = $"inhabitant {h.Name} station {i + 1} glanceEvery";
+                    if (h.Kind == PersonalityDef.Dog)
+                    {
+                        issues.Add($"{label}: a dog has no glances");
+                    }
+                    if (ge.Start < 0f || ge.Hold < 0f || ge.Period <= 0f)
+                    {
+                        issues.Add($"{label} needs a start and a hold not negative and a positive period");
+                        continue;
+                    }
+                    if (Mathf.Abs(ge.Yaw) > Tuning.HeadYawLimit + Eps)
+                    {
+                        issues.Add($"{label} yaw {ge.Yaw} exceeds the head limit of {Tuning.HeadYawLimit}");
+                    }
+                    float minPeriod = GlanceEveryMinPeriod(ge.Hold, ge.Yaw);
+                    if (ge.Period < minPeriod - Eps) // MUTATION:V2_GLANCE_PERIOD
+                    {
+                        issues.Add($"{label} period {ge.Period} is below {minPeriod:0.##} s: the hold plus two head turns, so turns never overlap");
+                    }
+                    if (ge.Count.HasValue && ge.Count.Value < 1)
+                    {
+                        issues.Add($"{label} count {ge.Count.Value} is below 1 (leave it out to fill the dwell)");
+                    }
+                    else if (ge.Count.HasValue && ge.Start + ge.Count.Value * ge.Period > s.Dwell + Eps)
+                    {
+                        issues.Add($"{label} runs past the dwell: start + count x period = {ge.Start + ge.Count.Value * ge.Period:0.##} s, dwell {s.Dwell} s");
+                    }
+                    else if (!ge.Count.HasValue && ge.ResolvedCount(s.Dwell) == 0)
+                    {
+                        issues.Add($"{label} fits no glance in the dwell of {s.Dwell} s");
+                    }
+                }
             }
         }
 

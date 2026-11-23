@@ -136,7 +136,8 @@ namespace OutOfSight
         }
 
         // ----- M4 (docs/CONTRACT_M4.md 2 and amendment 9.7) -----
-        // Careful mode is a held state, read in the fixed step. The action key (E, gamepad X = buttonWest) and the
+        // Careful mode is a held state, read in the fixed step. The action key (E, gamepad X = buttonWest; task DOORAUTO: it
+        // only switches the floor lamp now, doors and wardrobes open by pushing toward them) and the
         // move presses that right a tipped stool are edges: a press can start and end between two fixed steps, so
         // they are latched every rendered frame (LatchPresses, called from FurnitureController.Update) and consumed
         // by the next fixed step (ActionPressed, MovePressed). A press made while an action runs is dropped, never
@@ -146,6 +147,7 @@ namespace OutOfSight
         private const float StickDeadZoneSq = 0.04f;
 
         private static bool injectedAction;
+        private static bool injectedDoorPush;
         private static bool injectedCareful;
         private static bool injectedMove;
         private static bool latchedAction;
@@ -168,13 +170,38 @@ namespace OutOfSight
             return g != null && g.leftTrigger.ReadValue() > Tuning.TriggerHeld;
         }
 
-        /// <summary>One action press (E or gamepad X) since the last call, latched or injected. Consumes it.</summary>
+        /// <summary>
+        /// One action press (E, gamepad X, or a tap on the player lamp) since the last call, latched or injected. Consumes it.
+        /// Task DOORAUTO: the action only switches the floor lamp; doors and wardrobes take a push (FurnitureController).
+        /// </summary>
         public static bool ActionPressed()
         {
             bool pressed = injectedAction || latchedAction;
             injectedAction = false;
             latchedAction = false;
             return pressed;
+        }
+
+        /// <summary>
+        /// Task DOORAUTO, tests: one door push since the last call (<see cref="InjectDoorPush"/>). Consumes it.
+        /// </summary>
+        public static bool DoorPushPressed()
+        {
+            bool pressed = injectedDoorPush;
+            injectedDoorPush = false;
+            return pressed;
+        }
+
+        /// <summary>
+        /// Task DOORAUTO, tests: one door push already held for <see cref="Tuning.PushConfirmTime"/>, read by the next fixed
+        /// step that takes input, which hands it to the game (FurnitureController.DoorPushClaimed) exactly as the E press of
+        /// M5 and M6 did for a door or a wardrobe: no direction is needed, the game picks the leaf or the wardrobe. It skips
+        /// only the confirm hold (tested on its own with a real push through FurnitureController.ScriptedDirection); dropped
+        /// like an action press during an action, on a menu and by <see cref="ResetInjections"/>.
+        /// </summary>
+        public static void InjectDoorPush()
+        {
+            injectedDoorPush = true;
         }
 
         /// <summary>
@@ -187,6 +214,67 @@ namespace OutOfSight
             injectedMove = false;
             latchedMove = false;
             return pressed;
+        }
+
+        /// <summary>
+        /// Levels v2 (C3a, the held start): this fixed step carries an input that starts a held level: a move vector past
+        /// the dead zone (<see cref="Move"/>: keys, stick, D-pad, touch stick, or an injected vector), a move press, an
+        /// action press (E, gamepad X, a tap on the player lamp, or injected), an injected door push (DOORAUTO), or (task STARTFIX) a start press
+        /// (<see cref="StartPressPending"/>: Space, Enter, gamepad A, a tap outside the touch buttons, or injected), which
+        /// starts the level without moving. Peeks only: nothing is consumed, so the furniture's step that runs next still
+        /// reads the press. Camera input (mouse, wheel, right stick, touch orbit), the careful key, Escape, Start and R are
+        /// not start inputs.
+        /// </summary>
+        public static bool AnyStartInput()
+        {
+            return Move().sqrMagnitude > StickDeadZoneSq || injectedAction || latchedAction || injectedMove || latchedMove || injectedDoorPush
+                || StartPressPending; // MUTATION:START_PRESS
+        }
+
+        // ----- Task STARTFIX: the start press, which releases a held start without moving. -----
+        // A spawn can stand inside a watcher's cone at t = 0, and being seen still is allowed: the player must be able to
+        // start the clock and wait. Space, Enter (main or keypad), gamepad A (south) and a touch tap outside the buttons
+        // are latched every rendered frame (LatchPresses) and consumed by the held FixedUpdate (ConsumeStartPress). None of
+        // them is a gameplay verb (the action is E / X, a door is a push), so the press never also acts. A press on the frame a level is
+        // built or a menu closes (the Enter or A that pressed Play, Resume or Next level) is dropped (BlockStartPresses).
+
+        private static bool injectedStart;
+        private static bool latchedStart;
+        private static bool touchStartPending;
+        private static int startBlockFrame = -1;
+
+        /// <summary>A start press is latched or injected and not consumed yet (peek).</summary>
+        public static bool StartPressPending => injectedStart || latchedStart;
+
+        /// <summary>Tests: one start press (as Space, Enter, gamepad A or a tap), read by the next held fixed step.</summary>
+        public static void InjectStartPress()
+        {
+            injectedStart = true;
+        }
+
+        /// <summary>The held fixed step: drops the start press it read (used or not), so a stale one never fires later.</summary>
+        public static void ConsumeStartPress()
+        {
+            injectedStart = false;
+            latchedStart = false;
+        }
+
+        /// <summary>
+        /// A level was built, or a menu closed, on this frame: every start press so far is dropped, and so is a device press
+        /// of this frame (the Enter or gamepad A that submitted Play, Resume or Next level must not also start the level).
+        /// </summary>
+        public static void BlockStartPresses()
+        {
+            injectedStart = false;
+            latchedStart = false;
+            touchStartPending = false;
+            startBlockFrame = Time.frameCount;
+        }
+
+        /// <summary>TouchControls: a tap (a short touch that did not travel) outside every touch button.</summary>
+        public static void PressTouchStart()
+        {
+            touchStartPending = true;
         }
 
         public static void InjectAction()
@@ -222,18 +310,30 @@ namespace OutOfSight
                 || g.dpad.ReadValue().sqrMagnitude > StickDeadZoneSq);
             move |= stick && !stickWasActive;
             stickWasActive = stick;
-            // M7: the touch action button is the E key, and the touch stick leaving its dead zone is a move press.
+            // M7: a touch action (DOORAUTO: a tap on the player lamp) is the E key, and the touch stick leaving its dead zone
+            // is a move press.
             action |= touchActionPending;
             touchActionPending = false;
             bool touchMove = touchStick.sqrMagnitude > StickDeadZoneSq;
             move |= touchMove && !touchStickWasActive;
             touchStickWasActive = touchMove;
+            // STARTFIX: the start press, latched whatever ignore says (it only matters while held, when nothing acts), never
+            // on the frame a level was built or a menu closed (BlockStartPresses).
+            bool start = (k != null && (k.spaceKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame
+                    || k.numpadEnterKey.wasPressedThisFrame))
+                || (g != null && g.buttonSouth.wasPressedThisFrame) || touchStartPending;
+            touchStartPending = false;
+            if (start && Time.frameCount > startBlockFrame)
+            {
+                latchedStart = true;
+            }
             if (ignore)
             {
                 latchedAction = false;
                 latchedMove = false;
                 injectedAction = false;
                 injectedMove = false;
+                injectedDoorPush = false;
                 return;
             }
             latchedAction |= action;
@@ -244,6 +344,7 @@ namespace OutOfSight
         public static void ResetInjections()
         {
             injectedAction = false;
+            injectedDoorPush = false;
             injectedCareful = false;
             injectedMove = false;
             injectedMoveVector = null;
@@ -252,6 +353,11 @@ namespace OutOfSight
             injectedNextLevel = false;
             latchedAction = false;
             latchedMove = false;
+            // STARTFIX: the start press and its block frame.
+            injectedStart = false;
+            latchedStart = false;
+            touchStartPending = false;
+            startBlockFrame = -1;
             injectedBack = false;
             // M6: menu navigation injections, the right stick override and the last device (back to the keyboard,
             // hud.controls' default).
@@ -371,7 +477,11 @@ namespace OutOfSight
             latchedMove = false;
             injectedAction = false;
             injectedMove = false;
+            injectedDoorPush = false;
             touchActionPending = false;
+            // STARTFIX: a start press made on a menu, while paused or on the frame a menu closed is lost too, and so is a
+            // device press of this frame read later in the frame (FurnitureController.Update may run after GameState.Update).
+            BlockStartPresses();
         }
 
         /// <summary>M2: Enter (main or keypad) or the gamepad south button loads the next level after a win.</summary>
@@ -508,7 +618,8 @@ namespace OutOfSight
 
         // ----- M7 (docs/CONTRACT_M7.md 1.5): touch. -----
         // TouchControls (its own overlay) reads the fingers through ReadTouches (the real Touchscreen plus the fingers a
-        // test injects), turns them into a floating stick, an orbit drag and three buttons, and writes those back here.
+        // test injects), turns them into a floating stick, an orbit drag, two buttons (careful, pause) and a tap on the
+        // player lamp (DOORAUTO: it replaced the action button), and writes those back here.
         // The game reads them through the same calls as the keyboard and the gamepad (Move, CarefulHeld, the latched
         // action, PausePressed); the camera reads TouchLookDelta. Nothing here changes the keyboard, mouse or gamepad.
 
@@ -604,7 +715,7 @@ namespace OutOfSight
             touchCareful = on;
         }
 
-        /// <summary>TouchControls: one tap of the action button, latched as an E press by the next <see cref="LatchPresses"/>.</summary>
+        /// <summary>TouchControls: one tap on the player lamp (DOORAUTO), latched as an E press by the next <see cref="LatchPresses"/>.</summary>
         public static void PressTouchAction()
         {
             touchActionPending = true;

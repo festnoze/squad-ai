@@ -134,6 +134,7 @@ namespace OutOfSight
                 Prepare(game.Level);
             }
             Active = true;
+            FollowCeilingTier();
             float dt = Mathf.Min(Time.unscaledDeltaTime, 0.1f);
             Distance = Wrap(Distance + Tuning.TitleTourSpeed * SpeedFactor(Distance) * dt);
             Pose(Distance, out Vector3 position, out Quaternion rotation);
@@ -281,8 +282,10 @@ namespace OutOfSight
             BuildCeiling(level);
         }
 
-        private static void BuildCeiling(LevelInstance level)
+        private void BuildCeiling(LevelInstance level)
         {
+            ceiling = null;
+            ceilingTier = null;
             if (level.Root == null || level.Def == null)
             {
                 return;
@@ -310,6 +313,165 @@ namespace OutOfSight
             renderer.sharedMaterial = PrimitiveKit.Unlit(CeilingColor);
             renderer.shadowCastingMode = ShadowCastingMode.Off;
             renderer.receiveShadows = false;
+            ceiling = renderer;
+            ceilingRooms = rooms;
+            ceilingRect = new Rect(minX - 0.2f, minZ - 0.2f, maxX - minX + 0.4f, maxZ - minZ + 0.4f);
+            RefreshCeiling();
+        }
+
+        // ----- Room lighting on Haut (2026-11-20): the ceiling's corners -----
+
+        // The ceiling is unlit (nothing lights its underside, and it must not go black), so the SSAO of the Haut renderer,
+        // which darkens the walls and floors where they meet, never reaches it. On Haut its underside is a quad textured
+        // with its own contact shade instead: darker along every wall of each room below, the corners taking the shade of
+        // both walls, as a lit ceiling would be where it meets the walls. Bas and Moyen keep the plain box (unchanged).
+        // The shade at a wall face, multiplied over the ceiling colour as 1 - CeilingShade, falls off with the distance to
+        // that face over CeilingShadeReach (metres, exponential).
+        public const float CeilingShade = 0.45f;
+        public const float CeilingShadeReach = 0.4f;
+        private const float CeilingTexelsPerMetre = 16f;
+
+        /// <summary>Tools (the lighting look tool): the ceiling shade at a wall and its reach instead of the built in ones (0: none).</summary>
+        public static float? CeilingShadeOverride;
+        public static float? CeilingShadeReachOverride;
+
+        private MeshRenderer ceiling;
+        private List<RoomDef> ceilingRooms;
+        private Rect ceilingRect;
+        private string ceilingTier;
+        // One shaded material for the title house (its texture rebuilt only when the house or the shade changes).
+        private static Material shadedCeiling;
+        private static string shadedKey;
+        private static Mesh ceilingQuad;
+
+        /// <summary>The title ceiling's renderer while the tour has built one (tests and tools).</summary>
+        public MeshRenderer Ceiling => ceiling;
+
+        /// <summary>True while the ceiling shows its Haut contact shade (tests and tools).</summary>
+        public bool CeilingShaded => ceiling != null && ceiling.sharedMaterial == shadedCeiling && shadedCeiling != null;
+
+        /// <summary>Applies the tier (and the tools' overrides) to the ceiling now (tests and tools; the tour follows the tier by itself).</summary>
+        public void RefreshCeiling()
+        {
+            ceilingTier = "?";
+            FollowCeilingTier();
+        }
+
+        /// <summary>The Haut contact shade on the ceiling, or the plain box on Bas and Moyen. A string compare per frame, no allocation.</summary>
+        private void FollowCeilingTier()
+        {
+            string tier = QualityTier.Applied;
+            if (ceiling == null || (tier == ceilingTier && ceilingTier != "?"))
+            {
+                return;
+            }
+            ceilingTier = tier;
+            bool high = string.IsNullOrEmpty(tier) || tier == SaveOptions.QualityHigh;
+            float shade = CeilingShadeOverride ?? CeilingShade;
+            float reach = CeilingShadeReachOverride ?? CeilingShadeReach;
+            MeshFilter filter = ceiling.GetComponent<MeshFilter>();
+            if (!high || shade <= 0f)
+            {
+                filter.sharedMesh = PrimitiveKit.BoxMesh;
+                ceiling.sharedMaterial = PrimitiveKit.Unlit(CeilingColor);
+                return;
+            }
+            filter.sharedMesh = CeilingQuad();
+            ceiling.sharedMaterial = ShadedCeiling(ceilingRooms, ceilingRect, shade, reach);
+        }
+
+        /// <summary>The box's underside alone (the unit box's bottom face, facing down), its UV the ceiling's rectangle.</summary>
+        private static Mesh CeilingQuad()
+        {
+            if (ceilingQuad != null)
+            {
+                return ceilingQuad;
+            }
+            ceilingQuad = new Mesh { name = "TitleCeilingQuad" };
+            ceilingQuad.vertices = new[]
+            {
+                new Vector3(-0.5f, -0.5f, -0.5f), new Vector3(0.5f, -0.5f, -0.5f), new Vector3(0.5f, -0.5f, 0.5f), new Vector3(-0.5f, -0.5f, 0.5f),
+            };
+            ceilingQuad.normals = new[] { Vector3.down, Vector3.down, Vector3.down, Vector3.down };
+            ceilingQuad.uv = new[] { new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f) };
+            ceilingQuad.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+            ceilingQuad.RecalculateBounds();
+            ceilingQuad.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            return ceilingQuad;
+        }
+
+        /// <summary>
+        /// The ceiling's Haut contact shade (the factor on its colour) over the point (<paramref name="x"/>, <paramref name="z"/>):
+        /// in the first room of <paramref name="rooms"/> holding it, the product over the room's four wall faces (its sides,
+        /// half a wall thickness in) of 1 - shade * exp(-distance / reach); 1 - shade outside every room (inside a wall).
+        /// </summary>
+        public static float CeilingShadeAt(IList<RoomDef> rooms, float x, float z, float shade, float reach)
+        {
+            float k = 1f / Mathf.Max(0.01f, reach);
+            foreach (RoomDef r in rooms)
+            {
+                float half = Mathf.Max(0f, r.WallThickness) * 0.5f;
+                float left = x - (r.X - r.SizeX * 0.5f) - half;
+                float right = r.X + r.SizeX * 0.5f - half - x;
+                float near = z - (r.Z - r.SizeZ * 0.5f) - half;
+                float far = r.Z + r.SizeZ * 0.5f - half - z;
+                if (left < 0f || right < 0f || near < 0f || far < 0f)
+                {
+                    continue;
+                }
+                return (1f - shade * Mathf.Exp(-left * k)) * (1f - shade * Mathf.Exp(-right * k))
+                    * (1f - shade * Mathf.Exp(-near * k)) * (1f - shade * Mathf.Exp(-far * k));
+            }
+            return 1f - shade;
+        }
+
+        /// <summary>
+        /// The unlit ceiling colour times a small linear texture over <paramref name="rect"/> (x, z): in each room, the product
+        /// over its four wall faces of 1 - shade * exp(-distance / reach); outside every room (inside a wall) the shade at a
+        /// face. Cached by house and shade.
+        /// </summary>
+        private static Material ShadedCeiling(List<RoomDef> rooms, Rect rect, float shade, float reach)
+        {
+            string key = string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.###},{1:0.###},{2:0.###},{3:0.###},{4},{5:0.###},{6:0.###}",
+                rect.x, rect.y, rect.width, rect.height, rooms.Count, shade, reach);
+            if (shadedCeiling != null && shadedKey == key)
+            {
+                return shadedCeiling;
+            }
+            int w = Mathf.Clamp(Mathf.CeilToInt(rect.width * CeilingTexelsPerMetre), 4, 512);
+            int h = Mathf.Clamp(Mathf.CeilToInt(rect.height * CeilingTexelsPerMetre), 4, 512);
+            var pixels = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float z = rect.y + (y + 0.5f) / h * rect.height;
+                for (int x = 0; x < w; x++)
+                {
+                    float px = rect.x + (x + 0.5f) / w * rect.width;
+                    byte b = (byte)Mathf.RoundToInt(Mathf.Clamp01(CeilingShadeAt(rooms, px, z, shade, reach)) * 255f);
+                    pixels[y * w + x] = new Color32(b, b, b, 255);
+                }
+            }
+            if (shadedCeiling != null)
+            {
+                Texture old = shadedCeiling.GetTexture("_BaseMap");
+                Destroy(shadedCeiling);
+                if (old != null)
+                {
+                    Destroy(old);
+                }
+            }
+            var texture = new Texture2D(w, h, TextureFormat.RGBA32, false, true)
+            {
+                name = "TitleCeilingShade", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear,
+            };
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+            texture.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            shadedCeiling = new Material(PrimitiveKit.Unlit(CeilingColor)) { name = "Title Ceiling Shaded" };
+            shadedCeiling.SetTexture("_BaseMap", texture);
+            shadedCeiling.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            shadedKey = key;
+            return shadedCeiling;
         }
 
         // "--titletour <dir>": the title at six points of the loop, a text report, then quit.

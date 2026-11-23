@@ -1,0 +1,399 @@
+{
+  "id": "test_v2_schema_odile",
+  "nameKey": "level18.name",
+  "hintKey": "level18.hint",
+  "lesson": "wardrobe",
+  "doorMemory": true,
+  "rooms": [
+    {
+      "id": "couloir",
+      "x": 4.0,
+      "z": 1.0,
+      "sizeX": 8.0,
+      "sizeZ": 2.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorFinish": "carpet",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "wallFinish": "quatrefoil"
+    },
+    {
+      "id": "entree",
+      "x": 5.75,
+      "z": 3.1,
+      "sizeX": 1.5,
+      "sizeZ": 2.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorFinish": "verde",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "wallFinish": "travertine"
+    },
+    {
+      "id": "chambre",
+      "x": 1.0,
+      "z": -1.1,
+      "sizeX": 2.0,
+      "sizeZ": 2.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorFinish": "carpet",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "wallFinish": "sage"
+    },
+    {
+      "id": "cuisine",
+      "x": 9.6,
+      "z": 1.0,
+      "sizeX": 3.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorFinish": "tile",
+      "floorColor": "#EDE6DA",
+      "wallColor": "#F7F4EE",
+      "wallFinish": "subwaytile"
+    }
+  ],
+  "doors": [
+    {
+      "x": 5.5,
+      "z": 2.05,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 0.75,
+      "z": -0.05,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 8.05,
+      "z": 1.45,
+      "width": 1.0,
+      "top": 2.1,
+      "leaf": "closed",
+      "id": "porte_cuisine",
+      "swing": "cuisine",
+      "hinge": "start",
+      "openedByInhabitants": true
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.stool",
+    "kind": "stool",
+    "x": 0.75,
+    "z": -0.85,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 0.55,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 5.5,
+    "z": 3.6,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Armoire",
+      "kind": "wardrobe",
+      "x": 4.0,
+      "z": 1.45,
+      "yaw": 180.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#A0703F"
+    },
+    {
+      "name": "Buffet",
+      "kind": "cabinet",
+      "x": 1.725,
+      "z": 1.5,
+      "yaw": 0.0,
+      "sizeX": 3.45,
+      "sizeY": 0.8,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "name": "Lit",
+      "kind": "bed",
+      "x": 1.55,
+      "z": -1.25,
+      "yaw": 0.0,
+      "sizeX": 0.8,
+      "sizeY": 0.5,
+      "sizeZ": 1.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 10.6,
+      "z": 1.0,
+      "yaw": 270.0,
+      "sizeX": 2.0,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#5B93D9",
+      "accentColor": "#F7F4EE"
+    }
+  ],
+  "designerRoute": [
+    { "x": 0.25, "z": -0.85, "at": 5.4, "careful": true },
+    { "x": 0.25, "z": -1.85, "at": 5.9, "careful": true },
+    { "x": 0.75, "z": -1.85, "at": 6.9, "careful": true },
+    { "x": 0.75, "z": -0.85, "at": 7.4, "careful": true },
+    { "x": 0.75, "z": -0.35, "at": 8.4, "careful": true },
+    { "x": 0.75, "z": 0.25, "at": 8.9, "careful": true },
+    { "x": 1.75, "z": 0.25, "at": 9.4, "careful": true },
+    { "x": 2.75, "z": 0.25, "at": 10.4, "careful": true },
+    { "x": 3.75, "z": 0.25, "at": 11.4, "careful": true },
+    { "x": 4.25, "z": 0.25, "at": 12.4, "careful": true },
+    { "x": 4.25, "z": 0.75, "at": 12.9, "careful": true },
+    { "x": 4.25, "z": 0.75, "at": 13.4, "careful": true, "action": "hide" },
+    { "x": 4.25, "z": 0.75, "at": 17.7, "careful": true, "action": "leave" },
+    { "x": 5.25, "z": 0.75, "at": 18.2, "careful": true },
+    { "x": 5.25, "z": 1.75, "at": 19.2, "careful": true },
+    { "x": 5.25, "z": 2.35, "at": 20.2, "careful": true },
+    { "x": 5.25, "z": 3.35, "at": 20.7, "careful": true },
+    { "x": 5.5, "z": 3.6, "at": 20.7, "careful": true }
+  ],
+  "designerRouteHard": [
+    { "x": 0.25, "z": -0.85, "at": 5.6, "careful": true },
+    { "x": 0.25, "z": -1.85, "at": 6.1, "careful": true },
+    { "x": 0.75, "z": -1.85, "at": 7.1, "careful": true },
+    { "x": 0.75, "z": -0.85, "at": 7.6, "careful": true },
+    { "x": 0.75, "z": -0.35, "at": 8.6, "careful": true },
+    { "x": 0.75, "z": 0.25, "at": 9.1, "careful": true },
+    { "x": 1.75, "z": 0.25, "at": 9.6, "careful": true },
+    { "x": 2.75, "z": 0.25, "at": 10.6, "careful": true },
+    { "x": 3.75, "z": 0.25, "at": 11.6, "careful": true },
+    { "x": 4.25, "z": 0.25, "at": 12.6, "careful": true },
+    { "x": 4.25, "z": 0.75, "at": 13.1, "careful": true },
+    { "x": 4.25, "z": 0.75, "at": 13.6, "careful": true, "action": "hide" },
+    { "x": 4.25, "z": 0.75, "at": 17.7, "careful": true, "action": "leave" },
+    { "x": 5.25, "z": 0.75, "at": 18.0, "careful": true },
+    { "x": 5.25, "z": 1.75, "at": 19.0, "careful": true },
+    { "x": 5.25, "z": 2.35, "at": 20.0, "careful": true },
+    { "x": 5.25, "z": 3.35, "at": 20.5, "careful": true },
+    { "x": 5.5, "z": 3.6, "at": 20.5, "careful": true }
+  ],
+  "inhabitants": [
+    {
+      "name": "Odile",
+      "personality": "tidy",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 9.6,
+          "z": 1.45,
+          "facing": 270.0,
+          "dwell": 0.5,
+          "glances": []
+        },
+        {
+          "x": 7.75,
+          "z": 0.5,
+          "facing": 270.0,
+          "dwell": 320.0,
+          "glances": [
+            {
+              "offset": 2.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 11.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 20.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 29.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 38.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 47.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 56.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 65.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 74.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 83.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 92.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 101.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 110.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 119.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 128.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 137.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 146.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 155.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 164.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 173.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 182.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 191.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 200.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 209.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 218.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 227.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 236.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 245.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 254.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 263.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 272.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 281.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 290.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            },
+            {
+              "offset": 299.0,
+              "yaw": -80.0,
+              "hold": 5.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -72,11 +72,12 @@ namespace OutOfSight.Core
         // M7 walls pass (product owner, 2026-11-19): how a wall between the camera and the player gets out of the way:
         // "lowered" (it sinks to a low stub, its doorways standing), "seethrough" (it fades to WallOpacity), "both" (the stub
         // stays and the wall above it fades to WallOpacity) or "none" (the walls never change). WallOpacity is a percentage,
-        // one of WallOpacitySteps. A missing field or an unknown value is Lowered and Tuning.WallOpacityDefault: the version
-        // stays 1 and every older save loads lowered at 20 %. Product owner, 2026-11-19: the default briefly went from
-        // "lowered" to "both", then back to "lowered" the same day. The "walls" key is always written, so a save that holds
-        // it (even "both") keeps it as an explicit choice; only a save without the key (written before the walls pass)
-        // takes the default.
+        // one of WallOpacitySteps. A missing field or an unknown value is Both and Tuning.WallOpacityDefault (10 %): the
+        // version stays 1. Product owner, 2026-11-19: the default briefly went from "lowered" to "both", then back to
+        // "lowered" the same day; product owner, 2026-11-20: the default is "both" at 10 % (new saves, Par defaut, and a save
+        // without the key or with an unknown value). The "walls" and "wallOpacity" keys are always written, so a save that
+        // holds them (even "lowered" at 20 %, the old defaults) keeps them as an explicit choice; only a save without the
+        // key (written before the walls pass) takes the default.
         public const string WallsLowered = "lowered";
         public const string WallsSeeThrough = "seethrough";
         public const string WallsBoth = "both";
@@ -85,7 +86,7 @@ namespace OutOfSight.Core
         /// <summary>The wall opacities the Opacité des murs / Wall opacity row cycles through, in percent.</summary>
         public static readonly int[] WallOpacitySteps = { 10, 20, 35, 50 };
 
-        [JsonProperty("walls")] public string Walls = WallsLowered;
+        [JsonProperty("walls")] public string Walls = WallsBoth;
         [JsonProperty("wallOpacity")] public int WallOpacity = Tuning.WallOpacityDefault;
 
         /// <summary>True for "lowered", "seethrough", "both" and "none".</summary>
@@ -144,7 +145,7 @@ namespace OutOfSight.Core
                 Quality = IsQuality(Quality) ? Quality : null,
                 Difficulty = DifficultyDef.Normalize(Difficulty) == Difficulty ? Difficulty : null, // MUTATION:OPTIONS_DIFFICULTY_FALLBACK
                 Language = Language == Strings.English || Language == Strings.French ? Language : null,
-                Walls = IsWalls(Walls) ? Walls : WallsLowered, // MUTATION:OPTIONS_WALLS_FALLBACK
+                Walls = IsWalls(Walls) ? Walls : WallsBoth, // MUTATION:OPTIONS_WALLS_FALLBACK
                 WallOpacity = NearestWallOpacity(WallOpacity),
             };
         }
@@ -221,7 +222,8 @@ namespace OutOfSight.Core
     }
 
     /// <summary>
-    /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.7): the save file content, { "version": 1, "won": [...], "best": {...} }.
+    /// M5 (docs/CONTRACT_M5_v3.md 6 and 15.7): the save file content, { "version": 1, "won": [...], "best": {...} }; levels
+    /// v2 (docs/levels_v2/LEVELS_V2.md 7) adds "unlocked" and "order" with the version still 1.
     /// Pure data and rules; the file handling (paths, atomic writes, the .bak and .bad files) is SaveStore (Runtime).
     /// </summary>
     public sealed class SaveData
@@ -235,12 +237,72 @@ namespace OutOfSight.Core
         [JsonProperty("options")] public SaveOptions Options = SaveOptions.Default();
 
         /// <summary>
+        /// Levels v2 (docs/levels_v2/LEVELS_V2.md 7): the levels the one-shot order migration opened (<see cref="MigrateOrder"/>),
+        /// each playable whatever its predecessor in the play order. Missing on an older save, which then reads it as empty
+        /// (the version stays 1); a value that is not a list of strings is a parse problem, like <c>won</c>.
+        /// </summary>
+        [JsonProperty("unlocked")] public List<string> Unlocked = new List<string>();
+
+        /// <summary>
+        /// Levels v2: the manifest revision this save's progress was migrated to (levels.json "rev"). Missing, not an integer
+        /// or below 1 reads as 1, the v1 play order. SaveStore stamps a fresh save with the current revision.
+        /// </summary>
+        [JsonProperty("order")] public int Order = 1;
+
+        /// <summary>
+        /// Onboarding tips (idea 3, docs/next/progress/TIPS.md): the keys of the first-time tips already shown (tips.*), each
+        /// shown once per save. Missing, null or malformed reads as empty and never fails the save (a player loses at most a
+        /// tip again). "Par défaut" resets the options only: the tips stay shown; only a new save shows them again.
+        /// </summary>
+        [JsonProperty("tips")] public List<string> Tips = new List<string>();
+
+        /// <summary>
+        /// Stars (idea 5, docs/next/progress/STARS.md): the best star count (1 to <see cref="Tuning.StarsPerLevel"/>) per
+        /// record key (<see cref="DifficultyDef.RecordKey"/> of the level's RecordId: a redesigned level starts its stars
+        /// again, as its records). Missing on an older save, which reads it as empty (version stays 1): a level never won
+        /// since has 0 stars. Never fails a load: a malformed object or entry is skipped (<see cref="Parse"/>).
+        /// </summary>
+        [JsonProperty("stars")] public Dictionary<string, int> Stars = new Dictionary<string, int>();
+
+        /// <summary>
+        /// Stars: records <paramref name="stars"/> for <paramref name="recordId"/> at <paramref name="difficulty"/>, kept only
+        /// when above the saved count (clamped to 0..<see cref="Tuning.StarsPerLevel"/>). Returns the count now saved; 0 for
+        /// a null or empty record id. Does not save: the caller's RecordWin write (SaveStore) carries it.
+        /// </summary>
+        public int RecordStars(string recordId, int stars, string difficulty)
+        {
+            if (string.IsNullOrEmpty(recordId))
+            {
+                return 0;
+            }
+            Stars = Stars ?? new Dictionary<string, int>();
+            int clamped = Mathf.Clamp(stars, 0, Tuning.StarsPerLevel);
+            string key = DifficultyDef.RecordKey(recordId, difficulty);
+            if (!Stars.TryGetValue(key, out int previous) || clamped > previous) // MUTATION:STARS_ONLY_UP
+            {
+                Stars[key] = clamped;
+                return clamped;
+            }
+            return previous;
+        }
+
+        /// <summary>Stars: the saved count for <paramref name="recordId"/> at <paramref name="difficulty"/>, 0 when none.</summary>
+        public int StarsOf(string recordId, string difficulty)
+        {
+            if (string.IsNullOrEmpty(recordId) || Stars == null)
+            {
+                return 0;
+            }
+            return Stars.TryGetValue(DifficultyDef.RecordKey(recordId, difficulty), out int stars) ? stars : 0;
+        }
+
+        /// <summary>
         /// Records a win: the level joins Won (once), and its best time is replaced only by a strictly lower one. A null or
         /// empty level id records nothing.
         /// </summary>
         public RecordResult RecordWin(string levelId, float seconds)
         {
-            return RecordWin(levelId, seconds, DifficultyDef.Normal);
+            return RecordWin(levelId, levelId, seconds, DifficultyDef.Normal);
         }
 
         /// <summary>
@@ -249,6 +311,18 @@ namespace OutOfSight.Core
         /// id at Normal (old saves keep their records), "levelN@facile" and "levelN@difficile" otherwise.
         /// </summary>
         public RecordResult RecordWin(string levelId, float seconds, string difficulty)
+        {
+            return RecordWin(levelId, levelId, seconds, difficulty);
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7, record revision): a win of <paramref name="levelId"/> whose record is kept under
+        /// <paramref name="recordId"/> (<see cref="LevelDef.RecordId"/>, "level6~1" for a redesigned level). Won gets the bare
+        /// level id (unlocking is unaffected by a revision); Best gets <see cref="DifficultyDef.RecordKey"/>(recordId,
+        /// difficulty), so a record made on an older version of the level is never read again (it stays in the file). A null
+        /// or empty record id falls back to the level id.
+        /// </summary>
+        public RecordResult RecordWin(string levelId, string recordId, float seconds, string difficulty)
         {
             var result = new RecordResult { PreviousBest = -1f };
             if (string.IsNullOrEmpty(levelId))
@@ -261,7 +335,7 @@ namespace OutOfSight.Core
             {
                 Won.Add(levelId);
             }
-            string key = DifficultyDef.RecordKey(levelId, difficulty);
+            string key = DifficultyDef.RecordKey(string.IsNullOrEmpty(recordId) ? levelId : recordId, difficulty);
             if (Best.TryGetValue(key, out float previous))
             {
                 result.PreviousBest = previous;
@@ -280,14 +354,79 @@ namespace OutOfSight.Core
             return result;
         }
 
-        /// <summary>Level index i of the play order is unlocked when i is 0 or the level at i - 1 is won.</summary>
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): level index i of the play order is playable when i is 0, or the level itself is won (a
+        /// won level never locks again after a reorder), or the level at i - 1 is won, or the order migration opened it
+        /// (<see cref="Unlocked"/>). False for a null order or an index outside it.
+        /// </summary>
         public bool IsUnlocked(IReadOnlyList<string> order, int index)
         {
             if (order == null || index < 0 || index >= order.Count)
             {
                 return false;
             }
-            return index == 0 || (Won != null && Won.Contains(order[index - 1]));
+            if (index == 0)
+            {
+                return true;
+            }
+            string id = order[index];
+            if (Won != null && Won.Contains(id)) // MUTATION:UNLOCK_WON
+            {
+                return true;
+            }
+            if (Won != null && Won.Contains(order[index - 1]))
+            {
+                return true;
+            }
+            return Unlocked != null && Unlocked.Contains(id); // MUTATION:UNLOCK_MIGRATED
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): the one-shot migration of the progress to manifest revision <paramref name="rev"/>.
+        /// Nothing happens (false) when <see cref="Order"/> is already <paramref name="rev"/> or above. Otherwise every id of
+        /// <paramref name="previous"/> (the play order of the revision before) that was playable under the previous rule
+        /// (index 0, or its predecessor in <paramref name="previous"/> won) and is still listed in <paramref name="current"/>
+        /// joins <see cref="Unlocked"/>, then Order becomes rev (true). An id already won is skipped (the won term of
+        /// <see cref="IsUnlocked"/> opens it forever), and an id is never listed twice. Won and Best are never touched.
+        /// </summary>
+        public bool MigrateOrder(int rev, IReadOnlyList<string> previous, IReadOnlyList<string> current)
+        {
+            if (Order >= rev)
+            {
+                return false;
+            }
+            Won = Won ?? new List<string>();
+            Unlocked = Unlocked ?? new List<string>();
+            if (previous != null && current != null)
+            {
+                for (int j = 0; j < previous.Count; j++)
+                {
+                    string id = previous[j];
+                    if (string.IsNullOrEmpty(id) || Won.Contains(id) || Unlocked.Contains(id) || !Listed(current, id))
+                    {
+                        continue;
+                    }
+                    bool playable = j == 0 || Won.Contains(previous[j - 1]); // MUTATION:MIGRATE_PREDECESSOR
+                    if (playable)
+                    {
+                        Unlocked.Add(id);
+                    }
+                }
+            }
+            Order = rev;
+            return true;
+        }
+
+        private static bool Listed(IReadOnlyList<string> list, string id)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] == id)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -295,10 +434,11 @@ namespace OutOfSight.Core
         /// <list type="bullet">
         /// <item>not JSON, or not a JSON object;</item>
         /// <item>a missing <c>version</c>, a non-integer one, 0 or below, or above <see cref="CurrentVersion"/>;</item>
-        /// <item>a <c>won</c> that is not a list of strings, a <c>best</c> that is not an object of finite, non-negative
-        /// numbers.</item>
+        /// <item>a <c>won</c> or an <c>unlocked</c> that is not a list of strings, a <c>best</c> that is not an object of
+        /// finite, non-negative numbers.</item>
         /// </list>
-        /// A missing <c>won</c> or <c>best</c> is an empty one, and a level listed twice in <c>won</c> is kept once.
+        /// A missing <c>won</c>, <c>unlocked</c> or <c>best</c> is an empty one, a level listed twice is kept once, and a
+        /// missing or malformed <c>order</c> reads as 1.
         /// </summary>
         public static SaveData Parse(string json, out string problem)
         {
@@ -374,6 +514,56 @@ namespace OutOfSight.Core
                         data.Best[p.Name] = (float)seconds;
                     }
                 }
+                // Levels v2 (LEVELS_V2.md 7): "unlocked" follows the rules of "won" (missing or null is empty, anything but a
+                // list of strings is a problem, an id listed twice is kept once); "order" never fails the save.
+                JToken unlocked = root["unlocked"];
+                if (unlocked != null && unlocked.Type != JTokenType.Null)
+                {
+                    if (!(unlocked is JArray opened))
+                    {
+                        problem = "unlocked is not a list";
+                        return null;
+                    }
+                    foreach (JToken id in opened)
+                    {
+                        if (id.Type != JTokenType.String)
+                        {
+                            problem = "unlocked holds a " + id.Type;
+                            return null;
+                        }
+                        string s = id.Value<string>();
+                        if (!string.IsNullOrEmpty(s) && !data.Unlocked.Contains(s))
+                        {
+                            data.Unlocked.Add(s);
+                        }
+                    }
+                }
+                data.Order = ParseOrder(root["order"]);
+                // Stars (idea 5): never fails the save. Missing, null or not an object reads as empty; an entry that is not an
+                // integer is skipped; a value outside 0..StarsPerLevel is clamped (a hand edited save keeps its other stars).
+                if (root["stars"] is JObject stars)
+                {
+                    foreach (JProperty p in stars.Properties())
+                    {
+                        if (p.Value.Type == JTokenType.Integer && !string.IsNullOrEmpty(p.Name))
+                        {
+                            long count = p.Value.Value<long>();
+                            data.Stars[p.Name] = (int)System.Math.Max(0, System.Math.Min(Tuning.StarsPerLevel, count));
+                        }
+                    }
+                }
+                // Onboarding tips (idea 3): the shown keys; anything but a list of strings is ignored, never a problem.
+                if (root["tips"] is JArray tips)
+                {
+                    foreach (JToken id in tips)
+                    {
+                        string s = id.Type == JTokenType.String ? id.Value<string>() : null;
+                        if (!string.IsNullOrEmpty(s) && !data.Tips.Contains(s))
+                        {
+                            data.Tips.Add(s);
+                        }
+                    }
+                }
                 // M6 (CONTRACT_M6 2.1): missing, malformed or absent entirely, this never fails the save (SaveOptions.Parse
                 // falls back to defaults field by field instead of rejecting the whole file).
                 data.Options = SaveOptions.Parse(root["options"]);
@@ -384,6 +574,17 @@ namespace OutOfSight.Core
                 problem = e.GetType().Name + ": " + e.Message;
                 return null;
             }
+        }
+
+        /// <summary>Levels v2: the saved order revision; missing, not an integer or below 1 reads as 1.</summary>
+        private static int ParseOrder(JToken token)
+        {
+            if (token == null || token.Type != JTokenType.Integer)
+            {
+                return 1;
+            }
+            long value = token.Value<long>();
+            return value < 1 || value > int.MaxValue ? 1 : (int)value;
         }
 
         public string ToJson() => JsonConvert.SerializeObject(this, Formatting.Indented);

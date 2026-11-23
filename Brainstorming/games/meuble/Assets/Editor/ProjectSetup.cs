@@ -51,10 +51,14 @@ namespace OutOfSight.Editor
         private static readonly Color SilhouetteColor = new Color(0.22f, 0.52f, 1f, 0.85f);
         private static readonly Color ConeXRayColor = new Color(0.12f, 0.3f, 0.95f, 0.38f);
 
-        // SSAO: contact shadows under the furniture and in the corners, kept light on a flat palette.
-        private const float SsaoIntensity = 0.6f;
-        private const float SsaoRadius = 0.3f;
-        private const float SsaoDirectLighting = 0.25f;
+        // SSAO: contact shadows under the furniture and in the corners (Haut only: Mobile_Renderer has none).
+        // Room lighting on Haut (2026-11-20, A/B shots of four candidates rounds): a room-scale radius so a wall and floor
+        // junction and a wall corner darken over a hand's breadth (the M3 0.6 / 0.3 / 0.25 only lined the furniture), part of
+        // it on the sunlit surfaces too, interleaved gradient noise with 12 samples (blue noise left a grain in the corners at
+        // the title's close eye level camera; a radius of 0.9 m and more left black blotches there).
+        private const float SsaoIntensity = 1.6f;
+        private const float SsaoRadius = 0.7f;
+        private const float SsaoDirectLighting = 0.6f;
 
         [MenuItem("OutOfSight/Project Setup")]
         public static void Apply()
@@ -80,7 +84,8 @@ namespace OutOfSight.Editor
             // M7 walls pass (product owner, 2026-11-19): a flat colour no renderer's property block can override (URP applies a
             // renderer's block to an override material: the characters' prints showed their bodies through standing walls).
             Material silhouette = EnsureFlatMaterial(SilhouetteMaterialPath, SilhouetteColor, CullMode.Back);
-            Material cone = EnsureTransparentMaterial(ConeMaterialPath, ConeXRayColor, CullMode.Off);
+            // Cones look (2026-11-20): the hidden part of a cone is the vision cone shader's blue hatching (its _XRay mode).
+            Material cone = EnsureConeXRayMaterial(ConeMaterialPath, ConeXRayColor);
             // Fully transparent: drawn only for its stencil write (URP Unlit has no ColorMask property).
             Material stencilOnly = EnsureTransparentMaterial(StencilMaterialPath, new Color(0f, 0f, 0f, 0f), CullMode.Back);
             foreach (string path in new[] { PcRendererPath, MobileRendererPath })
@@ -232,7 +237,7 @@ namespace OutOfSight.Editor
             {
                 throw new InvalidOperationException("SSAO m_Settings not found: the URP version changed its layout");
             }
-            Set(settings, "AOMethod", 0);          // blue noise
+            Set(settings, "AOMethod", 1);          // interleaved gradient (smooth at close range)
             Set(settings, "Downsample", false);
             Set(settings, "AfterOpaque", false);   // applied in the lighting, not multiplied over the image
             Set(settings, "Source", 1);            // depth normals
@@ -240,7 +245,7 @@ namespace OutOfSight.Editor
             Set(settings, "Intensity", SsaoIntensity);
             Set(settings, "DirectLightingStrength", SsaoDirectLighting);
             Set(settings, "Radius", SsaoRadius);
-            Set(settings, "Samples", 1);           // medium
+            Set(settings, "Samples", 0);           // high (12)
             Set(settings, "BlurQuality", 0);       // high
             Set(settings, "Falloff", 100f);
             so.ApplyModifiedPropertiesWithoutUndo();
@@ -297,6 +302,33 @@ namespace OutOfSight.Editor
             m.shaderKeywords = new string[0];
             m.SetColor("_XRayColor", color);
             m.SetFloat("_Cull", (float)cull);
+            m.renderQueue = (int)RenderQueue.Transparent;
+            EditorUtility.SetDirty(m);
+            return m;
+        }
+
+        /// <summary>
+        /// Cones look (2026-11-20): the x-ray cone material asset, <see cref="VisionConeView.ConeShaderName"/> in its x-ray
+        /// mode (a blue diagonal hatching that fades with distance, read from the fan mesh's own UVs; no property block on
+        /// a cone, so nothing overrides its colour). The renderer references it, so the shader ships in the player with it.
+        /// </summary>
+        private static Material EnsureConeXRayMaterial(string path, Color color)
+        {
+            Shader shader = Shader.Find(VisionConeView.ConeShaderName);
+            if (shader == null)
+            {
+                throw new InvalidOperationException("Shader not found in the editor: " + VisionConeView.ConeShaderName);
+            }
+            var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (m == null)
+            {
+                m = new Material(shader) { name = Path.GetFileNameWithoutExtension(path) };
+                AssetDatabase.CreateAsset(m, path);
+            }
+            m.shader = shader;
+            m.shaderKeywords = new string[0];
+            m.SetColor("_BaseColor", color);
+            m.SetFloat("_XRay", 1f);
             m.renderQueue = (int)RenderQueue.Transparent;
             EditorUtility.SetDirty(m);
             return m;
@@ -427,7 +459,12 @@ namespace OutOfSight.Editor
                 }
             }
             bool changed = false;
-            foreach (string name in new[] { PrimitiveKit.LitShaderName, PrimitiveKit.UnlitShaderName })
+            // Cones look (2026-11-20): the vision cone shader is created from code (VisionConeView.ConeMaterial), so it is
+            // kept here as well as by XRay_Cone.mat (a shader only named in code is stripped from the player).
+            // LEVELNUM: the intro card's dim with the level number's holes (CardNumber) creates both its materials from code
+            // (Assets/Settings/UiCardDim.shader, UiNumberMask.shader); UI/Default is a default Always Included shader, pinned.
+            foreach (string name in new[] { PrimitiveKit.LitShaderName, PrimitiveKit.UnlitShaderName, VisionConeView.ConeShaderName,
+                CardNumber.DimShaderName, CardNumber.MaskShaderName, "UI/Default" })
             {
                 Shader shader = Shader.Find(name);
                 if (shader == null)

@@ -6,7 +6,7 @@ namespace OutOfSight
     /// <summary>
     /// M7 polish (docs/CONTRACT_M6.md 2.5): a quick, presentation-only open-slip-close animation for one wardrobe's
     /// two doors (FurnitureKit.Wardrobe's "Door0" and "Door1" boxes), played the instant the entry or exit action
-    /// starts (GameState calls <see cref="Begin"/> from the same step as the E press, not at the end of the action),
+    /// starts (GameState calls <see cref="Begin"/> from the same step as the door push (DOORAUTO; the E press before), not at the end of the action),
     /// so the player sees the doors swing open at once instead of waiting for the action to finish.
     /// <list type="bullet">
     /// <item>Visual only: the wardrobe keeps its one whole-box collider and GameState keeps its own hide/show timing

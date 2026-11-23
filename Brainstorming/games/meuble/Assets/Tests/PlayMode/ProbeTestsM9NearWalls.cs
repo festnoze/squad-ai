@@ -15,7 +15,7 @@ namespace OutOfSight.Tests
     /// M9 near walls (product owner, 2026-11-19: "even translucent, the outer wall in front of the camera veils the whole
     /// view"): in the see-through and both looks, an outer wall between the camera and the house that covers more than
     /// Tuning.NearWallEnterCoverage of the screen fades to nothing while its door frames stay opaque (M9 doors rule); an interior wall or a
-    /// small outer wall keeps the wall opacity option. Shots under docs/m9/nearwalls/.
+    /// small outer wall keeps the wall opacity option. Shots under Build/shots/nearwalls/.
     /// </summary>
     public sealed class ProbeTestsM9NearWalls
     {
@@ -373,7 +373,7 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// The shots: on level1 and level12, the see-through look at 35 %, the game camera around the player at its default
-        /// distance and two pitches, four yaws each: one 4 by 2 contact sheet per level, docs/m9/nearwalls/PREFIX_LEVEL.png;
+        /// distance and two pitches, four yaws each: one 4 by 2 contact sheet per level, Build/shots/nearwalls/PREFIX_LEVEL.png;
         /// level1 in the both look too (PREFIX_level1_both.png).
         /// </summary>
         [UnityTest]
@@ -405,7 +405,7 @@ namespace OutOfSight.Tests
                     }
                 }
                 sheet.Apply();
-                string dir = System.IO.Path.Combine("docs", "m9", "nearwalls");
+                string dir = System.IO.Path.Combine("Build", "shots", "nearwalls");
                 System.IO.Directory.CreateDirectory(dir);
                 System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, ShotPrefix + "_" + shot + ".png"), sheet.EncodeToPNG());
                 Object.Destroy(sheet);
@@ -419,7 +419,7 @@ namespace OutOfSight.Tests
         /// The door shots (product owner rule, 2026-11-19: doors and their frames never move, only the wall does): a
         /// doorway seen from the far side of its wall in the four looks (lowered, see-through 35 %, both, off), one row each:
         /// level12's first shared doorway and first outer doorway (from outside), level8's leaf door porte_cuisine;
-        /// docs/m9/doors/DOORPREFIX_doors.png.
+        /// Build/shots/doors/DOORPREFIX_doors.png.
         /// </summary>
         [UnityTest]
         public IEnumerator Step91z_DoorShots()
@@ -477,7 +477,7 @@ namespace OutOfSight.Tests
                 row++;
             }
             sheet.Apply();
-            string dir = System.IO.Path.Combine("docs", "m9", "doors");
+            string dir = System.IO.Path.Combine("Build", "shots", "doors");
             System.IO.Directory.CreateDirectory(dir);
             System.IO.File.WriteAllBytes(System.IO.Path.Combine(dir, DoorShotPrefix + "_doors.png"), sheet.EncodeToPNG());
             Object.Destroy(sheet);

@@ -184,7 +184,10 @@ namespace OutOfSight.Tests
 
         private string HideLine => Hud.Labels.TryGetValue("HideHintLine", out Text t) ? t.text : null;
 
-        /// <summary>The stool in front of the wardrobe, then E: waits for the 25 step entry. Returns the moving flags recorded.</summary>
+        /// <summary>
+        /// The stool in front of the wardrobe, then a door push (DOORAUTO, in place of E): waits for the 25 step entry. Returns
+        /// the moving flags recorded.
+        /// </summary>
         private IEnumerator EnterWardrobe(List<bool> moving)
         {
             Chair.Teleport(Front, 0f);
@@ -192,7 +195,7 @@ namespace OutOfSight.Tests
             Assert.AreSame(TheWardrobe(), Game.WardrobeInReach, "premise: the stool stands in front of the wardrobe");
             void Watch() => moving.Add(Chair.IsMoving);
             Game.FixedStepped += Watch;
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => Chair.Hidden, WardrobeSteps + 5);
             Game.FixedStepped -= Watch;
             Assert.IsTrue(Chair.Hidden, "the stool did not hide");
@@ -203,9 +206,10 @@ namespace OutOfSight.Tests
         // =====================================================================================================
 
         /// <summary>
-        /// Step 53a: E in front of the wardrobe enters it in a 25 step moving action, then the stool is hidden: no visual, no
-        /// sample, it cannot move, and a watcher looking at it sees nothing and never catches it; E leaves (visible, moving).
-        /// An entry seen is a catch after the grace. A chair does not fit: E does nothing.
+        /// Step 53a: a door push (DOORAUTO, in place of E) in front of the wardrobe enters it in a 25 step moving action, then
+        /// the stool is hidden: no visual, no sample, a push sideways does not move it, and a watcher looking at it sees
+        /// nothing and never catches it; a push leaves (visible, moving). An entry seen is a catch after the grace. A chair
+        /// does not fit: the push does nothing.
         /// </summary>
         [UnityTest]
         public IEnumerator Step53a_EnterAndLeaveTheWardrobe()
@@ -223,7 +227,7 @@ namespace OutOfSight.Tests
 
             var moving = new List<bool>();
             yield return EnterWardrobe(moving);
-            Assert.AreEqual(0, moving.IndexOf(true), "the entry did not start on the press step");
+            Assert.AreEqual(0, moving.IndexOf(true), "the entry did not start on the push step");
             int run = moving.TakeWhile(m => m).Count();
             Assert.AreEqual(WardrobeSteps, run, $"the entry is {run} moving steps, not {WardrobeSteps}");
             Assert.AreEqual(GameState.WardrobeStage.Hidden, Game.Wardrobe);
@@ -242,7 +246,8 @@ namespace OutOfSight.Tests
             Assert.IsTrue(Vision.Test(h.EyePosition, h.EyeForward, samples, r.ViewRange, r.HalfAngle, null),
                 "premise: the watcher would see the stool's samples");
             Vector3 at = Chair.transform.position;
-            Chair.ScriptedDirection = Vector3.back;
+            // DOORAUTO: sideways (the wardrobe faces -z), so the held input is no push out of it.
+            Chair.ScriptedDirection = Vector3.left;
             bool seen = false;
             bool seesPlayer = false;
             void Look()
@@ -260,10 +265,10 @@ namespace OutOfSight.Tests
             Assert.Less(Planar(Chair.transform.position, at), 1e-4f, "the hidden stool moved");
             Assert.IsTrue(Chair.Hidden);
 
-            // E leaves: visible again, a 25 step moving action, here seen: a catch after the grace.
-            InputReader.InjectAction();
+            // A push leaves: visible again, a 25 step moving action, here seen: a catch after the grace.
+            InputReader.InjectDoorPush();
             yield return Until(() => Game.State != PlayState.Playing, WardrobeSteps + 5);
-            Assert.IsFalse(Chair.Hidden, "E did not leave the wardrobe");
+            Assert.IsFalse(Chair.Hidden, "the push did not leave the wardrobe");
             Assert.AreEqual(1, Game.LeaveCount);
             Assert.AreEqual(PlayState.Caught, Game.State, "the exit seen is not a catch");
             Assert.AreEqual(LoseReason.SeenMoving, Game.LoseReason);
@@ -278,15 +283,15 @@ namespace OutOfSight.Tests
             Assert.AreEqual(PlayState.Playing, Game.State, "premise: playing after the restart");
             Assert.IsTrue(Game.Seen, "premise: the watcher sees the stool in front of the wardrobe");
             int pressStep = fixedSteps;
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => Game.State != PlayState.Playing, WardrobeSteps + 5);
             Assert.AreEqual(PlayState.Caught, Game.State, "the entry seen is not a catch");
             Assert.AreEqual(LoseReason.SeenMoving, Game.LoseReason);
             int caughtAfter = fixedSteps - pressStep;
-            Assert.That(caughtAfter, Is.InRange(GraceSteps, GraceSteps + 1), $"caught {caughtAfter} steps after the press, not after the grace");
+            Assert.That(caughtAfter, Is.InRange(GraceSteps, GraceSteps + 1), $"caught {caughtAfter} steps after the push, not after the grace");
             Assert.IsFalse(Chair.Hidden, "a caught entry hid the stool");
 
-            // A chair does not fit: E in front of the wardrobe does nothing.
+            // A chair does not fit: a push in front of the wardrobe does nothing, and it offers no push direction.
             Game.Restart();
             yield return Steps(2);
             Game.MainInhabitant.Pin(new Vector3(0f, 0f, -1f), 180f);
@@ -296,11 +301,94 @@ namespace OutOfSight.Tests
             Assert.IsTrue(WardrobeRule.InFront(TheWardrobe(), Chair.transform.position), "premise: the chair stands in front");
             Assert.IsNull(Game.WardrobeInReach, "a chair may enter the wardrobe");
             Assert.IsFalse(Hud.HideHintVisible, "the prompt shows for a chair");
-            InputReader.InjectAction();
+            Assert.IsNull(Game.DoorPushDirection, "the wardrobe offers a push direction to a chair");
+            InputReader.InjectDoorPush();
             yield return Steps(3);
-            Assert.IsFalse(Chair.ActionActive, "E began an action for a chair");
+            Assert.IsFalse(Chair.ActionActive, "a push began an action for a chair");
             Assert.IsFalse(Chair.Hidden, "the chair hid");
             Assert.AreEqual(GameState.WardrobeStage.None, Game.Wardrobe);
+            AssertClean();
+        }
+
+        /// <summary>
+        /// Step 53a2 (task DOORAUTO): real pushes of the move input (FurnitureController.ScriptedDirection). In front of the
+        /// wardrobe the push direction is into its front (+z here); a push sideways never enters it; a push into it held for
+        /// the confirm steps holds the stool still, then the 25 step entry begins on the next step. Hidden, the push direction
+        /// is out of the front; a push held into the wardrobe never leaves; a push out of it leaves after the confirm steps.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step53a2_PushIntoTheWardrobeHidesAndPushOutLeaves()
+        {
+            yield return Load(WardrobeLevel);
+            Game.MainInhabitant.Pin(new Vector3(0f, 0f, -1f), 180f);
+            int confirm = FurnitureController.DoorPushConfirmSteps(Dt);
+            PropDef wardrobe = TheWardrobe();
+            Chair.Teleport(Front, 0f);
+            yield return Steps(2);
+            Assert.AreSame(wardrobe, Game.WardrobeInReach, "premise: the stool stands in front of the wardrobe");
+            Assert.IsTrue(Game.DoorPushDirection.HasValue, "no push direction in front of the wardrobe");
+            Vector3 into = Game.DoorPushDirection.Value;
+            Assert.Less((into + WardrobeRule.Front(wardrobe)).magnitude, 1e-4f, $"the push direction {into} is not into the wardrobe's front");
+
+            // Sideways (careful, so the released stool never tips): no entry.
+            Chair.ScriptedCareful = true;
+            Chair.ScriptedDirection = Vector3.right;
+            yield return Steps(confirm * 3);
+            Chair.ScriptedDirection = null;
+            yield return Steps(3);
+            Chair.ScriptedCareful = null;
+            Assert.IsFalse(Chair.Tipped, "premise: the stool tipped over");
+            Assert.IsFalse(Chair.Hidden, "a push sideways hid the stool");
+            Assert.AreEqual(GameState.WardrobeStage.None, Game.Wardrobe, "a push sideways began an entry");
+
+            // Into the front: still for the confirm steps, then the entry on the next step.
+            Chair.Teleport(Front, 0f);
+            yield return Steps(2);
+            Vector3 at = Chair.transform.position;
+            var moving = new List<bool>();
+            var acting = new List<bool>();
+            void Watch()
+            {
+                moving.Add(Chair.IsMoving);
+                acting.Add(Chair.ActionActive);
+            }
+            Game.FixedStepped += Watch;
+            Chair.ScriptedDirection = into;
+            yield return Until(() => Chair.Hidden, confirm + WardrobeSteps + 5);
+            Game.FixedStepped -= Watch;
+            Assert.IsTrue(Chair.Hidden, "a push into the wardrobe did not hide the stool");
+            Assert.AreEqual(confirm, acting.IndexOf(true), $"the entry began on push step {acting.IndexOf(true) + 1}, not {confirm + 1}");
+            Assert.IsFalse(moving.Take(confirm).Any(m => m), "the stool moved while the push was being confirmed");
+            Assert.Less(Planar(Chair.transform.position, at), 1e-4f, "the push moved the stool");
+
+            // Hidden, the push held into the wardrobe never leaves.
+            yield return Steps(confirm * 3);
+            Assert.IsTrue(Chair.Hidden, "a push into the wardrobe left it");
+            Chair.ScriptedDirection = null;
+            yield return Steps(2);
+            Assert.IsTrue(Game.DoorPushDirection.HasValue, "no push direction while hidden");
+            Assert.Less((Game.DoorPushDirection.Value - WardrobeRule.Front(wardrobe)).magnitude, 1e-4f, "the hidden push direction is not out of the front");
+
+            // Out of the front: the exit after the confirm steps.
+            int leaves = Game.LeaveCount;
+            int start = fixedSteps;
+            int left = -1;
+            void WatchLeave()
+            {
+                if (left < 0 && Game.LeaveCount != leaves)
+                {
+                    left = fixedSteps - start;
+                }
+            }
+            Game.FixedStepped += WatchLeave;
+            Chair.ScriptedDirection = -into;
+            yield return Until(() => left >= 0, confirm + 5);
+            Chair.ScriptedDirection = null;
+            Game.FixedStepped -= WatchLeave;
+            Assert.AreEqual(confirm + 1, left, $"the exit began {left} steps after the push, not {confirm + 1}");
+            Assert.IsFalse(Chair.Hidden, "the push out did not leave the wardrobe");
+            yield return Until(() => !Chair.ActionActive, WardrobeSteps + 5);
+            Assert.AreEqual(PlayState.Playing, Game.State);
             AssertClean();
         }
 
@@ -409,7 +497,7 @@ namespace OutOfSight.Tests
             Assert.IsNotNull(memory, "premise: the watcher has a door memory");
             Assert.IsFalse(memory.RemembersOpen(0), "premise: porte remembered closed");
             Assert.IsTrue(porte.InReach(Chair), "premise: the chair is in reach of porte");
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => porte.Open && !porte.Swinging && !Chair.ActionActive, DoorSteps + 5);
             yield return Steps(2);
             Assert.IsTrue(porte.Open, "premise: the chair opened porte");
@@ -461,7 +549,7 @@ namespace OutOfSight.Tests
             h.Pin(station, 90f);
             yield return Steps(2);
             Assert.IsNull(Game.DoorMemoryOf(h), "a level without doorMemory has a door memory");
-            InputReader.InjectAction();
+            InputReader.InjectDoorPush();
             yield return Until(() => porte.Open && !porte.Swinging && !Chair.ActionActive, DoorSteps + 5);
             h.Pin(station, 270f, 0f, true);
             yield return Steps(60);

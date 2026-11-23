@@ -12,6 +12,8 @@ namespace OutOfSight
     /// house whose longest interior side is at most Tuning.CameraHouseReferenceSide (every level of M1 to M4) keeps
     /// Tuning.OrbitDistanceMax, a longer one gets that bound times its side over the reference, up to
     /// Tuning.CameraMaxDistanceHouse. The level comes from the target furniture's floor (FloorMap.Level).
+    /// Sky ceiling (2026-11-20): <see cref="Pitch"/> is the view's pitch, from Tuning.PitchMin (above the horizon) to
+    /// Tuning.PitchMax; the arm follows it down to Tuning.OrbitArmPitchMin only (<see cref="ArmPitchFor"/>).
     /// </summary>
     [DefaultExecutionOrder(200)]
     public sealed class OrbitCamera : MonoBehaviour
@@ -185,11 +187,39 @@ namespace OutOfSight
             Apply();
         }
 
+        /// <summary>
+        /// Sky ceiling (2026-11-20, docs/m9/backdrop/NOTES.md): the arm's pitch for a view pitch. Above
+        /// Tuning.OrbitArmPitchMin + Tuning.OrbitArmPitchEase the arm is the view (the camera orbits the focus, which stays
+        /// at the centre of the screen); below it the arm eases onto Tuning.OrbitArmPitchMin (a quadratic blend, no kink)
+        /// and stays there, the camera never sinking toward the floor, while the view keeps tilting up toward the sky down
+        /// to Tuning.PitchMin (the furniture then sits lower in the frame).
+        /// </summary>
+        public static float ArmPitchFor(float pitch)
+        {
+            const float floor = Tuning.OrbitArmPitchMin;
+            const float ease = Tuning.OrbitArmPitchEase;
+            if (pitch >= floor + ease)
+            {
+                return pitch;
+            }
+            if (pitch <= floor - ease)
+            {
+                return floor;
+            }
+            float t = pitch - floor + ease;
+            return floor + t * t / (4f * ease);
+        }
+
+        /// <summary>From the focus toward the camera for a yaw and a view pitch (unit length; see <see cref="ArmPitchFor"/>).</summary>
+        public static Vector3 ArmDirection(float yaw, float pitch)
+        {
+            return Quaternion.Euler(ArmPitchFor(pitch), yaw, 0f) * Vector3.back;
+        }
+
         private void Apply()
         {
-            Quaternion orbit = Quaternion.Euler(Pitch, Yaw, 0f);
-            Quaternion view = Showcase ? Quaternion.Euler(Pitch - ShowcaseTilt, Yaw, 0f) : orbit;
-            Vector3 back = orbit * Vector3.back;
+            Quaternion view = Quaternion.Euler(Showcase ? Pitch - ShowcaseTilt : Pitch, Yaw, 0f);
+            Vector3 back = ArmDirection(Yaw, Pitch);
             float arm = Fence.HasValue ? GardenBackdrop.ClampArm(Fence.Value, focus, back, Distance) : Distance;
             transform.SetPositionAndRotation(focus + back * arm, view);
         }

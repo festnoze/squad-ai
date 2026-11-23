@@ -115,6 +115,59 @@ namespace OutOfSight
         private const float PratfallOutRate = Tuning.PratfallOutRate;
         private const float ProceduralPratfallDrop = Tuning.ProceduralPratfallDrop;
         private const float ProceduralPratfallArms = Tuning.ProceduralPratfallArms;
+        // DOGCARRY (render only): the dog's happy wag after its drag, degrees each way and radians per second.
+        private const float DogWagDegrees = 12f;
+        private const float DogWagRate = 22f;
+        // DOGBIG, GRIP (render only): how much of the hold step shows (0 to 1), the step itself in the body's frame (x to the
+        // right, y back, metres), and how much of the human hand grip shows.
+        private float holdBackBlend;
+        private Vector2 holdTarget;
+        private float handBlend;
+
+        /// <summary>
+        /// DOGBIG (render only, set by GameState with the routines' carry distance): half the depth of the player furniture
+        /// along its own forward, the axis a carrier holds it by (a carried furniture takes the carrier's yaw). With
+        /// <see cref="InhabitantRoutine.CarryForward"/> it gives the near edge of the held furniture (the dog's fallback hold
+        /// back when it has no <see cref="Grip"/>).
+        /// </summary>
+        public float CarriedHalfDepth = 0.5f * Tuning.CarryForward;
+
+        /// <summary>
+        /// GRIP (render only, set by GameState): the player furniture and where carriers hold it (its body kind's
+        /// <see cref="GripDef"/>). A carrying human's hands rest on its wrist points and his model stands
+        /// <see cref="GripDef.HumanStand"/> behind its centre; the biting dog lowers its head onto <see cref="GripDef.Snout"/>.
+        /// </summary>
+        public FurnitureController GripFurniture;
+        public GripDef Grip;
+
+        /// <summary>
+        /// DOGBIG, GRIP (render only): how far the dog's model steps back along its facing while it holds the furniture, so its
+        /// snout lands on the point it bites (<see cref="GripDef.Snout"/>, the head lowered to it) instead of reaching into the
+        /// furniture; it may be negative (a step toward the furniture still on the floor at the pin). 0 for a human. The
+        /// routine, its anchor and the furniture never move for it.
+        /// </summary>
+        public float DogHoldBack => Rig != null && Rig.IsPet ? holdTarget.y : 0f;
+
+        /// <summary>DOGBIG: the hold back step the model shows now, metres (tests).</summary>
+        public float ShownHoldBack => holdBackBlend * holdTarget.y;
+
+        /// <summary>GRIP: the hold step the model shows now, in its body frame (x to the right, y back, metres; tests).</summary>
+        public Vector2 ShownHold => holdBackBlend * holdTarget;
+
+        /// <summary>GRIP: how much of the human hand grip shows now, 0 to 1 (tests).</summary>
+        public float ShownHandGrip => handBlend;
+
+        /// <summary>
+        /// DOGBIG v3 (render only, set by GameState every step): the dog holds the furniture in its mouth, from the pin and its
+        /// grip to the drop. Its model then bites the edge (InhabitantRig.Bite: head rolled, jaw open).
+        /// </summary>
+        public bool Biting;
+
+        // DOGBIG v3: how much of the bite pose shows (0 to 1).
+        private float biteBlend;
+
+        /// <summary>DOGBIG v3: the bite pose's weight now (tests).</summary>
+        public float ShownBite => biteBlend;
 
         public Vector3 EyePosition => Routine.EyePosition;
 
@@ -180,7 +233,7 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// M5: the catalog model an inhabitant shows: its personality's (CONTRACT_M5 3; the dog's Shiba), an explicit
+        /// M5: the catalog model an inhabitant shows: its personality's (CONTRACT_M5 3; the dog's Husky), an explicit
         /// <see cref="InhabitantDef.Model"/> winning. Null for a default inhabitant that names none (the procedural body).
         /// The level builder instantiates it.
         /// </summary>
@@ -436,14 +489,105 @@ namespace OutOfSight
             frownBlend = Mathf.MoveTowards(frownBlend, frown ? 1f : 0f, dt * 7f);
             carryBlend = Mathf.MoveTowards(carryBlend, carrying ? 1f : 0f, dt * 5f);
             bendBlend = Mathf.MoveTowards(bendBlend, bending ? 1f : 0f, dt * 6f);
+            // GRIP: the human's hands on the carried furniture.
+            bool handsOn = !Rig.IsPet && Grip != null && GripFurniture != null && Routine.IsCarrying && GripFurniture.Carried;
+            handBlend = Mathf.MoveTowards(handBlend, handsOn ? 1f : 0f, dt * HandGripRate);
             if (Visual != null)
             {
-                Visual.SetPositionAndRotation(position, Quaternion.Euler(0f, bodyYaw, 0f));
+                // DOGCARRY, presentation only: the dog wags its whole body after it dropped the furniture home (the head,
+                // set absolutely by the rig, keeps looking where the routine looks).
+                float wag = Routine.IsWagging ? DogWagDegrees * Mathf.Sin(visualClock * DogWagRate) : 0f;
+                // DOGBIG, GRIP: while the dog bites (and wags by the dropped furniture) its model steps so its snout lands on
+                // the point it bites; a carrying human's model stands where his hands rest on the furniture at a believable
+                // distance. Eased in and out, held while paused.
+                bool holding = UpdateHold(position, bodyYaw, carrying, handsOn, alpha);
+                holdBackBlend = Mathf.MoveTowards(holdBackBlend, holding ? 1f : 0f, dt * Tuning.DogHoldBackRate);
+                Vector2 hold = ShownHold;
+                Vector3 step = Quaternion.Euler(0f, bodyYaw, 0f) * new Vector3(hold.x, 0f, -hold.y);
+                Visual.SetPositionAndRotation(position + step, Quaternion.Euler(0f, bodyYaw + wag, 0f));
+            }
+            if (!Rig.IsPet)
+            {
+                SetHandTargets(alpha);
             }
             float gait = Mathf.Lerp(previousGaitCycles, gaitCycles, alpha);
+            // DOGBIG v3: the bite (head rolled onto the edge, mouth open) from the grip to the drop, eased, held while paused.
+            biteBlend = Mathf.MoveTowards(biteBlend, Rig.IsPet && Biting ? 1f : 0f, dt * Tuning.DogBiteRate);
+            Rig.Bite = biteBlend;
             Rig.Apply(bodyYaw, bodyYaw + headYaw, activity, tilt, carryBlend, bendBlend, frownBlend, startledBlend, gait, paused,
                 SeatedPose, eyeHeight, pratfallBlend);
             UpdateMarker();
+        }
+
+        // GRIP (render only): how fast the human hand grip eases in and out (1 per second).
+        private const float HandGripRate = 6f;
+        // GRIP (render only): the dog's sideways step toward the point it bites is never wider than this (metres).
+        private const float DogGripSideMax = 0.3f;
+
+        /// <summary>
+        /// GRIP (render only): the hold step for this frame (<see cref="holdTarget"/>), true while the model holds the
+        /// furniture. The dog: from the pin to the drop (and through its wag, keeping the last step), its snout on
+        /// <see cref="GripDef.Snout"/> with its head lowered to it (the rig's neck bend, InhabitantRig.GripNeck); with no grip
+        /// data, the DOGBIG step back onto the near edge. A human: while his hands rest on the carried furniture, his model
+        /// <see cref="GripDef.HumanStand"/> behind its centre.
+        /// </summary>
+        private bool UpdateHold(Vector3 position, float bodyYaw, bool carrying, bool handsOn, float alpha)
+        {
+            if (!Rig.IsPet)
+            {
+                if (handsOn)
+                {
+                    holdTarget = new Vector2(0f, Grip.HumanHoldBack(Routine.CarryForward));
+                }
+                return handsOn;
+            }
+            bool biting = Biting || (carrying && Routine.IsCarrying);
+            if (biting && Grip != null && GripFurniture != null)
+            {
+                // The point it bites, in the dog's body frame (x right, y up from its floor, z forward): on the carried
+                // furniture (which takes the dog's yaw, plus the tug's wobble), or, still on the floor at the pin, on its side
+                // toward the dog.
+                GripFurniture.InterpolatedBase(alpha, out Vector3 at, out float yaw);
+                float frameYaw = GripFurniture.Carried ? yaw : bodyYaw;
+                Vector3 world = at + Quaternion.Euler(0f, frameYaw, 0f) * Grip.Snout;
+                Vector3 local = Quaternion.Euler(0f, -bodyYaw, 0f) * (world - position);
+                Rig.SolveBite(local.y, out float bend, out float tipForward);
+                Rig.GripNeck = bend;
+                float back = tipForward - local.z;
+                if (!GripFurniture.Carried)
+                {
+                    back = Mathf.Max(back, -Tuning.DogGripReachIn);
+                }
+                holdTarget = new Vector2(Mathf.Clamp(local.x, -DogGripSideMax, DogGripSideMax), back);
+                return true;
+            }
+            if (carrying || Routine.IsWagging)
+            {
+                if (Grip == null || GripFurniture == null)
+                {
+                    // DOGBIG: no grip data, the snout on the held furniture's near edge.
+                    holdTarget = new Vector2(0f, Mathf.Max(0f, Rig.SnoutReach - (Routine.CarryForward - CarriedHalfDepth)));
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// GRIP (render only): the human's wrist targets on the carried furniture as it is drawn this frame (its interpolated
+        /// base and yaw times <see cref="GripDef"/>'s points), and the grip's weight, for the rig's arm IK.
+        /// </summary>
+        private void SetHandTargets(float alpha)
+        {
+            if (Grip == null || GripFurniture == null || handBlend <= 0f)
+            {
+                Rig.SetHandGrip(0f, Vector3.zero, Vector3.zero, Vector3.forward, Vector3.forward, 0f);
+                return;
+            }
+            GripFurniture.InterpolatedBase(alpha, out Vector3 at, out float yaw);
+            Quaternion frame = Quaternion.Euler(0f, yaw, 0f);
+            Rig.SetHandGrip(handBlend, at + frame * Grip.LeftWrist, at + frame * Grip.RightWrist, frame * Grip.LeftFingers,
+                frame * Grip.RightFingers, Grip.HumanLean);
         }
 
         // ----- M2 expressions -----
@@ -560,6 +704,29 @@ namespace OutOfSight
 
         /// <summary>M5: true while the marker canvas draws (tests).</summary>
         public bool MarkerShown => markerCanvas != null && markerCanvas.enabled;
+
+        /// <summary>Idea 7 (BUBBLES): a speech bubble's tail points this far above the marker's float (clear of the "?" and "!").</summary>
+        public const float BubbleLift = 0.32f;
+
+        /// <summary>
+        /// Idea 7 (BUBBLES): where a speech bubble's tail points, in world space: above the marker's place over the head
+        /// (the head bone of a model, the personality's standing eye for a low watcher like the dog; the procedural body's
+        /// own sink while seated), without the marker's bob. SpeechBubbles projects it to the screen every frame.
+        /// </summary>
+        public Vector3 BubbleAnchor
+        {
+            get
+            {
+                float lift = MarkerHeight + BubbleLift;
+                if (Rig != null && Rig.Head != null)
+                {
+                    float standingEye = Personality != null && Personality.EyeHeight > 0f ? Personality.EyeHeight : Tuning.EyeHeight;
+                    return Rig.MarkerPosition(lift - Tuning.EyeHeight + standingEye);
+                }
+                Transform frame = Visual != null ? Visual : transform;
+                return frame.position + Vector3.up * lift;
+            }
+        }
 
         // ----- M5: the sleep "z" (drawn here: a glyph of the watchers' own marker, no new material) -----
 

@@ -1,0 +1,74 @@
+{
+  "id": "test_v2_req_via",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "viaChecks": [
+    {
+      "name": "detour",
+      "x": -1.75,
+      "z": -0.75,
+      "sizeX": 0.9,
+      "sizeZ": 0.9,
+      "maxRatio": 4.0
+    },
+    {
+      "name": "coin_surveille",
+      "x": 3.25,
+      "z": 0.75,
+      "sizeX": 0.9,
+      "sizeZ": 0.9
+    }
+  ],
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "props": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -3.25,
+    "z": -0.75,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": -3.25,
+    "z": 0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Veilleur",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 2.25,
+          "z": 0.75,
+          "facing": 90.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

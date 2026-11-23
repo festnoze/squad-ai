@@ -20,7 +20,7 @@ namespace OutOfSight.Tests
     /// the lights per room (none on Bas, one on Moyen, all on Haut), the vision results of a level are the same with and
     /// without the secondary lights, and the floor lamp dims the secondary lights of its room and restores them exactly.
     /// Lights_z_Shots is a look tool (explicit): it renders test_lights, level12 and level20 with the lights on and off to
-    /// docs/m8/lights.
+    /// Build/shots/lights.
     /// </summary>
     public sealed class ProbeTestsM8Lights
     {
@@ -420,9 +420,9 @@ namespace OutOfSight.Tests
 
         // ----- z: the look shots (a tool, explicit) -----
 
-        private static string ShotsDir => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "docs", "m8", "lights"));
+        private static string ShotsDir => Path.GetFullPath(Path.Combine(Application.dataPath, "..", "Build", "shots", "lights"));
 
-        [UnityTest, Explicit("look tool: renders docs/m8/lights")]
+        [UnityTest, Explicit("look tool: renders Build/shots/lights")]
         public IEnumerator Lights_z_Shots()
         {
             Directory.CreateDirectory(ShotsDir);

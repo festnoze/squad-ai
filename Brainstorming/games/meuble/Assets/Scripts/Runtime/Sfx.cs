@@ -145,8 +145,14 @@ namespace OutOfSight
 
         // ----- M5 wave 5B (docs/CONTRACT_M5.md 4, 5 and 6): synthesized only, AudioLibrary unchanged. -----
 
-        /// <summary>The robot vacuum's hum: a motor drone with its brushes, a seamless one second loop (3D, on the robot).</summary>
+        /// <summary>The robot vacuum's hum: a motor drone with its brushes, a seamless one second loop (on the robot).</summary>
         public AudioClip Hum { get; private set; }
+
+        /// <summary>
+        /// The hum loop's length, seconds (the synthesized clip is exactly this long). Levels v2 C8: the robot's hum disc
+        /// (Robot.HumDisc) pulses once per loop.
+        /// </summary>
+        public const float HumLoopSeconds = 1f;
 
         /// <summary>The fallen load: a dull knock on the floor, then breaking china and scattering shards.</summary>
         public AudioClip Crash { get; private set; }
@@ -173,11 +179,12 @@ namespace OutOfSight
         /// <summary>
         /// The hum's volume for a furniture <paramref name="distance"/> metres from the robot (planar): full within
         /// SfxHumMinDistance, falling linearly to silence at SfxHumMaxDistance. The hum is what the furniture hears, so it
-        /// follows the furniture, never the camera.
+        /// follows the furniture, never the camera. Levels v2 C8: SfxHumMaxDistance is 3.5 m (it was 7 m), so the hum fades
+        /// out just past the 2.5 m within which it masks noises (Tuning.RobotHumRadius, the hum disc): the ear and the rule agree.
         /// </summary>
         public static float HumVolumeAt(float distance)
         {
-            float fade = Mathf.InverseLerp(Tuning.SfxHumMinDistance, Tuning.SfxHumMaxDistance, distance);
+            float fade = Mathf.InverseLerp(Tuning.SfxHumMinDistance, Tuning.SfxHumMaxDistance, distance); // MUTATION:HUM_AUDIO_RANGE
             return HumVolume * (1f - fade);
         }
 
@@ -356,7 +363,7 @@ namespace OutOfSight
             Door = SynthesizeDoor("door", Tuning.DoorOpenTime + 0.15f);
             Bark = Synthesize("bark", 0.52f, BarkSample);
             Sniff = Synthesize("sniff", 0.3f, SniffSample);
-            Hum = SynthesizeHum("hum", 1f);
+            Hum = SynthesizeHum("hum", HumLoopSeconds);
             Crash = SynthesizeCrash("crash", 0.9f);
             RockCreak = SynthesizeRockCreak("rock creak", Tuning.RockTime);
             RockCreakCareful = SynthesizeRockCreak("rock creak careful", Tuning.RockCarefulTime);
@@ -536,6 +543,10 @@ namespace OutOfSight
                 s.volume = 0f;
                 s.spatialBlend = 0f;
                 s.dopplerLevel = 0f;
+                // C8: the source's own rolloff states the same range as HumVolumeAt (the volume is set by hand: 2D source).
+                s.rolloffMode = AudioRolloffMode.Linear;
+                s.minDistance = Tuning.SfxHumMinDistance;
+                s.maxDistance = Tuning.SfxHumMaxDistance;
                 s.Play();
                 HumSourcesAdded++;
             }

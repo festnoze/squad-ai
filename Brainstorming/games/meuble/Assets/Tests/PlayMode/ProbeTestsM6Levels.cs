@@ -144,31 +144,33 @@ namespace OutOfSight.Tests
         }
 
         /// <summary>
-        /// Level 17's counter-route "drop at the spawn, then full speed": full speed from the spawn into a corner 1.5 m away
-        /// (the vase falls there), then the house at full speed (corridor, living room, mezzanine, the entree door, the
-        /// exit), never careful and never waiting. Rows are x, z; the row at <see cref="Level17OpenRow"/> opens porte_entree.
+        /// Level 13's counter-route "drop at the spawn, then full speed" (L17HIDE, 2026-11-23): full speed from the office
+        /// chair's spawn south (the vase falls on that full start, 0.5 s in, first run 2026-11-23), a hard turn west into the
+        /// corner 1.5 m away, then the designer's
+        /// own way at full speed (the south door of the direction office, the open-plan desks, the reception, the exit),
+        /// never careful and never waiting. Rows are x, z. Level 13 is the "load" lesson level of the act; Claire stands
+        /// 1 m from the spawn facing the north wall at the start, within her crash range.
         /// </summary>
-        private static readonly float[,] Level17DropAtSpawn =
+        private static readonly float[,] Level13DropAtSpawn =
         {
-            { 3.25f, 6.75f }, { 3.75f, 6.75f }, { 3.75f, 7.75f }, { 3.75f, 8.25f }, { 4.75f, 8.25f }, { 5.75f, 8.25f },
-            { 6.25f, 8.25f }, { 6.25f, 7.25f }, { 6.25f, 6.25f }, { 6.25f, 5.25f }, { 6.25f, 4.25f }, { 6.75f, 4.25f },
-            { 7.75f, 4.25f }, { 8.25f, 4.25f }, { 8.75f, 4.25f }, { 9.25f, 4.25f }, { 9.75f, 4.25f }, { 10.75f, 4.25f },
-            { 11.25f, 4.25f }, { 12.75f, 4.25f }, { 12.75f, 3.25f }, { 12.75f, 2.25f }, { 12.75f, 2.25f }, { 13.75f, 2.25f },
-            { 14.25f, 2.25f }, { 14.25f, 1.25f }, { 15.25f, 1.25f }, { 16.25f, 1.25f }, { 17.25f, 1.25f },
+            { 2.25f, 7.75f }, { 2.25f, 7.25f }, { 2.25f, 6.75f }, { 1.25f, 6.75f }, { 1.25f, 6.25f }, { 2.25f, 6.25f },
+            { 2.25f, 5.25f }, { 2.25f, 4.75f }, { 1.25f, 4.75f }, { 1.25f, 3.75f }, { 1.25f, 3.25f }, { 2.25f, 3.25f },
+            { 3.25f, 3.25f }, { 3.75f, 3.25f }, { 3.75f, 2.25f }, { 4.75f, 2.25f }, { 5.25f, 2.25f }, { 5.25f, 3.25f },
+            { 6.25f, 3.25f }, { 6.75f, 3.25f }, { 6.75f, 2.25f }, { 6.75f, 1.25f }, { 7.75f, 1.25f }, { 8.75f, 1.25f },
+            { 9.75f, 1.25f }, { 10.75f, 1.25f }, { 11.75f, 1.25f }, { 12.75f, 1.25f }, { 13.25f, 1.25f },
         };
 
-        private const int Level17OpenRow = 22;
-
         /// <summary>
-        /// Step 57b, the same counter-route on level 17 (CONTRACT_M5 19 M5): Mamie stands in the bedroom within her crash
-        /// range of the spawn and the first corners; the drop at the spawn then full speed must not win. Same premises as
-        /// step 57a.
+        /// Step 57b, the same counter-route on level 13 (CONTRACT_M5 19 M5): the drop at the spawn then full speed must not
+        /// win. Same premises as step 57a. L17HIDE (2026-11-23): retargeted from level17, where the vase no longer fell after
+        /// the LEVELS6 rebuild (its start now seats Mamie on the chair, her "sit": "player" station, the likely cause); level
+        /// 13 is the other shipped level, besides level 11 (step 57a), that carries the vase.
         /// </summary>
         [UnityTest]
         [Timeout(600000)]
-        public IEnumerator Step57b_Level17VaseDropIsHeard()
+        public IEnumerator Step57b_Level13VaseDropIsHeard()
         {
-            yield return DropAtSpawnThenFullSpeed("level17", Level17DropAtSpawn, Level17OpenRow, "porte_entree");
+            yield return DropAtSpawnThenFullSpeed("level13", Level13DropAtSpawn);
         }
 
         private IEnumerator DropAtSpawnThenFullSpeed(string id, float[,] rows, int openRow = -1, string door = null)

@@ -1,0 +1,76 @@
+{
+  "id": "test_v2_req_rug",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "requires": ["rug"],
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 7.0,
+      "sizeZ": 5.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "props": [
+    {
+      "name": "Fence",
+      "kind": "box",
+      "x": 0.0,
+      "z": -0.9,
+      "yaw": 0.0,
+      "sizeX": 7.0,
+      "sizeY": 0.5,
+      "sizeZ": 0.2,
+      "occluder": true,
+      "color": "#8C5A36"
+    }
+  ],
+  "doors": [
+    {
+      "x": 3.55,
+      "z": -1.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": -2.75,
+    "z": -1.75,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 2.75,
+    "z": -1.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Auditrice",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 0.0,
+          "z": -0.4,
+          "facing": 0.0,
+          "dwell": 5.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

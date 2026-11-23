@@ -171,6 +171,16 @@ namespace OutOfSight.Tests
 
         private static string Seconds(float seconds) => Strings.FormatSeconds(seconds);
 
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): the key a level's best time is kept under at Normal, its RecordId ("level1~1" once the
+        /// level has a rev), so the record premises follow a redesign of the level.
+        /// </summary>
+        private static string RecordIdOf(string levelId)
+        {
+            LevelDef def = LevelMiniature.Def(levelId);
+            return def != null && !string.IsNullOrEmpty(def.RecordId) ? def.RecordId : levelId;
+        }
+
         private static SaveData ReadSaveFile()
         {
             string file = SaveStore.FilePath;
@@ -394,21 +404,24 @@ namespace OutOfSight.Tests
             Menu.Play();
             string level = Game.LevelId;
             Assert.AreEqual(Order[0], level, "premise: Jouer started level 1");
+            // Levels v2 (LEVELS_V2.md 7): the record is kept under the level's RecordId ("level1~1" once level1 has a rev).
+            string record = Game.Def.RecordId;
+            Assert.AreEqual(RecordIdOf(level), record, "premise: the played level's record id");
 
             yield return WinNow(40);
             float first = Game.Elapsed;
-            Assert.IsTrue(SaveStore.TryGetBest(level, out float best), "the first win recorded no best time");
+            Assert.IsTrue(SaveStore.TryGetBest(record, out float best), "the first win recorded no best time");
             Assert.AreEqual(first, best, 1e-4f);
             Assert.IsTrue(Record.NewBestShown, "the first win is not a new record");
-            Assert.AreEqual(first, ReadSaveFile().Best[level], 1e-4f, "the first best time is not on disk");
+            Assert.AreEqual(first, ReadSaveFile().Best[record], 1e-4f, "the first best time is not on disk");
 
             Game.Restart();
             yield return WinNow(90);
             float slower = Game.Elapsed;
             Assert.Greater(slower, first + 0.5f, "premise: the second win is not slower");
-            Assert.IsTrue(SaveStore.TryGetBest(level, out best));
+            Assert.IsTrue(SaveStore.TryGetBest(record, out best));
             Assert.AreEqual(first, best, 1e-4f, "a slower win replaced the best time");
-            Assert.AreEqual(first, ReadSaveFile().Best[level], 1e-4f, "a slower win replaced the best time on disk");
+            Assert.AreEqual(first, ReadSaveFile().Best[record], 1e-4f, "a slower win replaced the best time on disk");
             Assert.IsTrue(Record.Shown);
             Assert.IsFalse(Record.NewBestShown, "a slower win shows Nouveau record");
             Assert.AreEqual(string.Format(Strings.WinBest, Seconds(first)), Record.BestText, "the record line does not show the kept best");
@@ -417,9 +430,9 @@ namespace OutOfSight.Tests
             yield return WinNow(5);
             float faster = Game.Elapsed;
             Assert.Less(faster, first - 0.3f, "premise: the third win is not faster");
-            Assert.IsTrue(SaveStore.TryGetBest(level, out best));
+            Assert.IsTrue(SaveStore.TryGetBest(record, out best));
             Assert.AreEqual(faster, best, 1e-4f, "a faster win did not replace the best time");
-            Assert.AreEqual(faster, ReadSaveFile().Best[level], 1e-4f, "the faster best time is not on disk");
+            Assert.AreEqual(faster, ReadSaveFile().Best[record], 1e-4f, "the faster best time is not on disk");
             Assert.IsTrue(Record.NewBestShown, "a faster win is not a new record");
             Assert.AreEqual(string.Format(Strings.WinBest, Seconds(faster)), Record.BestText);
 
@@ -578,7 +591,8 @@ namespace OutOfSight.Tests
             Assert.GreaterOrEqual(Order.Count, 2, "premise: levels.json lists at least two levels");
             string file = Path.Combine(NewTempDir(), SaveStore.FileName);
             string newer = "{ \"version\": 2, \"won\": [\"" + Order[0] + "\", \"" + Order[1] + "\"], \"best\": {} }";
-            string backup = "{ \"version\": 1, \"won\": [\"" + Order[0] + "\"], \"best\": { \"" + Order[0] + "\": 7.5 } }";
+            // Levels v2: the record under level 1's RecordId, the key the card reads.
+            string backup = "{ \"version\": 1, \"won\": [\"" + Order[0] + "\"], \"best\": { \"" + RecordIdOf(Order[0]) + "\": 7.5 } }";
             File.WriteAllText(file, newer);
             File.WriteAllText(file + SaveStore.BakSuffix, backup);
             yield return RebootWith(file);
@@ -611,7 +625,8 @@ namespace OutOfSight.Tests
         {
             Assert.GreaterOrEqual(Order.Count, 2, "premise: levels.json lists at least two levels");
             string file = Path.Combine(NewTempDir(), SaveStore.FileName);
-            string pending = "{ \"version\": 1, \"won\": [\"" + Order[0] + "\"], \"best\": { \"" + Order[0] + "\": 6.5 } }";
+            // Levels v2: the record under level 1's RecordId, the key the card reads.
+            string pending = "{ \"version\": 1, \"won\": [\"" + Order[0] + "\"], \"best\": { \"" + RecordIdOf(Order[0]) + "\": 6.5 } }";
             File.WriteAllText(file + SaveStore.TmpSuffix, pending);
             Assert.IsFalse(File.Exists(file), "premise: the save file is missing");
             yield return RebootWith(file);
@@ -633,6 +648,107 @@ namespace OutOfSight.Tests
             Menu.PlayButton.onClick.Invoke();
             Assert.AreEqual(Order[1], Game.LevelId, "Jouer does not continue the restored progress");
             yield return Steps(2);
+            Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
+        }
+
+        // ----- 41h: levels v2, a v1 save migrated at boot, the act tags (docs/levels_v2/LEVELS_V2.md 7) -----
+
+        /// <summary>
+        /// A v1 save (level1 to level10 won, no "order") booted with the v2 manifest: the migration opens level11 through
+        /// Unlocked and writes the save; the level select opens exactly the won levels, level12 (after level9) and level11,
+        /// selects Jouer's level (level12) by default, and the first card of each act wears its act tag.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step41h_MigratedSaveOpensTheExpectedCardsAndTheActTags()
+        {
+            ManifestDef manifest = LevelLoader.LoadManifestDef();
+            Assert.GreaterOrEqual(manifest.Rev, 2, "premise: levels.json is the v2 manifest");
+            Assert.GreaterOrEqual(manifest.Acts.Count, 2, "premise: levels.json lists the acts");
+            CollectionAssert.AreEqual(manifest.Levels, Order, "premise: the game plays the manifest's order");
+            string file = Path.Combine(NewTempDir(), SaveStore.FileName);
+            var won = new List<string>();
+            for (int n = 1; n <= 10; n++)
+            {
+                won.Add("level" + n);
+            }
+            // The record of level1 under its RecordId; when level1 has a rev, an older bare record beside it (never shown).
+            string level1Record = RecordIdOf("level1");
+            string best = "\"" + level1Record + "\": 8.5" + (level1Record != "level1" ? ", \"level1\": 3.0" : "");
+            File.WriteAllText(file, "{ \"version\": 1, \"won\": [\"" + string.Join("\", \"", won) + "\"], \"best\": { " + best + " } }");
+            var infos = new List<string>();
+            Application.LogCallback onInfo = (condition, stack, type) =>
+            {
+                if (type == LogType.Log)
+                {
+                    infos.Add(condition);
+                }
+            };
+            Application.logMessageReceived += onInfo;
+            try
+            {
+                yield return RebootWith(file);
+            }
+            finally
+            {
+                Application.logMessageReceived -= onInfo;
+            }
+
+            Assert.AreEqual(file, SaveStore.FilePath, "premise: the boot did not keep the injected save path");
+            Assert.AreEqual(0, main.FailedSteps);
+            Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the v1 save loads");
+            Assert.AreEqual(manifest.Rev, SaveStore.Current.Order, "the boot did not migrate the save");
+            CollectionAssert.AreEqual(new[] { "level11" }, SaveStore.Current.Unlocked);
+            Assert.IsTrue(infos.Exists(l => l == $"[SaveStore] progress migrated to order rev {manifest.Rev}: +1 unlocked"),
+                "no migration log line: " + string.Join(" | ", infos.FindAll(l => l.StartsWith("[SaveStore]"))));
+            SaveData disk = ReadSaveFile();
+            Assert.AreEqual(manifest.Rev, disk.Order, "the migrated save was not written");
+            CollectionAssert.AreEqual(won, disk.Won, "the migration changed the wins on disk");
+
+            SaveStore.UnlockAll = false;
+            OpenSelect();
+            yield return null;
+            var open = new HashSet<string>(won) { "level12", "level11" };
+            for (int i = 0; i < Order.Count; i++)
+            {
+                LevelSelect.Card card = Select.Cards[i];
+                bool expected = open.Contains(card.LevelId);
+                Assert.AreEqual(expected, Select.IsPlayable(i), $"card {i + 1} ({card.LevelId}) playable");
+                Assert.AreEqual(expected, card.Button.interactable, $"card {i + 1} ({card.LevelId}) interactable");
+                Assert.AreEqual(!expected, card.Locked.enabled, $"card {i + 1} ({card.LevelId}) lock line");
+            }
+            LevelSelect.Card target = Select.Cards[manifest.Levels.IndexOf("level12")];
+            Assert.AreEqual(target.Button, Menu.DefaultButton, "the default selection is not Jouer's level (level12)");
+            yield return UntilFrames(() => Selected == target.Button.gameObject, 10);
+            Assert.AreEqual(target.Button.gameObject, Selected, "the card of Jouer's level is not selected on open");
+            Assert.AreEqual(string.Format(Strings.SelectBest, Seconds(8.5f)), Select.Cards[0].Best.text, $"a migrated save lost its record (or showed a record not kept under {level1Record})");
+
+            // The act tags: the first card of each act, with the act's name; no other card.
+            var starts = new Dictionary<string, ActDef>();
+            foreach (ActDef act in manifest.Acts)
+            {
+                starts[manifest.Levels[act.From]] = act;
+            }
+            int tags = 0;
+            for (int i = 0; i < Order.Count; i++)
+            {
+                LevelSelect.Card card = Select.Cards[i];
+                if (!starts.TryGetValue(card.LevelId, out ActDef act))
+                {
+                    Assert.IsNull(card.ActTag, $"card {i + 1} ({card.LevelId}) has an act tag but opens no act");
+                    continue;
+                }
+                tags++;
+                Assert.IsNotNull(card.ActTag, $"card {i + 1} ({card.LevelId}) opens {act.NameKey} but has no act tag");
+                Assert.IsTrue(card.ActTag.enabled && card.Act.enabled, $"card {i + 1}: the act tag is hidden");
+                Assert.AreNotEqual(act.NameKey, Strings.Get(act.NameKey), $"premise: Strings has no {act.NameKey}");
+                StringAssert.Contains(Strings.Get(act.NameKey), card.Act.text, $"card {i + 1}: the act tag does not name {act.NameKey}");
+                Rect tag = ScreenRect(card.ActTag.rectTransform);
+                Rect plate = ScreenRect((RectTransform)card.Button.transform);
+                Assert.Greater(tag.width, 20f, $"card {i + 1}: the act tag has no width");
+                Assert.IsTrue(plate.Contains(tag.min) && plate.Contains(tag.max), $"card {i + 1}: the act tag {tag} leaves its card {plate}");
+                Assert.IsFalse(tag.Overlaps(ScreenRect(card.WonBadge.rectTransform)), $"card {i + 1}: the act tag covers the won badge");
+            }
+            Assert.AreEqual(manifest.Acts.Count, tags, "not every act has its tag");
             Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
         }
 

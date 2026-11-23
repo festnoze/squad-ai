@@ -47,6 +47,12 @@ namespace OutOfSight
             /// <summary>0 to 1: how far the flat face front rounds off toward an ellipse (the outer eye corners and the
             /// mouth corners set back from the nose, as on a real face; 0: the M7 flat front).</summary>
             public float FrontRound;
+            /// <summary>0 to 1: how far the shading normals under the jaw line follow the face and the neck instead of
+            /// the tucked surface's own (0: the geometric normals). The surface tucking from the jaw line to the collar
+            /// faces down, away from every ceiling light, and the jaw line's normal leans on it: shaded as is, the under
+            /// chin reads as a dark band (a goatee on a light skin). Here the jaw line keeps the face's slope above it and
+            /// the tucked rows turn toward the neck's outward normal as they tuck, so they light like the neck they meet.</summary>
+            public float TuckNormal;
         }
 
         /// <summary>Where the head grows from (eye frame): low in the head, over the neck, so the chin barely moves.</summary>
@@ -60,14 +66,18 @@ namespace OutOfSight
         {
             Scale = 1.14f, Nose = 1.35f, NoseWidth = 1.05f, Alar = 0.003f, Brow = 0.007f, Socket = 0.004f,
             Cheekbone = 0.004f, CheekHollow = 0.0015f, Lips = 0.003f, Chin = 0.007f, ChinGroove = 0.002f, Jaw = 0.006f,
-            Ear = 0.016f, JawEdge = 0.5f, EarCup = 0.3f, FrontRound = 0.6f,
+            Ear = 0.016f, JawEdge = 0.5f, EarCup = 0.3f, FrontRound = 0.6f, TuckNormal = 0f,
         };
 
+        // The woman (fix of 2026-11-21, NOTES.md): a smaller, wider chin, a softer jaw angle, a firmer turn under the jaw
+        // (the painted under-chin shadow no longer spreads into a goatee) and a flatter face front across her wide-set
+        // eyes, so their outer corners stay on the face instead of wrapping toward the ears. CHIN (2026-11-22): her under
+        // chin is lit like the neck (TuckNormal), the dark band under her chin was its shading, not the image.
         internal static Sculpt WomanSculpt = new Sculpt
         {
             Scale = 1.14f, Nose = 1.35f, NoseWidth = 1.05f, Alar = 0.0025f, Brow = 0.003f, Socket = 0.0035f,
-            Cheekbone = 0.003f, CheekHollow = 0f, Lips = 0.003f, Chin = 0.005f, ChinGroove = 0.002f, Jaw = 0.003f,
-            Ear = 0.014f, JawEdge = 0.3f, EarCup = 0.3f, FrontRound = 0.5f,
+            Cheekbone = 0.003f, CheekHollow = 0f, Lips = 0.003f, Chin = 0.0035f, ChinGroove = 0.002f, Jaw = 0.0015f,
+            Ear = 0.014f, JawEdge = 0.7f, EarCup = 0.3f, FrontRound = 0.3f, TuckNormal = 1f,
         };
 
         /// <summary>One plan section of the head: its height, half width, the z of its widest point, of its front and of
@@ -145,38 +155,43 @@ namespace OutOfSight
             EarV = 0.53f, EarHalfDu = 0.036f, EarHalfV = 0.125f,
         };
 
-        // The woman: a smaller head, round cheeks, a soft narrow chin, a small nose. Landmarks: pupils at u 0.428 and
-        // 0.569, v 0.457; nose tip v 0.60; mouth v 0.682; chin v 0.868; ears at u 0.231 and 0.769, v 0.40 to 0.65.
+        // The woman: a smaller head, a soft tapered jaw, a small chin, a small nose. Landmarks: pupils at u 0.428 and
+        // 0.569, v 0.46; eyes (with their eyeliner wings) out to |du| 0.13; nose tip v 0.60; mouth line v 0.689 (lips
+        // 0.67 to 0.737); chin v 0.868; ears at u 0.231 and 0.769, v 0.40 to 0.65. Her painted eyes are larger and wider
+        // set than the man's: the flat face front reaches |du| 0.135 (the whole eye), the eye span keeps the image within
+        // 6 % of its own proportions, and the front is flatter (exponent 3.6 over the eyes) so the eyes do not wrap round.
         private static readonly Shape Woman = new Shape
         {
-            PupilDu = 0.0705f, FrontDu = 0.115f, EarDu = 0.269f, EyeHalfSpan = 0.030f,
+            PupilDu = 0.0705f, FrontDu = 0.135f, EarDu = 0.269f, EyeHalfSpan = 0.031f,
             Jaw = new[] { (0f, 0.868f), (0.13f, 0.835f), (0.2f, 0.775f), (0.27f, 0.735f), (0.34f, 0.705f), (0.5f, 0.70f) },
-            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.235f, 0.30f, 0.36f, 0.41f, 0.457f, 0.51f, 0.555f, 0.585f, 0.603f, 0.621f, 0.64f, 0.682f, 0.745f, 0.81f, 0.868f, 0.9f, 0.94f },
+            Rows = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.235f, 0.30f, 0.36f, 0.41f, 0.457f, 0.51f, 0.555f, 0.585f, 0.603f, 0.621f, 0.64f, 0.69f, 0.745f, 0.81f, 0.868f, 0.91f, 0.96f },
             Sections = new[]
             {
                 new Section(0f, 0.115f, 0f, -0.086f, -0.086f, -0.086f, 2f, 2f),
                 new Section(0.06f, 0.111f, 0.040f, -0.086f, -0.044f, -0.128f, 2.2f, 2f),
                 new Section(0.12f, 0.101f, 0.060f, -0.084f, -0.016f, -0.155f, 2.5f, 2.1f),
                 new Section(0.18f, 0.085f, 0.074f, -0.082f, 0f, -0.171f, 2.9f, 2.2f),
-                new Section(0.24f, 0.066f, 0.081f, -0.080f, 0.008f, -0.180f, 3.1f, 2.2f),
-                new Section(0.33f, 0.036f, 0.084f, -0.079f, 0.012f, -0.186f, 3.2f, 2.3f),
-                new Section(0.39f, 0.016f, 0.084f, -0.079f, 0.013f, -0.187f, 3.2f, 2.3f),
-                new Section(0.457f, 0f, 0.084f, -0.079f, 0.010f, -0.187f, 3.2f, 2.3f),
-                new Section(0.53f, -0.017f, 0.085f, -0.079f, 0.013f, -0.184f, 3f, 2.3f),
-                new Section(0.60f, -0.033f, 0.083f, -0.079f, 0.015f, -0.178f, 2.8f, 2.3f),
-                new Section(0.682f, -0.052f, 0.077f, -0.080f, 0.017f, -0.172f, 2.5f, 2.3f),
-                new Section(0.745f, -0.067f, 0.070f, -0.082f, 0.016f, -0.169f, 2.3f, 2.3f),
-                new Section(0.81f, -0.083f, 0.059f, -0.086f, 0.013f, -0.167f, 2.2f, 2.3f),
-                new Section(0.868f, -0.097f, 0.045f, -0.091f, 0.006f, -0.165f, 2.1f, 2.3f),
-                new Section(1f, -0.108f, 0.042f, -0.100f, -0.045f, -0.165f, 2.2f, 2.3f),
+                // A rounder skull (the back 4 mm shorter), cheeks 3 mm wider, a jaw tapering to the chin, and a lower face
+                // set back behind the lips (the chin no longer as far forward as the lower lip).
+                new Section(0.24f, 0.066f, 0.081f, -0.080f, 0.008f, -0.176f, 3.1f, 2.2f),
+                new Section(0.33f, 0.036f, 0.087f, -0.079f, 0.012f, -0.182f, 3.6f, 2.3f),
+                new Section(0.39f, 0.016f, 0.087f, -0.079f, 0.013f, -0.183f, 3.6f, 2.3f),
+                new Section(0.457f, 0f, 0.087f, -0.079f, 0.010f, -0.183f, 3.6f, 2.3f),
+                new Section(0.53f, -0.017f, 0.088f, -0.079f, 0.013f, -0.180f, 3.6f, 2.3f),
+                new Section(0.60f, -0.033f, 0.086f, -0.079f, 0.015f, -0.174f, 3.3f, 2.3f),
+                new Section(0.682f, -0.052f, 0.078f, -0.080f, 0.017f, -0.168f, 2.8f, 2.3f),
+                new Section(0.745f, -0.067f, 0.068f, -0.082f, 0.014f, -0.165f, 2.3f, 2.3f),
+                new Section(0.81f, -0.083f, 0.055f, -0.086f, 0.010f, -0.163f, 2.2f, 2.3f),
+                new Section(0.868f, -0.097f, 0.042f, -0.091f, 0.003f, -0.161f, 2.1f, 2.3f),
+                new Section(1f, -0.108f, 0.040f, -0.100f, -0.045f, -0.165f, 2.2f, 2.3f),
             },
             Nose = new[] { (0.43f, 0f, 0.005f), (0.457f, 0.0025f, 0.0052f), (0.49f, 0.004f, 0.0056f), (0.525f, 0.006f, 0.006f), (0.555f, 0.0088f, 0.007f),
                 (0.585f, 0.0125f, 0.0085f), (0.60f, 0.0145f, 0.010f), (0.612f, 0.0135f, 0.011f), (0.625f, 0.009f, 0.012f),
                 (0.638f, 0.003f, 0.013f), (0.65f, 0f, 0.013f) },
             AlarX = 0.014f, AlarV = 0.612f,
             BrowV = 0.355f, BrowSigma = 0.035f,
-            CheekHeight = 0.006f, CheekDu = 0.11f, CheekV = 0.58f, CheekSigmaX = 0.022f, CheekSigmaV = 0.065f,
-            MouthV = 0.682f, ChinSigmaX = 0.016f, JawAngleV = 0.755f,
+            CheekHeight = 0.003f, CheekDu = 0.11f, CheekV = 0.58f, CheekSigmaX = 0.022f, CheekSigmaV = 0.065f,
+            MouthV = 0.69f, ChinSigmaX = 0.02f, JawAngleV = 0.755f,
             EarV = 0.527f, EarHalfDu = 0.037f, EarHalfV = 0.125f,
         };
 
@@ -248,9 +263,14 @@ namespace OutOfSight
                 }
             }
             neck /= neckRows * width;
+            // The woman's lighter skin shows the painted shadow under her chin (v 0.875 to 0.92) as a goatee once it lies
+            // on the surface tucking into the neck: her neck colour reaches up to just under the painted chin line
+            // (v 0.87), with a short fade, so the chin keeps its outline and the shadow below it goes.
+            float neckFrom = female ? 0.11f : 0.025f;
+            float neckTop = female ? 0.13f : 0.14f;
             for (int y = 0; y < height; y++)
             {
-                float body = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.025f, 0.14f, y / (float)(height - 1)));
+                float body = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(neckFrom, neckTop, y / (float)(height - 1)));
                 if (body <= 0f)
                 {
                     break;
@@ -466,26 +486,22 @@ namespace OutOfSight
             {
                 for (int col = 0; col < stride; col++)
                 {
-                    // Columns 0 and stride - 1 are the same seam at the back of the head.
-                    int before = row * stride + (col == 0 ? stride - 2 : col - 1);
-                    int after = row * stride + (col == stride - 1 ? 1 : col + 1);
-                    Vector3 du = position[after] - position[before];
-                    Vector3 dv = position[Mathf.Min(row + 1, rows - 1) * stride + col] - position[Mathf.Max(row - 1, 0) * stride + col];
-                    // At the nape the lowest rows can all lie on the collar: take the column's slope further up.
-                    for (int up = row - 2; dv.sqrMagnitude < 1e-14f && up >= 0; up--)
-                    {
-                        dv = position[row * stride + col] - position[up * stride + col];
-                    }
                     int i = row * stride + col;
-                    // Normalize each derivative before crossing (Vector3.normalized gives zero under 1e-5, and tucked
-                    // neighbours on the collar can be closer than that); where they still give no plane, face out of
-                    // the neck's axis.
-                    Vector3 n = row == 0 ? Vector3.up : Unit(Vector3.Cross(Unit(du), Unit(dv)));
-                    if (n.sqrMagnitude < 0.5f)
+                    Vector3 n = GridNormal(position, row, col, rows, false, neck);
+                    // The under chin lit like the neck (Sculpt.TuckNormal; 0 keeps the geometric normal untouched).
+                    bool underJaw = tucks[i] > 0f || (row + 1 < rows && tucks[i + stride] > 0f);
+                    if (sculpt.TuckNormal > 0f && row > 0 && underJaw) // MUTATION:CHIN_TUCK_NORMAL
                     {
+                        // The slope down from the row above only (the face's own on the jaw line, not the tucked row
+                        // below), turning toward the neck's outward normal as the vertex tucks.
+                        Vector3 lit = GridNormal(position, row, col, rows, true, neck);
                         Vector3 outward = position[i] - neck.Centre;
                         outward.y = 0f;
-                        n = outward.sqrMagnitude > 1e-12f ? outward.normalized : Vector3.up;
+                        if (outward.sqrMagnitude > 1e-12f)
+                        {
+                            lit = Vector3.Slerp(lit, outward.normalized, Smooth(0f, 0.5f, tucks[i]));
+                        }
+                        n = Vector3.Slerp(n, lit, sculpt.TuckNormal).normalized;
                     }
                     grid[i] = addHeadVertex(position[i], n, new Vector2(Columns[col], 1f - shape.Rows[row]), tucks[i]);
                 }
@@ -547,6 +563,39 @@ namespace OutOfSight
                     low++;
                 }
             }
+        }
+
+        /// <summary>
+        /// The grid's normal at (row, col) from its neighbours across the row and down the column; with
+        /// <paramref name="fromAbove"/>, down the column from the row above only (the surface's slope arriving at the
+        /// vertex, not leaving it).
+        /// </summary>
+        private static Vector3 GridNormal(Vector3[] position, int row, int col, int rows, bool fromAbove, Neck neck)
+        {
+            int stride = Columns.Length;
+            // Columns 0 and stride - 1 are the same seam at the back of the head.
+            int before = row * stride + (col == 0 ? stride - 2 : col - 1);
+            int after = row * stride + (col == stride - 1 ? 1 : col + 1);
+            Vector3 du = position[after] - position[before];
+            int below = fromAbove ? row : Mathf.Min(row + 1, rows - 1);
+            Vector3 dv = position[below * stride + col] - position[Mathf.Max(row - 1, 0) * stride + col];
+            // At the nape the lowest rows can all lie on the collar: take the column's slope further up.
+            for (int up = row - 2; dv.sqrMagnitude < 1e-14f && up >= 0; up--)
+            {
+                dv = position[row * stride + col] - position[up * stride + col];
+            }
+            int i = row * stride + col;
+            // Normalize each derivative before crossing (Vector3.normalized gives zero under 1e-5, and tucked
+            // neighbours on the collar can be closer than that); where they still give no plane, face out of
+            // the neck's axis.
+            Vector3 n = row == 0 ? Vector3.up : Unit(Vector3.Cross(Unit(du), Unit(dv)));
+            if (n.sqrMagnitude < 0.5f)
+            {
+                Vector3 outward = position[i] - neck.Centre;
+                outward.y = 0f;
+                n = outward.sqrMagnitude > 1e-12f ? outward.normalized : Vector3.up;
+            }
+            return n;
         }
 
         private static float[] BuildColumns()

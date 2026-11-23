@@ -739,5 +739,329 @@ namespace OutOfSight.Tests
             Assert.AreEqual("a", SaveStore.FirstUnwonLevel(order), "only b won: a is the first level not won");
             Assert.IsNull(SaveStore.FirstUnwonLevel(new List<string>()));
         }
+
+        // ----- Levels v2: the order migration (docs/levels_v2/LEVELS_V2.md 7) -----
+
+        /// <summary>The shipped levels.json, checked to be the v2 manifest the worked cases of section 7 are written for.</summary>
+        private static ManifestDef V2Manifest()
+        {
+            ManifestDef m = LevelLoader.LoadManifestDef();
+            Assert.AreEqual(2, m.Rev, "premise: levels.json is the v2 order (rev 2)");
+            Assert.AreEqual(24, m.Previous.Count, "premise: previous lists the 24 v1 ids");
+            for (int n = 1; n <= 24; n++)
+            {
+                Assert.AreEqual("level" + n, m.Previous[n - 1], "premise: previous is the v1 order");
+            }
+            // The relative order the worked cases rely on (LV12 may still insert level25 before level24).
+            string[] chain = { "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17", "level19", "level21", "level20" };
+            for (int k = 1; k < chain.Length; k++)
+            {
+                Assert.AreEqual(m.Levels.IndexOf(chain[k - 1]) + 1, m.Levels.IndexOf(chain[k]), $"premise: {chain[k]} follows {chain[k - 1]} in the v2 order");
+            }
+            foreach (string cut in new[] { "level10", "level16", "level23" })
+            {
+                CollectionAssert.DoesNotContain(m.Levels, cut, "premise: the cut levels are not listed");
+            }
+            return m;
+        }
+
+        /// <summary>
+        /// The shipped manifest's own consistency (LEVELS_V2.md 7): every listed level and every act start is distinct and
+        /// inside the order, the acts start at 0 and climb, and each act name resolves in Strings in both languages.
+        /// </summary>
+        [Test]
+        public void Manifest_v2_acts_and_lists_are_consistent()
+        {
+            ManifestDef m = V2Manifest();
+            Assert.AreEqual(m.Levels.Count, new HashSet<string>(m.Levels).Count, "a level is listed twice in the play order");
+            Assert.AreEqual(m.Previous.Count, new HashSet<string>(m.Previous).Count, "a level is listed twice in previous");
+            Assert.GreaterOrEqual(m.Acts.Count, 1, "the manifest has no act");
+            Assert.AreEqual(0, m.Acts[0].From, "the first act does not start at the first level");
+            for (int a = 0; a < m.Acts.Count; a++)
+            {
+                ActDef act = m.Acts[a];
+                Assert.IsNotNull(act, $"act {a + 1} is null");
+                Assert.That(act.From, Is.InRange(0, m.Levels.Count - 1), $"act {a + 1} starts outside the play order");
+                if (a > 0)
+                {
+                    Assert.Greater(act.From, m.Acts[a - 1].From, $"act {a + 1} does not start after act {a}");
+                }
+                Assert.IsFalse(string.IsNullOrEmpty(act.NameKey), $"act {a + 1} has no name key");
+                foreach (string language in new[] { Strings.French, Strings.English })
+                {
+                    Assert.AreNotEqual(act.NameKey, Strings.Get(act.NameKey, language), $"Strings has no {act.NameKey} in {language}");
+                }
+            }
+        }
+
+        private static List<string> Levels(int from, int to)
+        {
+            var ids = new List<string>();
+            for (int n = from; n <= to; n++)
+            {
+                ids.Add("level" + n);
+            }
+            return ids;
+        }
+
+        /// <summary>A v1 save (no "order", no "unlocked") with these wins.</summary>
+        private static string V1Save(List<string> won) => Json(1, won.Count == 0 ? "" : "\"" + string.Join("\", \"", won) + "\"", "");
+
+        private static void AssertPlayable(ManifestDef m, string id, bool expected, string why)
+        {
+            int i = m.Levels.IndexOf(id);
+            Assert.GreaterOrEqual(i, 0, $"premise: {id} is listed");
+            Assert.AreEqual(expected, SaveStore.IsUnlocked(m.Levels, i), $"{id}: {why}");
+        }
+
+        private static Regex MigratedLog(int rev, int added) =>
+            new Regex("^" + Regex.Escape($"[SaveStore] progress migrated to order rev {rev}: +{added} unlocked") + "$");
+
+        /// <summary>
+        /// Worked case 1: won level1 to level10. level12 (slot 10) opens after level9, level11 opens through Unlocked (its v1
+        /// predecessor level10 is won), level15 stays locked. The mutation killer of MIGRATE_PREDECESSOR (with "j" for "j -
+        /// 1" nothing joins Unlocked) and of UNLOCK_MIGRATED (level11 stays locked).
+        /// </summary>
+        [Test]
+        public void Migration_case1_won_level1_to_level10_opens_level12_and_level11()
+        {
+            ManifestDef m = V2Manifest();
+            List<string> won = Levels(1, 10);
+            File.WriteAllText(path, V1Save(won));
+            LogAssert.Expect(LogType.Log, MigratedLog(2, 1));
+
+            SaveStore.Load();
+            Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the v1 save loads");
+            Assert.AreEqual(2, SaveStore.Current.Order, "the save was not migrated to rev 2");
+            CollectionAssert.AreEqual(new[] { "level11" }, SaveStore.Current.Unlocked, "the migration opened the wrong levels");
+            CollectionAssert.AreEqual(won, SaveStore.Current.Won, "the migration changed Won");
+            Assert.AreEqual(1, SaveStore.WriteCount, "the migrated save was not written once");
+            SaveData disk = ReadBack(path);
+            Assert.AreEqual(2, disk.Order, "the migration is not on disk");
+            CollectionAssert.AreEqual(new[] { "level11" }, disk.Unlocked);
+            Assert.AreEqual(SaveData.CurrentVersion, disk.Version, "the save version must stay 1");
+
+            for (int n = 1; n <= 9; n++)
+            {
+                AssertPlayable(m, "level" + n, true, "a won level is locked");
+            }
+            AssertPlayable(m, "level12", true, "slot 10 does not open after level9");
+            AssertPlayable(m, "level11", true, "level11 (playable in v1: level10 won) does not open through Unlocked");
+            AssertPlayable(m, "level15", false, "level15 opened (level11 not won, never playable in v1)");
+            AssertPlayable(m, "level13", false, "level13 opened");
+            AssertPlayable(m, "level14", false, "level14 opened");
+            Assert.AreEqual("level12", SaveStore.FirstUnwonLevel(m.Levels), "Jouer does not start the first unwon playable level");
+        }
+
+        /// <summary>
+        /// Worked case 2: won level1 to level17 (not level18). level18 opens after level14, level17 is won and stays open
+        /// although level18 (its new predecessor) is not won, level19 opens after level17. The mutation killer of
+        /// UNLOCK_WON (level17 is not in Unlocked: only its win opens it).
+        /// </summary>
+        [Test]
+        public void Migration_case2_won_level1_to_level17_keeps_level17_open_after_level18()
+        {
+            ManifestDef m = V2Manifest();
+            List<string> won = Levels(1, 17);
+            File.WriteAllText(path, V1Save(won));
+            LogAssert.Expect(LogType.Log, MigratedLog(2, 1));
+
+            SaveStore.Load();
+            Assert.AreEqual(2, SaveStore.Current.Order);
+            CollectionAssert.AreEqual(new[] { "level18" }, SaveStore.Current.Unlocked);
+            CollectionAssert.DoesNotContain(SaveStore.Current.Unlocked, "level17", "premise: level17 is open only through its win");
+            CollectionAssert.DoesNotContain(SaveStore.Current.Won, "level18", "premise: level18 is not won");
+
+            AssertPlayable(m, "level18", true, "level18 does not open after level14");
+            AssertPlayable(m, "level17", true, "a won level locked behind the unwon level18");
+            AssertPlayable(m, "level19", true, "level19 does not open after the won level17");
+            AssertPlayable(m, "level21", false, "level21 opened (level19 not won)");
+            AssertPlayable(m, "level20", false, "level20 opened");
+            AssertPlayable(m, "level22", false, "level22 opened");
+            AssertPlayable(m, "level24", false, "level24 opened");
+            Assert.AreEqual("level18", SaveStore.FirstUnwonLevel(m.Levels));
+        }
+
+        /// <summary>Worked case 3: a fresh save opens only level1, starts at rev 2 and never migrates, even once written.</summary>
+        [Test]
+        public void Migration_case3_a_fresh_save_opens_only_level1_and_never_migrates()
+        {
+            ManifestDef m = V2Manifest();
+            var logs = new List<string>();
+            Application.LogCallback onLog = (condition, stack, type) => logs.Add(condition);
+            Application.logMessageReceived += onLog;
+            try
+            {
+                SaveStore.Load();
+                Assert.AreEqual(SaveLoadStatus.Fresh, SaveStore.LastLoad);
+                Assert.AreEqual(2, SaveStore.Current.Order, "a fresh save does not start at the manifest's revision");
+                Assert.IsEmpty(SaveStore.Current.Unlocked);
+                Assert.IsEmpty(Directory.GetFiles(dir), "loading a missing save wrote something");
+                Assert.IsTrue(SaveStore.IsUnlocked(m.Levels, 0), "level1 is locked on a fresh save");
+                for (int i = 1; i < m.Levels.Count; i++)
+                {
+                    Assert.IsFalse(SaveStore.IsUnlocked(m.Levels, i), $"{m.Levels[i]} is open on a fresh save");
+                }
+                Assert.AreEqual("level1", SaveStore.FirstUnwonLevel(m.Levels));
+
+                // Its first write holds the revision, so the next load has nothing to migrate.
+                SaveStore.RecordWin("level1", 9f);
+                Assert.AreEqual(2, ReadBack(path).Order, "a fresh save was written without its revision");
+                SaveStore.ResetForTests();
+                SaveStore.PathOverride = path;
+                SaveStore.Load();
+                Assert.AreEqual(0, SaveStore.WriteCount, "loading a rev 2 save wrote it");
+                Assert.IsEmpty(SaveStore.Current.Unlocked, "a rev 2 save was migrated");
+            }
+            finally
+            {
+                Application.logMessageReceived -= onLog;
+            }
+            Assert.IsFalse(logs.Exists(l => l.Contains("progress migrated")), "a fresh save ran the migration: " + string.Join(" | ", logs));
+        }
+
+        /// <summary>Worked case 4: a migrated save loaded again changes nothing and writes nothing.</summary>
+        [Test]
+        public void Migration_case4_a_migrated_save_loaded_again_changes_nothing_and_writes_nothing()
+        {
+            V2Manifest();
+            File.WriteAllText(path, V1Save(Levels(1, 10)));
+            LogAssert.Expect(LogType.Log, MigratedLog(2, 1));
+            SaveStore.Load();
+            Assert.AreEqual(1, SaveStore.WriteCount, "premise: the first load migrated and wrote the save");
+            string migrated = File.ReadAllText(path);
+            string bak = File.ReadAllText(path + SaveStore.BakSuffix);
+
+            var logs = new List<string>();
+            Application.LogCallback onLog = (condition, stack, type) => logs.Add(condition);
+            SaveStore.ResetForTests();
+            SaveStore.PathOverride = path;
+            Application.logMessageReceived += onLog;
+            try
+            {
+                SaveStore.Load();
+            }
+            finally
+            {
+                Application.logMessageReceived -= onLog;
+            }
+            Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad);
+            Assert.AreEqual(0, SaveStore.WriteCount, "a migrated save was written again");
+            Assert.AreEqual(migrated, File.ReadAllText(path), "a migrated save changed on the second load");
+            Assert.AreEqual(bak, File.ReadAllText(path + SaveStore.BakSuffix), "the .bak changed on the second load");
+            CollectionAssert.AreEqual(new[] { "level11" }, SaveStore.Current.Unlocked);
+            Assert.AreEqual(2, SaveStore.Current.Order);
+            Assert.IsFalse(logs.Exists(l => l.Contains("progress migrated")), "the migration ran twice: " + string.Join(" | ", logs));
+        }
+
+        [Test]
+        public void Unlocked_of_the_wrong_type_is_a_parse_problem_like_won()
+        {
+            Assert.IsNull(SaveData.Parse("{ \"version\": 1, \"unlocked\": \"level11\" }", out string problem), "a string unlocked was accepted");
+            Assert.AreEqual("unlocked is not a list", problem);
+            Assert.IsNull(SaveData.Parse("{ \"version\": 1, \"unlocked\": { \"level11\": true } }", out problem), "an object unlocked was accepted");
+            Assert.AreEqual("unlocked is not a list", problem);
+            Assert.IsNull(SaveData.Parse("{ \"version\": 1, \"unlocked\": [\"level11\", 3] }", out problem), "a number in unlocked was accepted");
+            StringAssert.StartsWith("unlocked holds a", problem);
+
+            SaveData missing = SaveData.Parse("{ \"version\": 1 }", out problem);
+            Assert.IsNotNull(missing, problem);
+            Assert.IsEmpty(missing.Unlocked, "a missing unlocked is not empty");
+            SaveData nulls = SaveData.Parse("{ \"version\": 1, \"unlocked\": null }", out problem);
+            Assert.IsNotNull(nulls, problem);
+            Assert.IsEmpty(nulls.Unlocked);
+            SaveData twice = SaveData.Parse("{ \"version\": 1, \"unlocked\": [\"level11\", \"level11\", \"\"] }", out problem);
+            Assert.IsNotNull(twice, problem);
+            CollectionAssert.AreEqual(new[] { "level11" }, twice.Unlocked, "an id listed twice (or an empty one) was kept");
+
+            // Through the store: a wrong-typed unlocked is a corrupt save (set aside as .bad, the .bak is tried).
+            string bad = "{ \"version\": 1, \"won\": [\"level1\"], \"unlocked\": 7 }";
+            File.WriteAllText(path, bad);
+            Assert.DoesNotThrow(SaveStore.Load);
+            Assert.AreEqual(SaveLoadStatus.Reset, SaveStore.LastLoad, "a wrong-typed unlocked was loaded");
+            Assert.AreEqual(bad, File.ReadAllText(path + SaveStore.BadSuffix));
+            Assert.IsEmpty(SaveStore.Current.Won);
+        }
+
+        [Test]
+        public void Order_missing_or_malformed_reads_as_1_and_round_trips()
+        {
+            foreach (string order in new[] { null, "0", "-3", "\"2\"", "2.5", "null", "true", "99999999999" })
+            {
+                string json = order == null ? "{ \"version\": 1 }" : "{ \"version\": 1, \"order\": " + order + " }";
+                SaveData data = SaveData.Parse(json, out string problem);
+                Assert.IsNotNull(data, $"order {order ?? "missing"} failed the save: {problem}");
+                Assert.AreEqual(1, data.Order, $"order {order ?? "missing"} does not read as 1");
+            }
+            SaveData three = SaveData.Parse("{ \"version\": 1, \"order\": 3 }", out string p);
+            Assert.IsNotNull(three, p);
+            Assert.AreEqual(3, three.Order);
+
+            var save = new SaveData { Order = 2 };
+            save.Unlocked.Add("level11");
+            save.RecordWin("level1", 4f);
+            string text = save.ToJson();
+            StringAssert.Contains("\"order\": 2", text);
+            StringAssert.Contains("\"unlocked\"", text);
+            StringAssert.Contains("\"version\": 1", text, "the save version must stay 1");
+            SaveData back = SaveData.Parse(text, out p);
+            Assert.IsNotNull(back, p);
+            Assert.AreEqual(2, back.Order);
+            CollectionAssert.AreEqual(new[] { "level11" }, back.Unlocked);
+            CollectionAssert.AreEqual(new[] { "level1" }, back.Won);
+        }
+
+        /// <summary>The migration only ever adds to Unlocked: Won and Best (cut levels and old record keys included) stay.</summary>
+        [Test]
+        public void MigrateOrder_never_shrinks_Won_or_Best_and_runs_once()
+        {
+            ManifestDef m = V2Manifest();
+            var save = new SaveData();
+            save.Won.AddRange(Levels(1, 10));
+            save.Won.Add("level16");
+            save.Won.Add("level23");
+            save.Best["level1"] = 5f;
+            save.Best["level10"] = 9f;
+            save.Best["level16@difficile"] = 3f;
+            save.Best["level6~1"] = 4f;
+            var wonBefore = new List<string>(save.Won);
+            var bestBefore = new Dictionary<string, float>(save.Best);
+            Assert.AreEqual(1, save.Order, "premise: a save without order is rev 1");
+
+            Assert.IsTrue(save.MigrateOrder(m.Rev, m.Previous, m.Levels), "the first migration reported no change");
+            CollectionAssert.AreEqual(wonBefore, save.Won, "the migration changed Won");
+            CollectionAssert.AreEquivalent(bestBefore, save.Best, "the migration changed Best");
+            Assert.AreEqual(2, save.Order);
+            // level11 (after level10) and level17 (after level16) were playable in v1; level17 is listed, level24 after
+            // level23 too; the cut level10, level16 and level23 never join (not listed).
+            CollectionAssert.AreEquivalent(new[] { "level11", "level17", "level24" }, save.Unlocked);
+
+            var unlockedBefore = new List<string>(save.Unlocked);
+            Assert.IsFalse(save.MigrateOrder(m.Rev, m.Previous, m.Levels), "a second migration reported a change");
+            CollectionAssert.AreEqual(unlockedBefore, save.Unlocked, "a second migration changed Unlocked");
+            Assert.IsFalse(new SaveData().MigrateOrder(1, m.Previous, m.Levels), "a rev 1 save migrated to rev 1");
+            Assert.IsFalse(new SaveData { Order = 3 }.MigrateOrder(2, m.Previous, m.Levels), "a newer save was migrated back");
+        }
+
+        /// <summary>MigrateOrder on small lists: the previous rule (index 0 or the predecessor in previous won), listed ids only.</summary>
+        [Test]
+        public void MigrateOrder_opens_what_the_previous_order_opened_and_is_still_listed()
+        {
+            var previous = new List<string> { "a", "b", "c", "x", "d" };
+            var current = new List<string> { "a", "d", "b", "c", "e" };
+            var save = new SaveData();
+            save.Won.Add("a");
+            save.Won.Add("c");
+            Assert.IsFalse(save.IsUnlocked(current, 2), "premise: b (after the unwon d) is locked before the migration");
+            Assert.IsTrue(save.MigrateOrder(2, previous, current));
+            // a: won (skipped); b: after the won a; c: won (skipped); x: after the won c but not listed; d: after x, not won.
+            CollectionAssert.AreEqual(new[] { "b" }, save.Unlocked);
+            Assert.IsTrue(save.IsUnlocked(current, 2), "b, playable in the previous order, is locked behind the unwon d");
+
+            var fresh = new SaveData();
+            Assert.IsTrue(fresh.MigrateOrder(2, previous, current));
+            CollectionAssert.AreEqual(new[] { "a" }, fresh.Unlocked, "index 0 of the previous order is the only level a v1 save with no win could play");
+            Assert.IsTrue(new SaveData().MigrateOrder(2, null, current), "a manifest without previous still stamps the revision");
+        }
     }
 }

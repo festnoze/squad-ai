@@ -264,39 +264,24 @@ namespace OutOfSight
             target.RecalculateBounds();
         }
 
-        /// <summary>The chair of FurnitureKit.Chair (seat, four legs, backrest): the fallback shape with no real furniture to copy.</summary>
+        /// <summary>
+        /// The chair of FurnitureKit.Chair: the fallback shape with no real furniture to copy. Soft movers (2026-11-20): the
+        /// rounded chair (SoftBodies.Chair: seat, legs, posts, rails and stretchers), as the player's chair now draws it.
+        /// </summary>
         private static void AddChairBoxes(Vector3 size, List<Vector3> vertices, List<Vector3> normals, List<int> triangles)
         {
-            float seatTop = size.y * 0.53f;
-            const float seat = 0.05f;
-            const float leg = 0.05f;
-            const float back = 0.05f;
-            float lx = size.x * 0.5f - leg * 0.5f - 0.01f;
-            float lz = size.z * 0.5f - leg * 0.5f - 0.01f;
-            float legHeight = seatTop - seat;
-            float backHeight = size.y - seatTop;
-            var boxes = new List<(Vector3 center, Vector3 size)>
+            foreach (SoftBodies.Piece piece in SoftBodies.Chair(size))
             {
-                (new Vector3(0f, seatTop - seat * 0.5f, 0f), new Vector3(size.x, seat, size.z)),
-                (new Vector3(-lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg)),
-                (new Vector3(lx, legHeight * 0.5f, lz), new Vector3(leg, legHeight, leg)),
-                (new Vector3(-lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg)),
-                (new Vector3(lx, legHeight * 0.5f, -lz), new Vector3(leg, legHeight, leg)),
-                (new Vector3(0f, seatTop + backHeight * 0.5f, -size.z * 0.5f + back * 0.5f), new Vector3(size.x, backHeight, back)),
-            };
-            Mesh box = PrimitiveKit.BoxMesh;
-            Vector3[] boxVertices = box.vertices;
-            Vector3[] boxNormals = box.normals;
-            int[] boxTriangles = box.triangles;
-            foreach ((Vector3 center, Vector3 s) in boxes)
-            {
+                Matrix4x4 m = piece.Matrix;
+                Vector3[] v = piece.Mesh.vertices;
+                Vector3[] n = piece.Mesh.normals;
                 int start = vertices.Count;
-                for (int i = 0; i < boxVertices.Length; i++)
+                for (int i = 0; i < v.Length; i++)
                 {
-                    vertices.Add(center + Vector3.Scale(boxVertices[i], s));
-                    normals.Add(boxNormals[i]);
+                    vertices.Add(m.MultiplyPoint3x4(v[i]));
+                    normals.Add(m.MultiplyVector(n[i]));
                 }
-                foreach (int t in boxTriangles)
+                foreach (int t in piece.Mesh.triangles)
                 {
                     triangles.Add(start + t);
                 }

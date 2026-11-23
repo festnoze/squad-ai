@@ -3,10 +3,17 @@
   "nameKey": "level4.name",
   "hintKey": "level4.hint",
   "lesson": "careful",
+  "rev": 1,
+  "pace": {
+    "minShare": 0.25,
+    "maxShare": 0.45,
+    "minPauses": 2,
+    "maxPause": 6.0
+  },
   "rooms": [
     {
       "id": "entree",
-      "x": -2.1,
+      "x": 2.1,
       "z": 0.0,
       "sizeX": 4.0,
       "sizeZ": 4.0,
@@ -20,14 +27,13 @@
     },
     {
       "id": "salon",
-      "x": 2.5,
+      "x": -2.5,
       "z": 0.0,
       "sizeX": 5.0,
       "sizeZ": 4.0,
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
       "wallFinish": "grasscloth"
@@ -35,13 +41,13 @@
   ],
   "doors": [
     {
-      "x": -0.05,
+      "x": 0.05,
       "z": -1.25,
       "width": 1.0,
       "top": 2.1
     },
     {
-      "x": 5.05,
+      "x": -5.05,
       "z": -1.25,
       "width": 1.0,
       "top": 2.1
@@ -49,7 +55,7 @@
   ],
   "windows": [
     {
-      "x": -2.1,
+      "x": 2.1,
       "z": 2.05,
       "width": 1.4,
       "bottom": 0.9,
@@ -59,9 +65,9 @@
   "player": {
     "model": "kenney.stool",
     "kind": "stool",
-    "x": -3.25,
+    "x": 3.25,
     "z": 1.25,
-    "yaw": 90.0,
+    "yaw": 270.0,
     "sizeX": 0.35,
     "sizeY": 0.55,
     "sizeZ": 0.35,
@@ -69,7 +75,7 @@
   },
   "exit": {
     "model": "kenney.doormat",
-    "x": 4.5,
+    "x": -4.5,
     "z": -1.25,
     "sizeX": 0.9,
     "sizeZ": 0.9,
@@ -80,7 +86,7 @@
       "model": "kenney.sofa",
       "name": "Sofa",
       "kind": "sofa",
-      "x": 2.5,
+      "x": -2.5,
       "z": 1.5,
       "yaw": 0.0,
       "sizeX": 2.0,
@@ -93,7 +99,7 @@
     {
       "name": "Buffet",
       "kind": "counter",
-      "x": 0.6,
+      "x": -0.6,
       "z": -0.55,
       "yaw": 0.0,
       "sizeX": 0.9,
@@ -106,7 +112,7 @@
     {
       "name": "Table",
       "kind": "table",
-      "x": 2.69,
+      "x": -2.69,
       "z": -0.55,
       "yaw": 0.0,
       "sizeX": 0.6,
@@ -119,12 +125,12 @@
     {
       "name": "Bench",
       "kind": "counter",
-      "x": 2.25,
-      "z": -1.85,
+      "x": -2.25,
+      "z": -1.875,
       "yaw": 0.0,
       "sizeX": 3.3,
       "sizeY": 0.5,
-      "sizeZ": 0.3,
+      "sizeZ": 0.25,
       "occluder": true,
       "color": "#8C5A36",
       "accentColor": "#F7F4EE"
@@ -132,7 +138,7 @@
     {
       "name": "Bookshelf",
       "kind": "bookshelf",
-      "x": -2.6,
+      "x": 2.6,
       "z": -1.8,
       "yaw": 180.0,
       "sizeX": 1.6,
@@ -144,34 +150,34 @@
     }
   ],
   "designerRoute": [
-    { "x": -3.35, "z": 0.25, "at": 3.2, "careful": true },
-    { "x": -3.35, "z": -0.75, "at": 4.2, "careful": true },
-    { "x": -3.35, "z": -1.25, "at": 5.2, "careful": true },
-    { "x": -2.35, "z": -1.25, "at": 5.7, "careful": true },
-    { "x": -1.35, "z": -1.25, "at": 6.7, "careful": true },
-    { "x": -0.35, "z": -1.25, "at": 7.7, "careful": true },
-    { "x": 0.25, "z": -1.25, "at": 8.7, "careful": true },
-    { "x": 1.25, "z": -1.25, "at": 9.2, "careful": true },
-    { "x": 2.25, "z": -1.25, "at": 10.2, "careful": true },
-    { "x": 2.75, "z": -1.25, "at": 11.2, "careful": true },
-    { "x": 3.75, "z": -1.25, "at": 13.4, "careful": true },
-    { "x": 4.25, "z": -1.25, "at": 14.4, "careful": true },
-    { "x": 4.5, "z": -1.25, "at": 14.4, "careful": true }
+    { "x": 2.35, "z": 1.25, "at": 3.2, "careful": true },
+    { "x": 1.35, "z": 1.25, "at": 4.2, "careful": true },
+    { "x": 0.35, "z": 1.25, "at": 5.2, "careful": true },
+    { "x": 0.35, "z": 0.25, "at": 6.2, "careful": true },
+    { "x": 0.35, "z": -0.75, "at": 7.2, "careful": true },
+    { "x": 0.35, "z": -1.25, "at": 8.2, "careful": true },
+    { "x": -0.25, "z": -1.25, "at": 8.7, "careful": true },
+    { "x": -1.25, "z": -1.25, "at": 9.2, "careful": true },
+    { "x": -2.25, "z": -1.25, "at": 10.2, "careful": true },
+    { "x": -2.75, "z": -1.25, "at": 11.2, "careful": true },
+    { "x": -3.75, "z": -1.25, "at": 13.4, "careful": true },
+    { "x": -4.25, "z": -1.25, "at": 14.4, "careful": true },
+    { "x": -4.5, "z": -1.25, "at": 14.4, "careful": true }
   ],
   "designerRouteHard": [
-    { "x": -3.35, "z": 0.25, "at": 3.2, "careful": true },
-    { "x": -3.35, "z": -0.75, "at": 4.2, "careful": true },
-    { "x": -3.35, "z": -1.25, "at": 5.2, "careful": true },
-    { "x": -2.35, "z": -1.25, "at": 5.7, "careful": true },
-    { "x": -1.35, "z": -1.25, "at": 6.7, "careful": true },
-    { "x": -0.35, "z": -1.25, "at": 7.7, "careful": true },
-    { "x": 0.25, "z": -1.25, "at": 8.7, "careful": true },
-    { "x": 1.25, "z": -1.25, "at": 9.2, "careful": true },
-    { "x": 2.25, "z": -1.25, "at": 10.2, "careful": true },
-    { "x": 2.75, "z": -1.25, "at": 11.2, "careful": true },
-    { "x": 3.75, "z": -1.25, "at": 13.4, "careful": true },
-    { "x": 4.25, "z": -1.25, "at": 14.4, "careful": true },
-    { "x": 4.5, "z": -1.25, "at": 14.4, "careful": true }
+    { "x": 2.35, "z": 1.25, "at": 3.2, "careful": true },
+    { "x": 1.35, "z": 1.25, "at": 4.2, "careful": true },
+    { "x": 0.35, "z": 1.25, "at": 5.2, "careful": true },
+    { "x": 0.35, "z": 0.25, "at": 6.2, "careful": true },
+    { "x": 0.35, "z": -0.75, "at": 7.2, "careful": true },
+    { "x": 0.35, "z": -1.25, "at": 8.2, "careful": true },
+    { "x": -0.25, "z": -1.25, "at": 8.7, "careful": true },
+    { "x": -1.25, "z": -1.25, "at": 9.2, "careful": true },
+    { "x": -2.25, "z": -1.25, "at": 10.2, "careful": true },
+    { "x": -2.75, "z": -1.25, "at": 11.2, "careful": true },
+    { "x": -3.75, "z": -1.25, "at": 13.4, "careful": true },
+    { "x": -4.25, "z": -1.25, "at": 14.4, "careful": true },
+    { "x": -4.5, "z": -1.25, "at": 14.4, "careful": true }
   ],
   "inhabitants": [
     {
@@ -182,7 +188,7 @@
       "headColor": "#E8B996",
       "stations": [
         {
-          "x": 2.5,
+          "x": -2.5,
           "z": 0.75,
           "facing": 180.0,
           "dwell": 9.0,
@@ -190,20 +196,20 @@
           "glances": [
             {
               "offset": 1.0,
-              "yaw": -80.0,
+              "yaw": 80.0,
               "hold": 3.0
             },
             {
               "offset": 6.0,
-              "yaw": 80.0,
+              "yaw": -80.0,
               "hold": 2.5
             }
           ]
         },
         {
-          "x": 4.25,
+          "x": -4.25,
           "z": 0.25,
-          "facing": 270.0,
+          "facing": 90.0,
           "dwell": 3.0,
           "glances": []
         }

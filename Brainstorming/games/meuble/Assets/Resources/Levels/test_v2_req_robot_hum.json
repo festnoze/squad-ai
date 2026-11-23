@@ -1,0 +1,91 @@
+{
+  "id": "test_v2_req_robot_hum",
+  "requires": ["hum"],
+  "nameKey": "level9.name",
+  "hintKey": "level9.hint",
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 3.7,
+      "z": 2.45,
+      "sizeX": 7.4,
+      "sizeZ": 4.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": 7.45,
+      "z": 0.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "player": {
+    "kind": "chair",
+    "x": 0.75,
+    "z": 0.75,
+    "yaw": 90.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D",
+    "model": "kenney.chair"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 6.75,
+    "z": 0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Barriere",
+      "kind": "box",
+      "x": 3.7,
+      "z": 1.6,
+      "yaw": 0.0,
+      "sizeX": 7.4,
+      "sizeY": 0.5,
+      "sizeZ": 0.2,
+      "occluder": true,
+      "color": "#8C5A36"
+    }
+  ],
+  "inhabitants": [
+    {
+      "name": "Habitant",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 3.75,
+          "z": 2.5,
+          "facing": 0.0,
+          "dwell": 30.0,
+          "glances": []
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "name": "Robot",
+      "loop": [
+        {
+          "x": 1.75,
+          "z": 2.05
+        },
+        {
+          "x": 5.25,
+          "z": 2.05
+        }
+      ]
+    }
+  ]
+}

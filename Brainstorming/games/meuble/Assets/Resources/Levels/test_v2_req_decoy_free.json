@@ -1,0 +1,67 @@
+{
+  "id": "test_v2_req_decoy_free",
+  "nameKey": "level3.name",
+  "hintKey": "level3.hint",
+  "rooms": [
+    {
+      "id": "couloir",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 12.0,
+      "sizeZ": 2.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "props": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": 5.25,
+    "z": -0.25,
+    "yaw": 270.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "decoys": [
+    {
+      "model": "kenney.chair",
+      "kind": "chair",
+      "x": 0.0,
+      "z": 0.75,
+      "yaw": 180.0,
+      "color": "#8C5A36"
+    }
+  ],
+  "exit": {
+    "x": -4.25,
+    "z": -0.25,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "inhabitants": [
+    {
+      "name": "Veilleur",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": -5.5,
+          "z": -0.25,
+          "facing": 270.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

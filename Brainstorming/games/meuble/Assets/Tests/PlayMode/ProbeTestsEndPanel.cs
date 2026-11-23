@@ -18,11 +18,11 @@ namespace OutOfSight.Tests
     /// its primary action the way the fail panel's Retry is (first in the row, larger, bold, in the same selection red,
     /// at rest since nothing selects it), the touch overlay hides under both panels, and both panels fit a 20:9 phone,
     /// 16:9 and a 4:3 tablet: every button inside the canvas, apart from the others and from the text lines. It writes
-    /// the panels' screenshots, with the touch strings, to docs/m9/endpanel (the HUD canvas rendered through the camera).
+    /// the panels' screenshots, with the touch strings, to Build/shots/endpanel (the HUD canvas rendered through the camera).
     /// </summary>
     public sealed class ProbeTestsEndPanel
     {
-        private const string ShotDir = "docs/m9/endpanel";
+        private const string ShotDir = "Build/shots/endpanel";
         // The screens checked: a 20:9 phone (the shortest canvas, 966 units), 16:9, a 4:3 tablet (the narrowest, 1663 units).
         private static readonly Vector2Int[] Screens = { new Vector2Int(2400, 1080), new Vector2Int(1920, 1080), new Vector2Int(1440, 1080) };
         // The least room left between a button and the canvas edge, in reference units.
@@ -242,6 +242,84 @@ namespace OutOfSight.Tests
             Assert.AreEqual(PlayState.Playing, Game.State, "Retry did not restart the level");
             Assert.IsTrue(controls.enabled, "the controls line did not come back after Retry");
             Assert.IsTrue(Hud.CreakGaugeVisible && Hud.SuspicionGaugeVisible, "the gauges did not come back after Retry");
+            Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
+        }
+
+        /// <summary>The button is drawn: every Canvas above it is enabled (panels are switched by their Canvas, never their GameObject).</summary>
+        private static bool Drawn(Button button)
+        {
+            if (button == null || !button.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+            foreach (Canvas canvas in button.GetComponentsInParent<Canvas>(true))
+            {
+                if (!canvas.enabled)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Step 73b (end screen fix, 2026-11-20): the final screen after the last level drew the win panel's Replay/Menu row
+        /// over its own Replay/Menu principal row. Now exactly one row is drawn there, Rejouer then Menu principal, the
+        /// latter the primary (larger, bold, red through its default selection), and it fits 20:9, 16:9 and 4:3.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step73b_EndScreenShowsOneRowWithMenuAsPrimary()
+        {
+            Strings.SetLanguage(Strings.French);
+            string last = Game.LevelOrder[Game.LevelOrder.Count - 1];
+            Game.LoadLevel(last);
+            Game.Rules = GameRules.M2;
+            yield return Steps(2);
+            Assert.IsTrue(Game.IsLastLevel, "premise: the last level of levels.json is up");
+            yield return WinCurrentLevel();
+            Assert.IsTrue(Hud.EndVisible, "premise: the end screen is not up");
+            Assert.IsFalse(Hud.WinButtonsVisible, "the win panel's own buttons count as up on the end screen");
+            Assert.IsFalse(Hud.WinNextVisible, "the end screen offers a next level");
+
+            // Exactly the end row is drawn: no second Rejouer/Menu principal, no Next level placeholder.
+            var drawn = new List<string>();
+            foreach (Button button in Hud.WinPanel.GetComponentsInChildren<Button>(true))
+            {
+                if (Drawn(button))
+                {
+                    drawn.Add(button.name);
+                }
+            }
+            CollectionAssert.AreEquivalent(new[] { Hud.EndReplayButton.name, Hud.EndButton.name }, drawn,
+                "the end screen does not draw exactly Rejouer and Menu principal: " + string.Join(", ", drawn));
+
+            // Menu principal is the primary: larger and bold, right of Rejouer, red through its default selection.
+            Button menu = Hud.EndButton;
+            Button replay = Hud.EndReplayButton;
+            Assert.AreEqual(FontStyle.Bold, Label(menu).fontStyle, "Menu principal's label is not bold");
+            Assert.AreNotEqual(FontStyle.Bold, Label(replay).fontStyle, "Rejouer's label is bold too");
+            Assert.Greater(Size(menu).x, Size(replay).x, "Menu principal is not wider than Rejouer");
+            Assert.Greater(Size(menu).y, Size(replay).y, "Menu principal is not taller than Rejouer");
+            Assert.Less(((RectTransform)replay.transform).anchoredPosition.x, ((RectTransform)menu.transform).anchoredPosition.x,
+                "Rejouer is not left of Menu principal");
+            Assert.AreEqual(Size(Hud.WinNextLevelButton), Size(menu), "Menu principal and Next level are not the same size");
+            Assert.AreEqual(Label(Hud.WinNextLevelButton).fontSize, Label(menu).fontSize, "Menu principal and Next level labels differ in size");
+            yield return Until(() => EventSystem.current.currentSelectedGameObject == menu.gameObject, 5);
+            Assert.AreEqual(menu.gameObject, EventSystem.current.currentSelectedGameObject, "Menu principal is not selected by default");
+            Assert.AreEqual(Hud.PrimaryRed, menu.colors.selectedColor, "Menu principal is not red when selected");
+            Assert.AreNotEqual(Hud.PrimaryRed, replay.colors.normalColor, "Rejouer is red at rest");
+
+            TouchStrings();
+            yield return null;
+            Assert.IsTrue(Hud.Labels.TryGetValue("WinPanelAction", out Text action) && action.text == Strings.WinActionTouch,
+                "the end screen's hint does not name the Rejouer button on a phone");
+            foreach (Vector2Int screen in Screens)
+            {
+                yield return Shoot($"end_fr_{screen.x}x{screen.y}.png", screen.x, screen.y, new[] { replay, menu },
+                    new[] { Hud.Labels["WinPanelTitle"].rectTransform, Hud.Labels["WinPanelBody"].rectTransform, action.rectTransform,
+                        Hud.Labels["EndTime"].rectTransform, Menu.RecordLine != null ? Menu.RecordLine.BestRect : null });
+            }
+            InputReader.ForceTouchUI = false;
             Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
         }
 

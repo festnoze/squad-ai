@@ -1,0 +1,68 @@
+{
+  "id": "test_v2_req_lit",
+  "nameKey": "level6.name",
+  "hintKey": "level6.hint",
+  "requires": ["lit"],
+  "rooms": [
+    {
+      "id": "salon",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 13.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [],
+  "windows": [],
+  "props": [],
+  "player": {
+    "model": "kenney.floorlamp",
+    "kind": "floor_lamp",
+    "x": -5.75,
+    "z": -0.75,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 1.8,
+    "sizeZ": 0.35,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": 0.25,
+    "z": -0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "litZones": [
+    {
+      "name": "plafonnier",
+      "x": -2.25,
+      "z": -0.25,
+      "sizeX": 1.5,
+      "sizeZ": 1.5
+    }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Veilleur",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 5.25,
+          "z": 0.0,
+          "facing": 270.0,
+          "dwell": 290.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

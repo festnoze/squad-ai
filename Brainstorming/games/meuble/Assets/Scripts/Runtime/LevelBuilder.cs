@@ -312,6 +312,10 @@ namespace OutOfSight
             // M8 (docs/m8/ROOMS_PLAN.md 5): the secondary lights by room type, visual only (no collider, Default layer). M7
             // walls pass: the wall fixtures' glows go with their wall line (the fader's caps).
             RoomLights.Build(def, root, fader);
+            // Levels v2 (C4): the lit zones (ceiling ring, unshadowed spot, floor pool), and their rule data handed to the player.
+            LitZoneView.Build(def, root, level.Furniture);
+            // Floor dust (docs/m9/FLOORS_WALLS.md section 10): the Haut tier's floor map, from the walls just built.
+            FloorDust.LevelBuilt(def, level.Root);
 
             Physics.SyncTransforms();
             Rect interior = def.InteriorBounds();

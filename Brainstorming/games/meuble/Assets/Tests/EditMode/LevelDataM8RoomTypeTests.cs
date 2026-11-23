@@ -143,14 +143,20 @@ namespace OutOfSight.Tests
                 foreach (RoomDef r in Load(id).AllRooms())
                 {
                     Assert.IsTrue(RoomTypes.IsKnown(r.Type), $"{id}: room {r.Id} has the type '{r.Type}'");
-                    if (r.Id != null)
+                    // Levels v2: a room may declare its type in the file (level25's "reserve" declares "other" on
+                    // purpose); only an undeclared named room must be in the inference table.
+                    if (r.Id != null && string.IsNullOrEmpty(r.DeclaredType))
                     {
                         Assert.AreNotEqual(RoomTypes.Other, r.Type, $"{id}: room {r.Id} is not in the inference table");
+                    }
+                    if (r.Id != null)
+                    {
                         typed++;
                     }
                 }
             }
-            Assert.Greater(typed, 100, "premise: the survey's 106 rooms");
+            // The survey had 106 rooms over 24 levels; the 22 levels of v2 hold about 90. At least two named rooms per level.
+            Assert.Greater(typed, 2 * order.Count, "premise: the rooms of the manifest levels are checked");
         }
     }
 }

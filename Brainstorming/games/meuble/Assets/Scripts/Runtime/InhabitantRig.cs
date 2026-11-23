@@ -47,7 +47,7 @@ namespace OutOfSight
     ///   the same bones, every cross fade blends them. While the Jump plays, the feet are also put on the shin tips: at
     ///   the top of the hop the clip's legs fall 0.06 m short of its feet.
     ///
-    /// - <b>Pets</b> (M5, docs/CONTRACT_M5_v3.md 15.5). A catalog entry of kind "pet" (the Shiba) names its Idle and Walk
+    /// - <b>Pets</b> (M5, docs/CONTRACT_M5_v3.md 15.5). A catalog entry of kind "pet" (the Husky) names its Idle and Walk
     ///   clips exactly; it has no Jump (Startled plays Idle), no sitting, no carry pose, no brows, no seat fit. Its head bone
     ///   follows the eye yaw like a human's, its stride is <see cref="Tuning.DogWalkCycleMeters"/>, and
     ///   <see cref="CompleteClips"/> completes its two clips too (its IK feet hang under the armature like the humans').
@@ -96,6 +96,11 @@ namespace OutOfSight
         public const string LowerArmLeftName = "LowerArm.L";
         public const string UpperArmRightName = "UpperArm.R";
         public const string LowerArmRightName = "LowerArm.R";
+        /// <summary>GRIP: the palm bones (at the wrists; the fingers hang under them), the end of the arm IK.</summary>
+        public const string PalmLeftName = "Palm.L";
+        public const string PalmRightName = "Palm.R";
+        /// <summary>GRIP: the pet's neck chain, root first (the Husky's AnimalArmature), bent by the bite.</summary>
+        public static readonly string[] NeckNames = { "Neck1", "Neck2", "Neck3" };
 
         /// <summary>M4.2: the foot bones (children of the root bone in this IK rig) and the tips of the shins they belong on.</summary>
         public const string FootLeftName = "Foot.L";
@@ -132,6 +137,10 @@ namespace OutOfSight
         public Transform LowerArmLeft { get; private set; }
         public Transform UpperArmRight { get; private set; }
         public Transform LowerArmRight { get; private set; }
+
+        /// <summary>GRIP: the palm bones (null when the model lacks them: no hand grip).</summary>
+        public Transform PalmLeft { get; private set; }
+        public Transform PalmRight { get; private set; }
 
         /// <summary>M3.1: the brow boxes (children of <see cref="BrowPivot"/>, itself a child of the head bone).</summary>
         public Transform BrowLeft { get; private set; }
@@ -285,6 +294,14 @@ namespace OutOfSight
             Quaternion toFacing = Quaternion.Inverse(facing);
 
             SetUpAnimation(modelRoot);
+            if (entry != null && entry.IsPet)
+            {
+                PetPose pose = PetPose.Find(modelRoot.transform, facing);
+                petPose = pose.HasBones ? pose : null;
+            }
+            // GRIP: the palms (human hands on the carried furniture), the dog's neck chain (its head lowered to the bite).
+            PalmLeft = FindBone(PalmLeftName);
+            PalmRight = FindBone(PalmRightName);
 
             // Head: the bind pose rotation relative to the body facing. Fallback: the Idle pose just sampled.
             CalibratedFromBindPose = TryBindRotation(Skin, Head, out Quaternion headBind);
@@ -298,6 +315,7 @@ namespace OutOfSight
             upperRightRest = UpperArmRight != null ? toFacing * UpperArmRight.rotation : Quaternion.identity;
             lowerRightRest = LowerArmRight != null ? toFacing * LowerArmRight.rotation : Quaternion.identity;
             HeadRestHeight = Head.position.y - frame.position.y;
+            MeasureGrip(frame, toFacing);
             // M5: a pet never sits, and has no face for brows.
             // M4 seat fit: where the head bone stands in Idle, and the eyes above it with the head held as Apply holds it.
             Hips = FindBone(HipsBoneName);
@@ -320,12 +338,17 @@ namespace OutOfSight
                 }
             }
             var bones = new System.Collections.Generic.List<Transform>();
-            foreach (Transform t in new[] { Spine, UpperArmLeft, LowerArmLeft, UpperArmRight, LowerArmRight, Head })
+            foreach (Transform t in new[] { Spine, UpperArmLeft, LowerArmLeft, UpperArmRight, LowerArmRight, Head, PalmLeft, PalmRight })
             {
                 if (t != null)
                 {
                     bones.Add(t);
                 }
+            }
+            // GRIP: the neck bones the bite bends.
+            for (int i = 0; neckBones != null && i < neckBones.Length; i++)
+            {
+                bones.Add(neckBones[i]);
             }
             driven = bones.ToArray();
             drivenLocalRest = new Quaternion[driven.Length];
@@ -463,7 +486,7 @@ namespace OutOfSight
                 string n = state.name;
                 if (pet)
                 {
-                    // M5: a pet's clip map names its clips exactly (the Shiba also stores "AnimalArmature|Idle" and so on).
+                    // M5: a pet's clip map names its clips exactly (the Husky also stores "AnimalArmature|Idle" and so on).
                     if (IdleClipName == null && n == Entry.idleClip)
                     {
                         IdleClipName = n;
@@ -754,6 +777,12 @@ namespace OutOfSight
                 Quaternion bent = facing * Quaternion.AngleAxis(BendDegrees, Vector3.right) * spineRest;
                 Spine.rotation = Quaternion.Slerp(Spine.rotation, bent, bend);
             }
+            float hands = Mathf.Clamp01(HandGripWeight);
+            if (Spine != null && hands > 0f && handLean > 0f)
+            {
+                // GRIP: the lean over a low furniture (the stool), never on top of the pick up's bend.
+                Spine.rotation = Quaternion.AngleAxis(handLean * hands * (1f - Mathf.Clamp01(bend)), facing * Vector3.right) * Spine.rotation;
+            }
             if (carry > 0f)
             {
                 float down = BendDegrees * bend;
@@ -762,12 +791,276 @@ namespace OutOfSight
                 PoseArm(UpperArmRight, upperRightRest, CarryUpperArmPitch + down, CarryArmSplay, facing, carry);
                 PoseArm(LowerArmRight, lowerRightRest, CarryLowerArmPitch + down, -0.5f * CarryArmSplay, facing, carry);
             }
+            if (hands > 0f)
+            {
+                // GRIP: from that carry pose, each arm reaches its wrist target on the furniture (two bone IK, the elbow out
+                // and down) and the hand points its fingers over the surface.
+                bool swap = armLeftSide > 0f;
+                ReachArm(UpperArmLeft, LowerArmLeft, PalmLeft, swap ? rightWristTarget : leftWristTarget,
+                    swap ? rightFingerTarget : leftFingerTarget, armLeftSide, facing, hands);
+                ReachArm(UpperArmRight, LowerArmRight, PalmRight, swap ? leftWristTarget : rightWristTarget,
+                    swap ? leftFingerTarget : rightFingerTarget, -armLeftSide, facing, hands);
+            }
+            // GRIP: the biting dog lowers its head onto the point it bites (the neck bent nose down, eased with the bite).
+            float neck = neckBones != null ? GripNeck * Mathf.Clamp01(Bite) : 0f;
+            if (neck > 0f)
+            {
+                BendNeck(neckBones, facing * Vector3.right, neck);
+            }
 
             // The head: absolute, so the clip's head motion never leaks into where the inhabitant looks.
             Tilt = Mathf.Clamp01(tilt);
             Quaternion roll = Quaternion.AngleAxis(TelegraphRollDegrees * Tilt, headLocalForward);
             Head.rotation = Quaternion.Euler(0f, eyeYaw, 0f) * headCalibration * roll; // MUTATION:HEAD
+            if (neck > 0f)
+            {
+                // GRIP: the muzzle follows the neck down (the bite's roll and dip then ride on it, PetPose).
+                Head.rotation = Quaternion.AngleAxis(neck * Tuning.DogGripHeadFollow, Quaternion.Euler(0f, eyeYaw, 0f) * Vector3.right) * Head.rotation;
+            }
             PoseBrows(frown, startled);
+            // DOGBIG: the black Labrador's bigger head, its bite, hanging ears and low tail, after the head (all ride on it).
+            if (petPose != null)
+            {
+                petPose.Bite = Bite;
+                petPose.Apply(Quaternion.Euler(0f, eyeYaw, 0f), facing);
+            }
+        }
+
+        // DOGBIG: the pet's head, ear, tail and jaw bones (null for a human, or a pet model without them).
+        private PetPose petPose;
+
+        /// <summary>DOGBIG v3: the bite pose's weight, 0 to 1, set by Inhabitant each frame (a pet only).</summary>
+        public float Bite { get; set; }
+
+        /// <summary>DOGBIG v3: true when the model has the bite's jaw joint.</summary>
+        public bool HasJaw => petPose != null && petPose.HasJaw;
+
+        /// <summary>
+        /// DOGBIG: how far ahead of the body root the snout reaches, metres: the catalog's rest pose reach
+        /// (ModelKit.ForwardReach), plus what the grown head (Tuning.DogHeadScale) adds ahead of the head bone.
+        /// </summary>
+        public float SnoutReach
+        {
+            get
+            {
+                float reach = ModelKit.ForwardReach(Entry);
+                return petPose != null ? reach + (Tuning.DogHeadScale - 1f) * Mathf.Max(0f, reach - HeadRestLocal.z) : reach;
+            }
+        }
+
+        // ----- GRIP (2026-11-22, presentation only): hands on the carried furniture, the dog's head lowered to its bite -----
+
+        // The human hand grip set by Inhabitant each frame: its weight, the wrist targets and finger directions (world), the
+        // spine's lean; which side of the body the ".L" arm hangs on (-1: the body's left, as expected).
+        private float handLean;
+        private Vector3 leftWristTarget;
+        private Vector3 rightWristTarget;
+        private Vector3 leftFingerTarget = Vector3.forward;
+        private Vector3 rightFingerTarget = Vector3.forward;
+        private float armLeftSide = -1f;
+        // The pet's neck chain and, in its body plane (x forward, y up, metres from the feet, Idle pose), its base, its
+        // segments up to the head bone and the snout tip ahead of the head bone (the grown head included).
+        private Transform[] neckBones;
+        private Vector2 neckBase;
+        private Vector2[] neckSegments;
+        private Vector2 snoutFromHead;
+
+        /// <summary>GRIP: the weight of the human hand grip this frame, 0 to 1 (set by <see cref="SetHandGrip"/>).</summary>
+        public float HandGripWeight { get; private set; }
+
+        /// <summary>GRIP: the dog's neck bend for its bite, degrees (Inhabitant solves it; applied times <see cref="Bite"/>).</summary>
+        public float GripNeck { get; set; }
+
+        /// <summary>GRIP: true when the pet's neck chain was found (its head can be lowered to the bite).</summary>
+        public bool HasNeck => neckBones != null;
+
+        /// <summary>
+        /// GRIP (Inhabitant, every frame): where the human's hands rest on the carried furniture this frame (wrists and finger
+        /// directions in world space, the carrier's left and right), the lean of his spine, and the grip's weight (0: the
+        /// plain carry pose).
+        /// </summary>
+        internal void SetHandGrip(float weight, Vector3 leftWrist, Vector3 rightWrist, Vector3 leftFingers, Vector3 rightFingers, float lean)
+        {
+            HandGripWeight = PalmLeft != null && PalmRight != null && UpperArmLeft != null && UpperArmRight != null
+                && LowerArmLeft != null && LowerArmRight != null ? Mathf.Clamp01(weight) : 0f;
+            leftWristTarget = leftWrist;
+            rightWristTarget = rightWrist;
+            leftFingerTarget = leftFingers;
+            rightFingerTarget = rightFingers;
+            handLean = lean;
+        }
+
+        /// <summary>
+        /// GRIP: the neck bend (degrees) that brings the dog's snout tip down to <paramref name="targetHeight"/> metres above its
+        /// feet (GripMath, from the Idle pose's neck chain), and how far ahead of its feet the tip then is. Without a neck
+        /// chain: no bend, the DOGBIG snout reach.
+        /// </summary>
+        internal void SolveBite(float targetHeight, out float bend, out float tipForward)
+        {
+            if (neckBones == null)
+            {
+                bend = 0f;
+                tipForward = SnoutReach;
+                return;
+            }
+            bend = GripMath.SolveNeckBend(neckBase, neckSegments, snoutFromHead, Tuning.DogGripHeadFollow, targetHeight);
+            tipForward = GripMath.Tip(neckBase, neckSegments, snoutFromHead, bend, Tuning.DogGripHeadFollow).x;
+        }
+
+        /// <summary>GRIP: the arm side and the pet's neck chain, measured once in the Idle pose (Bind).</summary>
+        private void MeasureGrip(Transform frame, Quaternion toFacing)
+        {
+            if (UpperArmLeft != null)
+            {
+                float side = (toFacing * (UpperArmLeft.position - frame.position)).x;
+                armLeftSide = side > 0f ? 1f : -1f;
+            }
+            neckBones = null;
+            if (Entry == null || !Entry.IsPet)
+            {
+                return;
+            }
+            var chain = new Transform[NeckNames.Length];
+            for (int i = 0; i < chain.Length; i++)
+            {
+                chain[i] = FindBone(NeckNames[i]);
+                if (chain[i] == null)
+                {
+                    return;
+                }
+            }
+            Vector2 Plane(Transform t)
+            {
+                Vector3 local = toFacing * (t.position - frame.position);
+                return new Vector2(local.z, local.y);
+            }
+            neckBones = chain;
+            neckBase = Plane(chain[0]);
+            neckSegments = new Vector2[chain.Length];
+            for (int i = 0; i < chain.Length; i++)
+            {
+                Transform next = i + 1 < chain.Length ? chain[i + 1] : Head;
+                neckSegments[i] = Plane(next) - Plane(chain[i]);
+            }
+            // The tip ahead of the head bone: the catalog's rest reach (ModelKit.ForwardReach) less the head bone's, a little
+            // below it (Tuning.DogSnoutDrop), grown with the head (PetPose scales it every frame).
+            float headForward = Plane(Head).x;
+            float grow = petPose != null ? Tuning.DogHeadScale : 1f;
+            snoutFromHead = new Vector2(Mathf.Max(0f, ModelKit.ForwardReach(Entry) - headForward), -Tuning.DogSnoutDrop) * grow;
+        }
+
+        /// <summary>GRIP: one arm onto its wrist target (the elbow out to its side, down and back), then the hand's fingers.</summary>
+        private static void ReachArm(Transform upper, Transform lower, Transform palm, Vector3 wrist, Vector3 fingers, float side,
+            Quaternion facing, float weight)
+        {
+            Vector3 pole = facing * new Vector3(side, -0.7f, -0.4f);
+            SolveArm(upper, lower, palm, wrist, pole, weight);
+            AimBone(palm, fingers, weight);
+        }
+
+        /// <summary>
+        /// GRIP: a two bone IK, swing only (each bone keeps its twist): <paramref name="upper"/> and <paramref name="lower"/> turn
+        /// so <paramref name="end"/> reaches <paramref name="target"/> (or as close as the arm's length allows), the middle
+        /// joint bending toward <paramref name="pole"/>; <paramref name="weight"/> blends from the pose they had.
+        /// </summary>
+        internal static void SolveArm(Transform upper, Transform lower, Transform end, Vector3 target, Vector3 pole, float weight)
+        {
+            if (upper == null || lower == null || end == null || weight <= 0f)
+            {
+                return;
+            }
+            Vector3 a = upper.position;
+            Vector3 b = lower.position;
+            Vector3 c = end.position;
+            float la = (b - a).magnitude;
+            float lb = (c - b).magnitude;
+            Vector3 toTarget = target - a;
+            float d = toTarget.magnitude;
+            if (la < 1e-5f || lb < 1e-5f || d < 1e-5f)
+            {
+                return;
+            }
+            Vector3 n = toTarget / d;
+            d = Mathf.Clamp(d, Mathf.Abs(la - lb) + 1e-4f, (la + lb) * 0.999f);
+            Vector3 m = pole - Vector3.Dot(pole, n) * n;
+            if (m.sqrMagnitude < 1e-8f)
+            {
+                m = Vector3.Cross(n, Vector3.right);
+            }
+            m.Normalize();
+            float x = (la * la - lb * lb + d * d) / (2f * d);
+            float h = Mathf.Sqrt(Mathf.Max(0f, la * la - x * x));
+            Vector3 elbow = a + n * x + m * h;
+            float w = Mathf.Clamp01(weight);
+            upper.rotation = Quaternion.Slerp(upper.rotation, Quaternion.FromToRotation(b - a, elbow - a) * upper.rotation, w);
+            b = lower.position;
+            c = end.position;
+            Vector3 reach = a + n * d;
+            lower.rotation = Quaternion.Slerp(lower.rotation, Quaternion.FromToRotation(c - b, reach - b) * lower.rotation, w);
+        }
+
+        /// <summary>GRIP: turns <paramref name="bone"/> so its axis (+Y, the Blender bone direction) points along <paramref name="direction"/>.</summary>
+        internal static void AimBone(Transform bone, Vector3 direction, float weight)
+        {
+            if (bone == null || direction.sqrMagnitude < 1e-8f || weight <= 0f)
+            {
+                return;
+            }
+            Quaternion aimed = Quaternion.FromToRotation(bone.up, direction.normalized) * bone.rotation;
+            bone.rotation = Quaternion.Slerp(bone.rotation, aimed, Mathf.Clamp01(weight));
+        }
+
+        /// <summary>GRIP: bends a neck chain nose down by <paramref name="degrees"/> about <paramref name="right"/>, a share per bone
+        /// (each child also turns with its parent: the first segment turns a third, the last all of it, as GripMath assumes).</summary>
+        internal static void BendNeck(Transform[] chain, Vector3 right, float degrees)
+        {
+            if (chain == null || chain.Length == 0)
+            {
+                return;
+            }
+            Quaternion step = Quaternion.AngleAxis(degrees / chain.Length, right);
+            foreach (Transform bone in chain)
+            {
+                if (bone != null)
+                {
+                    bone.rotation = step * bone.rotation;
+                }
+            }
+        }
+
+        /// <summary>
+        /// GRIP: the neck chain of a pet model under <paramref name="model"/> in its current pose, in the body plane of
+        /// <paramref name="frame"/> (for the title logo, which has no rig): false when a bone is missing.
+        /// </summary>
+        internal static bool NeckChain(Transform model, Transform frame, out Transform[] chain, out Transform head, out Vector2 basePoint,
+            out Vector2[] segments)
+        {
+            chain = new Transform[NeckNames.Length];
+            head = FindDeep(model, DefaultHeadBone);
+            basePoint = Vector2.zero;
+            segments = null;
+            for (int i = 0; i < chain.Length; i++)
+            {
+                chain[i] = FindDeep(model, NeckNames[i]);
+                if (chain[i] == null || head == null)
+                {
+                    return false;
+                }
+            }
+            Quaternion toFrame = Quaternion.Inverse(Quaternion.Euler(0f, frame.eulerAngles.y, 0f));
+            Vector2 Plane(Transform t)
+            {
+                Vector3 local = toFrame * (t.position - frame.position);
+                return new Vector2(local.z, local.y);
+            }
+            basePoint = Plane(chain[0]);
+            segments = new Vector2[chain.Length];
+            for (int i = 0; i < chain.Length; i++)
+            {
+                Transform next = i + 1 < chain.Length ? chain[i + 1] : head;
+                segments[i] = Plane(next) - Plane(chain[i]);
+            }
+            return true;
         }
 
         /// <summary>Where a marker floating <paramref name="height"/> meters above the feet goes: above the head bone.</summary>

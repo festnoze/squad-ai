@@ -247,6 +247,28 @@ namespace OutOfSight.Tests
         {
             List<(Renderer renderer, int slot, string source)> slots = ModelKit.SourceSlots(model, entry);
             Assert.Greater(slots.Count, 2, $"{label}: premise: the model's slots are matched to its source materials");
+            if (entry.IsPet && ModelKit.PetFurMap != null)
+            {
+                // DOGBIG: with its fur map (the black Labrador) every slot of the dog shows the one map material instead of
+                // its tint and palette colours (ModelKit.ApplyPetFurMap): one material for the dog.
+                Material fur = PrimitiveKit.MapMaterial(ModelKit.PetFurMap, 0.25f);
+                var furUsed = new HashSet<Material>();
+                foreach ((Renderer r, int slot, string source) in slots)
+                {
+                    Material m = r.sharedMaterials[slot];
+                    if (ModelKit.IsPetEyeWhite(source))
+                    {
+                        // v3: the eye whites keep their palette white.
+                        Assert.IsTrue(InPalette(PaletteColour(m)), $"{label}: the eye white slot {slot} is not a palette colour");
+                    }
+                    else
+                    {
+                        Assert.AreSame(fur, m, $"{label}: slot {slot} ({source}) does not show the fur map");
+                    }
+                    furUsed.Add(m);
+                }
+                return furUsed;
+            }
             Material tinted = PrimitiveKit.Lit(tint);
             int clothes = 0;
             var used = new HashSet<Material>();
@@ -542,7 +564,7 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// The dog (CONTRACT_M5_v3 4, 15.5): its routine eye, its visual eye and its model's own eyes at 0.35 m; a pet rig
-        /// (Idle and Walk from its clip map, no Jump, no brows, 46 bones at most, the clips completed as M4.2's feet fix).
+        /// (Idle and Walk from its clip map, no Jump, no brows, 50 bones at most, the clips completed as M4.2's feet fix).
         /// </summary>
         [UnityTest]
         public IEnumerator Step38_DogEyeIsLowAndItsModelIsAPet()
@@ -553,8 +575,8 @@ namespace OutOfSight.Tests
             Assert.AreEqual(PersonalityDef.Dog, dog.Personality.Id, "the dog's personality");
             InhabitantRig rig = dog.Rig;
             Assert.IsNotNull(rig, "premise: the dog has no rig (its model did not attach)");
-            Assert.AreEqual(ModelCatalog.QuaterniusShiba, rig.Entry.id, "premise: the Shiba");
-            Assert.IsTrue(rig.IsPet, "the Shiba's rig is not a pet's");
+            Assert.AreEqual(ModelCatalog.QuaterniusHusky, rig.Entry.id, "premise: the Husky");
+            Assert.IsTrue(rig.IsPet, "the Husky's rig is not a pet's");
             Assert.IsNotNull(rig.IdleState, "no Idle");
             Assert.IsNotNull(rig.WalkState, "no Walk");
             Assert.AreEqual(rig.Entry.idleClip, rig.IdleClipName, "Idle is not the clip map's");
@@ -564,7 +586,7 @@ namespace OutOfSight.Tests
             Assert.Greater(rig.CompletedProperties, 0, "the dog's Idle and Walk were not completed (M4.2 feet fix)");
             Assert.IsTrue(rig.CalibratedFromBindPose, "the dog's head calibration did not come from the bind pose");
             int bones = Probe.BonesUnder(dog.transform);
-            Assert.Greater(bones, Tuning.BudgetInhabitantBones, "premise: the Shiba has more bones than a human may");
+            Assert.Greater(bones, Tuning.BudgetInhabitantBones, "premise: the Husky has more bones than a human may");
             Assert.LessOrEqual(bones, Tuning.BudgetPetBones, "the dog's bones");
             Assert.LessOrEqual(Probe.TrianglesUnder(dog.transform), Tuning.BudgetInhabitantTriangles, "the dog's triangles");
 
@@ -590,7 +612,8 @@ namespace OutOfSight.Tests
             float modelEye = sum / samples;
             Debug.Log($"[Step38] dog: {bones} bones, routine eye {r.EyeHeight} m, visual eye off by {worstVisual:0.0000} m, model eyes at {modelEye:0.000} m");
             Assert.LessOrEqual(worstVisual, 0.005f, "the visual eye is not at 0.35 m");
-            Assert.That(modelEye, Is.EqualTo(Tuning.DogEyeHeight).Within(0.03f), "the Shiba's eyes are not at the dog's eye");
+            // DOGBIG: the model's eyes stand at its own fitted eye (bigger than the gameplay eye, which the visual eye keeps).
+            Assert.That(modelEye, Is.EqualTo(Tuning.DogModelEyeHeight).Within(0.03f * Tuning.DogModelScale), "the dog model's eyes are not at its fitted eye");
             CollectionAssert.IsEmpty(logged, "no error logged");
         }
 
@@ -747,7 +770,7 @@ namespace OutOfSight.Tests
             Color alarm = cone.Color;
             Assert.AreEqual(VisionConeView.ConeColor(true, true, false), alarm, "the dog's cone while it sees the chair");
             Material fan = cone.GetComponent<MeshRenderer>().sharedMaterial;
-            Assert.AreSame(PrimitiveKit.UnlitTransparent(alarm), fan, "the fan's material is not the cone colour");
+            Assert.AreSame(VisionConeView.ConeMaterial(alarm), fan, "the fan's material is not the cone colour");
             Color alarmChevron = cone.FacingFill;
             Assert.AreEqual(VisionConeView.FacingColor(true, true), alarmChevron, "the dog's chevron while it sees the chair");
             Game.Furniture.Teleport(BehindTheDog, 0f);

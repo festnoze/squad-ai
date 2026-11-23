@@ -274,6 +274,9 @@ namespace OutOfSight.Tests
             Vector3 chairAt = YawMath.Planar(chair.transform.position);
             inhabitant.Pin(inhabitant.Routine.Position, YawMath.YawOf(chairAt - inhabitant.Routine.Position), 0f, true);
             yield return Steps(2);
+            // The cone sets its outline in its LateUpdate: two fixed steps may both run within one slow frame (a loaded
+            // machine), so one plain frame lets that LateUpdate read the new sight before the outline is checked.
+            yield return null;
             Assert.IsTrue(Game.Seen, "premise: the inhabitant sees the still chair");
             Assert.IsTrue(vision.SeesPlayer, "premise: its own Vision test agrees");
             Assert.AreEqual(HudEye.Calm, Hud.Eye, "premise: seen and still must be calm");

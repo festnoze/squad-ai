@@ -17,11 +17,11 @@ namespace OutOfSight.Tests
     /// Step 72 (Credits page, 2026-11-19), on the real Boot scene: "Crédits" on the title between Options and Quitter, the
     /// page it opens (a page of the title: the game stays paused), its lines (Core.Credits) in both languages, its scroll
     /// by injected D-pad, by a real UI move event and to both ends, Retour and Back, and its fit on a 20:9 phone. It writes
-    /// the page's screenshots to docs/m9/credits (the menu canvas rendered through the camera into a texture).
+    /// the page's screenshots to Build/shots/credits (the menu canvas rendered through the camera into a texture).
     /// </summary>
     public sealed class ProbeTestsCredits
     {
-        private const string ShotDir = "docs/m9/credits";
+        private const string ShotDir = "Build/shots/credits";
         // A 20:9 phone at the menu's CanvasScaler (1920 x 1080 reference, match 0.5): 966 reference units high.
         private const float PhoneHalfHeight = 966f / 2f;
 

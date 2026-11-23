@@ -129,13 +129,24 @@ namespace OutOfSight.Tests
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }
 
-        /// <summary>Level 21 "La passerelle" (lesson split): the route climbs the catwalk.</summary>
+        /// <summary>Level 21 "La passerelle" (lesson split; levels v2: split + decoy, LEVELS_V2 10.1): the route climbs the
+        /// catwalk and parks at least once among the decoy office chairs (one decoy-explained stop).</summary>
         private void Level21Lesson(RouteReplayer.Result r, List<string> failures)
         {
             Assert.AreEqual(LevelDef.LessonSplit, Game.Def.Lesson, "premise: level 21 teaches the split");
+            // Levels v2: decoy office chairs at empty desks. A failure, not a premise, so the replay of the file as it
+            // stands still reports (level21 is still the v1 file: RULEFIX/LV10 escalated, LEVELS6 reworking it).
+            if (!Game.Def.Decoys.Exists(d => BodyKinds.Of(d.Kind) == BodyKinds.OfficeChair))
+            {
+                failures.Add($"{r.Label}: level 21 has no decoy office chair (the v2 catwalk parks among decoys, LEVELS_V2 10.1)");
+            }
             if (r.TopY < Tuning.PlatformMinHeight - 0.05f)
             {
                 failures.Add($"{r.Label}: the route never climbed the catwalk (top {r.TopY:0.00} m)");
+            }
+            if (r.Explained < 1)
+            {
+                failures.Add($"{r.Label}: no decoy ever explained the office chair: the route never parks among the decoys");
             }
         }
 

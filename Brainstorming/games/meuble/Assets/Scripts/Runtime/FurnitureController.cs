@@ -17,8 +17,8 @@ namespace OutOfSight
     /// (<see cref="MotionRule.IsMoving(float, float, bool)"/>), and the body does not travel during it.
     ///
     /// M5 (docs/CONTRACT_M5_v3.md 15.2 and 15.4, CONTRACT_M5 16.12): an action started from outside
-    /// (<see cref="BeginExternalAction"/>, the door opening), the E key claimed by the game before the body action
-    /// (<see cref="ActionKeyClaimed"/>), and the floor height (<see cref="Floor"/>) that <see cref="Teleport"/> and
+    /// (<see cref="BeginExternalAction"/>, the door opening), the door push claimed by the game before the body action
+    /// (<see cref="DoorPushClaimed"/>, task DOORAUTO: it replaced the E press), and the floor height (<see cref="Floor"/>) that <see cref="Teleport"/> and
     /// <see cref="Release"/> put the furniture on. 5A.1 m16: on a ramp the visual lies on the slope (its pitch along the
     /// facing, its roll across it, about the footprint centre); the sample box stays upright.
     ///
@@ -82,8 +82,8 @@ namespace OutOfSight
         /// carried and in no other action, or when the duration is not positive.
         ///
         /// Called between two fixed steps, the action covers the next round(duration / dt) steps. Called from
-        /// <see cref="ActionKeyClaimed"/> (inside <see cref="Step"/>), the step of the E press is its first step, as for
-        /// the lamp switch. Input and presses are ignored during it, as for every action; when it ends, a held key drives
+        /// <see cref="DoorPushClaimed"/> (inside <see cref="Step"/>), the step the door push is confirmed is its first step,
+        /// as for the lamp switch. Input and presses are ignored during it, as for every action; when it ends, a held key drives
         /// again on the next step (no neutral step, unlike the pin). A pin or a carry ends it at once.
         /// </summary>
         public bool BeginExternalAction(float duration)
@@ -137,14 +137,57 @@ namespace OutOfSight
         public bool Pushing => ActionActive && Action == BodyAction.Push;
 
         /// <summary>
-        /// M5 (docs/CONTRACT_M5_v3.md 15.2: a door in reach takes E before the body action), set by GameState. Called
-        /// once for each action press (E, gamepad X) consumed by a step that takes input, while the furniture is upright
-        /// and in no action (moving or not: the hook decides). True means the press goes to the game (a door): the body
-        /// action (the lamp switch) does not happen. The press is consumed either way, so it never fires later. The hook
-        /// may call <see cref="BeginExternalAction"/>: the step of the press is then the first step of that action, and
-        /// the body does not travel on it. Null: every press is the body's.
+        /// Task DOORAUTO (replaces M5's E press for doors, CONTRACT_M5_v3 15.2, and M6's for the wardrobe), set by GameState:
+        /// the planar unit direction the player pushes the move input toward to act on a door now (a closed leaf in reach:
+        /// into its wall; a wardrobe in front: into its front; hidden: out of its front), or null when there is none. Asked
+        /// on every step that takes input while the furniture is upright, not pinned and in no action (hidden included).
+        /// Null hook: no door push.
         /// </summary>
-        public Func<bool> ActionKeyClaimed;
+        public Func<Vector3?> DoorPushTarget;
+
+        /// <summary>
+        /// Task DOORAUTO: called once when a door push is confirmed (the move input held within
+        /// <see cref="Tuning.PushConeDegrees"/> of <see cref="DoorPushTarget"/> for <see cref="Tuning.PushConfirmTime"/>, the
+        /// furniture still), or for an injected confirmed push (<see cref="InputReader.InjectDoorPush"/>), while it is
+        /// upright and in no action. True means the game took it (a door, a wardrobe). The hook may call
+        /// <see cref="BeginExternalAction"/>: that step is then the first step of the action and the body does not travel on
+        /// it, exactly as the E press of M5 did. Null: no door push is ever taken.
+        /// </summary>
+        public Func<bool> DoorPushClaimed;
+
+        /// <summary>
+        /// Task DOORAUTO: the fixed steps a door push must be held before it is confirmed, round(PushConfirmTime / dt) (8 at
+        /// 50 Hz). The step after the 8th held step is the first step of the door's action.
+        /// </summary>
+        public static int DoorPushConfirmSteps(float dt) => Mathf.Max(1, Mathf.RoundToInt(Tuning.PushConfirmTime / Mathf.Max(dt, 1e-4f)));
+
+        /// <summary>
+        /// Task DOORAUTO: true when the planar wish <paramref name="wish"/> pushes toward the unit <paramref name="target"/>:
+        /// at least <see cref="Tuning.PushMinInput"/> strong and within <see cref="Tuning.PushConeDegrees"/> of it.
+        /// </summary>
+        public static bool PushesToward(Vector3 wish, Vector3 target)
+        {
+            Vector3 w = YawMath.Planar(wish);
+            if (w.sqrMagnitude < Tuning.PushMinInput * Tuning.PushMinInput || target.sqrMagnitude < 1e-6f)
+            {
+                return false;
+            }
+            return Vector3.Dot(w.normalized, YawMath.Planar(target).normalized) >= Mathf.Cos(Tuning.PushConeDegrees * Mathf.Deg2Rad) - 1e-5f;
+        }
+
+        /// <summary>
+        /// Task DOORAUTO: fixed steps the current door push has been held (0 with no push). Reset by an action, a teleport,
+        /// a pin, a carry and every step the input leaves the cone.
+        /// </summary>
+        public int DoorPushHeldSteps { get; private set; }
+
+        /// <summary>
+        /// Task DOORAUTO: on the last step a door push held the furniture: the move input pushed toward
+        /// <see cref="DoorPushTarget"/> and the push had started with the furniture still, so it did not drive toward the
+        /// door and stayed still until the push was confirmed. A furniture moving toward a door drives on (it stops against
+        /// the closed leaf, and a push then starts from there).
+        /// </summary>
+        public bool DoorPushHolding { get; private set; }
 
         /// <summary>
         /// M5 (docs/CONTRACT_M5_v3.md 15.4): the level's floor heights, set by the level builder; FloorMap.Flat (0
@@ -236,7 +279,8 @@ namespace OutOfSight
         /// What every inhabitant's ViewRange is multiplied by for this furniture's sample points: LampOffLight for
         /// a lamp body whose light is off under GameRules.Lamp, 1 otherwise (Vision.Step). CONTRACT_M4 10.4: during
         /// the switch itself the rules use the lit range, whichever way it goes (the light changes visually at the
-        /// start), so a switch seen for its whole duration is caught.
+        /// start), so a switch seen for its whole duration is caught. Levels v2 (C4): 1 as well while the furniture centre
+        /// stands in a lit zone (<see cref="InLitZone"/>): the dark gives no cover there.
         /// </summary>
         public float SightRangeFactor
         {
@@ -247,7 +291,36 @@ namespace OutOfSight
                     return 1f;
                 }
                 if (Action == BodyAction.Toggle) return 1f; // MUTATION:TOGGLE_LIT
+                if (InLitZone) return 1f; // MUTATION:LIT_FACTOR
                 return Lamp.RangeFactor;
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (C4, LEVELS_V2 D26): the lit zones of the level being played (LevelDef.LitZones, handed over by
+        /// LitZoneView.Build when the level is built), null or empty for none. Under a ceiling light the dark does not hide a
+        /// lamp: <see cref="SightRangeFactor"/> is 1 while the furniture centre stands in one, switched on or off.
+        /// </summary>
+        public System.Collections.Generic.IReadOnlyList<LitZoneDef> LitZones;
+
+        /// <summary>True while the furniture centre (its planar position) lies in one of <see cref="LitZones"/>, edges included.</summary>
+        public bool InLitZone
+        {
+            get
+            {
+                if (LitZones == null)
+                {
+                    return false;
+                }
+                Vector3 p = transform.position;
+                for (int i = 0; i < LitZones.Count; i++)
+                {
+                    if (LitZones[i] != null && LitZones[i].Contains(p))
+                    {
+                        return true;
+                    }
+                }
+                return false;
             }
         }
 
@@ -317,6 +390,7 @@ namespace OutOfSight
                 return;
             }
             Pinned = on;
+            ClearDoorPush();
             if (on)
             {
                 CompleteAction();
@@ -336,9 +410,10 @@ namespace OutOfSight
         // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5): hidden in a wardrobe -----
 
         /// <summary>
-        /// M6: hidden in a wardrobe (GameState sets it at the end of the entry action and clears it when E begins the exit
-        /// action). While hidden the visual is switched off, the furniture takes no move input and never moves (no hop, no
-        /// footstep), Vision gives it no sample point, and an action press goes to the game (<see cref="ActionKeyClaimed"/>).
+        /// M6: hidden in a wardrobe (GameState sets it at the end of the entry action and clears it when a push out of the
+        /// wardrobe begins the exit action). While hidden the visual is switched off, the furniture never moves (no hop, no
+        /// footstep), Vision gives it no sample point, and the move input only counts as a door push
+        /// (<see cref="DoorPushClaimed"/>, task DOORAUTO).
         /// </summary>
         public bool Hidden { get; private set; }
 
@@ -382,6 +457,17 @@ namespace OutOfSight
         public FurniturePose Pose => new FurniturePose(YawMath.Planar(transform.position), Yaw);
 
         /// <summary>
+        /// GRIP (render only): the base position and yaw the visual is drawn at between two fixed steps,
+        /// <paramref name="alpha"/> of the way (the interpolation LateUpdate uses, without the hop, the tremble or the tip),
+        /// so a carrier's hands and the dog's snout land on the drawn furniture whichever LateUpdate runs first.
+        /// </summary>
+        public void InterpolatedBase(float alpha, out Vector3 position, out float yaw)
+        {
+            position = Vector3.Lerp(previousPose, currentPose, alpha);
+            yaw = Mathf.LerpAngle(previousYaw, currentYaw, alpha);
+        }
+
+        /// <summary>
         /// Carried: the furniture base goes to <paramref name="anchor"/> with <paramref name="yaw"/>. The
         /// controller is disabled (the carried chair goes where the carrier goes), the velocity is zero, a
         /// carried furniture is never moving (3.5) and never hops. The interpolation poses advance, so the
@@ -394,6 +480,7 @@ namespace OutOfSight
             Carried = true;
             CompleteAction();
             ClearMotionState();
+            ClearDoorPush();
             if (controller.enabled)
             {
                 controller.enabled = false;
@@ -472,6 +559,9 @@ namespace OutOfSight
         // the push during the current Move (OnControllerColliderHit).
         private Vector3 pushVelocity;
         private bool pushBlocked;
+        // Task DOORAUTO: the planar travel of the last step per second, and whether its wish pushed toward the door target.
+        private Vector3 lastStepVelocity;
+        private bool doorPushTowardLastStep;
 
         /// <summary>Center of the bounds, at the fixed step pose.</summary>
         public Vector3 Center => transform.position + new Vector3(0f, Size.y * 0.5f, 0f);
@@ -518,6 +608,7 @@ namespace OutOfSight
             IsMoving = false;
             hopTime = 0f;
             ClearMotionState();
+            ClearDoorPush();
             currentPose = previousPose = interpolatedPosition = position;
             currentYaw = previousYaw = yaw;
             // A teleport (probe, tests) re-arms the input at once; Release sets the wait after its teleport.
@@ -539,6 +630,7 @@ namespace OutOfSight
             // Presses are consumed on every step, used or not, so a stale press never fires later.
             bool actionPress = InputReader.ActionPressed();
             bool movePress = InputReader.MovePressed();
+            bool injectedPush = InputReader.DoorPushPressed();
 
             // An action that has run all its steps ends at the start of the next step.
             if (ActionActive && actionStepsLeft <= 0)
@@ -556,6 +648,7 @@ namespace OutOfSight
                 Careful = false;
                 previousWishActive = false;
                 ClearMotionState();
+                ClearDoorPush();
                 EndStep(dt, startPosition, startYaw, bodies);
                 return;
             }
@@ -565,6 +658,7 @@ namespace OutOfSight
             {
                 actionPress = false;
                 movePress = false;
+                injectedPush = false;
             }
             if (WaitingForNeutralInput)
             {
@@ -576,21 +670,28 @@ namespace OutOfSight
                 wish = Vector3.zero;
                 actionPress = false;
                 movePress = false;
+                injectedPush = false;
             }
             bool wishActive = wish.sqrMagnitude >= 1e-4f;
             bool wishEdge = wishActive && !previousWishActive;
             previousWishActive = wishActive;
             Careful = bodies && allowInput && (ScriptedCareful ?? InputReader.CarefulHeld());
 
+            // Task DOORAUTO: the move input pushed toward the game's door target holds the furniture still and, once held
+            // for PushConfirmTime with the furniture still, is taken by the game as the E press was.
+            bool pushConfirmed = StepDoorPush(wish, allowInput, dt);
+            bool doorPush = injectedPush || pushConfirmed;
+
             if (Hidden && !ActionActive)
             {
-                // M6 (CONTRACT_M6 2.5): inside the wardrobe it cannot move; E goes to the game, which begins the exit action.
+                // M6 (CONTRACT_M6 2.5): inside the wardrobe it cannot move. DOORAUTO: a push out of the wardrobe goes to the
+                // game, which begins the exit action.
                 Velocity = Vector3.zero;
                 Careful = false;
                 ClearMotionState();
-                if (actionPress)
+                if (doorPush)
                 {
-                    ActionKeyClaimedByGame();
+                    DoorPushClaimedByGame();
                 }
                 EndStep(dt, startPosition, startYaw, bodies);
                 return;
@@ -611,14 +712,20 @@ namespace OutOfSight
                     StartAction(BodyAction.Right, Tuning.StoolRightTime, dt);
                 }
             }
-            else if (actionPress && ActionKeyClaimedByGame())
+            else if (doorPush && DoorPushClaimedByGame())
             {
-                // M5 (v3 15.2): the press went to the game (a door in reach), not to the body. When the hook began an
-                // action (BeginExternalAction), this step is its first one: the body does not travel.
+                // M5 (v3 15.2), DOORAUTO: the push went to the game (a door in reach, a wardrobe), not to the body. When the
+                // hook began an action (BeginExternalAction), this step is its first one: the body does not travel. A
+                // confirmed push the game took without an action keeps the furniture still (it never drives into the
+                // door); an injected one drives on, as the E press of M5 did.
                 if (ActionActive)
                 {
                     Velocity = Vector3.zero;
                     pendingTip = false;
+                }
+                else if (pushConfirmed)
+                {
+                    Drive(Vector3.zero, false, allowInput, bodies, dt);
                 }
                 else
                 {
@@ -627,12 +734,18 @@ namespace OutOfSight
             }
             else if (actionPress && Body.HasLight && lampRule && Lamp != null)
             {
-                // CONTRACT_M4 2.3: E switches the lamp, a 0.2 s action.
+                // CONTRACT_M4 2.3: E switches the lamp, a 0.2 s action. DOORAUTO: E (X, a tap on the lamp) only does this.
                 Velocity = Vector3.zero;
                 ClearMotionState();
                 Lamp.Toggle();
                 ToggleCount++;
                 StartAction(BodyAction.Toggle, Tuning.LampToggleTime, dt);
+                ResetDoorPush();
+            }
+            else if (DoorPushHolding)
+            {
+                // DOORAUTO: a push started still holds the furniture still (no travel, no turn) until it is confirmed.
+                Drive(Vector3.zero, false, allowInput, bodies, dt);
             }
             else
             {
@@ -669,11 +782,70 @@ namespace OutOfSight
             Velocity = dt > 0f ? YawMath.Planar(transform.position - moveFrom) / dt : Vector3.zero;
         }
 
-        /// <summary>M5: asks <see cref="ActionKeyClaimed"/> whether this action press goes to the game (once per press).</summary>
-        private bool ActionKeyClaimedByGame()
+        /// <summary>M5, DOORAUTO: asks <see cref="DoorPushClaimed"/> whether this door push goes to the game (once per push).</summary>
+        private bool DoorPushClaimedByGame()
         {
-            bool claimed = ActionKeyClaimed != null && ActionKeyClaimed(); // MUTATION:E_CLAIM
+            bool claimed = DoorPushClaimed != null && DoorPushClaimed(); // MUTATION:E_CLAIM
             return claimed;
+        }
+
+        /// <summary>
+        /// Task DOORAUTO, once per step that is not pinned: updates the door push from this step's <paramref name="wish"/>.
+        /// While the furniture is upright and in no action (hidden included) and the wish pushes toward
+        /// <see cref="DoorPushTarget"/> (<see cref="PushesToward"/>), a push starts if the furniture is still, or pressed
+        /// against the door (it pushed toward it on the last step too without travelling toward it); one travelling toward
+        /// the door drives on. The push then holds it still (<see cref="DoorPushHolding"/>, a release for the body) and counts
+        /// its steps; it is confirmed (true, once) on the first step after <see cref="DoorPushConfirmSteps"/> held steps on
+        /// which the furniture is still (not moving on its last step, not gliding, no tip pending), the condition
+        /// <see cref="BeginExternalAction"/> asks. Any other step resets it. A confirmed push starts counting again, so a push
+        /// the game took without an action is asked again one confirm time later.
+        /// </summary>
+        private bool StepDoorPush(Vector3 wish, bool allowInput, float dt)
+        {
+            Vector3? target = allowInput && !ActionActive && !Tipped && !Carried && DoorPushTarget != null ? DoorPushTarget() : null;
+            bool toward = target.HasValue && PushesToward(wish, target.Value);
+            bool wasToward = doorPushTowardLastStep;
+            doorPushTowardLastStep = toward;
+            if (!toward)
+            {
+                ResetDoorPush();
+                return false;
+            }
+            bool still = !IsMoving && !Gliding && !pendingTip;
+            // Pressed against the door: the wish pushed toward it on the last step too, yet the furniture did not travel
+            // toward it (it stands against the closed leaf or the wardrobe, maybe sliding along it at an angle).
+            bool pressed = wasToward && Vector3.Dot(lastStepVelocity, target.Value) <= Tuning.MovingSpeedThreshold;
+            if (!DoorPushHolding && !still && !pressed)
+            {
+                // A push never starts while the furniture travels toward the door: it drives on into the closed leaf, and the
+                // push starts once it stands pressed there. A route leg that heads for a door cell never opens it on the way.
+                ResetDoorPush();
+                return false;
+            }
+            DoorPushHolding = true;
+            int confirm = DoorPushConfirmSteps(dt);
+            if (DoorPushHeldSteps >= confirm && still)
+            {
+                DoorPushHeldSteps = 0;
+                return true;
+            }
+            DoorPushHeldSteps = Mathf.Min(DoorPushHeldSteps + 1, confirm);
+            return false;
+        }
+
+        /// <summary>Task DOORAUTO: no door push in progress.</summary>
+        private void ResetDoorPush()
+        {
+            DoorPushHeldSteps = 0;
+            DoorPushHolding = false;
+        }
+
+        /// <summary>Task DOORAUTO: no door push and no pressing memory (a teleport, a pin, a carry).</summary>
+        private void ClearDoorPush()
+        {
+            ResetDoorPush();
+            doorPushTowardLastStep = false;
+            lastStepVelocity = Vector3.zero;
         }
 
         /// <summary>Travel: the stool tip on release, the office chair glide, or plain driving (M1).</summary>
@@ -738,6 +910,7 @@ namespace OutOfSight
         {
             Vector3 delta = YawMath.Planar(transform.position - startPosition);
             PlanarSpeed = dt > 0f ? delta.magnitude / dt : 0f;
+            lastStepVelocity = dt > 0f ? delta / dt : Vector3.zero;
             YawRate = dt > 0f ? Mathf.DeltaAngle(startYaw, Yaw) / dt : 0f;
             IsMoving = !Pinned && MotionRule.IsMoving(PlanarSpeed, YawRate, ActionActive); // MUTATION:PUSH_MOVING
             // A wall stops the furniture: keep the velocity consistent with what really happened.

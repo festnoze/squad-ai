@@ -1,0 +1,249 @@
+{
+  "group": "act1",
+  "levels": [
+    {
+      "id": "level1",
+      "slot": "Act 1, slot 1 of 21",
+      "status": "fix",
+      "title_en": "The Living Room",
+      "title_fr": "Le salon",
+      "hint_en": "Only move when nobody's looking.",
+      "hint_fr": "Ne bouge que lorsque personne ne regarde.",
+      "body": "chair",
+      "main_threat": "sight only: one default watcher (range 10 m, half angle 55 deg) whose facing is the whole puzzle",
+      "plan_shape": "one 8 x 6 m room, no cover for the chair (see risks)",
+      "exit_direction": "NE in the world (spawn (-3.2, -2.2), exit (3.5, 2.3)); ahead-right of the start camera (spawn yaw 0)",
+      "look": "unchanged: wallpaper walls, default parquet. Living room in daylight, the act 1 reference room",
+      "twist": "the watcher walks toward the door and looks at it just when a rushing player would get there: the first freeze of the game happens mid-route, telegraphed, not at the spawn",
+      "lesson": "freeze while a cone is on you; move while backs are turned. Today a rush at full speed from t = 0 reaches the door at about 6 s, just before the door look starts (6.1 to 6.5 s), so once the clock starts on the first input (QW4) level 1 can be won without ever freezing. Today only the 5 s intro card stops that",
+      "changes": [
+        "inhabitants[0].stations[2] (the window station at (0.0, -2.3), facing 180): dwell 5.0 -> 3.5. Nothing else changes: startStation stays 2, positions, facings, glances, props and door stay as they are.",
+        "Effect (approximate simulator): the walk to station 3 (2.2, -0.7), which looks over the door, starts at about 4.6 s instead of 6.3 s. The door strip (x 1.75 to 3.5, z 2.25) is watched from about 4.75 to 8.0 s; the north lane at (-0.75, 1.25) stays free from 0 to 14 s. That makes it the natural place to freeze.",
+        "Run LevelAudit -writeRoutes at Normal and Difficile to rewrite designerRoute and designerRouteHard."
+      ],
+      "code_needs": [
+        "QW4: the clock, every routine and the creak start delay are held until the first move or action input after the intro card (P0 for act 1: the card now eats the first window of levels 1 and 6, and the audit's late-start warnings on 1, 2, 3, 5 and 7 come from this).",
+        "Test update: LevelDataM2Tests.Level1_keeps_its_stations_start_and_props expects dwell 5 for station 3 (index 2). Change it to 3.5, and record the change in PRD 6.3 (CONTRACT_M2 11.8 says any level 1 change goes back into the PRD).",
+        "UX2 first-time tips during level 1: the creak gauge (shown with no word today) and, on the first discovery, the memory rule ('He remembers where you stood').",
+        "R2 rush counter-route step: the straight full-speed path from t = 0 must lose on level 1."
+      ],
+      "targets": "Strict exit 9 to 12 s at Normal and Difficile (now 10.7 / 11.1). Pauses: at least 1 of 1.5 s or more, none above 6 s (15 to 35 % waiting is fine for slot 1). The full-speed straight rush from t = 0 loses (caught at the door look). Margin of at least 0.4 s early and late, so a first-time player is not punished for a reaction delay. Late-start sweep: no forced wait above 8 s. Level 1 keeps 1 room, 1 watcher, 3 props.",
+      "risks": [
+        "Deviation from the review ('change nothing'): one number changes, because QW4 (feedback P0) would otherwise let a first-time player rush level 1 in about 6 s and never learn the freeze. If QW4 is not built, the change is still safe: the card ends at 5 s, the watcher is already walking, and the north lane is free.",
+        "Correction to the review ('three pieces of cover'): none of the three props hides the chair from a standing watcher. Its top samples are at 0.87 m, above the sofa (0.85 m) and the table (0.75 m), and the bookshelf stands flush against the north wall (back at z 2.975, wall at 3.0). Level 1 is pure facing. That suits slot 1, but the first real cover comes in level 2 (the 2.0 m cabinet) and level 3 (the 1.9 m dresser, the 1.8 m fridge).",
+        "If the audit shows a margin under 0.3 s, use dwell 4.0 instead of 3.5 (the rush still meets the door look from about 5.1 s)."
+      ]
+    },
+    {
+      "id": "level2",
+      "slot": "Act 1, slot 2 of 21",
+      "status": "fix",
+      "title_en": "The Hallway",
+      "title_fr": "Le couloir",
+      "hint_en": "On a rug, nobody can hear you creep.",
+      "hint_fr": "Sur un tapis, personne ne t'entend.",
+      "body": "chair",
+      "main_threat": "hearing: hops on hard floor carry 2 m; the hallway runner rug is the only silent way behind the watcher's back (he stands 0.5 m from it, facing the wall, for 5.5 s)",
+      "plan_shape": "L: a 5 x 4.4 m bedroom under a 9 x 2 m hallway, one doorway between them",
+      "exit_direction": "NW after the mirror (spawn (3.75, -2.25), exit (-4.0, 2.0)); ahead-left of the start camera (spawn yaw 0). Level 1 exits ahead-right, so the two first levels turn opposite ways",
+      "look": "marble hallway (shiny hard floor, so the blue runner rug reads as the quiet strip) with quatrefoil walls; pinstripe bedroom on light oak",
+      "twist": "tiptoe on the rug right behind the man while he faces the wall",
+      "lesson": "noise: off the rug, every hop near a listener turns him round. The rug lets you pass at 0.5 m",
+      "changes": [
+        "Mirror the whole level about x = 0 (x -> -x; every yaw or facing f -> (360 - f) mod 360; every glance yaw g -> -g). The puzzle is unchanged because vision, hearing and walks are symmetric. The full list:",
+        "rooms: couloir stays at x 0.0; chambre x -2.0 -> 2.0.",
+        "doors: (-2.25, 0.95) -> (2.25, 0.95); (4.55, 2.0) -> (-4.55, 2.0). windows: (0.0, 3.05) unchanged; (-2.0, -3.55) -> (2.0, -3.55).",
+        "player: x -3.75 -> 3.75 (z -2.25, yaw 0 unchanged). exit: x 4.0 -> -4.0 (z 2.0).",
+        "rugs: hallway rug (0.0, 1.55) unchanged; bedroom rug x -2.4 -> 2.4 (z -0.9).",
+        "props: Console (0.0, 2.8) unchanged; Shoes x 3.5 -> -3.5; Plant x -4.2 -> 4.2; Wardrobe (cabinet) (0.2, -0.6) yaw 90 -> (-0.2, -0.6) yaw 270; Bed (-1.0, -2.5) yaw 180 -> (1.0, -2.5) yaw 180; Desk x -3.9 -> 3.9 (z -3.2); Nightstand (0.2, -3.1) yaw 180 -> (-0.2, -3.1) yaw 180.",
+        "inhabitant Habitant (startStation 2 unchanged): station 0 (0.0, 2.25) facing 0, dwell 7, glance offset 5.5 yaw -70 -> +70, hold 0.8; station 1 (3.0, 2.3) facing 45 -> (-3.0, 2.3) facing 315, dwell 4; station 2 (-2.25, 1.6) facing 180 -> (2.25, 1.6) facing 180, dwell 3, glance offset 0.5 yaw -50 -> +50, hold 0.6.",
+        "Look: couloir add \"floorFinish\": \"marble\" (it has none, so the default parquet shows today); floorColor #B07A4E -> #D8D4CC (the level-select miniature only). Chambre unchanged (pinstripe, lightoak).",
+        "Run LevelAudit -writeRoutes at Normal and Difficile."
+      ],
+      "code_needs": [
+        "FX1 (P1): a small dust puff at each hop on hard floor and none on a rug or soft floor, so the rule this level teaches can be seen and not only heard.",
+        "Audit lesson check 'rug' (P1): treat every rug as hard floor and require that no schedule exists. Today nothing proves the rug is needed; the data test only checks a rug lies within 2 m of a station.",
+        "R2 rush step: the designer route with every wait removed must lose."
+      ],
+      "targets": "Same puzzle, mirrored: strict exit 12 to 15 s (now 13.3 at both difficulties). At least 1 pause of 2 s or more (the spawn pause, while he looks into the bedroom through the doorway), none above 6 s. Rug samples within earshot of station 0: at least 20 (now 31). The waits-removed route loses. Difficile must still pass with hearing 1.",
+      "risks": [
+        "Deviation from the review ('change nothing'): the mirror exists only to vary the exit direction. If the mirrored audit differs from the original in any way other than the mirror, revert the mirror and keep only the marble floor.",
+        "Kenney models with a handed detail look mirrored-placed but not mirrored. That is visual only; check the near-wall and wall-fade shots once.",
+        "Marble floor plus a blue rug: confirm on a shot that the rug edge reads at play distance."
+      ]
+    },
+    {
+      "id": "level3",
+      "slot": "Act 1, slot 3 of 21",
+      "status": "fix",
+      "title_en": "The Dining Room",
+      "title_fr": "La salle à manger",
+      "hint_en": "They remember where you stood. Park beside another chair and nobody counts.",
+      "hint_fr": "Ils se souviennent de ta place. Gare-toi à côté d'une autre chaise : personne ne compte.",
+      "body": "chair",
+      "main_threat": "memory: the watcher remembers where the chair stood; seen still anywhere else, it is suspicious unless it stands beside a twin chair (decoy)",
+      "plan_shape": "two rooms side by side (5.5 x 5 m dining room, 4 x 5 m kitchen), one inner doorway, exit through the kitchen's south door",
+      "exit_direction": "E, then a last turn S (spawn (-3.25, -0.25) yaw 90, exit (4.35, -2.05)); ahead, then right",
+      "look": "unchanged: arches walls on herringbone (dining), subway tile on tile (kitchen)",
+      "twist": "park beside the decoy at the doorway while the watcher walks right past you on his way to the table",
+      "lesson": "displacement memory and decoys together. This is the first level where being seen still away from home matters, so the hint now states the memory rule",
+      "changes": [
+        "decoys[4] (the doorway decoy): (0.75, 0.70) -> (0.75, 0.20), yaw 0 unchanged. Why: the designed rest is (0.75, 1.25) from 7.5 to 13.4 s, and it lies on the watcher's walk from station 3 (4.15, 1.1) to station 0 (-1.75, 1.45) through the doorway centre (1.05, 1.25). He passes x 0.75 at about z 1.30 at about 11.4 s, i.e. he walks through the parked chair (IDEAS bug 1, Main.cs:69 ignores Player/Inhabitant collisions).",
+        "Expected new rest cell: (0.25, 0.25). It is 0.54 m from the moved decoy (inside the audit's 0.6 m and the game's 0.75 m) and about 1.05 m from the walk line. Seen from the doorway as he passes, it is explained ('just another chair'). The moved decoy stays hidden from the kitchen: the rays through the door gap hit the wall below z 0.75.",
+        "The data test Level3_has_decoys_around_the_table_and_one_beside_the_doorway still passes: |0.75 - 1.05| = 0.30 < 0.5 and |0.20 - 1.25| = 1.05 < 1.2. The decoy clears the dresser (its north edge is at z -0.55).",
+        "Hint text (Strings.cs level3.hint, EN and FR) as in hint_en and hint_fr.",
+        "Run LevelAudit -writeRoutes at Normal and Difficile."
+      ],
+      "code_needs": [
+        "Strings.cs: new level3.hint EN and FR. The current 'One more chair at the table?' points at the table decoys, which the route never uses (the rest is at the doorway decoy).",
+        "R14 audit or validator flag: a designed rest cell (a still span of 1 s or more) within 0.6 m of any inhabitant station walk segment. Level 3 fails it today.",
+        "Audit lesson check 'decoy' (P1): remove the same-kind decoys and require that no schedule exists. Today World.NeedDecoy only forces one explained sample; nothing proves the decoy is needed.",
+        "UX2: on the first 'explained by decoy' moment, a one-line tip."
+      ],
+      "targets": "Strict exit 17 to 21 s (now 18.6). 2 pauses (spawn and decoy rest), none above 6 s (the decoy rest is 5.5 to 6.3 s today; keep it at 6 s or less). Explained samples: at least 15 (now 30). The rest cell is at least 0.6 m from every inhabitant walk segment. The straight full-speed rush from t = 0 loses. Waiting share 40 to 50 % is accepted here: the wait is the joke.",
+      "risks": [
+        "Deviation from the review ('change nothing'): one decoy moves 0.5 m, to fix a walk-through that a first-time player sees at the exact moment of the joke.",
+        "The audit may pick another rest cell. Accept any cell that meets the 0.6 m walk-line rule and is explained. If no schedule exists, try the decoy at (0.75, 0.35).",
+        "Rejected idea: a second decoy rest in the kitchen (shorter station 0 dwell). The simulator shows it adds about 6 s of waiting and pushes the share past 60 %."
+      ]
+    },
+    {
+      "id": "level4",
+      "slot": "Act 1, slot 4 of 21",
+      "status": "fix",
+      "title_en": "The Stool",
+      "title_fr": "Le tabouret",
+      "hint_en": "Too fast and the stool topples. Hold {careful} to tiptoe.",
+      "hint_fr": "Trop vite, et le tabouret tombe. {careful} pour aller doucement.",
+      "body": "stool",
+      "main_threat": "a seated watcher (eye at 1.15 m on the sofa) who glances 80 deg each way; low props hide the 0.55 m stool only when you creep",
+      "plan_shape": "two rooms side by side (4 x 4 m entrance, 5 x 4 m living room), one long lane along the bench",
+      "exit_direction": "W after the mirror (spawn (3.25, 1.25) yaw 270, exit (-4.5, -1.25)); ahead of the start camera",
+      "look": "travertine entrance on verde (unchanged); grasscloth living room on the default parquet (herringbone removed, because level 3 next door uses herringbone)",
+      "twist": "creep low along the bench under a seated man's glances",
+      "lesson": "careful mode: the stool tips when released above 1.3 m/s; tiptoeing keeps it upright and slow",
+      "changes": [
+        "Mirror about x = 0 (x -> -x; yaw f -> (360 - f) mod 360; glance yaw g -> -g):",
+        "rooms: entree x -2.1 -> 2.1; salon x 2.5 -> -2.5.",
+        "doors: (-0.05, -1.25) -> (0.05, -1.25); (5.05, -1.25) -> (-5.05, -1.25). window: (-2.1, 2.05) -> (2.1, 2.05).",
+        "player: (-3.25, 1.25) yaw 90 -> (3.25, 1.25) yaw 270. exit: (4.5, -1.25) -> (-4.5, -1.25).",
+        "props: Sofa (2.5, 1.5) -> (-2.5, 1.5) yaw 0; Buffet (0.6, -0.55) -> (-0.6, -0.55); Table (2.69, -0.55) -> (-2.69, -0.55); Bench (2.25, -1.85) -> (-2.25, -1.85); Bookshelf (-2.6, -1.8) yaw 180 -> (2.6, -1.8) yaw 180.",
+        "inhabitant (startStation 1 unchanged): station 0 (2.5, 0.75) facing 180 sit Sofa -> (-2.5, 0.75) facing 180, dwell 9; glances {offset 1, yaw -80 -> +80, hold 3.0} and {offset 6, yaw +80 -> -80, hold 2.5}; station 1 (4.25, 0.25) facing 270 -> (-4.25, 0.25) facing 90, dwell 3.",
+        "Look: salon remove \"floorFinish\": \"herringbone\" (default parquet).",
+        "Hint: replace 'Shift' with the {careful} token (QW2).",
+        "Run LevelAudit -writeRoutes at Normal and Difficile; designerRoute stays all careful."
+      ],
+      "code_needs": [
+        "QW2: hint tokens {careful} and {action}, resolved per device (keyboard Shift, pad left trigger, touch button), for the level 4 and 6 hints.",
+        "UX2: a first-time tip the first time the stool leans (1.0 to 1.3 m/s): 'Too fast! Ease off or tiptoe'."
+      ],
+      "targets": "Same puzzle, mirrored: strict exit 14 to 16 s (now 14.9). 2 pauses (spawn and before the last lane), none above 6 s. Careful lesson required (no schedule at full stool speed). The stool's route is 100 % careful; replay has 0 topples. The 3 low props (sofa, buffet, table) stay taller than the stool's top (0.52 m) and lower than 1.6 m.",
+      "risks": [
+        "Deviation from the review ('change nothing'): the mirror only varies the exit direction (3 exits east, 4 now west, so neighbours 3 and 4, which share plan shape and threat family, now differ in exit). Revert if the mirrored audit differs beyond the mirror.",
+        "The prop-sit station check (seat front 0.5 m in front of the prop, facing away from it) is mirror-invariant, but re-run the validator."
+      ]
+    },
+    {
+      "id": "level5",
+      "slot": "Act 1, slot 5 of 21",
+      "status": "fix",
+      "title_en": "The Armchair",
+      "title_fr": "Le fauteuil",
+      "hint_en": "Be back in your spot when someone wants to sit down.",
+      "hint_fr": "Sois à ta place quand quelqu'un veut s'asseoir.",
+      "body": "armchair",
+      "main_threat": "a deadline: the watcher comes to sit on the armchair at about 8.5 s; anywhere but home is a pratfall and a discovery",
+      "plan_shape": "one 8 x 5 m room with a door in the north wall",
+      "exit_direction": "NE (spawn (-3.25, 0.25) yaw 90, exit (0.0, 1.95)); ahead-left",
+      "look": "unchanged: sage ribbed walls, light oak floor, blue rug at home",
+      "twist": "he sits on you, for long enough that you feel it; you are pinned, then free while he watches TV",
+      "lesson": "being sat on: home is a place you must be at a given moment; the seat ghost and ring announce it from the moment he starts walking",
+      "changes": [
+        "inhabitants[0].stations[1] (the sit station, \"sit\": \"player\"): dwell 0.5 -> 1.5. The sit becomes a visible beat (pinned about 2.6 s with the sit-down and stand-up instead of 1.7 s), not a flicker.",
+        "inhabitants[0].stations[2] (the TV station (3.0, -1.75)): dwell 8.0 -> 6.5 (docs/m7/design.md section 3 lever, feedback C11).",
+        "Run LevelAudit -writeRoutes at Normal and Difficile. In the simulator the current route still works shifted by +1.5 s after the sit (exit at about 17.6 s)."
+      ],
+      "code_needs": [
+        "R2: keep Step35b (the rush loses) green after the retune.",
+        "Audit report: count pinned (sat on) time apart from waiting in the waiting-share metric."
+      ],
+      "targets": "Strict exit 16 to 20 s (now 16.1). Sat on for 2.0 s or more in the replay, no pratfall. The pause at home is at most 6.5 s including the pinned time; any other pause is at most 6 s. Step35b rush loses. Margin at least 0.3 s at Normal and Difficile.",
+      "risks": [
+        "Deviation from the review ('change nothing'): this applies design.md's documented lever (feedback C11), at 1.5 s instead of 2.5 s so the home pause stays near 6 s.",
+        "Not fixed, by design: after he stands up the exit lane is free for about 11 s (he watches TV facing south). Level 5 is a patience-and-deadline lesson, not a crossing; the pressure lives before the sit. A true 'back in time' variant (spawn away from the seat home) needs code, because every memory starts at the spawn and he would see the armchair 'out of place' on its own seat."
+      ]
+    },
+    {
+      "id": "level6",
+      "slot": "Act 1, slot 6 of 21",
+      "status": "fix",
+      "title_en": "The Lamp",
+      "title_fr": "La lampe",
+      "hint_en": "Eyes don't reach far in the dark. Switch off ({action}) when nobody's looking.",
+      "hint_fr": "Dans le noir, on voit moins loin. Éteins ({action}) quand personne ne regarde.",
+      "body": "floor lamp",
+      "main_threat": "range instead of facing: switched off, the lamp is seen only within 0.4 x range (4.0 m at Normal, 3.4 Facile, 4.6 Difficile). The watcher now stands 3.3 to 3.8 m from the lamp's lane",
+      "plan_shape": "L: a 4 x 3 m bedroom below the west end of a 10 x 4 m living room",
+      "exit_direction": "N (spawn (-4.25, -4.35) yaw 0, exit (-1.0, 1.55)); ahead",
+      "look": "limewash living room on herringbone (unchanged); bedroom walls wallpaper -> arches, floor lightoak -> default parquet (level 5 next door uses light oak, level 1 uses wallpaper)",
+      "twist": "you stand inside his cone, in the dark, while he looks straight at you, and nothing happens; one step closer and he would see you",
+      "lesson": "darkness shortens sight, and the boundary is a distance. Today the watcher's nearest station is 5.2 m from the route and the lamp walks it with no pause (0.3 s of waiting); the dark is a free pass once switched off",
+      "changes": [
+        "inhabitants[0].stations[0]: (4.0, -0.25) -> (2.0, 0.6), facing 270 unchanged, dwell 7.0 -> 10.0. Glances: keep {offset 3.0, yaw 40, hold 1.0}; add {offset 7.0, yaw -40, hold 1.5} (looks toward the salon's south-west corner, where the lamp waits).",
+        "Correction to the review and design.md: their target (2.0, -0.25) lies inside the CoffeeTable (centre (2.0, -0.3), 1.0 x 0.55 m, so x 1.5 to 2.5, z -0.575 to -0.025). (2.0, 0.6) is clear: 0.9 m from the Table's east edge (x 1.1) and 0.6 m from the coffee table's north edge.",
+        "Resulting geometry: the lamp's lane x = -1.25 (z -1.75 to 1.25) is 3.3 to 3.8 m from the station, inside the dark range at every difficulty (Facile 3.4 covers the north half). The waiting corner (-2.75, -1.75) is 5.3 m away, outside the dark range even at Difficile (4.6), but inside the lit cone.",
+        "Expected schedule (simulator): toggle off at the spawn, reach (-2.75, -1.75) at about 8 s. Wait there about 3.5 s; the new glance (7.8 to 9.3 s) sweeps the lit cone over the lamp. When he walks to station 1 (from about 11.6 s), go north along x = -1.25, and exit at about 20 s, before station 2 (0, 1.25) watches the exit (from about 22 s at Normal, a little earlier at Difficile). Lit, the lane is free only about 3.5 s (11 to 15 s), too short for the lamp: the dark stays required.",
+        "Look: chambre \"wallFinish\": \"wallpaper\" -> \"arches\"; remove \"floorFinish\": \"lightoak\" (default parquet).",
+        "Hint: replace '(E)' with the {action} token (QW2).",
+        "Run LevelAudit -writeRoutes at Normal and Difficile."
+      ],
+      "code_needs": [
+        "QW4: the route's toggle is at 0.3 s, under the intro card today.",
+        "QW2: the {action} token in the hint.",
+        "Audit: make DarkFreePass synchronised in time and facing-aware (today it passes level 6 on a watcher 1.3 m from the path at 19.8 s, after the exit). Until then, verify the corner beat by replay (below)."
+      ],
+      "targets": "Strict exit 18 to 22 s at Normal (now 15.9); Difficile may differ by up to 2 s. At least 1 mid-route pause of 2 to 5 s at the dark boundary; none above 6 s; waiting 15 to 30 % (the lamp is slow, so travel dominates). Replay check: during that pause, station 0's lit cone covers the lamp and the lamp is more than the dark range from it. Lesson dark required, with the audit's 'dark alone not enough, timing needed' still printed. 0 switch-ons. Margin at least 0.3 s early and late at both difficulties.",
+      "risks": [
+        "If Difficile has no schedule (the exit is watched from station 2's arrival a bit earlier at 4.6 m range), reduce station 0's dwell to 9.5.",
+        "If the audit finds a schedule that skips the corner pause (the lamp arriving after 11.6 s anyway), shorten the bedroom approach: move the spawn from (-4.25, -4.35) to (-3.25, -3.85). Check the bed: it covers x -2.7 to -1.3, so the spawn is clear.",
+        "Night look: none is promised here; level 6 is an evening room lit by the lamp itself (dimming to 0.4 when off is the existing visual)."
+      ]
+    },
+    {
+      "id": "level7",
+      "slot": "Act 1, slot 7 of 21 (act closer)",
+      "status": "fix",
+      "title_en": "The Office",
+      "title_fr": "Le bureau",
+      "hint_en": "An office chair never stops on a dime.",
+      "hint_fr": "Une chaise à roulettes ne s'arrête jamais tout de suite.",
+      "body": "office chair",
+      "main_threat": "a pacing watcher who walks the length of the office and looks down it at each end; rolls are heard at 1.2 m",
+      "plan_shape": "one long room, now 5 m wide and 10 m deep, four desks with decoy office chairs",
+      "exit_direction": "S after a +90 deg rotation (spawn (0.25, 4.25) yaw 180, exit (-1.25, -4.5)); ahead of the camera, at the far end of a long view",
+      "look": "office: walls pinstripe -> sage (plain muted paint), floor herringbone -> marble (hard, cool, no parquet). Hard floor kept on purpose: the 1.2 m roll noise binds here",
+      "twist": "follow him down the room behind his back, park beside a decoy at a desk when he turns, and let the glide stop you on the mark",
+      "lesson": "glide: the office chair slides about 0.27 m (careful) to 0.53 m (full) after release; the stop ring shows where. Closes act 1 by combining glide with decoys (level 3) and backs turned (level 1)",
+      "changes": [
+        "Rotate the level by +90 deg about the origin: (x, z) -> (z, -x); every yaw and facing f -> f + 90 (mod 360). Glance yaws are relative and do not change (there are none). The full list:",
+        "room bureau: sizeX 10.0 -> 5.0, sizeZ 5.0 -> 10.0 (x 0, z 0).",
+        "door: (5.05, -1.25) -> (-1.25, -5.05). windows: (-2.5, 2.55) -> (2.55, 2.5); (2.5, 2.55) -> (2.55, -2.5).",
+        "player: (-4.25, 0.25) yaw 90 -> (0.25, 4.25) yaw 180. exit: (4.5, -1.25) -> (-1.25, -4.5).",
+        "props: DeskA (-1.66, 2.05) -> (2.05, 1.66) yaw 90; DeskB (0.84, -2.05) -> (-2.05, -0.84) yaw 90; DeskC (1.66, 2.05) -> (2.05, -1.66) yaw 90; DeskD (-1.66, -2.05) -> (-2.05, 1.66) yaw 90; Plant (-4.5, 2.0) -> (2.0, 4.5) yaw 90.",
+        "decoys: (-1.66, 1.25) -> (1.25, 1.66) yaw 90; (1.66, 1.25) -> (1.25, -1.66) yaw 90; (0.84, -1.25) -> (-1.25, -0.84) yaw 270; (-1.66, -1.25) -> (-1.25, 1.66) yaw 270. The last two now face their desks (today they turn their backs on DeskB and DeskD).",
+        "inhabitant (startStation 0): station 0 (-3.0, -0.25) facing 270 -> (-0.25, 3.0) facing 0, dwell 2.5 -> 2.0; station 1 (3.0, 0.25) facing 90 -> (0.25, -3.0) facing 180, dwell 2.5 -> 2.0 (design.md lever; it also brings the spawn wait from 6.4 s under 6 s).",
+        "Look: \"wallFinish\": \"pinstripe\" -> \"sage\"; \"floorFinish\": \"herringbone\" -> \"marble\"; floorColor #B07A4E -> #D8D4CC, wallColor #EDE6DA -> #A9B59A (miniature only).",
+        "Run LevelAudit -writeRoutes at Normal and Difficile."
+      ],
+      "code_needs": [
+        "None required. Optional: R2 rush step (straight full speed loses; rolls are heard and the watcher looks down the room)."
+      ],
+      "targets": "Strict exit 18 to 22 s (now 20.3; the simulator gives about 19 s with 2.0 s dwells). 2 pauses (spawn and the decoy rest), none above 6 s (now 6.4 at spawn). Glide lesson required, at least 3 glide stops in the schedule. Explained samples at least 10 (now 24). The decoy rest cell is at least 0.6 m from his walk line (it is about 1.27 m today). Margin at least 0.3 s at Normal and Difficile.",
+      "risks": [
+        "Deviation from the review ('change nothing'): the rotation only varies the exit (south is rare: only level 19 exits south today); the dwell change is design.md's lever, used here to meet the 6 s rule.",
+        "Rotation must be exact; a desk left at yaw 0 would block a lane. Run the validator and the near-wall shots.",
+        "The 5 m width keeps the same lanes as the 5 m depth today (rotation is a symmetry), so no corridor rule changes."
+      ]
+    }
+  ]
+}

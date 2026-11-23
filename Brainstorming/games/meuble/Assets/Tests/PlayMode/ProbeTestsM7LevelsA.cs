@@ -14,8 +14,8 @@ namespace OutOfSight.Tests
     /// M7 new levels probe, designer A (levels 19 and 20), on the real Boot scene.
     /// Step 58a: each level's designerRoute (LevelAudit -writeRoutes at Normal) wins at Normal and its designerRouteHard
     /// wins at Difficile, through RouteReplayer at the standard offsets (-0.2, 0 and +0.2 s, as steps 45 and 56a), with no
-    /// discovery, no alert, no creak, no bark and no error logged, and plays the level's lesson: level 19 climbs the
-    /// mezzanine and hides in a wardrobe and comes out (wardrobe), level 20 switches the lamp off, never opens a door
+    /// discovery, no alert, no creak, no bark and no error logged, and plays the level's lesson: level 19 (levels v2: no
+    /// mezzanine any more) hides in a wardrobe and comes out (wardrobe), level 20 switches the lamp off, never opens a door
     /// itself and lets the household open the kitchen door (dark). The level is loaded by id (LevelLoader reads
     /// Resources/Levels/&lt;id&gt;.json), so a level not yet listed in levels.json still runs.
     /// </summary>
@@ -125,14 +125,13 @@ namespace OutOfSight.Tests
             Assert.IsEmpty(failures, string.Join("\n", failures));
         }
 
-        /// <summary>Level 19 "Cache-cache en famille" (lesson wardrobe): the route climbs the mezzanine, hides and comes out.</summary>
+        /// <summary>Level 19 "Cache-cache en famille" (lesson wardrobe; levels v2: three bands and a long gallery, no platform,
+        /// LEVELS_V2 3 and 5): the route hides in a wardrobe and comes out.</summary>
         private void Level19Lesson(RouteReplayer.Result r, List<string> failures)
         {
             Assert.AreEqual(LevelDef.LessonWardrobe, Game.Def.Lesson, "premise: level 19 teaches the wardrobe");
-            if (r.TopY < Tuning.PlatformMinHeight - 0.05f)
-            {
-                failures.Add($"{r.Label}: the route never climbed the mezzanine (top {r.TopY:0.00} m)");
-            }
+            Assert.IsEmpty(Game.Def.Platforms, "premise: the v2 level 19 has no platform (its mezzanine is gone)");
+            Assert.GreaterOrEqual(Game.Def.Wardrobes().Count, 2, "premise: level 19 has its gallery wardrobes");
             if (r.Hides < 1 || r.Leaves < 1 || r.OpenFailures != 0)
             {
                 failures.Add($"{r.Label}: {r.Hides} hides, {r.Leaves} leaves, {r.OpenFailures} presses given up: the route must hide and come out");

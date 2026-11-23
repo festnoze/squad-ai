@@ -13,9 +13,10 @@ namespace OutOfSight.Tests
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.5), on the real Boot scene: the touch controls driven by injected fingers with
     /// <see cref="InputReader.ForceTouchUI"/> (no touchscreen in a headless run). Step63a: a drag on the left half moves
-    /// the furniture like the left stick, a drag on the right half orbits the camera (sensitivity option included), and
-    /// the action, careful and pause buttons work. Step63b: the overlay is hidden with no touch and shown when forced,
-    /// the controls line swaps to the touch names, and every button is at least 140 px at 1080p.
+    /// the furniture like the left stick, a drag on the right half orbits the camera (sensitivity option included), a tap
+    /// on the player lamp switches it (task DOORAUTO: it replaced the action button, which is gone), and the careful and
+    /// pause buttons work. Step63b: the overlay is hidden with no touch and shown when forced, the controls line swaps to the
+    /// touch names, and every button is at least 140 px at 1080p.
     /// Touch processing is per rendered frame (TouchControls.Update); every game wait is bounded by fixed steps.
     /// </summary>
     public sealed class ProbeTestsM7Touch
@@ -207,14 +208,31 @@ namespace OutOfSight.Tests
             FreezeInhabitantsAway();
             yield return Steps(2);
 
-            // The action button is E: it switches the lamp.
+            // DOORAUTO: a tap on the player lamp is E: it switches the lamp. A tap away from it does not.
             bool on = Furniture.Lamp.On;
             int toggles = Furniture.ToggleCount;
-            yield return Tap(Touch.ActionButton, 2);
+            Assert.IsTrue(TouchControls.PlayerLampScreenRect(out Rect lampRect), "premise: the player lamp is not on screen");
+            Vector2 away = new Vector2(lampRect.xMax < Screen.width * 0.5f ? Screen.width * 0.9f : Screen.width * 0.1f, Screen.height * 0.5f);
+            Assert.IsFalse(lampRect.Contains(away), "premise: the tap away lands on the lamp");
+            InputReader.InjectTouch(2, away);
+            yield return Frames(2);
+            InputReader.ReleaseTouch(2);
+            yield return Frames(1);
+            yield return Steps(StepsFor(Tuning.LampToggleTime) + 2);
+            Assert.AreEqual(toggles, Furniture.ToggleCount, "a tap away from the lamp switched it");
+            InputReader.InjectTouch(2, lampRect.center);
+            yield return Frames(2);
+            InputReader.ReleaseTouch(2);
+            yield return Frames(1);
             yield return StepUntil(() => Furniture.ToggleCount != toggles && !Furniture.ActionActive, StepsFor(Tuning.LampToggleTime) + 20);
-            Assert.AreEqual(toggles + 1, Furniture.ToggleCount, "the action button did not switch the lamp");
+            Assert.AreEqual(toggles + 1, Furniture.ToggleCount, "a tap on the player lamp did not switch it");
             Assert.AreEqual(!on, Furniture.Lamp.On, "the lamp is not in the state the switch should give");
-            Assert.AreEqual(Vector2.zero, InputReader.Move(), "a tap on a button moved the stick");
+            Assert.AreEqual(Vector2.zero, InputReader.Move(), "a tap on the lamp moved the stick");
+            // The chair has no lamp: no lamp rectangle, so a tap there is only the start press.
+            Furniture.SetBody(BodyDef.For("chair"));
+            Assert.IsFalse(TouchControls.PlayerLampScreenRect(out _), "a chair has a lamp rectangle");
+            Furniture.SetBody(BodyDef.For("floor_lamp"));
+            yield return Steps(2);
 
             // The careful button is a toggle.
             Assert.IsFalse(InputReader.CarefulHeld(), "premise: careful before the toggle");
@@ -252,7 +270,9 @@ namespace OutOfSight.Tests
             Assert.AreEqual(Strings.HudControlsTouch, controls.text, "the controls line does not show the touch names");
 
             var corners = new Vector3[4];
-            foreach (RectTransform b in new[] { Touch.ActionButton, Touch.CarefulButton, Touch.PauseButton })
+            // DOORAUTO: no action button any more (a door is a push, the lamp a tap on itself).
+            Assert.IsNull(Touch.transform.Find("TouchOverlay/ActionButton"), "the action button is still built");
+            foreach (RectTransform b in new[] { Touch.CarefulButton, Touch.PauseButton })
             {
                 b.GetWorldCorners(corners);
                 float w = (corners[2].x - corners[0].x) * 1080f / Screen.height;
@@ -262,7 +282,7 @@ namespace OutOfSight.Tests
                     $"{b.name} is not fully on screen");
                 Assert.Greater(TouchControls.ScreenCenter(b).x, Screen.width * 0.5f, $"{b.name} is not on the right");
             }
-            Assert.Less(TouchControls.ScreenCenter(Touch.ActionButton).y, Screen.height * 0.5f, "the action button is not at the bottom");
+            Assert.Less(TouchControls.ScreenCenter(Touch.CarefulButton).y, Screen.height * 0.5f, "the careful button is not at the bottom");
             Assert.Greater(TouchControls.ScreenCenter(Touch.PauseButton).y, Screen.height * 0.5f, "the pause button is not at the top");
 
             InputReader.ForceTouchUI = false;

@@ -1,0 +1,87 @@
+{
+  "id": "test_v2_audit_pace_spawn",
+  "nameKey": "level1.name",
+  "hintKey": "level1.hint",
+  "pace": { "maxPause": 2.0 },
+  "rooms": [
+    {
+      "id": "piece",
+      "x": 0.0,
+      "z": 0.0,
+      "sizeX": 8.0,
+      "sizeZ": 3.0,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA"
+    }
+  ],
+  "doors": [
+    {
+      "x": -1.75,
+      "z": 1.55,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [],
+  "player": {
+    "model": "kenney.chair",
+    "kind": "chair",
+    "x": -3.25,
+    "z": -0.75,
+    "yaw": 0.0,
+    "sizeX": 0.45,
+    "sizeY": 0.9,
+    "sizeZ": 0.45,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "x": -1.75,
+    "z": 1.05,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Bookshelf",
+      "kind": "bookshelf",
+      "x": -2.7,
+      "z": -0.75,
+      "yaw": 90.0,
+      "sizeX": 1.0,
+      "sizeY": 2.0,
+      "sizeZ": 0.3,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    }
+  ],
+  "inhabitants": [
+    {
+      "model": "quaternius.man",
+      "name": "Habitant",
+      "startStation": 0,
+      "bodyColor": "#2F6E4E",
+      "headColor": "#E8B996",
+      "stations": [
+        {
+          "x": 0.25,
+          "z": 0.25,
+          "facing": 270.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 0.25,
+          "z": -0.25,
+          "facing": 90.0,
+          "dwell": 7.0,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

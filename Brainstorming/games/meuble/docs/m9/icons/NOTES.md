@@ -61,3 +61,40 @@ Shared rules: 64-unit grid, 5-unit strokes with round caps and joins, flat, no g
 filled path per icon, then the SVG, the PNG and `sheet_final.png`). Run them in a throwaway venv outside the repo with
 `pip install resvg-py skia-python pillow numpy` (cairosvg needs a Cairo DLL that this machine does not have).
 `final.py` checks the baked path against the stroked source: the alpha matches within anti-aliasing.
+
+# Options icons: Defaults, Back and the Language flags (2026-11-20)
+
+Product owner request: icons on the Options page's "Par défaut" (Defaults) and "Retour" (Back) buttons, and the Language
+row's globe replaced by the flag of the chosen language (French flag in French, US flag in English), switching live.
+Original work, listed in `docs/LICENSES.md` (section UI icons).
+
+| File | What |
+|---|---|
+| `Assets/Art/UI/Icons/reset.svg`, `reset.png` | Defaults: an anticlockwise open-circle arrow, its solid head at the top pointing into the gap |
+| `Assets/Art/UI/Icons/back.svg`, `back.png` | Back: a left arrow, round-capped shaft and solid rounded head |
+| `Assets/Art/UI/Icons/flag_fr.svg`, `flag_fr.png` | French flag: three vertical bands, blue `#1F5BC4`, white, red `#E8333A` |
+| `Assets/Art/UI/Icons/flag_us.svg`, `flag_us.png` | US flag: 13 stripes (red `#C8283C` and white), a blue `#33417F` canton with a staggered 4-3-4-3-4 star grid |
+
+- Same grammar as the HUD pair: 64-unit grid, round caps and joins, flat, no text. The two glyphs are one filled white
+  path each (6-unit strokes, since they are line glyphs) and the PNG is pure white with the coverage in alpha, so the menu
+  tints them with its cream label ink (`Menu.TitleInk`).
+- The flags are drawn as is (not tinted): a 3:2 rounded rectangle (58 x 38.7 units, corner radius 5) on a thin
+  semi-transparent dark rim, so the edge holds on the brown rest plate and on the red selected plate (the French red band
+  next to the red selection). Layers are stacked (the white body first, the colours over it) so no two colours abut:
+  abutting anti-aliased edges leave a see-through seam.
+- 13 stripes were kept over a simplified 7-stripe variant: at the menu's 52 reference px both read, and 13 is the real
+  flag. The stars are small enough to read as stars at 128 px and as a light speckle at 52 px.
+- The PNG import settings are the HUD pair's (UiIconLibraryBuilder enforces them; the flags use them too, alpha is
+  transparency so the colour is dilated under the transparent margin). `UiIconLibrary` holds `reset`, `back`,
+  `flagFrench`, `flagEnglish`; a missing glyph leaves its button without an icon (label centred as before), a missing
+  flag falls back to the procedural globe.
+- In the menu (`Menu.OptionsPlainButton`), the Defaults and Back icons sit where the value rows' icons sit (inset 14,
+  52 units) and their labels start where the value rows' labels start, so the column reads as one. The Language row's
+  icon is swapped by `Menu.RefreshOptionsTexts`, which runs on every language change (`Strings.LanguageChanged`).
+- Checked by `OptionsIconsTests` (EditMode: files, white glyphs, flag colours, library, licence rows) and
+  `ProbeTestsOptionsIcons.Step79a_` (PlayMode: icons, live flag swap, navigation, fit on 1920 x 1080, 2400 x 1080 and
+  1440 x 1080, screenshots to `TestResults/options` or the folder in `OOS_SHOTS_DIR`, never under docs).
+
+Rebuilding: `options_icons.py` (this folder) writes the SVGs and PNGs and a review sheet (the icons on the Options plates
+at 32 to 128 px) to the folder given as its first argument (`--candidates` renders the variants compared). Same throwaway
+venv as above, outside the repo.

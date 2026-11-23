@@ -195,17 +195,17 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
-  - id: quaternius.shiba
-    prefab: {fileID: 2242888416370347441, guid: 832f8077a2464e9a9060d6c200a2cd29, type: 3}
-    nativeSize: {x: 1.0710188, y: 3.0889392, z: 4.1647615}
-    boundsCenter: {x: 0, y: 1.548895, z: 0.4138553}
-    yawOffset: -0
+  - id: quaternius.husky
+    prefab: {fileID: 2242888416370347441, guid: 8c974b8612c648bd894e7d88b10be189, type: 3}
+    nativeSize: {x: 0.9899646, y: 3.0763764, z: 3.6896315}
+    boundsCenter: {x: 0, y: 1.5412277, z: 0.3706962}
+    yawOffset: 0
     rigged: 1
     headBone: Head
-    eyeLocal: {x: 0.000025044355, y: 0.0023063184, z: 0.0014951162}
-    eyeHeight: 2.6913111
+    eyeLocal: {x: 0.000023165869, y: 0.0012394774, z: 0.0009167992}
+    eyeHeight: 2.6746023
     kind: pet
-    targetEyeHeight: 0.35
+    targetEyeHeight: 0.525
     idleClip: Idle
     walkClip: Walk
   - id: kenney.bed

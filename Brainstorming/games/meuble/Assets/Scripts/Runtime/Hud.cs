@@ -88,6 +88,17 @@ namespace OutOfSight
         private Canvas winCanvas;
         private Image eye;
         private Image eyeBackdrop;
+        // Eye redesign (2026-11-20): the half open frame shown for an instant between the closed and the open eye, how
+        // long ago the eye last changed, and whether that change opened or closed it (EyeBlink, AnimateEye).
+        private Image eyeBlink;
+        private float eyeChangeAge = 99f;
+        private bool eyeChangeOpens;
+        private bool eyeChangeBlinks;
+        private float hudClock;
+
+        /// <summary>Shots only: when above 0, every frame advances the HUD's animation clock by exactly this many seconds.</summary>
+        public static float ShotStep;
+
         private Image pulse;
         // M6 (docs/CONTRACT_M6.md 2.3): the pattern over the pulse, and 2.2's controls line (gamepad names swap in).
         private Image pulsePattern;
@@ -99,9 +110,31 @@ namespace OutOfSight
         private float seenMoving;
         private float titleTimer;
 
+        // ----- LEVELNUM: the intro card's full-screen dim with the level number as holes in it (CardNumber). -----
+        private CardNumber cardNumber;
+        private int levelNumber;
+
+        /// <summary>
+        /// LEVELNUM: accessibility hook, false by default (the game has no reduced-motion option yet). True, the intro card's
+        /// level number skips its zoom and shows in its final place at once.
+        /// </summary>
+        public static bool ReducedMotion;
+
+        /// <summary>The intro card number's values in use (LEVELNUM round 3: StreamingAssets/card_number.json, read at each card).</summary>
+        public CardNumberSettings CardSettings => cardNumber != null ? cardNumber.Settings : CardNumberSettings.Defaults;
+
+        /// <summary>LEVELNUM: the dim's opacity behind the intro card (outside the number's holes; card_number.json dimOpacity).</summary>
+        public float CardDimAlpha => CardSettings.DimOpacity;
+
+        /// <summary>LEVELNUM: the number's zoom-out length in seconds (card_number.json zoomSeconds).</summary>
+        public float NumberZoomSeconds => CardSettings.ZoomSeconds;
+
+        /// <summary>LEVELNUM: the held card, its dim and the number fade out over this long from the first input (fadeSeconds).</summary>
+        public float HeldCardFadeSeconds => CardSettings.FadeSeconds;
+
         // ----- M2 (docs/CONTRACT_M2.md 7): creak gauge, suspicion bar, suspicion fail panel, win.next. -----
 
-        /// <summary>Creak gauge value shown (0 to 1) and whether it flashes (the creak warning).</summary>
+        /// <summary>Creak gauge value shown (0 to 1) and whether the creak warning is on (the gauge shows its danger animation; the name predates it).</summary>
         public float CreakShown { get; private set; }
         public bool CreakFlashing { get; private set; }
 
@@ -136,6 +169,8 @@ namespace OutOfSight
         private Canvas creakCanvas;
         private Canvas suspicionCanvas;
         private Canvas winNextCanvas;
+        // The win panel's Replay and Menu (a plain win only; the end screen shows the EndGroup's row instead).
+        private Canvas winButtonsCanvas;
         private Gauge creakGauge;
         private Gauge suspicionGauge;
         private Text failTitle;
@@ -144,6 +179,10 @@ namespace OutOfSight
         // ShowFail/ShowWin/Relocalize can swap them for the touch wording while their Canvas stays the same.
         private Text failAction;
         private Text winNext;
+        // Stars (idea 5, docs/next/progress/STARS.md): the row of three stars beside the time on the win panel (and beside the
+        // end screen's own time), and the "New stars!" line under it. RecordLine shows them after it recorded the win.
+        private StarRow winStars;
+        private Text winStarsNew;
 
         // ----- M3 (docs/CONTRACT_M3.md 6): menus, end screen, markers below the HUD band. -----
 
@@ -190,7 +229,10 @@ namespace OutOfSight
         /// <summary>"Maj : au ralenti" shows (every body while the Bodies rule is on).</summary>
         public bool CarefulHintVisible => carefulCanvas != null && carefulCanvas.enabled;
 
-        /// <summary>"E : éteindre / allumer" shows (the floor lamp body while the Lamp rule is on).</summary>
+        /// <summary>
+        /// "E : éteindre / allumer" shows (the floor lamp body while the Lamp rule is on). DOORAUTO: its text follows the
+        /// device (hud.lamp, hud.lampPad, hud.lampTouch), label LampHintLabel.
+        /// </summary>
         public bool LampHintVisible => lampCanvas != null && lampCanvas.enabled;
 
         /// <summary>"Quelqu'un est assis sur toi." shows (the player furniture is pinned by a sitter).</summary>
@@ -204,7 +246,7 @@ namespace OutOfSight
 
         // ----- M5 (docs/CONTRACT_M5_v3.md 4, 15.2 and 15.5, CONTRACT_M5.md 3): the door hint and the people. -----
 
-        /// <summary>"E : ouvrir la porte" shows (a closed leaf is in reach).</summary>
+        /// <summary>"Pousse vers la porte pour l'ouvrir" shows (a closed leaf is in reach; DOORAUTO: a push, no key).</summary>
         public bool DoorHintVisible => doorCanvas != null && doorCanvas.enabled;
 
         /// <summary>The people block of the intro card shows (the level has people with a name).</summary>
@@ -235,6 +277,15 @@ namespace OutOfSight
         public float CreakThreshold => creakGauge != null ? creakGauge.Threshold : 1f;
         public float SuspicionThreshold => suspicionGauge != null ? suspicionGauge.Threshold : 1f;
 
+        /// <summary>Danger animation (tests): each gauge's fill colour, heat (0 to 1) and live sparks now.</summary>
+        public Color CreakFillColour => creakGauge != null ? creakGauge.Fill.color : Color.clear;
+        public float CreakHeat => creakGauge != null && creakGauge.Fx != null ? creakGauge.Fx.Heat : 0f;
+        public float SuspicionHeat => suspicionGauge != null && suspicionGauge.Fx != null ? suspicionGauge.Fx.Heat : 0f;
+        public int CreakSparks => creakGauge != null && creakGauge.Fx != null ? creakGauge.Fx.LiveSparks : 0;
+
+        /// <summary>Eye redesign (tests): the blink's half open frame shows now (for an instant after the eye opens or closes).</summary>
+        public bool EyeBlinkShowing => eyeBlink != null && eyeBlink.color.a > 0.5f;
+
         /// <summary>HUD gauge redesign: the suspicion gauge's screen rect in pixels, y up (empty when hidden; tests).</summary>
         public Rect SuspicionScreenRect => SuspicionGaugeVisible ? WorldRect(suspicionRect) : Rect.zero;
 
@@ -252,6 +303,20 @@ namespace OutOfSight
 
         /// <summary>The screen scale of the HUD canvas (screen pixels per reference pixel; tests).</summary>
         public float ScaleFactor => rootCanvas != null ? rootCanvas.scaleFactor : 1f;
+
+        // ----- Onboarding tips (idea 3, docs/next/progress/TIPS.md): the first-time tips and the anchors they point at. -----
+
+        /// <summary>The first-time tips of levels 1 to 3 (built by Init, a nested Canvas; null before Init).</summary>
+        public Tips Tips { get; private set; }
+
+        /// <summary>The eye's backdrop, what the eye and freeze tips point at.</summary>
+        public RectTransform EyeAnchor => eyeBackdrop != null ? eyeBackdrop.rectTransform : null;
+
+        /// <summary>The creak gauge's root, what the creak tip points at.</summary>
+        public RectTransform CreakAnchor => creakRect;
+
+        /// <summary>The suspicion gauge's root, what the suspicion tip points at.</summary>
+        public RectTransform SuspicionAnchor => suspicionRect;
 
         private Canvas balanceCanvas;
         private RectTransform balanceRect;
@@ -278,6 +343,30 @@ namespace OutOfSight
         private bool lampOn;
         private bool satOn;
         private bool dogHoldOn;
+
+        // ----- Levels v2 (docs/levels_v2/LEVELS_V2.md 6, task C3b): held card, hint tokens, locked and lit hints, exit marker. -----
+        private Text hintText;
+        private Text startLine;
+        private Image startPlate;
+        // The intro card is held fully visible while the level waits for its first input (GameState.Started false).
+        private bool cardHeld;
+        private Canvas lockedCanvas;
+        private Canvas litCanvas;
+        private bool lockedOn;
+        private bool litOn;
+        private Canvas markerCanvas;
+        private RectTransform markerRect;
+        private Image markerPlate;
+        private Image markerDoor;
+        private Image markerArrow;
+        private Image markerEye;
+        private CanvasGroup markerGroup;
+        private bool markerWanted;
+        private bool markerClamped;
+        private bool markerEyeOn;
+        private Vector2 markerScreen;
+        // The card was held at least once since ShowLevel: its fade then starts at the release instead of after 4 s.
+        private bool cardWasHeld;
 
         private Canvas endCanvas;
         private Text winTitle;
@@ -306,20 +395,28 @@ namespace OutOfSight
         private const float EndActionY = -150f;
         // M8 touch redesign: the fail, win and end panels' own button row, below every hint line and (on the win and
         // end panels) below win.next or the record line. At least 140 px tall at 1080p (a touch target) even when a
-        // narrower than 16:9 window scales the canvas down (0.87 at 16:10, hence 170); the spacing is the
-        // centre-to-centre distance of two adjacent buttons.
+        // narrower than 16:9 window scales the canvas down (0.87 at 16:10, hence 170).
         private const float PanelButtonY = -300f;
         private const float PanelButtonWidth = 450f;
         private const float PanelButtonHeight = 170f;
-        private const float PanelButtonSpacing = 520f;
         // End panel emphasis (2026-11-19): the panel's primary action (Retry on the fail panel, Next level on the win
-        // panel) is wider, taller and bold, first in its row, in the selection red even at rest (PrimaryRed). The
+        // panel, Menu principal on the end screen) is wider, taller and bold, in the selection red (PrimaryRed). The
         // secondary buttons got 30 px narrower for it, so the win row keeps its 1520 px (it fits a 4:3 tablet, whose
         // canvas is 1663 units wide at this scaler, with a margin). PanelButtonGap is the gap between two plates.
         private const float PanelPrimaryWidth = 540f;
         private const float PanelPrimaryHeight = 186f;
         private const int PanelPrimaryFontSize = 50;
         private const float PanelButtonGap = 40f;
+        // Stars: the row's centre right of the time line (the body at y -10 on the win panel, EndTime at y -82 on the end
+        // screen; the time's text spans about +-200 px at its widest), 56 px stars 8 px apart (184 px wide, so the row ends
+        // at x 422, well inside a 4:3 tablet's 1663 unit canvas), and the "New stars!" line just under it. Above the button
+        // row (its top is at -207) and clear of the record line (y -430).
+        private const float WinStarsX = 330f;
+        private const float WinStarsY = -10f;
+        private const float EndStarsY = -82f;
+        private const float WinStarSize = 56f;
+        private const float WinStarGap = 8f;
+        private const float WinStarsNewOffset = -40f;
         /// <summary>The menu button's selection red (<see cref="MenuButton"/>): the fail panel's selected Retry and the win panel's Next level at rest.</summary>
         public static readonly Color PrimaryRed = new Color(0.78f, 0.16f, 0.15f, 0.97f);
         private static readonly Color PrimaryRedHover = new Color(0.9f, 0.26f, 0.23f, 1f);
@@ -340,6 +437,27 @@ namespace OutOfSight
         private const float CardTitleY = 280f;
         private const float CardNameY = 200f;
         private const float CardHintY = 100f;
+        // Levels v2 (C3b): the hint's box, its top where the M1 one-line hint's top was (100 + 30), at most three lines tall.
+        private const float CardHintTop = CardHintY + 30f;
+        private const float CardHintWidth = 1600f;
+        private const float CardHintHeight = 112f;
+        private const int CardHintSize = 38;
+        private const int CardHintMinSize = 26;
+        // The start line (hud.start) on the sat-on row: nothing else uses that row while the level is held.
+        // STARTFIX: wider for "Appuie sur Espace pour commencer (ou bouge)" (43 characters at size 40).
+        private const float StartLineWidth = 1120f;
+        private static readonly Color StartInk = new Color(1f, 0.93f, 0.66f, 1f);
+        // The exit marker: its size, how far from the screen edge it clamps (reference pixels; the bottom margin clears the
+        // eye band and the sat-on row), the fade (fully drawn from MarkerFadeFar metres, gone at MarkerFadeNear) and colours.
+        private const float MarkerSize = 84f;
+        private const float MarkerEdge = 64f;
+        private const float MarkerBottomEdge = 320f;
+        public const float MarkerFadeNear = 1f;
+        public const float MarkerFadeFar = 3f;
+        private const float MarkerHeight = 0.4f;
+        /// <summary>Levels v2 (C3b): the exit marker's amber (never green beside the red player, AX3).</summary>
+        public static readonly Color MarkerAmber = new Color(1f, 0.74f, 0.28f, 1f);
+        private static readonly Color MarkerPlateColour = new Color(0.12f, 0.09f, 0.06f, 0.82f);
         // The top of the game title row (CardTitleY plus half its 60 px height): nothing of the people block goes below it.
         private const float CardTextTop = 310f;
         // M5: the people block of the intro card: the names line, then one line per person. Wave 5A.1 (critique m13): it
@@ -367,8 +485,6 @@ namespace OutOfSight
         private static readonly Color SuspicionLow = new Color(1f, 0.83f, 0.32f, 1f);
         private static readonly Color SuspicionMid = new Color(1f, 0.55f, 0.2f, 1f);
         private static readonly Color SuspicionHigh = new Color(0.95f, 0.2f, 0.15f, 1f);
-        // The creak warning's flash alternates the hot red with this pale cream (the old white, warmer).
-        private static readonly Color GaugeFlashPale = new Color(1f, 0.95f, 0.84f, 1f);
         // The gauge labels' cream (the menus' warm ink) and the threshold marker's.
         private static readonly Color GaugeInk = new Color(1f, 0.94f, 0.82f, 1f);
         private static readonly Color GaugeMarker = new Color(1f, 0.95f, 0.86f, 0.95f);
@@ -428,11 +544,18 @@ namespace OutOfSight
             // in the calm or suspicious states, which show no pulse at all), so the warning is never colour alone.
             pulsePattern = NewImage(transform, "SeenPulsePattern", ProceduralArt.PulsePattern, new Color(1f, 1f, 1f, 0f));
             Stretch(pulsePattern.rectTransform);
+            // LEVELNUM: the intro card's dim with the level number's holes, under the exit marker and every other HUD element.
+            cardNumber = new CardNumber(transform);
+            // Levels v2 (C3b): the exit marker over the world (walls included), under every other HUD element.
+            BuildExitMarker();
 
             eyeBackdrop = NewImage(transform, "EyeBackdrop", ProceduralArt.Disc, BackdropClosed);
             Place(eyeBackdrop.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, EyeY), new Vector2(210f, 128f));
             eye = NewImage(eyeBackdrop.transform, "Eye", ProceduralArt.EyeClosed, Color.white);
             Place(eye.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(170f, 99f));
+            eyeBlink = NewImage(eyeBackdrop.transform, "EyeBlink", ProceduralArt.EyeHalf, new Color(1f, 1f, 1f, 0f));
+            Place(eyeBlink.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(170f, 99f));
+            eyeBlink.canvasRenderer.cullTransparentMesh = true;
 
             controls = NewText(transform, "Controls", Strings.HudControls, 30, TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.92f));
             Place(controls.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, ControlsY), new Vector2(1600f, 50f));
@@ -452,12 +575,23 @@ namespace OutOfSight
             Place(levelName.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardNameY), new Vector2(1600f, 110f));
             Text hint = NewText(cardGo.transform, "Hint", Strings.Level1Hint, 38, TextAnchor.MiddleCenter, new Color(1f, 1f, 1f, 0.95f));
             Place(hint.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, CardHintY), new Vector2(1600f, 60f));
+            // Levels v2 (C3b): the v2 hints run to two or three sentences. The hint keeps its top edge and wraps downward in
+            // a box of at most CardHintHeight, its font shrunk until it fits (SetHintText).
+            hint.rectTransform.pivot = new Vector2(0.5f, 1f);
+            hint.rectTransform.anchoredPosition = new Vector2(0f, CardHintTop);
+            hint.rectTransform.sizeDelta = new Vector2(CardHintWidth, CardHintHeight);
+            hint.alignment = TextAnchor.UpperCenter;
+            hint.horizontalOverflow = HorizontalWrapMode.Wrap;
+            hintText = hint;
             BuildPeople(cardGo.transform);
+            BuildStartLine(cardGo.transform);
 
             BuildCreakGauge();
             BuildSuspicionGauge();
             BuildBalanceGauge();
             BuildBodyHints();
+            // Onboarding tips: over the band and the row hints, under the panels (built after them, so it draws over them).
+            Tips = Tips.Build(this);
 
             failCanvas = NewPanel("FailPanel", Strings.FailTitle, Strings.FailBody, Strings.FailAction, new Color(0.25f, 0.02f, 0.03f, 0.62f),
                 new Color(1f, 0.42f, 0.38f, 1f), out failBody);
@@ -479,6 +613,13 @@ namespace OutOfSight
             winCanvas.gameObject.AddComponent<GraphicRaycaster>();
             Labels.TryGetValue("WinPanelTitle", out winTitle);
             Labels.TryGetValue("WinPanelAction", out winAction);
+            // Stars: beside the time, hidden until RecordLine shows them (ShowWinStars) for the win just recorded.
+            winStars = new StarRow(winCanvas.transform, "WinStars", WinStarSize, WinStarGap);
+            winStars.Place(new Vector2(0.5f, 0.5f), new Vector2(WinStarsX, WinStarsY));
+            winStars.SetVisible(false);
+            winStarsNew = NewText(winCanvas.transform, "WinStarsNew", Strings.StarsNewBest, 26, TextAnchor.MiddleCenter, Stars.Gold);
+            Place(winStarsNew.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(WinStarsX, WinStarsY + WinStarsNewOffset), new Vector2(400f, 34f));
+            winStarsNew.enabled = false;
             // win.next and the Next level button share a Canvas inside the win panel: shown only with a next level.
             var nextGo = new GameObject("WinNextGroup", typeof(RectTransform));
             nextGo.transform.SetParent(winCanvas.transform, false);
@@ -488,10 +629,18 @@ namespace OutOfSight
             winNext = NewText(nextGo.transform, "WinNext", Strings.WinNext, 38, TextAnchor.MiddleCenter, new Color(1f, 0.93f, 0.6f, 1f));
             Place(winNext.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, -170f), new Vector2(1600f, 60f));
             WinNextLevelButton = MenuButton(nextGo.transform, "WinNextLevel", Strings.WinNextButton, DisplayFont, Labels);
+            // End screen fix (2026-11-20): Replay and Menu live in their own Canvas, shown only on a plain win. Children of
+            // the win panel itself, they stayed up under the end screen (the win panel with its EndGroup) and drew a second
+            // row over the end screen's own Replay and Menu principal.
+            var rowGo = new GameObject("WinButtonsGroup", typeof(RectTransform));
+            rowGo.transform.SetParent(winCanvas.transform, false);
+            Stretch((RectTransform)rowGo.transform);
+            winButtonsCanvas = rowGo.AddComponent<Canvas>();
+            rowGo.AddComponent<GraphicRaycaster>();
             // Replay and Menu are not EventSystem-selected (WinButtonsVisible doc): Enter and gamepad A keep loading
             // the next level exactly as GameState already reads them, so no button here must also catch that press.
-            WinReplayButton = MenuButton(winCanvas.transform, "WinReplay", Strings.WinReplay, DisplayFont, Labels);
-            WinMenuButton = MenuButton(winCanvas.transform, "WinMenu", Strings.PauseMenu, DisplayFont, Labels);
+            WinReplayButton = MenuButton(rowGo.transform, "WinReplay", Strings.WinReplay, DisplayFont, Labels);
+            WinMenuButton = MenuButton(rowGo.transform, "WinMenu", Strings.PauseMenu, DisplayFont, Labels);
             // End panel emphasis: Next level is the primary action, first and larger, and red at rest, since nothing
             // selects it (the same red as the fail panel's selected Retry).
             MakePrimary(WinNextLevelButton, true);
@@ -545,16 +694,33 @@ namespace OutOfSight
         /// </summary>
         private static void PlaceRow(Button primary, params Button[] secondary)
         {
-            float total = PanelPrimaryWidth + secondary.Length * (PanelButtonWidth + PanelButtonGap);
-            float x = -total * 0.5f;
-            Place((RectTransform)primary.transform, new Vector2(0.5f, 0.5f), new Vector2(x + PanelPrimaryWidth * 0.5f, PanelButtonY),
-                new Vector2(PanelPrimaryWidth, PanelPrimaryHeight));
-            x += PanelPrimaryWidth + PanelButtonGap;
-            foreach (Button button in secondary)
+            var row = new Button[secondary.Length + 1];
+            row[0] = primary;
+            secondary.CopyTo(row, 1);
+            PlaceButtons(primary, row);
+        }
+
+        /// <summary>
+        /// One centred row of panel buttons, <paramref name="row"/> left to right, <see cref="PanelButtonGap"/> apart:
+        /// <paramref name="primary"/> (anywhere in the row, or null for none) at the primary size, the others at the
+        /// secondary size. The same sizes, gap and height on every end panel.
+        /// </summary>
+        private static void PlaceButtons(Button primary, params Button[] row)
+        {
+            float total = -PanelButtonGap;
+            foreach (Button button in row)
             {
-                Place((RectTransform)button.transform, new Vector2(0.5f, 0.5f), new Vector2(x + PanelButtonWidth * 0.5f, PanelButtonY),
-                    new Vector2(PanelButtonWidth, PanelButtonHeight));
-                x += PanelButtonWidth + PanelButtonGap;
+                total += (button == primary ? PanelPrimaryWidth : PanelButtonWidth) + PanelButtonGap;
+            }
+            float x = -total * 0.5f;
+            foreach (Button button in row)
+            {
+                bool isPrimary = button == primary;
+                float width = isPrimary ? PanelPrimaryWidth : PanelButtonWidth;
+                float height = isPrimary ? PanelPrimaryHeight : PanelButtonHeight;
+                Place((RectTransform)button.transform, new Vector2(0.5f, 0.5f), new Vector2(x + width * 0.5f, PanelButtonY),
+                    new Vector2(width, height));
+                x += width + PanelButtonGap;
             }
         }
 
@@ -630,7 +796,61 @@ namespace OutOfSight
             // M4.1 (CONTRACT_M4 10.3): the same row; a stool lying on its side is never sat on.
             tippedCanvas = BuildLine("Tipped", ProceduralArt.Tipped, Strings.HudTipped, 1180f);
             // M5 (CONTRACT_M5_v3 15.2): the same row again; a pinned or lying furniture opens no door, so they never meet.
-            doorCanvas = BuildLine("DoorHint", ProceduralArt.Door, Strings.HudDoor, 640f);
+            doorCanvas = BuildLine("DoorHint", ProceduralArt.Door, Strings.HudDoor, 780f); // DOORAUTO: wide enough for the push sentence (no key any more)
+            // Levels v2 (C3b): the same row; a leaf only the household opens ("Locked", in place of the door hint), and a
+            // switched-off floor lamp standing in a lit zone (the dark gives it no cover there).
+            lockedCanvas = BuildLine("DoorLockedHint", ProceduralArt.Door, Strings.HudDoorLocked, 520f);
+            litCanvas = BuildLine("LitHint", ProceduralArt.Bulb, Strings.HudLit, 1120f);
+        }
+
+        /// <summary>
+        /// Levels v2 (C3b): the start line of the held intro card (hud.start, label StartLine), on a plate in the sat-on row,
+        /// inside the card so it fades with it. Shown only while the level waits for its first input.
+        /// </summary>
+        private void BuildStartLine(Transform card)
+        {
+            startPlate = NewImage(card, "StartPlate", ProceduralArt.Rounded, SatOnPlate);
+            startPlate.type = Image.Type.Sliced;
+            Place(startPlate.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, SatOnY), new Vector2(StartLineWidth, 76f));
+            startLine = NewText(startPlate.transform, "StartLine", Strings.HudStart, 40, TextAnchor.MiddleCenter, StartInk);
+            Stretch(startLine.rectTransform);
+            startPlate.enabled = false;
+            startLine.enabled = false;
+        }
+
+        /// <summary>
+        /// Levels v2 (C3b, code_features "Exit and goal markers over walls"): a screen space marker for the exit zone, in its
+        /// own Canvas: a dark disc with the amber door icon, an arrow at its rim (shown while the marker is clamped to the screen
+        /// edge, pointing at the exit) and the open-eye glyph (shown while a human sees the furniture standing on the exit).
+        /// </summary>
+        private void BuildExitMarker()
+        {
+            var go = new GameObject("ExitMarker", typeof(RectTransform));
+            go.transform.SetParent(transform, false);
+            markerRect = (RectTransform)go.transform;
+            markerRect.anchorMin = markerRect.anchorMax = Vector2.zero;
+            markerRect.pivot = new Vector2(0.5f, 0.5f);
+            markerRect.sizeDelta = new Vector2(MarkerSize, MarkerSize);
+            markerCanvas = go.AddComponent<Canvas>();
+            markerGroup = go.AddComponent<CanvasGroup>();
+            markerGroup.interactable = false;
+            markerGroup.blocksRaycasts = false;
+            markerPlate = NewImage(go.transform, "ExitMarkerPlate", ProceduralArt.Disc, MarkerPlateColour);
+            Stretch(markerPlate.rectTransform);
+            markerDoor = NewImage(go.transform, "ExitMarkerDoor", ProceduralArt.Door, MarkerAmber);
+            Place(markerDoor.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(MarkerSize * 0.72f, MarkerSize * 0.72f));
+            markerEye = NewImage(go.transform, "ExitMarkerEye", ProceduralArt.EyeOpen, Color.white);
+            Place(markerEye.rectTransform, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(MarkerSize * 0.86f, MarkerSize * 0.5f));
+            // The arrow turns around the marker's centre: a pivot child carries the rotation, the chevron sits at its rim.
+            var pivotGo = new GameObject("ExitMarkerArrowPivot", typeof(RectTransform));
+            pivotGo.transform.SetParent(go.transform, false);
+            var pivot = (RectTransform)pivotGo.transform;
+            Place(pivot, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero);
+            markerArrow = NewImage(pivot, "ExitMarkerArrow", ProceduralArt.Chevron, MarkerAmber);
+            Place(markerArrow.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0f, MarkerSize * 0.5f + 16f), new Vector2(38f, 38f));
+            markerEye.enabled = false;
+            markerArrow.enabled = false;
+            markerCanvas.enabled = false;
         }
 
         /// <summary>
@@ -831,11 +1051,12 @@ namespace OutOfSight
             // end screen's default-selected button (Enter submits it, docs/CONTRACT_M3.md 6, S2); Rejouer is reachable
             // beside it with the keyboard or a gamepad's D-pad, and both are now at least 140 px tall at 1080p.
             EndReplayButton = MenuButton(go.transform, "EndReplay", Strings.WinReplay, DisplayFont, Labels);
-            Place((RectTransform)EndReplayButton.transform, new Vector2(0.5f, 0.5f), new Vector2(-PanelButtonSpacing * 0.5f, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
             EndButton = MenuButton(go.transform, "EndMenuButton", Strings.PauseMenu, DisplayFont, Labels);
-            Place((RectTransform)EndButton.transform, new Vector2(0.5f, 0.5f), new Vector2(PanelButtonSpacing * 0.5f, PanelButtonY),
-                new Vector2(PanelButtonWidth, PanelButtonHeight));
+            // End screen fix (2026-11-20): the end screen has no next level, so Menu principal is its primary action, at the
+            // primary size and bold like Next level and Retry; it is red through its default selection (as Retry is), so the
+            // D-pad never shows two red buttons. The row keeps Menu on the right end, where it is on every other panel.
+            MakePrimary(EndButton, false);
+            PlaceButtons(EndButton, EndReplayButton, EndButton);
             ChainLR(EndReplayButton, EndButton);
             endCanvas.enabled = false;
         }
@@ -918,6 +1139,8 @@ namespace OutOfSight
             public float TickStep = -1f;
             // 1 on a sudden rise, then down to 0: the shake.
             public float Bump;
+            // Danger animation (2026-11-20): the bloom, sheen, head flare and sparks past the threshold.
+            public GaugeFx Fx;
 
             /// <summary>The fill's colour at <paramref name="t"/>: calm at 0, warm at the threshold, hot at 1.</summary>
             public Color LevelColour(float t)
@@ -1026,6 +1249,10 @@ namespace OutOfSight
             g.Label = NewText(g.Body, labelName, label, GaugeLabelSize, TextAnchor.LowerLeft, GaugeInk);
             g.Label.font = DisplayFont;
             Place(g.Label.rectTransform, Vector2.zero, new Vector2(GaugeLabelX, labelY), new Vector2(width - GaugeLabelX, GaugeHeight - labelY));
+
+            // Danger animation (2026-11-20): built last, so its sparks draw over the whole gauge.
+            g.Fx = new GaugeFx(g.Body, plate, track, g.Fill, new Vector2(CapsuleX, CapsuleY), new Vector2(capsuleWidth, CapsuleHeight),
+                new Vector2(TrackLeft, CapsuleY + TrackInset), new Vector2(trackWidth, trackHeight), (uint)name.Length * 2654435761u);
             return g;
         }
 
@@ -1075,6 +1302,11 @@ namespace OutOfSight
             {
                 g.Bump = 1f;
             }
+            if (burst && g.Fx != null)
+            {
+                // The creak itself: the full gauge bursts where its fill stood as it empties.
+                g.Fx.Explode(g.Fill.fillAmount);
+            }
             g.Target = value;
         }
 
@@ -1098,10 +1330,11 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// One frame of a gauge (no allocation): the drawn fill eases toward the value, its colour follows its level (or
-        /// flashes hot and pale with <paramref name="flash"/>, the creak warning), and near the limit (past the threshold,
-        /// or <paramref name="red"/> on a two tone gauge) the glow fades in, the badge's ring warms and the capsule
-        /// pulses; a sudden rise shakes it.
+        /// One frame of a gauge (no allocation): the drawn fill eases toward the value and its colour follows its level
+        /// (never flashing). Near the limit the glow fades in and the badge's ring warms; past the threshold (or with
+        /// <paramref name="flash"/>, the creak warning, or <paramref name="red"/> on a two tone gauge) the danger animation
+        /// (GaugeFx: bloom, laser sheen, hot spot, sparks on crossing) takes over and the glow breathes with it; a sudden
+        /// rise shakes the gauge.
         /// </summary>
         private static void AnimateGauge(Gauge g, float dt, float time, bool flash, bool red)
         {
@@ -1114,25 +1347,22 @@ namespace OutOfSight
             g.Fill.fillAmount = drawn;
             Color level = g.TwoTone ? (red ? g.Hot : g.Calm) : g.LevelColour(drawn);
             float near = g.TwoTone ? (red ? 1f : 0f) : Mathf.InverseLerp(g.Threshold - 0.1f, 1f, drawn);
-            float pulse = 0.5f + 0.5f * Mathf.Sin(time * 8f);
-            bool on = flash && Mathf.Repeat(time * 6f, 1f) < 0.5f;
-            if (flash)
-            {
-                level = on ? g.Hot : GaugeFlashPale;
-                near = 1f;
-                pulse = on ? 1f : 0.3f;
-            }
+            bool danger = g.TwoTone ? red : flash || drawn >= g.Threshold - 1e-4f;
+            float heat = g.Fx.Animate(dt, time, drawn, danger, level);
+            float breath = g.Fx.Breath;
+            Color hotLevel = Color.Lerp(level, g.Hot, 0.5f * heat);
             g.Fill.color = level;
-            Color glow = flash ? g.Hot : level;
-            glow.a = near * (0.3f + 0.5f * pulse);
+            Color glow = hotLevel;
+            glow.a = 0.3f * near * (1f - heat) + heat * (0.35f + 0.35f * breath);
             g.Glow.color = glow;
-            g.Badge.color = Color.Lerp(Color.white, flash ? g.Hot : level, near * 0.85f);
+            float warmth = Mathf.Max(near, heat);
+            g.Badge.color = Color.Lerp(Color.white, hotLevel, warmth * 0.85f);
             if (g.TintIcon)
             {
-                g.Icon.color = Color.Lerp(GaugeInk, flash ? g.Hot : level, 0.25f + 0.6f * near);
+                g.Icon.color = Color.Lerp(GaugeInk, hotLevel, 0.25f + 0.6f * warmth);
             }
-            float scale = 1f + 0.035f * near * pulse;
-            g.Body.localScale = new Vector3(scale, scale, 1f);
+            float grow = 1f + 0.012f * heat * breath;
+            g.Body.localScale = new Vector3(grow, grow, 1f);
             g.Bump = Mathf.MoveTowards(g.Bump, 0f, dt * 2.2f);
             g.Body.anchoredPosition = new Vector2(g.Bump * g.Bump * 6f * Mathf.Sin(time * 63f), 0f);
         }
@@ -1174,6 +1404,10 @@ namespace OutOfSight
             {
                 eye.enabled = band;
             }
+            if (eyeBlink != null)
+            {
+                eyeBlink.enabled = band;
+            }
             if (controls != null)
             {
                 controls.enabled = band;
@@ -1182,7 +1416,10 @@ namespace OutOfSight
             SetEnabled(suspicionCanvas, Visible && suspicionOn && band);
             SetEnabled(failCanvas, Visible && failOn);
             SetEnabled(winCanvas, Visible && winOn);
-            SetEnabled(winNextCanvas, Visible && winOn && winNextOn);
+            // One row of buttons at a time on the win panel: Next level/Replay/Menu on a plain win, the EndGroup's own
+            // Replay/Menu principal on the end screen (never both: they share the row's place).
+            SetEnabled(winNextCanvas, Visible && winOn && winNextOn && !endOn);
+            SetEnabled(winButtonsCanvas, Visible && winOn && !endOn);
             SetEnabled(endCanvas, Visible && winOn && endOn);
             SetEnabled(carefulCanvas, Visible && carefulOn && band);
             SetEnabled(lampCanvas, Visible && lampOn && band);
@@ -1190,6 +1427,12 @@ namespace OutOfSight
             SetEnabled(dogHoldCanvas, Visible && dogHoldOn && !satOn && !failOn && !winOn);
             SetEnabled(tippedCanvas, Visible && tippedOn && !satOn && !dogHoldOn && !failOn && !winOn);
             SetEnabled(doorCanvas, Visible && doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
+            // Levels v2 (C3b): the locked hint never with the door hint (GameState wants it only with no openable leaf in
+            // reach); the lit hint last on the row, under every other line of it (the wardrobe prompt included).
+            SetEnabled(lockedCanvas, Visible && lockedOn && !doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
+            SetEnabled(litCanvas, Visible && litOn && !lockedOn && !doorOn && !satOn && !dogHoldOn && !tippedOn && !HideHintVisible
+                && !failOn && !winOn);
+            SetEnabled(markerCanvas, Visible && markerWanted && !failOn && !winOn);
             SetEnabled(peopleCanvas, Visible && peopleOn);
             SetEnabled(balanceCanvas, Visible && balanceOn && band);
         }
@@ -1242,6 +1485,15 @@ namespace OutOfSight
         /// </summary>
         public void SetEye(HudEye state, float seenMovingTime)
         {
+            bool wasOpen = EyeOpen;
+            if (state != Eye)
+            {
+                // Eye redesign (2026-11-20): a change between closed and open blinks through the half open frame; a change
+                // between two open eyes only pops. The sprite itself (EyeSprite) is the new state's at once.
+                eyeChangeAge = 0f;
+                eyeChangeBlinks = wasOpen != (state != HudEye.Closed);
+                eyeChangeOpens = state != HudEye.Closed;
+            }
             Eye = state;
             EyeOpen = state != HudEye.Closed;
             seenMoving = seenMovingTime;
@@ -1274,12 +1526,93 @@ namespace OutOfSight
         /// <summary>The sprite the eye shows now (tests).</summary>
         public Sprite EyeSprite => eye != null ? eye.sprite : null;
 
+        // Eye redesign (2026-11-20): the blink's half open frame shows for EyeBlinkHold seconds, then the new eye pops in
+        // from EyePop times its size over EyePopTime (an opening eye; a closing one only settles from a slight squash).
+        private const float EyeBlinkHold = 0.06f;
+        private const float EyePopTime = 0.16f;
+        private const float EyePop = 1.14f;
+
+        /// <summary>One frame of the eye's change (no allocation; nothing is written once it has settled).</summary>
+        private void AnimateEye(float dt)
+        {
+            if (eye == null || eyeChangeAge > EyeBlinkHold + EyePopTime + 1f)
+            {
+                return;
+            }
+            eyeChangeAge += dt;
+            float age = eyeChangeAge;
+            bool hold = eyeChangeBlinks && age < EyeBlinkHold;
+            float popAge = eyeChangeBlinks ? age - EyeBlinkHold : age;
+            float t = Mathf.Clamp01(popAge / EyePopTime);
+            // Ease out: fast at first, settling on 1.
+            float e = 1f - (1f - t) * (1f - t) * (1f - t);
+            float from = eyeChangeOpens ? EyePop : 0.9f;
+            float scale = hold ? 1f : Mathf.Lerp(from, 1f, e);
+            eye.rectTransform.localScale = new Vector3(scale, eyeChangeOpens ? scale : Mathf.Lerp(0.8f, 1f, e), 1f);
+            Color c = eye.color;
+            c.a = hold ? 0f : 1f;
+            eye.color = c;
+            Color b = eyeBlink.color;
+            b.a = hold ? 1f : 0f;
+            eyeBlink.color = b;
+            if (age > EyeBlinkHold + EyePopTime)
+            {
+                // Settled: the next frames write nothing.
+                eye.rectTransform.localScale = Vector3.one;
+                eyeChangeAge = 99f;
+            }
+        }
+
         // ----- M5 (docs/CONTRACT_M5.md 16.12) -----
         /// <summary>The win panel's transform, where the record line attaches.</summary>
         public RectTransform WinPanel => winCanvas != null ? winCanvas.transform as RectTransform : null;
 
+        // ----- Stars (idea 5, docs/next/progress/STARS.md) -----
+        /// <summary>The win panel's star row (tests read its count, images and reveal state); null before Build.</summary>
+        public StarRow WinStars => winStars;
+
+        /// <summary>The star row shows on screen: a visible win panel with stars set for the win just recorded.</summary>
+        public bool WinStarsVisible => WinVisible && winStars != null && winStars.Images.Count > 0 && winStars.Images[0].enabled;
+
+        /// <summary>"New stars!" shows under the row (this win raised the saved count).</summary>
+        public bool WinStarsNewVisible => WinStarsVisible && winStarsNew != null && winStarsNew.enabled;
+
         /// <summary>
-        /// M5 (CONTRACT_M5_v3 15.2): the door hint "E : ouvrir la porte", called by GameState on every fixed step: shown while a
+        /// Shows <paramref name="count"/> stars beside the time of the win panel (or beside the end screen's time when
+        /// <paramref name="endScreen"/>), popping in one after the other, and "New stars!" under them when
+        /// <paramref name="newBest"/>. Called by RecordLine once the win is recorded; ShowWin and HidePanels hide the row.
+        /// </summary>
+        public void ShowWinStars(int count, bool newBest, bool endScreen)
+        {
+            if (winStars == null)
+            {
+                return;
+            }
+            float y = endScreen ? EndStarsY : WinStarsY;
+            winStars.Place(new Vector2(0.5f, 0.5f), new Vector2(WinStarsX, y));
+            winStars.Set(count, true);
+            if (winStarsNew != null)
+            {
+                winStarsNew.text = Strings.StarsNewBest;
+                winStarsNew.rectTransform.anchoredPosition = new Vector2(WinStarsX, y + WinStarsNewOffset);
+                winStarsNew.enabled = newBest;
+            }
+        }
+
+        private void HideWinStars()
+        {
+            if (winStars != null)
+            {
+                winStars.SetVisible(false);
+            }
+            if (winStarsNew != null)
+            {
+                winStarsNew.enabled = false;
+            }
+        }
+
+        /// <summary>
+        /// M5 (CONTRACT_M5_v3 15.2): the door hint (hud.door, DOORAUTO: push toward the door), called by GameState on every fixed step: shown while a
         /// closed leaf is in reach of a furniture that could open it. It shares the sat-on row (never both at once).
         /// </summary>
         public void ShowDoorHint(bool visible)
@@ -1294,7 +1627,7 @@ namespace OutOfSight
         // ----- M6 gameplay (docs/CONTRACT_M6.md 2.5): the wardrobe prompt, on the sat-on row (built on first use). -----
         private Canvas hideCanvas;
 
-        /// <summary>M6: the wardrobe prompt shows ("E : se cacher" or "E : sortir", label HideHintLine).</summary>
+        /// <summary>M6: the wardrobe prompt shows (hud.hide or hud.leave, DOORAUTO: a push; label HideHintLine).</summary>
         public bool HideHintVisible => hideCanvas != null && hideCanvas.enabled;
 
         /// <summary>
@@ -1305,7 +1638,7 @@ namespace OutOfSight
         {
             if (visible && hideCanvas == null)
             {
-                hideCanvas = BuildLine("HideHint", ProceduralArt.Door, sentence, 520f);
+                hideCanvas = BuildLine("HideHint", ProceduralArt.Door, sentence, 780f); // DOORAUTO: wide enough for the push sentence
             }
             if (hideCanvas == null)
             {
@@ -1315,7 +1648,10 @@ namespace OutOfSight
             {
                 line.text = sentence;
             }
-            SetEnabled(hideCanvas, Visible && visible && !satOn && !tippedOn && !doorOn && !failOn && !winOn);
+            SetEnabled(hideCanvas, Visible && visible && !satOn && !tippedOn && !doorOn && !lockedOn && !failOn && !winOn);
+            // Levels v2 (C3b): the lit hint gives the row up to the wardrobe prompt.
+            SetEnabled(litCanvas, Visible && litOn && !lockedOn && !doorOn && !satOn && !dogHoldOn && !tippedOn && !HideHintVisible
+                && !failOn && !winOn);
         }
 
         /// <summary>
@@ -1383,28 +1719,79 @@ namespace OutOfSight
         /// </summary>
         public static List<string> PeopleLines(IEnumerable<PersonalityDef> people)
         {
-            var names = new List<string>();
+            return PeopleLines(people, null);
+        }
+
+        /// <summary>
+        /// Levels v2 (C3b, code_features "Intro card: inhabitant names"): the people lines with each inhabitant's data name
+        /// (<paramref name="names"/>[i] for the i-th personality, InhabitantDef.Name). The names line lists the data names;
+        /// each person line is hud.person ("{0}, {1}": the name, then the personality label, its article in lower case: "Lea,
+        /// the Suspicious One", "Rex, the dog"), then the trait. A missing or empty name falls back to the M5 line (the label
+        /// alone); a name equal to its label shows once ("Mamie" in French).
+        /// </summary>
+        public static List<string> PeopleLines(IEnumerable<PersonalityDef> people, IList<string> names)
+        {
+            var shown = new List<string>();
             var lines = new List<string>();
             if (people != null)
             {
+                int index = -1;
                 foreach (PersonalityDef p in people)
                 {
+                    index++;
                     if (p == null || string.IsNullOrEmpty(p.NameKey))
                     {
                         continue;
                     }
-                    string name = Strings.Get(p.NameKey);
-                    names.Add(name);
+                    string label = Strings.Get(p.NameKey);
+                    string name = names != null && index < names.Count ? names[index] : null;
+                    shown.Add(string.IsNullOrEmpty(name) ? label : name);
                     string trait = string.IsNullOrEmpty(p.TraitKey) ? null : Strings.Get(p.TraitKey);
-                    lines.Add(PersonLine(name, trait));
+                    lines.Add(PersonLine(PersonTitle(name, label, p.Id == PersonalityDef.Dog), trait));
                 }
             }
-            if (names.Count == 0)
+            if (shown.Count == 0)
             {
                 return lines;
             }
-            lines.Insert(0, string.Format(Strings.IntroHere, string.Join(", ", names)));
+            lines.Insert(0, string.Format(Strings.IntroHere, string.Join(", ", shown)));
             return lines;
+        }
+
+        /// <summary>
+        /// Levels v2 (C3b): the coloured part of a person line, hud.person with the data name and the personality label. The
+        /// label's leading article goes to lower case after the comma ("the Suspicious One", "la méfiante"); the dog's whole
+        /// label does ("the dog", "le chien"). No name: the label alone; a name equal to the label: the name alone.
+        /// </summary>
+        public static string PersonTitle(string name, string label, bool dog)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return label;
+            }
+            if (string.IsNullOrEmpty(label) || string.Equals(name.Trim(), label.Trim(), System.StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+            return string.Format(Strings.HudPerson, name, LabelAfterName(label, dog));
+        }
+
+        private static readonly string[] Articles = { "The ", "Le ", "La ", "Les ", "L'", "L’" };
+
+        private static string LabelAfterName(string label, bool dog)
+        {
+            if (dog)
+            {
+                return label.ToLowerInvariant();
+            }
+            foreach (string article in Articles)
+            {
+                if (label.StartsWith(article, System.StringComparison.Ordinal))
+                {
+                    return char.ToLowerInvariant(label[0]) + label.Substring(1);
+                }
+            }
+            return label;
         }
 
         /// <summary>One person line: the name in a warm colour (rich text), then the trait, both from Strings.</summary>
@@ -1416,17 +1803,35 @@ namespace OutOfSight
 
         /// <summary>
         /// The people block for these personalities (<see cref="PeopleLines"/>), remembered so a language change can list them
-        /// again in the new language.
+        /// again in the new language. Levels v2 (C3b): with the data names of the current level's inhabitants, when
+        /// <see cref="Game"/>'s level has one inhabitant per personality (GameState lists them in level order).
         /// </summary>
         public void ShowPeopleOf(IEnumerable<PersonalityDef> people)
         {
             peopleDefs = people != null ? new List<PersonalityDef>(people) : null;
-            ShowPeople(PeopleLines(peopleDefs));
+            peopleNames = NamesOfLevel(peopleDefs != null ? peopleDefs.Count : 0);
+            ShowPeople(PeopleLines(peopleDefs, peopleNames));
+        }
+
+        /// <summary>The data names of the current level's inhabitants, in level order; null when they are not <paramref name="count"/>.</summary>
+        private List<string> NamesOfLevel(int count)
+        {
+            if (Game == null || Game.Level == null || Game.Level.Inhabitants == null || Game.Level.Inhabitants.Count != count || count == 0)
+            {
+                return null;
+            }
+            var names = new List<string>(count);
+            foreach (Inhabitant h in Game.Level.Inhabitants)
+            {
+                names.Add(h != null && h.Def != null ? h.Def.Name : null);
+            }
+            return names;
         }
 
         // What the intro card and the panels show, kept for Relocalize.
         private LevelDef shownLevel;
         private List<PersonalityDef> peopleDefs;
+        private List<string> peopleNames;
         private float shownSeconds;
 
         /// <summary>
@@ -1442,15 +1847,14 @@ namespace OutOfSight
                 {
                     name.text = Strings.Get(shownLevel.NameKey);
                 }
-                if (Labels.TryGetValue("Hint", out Text hint))
-                {
-                    hint.text = Strings.Get(shownLevel.HintKey);
-                }
+                SetHintText();
             }
             if (peopleOn && peopleDefs != null)
             {
-                ShowPeople(PeopleLines(peopleDefs));
+                ShowPeople(PeopleLines(peopleDefs, peopleNames));
             }
+            SetStartLineText();
+            SetLampHintText();
             if (controls != null)
             {
                 controls.text = controlsTouch ? Strings.HudControlsTouch : controlsGamepad ? Strings.HudControlsGamepad : Strings.HudControls;
@@ -1487,25 +1891,42 @@ namespace OutOfSight
             {
                 endTime.text = string.Format(Strings.WinBody, Strings.FormatSeconds(shownSeconds));
             }
+            if (winStarsNew != null)
+            {
+                winStarsNew.text = Strings.StarsNewBest;
+            }
+            Tips?.Relocalize();
         }
 
         public void ShowLevel(LevelDef level)
         {
             shownLevel = level;
             HidePanels();
+            // Onboarding tips: a new level or a restart drops the shown tip.
+            Tips?.OnLevelShown();
             if (Labels.TryGetValue("LevelName", out Text name))
             {
                 name.text = Strings.Get(level.NameKey);
             }
-            if (Labels.TryGetValue("Hint", out Text hint))
-            {
-                hint.text = Strings.Get(level.HintKey);
-            }
+            SetHintText();
             titleTimer = 0f;
             if (titleCard != null)
             {
                 titleCard.alpha = 1f;
             }
+            // Levels v2 (C3b): the held card follows GameState.Started from the next frame (Update); a level shown
+            // started keeps the M1 timing (4 s, then the 1 s fade). No locked or lit line until GameState wants one.
+            cardHeld = false;
+            cardWasHeld = false;
+            UpdateCardHold();
+            // LEVELNUM: the level select's number of this level; a new level and every restart replay the zoom.
+            string id = !string.IsNullOrEmpty(level.Id) ? level.Id : Game != null ? Game.LevelId : null;
+            SetLevelNumber(Game != null ? LevelSelect.DisplayNumber(Game.LevelOrder, id) : 0);
+            lockedOn = false;
+            litOn = false;
+            markerWanted = false;
+            markerClamped = false;
+            markerEyeOn = false;
             SetSeen(false, 0f);
             SetCreak(0f, false);
             SetSuspicion(0f);
@@ -1577,6 +1998,21 @@ namespace OutOfSight
                 winNext.text = InputReader.TouchUIActive ? Strings.WinNextTouch : Strings.WinNext;
             }
             winNextOn = hasNext;
+            // Stars: the row of the previous win never shows on a new one; RecordLine shows this win's once recorded.
+            HideWinStars();
+            // With no next level (GameState shows the end screen instead, but ShowWin(seconds) has no next either),
+            // Replay and Menu close up into a centred row rather than leave Next level's place empty.
+            if (WinReplayButton != null && WinMenuButton != null && WinNextLevelButton != null)
+            {
+                if (hasNext)
+                {
+                    PlaceRow(WinNextLevelButton, WinReplayButton, WinMenuButton);
+                }
+                else
+                {
+                    PlaceButtons(null, WinReplayButton, WinMenuButton);
+                }
+            }
             endOn = false;
             winOn = true;
             failOn = false;
@@ -1626,6 +2062,7 @@ namespace OutOfSight
             {
                 titleCard.alpha = 0f;
             }
+            SyncBackdrop();
         }
 
         public float TitleCardAlpha => titleCard != null ? titleCard.alpha : 0f;
@@ -1635,6 +2072,7 @@ namespace OutOfSight
             failOn = false;
             winOn = false;
             endOn = false;
+            HideWinStars();
             ApplyCanvases();
             FailReason = LoseReason.None;
         }
@@ -1645,13 +2083,21 @@ namespace OutOfSight
             {
                 return;
             }
-            // HUD gauge redesign: the gauges ease, glow, pulse and shake; the creak warning flashes the creak gauge between
-            // hot red and pale cream, fast enough to catch the eye.
-            float gaugeDt = Time.unscaledDeltaTime;
-            float gaugeTime = Time.unscaledTime;
+            // HUD gauge redesign: the gauges ease, glow and shake; past its threshold (the creak warning) a gauge shows its
+            // danger animation (GaugeFx). The eye plays its blink between closed and open. ShotStep (shots) makes every
+            // frame one fixed step of the HUD's own clock.
+            float gaugeDt = ShotStep > 0f ? ShotStep : Time.unscaledDeltaTime;
+            hudClock += gaugeDt;
+            // Stars: the win panel's reveal (nothing once the row settled).
+            if (winStars != null)
+            {
+                winStars.Animate(gaugeDt);
+            }
+            float gaugeTime = hudClock;
             AnimateGauge(creakGauge, gaugeDt, gaugeTime, CreakFlashing, false);
             AnimateGauge(suspicionGauge, gaugeDt, gaugeTime, false, false);
             AnimateGauge(balanceGauge, gaugeDt, gaugeTime, false, BalanceRed);
+            AnimateEye(gaugeDt);
             // PRD 4.3: the screen edge pulses red while seenMoving is above zero.
             float a = seenMoving > 0f ? 0.45f + 0.35f * Mathf.Sin(Time.unscaledTime * 18f) : 0f;
             Color c = pulse.color;
@@ -1683,13 +2129,30 @@ namespace OutOfSight
                     controls.text = gamepad ? Strings.HudControlsGamepad : Strings.HudControls; // MUTATION:CONTROLS_GAMEPAD_TEXT
                     controls.text = touch ? Strings.HudControlsTouch : controls.text;
                 }
+                // Levels v2 (C3b): the hint's {action} and {careful}, and the start line, name the new device's controls.
+                SetHintText();
+                SetStartLineText();
+                SetLampHintText();
             }
 
             titleTimer += Time.unscaledDeltaTime;
+            UpdateCardHold();
             if (titleCard != null)
             {
-                titleCard.alpha = titleTimer < 4f ? 1f : Mathf.Clamp01(1f - (titleTimer - 4f));
+                // LEVELNUM: a held card goes with a short fade from the first input (HeldCardFadeSeconds); a card shown
+                // started keeps the M1 timing (4 s, then 1 s).
+                float fade = cardWasHeld ? HeldCardFadeSeconds : 1f;
+                titleCard.alpha = titleTimer < CardHoldSeconds ? 1f : Mathf.Clamp01(1f - (titleTimer - CardHoldSeconds) / fade);
             }
+            AnimateLevelNumber(gaugeDt);
+            if (cardHeld && startLine != null)
+            {
+                // A slow breath on the start line, so the waiting card reads as waiting.
+                Color s = startLine.color;
+                s.a = 0.78f + 0.22f * Mathf.Cos(hudClock * 3.2f);
+                startLine.color = s;
+            }
+            UpdateRowHints();
             // The people block fits the screen it was laid out for: it is laid out again when the screen changes size.
             if (peopleOn && titleCard != null && titleCard.alpha > 0f)
             {
@@ -1699,6 +2162,410 @@ namespace OutOfSight
                     LayoutPeople();
                 }
             }
+        }
+
+        // ----- Levels v2 (docs/levels_v2/LEVELS_V2.md 6, task C3b): held card, hint tokens, row hints, exit marker. -----
+
+        /// <summary>The device whose control names the HUD writes into a hint ({action}, {careful}) and the start line.</summary>
+        public enum HintDevice
+        {
+            Keyboard,
+            Gamepad,
+            Touch,
+        }
+
+        // M1 timing of a card shown started: fully visible for this long, then the 1 s fade.
+        private const float CardShowSeconds = 4f;
+
+        /// <summary>
+        /// Seconds the intro card stays fully visible after <see cref="titleTimer"/> starts: 4 for a level shown started (M1),
+        /// 0 once the card was held (the timer restarts at the release, so the fade, <see cref="HeldCardFadeSeconds"/> long
+        /// since LEVELNUM, starts with the first input).
+        /// </summary>
+        private float CardHoldSeconds => cardWasHeld ? 0f : CardShowSeconds;
+
+        /// <summary>Levels v2 (C3b): the intro card is held fully visible now (the level waits for its first input; tests).</summary>
+        public bool CardHeld => cardHeld;
+
+        /// <summary>Levels v2 (C3b): the held card's start line shows (hud.start, label StartLine; tests).</summary>
+        public bool StartLineVisible => startLine != null && startLine.enabled && TitleCardAlpha > 0f;
+
+        /// <summary>Levels v2 (C3b): the start line's text and the intro card's hint as shown (tokens resolved; tests).</summary>
+        public string StartLineText => startLine != null ? startLine.text : null;
+        public string HintShown => hintText != null ? hintText.text : null;
+
+        /// <summary>Levels v2 (C3b): "Locked" (hud.door.locked) and the lit-zone line (hud.lit) show (tests).</summary>
+        public bool LockedHintVisible => lockedCanvas != null && lockedCanvas.enabled;
+        public bool LitHintVisible => litCanvas != null && litCanvas.enabled;
+
+        /// <summary>Levels v2 (C3b): the exit marker is drawn now (its Canvas on and its alpha above 0; tests).</summary>
+        public bool ExitMarkerVisible => markerCanvas != null && markerCanvas.enabled && markerGroup != null && markerGroup.alpha > 0.001f;
+
+        /// <summary>The exit marker exists (built with the HUD; tests).</summary>
+        public bool ExitMarkerExists => markerCanvas != null;
+
+        /// <summary>The exit marker's alpha (1 from <see cref="MarkerFadeFar"/> metres, 0 at <see cref="MarkerFadeNear"/>; tests).</summary>
+        public float ExitMarkerAlpha => markerGroup != null ? markerGroup.alpha : 0f;
+
+        /// <summary>The exit marker sits clamped at the screen edge with its arrow (the exit is off screen or behind; tests).</summary>
+        public bool ExitMarkerClamped => markerClamped;
+
+        /// <summary>The exit marker shows the open-eye glyph (a human sees the furniture standing on the exit; tests).</summary>
+        public bool ExitMarkerEyeShown => markerEyeOn;
+
+        /// <summary>The exit marker's centre in screen pixels, y up (tests).</summary>
+        public Vector2 ExitMarkerScreenPosition => markerScreen;
+
+        /// <summary>The device the HUD names now: touch while the touch controls show, else the last device used.</summary>
+        public HintDevice Device => controlsTouch ? HintDevice.Touch : controlsGamepad ? HintDevice.Gamepad : HintDevice.Keyboard;
+
+        /// <summary>
+        /// The name of the action control on <paramref name="device"/> in the current language. DOORAUTO: the action only
+        /// switches the floor lamp (doors and wardrobes are a push, named in words): the key of the keyboard's lamp hint
+        /// ("E"), the gamepad's ("X"), and on touch "tap the lamp" (touch.lamp; the action button is gone).
+        /// </summary>
+        public static string ActionLabel(HintDevice device)
+        {
+            switch (device)
+            {
+                case HintDevice.Touch:
+                    return Strings.TouchLamp;
+                case HintDevice.Gamepad:
+                    return KeyOf(Strings.HudLampPad, "X");
+                default:
+                    return KeyOf(Strings.HudLamp, "E");
+            }
+        }
+
+        /// <summary>DOORAUTO: the lamp hint's sentence on <paramref name="device"/> (hud.lamp, hud.lampPad, hud.lampTouch).</summary>
+        public static string LampHintText(HintDevice device)
+        {
+            switch (device)
+            {
+                case HintDevice.Touch:
+                    return Strings.HudLampTouch;
+                case HintDevice.Gamepad:
+                    return Strings.HudLampPad;
+                default:
+                    return Strings.HudLamp;
+            }
+        }
+
+        /// <summary>DOORAUTO: the lamp hint (label LampHintLabel) in the current language for the current device.</summary>
+        private void SetLampHintText()
+        {
+            if (Labels.TryGetValue("LampHintLabel", out Text lamp) && lamp != null)
+            {
+                lamp.text = LampHintText(Device);
+            }
+        }
+
+        /// <summary>
+        /// The name of the careful control on <paramref name="device"/> in the current language: the key of the careful hint
+        /// ("Shift", "Maj"), the gamepad's left trigger ("LT"), the touch careful button's label.
+        /// </summary>
+        public static string CarefulLabel(HintDevice device)
+        {
+            switch (device)
+            {
+                case HintDevice.Touch:
+                    return Strings.TouchCareful;
+                case HintDevice.Gamepad:
+                    return "LT";
+                default:
+                    return KeyOf(Strings.HudCareful, "Shift");
+            }
+        }
+
+        /// <summary>The key before the colon of a "Key: does" hint line ("Maj : au ralenti" gives "Maj"), or the fallback.</summary>
+        private static string KeyOf(string line, string fallback)
+        {
+            int colon = string.IsNullOrEmpty(line) ? -1 : line.IndexOf(':');
+            string key = colon > 0 ? line.Substring(0, colon).Trim() : null;
+            return string.IsNullOrEmpty(key) ? fallback : key;
+        }
+
+        /// <summary>
+        /// Levels v2 (C3b, LEVELS_V2 D29): <paramref name="hint"/> with every {action} and {careful} replaced by the control
+        /// names of <paramref name="device"/> (<see cref="ActionLabel"/>, <see cref="CarefulLabel"/>).
+        /// </summary>
+        public static string ResolveHintTokens(string hint, HintDevice device)
+        {
+            if (string.IsNullOrEmpty(hint) || hint.IndexOf('{') < 0)
+            {
+                return hint;
+            }
+            return hint.Replace("{action}", ActionLabel(device)).Replace("{careful}", CarefulLabel(device)); // MUTATION:HINT_TOKENS
+        }
+
+        /// <summary>
+        /// The intro card's hint for the shown level and the current device, its font shrunk (38 down to 26) until its
+        /// wrapped lines fit the hint box (the v2 hints run to two or three sentences).
+        /// </summary>
+        private void SetHintText()
+        {
+            if (hintText == null || shownLevel == null)
+            {
+                return;
+            }
+            hintText.text = ResolveHintTokens(Strings.Get(shownLevel.HintKey), Device);
+            int size = CardHintSize;
+            hintText.fontSize = size;
+            while (size > CardHintMinSize && hintText.preferredHeight > CardHintHeight)
+            {
+                size -= 2;
+                hintText.fontSize = size;
+            }
+        }
+
+        /// <summary>The start line in the current language and for the current device (hud.start and its variants).</summary>
+        private void SetStartLineText()
+        {
+            if (startLine == null)
+            {
+                return;
+            }
+            HintDevice device = Device;
+            startLine.text = device == HintDevice.Touch ? Strings.HudStartTouch
+                : device == HintDevice.Gamepad ? Strings.HudStartGamepad : Strings.HudStart;
+        }
+
+        /// <summary>
+        /// Every frame and at ShowLevel: the card is held while the shown level waits for its first input (GameState.Started
+        /// false, still playing, no panel). Held, the card stays fully visible (its timer stays at 0) with the start line;
+        /// at the release the start line goes and the card fades over <see cref="HeldCardFadeSeconds"/> from that instant.
+        /// </summary>
+        private void UpdateCardHold()
+        {
+            bool held = shownLevel != null && Game != null && Game.Level != null && !Game.Started
+                && Game.State == PlayState.Playing && !failOn && !winOn;
+            if (held)
+            {
+                titleTimer = 0f; // MUTATION:CARD_HELD
+                cardWasHeld = true;
+            }
+            if (held == cardHeld)
+            {
+                return;
+            }
+            cardHeld = held;
+            if (held)
+            {
+                SetStartLineText();
+            }
+            if (startPlate != null)
+            {
+                startPlate.enabled = held;
+            }
+            if (startLine != null)
+            {
+                startLine.enabled = held;
+            }
+        }
+
+        // ----- LEVELNUM (docs/next/progress/LEVELNUM.md): the intro card's dim with the level number's holes (CardNumber). -----
+
+        /// <summary>LEVELNUM: the number the intro card shows (the level select's number), 0 when none (a level outside levels.json).</summary>
+        public int LevelNumberShown => levelNumber;
+
+        /// <summary>LEVELNUM: seconds of the number's zoom played (frozen while paused or under a menu); tests and shots set it.</summary>
+        public float LevelNumberAge
+        {
+            get => cardNumber != null ? cardNumber.Age : 0f;
+            set
+            {
+                if (cardNumber != null)
+                {
+                    cardNumber.Age = value;
+                    PoseCardNumber();
+                }
+            }
+        }
+
+        /// <summary>LEVELNUM: the dim layer's alpha (it always follows <see cref="TitleCardAlpha"/>).</summary>
+        public float CardBackdropAlpha => cardNumber != null ? cardNumber.Alpha : 0f;
+
+        /// <summary>LEVELNUM: the dim's effective opacity outside the holes now.</summary>
+        public float CardDimShown => CardDimAlpha * CardBackdropAlpha;
+
+        /// <summary>LEVELNUM: the dim and the holes use their shaders (false: a plain dim, the shaders are missing).</summary>
+        public bool LevelNumberHolesReady => cardNumber != null && cardNumber.Ready;
+
+        /// <summary>LEVELNUM: the number's scale now, and the scale it settles at on the current canvas.</summary>
+        public float LevelNumberScale => cardNumber != null ? cardNumber.Scale : 0f;
+        public float LevelNumberFinalScale => cardNumber != null ? cardNumber.FinalScale : 0f;
+
+        /// <summary>LEVELNUM: the number's ink (the digits' box) in the HUD root's local units, centred on the screen centre.</summary>
+        public Rect LevelNumberInkRect => cardNumber != null ? cardNumber.InkRect : Rect.zero;
+
+        /// <summary>LEVELNUM: the share of the holes' mask at least half covered, and the highest coverage (tests).</summary>
+        public float LevelNumberCoveredShare(out float highest)
+        {
+            highest = 0f;
+            return cardNumber != null ? cardNumber.CoveredShare(out highest) : 0f;
+        }
+
+        private void OnDestroy()
+        {
+            cardNumber?.Dispose();
+            cardNumber = null;
+        }
+
+        /// <summary>The level select's <paramref name="number"/> on the card (0: none, a plain dim) and the zoom from its start.</summary>
+        private void SetLevelNumber(int number)
+        {
+            levelNumber = Mathf.Max(0, number);
+            if (cardNumber != null)
+            {
+                cardNumber.SetNumber(levelNumber);
+            }
+            PoseCardNumber();
+        }
+
+        /// <summary>The layer follows the card's alpha now (the number keeps its pose).</summary>
+        private void SyncBackdrop()
+        {
+            PoseCardNumber();
+        }
+
+        /// <summary>Every frame: the zoom plays on the HUD clock, then the layer follows the card.</summary>
+        private void AnimateLevelNumber(float dt)
+        {
+            // Frozen while paused or under a menu, so the zoom is seen when the card is; a step is capped at a 30 Hz frame,
+            // so the frame after a level build (a long one) does not skip it.
+            if (cardNumber != null && levelNumber > 0 && Visible && (Game == null || !Game.Paused))
+            {
+                cardNumber.Age += Mathf.Min(dt, 1f / 30f);
+            }
+            PoseCardNumber();
+        }
+
+        /// <summary>The number at its age (at the end under <see cref="ReducedMotion"/>) over the HUD's canvas, with the card's alpha.</summary>
+        private void PoseCardNumber()
+        {
+            if (cardNumber == null)
+            {
+                return;
+            }
+            Rect canvas = ((RectTransform)transform).rect;
+            float pixelsPerUnit = rootCanvas != null ? rootCanvas.scaleFactor : 1f;
+            float age = ReducedMotion ? NumberZoomSeconds : cardNumber.Age;
+            cardNumber.Pose(titleCard != null ? titleCard.alpha : 0f, age, canvas.size, canvas.size * pixelsPerUnit);
+        }
+
+        /// <summary>
+        /// Every frame: the row hints GameState does not push (the locked door from <see cref="GameState.LockedDoorHintWanted"/>,
+        /// the lit zone from the furniture), then the exit marker.
+        /// </summary>
+        private void UpdateRowHints()
+        {
+            bool locked = Game != null && Game.LockedDoorHintWanted; // MUTATION:LOCKED_HINT
+            bool lit = LitHintWanted();
+            if (locked != lockedOn || lit != litOn)
+            {
+                lockedOn = locked;
+                litOn = lit;
+                ApplyCanvases();
+            }
+            UpdateExitMarker();
+        }
+
+        /// <summary>
+        /// The lit-zone line is wanted: the level runs, the furniture is a lamp body under the Lamp rule, its light is off
+        /// and its centre stands in a lit zone (FurnitureController.InLitZone: the dark gives it no cover there).
+        /// </summary>
+        private bool LitHintWanted()
+        {
+            if (Game == null || Game.Level == null || Game.State != PlayState.Playing || !Game.Started)
+            {
+                return false;
+            }
+            FurnitureController f = Game.Furniture;
+            if (f == null || f.Body == null || !f.Body.HasLight || f.Lamp == null || f.Rules == null || !f.Rules.Lamp)
+            {
+                return false;
+            }
+            return !f.Lamp.On && f.InLitZone && !f.Hidden && !f.Carried; // MUTATION:LIT_HINT
+        }
+
+        /// <summary>
+        /// One frame of the exit marker: over the exit zone's centre (on its floor, MarkerHeight up); when that point is off
+        /// screen or behind the camera, clamped to the screen edge along the line from the screen centre with its arrow
+        /// pointing on; its alpha 1 from MarkerFadeFar metres of the furniture down to 0 at MarkerFadeNear; the open-eye
+        /// glyph in place of the door (at full alpha) while a human sees the furniture standing on the exit. Hidden while
+        /// paused, under the panels and the menus (ApplyCanvases), and when no level runs.
+        /// </summary>
+        private void UpdateExitMarker()
+        {
+            if (markerCanvas == null)
+            {
+                return;
+            }
+            LevelDef def = Game != null && Game.Level != null ? Game.Def : null;
+            FurnitureController f = def != null ? Game.Furniture : null;
+            bool want = def != null && def.Exit != null && f != null && View != null && Game.State == PlayState.Playing
+                && !Game.Paused;
+            if (want != markerWanted)
+            {
+                markerWanted = want;
+                SetEnabled(markerCanvas, Visible && markerWanted && !failOn && !winOn);
+            }
+            if (!want)
+            {
+                markerClamped = false;
+                markerEyeOn = false;
+                return;
+            }
+
+            float floor = def.Floor != null ? def.FloorHeightAt(def.Exit.X, def.Exit.Z) : 0f;
+            var world = new Vector3(def.Exit.X, floor + MarkerHeight, def.Exit.Z);
+            Vector3 sp = View.WorldToScreenPoint(world);
+            bool behind = sp.z <= 0f;
+            float scale = rootCanvas != null && rootCanvas.scaleFactor > 0f ? rootCanvas.scaleFactor : 1f;
+            Vector2 size = ((RectTransform)transform).rect.size;
+            // Reference units, y up, origin at the bottom left (the marker's anchor).
+            var p = new Vector2(sp.x, sp.y) / scale;
+            if (behind)
+            {
+                // Behind the camera the projection is mirrored: mirror it back, so the arrow points the right way round.
+                p = size - p;
+            }
+            float half = MarkerSize * 0.5f;
+            bool onScreen = !behind && p.x >= 0f && p.x <= size.x && p.y >= 0f && p.y <= size.y;
+            Vector2 pos;
+            if (onScreen)
+            {
+                pos = new Vector2(Mathf.Clamp(p.x, half, size.x - half), Mathf.Clamp(p.y, half, size.y - half));
+                markerClamped = false;
+            }
+            else
+            {
+                // Clamped inside the margins (the bottom one clears the eye band and the sat-on row), on the line from the
+                // inner rect's centre toward the exit.
+                var inner = Rect.MinMaxRect(MarkerEdge + half, MarkerBottomEdge + half, size.x - MarkerEdge - half, size.y - MarkerEdge - half);
+                Vector2 c = inner.center;
+                Vector2 d = p - c;
+                if (d.sqrMagnitude < 1e-4f)
+                {
+                    d = Vector2.down;
+                }
+                float tx = Mathf.Abs(d.x) > 1e-4f ? inner.width * 0.5f / Mathf.Abs(d.x) : float.MaxValue;
+                float ty = Mathf.Abs(d.y) > 1e-4f ? inner.height * 0.5f / Mathf.Abs(d.y) : float.MaxValue;
+                pos = c + d * Mathf.Min(tx, ty); // MUTATION:MARKER_CLAMP
+                markerClamped = true;
+                markerArrow.rectTransform.parent.localRotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg - 90f);
+            }
+            markerRect.anchoredPosition = pos;
+            markerScreen = pos * scale;
+            markerArrow.enabled = markerClamped;
+
+            Vector3 at = f.transform.position;
+            float distance = new Vector2(at.x - def.Exit.X, at.z - def.Exit.Z).magnitude;
+            bool eyeOn = Game.Seen && def.Exit.Contains(at) && !f.Carried && !f.Hidden;
+            markerEyeOn = eyeOn;
+            markerEye.enabled = eyeOn;
+            markerDoor.enabled = !eyeOn;
+            markerGroup.alpha = eyeOn ? 1f : Mathf.InverseLerp(MarkerFadeNear, MarkerFadeFar, distance); // MUTATION:MARKER_FADE
         }
 
         // ----- M3: world markers (tests read them; M3.1 dropped the clamp, the HUD band is at the bottom) -----

@@ -92,6 +92,18 @@ namespace OutOfSight
         }
 
         /// <summary>
+        /// AUTOSTART: the step's sighting of a furniture that is out of play (GameState.Started false, before the player's
+        /// first input): nothing is seen, so the cone view never shows the alarm. Called by GameState in place of
+        /// <see cref="Step(FurnitureController, float)"/>. Returns false.
+        /// </summary>
+        public bool Unseen()
+        {
+            SeesPlayer = false;
+            System.Array.Clear(SampleVisible, 0, SampleVisible.Length);
+            return false;
+        }
+
+        /// <summary>
         /// M5 (docs/CONTRACT_M5_v3.md 15.2): the samples of every swinging leaf, seen by this watcher? Its own range (no
         /// lamp factor: the leaf is not the lamp, as in the audit) and half angle; asleep, nothing. A leaf never hides its
         /// own samples (they lie on its mid plane, inside its collider), every other occluder does. Outside a swing a leaf

@@ -13,7 +13,8 @@ namespace OutOfSight.Tests
     /// The M5 bodies probe, wave 5A (docs/CONTRACT_M5.md 16.12; CONTRACT_M5_v3.md 15.2 and 15.4), on the real Boot scene,
     /// level 1, with the body set by <see cref="FurnitureController.SetBody"/>, as the M4 bodies probe.
     /// Steps 36g to 36j: the external action a door opening stands on (<see cref="FurnitureController.BeginExternalAction"/>)
-    /// and the E key claimed by the game before the body action (<see cref="FurnitureController.ActionKeyClaimed"/>).
+    /// and the door push claimed by the game before the body action (<see cref="FurnitureController.DoorPushClaimed"/>, task
+    /// DOORAUTO: it replaced the E press for doors).
     /// Step 36k: the back press of the level select (<see cref="InputReader.BackPressed"/>). Steps 39c and 39d: the floor
     /// height (<see cref="FurnitureController.Floor"/>, <see cref="GhostView.Floor"/>) on a platform of the house's
     /// <see cref="FloorMap"/>; their platform part needs the house FloorMap (a premise names it while it is a stub).
@@ -127,7 +128,8 @@ namespace OutOfSight.Tests
                 {
                     main.Game.Furniture.ScriptedDirection = null;
                     main.Game.Furniture.ScriptedCareful = null;
-                    main.Game.Furniture.ActionKeyClaimed = null;
+                    main.Game.Furniture.DoorPushClaimed = null;
+                    main.Game.Furniture.DoorPushTarget = null;
                     main.Game.Furniture.Floor = null;
                 }
                 if (main.Game.Ghost != null)
@@ -452,6 +454,15 @@ namespace OutOfSight.Tests
             AssertClean();
         }
 
+        /// <summary>
+        /// Step 36j (task DOORAUTO, in place of M5's claimed E press): a push of the move input toward
+        /// <see cref="FurnitureController.DoorPushTarget"/> goes to the game (<see cref="FurnitureController.DoorPushClaimed"/>)
+        /// once held for the confirm steps, and never to the lamp. With no target the push simply drives. Pushing toward the
+        /// target holds the lamp still and the hook is asked exactly once, on the step after the confirm steps; a claim with no
+        /// action begun keeps the lamp still and is asked again one confirm time later; a hook that begins the opening makes
+        /// that step the first of the external action, and a push held through it reaches neither the hook nor the lamp. E
+        /// still switches the lamp, and never reaches the hook.
+        /// </summary>
         [UnityTest]
         public IEnumerator Step36j_ClaimedActionKeyGoesToTheDoorNotTheLamp()
         {
@@ -460,65 +471,81 @@ namespace OutOfSight.Tests
             yield return Steps(2);
             LampLight lamp = Chair.Lamp;
             Assert.IsTrue(lamp != null && lamp.On, "premise: the lamp is on");
+            int confirm = FurnitureController.DoorPushConfirmSteps(Dt);
             int toggles = Chair.ToggleCount;
             int asked = 0;
-
-            // Not claimed: the press is the body's, and the lamp switches (M4).
-            Chair.ActionKeyClaimed = () =>
+            bool claim = false;
+            bool begin = false;
+            bool began = false;
+            Chair.DoorPushClaimed = () =>
             {
                 asked++;
-                return false;
+                if (begin)
+                {
+                    began = Chair.BeginExternalAction(Tuning.DoorOpenTime);
+                }
+                return claim;
             };
+
+            // No target: a push is a plain drive, and the hook is never asked.
+            Chair.DoorPushTarget = () => null;
+            Chair.ScriptedDirection = Vector3.right;
+            yield return Steps(confirm + 4);
+            Chair.ScriptedDirection = null;
             yield return Steps(3);
-            Assert.AreEqual(0, asked, "the hook was asked with no press");
+            Assert.AreEqual(0, asked, "the hook was asked with no push target");
+            Assert.Greater(Chair.transform.position.x, LaneStart.x + 0.05f, "premise: with no target the push drove the lamp");
+
+            // E is the lamp's: it switches, and never reaches the hook.
+            Chair.DoorPushTarget = () => Vector3.right;
             InputReader.InjectAction();
             yield return Steps(1);
-            Assert.AreEqual(1, asked, "the hook was not asked exactly once for the press");
-            Assert.AreEqual(toggles + 1, Chair.ToggleCount, "an unclaimed press did not switch the lamp");
+            Assert.AreEqual(toggles + 1, Chair.ToggleCount, "E did not switch the lamp");
+            Assert.AreEqual(0, asked, "E reached the door push hook");
             yield return Until(() => !Chair.ActionActive, 20);
             yield return Steps(2);
-            Assert.AreEqual(1, asked, "the hook was asked again with no new press");
-
-            // Claimed, with no action begun: nothing for the body, and the press is consumed (it never fires later).
             toggles = Chair.ToggleCount;
             bool lit = lamp.On;
-            Chair.ActionKeyClaimed = () =>
-            {
-                asked++;
-                return true;
-            };
-            InputReader.InjectAction();
+
+            // Claimed, with no action begun: the lamp holds still and does not switch; asked once per confirm time.
+            claim = true;
+            Vector3 at = Chair.transform.position;
+            int start = trace.Count;
+            Chair.ScriptedDirection = Vector3.right;
+            yield return Steps(confirm);
+            Assert.AreEqual(0, asked, "the hook was asked before the confirm steps");
             yield return Steps(1);
-            Assert.AreEqual(2, asked, "the hook was not asked for the second press");
-            Assert.AreEqual(toggles, Chair.ToggleCount, "a claimed press switched the lamp");
-            Assert.IsFalse(Chair.ActionActive || Chair.IsMoving, "a claimed press with no action moved the lamp");
-            Chair.ActionKeyClaimed = null;
-            yield return Steps(5);
-            Assert.AreEqual(toggles, Chair.ToggleCount, "the claimed press fired later");
+            Assert.AreEqual(1, asked, "the hook was not asked on the step after the confirm steps");
+            yield return Steps(confirm + 1);
+            Assert.AreEqual(2, asked, "a push held on was not asked again one confirm time later");
+            Chair.ScriptedDirection = null;
+            yield return Steps(2);
+            for (int i = start; i < trace.Count; i++)
+            {
+                Assert.IsFalse(trace[i].Moving || trace[i].Action, $"push step {i - start}: the lamp moved or acted");
+            }
+            Assert.Less(Planar(Chair.transform.position, at), 1e-4f, "the push toward the target drove the lamp");
+            Assert.AreEqual(toggles, Chair.ToggleCount, "a claimed push switched the lamp");
             Assert.AreEqual(lit, lamp.On, "the lamp changed");
 
-            // Claimed by a door: the hook begins the opening, and the step of the press is its first step.
-            bool began = false;
-            Chair.ActionKeyClaimed = () =>
-            {
-                asked++;
-                began = Chair.BeginExternalAction(Tuning.DoorOpenTime);
-                return true;
-            };
-            int start = trace.Count;
-            InputReader.InjectAction();
-            yield return Steps(1);
-            Assert.AreEqual(3, asked, "the hook was not asked for the third press");
+            // Claimed by a door: the hook begins the opening, and that step is its first one.
+            begin = true;
+            asked = 0;
+            start = trace.Count;
+            Chair.ScriptedDirection = Vector3.right;
+            yield return Steps(confirm + 1);
+            Assert.AreEqual(1, asked, "the hook was not asked once for the push");
             Assert.IsTrue(began, "the opening begun from the hook was refused");
             Assert.AreEqual(FurnitureController.BodyAction.External, Chair.Action, "the hook's action is not running");
-            Assert.IsTrue(trace[start].Action && trace[start].Moving, "the step of the press is not the first step of the opening");
-            Assert.AreEqual(toggles, Chair.ToggleCount, "the door's press also switched the lamp");
-            // A press made during the opening reaches neither the hook nor the lamp.
+            Assert.IsTrue(trace[start + confirm].Action && trace[start + confirm].Moving, "the claim step is not the first step of the opening");
+            Assert.IsFalse(trace[start + confirm - 1].Action, "the opening began before the confirm steps ran");
+            // The push held through the opening reaches neither the hook nor the lamp, and E during it is dropped.
             InputReader.InjectAction();
             yield return Until(() => !Chair.ActionActive, DoorSteps + 5);
+            Chair.ScriptedDirection = null;
             yield return Steps(3);
-            Assert.AreEqual(DoorSteps, ActionRun(start), "the opening begun from the hook did not last exactly DoorOpenTime");
-            Assert.AreEqual(3, asked, "a press made during the opening reached the hook");
+            Assert.AreEqual(DoorSteps, ActionRun(start + confirm), "the opening begun from the hook did not last exactly DoorOpenTime");
+            Assert.AreEqual(1, asked, "a push held during the opening reached the hook");
             Assert.AreEqual(toggles, Chair.ToggleCount, "a press made during the opening switched the lamp");
             Assert.AreEqual(lit, lamp.On, "the lamp changed");
             AssertClean();
@@ -1092,8 +1119,8 @@ namespace OutOfSight.Tests
         /// The product owner's 2026-11-18 report: the memory ghost always drew a chair (6 boxes, 72 triangles), whatever
         /// the player furniture's own kind. On test_rock (a procedural rocking_chair, no model, 20 boxes, 240 triangles:
         /// not a chair) GhostView.Show now copies FurnitureController.Visual's own meshes, so the ghost's combined bounds
-        /// span the same world size as the real furniture body, and its mesh carries the rocking chair's own triangles
-        /// (240, plus the ring), not the chair's fallback (72, plus the ring: 168 total). A tiny ring tolerance keeps the
+        /// span the same world size as the real furniture body, and its mesh carries exactly the rocking chair's own
+        /// triangles plus the ring, not the chair's fallback (soft movers, 2026-11-20: both rounded now). A tiny ring tolerance keeps the
         /// ring well inside the body's own footprint, so it cannot pad the bounds and hide a wrong body shape.
         /// </summary>
         [UnityTest]
@@ -1119,10 +1146,12 @@ namespace OutOfSight.Tests
             Assert.AreEqual(furnitureBounds.size.y, ghostBounds.size.y, tolerance, "the ghost's height does not match the real rocking chair");
             Assert.AreEqual(furnitureBounds.size.z, ghostBounds.size.z, tolerance, "the ghost's depth does not match the real rocking chair");
 
-            // The chair's own boxes (the bug) would be 6 boxes and a ring, 168 triangles; the real rocking chair's 20
-            // boxes and the same ring are 336: well over the chair's fallback count either way.
+            // Soft movers (2026-11-20): the chair's fallback is now the rounded chair (342 triangles), close to the rounded
+            // rocking chair (374), so a count threshold no longer tells them apart: the ghost carries exactly the body's own
+            // triangles and its ring (GhostView's 48 segments, 96 triangles).
             int ghostTriangles = ghost.GetComponent<MeshFilter>().sharedMesh.triangles.Length / 3;
-            Assert.Greater(ghostTriangles, 200, "the ghost's mesh is too small to be the rocking chair's own shape (still the chair's boxes?)");
+            Assert.AreEqual(Probe.TrianglesUnder(furniture.Visual) + 96, ghostTriangles,
+                "the ghost's mesh is not the rocking chair's own shape and its ring (still the chair's fallback?)");
             ghost.Hide();
             AssertClean();
         }

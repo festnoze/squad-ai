@@ -30,7 +30,7 @@
     {
       "name": "Chien",
       "kind": "dog",
-      "model": "quaternius.shiba",
+      "model": "quaternius.husky",
       "startStation": 0,
       "stations": [
         { "x": 0.0, "z": 1.5, "facing": 180.0, "dwell": 2.0, "glances": [], "sleep": true },

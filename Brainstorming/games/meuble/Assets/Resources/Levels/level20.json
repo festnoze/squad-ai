@@ -4,6 +4,7 @@
   "hintKey": "level20.hint",
   "lesson": "dark",
   "doorMemory": true,
+  "lighting": "night",
   "rooms": [
     {
       "id": "salon",

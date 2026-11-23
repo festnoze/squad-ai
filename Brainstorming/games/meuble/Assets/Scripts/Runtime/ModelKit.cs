@@ -145,6 +145,12 @@ namespace OutOfSight
                 t.localRotation = Quaternion.Euler(0f, yaw, 0f);
                 t.localScale = scale;
                 SetLayer(t, parent != null ? parent.gameObject.layer : 0);
+                // Soft movers (2026-11-20): a body model (chair, stool, armchair, lamp) draws its rounded design instead,
+                // before the paint, so the detail and the main colour are taken on the meshes it draws.
+                if (fit == ModelFit.Box)
+                {
+                    SoftBodies.ApplyToModel(id, instance, parent, boxSize);
+                }
                 string problem = Paint(instance, paint, fit == ModelFit.Box && boxSize.y < FlatHeight, entry);
                 if (problem != null)
                 {
@@ -357,6 +363,9 @@ namespace OutOfSight
         private static readonly int[] HairColours = { 0, 4, 5, 7 };
         private static readonly int[] LegColours = { 0, 3, 5, 6 };
         private static readonly int[] LightColours = { 6, 5 };
+        // DOGBIG: a pet's light fur (the Husky's mask and belly) and eye whites are the white: a classic two-tone coat with
+        // its charcoal tint, never the mid grey its 0.58 source would pick.
+        private static readonly int[] PetLightColours = { 6 };
         private static readonly int[] DarkColours = { 0 };
         private static readonly int[] AnyColour = { 0, 1, 2, 3, 4, 5, 6, 7 };
 
@@ -434,7 +443,7 @@ namespace OutOfSight
                     allowed = LegColours;
                     break;
                 case CharacterPart.Light:
-                    allowed = LightColours;
+                    allowed = pet ? PetLightColours : LightColours;
                     break;
                 case CharacterPart.Dark:
                     allowed = DarkColours;
@@ -518,7 +527,110 @@ namespace OutOfSight
             {
                 pair.Key.sharedMaterials = pair.Value;
             }
+            // DOGBIG: once the dog's fur texture exists, it wins over the tint (the picture carries the colours).
+            ApplyPetFurMap(instance, entry);
             return count;
+        }
+
+        // ----- DOGBIG: the dog's fur texture (docs/next/progress/DOGBIG.md) -----
+
+        private static bool petFurLooked;
+        private static Texture2D petFurMap;
+
+        /// <summary>
+        /// The dog's fur texture (Resources/<see cref="Tuning.DogFurTextureResource"/>, painted on the Husky's UV0 atlas), or
+        /// null while none is in the project (the dog then keeps its plain tint and palette slots: no new material).
+        /// </summary>
+        public static Texture2D PetFurMap
+        {
+            get
+            {
+                if (!petFurLooked)
+                {
+                    petFurLooked = true;
+                    petFurMap = Resources.Load<Texture2D>(Tuning.DogFurTextureResource);
+                    if (petFurMap != null)
+                    {
+                        // DOGBIG v3: a sharper mip at game distance and anisotropic filtering at the camera's slant, so the
+                        // strands are not averaged into flat black.
+                        petFurMap.mipMapBias = Tuning.DogFurMipBias;
+                        petFurMap.anisoLevel = Mathf.Max(petFurMap.anisoLevel, 4);
+                    }
+                }
+                return petFurMap;
+            }
+        }
+
+        /// <summary>
+        /// DOGBIG: with a fur texture in the project (<see cref="PetFurMap"/>), every material slot of a pet instance takes the
+        /// one URP Lit material that shows it (white base colour, the texture as base map, on the model's own UV0), so the
+        /// fur, mask, nose and eyes come from the painting. Returns true when the texture was applied; without it nothing
+        /// changes. Called after the paint and after the tint, so the game, the catalog prefab's instances and the title
+        /// logo's baked dog all pick it up.
+        /// </summary>
+        public static bool ApplyPetFurMap(GameObject instance, ModelCatalog.Entry entry)
+        {
+            if (instance == null || entry == null || !entry.IsPet)
+            {
+                return false;
+            }
+            Texture2D map = PetFurMap;
+            if (map == null)
+            {
+                return false;
+            }
+            Material fur = PrimitiveKit.MapMaterial(map, Tuning.DogFurSmoothness);
+            // DOGBIG v3: the eye whites keep their palette white (a material every character already uses), so the eyes read
+            // at game distance; every other slot shows the map (the irises and pupils come from the face picture).
+            var keep = new HashSet<(Renderer, int)>();
+            foreach ((Renderer r, int slot, string source) in SourceSlots(instance, entry))
+            {
+                if (IsPetEyeWhite(source))
+                {
+                    keep.Add((r, slot));
+                }
+            }
+            foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
+            {
+                Material[] slots = r.sharedMaterials;
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    if (!keep.Contains((r, i)))
+                    {
+                        slots[i] = fur;
+                    }
+                }
+                r.sharedMaterials = slots;
+            }
+            return true;
+        }
+
+        /// <summary>DOGBIG v3: a pet's eye white slot (by its source material's name), kept out of the fur map.</summary>
+        public static bool IsPetEyeWhite(string sourceMaterial)
+        {
+            return string.Equals((sourceMaterial ?? "").Trim(), "Eyes_White", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// DOGBIG: how far ahead of its root a fitted rigged model reaches, metres along its facing: the front of the catalog's
+        /// rest pose bounds (native units, root space), turned by the entry's yaw as the instance is, at
+        /// <see cref="RiggedScale"/>. For the dog, its snout (the Husky: 0.47 m). 0 for a static model.
+        /// </summary>
+        public static float ForwardReach(ModelCatalog.Entry entry)
+        {
+            if (entry == null || !entry.rigged)
+            {
+                return 0f;
+            }
+            Quaternion turn = Quaternion.Euler(0f, ModelMath.SnapYaw(entry.yawOffset), 0f);
+            Vector3 half = entry.nativeSize * 0.5f;
+            float reach = float.MinValue;
+            for (int c = 0; c < 8; c++)
+            {
+                var corner = new Vector3((c & 1) == 0 ? -half.x : half.x, (c & 2) == 0 ? -half.y : half.y, (c & 4) == 0 ? -half.z : half.z);
+                reach = Mathf.Max(reach, (turn * (entry.boundsCenter + corner)).z);
+            }
+            return reach * RiggedScale(entry);
         }
 
         /// <summary>The catalog prefab's renderers by their path under its root.</summary>
@@ -798,6 +910,11 @@ namespace OutOfSight
                     // clothes); every other model shows its surfaces' images in their own colours.
                     PrimitiveKit.Detail(r, i, surfaces[i], character);
                 }
+            }
+            if (pet)
+            {
+                // DOGBIG: the dog's fur texture, once it exists, replaces its palette slots.
+                ApplyPetFurMap(instance, entry);
             }
             return null;
         }

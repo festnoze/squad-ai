@@ -182,6 +182,56 @@ void WallSurface(WallVaryings input, out half3 albedo, out half3 normalTS, out h
     metallic = 0;
 }
 
+#if defined(OOS_FLOOR_DUST) && !defined(WALL_SEE_THROUGH)
+// Floor dust (FloorDust.cs, docs/m9/FLOORS_WALLS.md section 10), the Haut tier only: the level's top-down map (bilinear,
+// 12 texels per metre) holds R the grime (walls, stronger in the corners), G the wear of the traffic paths and B low
+// frequency patches (0.5 on average). Barely visible on purpose: the floor images must still read as themselves.
+TEXTURE2D(_OosFloorDust);
+SAMPLER(sampler_OosFloorDust);
+float4 _OosFloorDustRect; // x, z of the map's corner, 1 / its width and depth in metres
+
+// UV1.x (slice + 1) above this names a floor look (FloorDust.FirstFloorSlice: WallArray.Slices[12] is the parquet).
+#define FLOOR_DUST_FIRST_FINISH 12.5
+// The soft variation of the albedo (+-8 %) that breaks the repeat of the floor images.
+#define FLOOR_DUST_VARIATION 0.16
+// The dust film: a pale warm grey (linear), so it greys a dark floor and dulls a pale one; how much the patches and the
+// grime lay of it (the patches only where they rise above their mean, so they read as patches, not as a haze).
+#define FLOOR_DUST_COLOUR half3(0.36, 0.32, 0.26)
+#define FLOOR_DUST_FILM_PATCH 0.15
+#define FLOOR_DUST_FILM_GRIME 0.16
+// The grime's tint at its fullest (a corner): darker and warmer.
+#define FLOOR_DUST_GRIME half3(0.70, 0.63, 0.54)
+// The wear: how much of the dust a path sweeps away, and how far its finish turns (a paler, greyer varnish or stone; a
+// darker, flattened carpet).
+#define FLOOR_DUST_SWEPT 0.85
+#define FLOOR_DUST_WORN 0.30
+
+void WallFloorDust(float3 positionWS, inout half3 albedo, inout half3 normalTS, inout half smoothness)
+{
+    float2 at = (positionWS.xz - _OosFloorDustRect.xy) * _OosFloorDustRect.zw;
+    // One level of detail: a smooth map, magnified at every play distance, and safe inside the branch.
+    half4 d = SAMPLE_TEXTURE2D_LOD(_OosFloorDust, sampler_OosFloorDust, at, 0);
+    half grime = d.r;
+    half wear = d.g;
+    half patch = d.b;
+
+    albedo *= 1.0 + (patch - 0.5) * FLOOR_DUST_VARIATION;
+    half film = (FLOOR_DUST_FILM_PATCH * smoothstep(0.45, 1.0, patch) + FLOOR_DUST_FILM_GRIME * grime) * (1.0 - FLOOR_DUST_SWEPT * wear);
+    albedo = lerp(albedo, FLOOR_DUST_COLOUR, film);
+    albedo *= lerp(half3(1.0, 1.0, 1.0), FLOOR_DUST_GRIME, grime);
+
+    // A hard floor (some smoothness) wears paler and greyer, a carpet (none) darker.
+    half hard = saturate(smoothness * 6.0 - 0.6);
+    half luma = dot(albedo, half3(0.2126, 0.7152, 0.0722));
+    half3 worn = lerp(albedo * 0.88, lerp(albedo, luma.xxx, 0.25) * 1.07, hard);
+    albedo = lerp(albedo, worn, wear * FLOOR_DUST_WORN);
+
+    // Dust and grime dull the sheen and fill the grooves; the patches vary the sheen too (no two boards shine alike).
+    smoothness *= saturate(1.0 - 2.5 * film - 0.35 * grime - 0.15 * wear) * (0.88 + 0.24 * patch);
+    normalTS.xy *= 1.0 - 2.0 * film;
+}
+#endif
+
 void WallFragment(
     WallVaryings input
     , out half4 outColor : SV_Target0
@@ -199,6 +249,14 @@ void WallFragment(
     half metallic;
     float2 uv;
     WallSurface(input, albedo, normalTS, smoothness, metallic, uv);
+#if defined(OOS_FLOOR_DUST) && !defined(WALL_SEE_THROUGH)
+    // A vertex attribute branch: a floor's triangles all name a floor look and face up, a wall's never.
+    UNITY_BRANCH
+    if (input.finish.x > FLOOR_DUST_FIRST_FINISH && input.normalWS.y > 0.5)
+    {
+        WallFloorDust(input.positionWS, albedo, normalTS, smoothness);
+    }
+#endif
 
     float3 normalWS = normalize(input.normalWS);
     half3x3 tangentToWorld = (half3x3)WallTangentFrame(normalWS, input.positionWS, uv);

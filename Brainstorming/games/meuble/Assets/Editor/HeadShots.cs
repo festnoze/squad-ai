@@ -58,7 +58,65 @@ namespace OutOfSight.Editor
                 // moved toward the back of the head (less faceted from behind).
                 ["v7_refined"] = (Features(1.14f, 1.35f, 1.05f, 0.003f, 0.007f, 0.004f, 0.004f, 0.0015f, 0.003f, 0.007f, 0.002f, 0.006f, 0.5f, 0.016f, 0.3f, 0.6f),
                     Features(1.14f, 1.35f, 1.05f, 0.0025f, 0.003f, 0.0035f, 0.003f, 0f, 0.003f, 0.005f, 0.002f, 0.003f, 0.3f, 0.014f, 0.3f, 0.5f)),
+                // Woman fix (2026-11-21): the man unchanged; the woman's flatter face front, softer chin and cheeks, firmer
+                // jaw edge (her landmarks and sections are in WomanShapeTrials).
+                ["w1_flat"] = (new Dictionary<string, float>(),
+                    Features(1.14f, 1.35f, 1.05f, 0.0025f, 0.003f, 0.0035f, 0.003f, 0f, 0.003f, 0.0035f, 0.002f, 0.003f, 0.5f, 0.014f, 0.3f, 0.3f)),
+                ["w3_wide"] = (new Dictionary<string, float>(),
+                    Features(1.14f, 1.35f, 1.05f, 0.0025f, 0.003f, 0.0035f, 0.003f, 0f, 0.003f, 0.0035f, 0.002f, 0.003f, 0.5f, 0.014f, 0.3f, 0.25f)),
+                // Round 2 of the woman fix: the shipped woman (w1 with a tapered jaw, a lighter under-chin band and a
+                // firmer jaw edge 0.7), here with the softer jaw edge 0.5 to compare.
+                ["w5_edge05"] = (new Dictionary<string, float>(),
+                    Features(1.14f, 1.35f, 1.05f, 0.0025f, 0.003f, 0.0035f, 0.003f, 0f, 0.003f, 0.0035f, 0.002f, 0.0015f, 0.5f, 0.014f, 0.3f, 0.3f)),
+                // CHIN (2026-11-22): the shipped woman with the geometric normals under her jaw (the dark band, before the
+                // fix) and with them turned only part way toward the neck. "final" ships TuckNormal 1.
+                ["c0_before"] = (new Dictionary<string, float>(), new Dictionary<string, float> { ["TuckNormal"] = 0f }),
+                ["c1_soft"] = (new Dictionary<string, float>(), new Dictionary<string, float> { ["TuckNormal"] = 0.6f }),
             };
+
+        /// <summary>The woman's shape trials: fields of CharacterHead's private Woman shape (landmarks, rows, sections),
+        /// set by reflection on top of the sculpt trial of the same name. "Sections" is the whole table, one float[8] per
+        /// section (v, y, half width, zc, zf, zb, front and back exponents).</summary>
+        private static readonly Dictionary<string, Dictionary<string, object>> WomanShapeTrials =
+            new Dictionary<string, Dictionary<string, object>>
+            {
+                ["w1_flat"] = WomanShape(0.031f, 0.003f),
+                ["w3_wide"] = WomanShape(0.032f, 0.005f),
+            };
+
+        /// <summary>The fixed woman: the eye span given, the face front out to the eyeliner wings (|du| 0.135), the lips
+        /// on the painted mouth, a smaller cheek, a wider chin; sections widened by <paramref name="widen"/> over the
+        /// face, a flatter front across the eyes, a shorter skull back and a lower face set back behind the lips.</summary>
+        private static Dictionary<string, object> WomanShape(float eyeHalfSpan, float widen)
+        {
+            float w = widen;
+            return new Dictionary<string, object>
+            {
+                ["EyeHalfSpan"] = eyeHalfSpan, ["FrontDu"] = 0.135f, ["MouthV"] = 0.69f, ["CheekHeight"] = 0.003f, ["ChinSigmaX"] = 0.02f,
+                ["Rows"] = new[] { 0f, 0.05f, 0.11f, 0.17f, 0.235f, 0.30f, 0.36f, 0.41f, 0.457f, 0.51f, 0.555f, 0.585f, 0.603f, 0.621f, 0.64f, 0.69f, 0.745f, 0.81f, 0.868f, 0.9f, 0.94f },
+                ["Sections"] = new[]
+                {
+                    new[] { 0f, 0.115f, 0f, -0.086f, -0.086f, -0.086f, 2f, 2f },
+                    new[] { 0.06f, 0.111f, 0.040f, -0.086f, -0.044f, -0.128f, 2.2f, 2f },
+                    new[] { 0.12f, 0.101f, 0.060f, -0.084f, -0.016f, -0.155f, 2.5f, 2.1f },
+                    new[] { 0.18f, 0.085f, 0.074f, -0.082f, 0f, -0.171f, 2.9f, 2.2f },
+                    new[] { 0.24f, 0.066f, 0.081f, -0.080f, 0.008f, -0.176f, 3.1f, 2.2f },
+                    new[] { 0.33f, 0.036f, 0.084f + w, -0.079f, 0.012f, -0.182f, 3.6f, 2.3f },
+                    new[] { 0.39f, 0.016f, 0.084f + w, -0.079f, 0.013f, -0.183f, 3.6f, 2.3f },
+                    new[] { 0.457f, 0f, 0.084f + w, -0.079f, 0.010f, -0.183f, 3.6f, 2.3f },
+                    new[] { 0.53f, -0.017f, 0.085f + w, -0.079f, 0.013f, -0.180f, 3.6f, 2.3f },
+                    new[] { 0.60f, -0.033f, 0.083f + w, -0.079f, 0.015f, -0.174f, 3.3f, 2.3f },
+                    new[] { 0.682f, -0.052f, 0.077f + w, -0.080f, 0.017f, -0.168f, 2.8f, 2.3f },
+                    new[] { 0.745f, -0.067f, 0.070f + w, -0.082f, 0.014f, -0.165f, 2.3f, 2.3f },
+                    new[] { 0.81f, -0.083f, 0.059f + w, -0.086f, 0.010f, -0.163f, 2.2f, 2.3f },
+                    new[] { 0.868f, -0.097f, 0.045f, -0.091f, 0.003f, -0.161f, 2.1f, 2.3f },
+                    new[] { 1f, -0.108f, 0.042f, -0.100f, -0.045f, -0.165f, 2.2f, 2.3f },
+                },
+            };
+        }
+
+        /// <summary>The woman shape fields a trial changed, with their shipped values.</summary>
+        private static readonly List<(FieldInfo field, object value)> ShapeRestore = new List<(FieldInfo, object)>();
 
         private static Dictionary<string, float> Features(float scale, float nose, float noseWidth, float alar, float brow, float socket,
             float cheekbone, float cheekHollow, float lips, float chin, float chinGroove, float jaw, float jawEdge, float ear, float earCup, float frontRound = 0f)
@@ -136,6 +194,37 @@ namespace OutOfSight.Editor
             woman = womanField.GetValue(null);
             manField.SetValue(null, With(man, trial.man));
             womanField.SetValue(null, With(woman, trial.woman));
+            if (WomanShapeTrials.TryGetValue(variant, out var shapeFields))
+            {
+                SetWomanShape(shapeFields);
+            }
+        }
+
+        private static void SetWomanShape(Dictionary<string, object> fields)
+        {
+            object shape = HeadType.GetField("Woman", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            Type type = shape.GetType();
+            Type sectionType = HeadType.GetNestedType("Section", BindingFlags.NonPublic);
+            foreach (var pair in fields)
+            {
+                FieldInfo f = type.GetField(pair.Key, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (f == null)
+                {
+                    throw new ArgumentException("no shape field " + pair.Key);
+                }
+                object value = pair.Value;
+                if (pair.Value is float[][] table)
+                {
+                    Array sections = Array.CreateInstance(sectionType, table.Length);
+                    for (int i = 0; i < table.Length; i++)
+                    {
+                        sections.SetValue(Activator.CreateInstance(sectionType, table[i].Cast<object>().ToArray()), i);
+                    }
+                    value = sections;
+                }
+                ShapeRestore.Add((f, f.GetValue(shape)));
+                f.SetValue(shape, value);
+            }
         }
 
         private static object With(object shipped, Dictionary<string, float> fields)
@@ -164,6 +253,15 @@ namespace OutOfSight.Editor
             {
                 HeadType.GetField("ManSculpt", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).SetValue(null, man);
                 HeadType.GetField("WomanSculpt", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public).SetValue(null, woman);
+            }
+            if (ShapeRestore.Count > 0)
+            {
+                object shape = HeadType.GetField("Woman", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+                for (int i = ShapeRestore.Count - 1; i >= 0; i--)
+                {
+                    ShapeRestore[i].field.SetValue(shape, ShapeRestore[i].value);
+                }
+                ShapeRestore.Clear();
             }
             ClearProjections();
         }

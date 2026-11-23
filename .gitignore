@@ -40,6 +40,7 @@ service-account-1.json
 images_to_ocr/
 venv/
 venv*/
+.venv/
 
 /Include
 /Lib

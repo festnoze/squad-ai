@@ -258,17 +258,118 @@ namespace OutOfSight
             GameObject go = Child("Sun");
             Sun = go.AddComponent<Light>();
             Sun.type = LightType.Directional;
-            Sun.color = new Color(1f, 0.87f, 0.67f);
+            Sun.color = DaySunColour;
             Sun.intensity = SunIntensity;
             Sun.shadows = LightShadows.Soft; // MUTATION:SUN_SOFT_SHADOWS
-            Sun.shadowStrength = 0.78f;
-            go.transform.rotation = Quaternion.Euler(44f, 32f, 0f);
+            Sun.shadowStrength = DaySunShadowStrength;
+            go.transform.rotation = Quaternion.Euler(DaySunPitch, SunYaw, 0f);
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.58f, 0.63f, 0.73f);
-            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.47f, 0.42f);
-            RenderSettings.ambientGroundColor = new Color(0.28f, 0.23f, 0.19f);
+            RenderSettings.ambientSkyColor = DayAmbientSky;
+            RenderSettings.ambientEquatorColor = DayAmbientEquator;
+            RenderSettings.ambientGroundColor = DayAmbientGround;
             RenderSettings.skybox = null;
             RenderSettings.fog = false;
+            // A scene reload starts from the day look (the flag is static and outlives the previous Boot).
+            AppliedLighting = LevelDef.LightingDay;
+        }
+
+        // ----- Levels v2 (D25, C10): the night lighting preset, visual only -----
+
+        // The day look as BuildLighting and BuildVolume set it (the night preset puts exactly these back).
+        private static readonly Color DaySunColour = new Color(1f, 0.87f, 0.67f);
+        private const float DaySunShadowStrength = 0.78f;
+        private const float DaySunPitch = 44f;
+        private const float SunYaw = 32f;
+        private static readonly Color DayAmbientSky = new Color(0.58f, 0.63f, 0.73f);
+        private static readonly Color DayAmbientEquator = new Color(0.52f, 0.47f, 0.42f);
+        private static readonly Color DayAmbientGround = new Color(0.28f, 0.23f, 0.19f);
+        private const float DayTemperature = 9f;
+        private const float DayVignette = 0.22f;
+
+        // Night (presentation only, so not in Tuning; no rule reads any of it, PRD 4.7 unchanged): a low, cool moon as
+        // the one shadowed key light (the same yaw as the sun, so the sky picture's glow and every cached sky mesh keep
+        // their place), the ambient trilight at about NightAmbientFactor of the day's and pushed toward blue, a cool
+        // grade and a deeper vignette. The room lights carry the warm pools (RoomLights.NightAllowance, NightPool), the
+        // player's floor lamp shines brighter and further (LampLight.NightIntensity), the windows and the garden go dark
+        // blue (WindowImage.NightColour, GardenBackdrop.NightTint).
+        // NIGHT pass (2026-11-22, first look at it in real captures): the first values (moon 0.5, ambient 0.35) read as a
+        // blue dusk, the light walls still pale and the pools faint. The moon and the ambient now go lower, so walls and
+        // floors read dark and the warm pools carry the rooms; the cones (unlit shader) and the HUD (overlay) do not
+        // depend on any of it.
+        private static readonly Color NightMoonColour = new Color(0.6f, 0.71f, 1f);
+        private const float NightMoonIntensity = 0.3f;
+        private const float NightMoonShadowStrength = 0.55f;
+        private const float NightMoonPitch = 27f;
+
+        /// <summary>The night ambient trilight over the day's (each colour, before <see cref="NightAmbientTint"/>).</summary>
+        public const float NightAmbientFactor = 0.24f;
+
+        // Its luminance (Rec. 709 weights) is about 1 (0.97), so the factor above stays the ambient's brightness ratio.
+        private static readonly Color NightAmbientTint = new Color(0.86f, 0.97f, 1.32f);
+        private const float NightTemperature = -12f;
+        // A deeper vignette frames the lit middle of the view (the HUD is an overlay: never darkened by it).
+        private const float NightVignette = 0.3f;
+
+        /// <summary>The preset applied last (<see cref="LevelDef.LightingDay"/> or <see cref="LevelDef.LightingNight"/>).</summary>
+        public static string AppliedLighting { get; private set; } = LevelDef.LightingDay;
+
+        /// <summary>True while the night preset is applied (WindowImage and GardenBackdrop read it as they build).</summary>
+        public static bool Night => AppliedLighting == LevelDef.LightingNight;
+
+        /// <summary>True when <paramref name="def"/> asks for the night preset ("lighting": "night"); null or "day" is day.</summary>
+        public static bool IsNight(LevelDef def)
+        {
+            return def != null && def.Lighting == LevelDef.LightingNight;
+        }
+
+        private WhiteBalance whiteBalance;
+        private Vignette vignette;
+
+        /// <summary>
+        /// Levels v2 (D25, C10): applies the lighting preset of <paramref name="def"/> (GardenBackdrop.Build calls it, the
+        /// first level build step that sees the level, before any window reads <see cref="WindowImage.Colour"/>). Day puts
+        /// back exactly the look of BuildLighting and BuildVolume; night dims and cools the sun into a moon, the ambient and
+        /// the grade, and turns the camera's clear colour to the night sky. Without a Main (edit mode tools) only the flag
+        /// the windows and the backdrop read changes. Visual only: no rule, no vision and no audit reads it.
+        /// </summary>
+        public static void ApplyLighting(LevelDef def)
+        {
+            bool night = IsNight(def);
+            AppliedLighting = night ? LevelDef.LightingNight : LevelDef.LightingDay;
+            Main main = Instance;
+            if (main == null)
+            {
+                return;
+            }
+            if (main.Sun != null)
+            {
+                main.Sun.color = night ? NightMoonColour : DaySunColour; // MUTATION:NIGHT_MOON
+                main.Sun.intensity = night ? NightMoonIntensity : SunIntensity;
+                main.Sun.shadowStrength = night ? NightMoonShadowStrength : DaySunShadowStrength;
+                main.Sun.transform.rotation = Quaternion.Euler(night ? NightMoonPitch : DaySunPitch, SunYaw, 0f);
+            }
+            RenderSettings.ambientSkyColor = night ? NightAmbient(DayAmbientSky) : DayAmbientSky;
+            RenderSettings.ambientEquatorColor = night ? NightAmbient(DayAmbientEquator) : DayAmbientEquator;
+            RenderSettings.ambientGroundColor = night ? NightAmbient(DayAmbientGround) : DayAmbientGround;
+            DynamicGI.UpdateEnvironment();
+            if (main.whiteBalance != null)
+            {
+                main.whiteBalance.temperature.Override(night ? NightTemperature : DayTemperature);
+            }
+            if (main.vignette != null)
+            {
+                main.vignette.intensity.Override(night ? NightVignette : DayVignette);
+            }
+            if (main.Camera != null)
+            {
+                main.Camera.backgroundColor = GardenBackdrop.ClearColour;
+            }
+        }
+
+        private static Color NightAmbient(Color day)
+        {
+            return new Color(day.r * NightAmbientFactor * NightAmbientTint.r, day.g * NightAmbientFactor * NightAmbientTint.g,
+                day.b * NightAmbientFactor * NightAmbientTint.b, 1f);
         }
 
         private void BuildCamera()
@@ -317,11 +418,13 @@ namespace OutOfSight
             color.saturation.Override(11f);
             color.contrast.Override(10f);
             WhiteBalance white = profile.Add<WhiteBalance>(true);
-            white.temperature.Override(9f);
+            white.temperature.Override(DayTemperature);
+            whiteBalance = white;
             white.tint.Override(0f);
-            Vignette vignette = profile.Add<Vignette>(true);
-            vignette.intensity.Override(0.22f);
-            vignette.smoothness.Override(0.45f);
+            Vignette frame = profile.Add<Vignette>(true);
+            frame.intensity.Override(DayVignette);
+            frame.smoothness.Override(0.45f);
+            vignette = frame;
             volume.sharedProfile = profile;
             PostProcessing = volume;
         }

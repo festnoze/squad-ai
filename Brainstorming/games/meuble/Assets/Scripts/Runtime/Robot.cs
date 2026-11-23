@@ -22,6 +22,12 @@ namespace OutOfSight
     /// <item>Budgets: 3 material slots (shell, bumper, light); the light reuses the window pane's glow colour (CONTRACT_M6
     /// 2.4: the shell and the bumper now carry their own metal and plastic finish, Metal009 and Plastic006, so they no
     /// longer share a material with the window trim or the frame).</item>
+    /// <item>Levels v2 C8 (docs/levels_v2/LEVELS_V2.md, wave1 code_features "Robot hum disc and matched audio rolloff"):
+    /// the hum disc, a faint floor ring of radius <see cref="Tuning.RobotHumRadius"/> (the radius within which the hum
+    /// masks hops, rolls and clicks, Hearing.IsMasked) that follows the drawn body and pulses at the hum loop's period
+    /// (<see cref="Sfx.HumLoopSeconds"/>). One renderer, one material slot, one material shared by every robot, no
+    /// collider, no shadow. It is a sibling of the robot under the same parent (the level root), not its child, so the
+    /// level budgets count it while the robot's own hierarchy keeps its 3 slots and its RobotRadius footprint.</item>
     /// </list>
     /// </summary>
     public sealed class Robot : MonoBehaviour
@@ -40,6 +46,23 @@ namespace OutOfSight
         private const float LightRadius = 0.012f;
         private const float LightAhead = 0.115f;
         private const int Segments = 20;
+
+        // C8 hum disc: a pale lilac (apart from the cyan memory ghost, the amber seat ghost and the cones' yellow and red),
+        // lifted above a rug's printed top (Tuning.RugHeight + 0.002) and under the vision cone's 0.015 m. The band runs from
+        // HumDiscBand inside the radius to the radius: a very faint fill rising to a soft rim at the edge (HumDiscTexture).
+        private static readonly Color HumDiscColour = new Color(0.80f, 0.76f, 1f, 1f);
+        private const float HumDiscLift = 0.014f;
+        private const float HumDiscBand = 0.6f;
+        private const int HumDiscSegments = 72;
+        private const int HumDiscTexels = 64;
+        /// <summary>The disc's alpha at the top of its pulse (times the band's profile, 1 on the rim).</summary>
+        public const float HumDiscAlpha = 0.3f;
+        /// <summary>The bottom of the pulse, as a fraction of <see cref="HumDiscAlpha"/>.</summary>
+        public const float HumDiscPulseMin = 0.55f;
+        public const string HumDiscName = "HumDisc";
+        private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        private static Material humDiscMaterial;
+        private static Texture2D humDiscTexture;
 
         public RobotDef Def { get; private set; }
 
@@ -64,7 +87,21 @@ namespace OutOfSight
         /// <summary>The number of <see cref="SetPose"/> calls (tests).</summary>
         public int PoseCount { get; private set; }
 
+        /// <summary>C8: the hum disc (a sibling of the robot under its parent), centred under the drawn body.</summary>
+        public Transform HumDisc { get; private set; }
+
+        /// <summary>C8: the hum disc's renderer (one material slot).</summary>
+        public MeshRenderer HumDiscRenderer { get; private set; }
+
+        /// <summary>C8: the outer radius of the hum disc as built, metres (<see cref="Tuning.RobotHumRadius"/>).</summary>
+        public float HumDiscRadius { get; private set; }
+
+        /// <summary>C8: the disc's current pulse, from <see cref="HumDiscPulseMin"/> to 1 (its alpha is HumDiscAlpha times it).</summary>
+        public float HumDiscPulse { get; private set; } = 1f;
+
         private float clock;
+        private float humClock;
+        private MaterialPropertyBlock humBlock;
         // m15: the pose before the last fixed step's (the interpolation's start), the fixed time of the last pose, and the
         // body's drawn position.
         private Vector3 fromPosition;
@@ -84,6 +121,7 @@ namespace OutOfSight
             robot.Def = def;
             robot.Path = new RobotPath(def);
             robot.Build();
+            robot.BuildHumDisc(parent);
             robot.SetPose(robot.Path.PositionAt(0f), robot.Path.HeadingAt(0f));
             robot.PoseCount = 0;
             return robot;
@@ -119,6 +157,26 @@ namespace OutOfSight
             {
                 Body.SetPositionAndRotation(drawnPosition, Quaternion.Euler(0f, VisualYaw, 0f));
             }
+            PlaceHumDisc();
+        }
+
+        /// <summary>C8: the hum disc under the drawn body, level, at the floor height of the pose plus its lift.</summary>
+        private void PlaceHumDisc()
+        {
+            if (HumDisc != null)
+            {
+                HumDisc.SetPositionAndRotation(drawnPosition + Vector3.up * HumDiscLift, Quaternion.identity); // MUTATION:HUM_DISC_FOLLOW
+            }
+        }
+
+        private void OnDestroy()
+        {
+            // The disc is a sibling: it goes with the robot (a level rebuild destroys both with the root anyway; outside
+            // play mode the parent's DestroyImmediate takes it).
+            if (HumDisc != null && Application.isPlaying)
+            {
+                Destroy(HumDisc.gameObject);
+            }
         }
 
         private void LateUpdate()
@@ -130,6 +188,7 @@ namespace OutOfSight
                 float pulse = 0.5f + 0.5f * Mathf.Sin(clock * Tuning.RobotLightPulseRate * 2f * Mathf.PI);
                 StatusLight.localScale = Vector3.one * Mathf.Lerp(Tuning.RobotLightPulseMin, Tuning.RobotLightPulseMax, pulse);
             }
+            PulseHumDisc(dt);
             if (Body == null || !posed)
             {
                 return;
@@ -141,6 +200,141 @@ namespace OutOfSight
             drawnPosition = Vector3.Lerp(fromPosition, transform.position, alpha);
             VisualYaw = Mathf.MoveTowardsAngle(VisualYaw, Yaw, Tuning.RobotTurnRate * dt); // MUTATION:ROBOT_TURN_CAP
             Body.SetPositionAndRotation(drawnPosition, Quaternion.Euler(0f, VisualYaw, 0f));
+            PlaceHumDisc();
+        }
+
+        /// <summary>
+        /// C8: the hum disc's alpha swells once per hum loop (<see cref="Sfx.HumLoopSeconds"/>), from
+        /// <see cref="HumDiscPulseMin"/> to 1 of <see cref="HumDiscAlpha"/>, held while paused (dt 0). A property block, so
+        /// the one shared material is never changed.
+        /// </summary>
+        private void PulseHumDisc(float dt)
+        {
+            if (HumDiscRenderer == null)
+            {
+                return;
+            }
+            humClock = Mathf.Repeat(humClock + dt, Sfx.HumLoopSeconds);
+            float swell = 0.5f + 0.5f * Mathf.Cos(humClock / Sfx.HumLoopSeconds * 2f * Mathf.PI);
+            HumDiscPulse = Mathf.Lerp(HumDiscPulseMin, 1f, swell);
+            humBlock ??= new MaterialPropertyBlock();
+            Color c = HumDiscColour;
+            c.a = HumDiscAlpha * HumDiscPulse;
+            humBlock.SetColor(BaseColorId, c);
+            HumDiscRenderer.SetPropertyBlock(humBlock);
+        }
+
+        /// <summary>
+        /// C8: the hum disc, a sibling of the robot under <paramref name="parent"/> (the level root: the budgets count it), in
+        /// world space, placed by <see cref="SetPose"/> and LateUpdate. No collider, not an occluder, no shadow.
+        /// </summary>
+        private void BuildHumDisc(Transform parent)
+        {
+            var go = new GameObject(HumDiscName) { layer = gameObject.layer };
+            go.transform.SetParent(parent, false);
+            Mesh mesh = LoadView.CachedMesh("robot hum disc", HumDiscMesh);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = go.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = HumDiscMaterial();
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            HumDisc = go.transform;
+            HumDiscRenderer = renderer;
+            HumDiscRadius = Tuning.RobotHumRadius;
+            PulseHumDisc(0f);
+        }
+
+        /// <summary>
+        /// C8: the one material of every hum disc: alpha blended, unlit, double sided, no depth write (the floor cone's
+        /// setup), its base map the band's radial profile (<see cref="HumDiscTexture"/>). The colour comes from each disc's
+        /// property block.
+        /// </summary>
+        public static Material HumDiscMaterial()
+        {
+            if (humDiscMaterial != null)
+            {
+                return humDiscMaterial;
+            }
+            var m = new Material(PrimitiveKit.UnlitTransparent(HumDiscColour)) { name = "Robot hum disc" };
+            m.SetTexture("_BaseMap", HumDiscTexture());
+            m.SetColor(BaseColorId, new Color(HumDiscColour.r, HumDiscColour.g, HumDiscColour.b, HumDiscAlpha));
+            m.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            humDiscMaterial = m;
+            return m;
+        }
+
+        /// <summary>
+        /// The band's radial alpha, u = 0 at the inner edge (HumDiscBand inside the radius) to u = 1 on the radius: a fill that
+        /// rises from nothing to a fifth, then a soft rim at full alpha over the outer 6 % of the band.
+        /// </summary>
+        public static float HumDiscProfile(float u)
+        {
+            u = Mathf.Clamp01(u);
+            float fill = 0.2f * u * u;
+            float rim = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.8f, 0.94f, u));
+            return Mathf.Max(fill, rim);
+        }
+
+        private static Texture2D HumDiscTexture()
+        {
+            if (humDiscTexture != null)
+            {
+                return humDiscTexture;
+            }
+            var t = new Texture2D(HumDiscTexels, 1, TextureFormat.RGBA32, false)
+            {
+                name = "Robot hum disc band",
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+            };
+            var texels = new Color[HumDiscTexels];
+            for (int i = 0; i < HumDiscTexels; i++)
+            {
+                texels[i] = new Color(1f, 1f, 1f, HumDiscProfile(i / (HumDiscTexels - 1f)));
+            }
+            t.SetPixels(texels);
+            t.Apply(false, true);
+            humDiscTexture = t;
+            return t;
+        }
+
+        /// <summary>
+        /// The disc's flat band (metres, local: the floor at y = 0, centred on the robot): HumDiscSegments quads from
+        /// <see cref="HumDiscBand"/> inside <see cref="Tuning.RobotHumRadius"/> out to it, facing up, u running outward.
+        /// </summary>
+        private static Mesh HumDiscMesh()
+        {
+            float outer = Tuning.RobotHumRadius; // MUTATION:HUM_DISC_RADIUS
+            float inner = outer - HumDiscBand;
+            var vertices = new Vector3[2 * HumDiscSegments];
+            var normals = new Vector3[vertices.Length];
+            var uv = new Vector2[vertices.Length];
+            var triangles = new int[6 * HumDiscSegments];
+            for (int s = 0; s < HumDiscSegments; s++)
+            {
+                float a = 2f * Mathf.PI * s / HumDiscSegments;
+                var dir = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+                vertices[2 * s] = dir * inner;
+                vertices[2 * s + 1] = dir * outer;
+                normals[2 * s] = normals[2 * s + 1] = Vector3.up;
+                uv[2 * s] = new Vector2(0f, 0.5f);
+                uv[2 * s + 1] = new Vector2(1f, 0.5f);
+                int n = (s + 1) % HumDiscSegments;
+                int k = 6 * s;
+                // (inner, outer, next outer) and (inner, next outer, next inner): both face +y.
+                triangles[k] = 2 * s;
+                triangles[k + 1] = 2 * s + 1;
+                triangles[k + 2] = 2 * n + 1;
+                triangles[k + 3] = 2 * s;
+                triangles[k + 4] = 2 * n + 1;
+                triangles[k + 5] = 2 * n;
+            }
+            var mesh = new Mesh { vertices = vertices, normals = normals, uv = uv, triangles = triangles };
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         private void Build()
@@ -175,14 +369,20 @@ namespace OutOfSight
 
         // ----- Meshes (metres, local: the floor at y = 0, the front on +z) -----
 
+        /// <summary>
+        /// The white shell, a lathe. Soft movers (2026-11-20): its bottom edge and its top edge are rounded (a quarter circle
+        /// of 1.6 cm in two steps on top) instead of a single chamfer each, as the furniture bodies' edges.
+        /// </summary>
         private static Mesh ShellMesh()
         {
             float r = Tuning.RobotRadius - BumperWidth;
+            const float round = 0.016f;
+            float diagonal = round * (1f - Mathf.Sqrt(0.5f));
             var b = new MeshBuilder();
             b.AddLathe(Matrix4x4.identity, new[]
             {
-                new Vector2(r - 0.01f, Clearance), new Vector2(r, Clearance + 0.01f), new Vector2(r, ShellTop - 0.008f),
-                new Vector2(r - 0.008f, ShellTop),
+                new Vector2(r - 0.008f, Clearance), new Vector2(r - 0.002f, Clearance + 0.003f), new Vector2(r, Clearance + 0.009f),
+                new Vector2(r, ShellTop - round), new Vector2(r - diagonal, ShellTop - diagonal), new Vector2(r - round, ShellTop),
             }, Segments, true, true);
             return b.Build();
         }

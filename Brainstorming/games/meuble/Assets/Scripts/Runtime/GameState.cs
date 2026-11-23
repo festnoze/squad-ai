@@ -35,8 +35,9 @@ namespace OutOfSight
     /// furniture is pinned; 9 the body's hints, the sat-on line and the seat ghost of a sit-on-player approach.
     ///
     /// M5 wave 5A (docs/CONTRACT_M5.md 3 and 16; CONTRACT_M5_v3.md 3, 4 and 15.1 to 15.6), in the same order:
-    /// 1 the furniture (E in reach of a closed leaf goes to the door through <see cref="FurnitureController.ActionKeyClaimed"/>:
-    /// a 0.6 s external action, the leaf's swing begins), then every swinging leaf steps once (the press step is the
+    /// 1 the furniture (a push toward a closed leaf in reach goes to the door through
+    /// <see cref="FurnitureController.DoorPushClaimed"/>, task DOORAUTO, in place of M5's E press:
+    /// a 0.6 s external action, the leaf's swing begins), then every swinging leaf steps once (the push step is the
     /// swing's first step, so the leaf reaches its open angle on the action's 30th step, sampled on all 30, and the swing
     /// ends at the start of the next step); 2 inhabitants, built by the level builder through
     /// RoutineFactory with the level's one seat registry, their frozen station walks and an investigate planner on the
@@ -65,8 +66,19 @@ namespace OutOfSight
     /// fall is a Crash at the clue; 9 the balance gauge.
     ///
     /// The dog's hold (docs/CONTRACT_M5.md 20): in step 6, after the carry, a dog that barked runs to the furniture, pins
-    /// it next to it (step 5 keeps the pin with a sitter's) and barks at it, and the nearest free human comes to put it
-    /// back as after a discovery (<see cref="StepDogHold"/>); 9 the hold line and the bark loop.
+    /// it next to it (step 5 keeps the pin with a sitter's) and barks at it, then (DOGCARRY) drags it back itself to the
+    /// slot the nearest human remembers, with that human's discovery, through the carry of step 6; only when the dog has
+    /// no path there does the nearest free human come to put it back as after a discovery (<see cref="StepDogHold"/>);
+    /// 9 the hold line and the bark loop.
+    ///
+    /// Levels v2 (docs/levels_v2/LEVELS_V2.md 6, C3a): a playerLocked leaf is never opened by E (step 1), only by an
+    /// inhabitant's walk (step 2, openedByInhabitants). AUTOSTART (docs/next/progress/AUTOSTART.md, replaces C3a's held
+    /// start): the world runs every step from the build; until the player's first input (<see cref="Started"/> false, the
+    /// title card up) the player's furniture is out of play: step 1 gives it no input, step 2 never shoves it, step 3 never
+    /// sees it, step 4 (clock, exit, catch, barks) and the creak of step 7 wait, a pratfall of step 5 costs nothing.
+    ///
+    /// Next, idea 6 (docs/IDEAS.md QW1, task FOCUS): a focus loss or an app pause opens the pause menu over a level in play
+    /// (<see cref="PauseForBackground"/>), never over the title or an end panel; the regain never resumes by itself.
     /// </summary>
     public sealed class GameState : MonoBehaviour
     {
@@ -86,11 +98,175 @@ namespace OutOfSight
         public LevelDef Def { get; private set; }
         public CaughtRule Rule { get; } = new CaughtRule();
 
-        /// <summary>Simulated time since the level started, in fixed steps (the win time).</summary>
+        /// <summary>Simulated time since the level started, in fixed steps (the win time). AUTOSTART: from the player's first input.</summary>
         public float Elapsed { get; private set; }
 
-        /// <summary>Number of fixed steps simulated since the level started.</summary>
+        /// <summary>Number of fixed steps simulated since the level started. AUTOSTART: from the player's first input.</summary>
         public int Steps { get; private set; }
+
+        /// <summary>
+        /// AUTOSTART: fixed steps the world (inhabitants, robots, doors) ran since the build, the time on the routines' and
+        /// the robots' timelines. Equal to <see cref="Steps"/> when the level is not held; ahead of it by the steps spent
+        /// under the title card before the player's first input otherwise. Pauses stop both.
+        /// </summary>
+        public int WorldSteps { get; private set; }
+
+        // ----- Levels v2 (docs/levels_v2/LEVELS_V2.md 1.2 and 6, task C3a): the held start -----
+
+        /// <summary>
+        /// Levels v2 (C3a): a level built while this holds starts held (<see cref="Started"/> false) and waits for the
+        /// player's first move input or action press. AUTOSTART: held only means the title card stays up and the clock
+        /// waits; the world runs from the build. Read by every build, so a restart and the next level hold again.
+        /// Default (<see cref="DefaultHoldStart"/>): true in a player and in editor play mode; false under --probe, --look
+        /// and in batch mode, and the PlayMode suite turns it off for every test (ProbeTestsHeldStart's run callback), so
+        /// the existing steps keep t = 0 at the build. A test sets it; <see cref="ResetHoldStart"/> goes back to the default.
+        /// </summary>
+        public static bool HoldStart
+        {
+            get => holdStartOverride ?? DefaultHoldStart;
+            set => holdStartOverride = value;
+        }
+
+        private static bool? holdStartOverride;
+
+        /// <summary>
+        /// The held start's default: on unless this run is the probe (--probe), the look agent's screenshots (--look) or
+        /// a batch-mode run (no human there to press a key: the CLI test runner, the audit, the build tools).
+        /// </summary>
+        public static bool DefaultHoldStart => !(Probe.Requested || SaveStore.LookRequested || Application.isBatchMode);
+
+        /// <summary>Tests: <see cref="HoldStart"/> goes back to <see cref="DefaultHoldStart"/>.</summary>
+        public static void ResetHoldStart()
+        {
+            holdStartOverride = null;
+        }
+
+        // ----- Next (docs/IDEAS.md QW1, idea 6, task FOCUS): the pause on a focus loss or an app pause -----
+
+        /// <summary>
+        /// Idea 6 (FOCUS): a level in play pauses itself, pause menu open, when the window loses focus (PC: alt-tab, a
+        /// click on another window) or the app goes to the background (Android: the home button, a call). Read on every
+        /// focus event. Default (<see cref="DefaultAutoPause"/>): true in a player and in editor play mode; false under
+        /// --probe, --look and in batch mode (timed captures and the CLI test runner would be interrupted by a pause
+        /// nobody can resume), and the PlayMode suite turns it off for every test (ProbeTestsFocusPause's run callback)
+        /// so an editor losing focus during a run never pauses a test's level. A test sets it; <see cref="ResetAutoPause"/>
+        /// goes back to the default.
+        /// </summary>
+        public static bool AutoPause
+        {
+            get => autoPauseOverride ?? DefaultAutoPause;
+            set => autoPauseOverride = value;
+        }
+
+        private static bool? autoPauseOverride;
+
+        /// <summary>The auto pause's default: on unless this run is the probe, the look agent's screenshots or batch mode.</summary>
+        public static bool DefaultAutoPause => !(Probe.Requested || SaveStore.LookRequested || Application.isBatchMode);
+
+        /// <summary>Tests: <see cref="AutoPause"/> goes back to <see cref="DefaultAutoPause"/>.</summary>
+        public static void ResetAutoPause()
+        {
+            autoPauseOverride = null;
+        }
+
+        /// <summary>Idea 6 (FOCUS): pauses opened by a focus loss or an app pause since the boot (tests, the probe).</summary>
+        public int FocusPauses { get; private set; }
+
+        /// <summary>
+        /// Idea 6 (FOCUS): the window lost focus (Unity: on PC and in editor play mode; on Android before
+        /// <see cref="OnApplicationPause"/>). A regain does nothing here: the player resumes from the pause menu, so the
+        /// key or the touch that brought the window back is never a game input (while paused, Update discards every
+        /// gameplay press, FixedUpdate runs no rule and reads no start input; the frame the menu closes, Menu.ClosedThisFrame
+        /// drops the presses too). MusicPlayer checks its loops on the regain by itself.
+        /// </summary>
+        private void OnApplicationFocus(bool focused)
+        {
+            if (!focused)
+            {
+                PauseForBackground();
+            }
+        }
+
+        /// <summary>Idea 6 (FOCUS): the app went to the background (Android: the home button, a call, the screen off).</summary>
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused)
+            {
+                PauseForBackground();
+            }
+        }
+
+        /// <summary>
+        /// Idea 6 (FOCUS): the pause a focus loss or an app pause asks for. Opens the pause menu (Menu.SetPaused, so the
+        /// Resume button is selected and the music ducks exactly as on an Escape press) when there is a level in play
+        /// to pause: <see cref="AutoPause"/> on, a level built, still <see cref="PlayState.Playing"/> (never under the
+        /// fail or the win panel, nothing runs there), and no menu open (never under the title and its pages, nothing to
+        /// pause; never twice). A held start (<see cref="Started"/> false, the intro card) pauses too: since AUTOSTART the
+        /// world runs under the card, and the first input after the regain must be deliberate. Without a Menu (a bare GameState) it sets
+        /// <see cref="Paused"/> itself, which also pauses the audio listener. Returns true when it paused.
+        /// </summary>
+        public bool PauseForBackground()
+        {
+            if (!AutoPause || Level == null || State != PlayState.Playing) // MUTATION:FOCUS_PAUSE_GATE
+            {
+                return false;
+            }
+            if (Menu == null)
+            {
+                if (Paused)
+                {
+                    return false;
+                }
+                Paused = true;
+            }
+            else
+            {
+                if (Menu.IsOpen)
+                {
+                    return false;
+                }
+                Menu.SetPaused(true);
+                if (!Menu.PauseOpen)
+                {
+                    return false;
+                }
+            }
+            FocusPauses++;
+            return true;
+        }
+
+        /// <summary>
+        /// Levels v2 (C3a), AUTOSTART: the player started. False from a held build (<see cref="HoldStart"/>) until the first
+        /// fixed step with a move input past the dead zone, an action press or (STARTFIX) a start press: Space, Enter,
+        /// gamepad A or a touch tap, which starts without moving (InputReader.AnyStartInput); that step sets it and takes
+        /// the input. The world never waits for it: inhabitants, robots, doors and <see cref="FixedStepped"/> run from the
+        /// build. Until it is set the player's furniture is out of play (the detection-before-first-input rule): it takes
+        /// no input, no watcher sees it (so no catch, bark, discovery or suspicion), no robot shoves it (a robot that runs
+        /// into it reverses), a pratfall on its seat home costs no discovery, the creak gauge and the clock wait, and the
+        /// HUD keeps the intro card up (Hud.UpdateCardHold) with no hint and no tip. An inhabitant may still sit on it (a
+        /// routine, not a detection). Camera input and the careful key alone do not start it; the pause works while held.
+        /// <see cref="Elapsed"/> and <see cref="Steps"/> count from it, so a record excludes the time spent reading the
+        /// intro card; <see cref="WorldSteps"/> counts from the build. True from the build when the hold is off.
+        /// </summary>
+        public bool Started { get; private set; } = true;
+
+        /// <summary>Levels v2 (C3a): raised once when a held start is released (never by a build with the hold off).</summary>
+        public event Action LevelStarted;
+
+        /// <summary>
+        /// Levels v2 (C3a): releases a held start now, as the first input would: the next fixed step is step 1 of the
+        /// player's clock. RouteReplayer calls it at its first sample when a test turned the hold on (AUTOSTART: right
+        /// after the build, the world has not stepped yet, so the route keeps t = 0). Nothing when started.
+        /// </summary>
+        public void ReleaseStart()
+        {
+            if (Started)
+            {
+                return;
+            }
+            Started = true;
+            LevelStarted?.Invoke();
+        }
 
         /// <summary>
         /// The furniture's own samples are seen by a watcher that counts for the catch (every inhabitant of M1 to M4; since
@@ -117,6 +293,26 @@ namespace OutOfSight
 
         /// <summary>Every noise event emitted (hops on a hard floor, creaks), before it reaches the inhabitants.</summary>
         public event Action<NoiseEvent> Noise;
+
+        /// <summary>
+        /// Idea 7 (BUBBLES): an inhabitant's comic moment (Core.ReactionKind) with the inhabitant, raised inside the fixed step
+        /// where it happens (a discovery, a put down, a sit on the player, the dog's barks and its call, the catch, a household
+        /// door opened). SpeechBubbles shows the line; the near miss is its own detection. Events only: nothing here waits
+        /// on a listener.
+        /// </summary>
+        public event Action<ReactionKind, Inhabitant> Reacted;
+
+        /// <summary>Idea 7 (BUBBLES): a robot ran into the furniture while playing (Contact), with the robot.</summary>
+        public event Action<Robot> RobotBumped;
+
+        /// <summary>Raises <see cref="Reacted"/> for inhabitant <paramref name="i"/> of the level (nothing for -1).</summary>
+        private void React(ReactionKind kind, int i)
+        {
+            if (Level != null && i >= 0 && i < Level.Inhabitants.Count)
+            {
+                Reacted?.Invoke(kind, Level.Inhabitants[i]);
+            }
+        }
 
         /// <summary>The play order of levels.json (a single level when the file is missing).</summary>
         public IReadOnlyList<string> LevelOrder => Manifest;
@@ -230,7 +426,7 @@ namespace OutOfSight
         /// <summary>A watcher that counts for the catch sees a sample of a swinging leaf on this step (seen moving).</summary>
         public bool LeafSeen { get; private set; }
 
-        /// <summary>Doors the player opened since the level started (E in reach, the opening began).</summary>
+        /// <summary>Doors the player opened since the level started (a push toward a closed leaf in reach, the opening began).</summary>
         public int DoorOpenCount { get; private set; }
 
         /// <summary>Where the last bark was emitted (planar: at the dog).</summary>
@@ -239,8 +435,35 @@ namespace OutOfSight
         /// <summary>The fixed step (<see cref="Steps"/>) of the last bark, -1 before the first one.</summary>
         public int LastBarkStep { get; private set; } = -1;
 
-        /// <summary>The leaf the action key would open now (a closed leaf in reach, the nearest), or null.</summary>
+        /// <summary>
+        /// The leaf a door push would open now (a closed leaf in reach, the nearest), or null. Levels v2 (C3a): never a
+        /// playerLocked leaf (<see cref="LockedLeafInReach"/>).
+        /// </summary>
         public DoorLeaf DoorInReach => Level != null ? NearestClosedLeafInReach(Level.Furniture) : null;
+
+        /// <summary>
+        /// Levels v2 (C3a, OpeningDef.PlayerLocked): the nearest closed playerLocked leaf in reach while no leaf the player
+        /// may open is (a door push then skips it: no action begins for it), or null. Only an inhabitant's walk opens such a leaf.
+        /// </summary>
+        public DoorLeaf LockedLeafInReach =>
+            Level != null && lockedLeaves != 0 && NearestClosedLeafInReach(Level.Furniture) == null
+                ? NearestClosedLeafInReach(Level.Furniture, true)
+                : null;
+
+        /// <summary>
+        /// Levels v2 (C3a): the HUD's "Locked" hint (hud.door.locked) is wanted now: a playerLocked leaf is in reach
+        /// (<see cref="LockedLeafInReach"/>) of a furniture that could otherwise act on a door (playing, started, upright,
+        /// not pinned, not carried, not hidden, in no action). The HUD reads it (Hud.Game) in place of the door hint.
+        /// </summary>
+        public bool LockedDoorHintWanted
+        {
+            get
+            {
+                FurnitureController furniture = Level != null ? Level.Furniture : null;
+                return furniture != null && State == PlayState.Playing && Started && !furniture.Carried && !furniture.Pinned
+                    && !furniture.Tipped && !furniture.ActionActive && !furniture.Hidden && LockedLeafInReach != null;
+            }
+        }
 
         /// <summary>The seconds a dog's bark accumulator has seen the furniture moving (0 during its cooldown).</summary>
         public float DogSeenMoving(Inhabitant dog)
@@ -261,18 +484,24 @@ namespace OutOfSight
         /// <summary>The dog running to the furniture after its bark, or holding it, or null.</summary>
         public Inhabitant HoldingDog => holdDog >= 0 && Level != null && holdDog < Level.Inhabitants.Count ? Level.Inhabitants[holdDog] : null;
 
-        /// <summary>The dog stands next to the furniture and pins it, until a human puts it back.</summary>
+        /// <summary>The dog stands next to the furniture and pins it (or drags it home), until it is put back.</summary>
         public bool HeldByDog => dogHolding;
 
-        /// <summary>The human the dog's hold sent to put the furniture back, or null.</summary>
+        /// <summary>DOGCARRY: the dog drags the furniture back to its slot itself (it is the <see cref="Carrier"/>).</summary>
+        public bool DraggedByDog => dogDragging;
+
+        /// <summary>The human the dog's hold sent to put the furniture back (DOGCARRY: only when the dog has no path), or null.</summary>
         public Inhabitant DogCaller => holdCaller >= 0 && Level != null && holdCaller < Level.Inhabitants.Count ? Level.Inhabitants[holdCaller] : null;
 
         /// <summary>Since the level started: runs begun after a bark, holds (the dog reached and pinned the furniture), humans
-        /// sent by a hold, and the discoveries those humans made on arrival.</summary>
+        /// sent by a hold, and the discoveries of a hold (the dragging dog's, or the sent human's on arrival). DOGCARRY: the
+        /// drags the dog began, and the holds where it had no path home and called a human instead.</summary>
         public int DogRunCount { get; private set; }
         public int DogHoldCount { get; private set; }
         public int DogCallCount { get; private set; }
         public int DogHoldDiscoveryCount { get; private set; }
+        public int DogDragCount { get; private set; }
+        public int DogDragFallbackCount { get; private set; }
 
         /// <summary>The watcher saw a sample of a swinging leaf on the last step (any watcher, the dog included).</summary>
         public bool SeesLeaf(Inhabitant inhabitant)
@@ -287,8 +516,9 @@ namespace OutOfSight
         public IReadOnlyList<Robot> Robots => robots;
 
         /// <summary>
-        /// The time on the robots' timelines: fixed steps since the level was built, times dt. The robots never wait for the
-        /// player (CONTRACT_M5 4: the timeline is fixed), so it is the inhabitants' time, and the audit's.
+        /// The time on the robots' timelines: fixed steps since the build (AUTOSTART: the robots no longer wait for the
+        /// player's first input, <see cref="WorldSteps"/>), times dt. The robots never wait for the player (CONTRACT_M5 4:
+        /// the timeline is fixed), so it is the inhabitants' time, and the audit's.
         /// </summary>
         public float RobotTime { get; private set; }
 
@@ -463,6 +693,8 @@ namespace OutOfSight
         private DoorMemory[] doorMemories = new DoorMemory[0];
         private int[] doorFixers = new int[0];
         private int householdLeaves;
+        // Levels v2 (C3a): bit k set when leaf k (LevelDef.LeafDoors order, DoorLeaf.Index) carries playerLocked.
+        private int lockedLeaves;
         private DoorLeaf householdDoorThisStep;
         private readonly List<PropDef> wardrobes = new List<PropDef>();
         private readonly Vector3[] spotSamples = new Vector3[Tuning.SampleCount];
@@ -567,6 +799,11 @@ namespace OutOfSight
         private int holdBarkSteps;
         private bool holdBarkThisStep;
         private bool sitPinned;
+        // DOGCARRY: the steps the dog has held the furniture before it grips it, whether it drags it home (it is the
+        // carrier), and whether this hold fell back on calling a human (the dog had no path home).
+        private int holdGripSteps;
+        private bool dogDragging;
+        private bool dogDragFallback;
 
         // M5 wave 5B: the robots, their planar positions this step (the hum) and whether each one touched the furniture on the
         // last step (a contact is the first step of an overlap); the fixed steps of the robot timeline.
@@ -597,6 +834,8 @@ namespace OutOfSight
 
         public void Begin()
         {
+            // Idea 7 (BUBBLES): the speech bubbles live as a child of the game, built once, listening to Reacted.
+            SpeechBubbles.Ensure(this);
             LevelDef def = LevelLoader.Load(LevelId);
             TeardownLevel();
             Def = def;
@@ -643,10 +882,16 @@ namespace OutOfSight
             Creak.Reset();
             Creak.FillTime = Difficulty.CreakFillTime;
             State = PlayState.Playing;
+            // Levels v2 (C3a), AUTOSTART: a held build waits for the player's first input to start the clock and drop the
+            // title card (the world runs at once); a restart and the next level hold again.
+            Started = !HoldStart;
+            // STARTFIX: the Enter or gamepad A that built this level (Play, Next level, a level card) never also starts it.
+            InputReader.BlockStartPresses();
             LoseReason = LoseReason.None;
             LostTo = null;
             Elapsed = 0f;
             Steps = 0;
+            WorldSteps = 0;
             Seen = false;
             MaxSuspicion = 0f;
             DiscoveryCount = 0;
@@ -697,7 +942,13 @@ namespace OutOfSight
             DogHoldCount = 0;
             DogCallCount = 0;
             DogHoldDiscoveryCount = 0;
-            Level.Furniture.ActionKeyClaimed = ClaimActionKey;
+            holdGripSteps = 0;
+            dogDragging = false;
+            dogDragFallback = false;
+            DogDragCount = 0;
+            DogDragFallbackCount = 0;
+            Level.Furniture.DoorPushClaimed = ClaimDoorPush;
+            Level.Furniture.DoorPushTarget = () => DoorPushDirection;
             lastToppleCount = Level.Furniture.ToppleCount;
             lastToggleCount = Level.Furniture.ToggleCount;
             lastRollCount = Level.Furniture.RollCount;
@@ -738,6 +989,7 @@ namespace OutOfSight
             wardrobes.Clear();
             wardrobes.AddRange(Def.Wardrobes());
             householdLeaves = Def.HouseholdLeafMask();
+            lockedLeaves = LockedLeafMask(Def);
 
             int n = Level.Inhabitants.Count;
             seatHooks = new Func<bool>[n];
@@ -843,8 +1095,15 @@ namespace OutOfSight
         {
             List<Inhabitant> inhabitants = Level.Inhabitants;
             float carryForward = Level.Furniture.Body != null ? Level.Furniture.Body.CarryForward : Tuning.CarryForward;
+            // DOGBIG (render only): the near edge of the held furniture, for the dog's hold back step (Inhabitant.DogHoldBack).
+            float carriedHalfDepth = 0.5f * Level.Furniture.Size.z;
+            // GRIP (render only): where carriers hold this body (the humans' hands, the dog's bite).
+            GripDef grip = GripDef.For(Level.Furniture.Kind);
             for (int i = 0; i < inhabitants.Count && i < seatHooks.Length; i++)
             {
+                inhabitants[i].CarriedHalfDepth = carriedHalfDepth;
+                inhabitants[i].GripFurniture = Level.Furniture;
+                inhabitants[i].Grip = grip;
                 InhabitantRoutine routine = inhabitants[i].Routine;
                 if (routine == null)
                 {
@@ -891,8 +1150,12 @@ namespace OutOfSight
             return 0;
         }
 
-        /// <summary>The nearest closed leaf the furniture can open from where it stands (DoorLeaf.InReach), or null.</summary>
-        private DoorLeaf NearestClosedLeafInReach(FurnitureController furniture)
+        /// <summary>
+        /// The nearest closed leaf the furniture can open from where it stands (DoorLeaf.InReach), or null. Levels v2 (C3a):
+        /// a playerLocked leaf is never one the player can open; with <paramref name="locked"/> true the search looks at the
+        /// playerLocked leaves only (<see cref="LockedLeafInReach"/>).
+        /// </summary>
+        private DoorLeaf NearestClosedLeafInReach(FurnitureController furniture, bool locked = false)
         {
             if (Level == null || furniture == null)
             {
@@ -906,6 +1169,10 @@ namespace OutOfSight
                 {
                     continue;
                 }
+                if (IsPlayerLocked(leaf) != locked) // MUTATION:LOCKED_LEAF
+                {
+                    continue;
+                }
                 float d = YawMath.Planar(furniture.transform.position - leaf.Geometry.Center).magnitude;
                 if (d < bestDistance)
                 {
@@ -916,13 +1183,79 @@ namespace OutOfSight
             return best;
         }
 
+        /// <summary>Levels v2 (C3a): the leaf carries OpeningDef.PlayerLocked (only an inhabitant's walk opens it).</summary>
+        private bool IsPlayerLocked(DoorLeaf leaf)
+        {
+            return leaf != null && leaf.Index >= 0 && leaf.Index < 31 && (lockedLeaves & (1 << leaf.Index)) != 0;
+        }
+
+        /// <summary>Levels v2 (C3a): bit k set when leaf k of <see cref="LevelDef.LeafDoors"/> carries playerLocked.</summary>
+        private static int LockedLeafMask(LevelDef def)
+        {
+            int mask = 0;
+            List<OpeningDef> leaves = def != null ? def.LeafDoors() : null;
+            for (int k = 0; leaves != null && k < leaves.Count && k < 31; k++)
+            {
+                if (leaves[k] != null && leaves[k].PlayerLocked)
+                {
+                    mask |= 1 << k;
+                }
+            }
+            return mask;
+        }
+
         /// <summary>
-        /// CONTRACT_M5_v3 15.2, the furniture's action key hook (called inside its step, once per E press it consumes while
-        /// upright and in no action): a closed leaf in reach takes E before the body action (the lamp switch). The door
-        /// opens only when the furniture accepts the 0.6 s external action (still, upright, not pinned, not carried);
-        /// otherwise E does nothing at all. With no closed leaf in reach, E is the body's.
+        /// Task DOORAUTO: the planar unit direction the player pushes the move input toward to act now, the furniture's
+        /// <see cref="FurnitureController.DoorPushTarget"/> (RouteReplayer pushes along it too), or null. Hidden: out of the
+        /// wardrobe's front (<see cref="WardrobeRule.Front"/>). Else a closed leaf in reach that the player may open (the
+        /// nearest, as <see cref="ClaimDoorPush"/> picks it): into its wall (<see cref="DoorPushToward"/>). Else a wardrobe in
+        /// front that the furniture fits in: into its front. A playerLocked leaf is never one (the "Locked" hint shows
+        /// instead, and the furniture simply drives into it). Null while not playing.
         /// </summary>
-        private bool ClaimActionKey()
+        public Vector3? DoorPushDirection
+        {
+            get
+            {
+                FurnitureController furniture = Level != null ? Level.Furniture : null;
+                if (furniture == null || State != PlayState.Playing)
+                {
+                    return null;
+                }
+                if (furniture.Hidden)
+                {
+                    return WardrobeProp != null ? WardrobeRule.Front(WardrobeProp) : (Vector3?)null;
+                }
+                DoorLeaf leaf = NearestClosedLeafInReach(furniture);
+                if (leaf != null)
+                {
+                    return DoorPushToward(leaf, furniture.transform.position);
+                }
+                PropDef wardrobe = WardrobeFor(furniture);
+                return wardrobe != null ? -WardrobeRule.Front(wardrobe) : (Vector3?)null;
+            }
+        }
+
+        /// <summary>
+        /// Task DOORAUTO: the direction that pushes toward <paramref name="leaf"/> from <paramref name="from"/>: its wall's
+        /// normal, pointing from the side <paramref name="from"/> stands on into the wall (not toward the doorway centre, so a
+        /// push along the wall never opens it). Planar, unit.
+        /// </summary>
+        public static Vector3 DoorPushToward(DoorLeaf leaf, Vector3 from)
+        {
+            Vector3 normal = leaf.Geometry.AlongX ? Vector3.forward : Vector3.right;
+            float side = Vector3.Dot(YawMath.Planar(leaf.Geometry.Center - from), normal);
+            return side >= 0f ? normal : -normal;
+        }
+
+        /// <summary>
+        /// CONTRACT_M5_v3 15.2, the furniture's door push hook (task DOORAUTO: called inside its step, once per confirmed push
+        /// toward <see cref="DoorPushDirection"/>, or per injected push, while upright and in no action; it replaced the E
+        /// press): a closed leaf in reach takes it. The door opens only when the furniture accepts the 0.6 s external action
+        /// (still, upright, not pinned, not carried); otherwise the push does nothing at all. Levels v2 (C3a): a playerLocked
+        /// leaf is skipped (NearestClosedLeafInReach never returns it): no action begins for it and the push goes on as if it
+        /// were not there (a wardrobe in front, else nothing).
+        /// </summary>
+        private bool ClaimDoorPush()
         {
             if (Level == null || State != PlayState.Playing)
             {
@@ -931,7 +1264,7 @@ namespace OutOfSight
             FurnitureController furniture = Level.Furniture;
             if (furniture.Hidden)
             {
-                // M6 (CONTRACT_M6 2.5): E inside the wardrobe leaves it: visible again in front of it, a brisk moving
+                // M6 (CONTRACT_M6 2.5): a push out of the wardrobe leaves it: visible again in front of it, a brisk moving
                 // action (Tuning.WardrobeActionTime). M7 polish: the doors swing open at once (PlayWardrobeDoors),
                 // on this same step, instead of waiting for the action to end.
                 if (furniture.BeginExternalAction(Tuning.WardrobeActionTime))
@@ -946,7 +1279,7 @@ namespace OutOfSight
             DoorLeaf leaf = NearestClosedLeafInReach(furniture);
             if (leaf == null)
             {
-                // M6: no closed leaf in reach: a wardrobe the furniture fits in, standing in front of it, takes E.
+                // M6: no closed leaf in reach: a wardrobe the furniture fits in, standing in front of it, takes the push.
                 PropDef wardrobe = WardrobeFor(furniture);
                 if (wardrobe == null)
                 {
@@ -970,7 +1303,7 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// Step 1, after the furniture: every swinging leaf advances one fixed step. The E press step is the swing's first
+        /// Step 1, after the furniture: every swinging leaf advances one fixed step. The push step is the swing's first
         /// step, so the leaf reaches its open angle on the 30th and last step of the opening action and has its samples on
         /// all 30 steps (CONTRACT_M5_v3 15.2, wave 5A.1 critique m5; the audit's opening samples end at 90 deg); its next
         /// Step only ends the swing. The level's open mask counts the leaf from its first swing step
@@ -1032,6 +1365,7 @@ namespace OutOfSight
                 BarkCount++;
                 LastBarkAt = at;
                 LastBarkStep = Steps;
+                React(ReactionKind.DogBark, i);
                 EmitUnlessMasked(new NoiseEvent(at, Hearing.RadiusOf(NoiseKind.Bark), NoiseKind.Bark));
             }
         }
@@ -1044,7 +1378,10 @@ namespace OutOfSight
         /// on and the furniture neither hidden nor carried. A furniture that moved on before the dog got there is chased from
         /// where the dog stopped; one the dog cannot reach ends the run. Within InvestigateReach + CarryReachMargin the dog
         /// holds it: the furniture is pinned (<see cref="ApplyPin"/>, as when sat on), the dog barks at it every
-        /// <see cref="Tuning.DogHoldBarkInterval"/> (a sound, not a noise event), and the nearest human free to come (memory,
+        /// <see cref="Tuning.DogHoldBarkInterval"/> (a sound, not a noise event). DOGCARRY: after <see cref="Tuning.DogGripTime"/>
+        /// the dog drags it back itself (<see cref="BeginDogDrag"/>): it is the carrier until the put down, then it barks once,
+        /// wags and resumes its routine; no human is called. Only when the dog has no path to the slot (the fallback, logged)
+        /// does the M5 hold go on: the nearest human free to come (memory,
         /// Routine or Alerted, not frozen, on no other errand) is sent to it with <see cref="InhabitantRoutine.Investigate"/>.
         /// Its arrival is <see cref="StepInvestigations"/>': out of place for its memory, one discovery and the carry back to its
         /// slot, as always; in place, nothing. The hold ends when the furniture is put down, when the called human goes back to
@@ -1080,6 +1417,23 @@ namespace OutOfSight
                 return;
             }
             InhabitantRoutine d = holdDog < inhabitants.Count ? inhabitants[holdDog].Routine : null;
+            if (dogDragging)
+            {
+                // DOGCARRY: the dog drags it home; StepInvestigations' carry moves it, puts it down and updates every memory.
+                if (putDownThisStep && d != null)
+                {
+                    // Dropped where it belongs: one happy bark (a sound, not a noise event), then the wag beat of its routine.
+                    React(ReactionKind.DogBark, holdDog);
+                    Sfx?.PlayBark(PanToward(inhabitants[holdDog].transform.position));
+                    EndHold();
+                }
+                else if (carrier != holdDog)
+                {
+                    // The drag was cancelled (a pin, a startle): the carry dropped the furniture where it was.
+                    EndHold();
+                }
+                return;
+            }
             if (d == null || !d.Running || d.Mode != InhabitantMode.Investigating || furniture.Hidden)
             {
                 // The dog was interrupted (a pin, a startle), or the furniture went into a wardrobe.
@@ -1115,7 +1469,9 @@ namespace OutOfSight
                 dogHolding = true; // MUTATION:DOG_HOLD
                 DogHoldCount++;
                 holdBarkSteps = 0;
+                holdGripSteps = 0;
                 ApplyPin(furniture);
+                React(ReactionKind.DogBark, holdDog);
             }
             if (putDownThisStep)
             {
@@ -1132,6 +1488,7 @@ namespace OutOfSight
             {
                 holdBarkThisStep = true;
                 holdBarkSteps = Mathf.Max(1, Mathf.RoundToInt(Tuning.DogHoldBarkInterval / dt));
+                React(ReactionKind.DogBark, holdDog);
             }
             if (holdCaller >= 0)
             {
@@ -1142,6 +1499,29 @@ namespace OutOfSight
                 // Back to its routine without a carry: it found the furniture in place, or could not reach it and accepted it.
                 EndHold();
                 return;
+            }
+            if (!dogDragFallback)
+            {
+                // DOGCARRY: no human is called: the dog brings it back itself, unless it has no path home.
+                if (++holdGripSteps < Mathf.Max(1, Mathf.RoundToInt(Tuning.DogGripTime / dt)))
+                {
+                    return;
+                }
+                switch (BeginDogDrag(d, furniture))
+                {
+                    case DogDrag.Begun:
+                    case DogDrag.Over:
+                        return;
+                    case DogDrag.NoPath:
+                        // Fall back on the M5 hold: the nearest free human is called below, as before.
+                        dogDragFallback = true;
+                        DogDragFallbackCount++;
+                        Debug.Log($"[GameState] DOGCARRY: the dog has no path to the furniture's slot: a human is called instead.");
+                        break;
+                    default:
+                        // Nobody remembers a slot for it (no human with memory): the dog waits, then gives up.
+                        break;
+                }
             }
             int best = -1;
             float bestDistance = float.MaxValue;
@@ -1171,6 +1551,7 @@ namespace OutOfSight
                     resolved[best] = false;
                     holdWaitSteps = 0;
                     DogCallCount++;
+                    React(ReactionKind.DogCall, best);
                     return;
                 }
             }
@@ -1196,7 +1577,91 @@ namespace OutOfSight
             dogHolding = false;
             holdCaller = -1;
             holdWaitSteps = 0;
+            holdGripSteps = 0;
+            dogDragging = false;
+            dogDragFallback = false;
             ApplyPin(Level.Furniture);
+        }
+
+        /// <summary>DOGCARRY: what <see cref="BeginDogDrag"/> did.</summary>
+        private enum DogDrag
+        {
+            /// <summary>The dog is now the carrier: it drags the furniture home.</summary>
+            Begun,
+            /// <summary>The hold is over (in place for the owner, or the discovery lost the level).</summary>
+            Over,
+            /// <summary>The dog has no path to the slot: the M5 hold calls a human instead.</summary>
+            NoPath,
+            /// <summary>No human with a memory: nobody knows where it belongs.</summary>
+            NoOwner,
+        }
+
+        /// <summary>
+        /// DOGCARRY (the product owner's "when it catches you, it brings you back like a human would"): the dog holding the
+        /// furniture puts it back itself, with the consequences of a human put back. The owner is the nearest human with a
+        /// memory (the one the M5 hold would have called, wherever it is: it does not need to come). In place for its memory:
+        /// nothing to bring back, the hold ends at no cost (as when the called human found it in place). Out of place: the
+        /// dog must have a path to the owner's slot (<see cref="InhabitantRoutine.CanPlanCarry"/>, the humans' planner),
+        /// otherwise <see cref="DogDrag.NoPath"/>. With one, the dog begins the human carry to that slot
+        /// (<see cref="InhabitantRoutine.BeginCarry"/>: the same pick up, path, put down and return pose; StepInvestigations
+        /// attaches the furniture, puts it down and sets every memory's slot to it, as for a human carrier), and the owner
+        /// makes the discovery its arrival would have made (one discovery, suspicion 1 loses as usual).
+        /// </summary>
+        private DogDrag BeginDogDrag(InhabitantRoutine dog, FurnitureController furniture)
+        {
+            List<Inhabitant> inhabitants = Level.Inhabitants;
+            Vector3 at = YawMath.Planar(furniture.transform.position);
+            int owner = -1;
+            float ownerDistance = float.MaxValue;
+            for (int i = 0; i < inhabitants.Count && i < memories.Length; i++)
+            {
+                InhabitantRoutine h = inhabitants[i].Routine;
+                if (h == null || !h.Personality.Memory || memories[i] == null)
+                {
+                    continue;
+                }
+                float distance = YawMath.Planar(h.Position - at).magnitude;
+                if (distance < ownerDistance)
+                {
+                    ownerDistance = distance;
+                    owner = i;
+                }
+            }
+            if (owner < 0)
+            {
+                return DogDrag.NoOwner;
+            }
+            if (!memories[owner].OutOfPlace(furniture.Pose, furniture.Tipped)) // MUTATION:DOG_DRAG_FINDS
+            {
+                // In place for the human who would have come: nothing to put back.
+                EndHold();
+                return DogDrag.Over;
+            }
+            FurniturePose slot = memories[owner].PlayerSlot;
+            if (!dog.CanPlanCarry(slot))
+            {
+                return DogDrag.NoPath;
+            }
+            dog.BeginCarry(slot); // MUTATION:DOG_DRAG
+            if (!dog.IsCarrying)
+            {
+                return DogDrag.NoPath;
+            }
+            carrier = holdDog;
+            dogDragging = true;
+            DogDragCount++;
+            React(ReactionKind.DogDrag, holdDog);
+            // The owner's discovery, as on the called human's arrival (StepInvestigations), without the walk.
+            DiscoveryCount++;
+            DogHoldDiscoveryCount++;
+            meters[owner].AddDiscovery();
+            Sfx?.PlayHein(PanToward(inhabitants[owner].transform.position));
+            if (meters[owner].Lost || meters[owner].Value >= Tuning.SuspicionLose)
+            {
+                Lose(LoseReason.Suspicion, owner);
+                return DogDrag.Over;
+            }
+            return DogDrag.Begun;
         }
 
         /// <summary>
@@ -1292,6 +1757,10 @@ namespace OutOfSight
             RobotContactCount++;
             contactThisStep = true;
             contactAt = at;
+            if (playing)
+            {
+                RobotBumped?.Invoke(robot);
+            }
             bool free = playing && !furniture.Pinned && !furniture.Carried;
             if (free && furniture.BeginPush(direction, Tuning.RobotPushDistance, Tuning.RobotPushTime))
             {
@@ -1587,14 +2056,15 @@ namespace OutOfSight
         /// </summary>
         private bool DoorHintWanted(FurnitureController furniture)
         {
-            return State == PlayState.Playing && Level.Leaves.Count > 0 && !furniture.Carried && !furniture.Pinned && !furniture.Tipped
+            // AUTOSTART: no hint under the title card, before the player's first input (as LockedDoorHintWanted).
+            return State == PlayState.Playing && Started && Level.Leaves.Count > 0 && !furniture.Carried && !furniture.Pinned && !furniture.Tipped
                 && !furniture.ActionActive && !furniture.Hidden && NearestClosedLeafInReach(furniture) != null;
         }
 
-        /// <summary>M6: the wardrobe prompt shows while hidden (and still), or in front of a wardrobe E would enter.</summary>
+        /// <summary>M6: the wardrobe prompt shows while hidden (and still), or in front of a wardrobe a push would enter.</summary>
         private bool HideHintWanted(FurnitureController furniture)
         {
-            if (wardrobes.Count == 0 || State != PlayState.Playing || furniture.Carried || furniture.Pinned || furniture.Tipped || furniture.ActionActive)
+            if (wardrobes.Count == 0 || State != PlayState.Playing || !Started || furniture.Carried || furniture.Pinned || furniture.Tipped || furniture.ActionActive)
             {
                 return false;
             }
@@ -1644,6 +2114,26 @@ namespace OutOfSight
             {
                 return;
             }
+            if (!Started)
+            {
+                // AUTOSTART: the world runs from the build (inhabitants, robots, doors), but until the player's first input
+                // the furniture is out of play (see Started): no input, unseen, never shoved, no clock, no creak. The first
+                // step with a move input past the dead zone or an action press starts the player (title card off, clock on)
+                // and that same step takes the input; the press stays latched for the furniture's own step. Camera input and
+                // the careful key alone do not. STARTFIX: a start press (Space, Enter, gamepad A, a touch tap) starts it too,
+                // with no move: the furniture stays put and a watcher looking at the spawn sees it still, which is allowed.
+                bool release = InputReader.AnyStartInput(); // MUTATION:HOLD_START
+                InputReader.ConsumeStartPress();
+                if (release)
+                {
+                    ReleaseStart();
+                }
+            }
+            // STARTFIX: a start press made while the level runs is no input at all (never kept for a later build).
+            InputReader.ConsumeStartPress();
+            WorldSteps++;
+            // AUTOSTART: the player's furniture takes part in the rules only once the player started.
+            bool started = Started;
             float dt = Time.fixedDeltaTime;
             GameRules rules = Rules ?? NoRules;
             FurnitureController furniture = Level.Furniture;
@@ -1664,7 +2154,7 @@ namespace OutOfSight
             rollMasked = false;
 
             // 1. The furniture: driven by input, or following its carrier. M4: it reads the rule switches itself.
-            // M5: E in reach of a closed leaf begins its opening inside this step (ClaimActionKey); then the leaves swing.
+            // M5: a push toward a closed leaf in reach begins its opening inside this step (ClaimDoorPush); then the leaves swing.
             // M5 wave 5B: a shove is the furniture's own push action (begun by a contact in step 2 of an earlier step), so it
             // runs inside furniture.Step; Shoving reads it after the step. Then the rock and the load.
             furniture.Rules = rules;
@@ -1675,7 +2165,7 @@ namespace OutOfSight
             }
             else
             {
-                furniture.Step(dt, playing);
+                furniture.Step(dt, playing && started);
             }
             Shoving = furniture.Pushing;
             StepLeaves(dt);
@@ -1691,7 +2181,8 @@ namespace OutOfSight
                 inhabitants[i].Step(dt);
             }
             StepHouseholdDoors();
-            StepRobots(furniture, playing, dt);
+            // AUTOSTART: before the first input a robot bumps into the furniture and reverses, but never shoves it.
+            StepRobots(furniture, playing && started /*MUTATION:SHOVE_BEFORE_START*/, dt);
 
             // 3. Vision of the player furniture, for every inhabitant. M2.1 (11.3): a decoy explains the chair
             // whether or not it is seen, so decoys need no raycast at all.
@@ -1706,7 +2197,8 @@ namespace OutOfSight
             for (int i = 0; i < inhabitants.Count; i++)
             {
                 Vision vision = visions[i];
-                bool sees = vision != null && vision.Step(furniture, loadHeight);
+                // AUTOSTART: before the first input nobody sees the furniture (Vision.Unseen keeps the cone view in step).
+                bool sees = vision != null && (started /*MUTATION:UNSEEN_BEFORE_START*/ ? vision.Step(furniture, loadHeight) : vision.Unseen());
                 bool seesSwing = vision != null && vision.StepLeaves(Level.Leaves); // MUTATION:LEAF_JOIN
                 seesPlayer[i] = sees;
                 seesLeaf[i] = seesSwing;
@@ -1728,7 +2220,8 @@ namespace OutOfSight
             // M5 wave 5B (CONTRACT_M5 4, 16.8, 19): a step of a shove is moving through the push action (FurnitureController's
             // predicate counts any action), so the furniture's own predicate is the whole rule.
             FurnitureMoving = furniture.IsMoving;
-            if (playing)
+            // AUTOSTART: the clock (Steps, Elapsed), the exit, the catch and the barks wait for the player's first input.
+            if (playing && started)
             {
                 Steps++;
                 Elapsed = Steps * dt;
@@ -1781,6 +2274,12 @@ namespace OutOfSight
                 if (State == PlayState.Playing)
                 {
                     StepDogHold(rules, dt);
+                }
+                // DOGBIG (render only): the dog bites the furniture's edge from the grip to the drop (not while it waits
+                // for a called human).
+                for (int i = 0; i < Level.Inhabitants.Count; i++)
+                {
+                    Level.Inhabitants[i].Biting = i == holdDog && dogHolding && !dogDragFallback && holdCaller < 0;
                 }
                 StepLamp(rules);
                 StepPutAway();
@@ -1838,11 +2337,11 @@ namespace OutOfSight
                 // CONTRACT_M5 20: the dog's hold line.
                 Hud.SetDogHold(State == PlayState.Playing && dogHolding && furniture.Pinned && !sitPinned);
                 Hud.SetTipped(State == PlayState.Playing && furniture.LyingDown && !furniture.Carried);
-                // M5 (CONTRACT_M5_v3 15.2): E opens the door in reach.
+                // M5 (CONTRACT_M5_v3 15.2): a push opens the door in reach (DOORAUTO).
                 Hud.ShowDoorHint(DoorHintWanted(furniture));
-                // M6 (CONTRACT_M6 2.5): E hides in the wardrobe in front, or leaves it.
-                bool pad = InputReader.LastInputWasGamepad;
-                string hide = furniture.Hidden ? (pad ? Strings.HudLeavePad : Strings.HudLeave) : (pad ? Strings.HudHidePad : Strings.HudHide);
+                // M6 (CONTRACT_M6 2.5): a push hides in the wardrobe in front, or leaves it (DOORAUTO).
+                // The push names no key, so one sentence serves every device.
+                string hide = furniture.Hidden ? Strings.HudLeave : Strings.HudHide;
                 Hud.ShowHideHint(HideHintWanted(furniture), hide);
                 // M5 wave 5B (CONTRACT_M5 6, 16.5): the balance gauge, while a load is carried.
                 Hud.SetBalance(CarryingLoad ? Load.Ratio : 0f, State == PlayState.Playing && CarryingLoad);
@@ -1942,6 +2441,7 @@ namespace OutOfSight
             Vector3 anchor = routine.CarryAnchor;
             float yaw = routine.BodyYaw;
             Vector3 position = anchor;
+            float wobble;
             if (routine.LastActivity == RoutineActivity.PuttingDown)
             {
                 putDownSteps++;
@@ -1950,12 +2450,22 @@ namespace OutOfSight
                 // M5 (CONTRACT_M5_v3 15.4): lowered onto the floor height where it is put back (Release puts it there).
                 position = Vector3.Lerp(anchor, Level.Floor.OnFloor(YawMath.Planar(back.Position)), t);
                 yaw = Mathf.LerpAngle(yaw, back.Yaw, t);
+                wobble = 1f - t;
             }
             else
             {
                 float t = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(carrySteps * dt / Tuning.PickUpDuration));
                 position = Vector3.Lerp(carryFrom, anchor, t);
                 yaw = Mathf.LerpAngle(carryFromYaw, yaw, t);
+                wobble = t;
+            }
+            if (routine.Personality.Barks)
+            {
+                // DOGCARRY: dragged by an edge in the dog's mouth: a small tug wobble (yaw and lift), none at the put down's end
+                // so the return pose is exact. Deterministic (the carry's own step count); a carried furniture is never moving.
+                float w = Mathf.Sin(carrySteps * dt * Tuning.DogDragWobbleHz * 2f * Mathf.PI);
+                yaw += Tuning.DogDragWobbleDegrees * w * wobble;
+                position.y += Tuning.DogDragBob * Mathf.Abs(w) * wobble;
             }
             furniture.FollowCarrier(position, yaw);
         }
@@ -2020,6 +2530,7 @@ namespace OutOfSight
                     DiscoveryCount++;
                     meters[i].AddDiscovery();
                     Sfx?.PlayHein(PanToward(inhabitants[i].transform.position));
+                    React(furniture.Hidden ? ReactionKind.SpotEmpty : ReactionKind.Noticed, i);
                     if (meters[i].Lost || meters[i].Value >= Tuning.SuspicionLose)
                     {
                         Lose(LoseReason.Suspicion, i);
@@ -2057,10 +2568,21 @@ namespace OutOfSight
                     if (routine.LastSitResult == SitResult.OnPlayer)
                     {
                         SitOnPlayer(routine);
+                        React(ReactionKind.SatOn, i);
                     }
                     else if (routine.LastSitResult == SitResult.Pratfall)
                     {
-                        Pratfall(i);
+                        // AUTOSTART: before the player's first input the furniture is out of play, so a pratfall there
+                        // (the seat home is not the spawn) is only the comic moment, never a discovery.
+                        if (Started)
+                        {
+                            Pratfall(i);
+                        }
+                        else
+                        {
+                            PratfallCount++;
+                            pratfallThisStep = i;
+                        }
                     }
                 }
                 sitting |= routine.SittingOnPlayer;
@@ -2207,6 +2729,11 @@ namespace OutOfSight
                 {
                     memories[i].SetPlayerSlot(furniture.Pose);
                 }
+                if (c.Personality.Memory)
+                {
+                    // DOGCARRY: the dog's put back is a bark, said by StepDogHold.
+                    React(ReactionKind.PutBack, carrier);
+                }
                 carrier = -1;
                 putDownThisStep = true;
             }
@@ -2315,7 +2842,8 @@ namespace OutOfSight
             // time at the start of this step (Elapsed already counts it), so 5 s + 20 s creaks at 25.00 s.
             // M4: it pauses while the furniture is pinned under a sitter. M5 wave 5B: a shove is moving.
             float stepStart = (Steps - 1) * dt;
-            if (rules.Creak && Creak.Step(dt, moving, furniture.Carried, stepStart, furniture.Pinned))
+            // AUTOSTART: the gauge waits for the player's first input (Steps, hence its start delay, counts from it).
+            if (Started && rules.Creak && Creak.Step(dt, moving, furniture.Carried, stepStart, furniture.Pinned))
             {
                 CreakCount++;
                 CreakedThisStep = true;
@@ -2500,6 +3028,23 @@ namespace OutOfSight
             // next frame so Enter and gamepad A submit it too (docs/CONTRACT_M3.md 6, S2's pattern for the fail panel).
             Menu?.OnFailScreen();
             StateChanged?.Invoke(State);
+            // Idea 7 (BUBBLES): the catch's line, after the state change (which clears every other bubble): by the inhabitant
+            // the rule named, else by the first human that sees the furniture or a swinging leaf this step.
+            React(ReactionKind.Caught, inhabitantIndex >= 0 ? inhabitantIndex : FirstSeer());
+        }
+
+        /// <summary>The first inhabitant that counts for the catch and sees the furniture (or a swinging leaf) this step, or -1.</summary>
+        private int FirstSeer()
+        {
+            for (int i = 0; i < Level.Inhabitants.Count && i < seesPlayer.Length; i++)
+            {
+                bool sees = seesPlayer[i] || (i < seesLeaf.Length && seesLeaf[i]);
+                if (sees && PersonalityOf(Level.Inhabitants[i]).CountsForCatch)
+                {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         // ----- Sounds -----
@@ -2779,6 +3324,7 @@ namespace OutOfSight
                     routine.Hold(Tuning.InhabitantDoorStop); // MUTATION:DOOR_STOP
                     leaf.BeginOpen(true);
                     HouseholdDoorOpenCount++;
+                    React(ReactionKind.DoorOpened, i);
                     householdDoorThisStep = leaf;
                     RememberDoor(k, true);
                     break;

@@ -1,0 +1,185 @@
+{
+  "group": "act2a",
+  "author": "levels_v2 wave 1 designer, group act2a (slots 8 to 11 + the fate of level10)",
+  "audited": false,
+  "levels": [
+    {
+      "id": "level8",
+      "slot": "8",
+      "status": "fix",
+      "title_en": "The Doors",
+      "title_fr": "Les portes",
+      "body": "chair",
+      "main_threat": "Paul (dreamer, 0.9 m/s, range 8 m, half angle 45 deg, hop earshot 1.65 m) rotating between three posts: the salon window post (guards the kitchen gap, the lane behind the sofa and, by earshot, the east strip), the sofa (guards the strip in front of the TV, then the gap and the doormat in two long looks), the kitchen (guards porte_cuisine).",
+      "plan_shape": "unchanged 4-room square with a loop: route A = chambre -> porte_cuisine -> cuisine -> gap (4.45, 1.75) -> lane z 4.25 behind the sofa -> east strip x 9.25 -> doormat; route B = chambre -> couloir -> porte_salon -> east strip x 9.25 -> doormat. Both routes meet on the east strip during Paul's sofa nap.",
+      "exit_direction": "south-east of the spawn (unchanged doormat (9.25, 1.25)); route A arrives from the west, route B from the north",
+      "look": "light sage and teal flat: chambre wallFinish wallpaper + floorFinish lightoak; couloir limewash + default parquet; cuisine whitetile + tealtile (not the subway tile every kitchen has); salon sage + lightoak. No dark finish, no new slice.",
+      "twist": "the first real route choice of the game: the short kitchen door whose gap Paul watches from his window post, or the long corridor door with a safe hold behind it; both are funnelled into the same 12 s sofa sit.",
+      "lesson": "a closed door is a route choice, not a lock: two doors, two routes with different risk, and an opening is seen as movement.",
+      "changes": [
+        "inhabitants[Paul].startStation: 0 -> 1 (the level opens with Paul at his window post, so the kitchen door is free but the kitchen gap is watched).",
+        "Paul station 0 (2.25, 3.25) facing 0: dwell 5.0 -> 4.0, glances [] unchanged (still stares at porte_cuisine).",
+        "Paul station 1 (8.75, 4.75): facing 90 -> 270; dwell 5.0 -> 7.0; glances [] -> [ { offset 4.5, yaw 80, hold 2.0 } ]. Facing west he sees the kitchen gap (4.45, 1.75) at 35 deg off axis and the whole lane z 4.25; the glance (head 350) covers porte_salon (8.75, 6.95) and the salon NE corner; standing 0.5 m from x 9.25 he hears any descent of the east strip.",
+        "Paul station 2 sofa (7.25, 2.0) facing 180, sit Canape: dwell 8.0 -> 12.0; glances [ { offset 4.0, yaw -40, hold 1.0 } ] -> [ { offset 3.0, yaw -70, hold 1.5 }, { offset 6.5, yaw 80, hold 3.0 } ]. Head 110 covers the doormat (bearing 110.6 deg); head 260 covers the gap and the lane's west end (5.25, 1.75 to 5.25, 4.25). The lane z 4.25 is behind him and 2.25 m away (outside his 1.65 m earshot); the east strip below z 3 is 2.0 m away and outside his cone.",
+        "No prop added or moved (materials are at 23/24). Station positions stay on cell centres.",
+        "rooms: chambre wallFinish quatrefoil -> wallpaper, add floorFinish lightoak; couloir wallFinish travertine -> limewash; cuisine wallFinish subwaytile -> whitetile, floorFinish verde -> tealtile; salon wallFinish arches -> sage, add floorFinish lightoak. Optional: update floorColor/wallColor for the level-select miniature only.",
+        "Strings level8.hint EN: 'Two closed doors, two ways out: the kitchen is quicker, the corridor is safer. A door seen swinging gives you away.' FR: 'Deux portes fermees, deux chemins : la cuisine est plus rapide, le couloir plus sur. Une porte qu'on voit bouger te trahit.' (drops the hard-coded (E), R8).",
+        "Re-audit Normal and Difficile, then -writeRoutes. Also audit two variant files outside Assets: level8_viaA (the porte_salon door entry deleted, so only route A exists) and level8_viaB (the porte_cuisine door entry deleted, so only route B exists)."
+      ],
+      "code_needs": [
+        "None mandatory. The two-route proof is done with variant files audited by absolute path; a 'barred region' audit option would let it live in the main audit later (audit code, optional).",
+        "Test churn: ProbeTestsM5Levels level8 checks (route opens its door, rushed route caught by the swinging leaf, route without the open never wins, first open after 3 s) must be re-run; the 3 s premise may need the new first-open time. Step64b_Level08Hard replays the new hard route.",
+        "Hint tokens for the action key (QW2) so no hint names E."
+      ],
+      "targets": "Normal strict exit 18 to 26 s (now 18.2 s); waiting 25 to 40 % of the run with >= 3 pauses, none above 6 s (now 2 pauses, 6.0 s at spawn); door lesson binds; both variant audits find a schedule and their exits differ by <= 6 s (proves two viable routes); the main schedule passes within Paul's sofa look windows (it waits at least once for the head-110 look before the doormat); margin >= 0.3 / 0.3 at Normal and Difficile; rush counter-routes lose: (a) the main route with every wait removed, (b) the straight corridor run opening porte_salon at 6 s and descending at once (heard by Paul at his window post). No dead room: the corridor is on a proven route, the kitchen holds station 0.",
+      "risks": [
+        "Unaudited by hand reasoning only: walk times assume 0.9 m/s NavMesh paths around the sofa; dwell 7 / 12 and the glance offsets are the first knobs to turn if a variant fails.",
+        "Route B may stay 2 to 4 s faster than route A, so the main audit route uses the corridor and the kitchen is only proven by level8_viaA. That is acceptable (the kitchen still holds Paul's post), but if the gap is larger than 6 s shorten the sofa's head-260 look (hold 3.0 -> 2.0).",
+        "The review's 'turn the sofa toward the kitchen crossing for half his cycle' is applied as a 3 s head-260 look plus his window post facing the gap: the sofa itself cannot face west (a sit station faces away from its prop).",
+        "Level length stays short (act 2 opener): I target 18 to 26 s, not the feedback's 25 to 50 s act-2 band, because a longer level 8 would only come from a longer Paul loop (long holds behind doors), which breaks the 6 s pause rule.",
+        "With startStation 1 the first 4 s are free for route B's walk to the corridor; under the 5 s intro card (IDEAS QW4) a player starts late, which still works (the corridor hold absorbs it)."
+      ]
+    },
+    {
+      "id": "level9",
+      "slot": "9",
+      "status": "fix",
+      "title_en": "The Robot",
+      "title_fr": "Le robot",
+      "body": "chair",
+      "main_threat": "Claire (watchful, fixed at (8.25, 6.75), hop earshot 2.25 m on the hard band) with +-80 deg head turns, plus the robot sharing the player's lane: its hum is the only way to move in her earshot, its bumper is a moving obstacle that evicts you.",
+      "plan_shape": "3 rooms: bedroom, one long salon crossed along its north band (z 8.25), hall; a single lane where the player and the robot must share 7 m.",
+      "exit_direction": "east (unchanged doormat (14.25, 6.25))",
+      "look": "dusty blue: chambre arches + lightoak; salon grasscloth + herringbone (the dark floor makes the robot and its lane read); entree travertine + marble (unchanged).",
+      "twist": "ride in the robot's hum: trail it through Claire's earshot in short hops, hold still in her blind middle during her head turns, and get out of the lane before it comes back the other way.",
+      "lesson": "the robot's hum masks your hops within 2.5 m, but only while you keep its pace; its contact shoves you (seen as movement).",
+      "changes": [
+        "Delete room 'cuisine' (x 0 to 4.4, z 0 to 4.4, dead room: nobody enters), its door (2.25, 4.45), its window (2.2, -0.05) and its props 'Plan' and 'TableCuisine'. Keep 'Armoire' (3.6, 4.8): it stands in the chambre (z 4.525 to 5.075). Area 114 -> about 95 m2.",
+        "inhabitants[Claire].startStation: 0 -> 1 (docs/m7/design.md lever: she opens facing the band, so the spawn wait is forced).",
+        "Claire station 1 (8.25, 6.75) facing 0: dwell 6.0 -> 5.0, glances unchanged ({2.0, -40, 1.0}, {4.0, 40, 1.0}).",
+        "Claire station 0 (8.25, 6.75) facing 180, dwell 16.0: glances yaw -45 -> -80 and +45 -> +80, hold 1.5 -> 2.0, offsets 3.0 and 10.0 unchanged. Head 260 sees the band west of x 7.0, head 100 sees it east of x 9.5 (half angle 60); the band middle x 7.0 to 9.5 stays hidden but lies inside her earshot (x 6.57 to 9.93 on z 8.25).",
+        "robots[0].loop: [ {5.75, 7.25}, {10.75, 7.25} ] -> [ {5.25, 8.25}, {11.25, 8.25} ], add \"speed\": 0.5 (12 s per leg, 24 s period), start 0. The robot disc (0.17 m) clears the north wall (8.9) and the chambre door gap; it stays > 1 m from spawn and doormat.",
+        "rugs: remove the salon rug at (9.75, 2.5) (never touched, it advertises a silent path the level does not use). Keep the chambre rug under the spawn (test 'level9: hard floors and rugs' still holds).",
+        "rooms finishes: chambre wallFinish wallpaper -> arches (keep lightoak); salon wallFinish sageribbed -> grasscloth, floorFinish lightoak -> herringbone; entree unchanged.",
+        "Strings level9.hint EN: 'Claire hears every hop on the parquet, except right beside the robot. Don't let it bump into you.' FR: 'Claire entend chaque saut sur le parquet, sauf tout pres du robot. Ne le laisse pas te cogner.'",
+        "Re-audit Normal and Difficile, -writeRoutes."
+      ],
+      "code_needs": [
+        "Strongly recommended (R7): a floor disc showing the 2.5 m hum radius (today only audio to 7 m tells where masking ends); this level asks the player to stay inside it.",
+        "Test churn: ProbeTestsM5Levels Step45o asserts the robot lane at z 7.25 heading east (update to z 8.25 and the new Level9ToTheRobotLane legs); LevelDataM2Tests WaveB row level9 MinRooms/MaxRooms 4 -> 3; Step45i (masked noises >= 1) stays valid; Step64b_Level09Hard replays the new hard route; ProbeTestsM6Textures and M7Walls/M9Backdrop load level9 by id (re-run, no data premise on the kitchen expected)."
+      ],
+      "targets": "Normal strict exit 20 to 28 s (now 12.3 s); robot lesson binds by the hum; masked samples on the route >= 40 (now 27); >= 4 pauses (spawn plus >= 3 short holds while trailing the robot), none above 6 s; waiting 30 to 45 %; no robot contact on the route; all 3 rooms on the route; margin >= 0.3 / 0.3 at both difficulties; rush counter-route loses: the band crossed straight at full speed from 6 s (heard by Claire outside the hum).",
+      "risks": [
+        "The robot on the player's lane can make the band impassable at some phases; the audit's start-delay sweep is off for this id (only levels 1 to 7), so check Difficile and one shifted start by hand (startStation 0 variant).",
+        "Watchful Claire at 2 discoveries: a human who stops in her glance cone loses fast. Intended for act 2, but watch first-clear times.",
+        "Overtaking the robot means stepping to z 7.75, 1.0 m from Claire: if the solver does that during her back-turned 16 s dwell, holds disappear. Fallback: robot speed 0.5 -> 0.4 or Claire's glances hold 2.0 -> 2.5.",
+        "Removing the kitchen loses one room of variety the product owner liked (F6); it is the review's rule 1 (dead room). Alternative kept in reserve: make it the robot's dock with a 3+ waypoint loop through the chambre (needs 1 m from spawn; geometry is tight at the Armoire)."
+      ]
+    },
+    {
+      "id": "level15",
+      "slot": "10 (review line-up); alternative 12 if the synthesis swaps it with level12 'The Dog', see notes",
+      "status": "rebuild",
+      "title_en": "Let Sleeping Dogs Lie",
+      "title_fr": "Chien qui dort",
+      "body": "rocking_chair",
+      "main_threat": "Rex the dog napping by the front door (asleep 3.5 s, awake 1.8 s, facing down the hall): he only sees motion, so the rocker hops on his naps and must have finished swinging before he wakes. Mamie (granny) is the memory watcher who shapes where you can be in the salon.",
+      "plan_shape": "4 rooms in an L: study (spawn) -> salon SW corner -> one long hall (entree, 8.9 x 1.9 m) running east to the front door; the kitchen is Mamie's second post.",
+      "exit_direction": "east (doormat (12.75, 0.75), beside the dog)",
+      "look": "warm beige and olive with a green marble hall: bureau pinstripe + default parquet; salon quatrefoil + herringbone; cuisine subwaytile + ivorytile; entree limewash + verde (the cyan dog cone reads on the dark green floor).",
+      "twist": "every hop ends in a visible swing: the rocker keeps rocking 0.8 s after each stop (0.4 s if you brake gently), and Rex barks at a swing as he would at a step.",
+      "lesson": "the rocking chair's after-swing is movement: stop early (or gently) before a watcher who sees motion looks back. This is the rock lesson that level 10 never made bind.",
+      "changes": [
+        "lesson: 'robot' -> 'rock' (no lessonAdvisory).",
+        "rooms: delete 'chambre' and 'couloir' (only the teen Hugo used them). Keep 'bureau' (x 0 to 4.4, z 0 to 4.9), 'salon' (x 4.5 to 9.9, z 2.0 to 7.4), 'cuisine' (x 10.0 to 13.4, z 2.0 to 7.4), 'entree' (x 4.5 to 13.4, z 0 to 1.9). Finishes: bureau wallFinish sageribbed -> pinstripe, floorFinish lightoak -> none (parquet); salon grasscloth -> quatrefoil, lightoak -> herringbone; cuisine subwaytile kept, floorFinish tile -> ivorytile; entree travertine -> limewash, verde kept.",
+        "doors: keep (4.45, 3.25) bureau-salon and the outer door (13.45, 0.75); move the salon-entree door (8.25, 1.95) -> (5.25, 1.95); add salon-cuisine door { x 9.95, z 5.75, width 1.0, top 2.1 }; delete (2.25, 4.95), (4.45, 8.25), (6.25, 7.45), (11.75, 7.45).",
+        "windows: keep (-0.05, 2.25) and (13.45, 4.75); delete (2.2, 8.95).",
+        "props: delete 'Lit'; keep BureauTable, Canape (8.75, 6.6), Cheminee, Plan (kitchen_sink), Frigo, Console (10.75, 0.3).",
+        "robots: delete the robot (the hum would mask the hall and the level must stay about the rock).",
+        "inhabitants: delete Claire and Hugo. Add Mamie { personality granny, pattern loop, startStation 0, stations: [ M0 { x 8.75, z 5.85, facing 180, dwell 3.5, sit 'Canape', glances [ { offset 1.5, yaw 60, hold 1.5 } ] }, M1 { x 12.25, z 4.75, facing 90, dwell 6.0, glances [] }, M2 { x 5.75, z 4.75, facing 270, dwell 5.0, glances [ { offset 2.0, yaw -60, hold 1.5 } ] } ] }. Seated at M0 she sees the salon SW corner (49 deg off axis) and, through the new hall door, the hall strip x 4.4 to 5.2; her head-240 look covers the study door. M2's head-210 look covers the hall door.",
+        "Add Rex { kind dog, pattern loop, startStation 1, stations: [ R0 { x 11.75, z 1.25, facing 270, dwell 1.8, glances [] }, R1 { x 11.75, z 1.25, facing 270, dwell 3.5, glances [], sleep true } ] }. From (11.75, 1.25) facing west his 6 m, 70 deg cone covers the hall x 5.75 to 11.5; the doormat and the last metre (x >= 12.0) are beside him, outside the cone.",
+        "player unchanged: rocking_chair (1.25, 3.25) yaw 90. exit unchanged (12.75, 0.75).",
+        "Strings level15.name EN 'Let Sleeping Dogs Lie' FR 'Chien qui dort'; level15.hint EN: 'The rocker swings a moment after every stop, less if you brake gently. Rex only sees what moves.' FR: 'Le fauteuil se balance un instant apres chaque arret, moins si tu freines en douceur. Rex ne voit que ce qui bouge.'",
+        "Audit Normal and Difficile with -writeRoutes. Expected first-pass shape: spawn hold about 4 s (until Mamie stands), study -> salon SW corner -> hall door behind her back (about 6 m), hall entry hold, then 3 hops of about 2 m on Rex's naps with 2 awake holds of about 2.5 s; exit about 25 to 28 s."
+      ],
+      "code_needs": [
+        "Test churn (rebuild): LevelDataM2Tests WaveB row level15 (lesson rock, rooms 4, people ['dog', 'granny:loop'], robots 0); ProbeTestsM5Levels WaveB row (2 humans, 1 robot -> 1 human, 1 dog, 0 robot) and Step45m rewritten (premise: no robot; require Rocks >= 3 and a win, drop MaskedNoises); Step45r and Wave5B_levels_are_valid_and_played_in_number_order (level15 now plays before level11); Step64b_Level15Hard replays the new hard route; ProbeTestsM9FloorDust lists level15 by id (re-run).",
+        "Record versioning (R13): the old level15 best times (a different level) must not stand; a 'rev' per level or a reset of best['level15*'].",
+        "Unlock rule (R13): with level15 at slot 10, a save that won 1 to 14 sees level11 to level14 locked until level15 is won.",
+        "Optional (audit): model the careful rock (0.4 s) as an option so the report shows the gentler human line; the audit's full 0.8 s rock keeps the design conservative."
+      ],
+      "targets": "Normal strict exit 24 to 34 s (old level15 28.9 s, old level10 18.1 s); rock lesson binds without any waiver (the rock-off schedule is seen swinging by Rex); >= 3 rocks in Rex's view on the route; >= 4 pauses, none above 6 s; waiting 30 to 45 % of the run with the rocks counted as moves (a hop level waits more by nature), <= 50 % with rocks counted as waiting; never seen by Mamie out of place; all 4 rooms used (cuisine holds M1); materials <= 24 and draw calls <= 120 (4 rooms puts it in the small budget class); rush counter-route loses: crossing the hall in one go (barked at), and stopping at the end of each nap (seen swinging).",
+      "risks": [
+        "The dog appears here before its own lesson level (slot 12). This is forced by evidence: under the audit a rocker's stop seen by a human must be within 0.3 m of the spawn (docs/m6/levels.json), and rocking-chair decoys cannot work (the chair cannot get closer than 0.64 m to a decoy centre, the audit explains only within 0.6 m). Only a watcher without memory (the dog) makes the rock bind; the m6 dog trial proved it (rock-off seen rocking at 14.2 s). Level 12 then deepens the dog (awake, low eye, sofa cover, the pin). If the synthesis prefers one new thing per level, swap level15 and level12 (rocker at slot 12, dog at slot 10): this design works unchanged there, and the robot could even come back as an act-2 combination.",
+        "4 rooms drop the level into the 120 draw call / 24 material class: granny and dog models plus the cyan cone are new; if materials exceed 24, delete Console and Frigo first.",
+        "Waiting share sits at the top of the review's band: every hop costs a 0.8 s swing and a dog wake cycle; shortening R0 below 1.8 s makes the dog a flicker rather than a threat.",
+        "The m6 trial's failure mode (the dog's view reaching back to the spawn and forcing an 11 s idle) is avoided by putting Rex at the far east end; verify the spawn hold stays <= 6 s.",
+        "Exit beside a dog: the player passes 0.05 to 0.3 m from Rex's body at the doormat (no collision between inhabitants and furniture). Comic, but check it reads; fallback Rex at (11.25, 1.25)."
+      ]
+    },
+    {
+      "id": "level11",
+      "slot": "11",
+      "status": "fix",
+      "title_en": "The Vase",
+      "title_fr": "Le vase",
+      "body": "chair + vase",
+      "main_threat": "Lea (tidy, tolerance 0.4 m, 3 discoveries lose at Normal) walking a loop: she opens the level at the corridor foot staring up it, then posts in the kitchen facing the corridor door, then in the salon facing south through the salon-kitchen doorway at the doormat.",
+      "plan_shape": "4 rooms around a 1.4 m corridor spine: bedroom (spawn) -> corridor -> kitchen -> doormat; the salon is Lea's long post that overlooks the doormat through a doorway.",
+      "exit_direction": "south-east (doormat (11.25, 1.75), unchanged)",
+      "look": "green and stone: chambre sageribbed + lightoak; couloir travertine + herringbone (the vase reads against the dark corridor floor); salon sage + default parquet; cuisine whitetile + marble.",
+      "twist": "the last 90-degree turn with the vase, into the doormat, has to be made slowly inside Lea's 2.5 s head turn while she watches the doormat through a doorway.",
+      "lesson": "carrying a load: every turn must be slow, and here one slow turn has to fit someone's schedule.",
+      "changes": [
+        "inhabitants[Lea].startStation: 3 -> 1 (docs/m7/design.md and review lever: she opens at the corridor foot (5.25, 0.6) facing up it).",
+        "Lea station 1 (5.25, 0.6) facing 0: dwell 5.0 -> 4.5, glances [] unchanged.",
+        "Lea station 2: (8.25, 1.25) facing 180 dwell 10 glance {4, -40, 1} -> (10.75, 2.75) facing 270, dwell 6.0, glances []. She now stares west across the kitchen at the corridor door (5.95, 1.25) (17 deg off axis) and, through it, the corridor foot; she no longer stands on the route line z 1.25.",
+        "Lea station 0 (8.75, 8.15): facing 0 -> 180; dwell 12.0 -> 10.0; glances [ { 6.0, 50, 1.0 } ] -> [ { offset 3.0, yaw 80, hold 2.5 } ]. Facing south she sees, through the salon-kitchen doorway (10.25, 3.95), the kitchen strip x 10.4 to 11.9 on z 1.25 including the doormat; the hold point (10.25, 1.25) is just outside that view; her head-260 turn opens a 2.5 s window for the final turn.",
+        "Lea station 3 (0.6, 5.0) facing 180: dwell 14.0 -> 8.0, glances [] unchanged (shorter loop, about 63 s).",
+        "rugs: keep the chambre rug (spawn); optional: remove the salon rug (8.75, 6.25) (never touched).",
+        "rooms finishes: chambre sage -> sageribbed; couloir limewash -> travertine, lightoak -> herringbone; salon arches -> sage, herringbone -> none (parquet); cuisine subwaytile -> whitetile, tile -> marble.",
+        "Strings level11.hint EN: 'Slow down before every turn or the vase falls. Lea can see the doormat through the doorway.' FR: 'Ralentis avant chaque virage, sinon le vase tombe. Lea voit le paillasson par la porte.' (drops the hard-coded Shift, R8).",
+        "Re-audit Normal and Difficile, -writeRoutes. Expected shape: spawn hold about 5 s (Lea at the corridor foot), corridor descent, hold at (5.25, 3.25) about 3 s (hidden from station 2 behind the corridor wall), kitchen crossing along z 1.25 during her walk to the salon, hold at (10.25, 1.25) about 2 s, careful 1 m east plus the careful turn north into the doormat inside her head-260 turn; exit about 25 to 28 s."
+      ],
+      "code_needs": [
+        "Test churn: ProbeTestsM6Levels Level11DropAtSpawn (hardcoded coordinates; premise 'the alerted human stood within crash range' fails with Lea 6.4 m from the spawn at the start) needs new legs from the audit's load counter-route; Step45q (hardcoded full-speed route drops the vase) re-checked; Step64b_Level11Hard replays the new hard route; WaveB row level11 unchanged (tidy:loop, 4 rooms).",
+        "Hint tokens for the careful key (QW2)."
+      ],
+      "targets": "Normal strict exit 24 to 32 s (now 15.5 s); load lesson binds; >= 3 pauses (spawn, corridor, kitchen before the doormat), none above 6 s; waiting 30 to 40 %; the route's last leg into the doormat is careful and starts inside Lea's head-260 window; never seen out of place by Lea; all 4 rooms used (salon holds station 0); margin >= 0.3 / 0.3 at both difficulties; rush counter-routes lose: leaving at 0.3 s down the corridor (seen by Lea at station 1), the main route without its waits, and 'drop the vase at the spawn, then full speed'.",
+      "risks": [
+        "Lea's walks (about 1.2 m/s around the kitchen table) set every window; if the corridor hold exceeds 6 s, shorten station 2 dwell 6.0 -> 5.0.",
+        "Tidy tolerance 0.4 m and 1.3 suspicion gain make a human mistake expensive; acceptable at slot 11, but this is the first level where a single long glance gates the exit.",
+        "The doorway view of the doormat depends on the door gap (9.75 to 10.75); a narrower view (the hold point visible) would break the hold. Fallback: hold point (9.75, 1.25)."
+      ]
+    },
+    {
+      "id": "level10",
+      "slot": "cut (removed from levels.json; file kept on disk)",
+      "status": "cut",
+      "title_en": "The Rocking Chair",
+      "title_fr": "Le fauteuil a bascule",
+      "body": "rocking_chair",
+      "main_threat": "none (cut)",
+      "plan_shape": "none (cut)",
+      "exit_direction": "none (cut)",
+      "look": "none (cut)",
+      "twist": "none (cut): its lesson moves to level15 'Let Sleeping Dogs Lie'.",
+      "lesson": "none: the rock lesson never bound here (lessonAdvisory waiver, route = one wait + one 13 m dash, Mamie's sit on the player never fires before the 18.1 s exit).",
+      "changes": [
+        "levels.json: remove 'level10'. Keep Assets/Resources/Levels/level10.json, its Strings entries (level10.name/hint) and Level10Name/Level10Hint: tests and the BodyShots editor tool load the id directly.",
+        "Saves: level10 stays in 'won' and 'best' as an orphan (never shown, never counted, harmless). Nothing to migrate.",
+        "Do not reuse the id for a new level (records would carry over); new levels take new ids (level25+)."
+      ],
+      "code_needs": [
+        "Tests that break: LevelDataM2Tests PlayOrder + Manifest test (count and list), WaveB row level10 and Wave5B_levels_are_valid_and_played_in_number_order; ProbeTestsM5Levels Step40 count, WaveB row level10, Step45j_Level10Routes and Step45p_Level10RouteWithoutTheRockIsSeenRocking (manifest premise; delete or move to a non-manifest fixture), ProbeTestsM7Design Step64b_Level10Hard (delete). ProbeTestsM7Walls loads level10 by id and keeps working.",
+        "Unlock rule (R13) so the reorder does not lock won levels."
+      ],
+      "targets": "levels.json no longer lists level10; all listed levels unlock in order; no test loads level10 through the manifest.",
+      "risks": [
+        "Cutting 10 without level15 being rebuilt first would remove the rocking chair lesson from the game for a while: ship both in the same change.",
+        "Level 10 had the only granny-sits-on-the-rocker idea; it is dropped (the sit lesson lives in 5 and 14)."
+      ]
+    }
+  ],
+  "notes": "LENGTH (PRD 2 to 6 min vs measured 10 to 57 s): I read the PRD as a first clear with retries, not a clean run (feedback section 4). For slots 8 to 11 I lengthen the strict Normal exit about 1.3 to 2x (8: 18.2 -> 18-26 s, 9: 12.3 -> 20-28, 10: 18.1/28.9 -> 24-34, 11: 15.5 -> 24-32) with 3 to 5 decision pauses each (a watcher deciding, a robot passing, a dog waking), never with longer walks: level 9 loses its kitchen and level15 loses two rooms. With windows this tight a first clear should take 2 to 4 minutes, which is the PRD band. Longer clean runs would need holds above 6 s (breaks rule 3) or more floor (breaks the review's finding 1).\nROCKER EVIDENCE: the rock lesson can only bind with a watcher who sees a stop without caring where it is. Humans with memory punish any stop away from the spawn (audit in-place radius 0.3 m, docs/m6/levels.json, which also showed the dog making the rock bind at 14.2 s). Rocking-chair decoys are impossible: collider half 0.30 + body radius 0.36 - skin 0.02 = 0.64 m minimum centre distance, above the audit's 0.6 m explained radius. So the rebuilt level15 uses a napping dog. Recommended alternative for the synthesis: swap level15 and level12 (dog at slot 10, rocker at slot 12) so each level brings one new thing; my level15 design works unchanged in either slot (the hint is the same), and in slot 12 the robot could return as a combination.\nROBOT: kept only in level 9 (now on the player's lane). Level15 drops its robot so slot 9 and 10 do not share a threat; the review's 'hum as reward' for the rocker is dropped on purpose.\nNEIGHBOUR AXES (body / threat / shape / exit / look): 7-8 share nothing but the general east exit; 8-9 share body (chair) and exit (SE/E); 9-10 share exit (E) and a linear shape (band / hall); 10-11 share nothing but the south-east bias; 11-12 to be checked by act2b (level 11 chair, Lea walker, corridor spine, SE, green). All pairs share at most two axes. Exit variety is weak in this group (all east or south-east); flipping a whole level costs a full rebuild of stations, so I leave direction variety to act 3 and to act2b.\nDATA THE REVIEW GOT WRONG (verified): level 9's robot is required by the hum (27 samples), not 'neither blocks nor helps'; my fix keeps the hum and makes it shape the route instead. Level 11's Lea starts at station 3 in the chambre with the player, facing the wall for 14 s, which is why the route never waits. Level 8's second door is not scenery for the door lesson (the chambre has no exit without a leaf) but the corridor is never used. Level 10's Mamie sit station exists but never fires before the exit.\nSLOT TABLE AND SAVES: new act-2a order = level8, level9, level15, level11. Level10 removed from levels.json, file kept. Records keyed by id: level15's old best times must be versioned or reset (code). Unlocking follows the previous slot, so won levels 11 to 14 lock until level15 is won (code: R13 unlock rule).\nVERIFICATION PROTOCOL (all unaudited by me, no Unity run in this wave): for each level, audit Normal and Difficile; compute waiting share and pause count from the route (numbers.py); for level 8 also audit level8_viaA and level8_viaB variants by absolute path; for level15 confirm 'lecon rock ... la bascule est requise'. First knobs if a target fails: level 8 sofa dwell 12 and its head-260 hold; level 9 robot speed 0.5 and Claire's glance hold 2.0; level15 Rex sleep 3.5 / awake 1.8 and Mamie M0 dwell 3.5; level 11 Lea station 2 dwell 6 and station 0 glance hold 2.5.\nCODE ASKS FROM THIS GROUP (smallest first): test updates for the reorder, cut and rebuilds; hint tokens (QW2); record versioning and the unlock rule (R13); hum radius floor disc (R7, needed by level 9); start on first input (QW4, all four levels have a forced spawn hold that the 5 s intro card currently eats); optional audit 'barred region' and careful-rock options."
+}

@@ -470,8 +470,14 @@ namespace OutOfSight.Core
         /// <summary>M5: the walk speed of the station cycle, the investigations and the resumes.</summary>
         private float WalkSpeed => personality.WalkSpeed;
 
-        /// <summary>M5: the carry speed, times the personality's carry factor.</summary>
-        private float CarrySpeed => Tuning.CarrySpeed * personality.CarryFactor;
+        /// <summary>
+        /// M5: the carry speed, times the personality's carry factor. DOGCARRY: the dog (carry factor 0, it never carries in
+        /// its arms) drags the furniture at <see cref="Tuning.DogDragSpeed"/>.
+        /// </summary>
+        private float CarrySpeed => personality.Barks ? Tuning.DogDragSpeed : Tuning.CarrySpeed * personality.CarryFactor;
+
+        /// <summary>DOGCARRY: how high the carried furniture is held: a human lifts it, the dog's mouth barely does.</summary>
+        private float CarryLift => personality.Barks ? Tuning.DogDragLift : Tuning.CarryHeight;
 
         /// <summary>M5: sit stations sit only with sitting on and a personality that sits (never the dog).</summary>
         private bool CanSit => SittingEnabled && personality.Sits;
@@ -519,9 +525,35 @@ namespace OutOfSight.Core
         public FurniturePose CarryReturnPose { get; private set; }
         /// <summary>
         /// Where the carried furniture is held: <see cref="CarryForward"/> ahead of the body, <see cref="Tuning.CarryHeight"/>
-        /// above the floor under the inhabitant (M5, <see cref="Floor"/>).
+        /// above the floor under the inhabitant (M5, <see cref="Floor"/>). DOGCARRY: for the dog, its near edge is at the
+        /// dog's snout (the body's CarryForward reaches it as it reaches a human's hands), <see cref="Tuning.DogDragLift"/> high.
         /// </summary>
-        public Vector3 CarryAnchor => Position + YawMath.Forward(BodyYaw) * CarryForward + Vector3.up * (Tuning.CarryHeight + FloorHeight);
+        public Vector3 CarryAnchor => Position + YawMath.Forward(BodyYaw) * CarryForward + Vector3.up * (CarryLift + FloorHeight);
+
+        /// <summary>
+        /// DOGCARRY: the dog's happy beat right after it dropped the furniture it dragged home (still in the Carrying mode, the
+        /// put down over, before the routine resumes). Presentation reads it (the wag).
+        /// </summary>
+        public bool IsWagging => personality.Barks && mode == InhabitantMode.Carrying && !IsCarrying && LastActivity == RoutineActivity.Looking;
+
+        /// <summary>
+        /// DOGCARRY: true when <see cref="BeginCarry"/> to <paramref name="returnPose"/> would find a path with
+        /// <see cref="InvestigatePlanner"/> (the humans' planner) from where the body stands, instead of the straight line
+        /// fallback. GameState asks it before the dog drags the furniture home (no path: a human is called, as before).
+        /// </summary>
+        public bool CanPlanCarry(FurniturePose returnPose)
+        {
+            Vector3 here = lowered ? standPoint : Position;
+            Vector3 home = YawMath.Planar(returnPose.Position);
+            Vector3 goal = home - YawMath.Forward(ApproachYaw(here, home)) * CarryForward;
+            if (YawMath.Planar(goal - here).magnitude <= Tuning.InvestigateReach)
+            {
+                return true;
+            }
+            return OtherPlanner.TryPlan(here, goal, carryProbe) && carryProbe.Count > 0;
+        }
+
+        private readonly List<Vector3> carryProbe = new List<Vector3>();
         public Vector3 AlertSource { get; private set; }
 
         public InhabitantRoutine(List<StationDef> stations, int startStation)
@@ -826,6 +858,8 @@ namespace OutOfSight.Core
             mode = InhabitantMode.Carrying;
             IsCarrying = true;
             ReachedTarget = false;
+            // DOGCARRY: the dog's run is over once it carries (a new bark during the drag or the wag starts no run).
+            Running = false;
             CarryReturnPose = returnPose;
             ClearPlan();
             stampGoal = -1;
@@ -844,6 +878,11 @@ namespace OutOfSight.Core
             EnqueuePath(here, CarrySpeed, RoutineActivity.Carrying, false);
             Enqueue(new Action { Kind = Kind.FaceTarget, Target = home });
             Enqueue(new Action { Kind = Kind.PutDown, Value = Tuning.PutDownDuration });
+            if (personality.Barks)
+            {
+                // DOGCARRY: the dog dropped it home: a happy wag beat (IsWagging) before it resumes its routine.
+                Enqueue(new Action { Kind = Kind.Look, Value = Tuning.DogWagTime });
+            }
             Enqueue(new Action { Kind = Kind.EndInvestigation });
         }
 

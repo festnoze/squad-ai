@@ -110,7 +110,7 @@ whole game is about seeing yourself and the watcher in the same frame.
 | Constant | Value |
 |---|---|
 | Orbit distance | 4.0 m (mouse wheel 2.5 to 6.0) |
-| Pitch range | 15 to 75 deg above horizontal |
+| Pitch range | -10 to 75 deg (the view; 2026-11-20 sky ceiling, was 15 to 75): the arm follows down to 5 deg above horizontal only, lower pitches tilt the view up toward the sky |
 | Default pitch | 40 deg |
 | Mouse sensitivity | 0.12 deg per pixel |
 | Target point | furniture center + 0.5 m up |

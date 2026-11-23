@@ -91,54 +91,60 @@ namespace OutOfSight.Tests
                 Assert.IsTrue(string.IsNullOrEmpty(e.idleClip) && string.IsNullOrEmpty(e.walkClip), id + ": a human finds its clips by suffix");
                 Assert.Greater(e.eyeHeight, 0f, id + ": no measured eye height");
             }
-            ModelCatalog.Entry dog = Entry(ModelCatalog.QuaterniusShiba);
-            Assert.IsTrue(dog.rigged, "the Shiba is rigged");
-            Assert.AreEqual(ModelCatalog.KindPet, dog.kind, "the Shiba is a pet");
+            ModelCatalog.Entry dog = Entry(ModelCatalog.QuaterniusHusky);
+            Assert.IsTrue(dog.rigged, "the Husky is rigged");
+            Assert.AreEqual(ModelCatalog.KindPet, dog.kind, "the Husky is a pet");
             Assert.IsTrue(dog.IsPet && !dog.IsHuman);
-            Assert.AreEqual(Tuning.DogEyeHeight, dog.targetEyeHeight, 1e-6f, "the dog's eyes are fitted at Tuning.DogEyeHeight");
-            Assert.AreEqual(Tuning.DogEyeHeight, dog.TargetEye, 1e-6f);
+            // DOGBIG: the model is fitted bigger than the gameplay eye (Tuning.DogEyeHeight stays the routine's).
+            Assert.AreEqual(Tuning.DogModelEyeHeight, dog.targetEyeHeight, 1e-6f, "the dog's eyes are fitted at Tuning.DogModelEyeHeight");
+            Assert.AreEqual(Tuning.DogModelEyeHeight, dog.TargetEye, 1e-6f);
+            Assert.AreEqual(Tuning.DogEyeHeight * Tuning.DogModelScale, Tuning.DogModelEyeHeight, 1e-6f, "the model eye is the gameplay eye times the model scale");
             Assert.AreEqual("Idle", dog.idleClip, "the pet clip map's Idle");
             Assert.AreEqual("Walk", dog.walkClip, "the pet clip map's Walk");
-            Assert.AreEqual("Head", dog.headBone, "the Shiba's head bone");
-            Assert.AreNotEqual(Vector3.zero, dog.eyeLocal, "the Shiba's eyes were not found");
+            Assert.AreEqual("Head", dog.headBone, "the Husky's head bone");
+            Assert.AreNotEqual(Vector3.zero, dog.eyeLocal, "the Husky's eyes were not found");
             Animation anim = dog.prefab.GetComponentInChildren<Animation>(true);
-            Assert.IsNotNull(anim, "premise: the Shiba has an Animation");
+            Assert.IsNotNull(anim, "premise: the Husky has an Animation");
             var clips = new List<string>();
             foreach (AnimationState s in anim)
             {
                 clips.Add(s.name);
             }
-            CollectionAssert.Contains(clips, dog.idleClip, "the Shiba's Idle clip is missing");
-            CollectionAssert.Contains(clips, dog.walkClip, "the Shiba's Walk clip is missing");
+            CollectionAssert.Contains(clips, dog.idleClip, "the Husky's Idle clip is missing");
+            CollectionAssert.Contains(clips, dog.walkClip, "the Husky's Walk clip is missing");
             foreach (string id in ModelCatalog.Ids.Where(i => i.StartsWith("kenney.", System.StringComparison.Ordinal)))
             {
                 ModelCatalog.Entry e = Entry(id);
                 Assert.IsFalse(e.rigged, id);
                 Assert.IsFalse(e.IsHuman || e.IsPet, id + ": a static model is no character");
             }
-            CollectionAssert.IsSubsetOf(Humans.Concat(new[] { ModelCatalog.QuaterniusShiba }), ModelCatalog.Ids, "every character is a required id");
+            CollectionAssert.IsSubsetOf(Humans.Concat(new[] { ModelCatalog.QuaterniusHusky }), ModelCatalog.Ids, "every character is a required id");
         }
 
         [Test]
         public void The_dog_is_fitted_with_its_eyes_at_the_dog_eye_and_the_humans_at_theirs()
         {
-            ModelCatalog.Entry dog = Entry(ModelCatalog.QuaterniusShiba);
+            ModelCatalog.Entry dog = Entry(ModelCatalog.QuaterniusHusky);
             float dogEyes = ModelKit.RiggedScale(dog) * dog.eyeHeight;
-            Assert.That(dogEyes, Is.EqualTo(Tuning.DogEyeHeight).Within(1e-4f), $"the fitted Shiba's eyes stand at {dogEyes:0.###} m");
+            Assert.That(dogEyes, Is.EqualTo(Tuning.DogModelEyeHeight).Within(1e-4f), $"the fitted dog's eyes stand at {dogEyes:0.###} m");
             foreach (string id in Humans)
             {
                 ModelCatalog.Entry e = Entry(id);
                 Assert.That(ModelKit.RiggedScale(e) * e.eyeHeight, Is.EqualTo(Tuning.EyeHeight).Within(1e-4f), id);
             }
-            // The fitted dog is a small dog: about 0.4 to 0.6 m tall (its native height times the same scale).
+            // DOGBIG: the fitted dog is a big dog (it was a 0.4 m Shiba): about 0.6 m tall at the ears (its native height
+            // times the same scale), at most 0.8 m from snout to tail, its snout about 0.47 m ahead of its root.
             float height = ModelKit.RiggedScale(dog) * dog.nativeSize.y;
-            Assert.That(height, Is.InRange(0.35f, 0.7f), $"the fitted Shiba is {height:0.00} m tall");
+            Assert.That(height, Is.InRange(0.55f, 0.75f), $"the fitted dog is {height:0.00} m tall");
+            float length = ModelKit.RiggedScale(dog) * dog.nativeSize.z;
+            Assert.That(length, Is.InRange(0.6f, 0.85f), $"the fitted dog is {length:0.00} m long");
+            Assert.That(ModelKit.ForwardReach(dog), Is.InRange(0.4f, 0.55f), "the fitted dog's snout reach");
         }
 
         [Test]
         public void Every_character_is_within_its_budget()
         {
-            foreach (string id in Humans.Concat(new[] { ModelCatalog.QuaterniusShiba }))
+            foreach (string id in Humans.Concat(new[] { ModelCatalog.QuaterniusHusky }))
             {
                 ModelCatalog.Entry e = Entry(id);
                 SkinnedMeshRenderer skin = Skin(e);
@@ -150,7 +156,7 @@ namespace OutOfSight.Tests
                 Assert.LessOrEqual(triangles, Tuning.BudgetInhabitantTriangles, $"{id}: {triangles} triangles");
                 if (e.IsPet)
                 {
-                    Assert.Greater(bones, Tuning.BudgetInhabitantBones, "premise: the Shiba needs the pet bone budget");
+                    Assert.Greater(bones, Tuning.BudgetInhabitantBones, "premise: the Husky needs the pet bone budget");
                 }
             }
         }
@@ -182,7 +188,7 @@ namespace OutOfSight.Tests
             // The inhabitant's view of it: the personality's model and tint, an explicit model or body colour winning,
             // and no tint for a default inhabitant whatever its body colour.
             Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, Inhabitant.ModelIdOf(new InhabitantDef { Personality = PersonalityDef.Granny }));
-            Assert.AreEqual(ModelCatalog.QuaterniusShiba, Inhabitant.ModelIdOf(new InhabitantDef { Kind = PersonalityDef.Dog }));
+            Assert.AreEqual(ModelCatalog.QuaterniusHusky, Inhabitant.ModelIdOf(new InhabitantDef { Kind = PersonalityDef.Dog }));
             Assert.AreEqual(ModelCatalog.QuaterniusMan, Inhabitant.ModelIdOf(new InhabitantDef { Personality = PersonalityDef.Teen, Model = "quaternius.man" }));
             Assert.IsNull(Inhabitant.ModelIdOf(new InhabitantDef()), "a default inhabitant naming no model keeps the procedural body");
             Assert.IsTrue(Same(Tint(PersonalityDef.For(PersonalityDef.Teen)), Inhabitant.TintOf(new InhabitantDef { Personality = PersonalityDef.Teen }).Value));
@@ -296,6 +302,108 @@ namespace OutOfSight.Tests
                 float d = DeltaE(dog, floor);
                 Assert.GreaterOrEqual(d, DogFloorDeltaE,
                     $"the dog's tint {row.Tint} is {d:0.0} from the floor of {where} (#{ColorUtility.ToHtmlStringRGB(floor)})");
+            }
+        }
+
+        /// <summary>
+        /// DOGBIG (black Labrador): once the dog's fur map ships, its mean colour (the map's pixels averaged in linear light:
+        /// the atlas is fur wherever no triangle maps, so this is the dog's mean within a unit) stands out from every floor of
+        /// every shipped level with a dog, as its tint must (offline, v3 with its strands lifted: #3E3C3C, 36.5 from the nearest, the carpet borders).
+        /// </summary>
+        [Test]
+        public void The_dog_fur_map_stands_out_from_every_floor_it_walks_on()
+        {
+            const string path = "Assets/Art/Characters/Resources/" + Tuning.DogFurTextureResource + ".png";
+            if (!File.Exists(path))
+            {
+                Assert.Ignore("no dog fur map: the dog shows its tint (checked above)");
+            }
+            var map = new Texture2D(2, 2);
+            try
+            {
+                Assert.IsTrue(map.LoadImage(File.ReadAllBytes(path)), "the fur map does not decode");
+                Color[] pixels = map.GetPixels();
+                var sum = Vector3.zero;
+                foreach (Color p in pixels)
+                {
+                    Color l = Linear(p);
+                    sum += new Vector3(l.r, l.g, l.b);
+                }
+                sum /= pixels.Length;
+                var mean = new Color(Mathf.LinearToGammaSpace(sum.x), Mathf.LinearToGammaSpace(sum.y), Mathf.LinearToGammaSpace(sum.z), 1f);
+                foreach ((string where, Color floor) in DogFloors(out _))
+                {
+                    float d = DeltaE(mean, floor);
+                    Assert.GreaterOrEqual(d, DogFloorDeltaE,
+                        $"the dog's fur (mean #{ColorUtility.ToHtmlStringRGB(mean)}) is {d:0.0} from the floor of {where} (#{ColorUtility.ToHtmlStringRGB(floor)})");
+                }
+            }
+            finally
+            {
+                Object.DestroyImmediate(map);
+            }
+        }
+
+        /// <summary>
+        /// DOGFACE (black Labrador, 2026-11-22: "the brows and the mouth barely show, the open mouth does not read"): on the
+        /// fur map, the tan brow marks over the eyes stand out from the forehead's black, and the mouth's inside (the atlas
+        /// region the bite's open jaw shows: make_husky.py v5 MOUTH_REGION 0.60, 0.62, 0.30 x 0.14, painted by
+        /// compose_dogfur.py) is a pink far from the coat. Offline: brows L* 34 against the forehead's 22 (dE 14.7), the
+        /// tongue #AE5B67 (dE about 40 from the coat's mean).
+        /// </summary>
+        [Test]
+        public void The_dog_face_marks_and_mouth_inside_read_against_its_black_fur()
+        {
+            const string path = "Assets/Art/Characters/Resources/" + Tuning.DogFurTextureResource + ".png";
+            if (!File.Exists(path))
+            {
+                Assert.Ignore("no dog fur map: the dog shows its tint");
+            }
+            var map = new Texture2D(2, 2);
+            try
+            {
+                Assert.IsTrue(map.LoadImage(File.ReadAllBytes(path)), "the fur map does not decode");
+                // Atlas UVs from the image's top left (glTF), averaged over 7 x 7 pixels.
+                Color At(float u, float v)
+                {
+                    int cx = Mathf.RoundToInt(u * map.width), cy = map.height - 1 - Mathf.RoundToInt(v * map.height);
+                    Color sum = Color.clear;
+                    for (int dy = -3; dy <= 3; dy++)
+                    {
+                        for (int dx = -3; dx <= 3; dx++)
+                        {
+                            sum += map.GetPixel(cx + dx, cy + dy);
+                        }
+                    }
+                    return sum / 49f;
+                }
+                Color[] pixels = map.GetPixels();
+                var lin = Vector3.zero;
+                foreach (Color p in pixels)
+                {
+                    Color l = Linear(p);
+                    lin += new Vector3(l.r, l.g, l.b);
+                }
+                lin /= pixels.Length;
+                var coat = new Color(Mathf.LinearToGammaSpace(lin.x), Mathf.LinearToGammaSpace(lin.y), Mathf.LinearToGammaSpace(lin.z), 1f);
+                Color forehead = At(0.7634f, 0.1221f);
+                foreach (float u in new[] { 0.6969f, 0.8298f })
+                {
+                    Color brow = At(u, 0.1517f);
+                    Assert.Greater(brow.grayscale, forehead.grayscale, $"the brow at u {u} is not lighter than the forehead");
+                    Assert.GreaterOrEqual(DeltaE(brow, forehead), 10f,
+                        $"the brow at u {u} (#{ColorUtility.ToHtmlStringRGB(brow)}) does not stand out from the forehead (#{ColorUtility.ToHtmlStringRGB(forehead)})");
+                }
+                Color tongue = At(0.60f + 0.30f * 0.5f, 0.62f + 0.14f * 0.8f);
+                Color palate = At(0.60f + 0.30f * 0.5f, 0.62f + 0.14f * 0.1f);
+                Assert.GreaterOrEqual(DeltaE(tongue, coat), 30f,
+                    $"the tongue (#{ColorUtility.ToHtmlStringRGB(tongue)}) does not stand out from the coat (#{ColorUtility.ToHtmlStringRGB(coat)})");
+                Assert.Greater(tongue.r - tongue.g, 0.2f, $"the tongue (#{ColorUtility.ToHtmlStringRGB(tongue)}) is not pink");
+                Assert.Greater(palate.r - palate.g, 0.1f, $"the mouth's inside (#{ColorUtility.ToHtmlStringRGB(palate)}) is not a dark red");
+            }
+            finally
+            {
+                Object.DestroyImmediate(map);
             }
         }
 

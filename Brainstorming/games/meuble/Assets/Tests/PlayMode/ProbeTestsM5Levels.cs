@@ -28,6 +28,10 @@ namespace OutOfSight.Tests
     /// step 45r, the wave 5B levels boot with their body, lesson, people, robot and load.
     /// Step 40: the whole play order through the real level flow (Enter to the next level) at offset 0 and timeScale 8,
     /// the save checked after each win, ending on the end screen.
+    /// Levels v2 (docs/levels_v2/LEVELS_V2.md 9): the replays of the cut level10 and level16 are deleted (45d, 45j), step
+    /// 45m plays level15's rock, 45o uses level9's v2 lane, 45b is time-aware, 45g is redrawn for the v2 salon, and the
+    /// order checks of 45a and 45r are gone (LevelDataM2Tests checks the v2 order). The level10 counter-route (45p) still
+    /// loads the archived file by id.
     /// Every step asserts its premise first, so a level that does not run cannot pass.
     /// </summary>
     public sealed class ProbeTestsM5Levels
@@ -40,13 +44,16 @@ namespace OutOfSight.Tests
         /// <summary>CONTRACT_M5 12 (step 45) and M2.1: every route is replayed this much early, on time and late.</summary>
         private static readonly float[] Offsets = { -0.2f, 0f, 0.2f };
 
-        /// <summary>The wave 5A levels in play order, with the body and the lesson of CONTRACT_M5 16.10.</summary>
+        /// <summary>Levels v2 (docs/levels_v2/LEVELS_V2.md 3, D1): the play order holds 22 levels (7 + 9 + 6).</summary>
+        private const int V2LevelCount = 22;
+
+        /// <summary>The wave 5A levels still played in v2, with the body and the lesson of CONTRACT_M5 16.10 (level16 is cut,
+        /// LEVELS_V2 D2).</summary>
         private static readonly (string id, string body, string lesson, int humans, int dogs)[] WaveA =
         {
             ("level8", BodyKinds.Chair, LevelDef.LessonDoor, 1, 0),
             ("level12", BodyKinds.Stool, LevelDef.LessonPet, 1, 1),
             ("level14", BodyKinds.Armchair, LevelDef.LessonSplit, 2, 0),
-            ("level16", BodyKinds.FloorLamp, LevelDef.LessonDark, 2, 1),
         };
 
         [UnitySetUp]
@@ -121,7 +128,7 @@ namespace OutOfSight.Tests
         /// wins, with no discovery, no alert, no creak and no bark (the audit forbids a bark), no error logged, and passes
         /// <paramref name="lesson"/>, which adds a failure when the run did not play the level's lesson.
         /// </summary>
-        private IEnumerator ReplayDesignerRoute(string id, Action<RouteReplayer.Result, List<string>> lesson)
+        private IEnumerator ReplayDesignerRoute(string id, Action<RouteReplayer.Result, List<string>> lesson, Action perStep = null)
         {
             CollectionAssert.Contains(Game.LevelOrder.ToList(), id, "premise: " + id + " is listed in levels.json");
             var failures = new List<string>();
@@ -131,7 +138,22 @@ namespace OutOfSight.Tests
                 yield return LoadFresh(id);
                 Assert.GreaterOrEqual(Game.Def.DesignerRoute.Count, 2, id + ": premise: no designerRoute (LevelAudit -writeRoutes writes it)");
                 var r = new RouteReplayer.Result();
-                yield return RouteReplayer.Replay(Game, offset, r, Tuning.PlaythroughTimeScale);
+                // Levels v2: a time-aware check of the caller watches every fixed step of the replay (Step45b).
+                if (perStep != null)
+                {
+                    Game.FixedStepped += perStep;
+                }
+                try
+                {
+                    yield return RouteReplayer.Replay(Game, offset, r, Tuning.PlaythroughTimeScale);
+                }
+                finally
+                {
+                    if (perStep != null)
+                    {
+                        Game.FixedStepped -= perStep;
+                    }
+                }
                 Debug.Log("[Step45] " + r);
                 string label = r.Label;
                 if (r.State != PlayState.Won)
@@ -190,14 +212,25 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// Step 45b, level 12 "Le chien" (lesson pet): the careful stool never tips nor runs past the tip speed, and the
-        /// awake dog never barks (asserted for every run). 5A.1 (CONTRACT_M5 17): the hint "le canapé te cache de lui" is
-        /// true: every route point in the dog's room that its awake stations could see (range and cone) has a sofa
-        /// between the dog and it.
+        /// awake dog never barks (asserted for every run). 5A.1 (CONTRACT_M5 17), made time-aware by levels v2 (the v2 Rex
+        /// turns on his spot instead of napping): the hint "les canapés te cachent de lui" is true: at every fixed step of
+        /// every replay where the awake dog, as he stands and looks at that moment, has the stool in his room within his
+        /// range and half angle, a sofa stands between him and the stool.
         /// </summary>
         [UnityTest]
         [Timeout(900000)]
         public IEnumerator Step45b_Level12Routes()
         {
+            int watched = 0;
+            var uncovered = new List<string>();
+            void Watch()
+            {
+                if (Game.State != PlayState.Playing)
+                {
+                    return;
+                }
+                watched += DogSightsWithoutASofa(uncovered);
+            }
             yield return ReplayDesignerRoute("level12", (r, failures) =>
             {
                 Assert.IsTrue(Game.Def.Inhabitants.Any(h => h.Kind == PersonalityDef.Dog), "premise: level 12 has a dog");
@@ -205,46 +238,47 @@ namespace OutOfSight.Tests
                 {
                     failures.Add($"{r.Label}: the stool tipped ({r.Topples}) or went {r.TopSpeed:0.00} m/s, above {Tuning.StoolTipSpeed}");
                 }
-            });
-            List<string> uncovered = PointsTheDogCouldSeeWithoutASofa(Game.Def, out int watched);
-            Assert.Greater(watched, 0, "premise: no route point lies in the dog's room within its range and cone (the sofa hides nothing)");
-            Assert.IsEmpty(uncovered, "route points the awake dog could see with no sofa between them:\n" + string.Join("\n", uncovered));
+            }, Watch);
+            Debug.Log($"[Step45b] {watched} steps with the stool in the awake dog's range and cone, {uncovered.Count} without a sofa between");
+            Assert.Greater(watched, 0, "premise: the stool never stood in the awake dog's room within his range and cone (the sofa hides nothing)");
+            Assert.IsEmpty(uncovered, "steps where the awake dog had the stool in range and cone with no sofa between them:\n"
+                                      + string.Join("\n", uncovered.Take(12)));
         }
 
         /// <summary>
-        /// The designer route points of <paramref name="def"/> that lie in the room of an awake dog station, within the dog's
-        /// range and half angle, with no prop of kind "sofa" crossing the segment from the dog to them (a plan view test:
-        /// the sofa is what hides the stool, CONTRACT_M5 17). <paramref name="watched"/> counts the points in range and cone.
+        /// One fixed step of the time-aware sofa check (Step 45b): for each awake dog of the running level, when the furniture
+        /// is in the dog's room, within his view range and half angle around his eye yaw, returns 1 and, when no prop of kind
+        /// "sofa" crosses the plan segment from the dog to the furniture, adds a line to <paramref name="uncovered"/> (a plan
+        /// view test: the sofa is what hides the stool, CONTRACT_M5 17).
         /// </summary>
-        private static List<string> PointsTheDogCouldSeeWithoutASofa(LevelDef def, out int watched)
+        private int DogSightsWithoutASofa(List<string> uncovered)
         {
-            var uncovered = new List<string>();
-            watched = 0;
-            PersonalityDef dog = PersonalityDef.For(PersonalityDef.Dog);
+            LevelDef def = Game.Def;
+            Vector3 stool = YawMath.Planar(Game.Furniture.transform.position);
+            RoomDef stoolRoom = def.RoomAt(stool);
+            int inSight = 0;
             List<PropDef> sofas = def.Props.Where(p => p.Kind == "sofa" && p.Occluder).ToList();
-            foreach (InhabitantDef h in def.Inhabitants.Where(h => h.Kind == PersonalityDef.Dog))
+            foreach (Inhabitant h in Game.Level.Inhabitants)
             {
-                foreach (StationDef s in h.Stations.Where(s => !s.Sleep))
+                if (h.Def.Kind != PersonalityDef.Dog || h.Routine.Asleep)
                 {
-                    RoomDef room = def.RoomAt(s.Position);
-                    foreach (RouteStepDef p in def.DesignerRoute)
-                    {
-                        var point = new Vector3(p.X, 0f, p.Z);
-                        Vector3 to = point - s.Position;
-                        if (room == null || def.RoomAt(point) != room || to.magnitude > dog.ViewRange
-                            || Mathf.Abs(Mathf.DeltaAngle(s.Facing, YawMath.YawOf(to))) > dog.HalfAngle)
-                        {
-                            continue;
-                        }
-                        watched++;
-                        if (!sofas.Any(sofa => SegmentCrossesFootprint(s.Position, point, sofa)))
-                        {
-                            uncovered.Add($"({p.X}, {p.Z}) at {p.At} s from the dog at ({s.X}, {s.Z}) facing {s.Facing}");
-                        }
-                    }
+                    continue;
+                }
+                Vector3 dog = YawMath.Planar(h.Routine.Position);
+                Vector3 to = stool - dog;
+                if (stoolRoom == null || def.RoomAt(dog) != stoolRoom || to.magnitude > h.Routine.ViewRange
+                    || Mathf.Abs(Mathf.DeltaAngle(h.Routine.EyeYaw, YawMath.YawOf(to))) > h.Routine.HalfAngle)
+                {
+                    continue;
+                }
+                inSight++;
+                if (!sofas.Any(sofa => SegmentCrossesFootprint(dog, stool, sofa)))
+                {
+                    uncovered.Add(string.Format(CultureInfo.InvariantCulture, "stool ({0:0.00}, {1:0.00}) at {2:0.00} s, dog at ({3:0.00}, {4:0.00}) looking {5:0}",
+                        stool.x, stool.z, Game.Elapsed, dog.x, dog.z, h.Routine.EyeYaw));
                 }
             }
-            return uncovered;
+            return inSight;
         }
 
         /// <summary>True when the plan segment a to b crosses the yawed footprint of <paramref name="prop"/>.</summary>
@@ -345,27 +379,7 @@ namespace OutOfSight.Tests
             yield return null;
         }
 
-        /// <summary>
-        /// Step 45d, level 16 "La nuit" (lesson dark): the lamp is switched off, nobody switches it back on, the dog never
-        /// barks, and the closed leaf stays closed: E at the switch-off spot is the lamp's, never the door's.
-        /// </summary>
-        [UnityTest]
-        [Timeout(900000)]
-        public IEnumerator Step45d_Level16Routes()
-        {
-            yield return ReplayDesignerRoute("level16", (r, failures) =>
-            {
-                Assert.AreEqual(1, Game.Level.Leaves.Count, "premise: level 16 has one closed leaf");
-                if (r.Toggles == 0 || r.SwitchOns != 0)
-                {
-                    failures.Add($"{r.Label}: {r.Toggles} toggles, {r.SwitchOns} switch-ons (the lamp crosses dark, unseen)");
-                }
-                if (r.Opens != 0 || r.DoorOpens != 0 || Game.Level.Leaves.Any(l => l.Open))
-                {
-                    failures.Add($"{r.Label}: {r.Opens} openings, {r.DoorOpens} counted by the game: E opened the leaf instead of switching the lamp");
-                }
-            });
-        }
+        // Step 45d (the level16 replay) is deleted by levels v2: level16 is cut (LEVELS_V2 D2), its door beat moved to level20.
 
         /// <summary>
         /// Step 45e, the counter-routes of the door level (CONTRACT_M5 12; CONTRACT_M5_v3 15.2: a leaf seen swinging is seen
@@ -435,24 +449,27 @@ namespace OutOfSight.Tests
             Assert.Greater(worst, 0f, "the chair got past the closed leaf");
         }
 
-        /// <summary>The uncovered line of level 12 (5A.1 M5): from the spawn through the bedroom and the corridor into the
-        /// salon, round the west end of the sofas and straight east in front of them to the entree door (in line with
-        /// it), then to the exit; careful legs, so the stool never tips.</summary>
+        /// <summary>The hide of level 12's designer route the uncovered line leaves from (levels v2): behind the middle sofa.</summary>
+        private static readonly Vector2 Level12SofaHide = new Vector2(7.25f, 7.25f);
+
+        /// <summary>The uncovered line of level 12 (5A.1 M5, redrawn for the v2 salon): from the hide behind the middle sofa,
+        /// west to the gap between the two sofas, south through it into the open salon in front of them, then straight
+        /// east to the entree door and the exit; careful legs, so the stool never tips.</summary>
         private static readonly Vector2[] Level12UncoveredLine =
         {
-            new Vector2(3.75f, 7.25f), new Vector2(3.75f, 8.25f), new Vector2(3.75f, 8.75f), new Vector2(4.75f, 8.75f),
-            new Vector2(5.25f, 8.25f), new Vector2(5.25f, 7.75f), new Vector2(4.75f, 7.25f), new Vector2(4.75f, 6.25f),
-            new Vector2(4.75f, 5.75f), new Vector2(5.75f, 5.75f), new Vector2(6.75f, 5.75f), new Vector2(7.75f, 5.75f),
-            new Vector2(8.75f, 5.75f), new Vector2(9.75f, 5.75f), new Vector2(10.75f, 5.75f), new Vector2(11.75f, 6.25f),
+            new Vector2(6.25f, 7.25f), new Vector2(6.25f, 6.25f), new Vector2(6.25f, 5.25f), new Vector2(7.25f, 5.25f),
+            new Vector2(8.25f, 5.25f), new Vector2(9.25f, 5.25f), new Vector2(9.75f, 5.75f), new Vector2(10.75f, 5.75f),
+            new Vector2(11.75f, 6.25f),
         };
 
         /// <summary>
-        /// Step 45g, the counter-route of the dog level (CONTRACT_M5 17, critique 5A M5: the lesson has teeth). The line
-        /// in front of the sofas, straight at the entree door, runs in the awake dog's sight: the dog barks, a human within
-        /// his hearing radius of the bark turns toward it (an alert), and the run does not win: he sees the stool moving
-        /// and catches it. Premises: the line leaves at once and the bark comes before the dog's first nap (no wait for
-        /// it), no human saw the stool before the first bark (the bark is what turns him), the alert follows the bark,
-        /// and the human alerted stood within Tuning.BarkRadius times his hearing factor of the bark.
+        /// Step 45g, the counter-route of the dog level (CONTRACT_M5 17, critique 5A M5: the lesson has teeth). Redrawn for
+        /// levels v2 (Rex no longer naps, he turns on his spot): the designer route up to its hide behind the middle sofa,
+        /// then, instead of waiting there, the line through the gap between the sofas and east in front of them runs in the
+        /// awake dog's sight: the dog barks, a human within his hearing radius of the bark turns toward it (an alert), and
+        /// the run does not win: he sees the stool moving and catches it. Premises: the bark comes on the uncovered line
+        /// (after it left the hide), no human saw the stool before the first bark (the bark is what turns him), the alert
+        /// follows the bark, and the human alerted stood within Tuning.BarkRadius times his hearing factor of the bark.
         /// </summary>
         [UnityTest]
         [Timeout(600000)]
@@ -461,16 +478,17 @@ namespace OutOfSight.Tests
             yield return LoadFresh("level12");
             InhabitantDef dog = Game.Def.Inhabitants.FirstOrDefault(h => h.Kind == PersonalityDef.Dog);
             Assert.IsNotNull(dog, "premise: level 12 has a dog");
-            StationDef dogStart = dog.Stations[dog.StartStation];
-            Assert.IsFalse(dogStart.Sleep, "premise: the dog starts awake");
-            // The dog's first nap starts after its first awake dwell: a bark before it was not waited for.
-            float firstNap = dogStart.Dwell;
+            Assert.IsFalse(dog.Stations[dog.StartStation].Sleep, "premise: the dog starts awake");
             List<RouteStepDef> route = Game.Def.DesignerRoute;
             Assert.GreaterOrEqual(route.Count, 2, "premise: level 12 has a designer route");
+            int hide = route.FindIndex(s => Mathf.Abs(s.X - Level12SofaHide.x) < 0.01f && Mathf.Abs(s.Z - Level12SofaHide.y) < 0.01f);
+            Assert.GreaterOrEqual(hide, 1, $"premise: the designer route of level 12 passes its hide behind the middle sofa {Level12SofaHide}");
             Vector2 end = Level12UncoveredLine[Level12UncoveredLine.Length - 1];
             Assert.IsTrue(Game.Def.Exit.Contains(new Vector3(end.x, 0f, end.y)), "premise: the uncovered line ends on the exit");
-            route.Clear();
-            float at = 0.3f;
+            // The designer route up to its hide, then the uncovered line at once (each leg departs as the previous one ends).
+            route.RemoveRange(hide + 1, route.Count - hide - 1);
+            float leaveAt = route[hide].At + 0.7f;
+            float at = leaveAt;
             foreach (Vector2 p in Level12UncoveredLine)
             {
                 route.Add(new RouteStepDef { X = p.x, Z = p.y, At = at, Careful = true });
@@ -522,7 +540,7 @@ namespace OutOfSight.Tests
                       + $"{alertedDistance:0.00} m from the bark, hears it within {alertedRadius:0.00} m), seen before the bark {seenBeforeBark}");
             Assert.Greater(r.TopSpeed, 0.3f, "premise: the stool never drove");
             Assert.GreaterOrEqual(r.Barks, 1, "the dog never barked at the stool crossing in front of the sofas");
-            Assert.Less(firstBark, firstNap, $"premise: the bark came at {firstBark:0.00} s, after the dog's first nap at {firstNap:0.0} s (the line waited for something)");
+            Assert.GreaterOrEqual(firstBark, leaveAt - 1e-3f, $"premise: the bark came at {firstBark:0.00} s, before the stool left its hide at {leaveAt:0.0} s (not the uncovered line's)");
             Assert.IsFalse(seenBeforeBark, "premise: a human saw the stool before the bark (the bark would not be what turns him)");
             Assert.GreaterOrEqual(r.Alerts, 1, "nobody heard the bark: no human turned");
             Assert.GreaterOrEqual(firstAlert, firstBark, "premise: the first alert came before the bark");
@@ -537,22 +555,19 @@ namespace OutOfSight.Tests
         // ----- 45a and 45f: boot and the replayer -----
 
         /// <summary>
-        /// Step 45a (CONTRACT_M5 8, 16.2, 16.10): levels.json plays levels 8, 12, 14 and 16 in number order, each right after
-        /// the level whose number precedes its own (after wave 5B the play order is level1 to level17). Each one boots through GameState.LoadLevel with no error, with its body, its lesson, its humans and its dog, and
-        /// 3 s of game time with no input leave it playing: an idle player at its spawn is never caught.
+        /// Step 45a (CONTRACT_M5 8, 16.2, 16.10; levels v2): levels.json lists levels 8, 12 and 14 (the v2 order is checked by
+        /// LevelDataM2Tests, not here). Each one boots through GameState.LoadLevel with no error, with its body, its lesson,
+        /// its humans and its dog, and 3 s of game time with no input leave it playing: an idle player at its spawn is never
+        /// caught.
         /// </summary>
         [UnityTest]
         [Timeout(600000)]
         public IEnumerator Step45a_WaveALevelsBootAndAnIdlePlayerIsNeverCaught()
         {
             List<string> order = Game.LevelOrder.ToList();
-            Assert.GreaterOrEqual(order.IndexOf("level7"), 0, "premise: levels.json plays level 7");
-            for (int i = 0; i < WaveA.Length; i++)
+            foreach (var level in WaveA)
             {
-                int n = int.Parse(WaveA[i].id.Substring("level".Length), CultureInfo.InvariantCulture);
-                int before = order.IndexOf("level" + (n - 1));
-                Assert.GreaterOrEqual(before, 0, $"premise: levels.json plays level{n - 1}: {string.Join(", ", order)}");
-                Assert.AreEqual(before + 1, order.IndexOf(WaveA[i].id), $"{WaveA[i].id} is not at its place in levels.json: {string.Join(", ", order)}");
+                Assert.GreaterOrEqual(order.IndexOf(level.id), 0, $"{level.id} is not listed in levels.json: {string.Join(", ", order)}");
             }
             var failures = new List<string>();
             foreach ((string id, string body, string lesson, int humans, int dogs) in WaveA)
@@ -635,14 +650,16 @@ namespace OutOfSight.Tests
 
         // ----- 45i to 45r: wave 5B (levels 9, 10, 11, 13, 15 and 17) -----
 
-        /// <summary>The wave 5B levels in play order (CONTRACT_M5 16.10), with their body, lesson, people, robots and load.</summary>
+        /// <summary>The wave 5B levels (CONTRACT_M5 16.10, as retuned by levels v2), with their body, lesson, people, robots and
+        /// load. level10 is cut (LEVELS_V2 D2) but still boots by id as an archived file; level15 is the v2 rocker level
+        /// (Mamie and napping Rex, no robot).</summary>
         private static readonly (string id, string body, string lesson, int humans, int dogs, int robots, string load)[] WaveB =
         {
             ("level9", BodyKinds.Chair, LevelDef.LessonRobot, 1, 0, 1, null),
             ("level10", BodyKinds.RockingChair, LevelDef.LessonRock, 1, 0, 0, null),
             ("level11", BodyKinds.Chair, LevelDef.LessonLoad, 1, 0, 0, LoadView.Vase),
             ("level13", BodyKinds.OfficeChair, LevelDef.LessonLoad, 2, 0, 0, LoadView.Vase),
-            ("level15", BodyKinds.RockingChair, LevelDef.LessonRobot, 2, 0, 1, null),
+            ("level15", BodyKinds.RockingChair, LevelDef.LessonRock, 1, 1, 0, null),
             ("level17", BodyKinds.Chair, LevelDef.LessonFinal, 3, 1, 1, LoadView.Vase),
         };
 
@@ -664,24 +681,8 @@ namespace OutOfSight.Tests
             });
         }
 
-        /// <summary>
-        /// Step 45j, level 10 "Le fauteuil a bascule" (lesson rock, CONTRACT_M5 5 and 16.9): the rocking chair rocks after a
-        /// stop on the route, and no rock is seen (the run wins).
-        /// </summary>
-        [UnityTest]
-        [Timeout(900000)]
-        public IEnumerator Step45j_Level10Routes()
-        {
-            yield return ReplayDesignerRoute("level10", (r, failures) =>
-            {
-                Assert.IsTrue(Game.Furniture.Body.Rocks, "premise: the body of level 10 rocks");
-                // M6b waiver (CONTRACT_M6 5): an advisory lesson only has to win, the audit's route need not rock.
-                if (r.Rocks < 1 && !Game.Def.LessonAdvisory)
-                {
-                    failures.Add($"{r.Label}: the rocking chair never rocked: the route does not play the rock lesson");
-                }
-            });
-        }
+        // Step 45j (the level10 replay) is deleted by levels v2: level10 is cut (LEVELS_V2 D2), its rock lesson moved to
+        // level15 (Step 45m).
 
         /// <summary>
         /// Step 45k, level 11 "Le vase" (lesson load, CONTRACT_M5 6 and 16.5): the vase rides on the chair to the exit (the
@@ -717,9 +718,14 @@ namespace OutOfSight.Tests
             });
         }
 
+        /// <summary>Levels v2 (LEVELS_V2 5, level15): "every stop swings": the rocker route stops and rocks at least this often
+        /// (the audit's route rocks 4 times; 3 leaves room for a stop merged by an offset).</summary>
+        private const int Level15MinRocks = 3;
+
         /// <summary>
-        /// Step 45m, level 15 "La bascule et le robot" (lesson robot): the hum masks at least one noise of the route, and the
-        /// rocking chair rocks after a stop without being seen.
+        /// Step 45m, level 15 "Chien qui dort" (levels v2 rebuild, lesson rock, D4 and D20): the rocking chair hops down the
+        /// hall while napping Rex sleeps and rocks after its stops (at least <see cref="Level15MinRocks"/> times) with no rock
+        /// seen and no bark (the run wins). Premises: the body rocks, the level has its dog and no robot.
         /// </summary>
         [UnityTest]
         [Timeout(900000)]
@@ -727,11 +733,12 @@ namespace OutOfSight.Tests
         {
             yield return ReplayDesignerRoute("level15", (r, failures) =>
             {
-                Assert.AreEqual(1, Game.Robots.Count, "premise: level 15 has its robot");
+                Assert.AreEqual(0, Game.Robots.Count, "premise: level 15 has no robot in v2 (D20)");
+                Assert.IsTrue(Game.Def.Inhabitants.Any(h => h.Kind == PersonalityDef.Dog), "premise: level 15 has its dog (Rex)");
                 Assert.IsTrue(Game.Furniture.Body.Rocks, "premise: the body of level 15 rocks");
-                if (r.MaskedNoises < 1 || r.Rocks < 1)
+                if (r.Rocks < Level15MinRocks)
                 {
-                    failures.Add($"{r.Label}: {r.MaskedNoises} noises masked by the hum and {r.Rocks} rocks (each must be at least 1)");
+                    failures.Add($"{r.Label}: {r.Rocks} rocks, the rocker route must rock at least {Level15MinRocks} times (every stop swings)");
                 }
             });
         }
@@ -828,18 +835,21 @@ namespace OutOfSight.Tests
             }
         }
 
-        /// <summary>Level 9's wait for the robot: north of its lane, its footprint over the robot's disc, east of Claire.</summary>
-        private static readonly Vector2[] Level9ToTheRobotLane =
-        {
-            new Vector2(3.9f, 8.25f), new Vector2(5.5f, 8.25f), new Vector2(9.5f, 8.25f), new Vector2(9.5f, 7.5f),
-        };
+        /// <summary>Level 9's robot lane in levels v2 (LEVELS_V2 5, level9): the north band, z 8.25.</summary>
+        private const float Level9LaneZ = 8.25f;
+
+        /// <summary>The lane x from which level 9's designer route leaves the lane (the dodge east of the console): the wait
+        /// of Step 45o is the route's first waypoint in the lane at or past it.</summary>
+        private const float Level9LaneWaitMinX = 9.5f;
 
         /// <summary>
-        /// Step 45o, the robot collision on level 9 (CONTRACT_M5 4, 12 and 16.8): the chair crosses the north band behind
-        /// Claire's back, under the hum, and stops in the robot's lane ahead of it. The robot touches the still chair on its
-        /// first pass: the chair is shoved once, 0.25 m along the robot's heading (east), every step of the shove counts as
-        /// moving, and the robot reverses its loop. Premises: the chair reached its wait while the level was playing and stood
-        /// still for 0.5 s before the contact, and the robot was heading east.
+        /// Step 45o, the robot collision on level 9 (CONTRACT_M5 4, 12 and 16.8; redrawn for the v2 lane, z 8.25): the chair
+        /// rides behind the robot in its hum along the north lane (the designer route up to the point where it dodges the
+        /// bumper), then stays in the lane instead of dodging. The robot, coming back west from the lane's east end, touches
+        /// the still chair: the chair is shoved once, RobotPushDistance along the robot's heading (west), every step of the
+        /// shove counts as moving, and the robot reverses its loop (it heads east again). Premises: the robot starts east
+        /// along z 8.25, the chair reached its wait while the level was playing and stood still for 0.5 s before the contact,
+        /// and the robot was heading west at the contact.
         /// </summary>
         [UnityTest]
         [Timeout(600000)]
@@ -850,23 +860,36 @@ namespace OutOfSight.Tests
             Robot robot = Game.Robots[0];
             RobotPath path = robot.Path;
             Assert.Greater(path.ForwardAt(0f).x, 0.99f, "premise: the robot starts east along its lane");
-            Assert.AreEqual(7.25f, path.PositionAt(0f).z, 0.01f, "premise: the robot's lane runs at z 7.25");
+            Assert.AreEqual(Level9LaneZ, path.PositionAt(0f).z, 0.01f, $"premise: the robot's lane runs at z {Level9LaneZ}");
+            List<RouteStepDef> designer = Game.Def.DesignerRoute;
+            int wait = designer.FindIndex(s => s.X >= Level9LaneWaitMinX - 1e-3f && Mathf.Abs(s.Z - Level9LaneZ) < 0.01f);
+            Assert.GreaterOrEqual(wait, 1, "premise: the designer route of level 9 rides the lane to its dodge point");
+            var lane = designer.GetRange(0, wait + 1);
+            var waitAt = new Vector2(lane[wait].X, lane[wait].Z);
             int contacts0 = Game.RobotContactCount;
             int shoves0 = Game.ShoveCount;
             int reverses0 = path.ReverseCount;
             float contactAt = -1f;
             float shoveEndAt = -1f;
+            float reachedAt = -1f;
             int still = 0;
             int stillAtContact = -1;
             int shoveSteps = 0;
             int movingShoveSteps = 0;
+            int reversesAtEnd = reverses0;
             Vector3 before = Game.Furniture.transform.position;
             Vector3 after = before;
             Vector3 heading = Vector3.zero;
+            Vector3 robotAtContact = Vector3.zero;
+            Vector3 robotAfter = Vector3.zero;
             PlayState stateAtContact = PlayState.Playing;
             void Watch()
             {
                 FurnitureController f = Game.Furniture;
+                if (reachedAt < 0f && YawMath.Planar(f.transform.position - new Vector3(waitAt.x, 0f, waitAt.y)).magnitude < 0.15f)
+                {
+                    reachedAt = Game.Elapsed;
+                }
                 if (contactAt < 0f)
                 {
                     if (Game.RobotContactCount > contacts0)
@@ -874,6 +897,7 @@ namespace OutOfSight.Tests
                         contactAt = Game.Elapsed;
                         stillAtContact = still;
                         heading = Game.LastShoveDirection;
+                        robotAtContact = path.ForwardAt(Game.RobotTime);
                         stateAtContact = Game.State;
                         return;
                     }
@@ -891,36 +915,38 @@ namespace OutOfSight.Tests
                     }
                     shoveEndAt = Game.Elapsed;
                     after = f.transform.position;
+                    robotAfter = path.ForwardAt(Game.RobotTime);
+                    reversesAtEnd = path.ReverseCount;
                 }
             }
-            var done = new float[1];
+            var r = new RouteReplayer.Result();
             Game.FixedStepped += Watch;
             try
             {
-                yield return DriveLegs(Level9ToTheRobotLane, 0.2f, false, () => shoveEndAt >= 0f || Game.State != PlayState.Playing, 20f, done);
+                yield return RouteReplayer.Replay(Game, 0f, r, Tuning.PlaythroughTimeScale, lane);
             }
             finally
             {
                 Game.FixedStepped -= Watch;
             }
             Vector3 moved = YawMath.Planar(after - before);
-            Debug.Log($"[Step45o] wait reached at {done[0]:0.00} s, contact at {contactAt:0.00} s after {stillAtContact} still steps, "
-                      + $"shove {shoveSteps} steps ({movingShoveSteps} moving) heading {heading}, moved {moved} ({moved.magnitude:0.000} m), "
-                      + $"robot reversals {path.ReverseCount - reverses0}, {Game.State} ({Game.LoseReason}) at {Game.Elapsed:0.00} s, "
-                      + $"{Game.MaskedNoiseCount} noises masked");
-            Assert.GreaterOrEqual(done[0], 0f, $"premise: the chair never reached its wait in the robot's lane ({Game.State}, {Game.LoseReason})");
+            Debug.Log($"[Step45o] {r}; wait {waitAt} reached at {reachedAt:0.00} s, contact at {contactAt:0.00} s after {stillAtContact} still steps, "
+                      + $"robot heading {robotAtContact}, shove {shoveSteps} steps ({movingShoveSteps} moving) heading {heading}, moved {moved} "
+                      + $"({moved.magnitude:0.000} m), robot reversals {reversesAtEnd - reverses0}, then heading {robotAfter}, {r.MaskedNoises} noises masked");
+            Assert.GreaterOrEqual(reachedAt, 0f, $"premise: the chair never reached its wait in the robot's lane ({r.State}, {r.Reason})");
             Assert.GreaterOrEqual(contactAt, 0f, "the robot never touched the chair standing in its lane");
             Assert.AreEqual(PlayState.Playing, stateAtContact, "premise: the level ended before the contact");
             Assert.GreaterOrEqual(stillAtContact, 25, "premise: the chair was not still for 0.5 s before the contact");
+            Assert.Less(robotAtContact.x, -0.99f, $"premise: the robot was not heading west at the contact ({robotAtContact})");
             Assert.AreEqual(1, Game.ShoveCount - shoves0, "the contact did not shove the chair exactly once");
-            Assert.Greater(heading.x, 0.99f, $"the shove was not along the robot's heading east ({heading})");
+            Assert.Less(heading.x, -0.99f, $"the shove was not along the robot's heading west ({heading})");
             Assert.AreEqual(Mathf.RoundToInt(Tuning.RobotPushTime / Time.fixedDeltaTime), shoveSteps, "the shove did not last RobotPushTime");
             Assert.AreEqual(shoveSteps, movingShoveSteps, "a step of the shove did not count as moving");
             Assert.GreaterOrEqual(shoveEndAt, 0f, "the shove never ended");
-            Assert.AreEqual(Tuning.RobotPushDistance, moved.x, 0.05f, $"the shove moved the chair {moved.x:0.000} m east, not {Tuning.RobotPushDistance} m");
+            Assert.AreEqual(-Tuning.RobotPushDistance, moved.x, 0.05f, $"the shove moved the chair {moved.x:0.000} m along x, not {-Tuning.RobotPushDistance} m (west)");
             Assert.AreEqual(0f, moved.z, 0.05f, "the shove moved the chair across the robot's heading");
-            Assert.Greater(path.ReverseCount, reverses0, "the robot did not reverse its loop after the contact");
-            Assert.Less(path.ForwardAt(Game.RobotTime).x, -0.99f, "the robot does not head back west after the contact");
+            Assert.Greater(reversesAtEnd, reverses0, "the robot did not reverse its loop after the contact");
+            Assert.Greater(robotAfter.x, 0.99f, "the robot does not head back east after the contact");
             CollectionAssert.IsEmpty(errors, "no error logged");
         }
 
@@ -1105,26 +1131,15 @@ namespace OutOfSight.Tests
         /// Step 45r (CONTRACT_M5 16.10): the wave 5B levels boot through GameState.LoadLevel with no error, with their body,
         /// lesson, humans and dog, the robots of their data (built by the level, one per RobotDef) and their load (a riding
         /// LoadView of the right kind, or none); 3 s of game time with no input leave each one playing: an idle player at its
-        /// spawn is never caught. Levels.json, when it lists them, plays them in number order.
+        /// spawn is never caught. Levels v2: no order check (the v2 order is LevelDataM2Tests'); the cut level10 boots by id.
         /// </summary>
         [UnityTest]
         [Timeout(600000)]
         public IEnumerator Step45r_WaveBLevelsBootWithRobotAndLoadAndAnIdlePlayerIsNeverCaught()
         {
             var failures = new List<string>();
-            List<string> order = Game.LevelOrder.ToList();
-            int last = -1;
             foreach ((string id, string body, string lesson, int humans, int dogs, int robots, string load) in WaveB)
             {
-                int at = order.IndexOf(id);
-                if (at >= 0)
-                {
-                    if (at < last)
-                    {
-                        failures.Add($"{id} is listed out of number order in levels.json: {string.Join(", ", order)}");
-                    }
-                    last = at;
-                }
                 int errorsBefore = errors.Count;
                 Game.LoadLevel(id);
                 yield return Steps(1);
@@ -1185,7 +1200,14 @@ namespace OutOfSight.Tests
         public IEnumerator Step40_FullPlaythrough()
         {
             List<string> order = Game.LevelOrder.ToList();
-            Assert.AreEqual(24, order.Count, "premise: levels.json lists the 18 levels of M6b and levels 19 to 24 of M7: " + string.Join(", ", order));
+            // Levels v2 (LEVELS_V2 3 and 7): the count comes from the manifest; it must be the 22 v2 levels, none of them cut.
+            ManifestDef manifest = LevelLoader.LoadManifestDef();
+            CollectionAssert.AreEqual(manifest.Levels, order, "premise: the game plays the manifest's order");
+            Assert.AreEqual(V2LevelCount, order.Count, "premise: levels.json lists the levels of v2: " + string.Join(", ", order));
+            foreach (string cut in new[] { "level10", "level16", "level23" })
+            {
+                CollectionAssert.DoesNotContain(order, cut, "premise: a cut level is listed");
+            }
             Assert.AreEqual(order[0], Game.LevelId, "premise: the editor boot starts the first level");
             Assert.AreEqual(PlayState.Playing, Game.State, "premise: the first level is playing");
             Assert.IsEmpty(SaveStore.Current.Won, "premise: the boot did not start on a fresh save");
@@ -1217,10 +1239,12 @@ namespace OutOfSight.Tests
                 CollectionAssert.IsEmpty(errors.Skip(errorsBefore).ToList(), id + ": error(s) logged");
                 total += r.Time;
 
-                // The save after the win: the level is won with its time as the best, in memory and in the file.
+                // The save after the win: the level is won with its time as the best, in memory and in the file. Levels v2
+                // (LEVELS_V2 7): the win under the bare id, the best time under the level's RecordId ("level6~1").
                 CollectionAssert.Contains(SaveStore.Current.Won, id, id + ": the win is not in the save");
                 Assert.AreEqual(i + 1, SaveStore.Current.Won.Count, id + ": the save does not hold exactly the levels won so far");
-                Assert.IsTrue(SaveStore.TryGetBest(id, out float best), id + ": no best time in the save");
+                string recordId = Game.Def.RecordId;
+                Assert.IsTrue(SaveStore.TryGetBest(recordId, out float best), id + ": no best time in the save under " + recordId);
                 Assert.AreEqual(r.Time, best, 1e-3f, id + ": the best time is not the time of the win");
                 Assert.Greater(SaveStore.WriteCount, writes, id + ": the save file was not written after the win");
                 Assert.IsTrue(File.Exists(SaveStore.FilePath), id + ": no save file at " + SaveStore.FilePath);

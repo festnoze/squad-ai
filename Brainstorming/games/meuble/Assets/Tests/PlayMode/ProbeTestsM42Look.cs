@@ -645,6 +645,9 @@ namespace OutOfSight.Tests
                         Assert.Greater(all.Count(s => s.Texture != null) + roomSurfaces, 20, $"{id}: premise: few textured slots");
                     }
                     Camera cam = main.Camera;
+                    // The boxes are projected with the camera's own aspect: pinned to the render's (2026-11-20), else
+                    // a box near the frame's edge (the doormat, an inhabitant) lands off what the render shows there.
+                    cam.aspect = width / (float)height;
                     Rect box = ScreenBox(cam, Game.Furniture.transform, width, height);
                     Color32[] pixels = RenderPixels(cam, width, height);
                     if (flat)
@@ -685,6 +688,7 @@ namespace OutOfSight.Tests
                             }
                         }
                     }
+                    cam.ResetAspect();
                 }
                 TextureLibrary.Disabled = false;
 
@@ -944,7 +948,7 @@ namespace OutOfSight.Tests
             // level sets player.load to "plant"; ProbeTestsM6Textures.Step50b_ exercises it directly), so it alone is
             // never seen here. M9 floors (docs/m9/FLOORS_WALLS.md, 2026-11-19): every floor finish (the M8 Marble,
             // Herringbone and CarpetFinish, the new LightOak, Verde, IvoryTile and TealTile) is used by at least one of
-            // the 24 shipped levels, so all of them must be seen here, at their own repeat.
+            // the levels levels.json lists (22 in levels v2), so all of them must be seen here, at their own repeat.
             Surface[] neverShipped = { Surface.Soil };
             int expectedSurfaces = TextureLibrary.Textured.Length - neverShipped.Count(s => !worst.ContainsKey(s));
             Assert.AreEqual(expectedSurfaces, worst.Count,

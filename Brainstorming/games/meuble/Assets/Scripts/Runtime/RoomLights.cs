@@ -45,6 +45,8 @@ namespace OutOfSight
     /// (Forward+). The tier is read when the level is built and again whenever it changes (a string compare per frame, no
     /// allocation). Only <see cref="Light.enabled"/> changes, never an intensity, so LampLight's room dimming (every enabled
     /// point or spot light standing in the lamp's room, to Tuning.LampOffLight) dims these lights and restores them exactly.
+    /// Levels v2 night preset (C10, "lighting": "night"): Bas keeps one light per room too (<see cref="NightAllowance"/>);
+    /// NIGHT pass: every light is built <see cref="NightPool"/> stronger and a room of type "other" gets one dim sconce.
     /// </summary>
     public sealed class RoomLights : MonoBehaviour
     {
@@ -128,11 +130,44 @@ namespace OutOfSight
             return quality == SaveOptions.QualityLow ? 0 : quality == SaveOptions.QualityMedium ? 1 : MaxPerRoom; // MUTATION:LIGHTS_TIER
         }
 
-        /// <summary>Enables the lights the tier allows (<see cref="AllowedPerRoom"/>, by rank in the room). Never touches an intensity.</summary>
+        /// <summary>
+        /// Levels v2 (D25, C10): the lights a room keeps on a tier under the night preset. The room lights are the night's
+        /// warm pools, so Bas keeps the first light of each room (Moyen's cost, on the same Mobile_RPAsset) instead of none;
+        /// Moyen keeps its one (its Forward renderer still shades at most 4 additional lights per object) and Haut keeps
+        /// them all, as by day. Every kept light shines at its full built intensity (only LampLight dims it, as by day).
+        /// </summary>
+        public static int NightAllowance(string quality)
+        {
+            return quality == SaveOptions.QualityLow ? 1 : AllowedPerRoom(quality); // MUTATION:NIGHT_LIGHTS
+        }
+
+        /// <summary>The lights a room keeps on a tier for a level by day or by night (<see cref="AllowedPerRoom(string)"/>, <see cref="NightAllowance"/>).</summary>
+        public static int AllowedPerRoom(string quality, bool night)
+        {
+            return night ? NightAllowance(quality) : AllowedPerRoom(quality);
+        }
+
+        /// <summary>
+        /// NIGHT pass (2026-11-22): under the night preset every room light is built this much stronger (its pool and its
+        /// near cap alike), so the warm pools stand out of the darker moonlit rooms. Built in: <see cref="Fixture.Intensity"/>
+        /// is the night intensity, and LampLight's dimming and the tiers work on it exactly as by day.
+        /// </summary>
+        public const float NightPool = 1.45f;
+
+        /// <summary>
+        /// NIGHT pass: under the night preset a room of type "other" (a store room, a back office), unlit by day, gets one
+        /// dim warm wall light, so no room of a night level is left to the moon alone. Its light follows the same tiers.
+        /// </summary>
+        private static readonly Mood NightLightMood = new Mood(new Color(1f, 0.81f, 0.62f), 0.4f, false);
+
+        /// <summary>True when the level was built under the night preset ("lighting": "night", Main.IsNight).</summary>
+        public bool Night { get; private set; }
+
+        /// <summary>Enables the lights the tier allows (<see cref="AllowedPerRoom(string, bool)"/>, by rank in the room). Never touches an intensity.</summary>
         public void ApplyTier(string quality)
         {
             Tier = string.IsNullOrEmpty(quality) ? SaveOptions.QualityHigh : quality;
-            int allowed = AllowedPerRoom(Tier);
+            int allowed = AllowedPerRoom(Tier, Night);
             foreach (Fixture f in fixtures)
             {
                 if (f.Light != null)
@@ -323,6 +358,7 @@ namespace OutOfSight
             var go = new GameObject(RootName) { layer = 0 };
             go.transform.SetParent(levelRoot, false);
             RoomLights lights = go.AddComponent<RoomLights>();
+            lights.Night = Main.IsNight(def);
             var placer = new Placer(def, lights);
             List<RoomDef> rooms = def.AllRooms();
             for (int i = 0; i < rooms.Count; i++)
@@ -766,12 +802,18 @@ namespace OutOfSight
             public void Room(int index, RoomDef room)
             {
                 string type = room.Type;
-                if (room.LightWall == RoomDef.LightWallNone || !IsLit(type))
+                bool nightLight = owner.Night && type == RoomTypes.Other; // MUTATION:NIGHT_OTHER_ROOM
+                if (room.LightWall == RoomDef.LightWallNone || !(IsLit(type) || nightLight))
                 {
                     return;
                 }
                 taken.Clear();
                 next = 0;
+                if (nightLight)
+                {
+                    Wall(index, room, type, NightLightMood, Style.Sconce);
+                    return;
+                }
                 Mood mood = MoodOf(type);
                 float area = room.SizeX * room.SizeZ;
                 float longest = Mathf.Max(room.SizeX, room.SizeZ);
@@ -1284,7 +1326,7 @@ namespace OutOfSight
                     offAxis = edge - tilt;
                     nearDistance = new Vector2(Mathf.Max(0f, nearFront), near).magnitude;
                 }
-                float intensity = IntensityFor(mood.Pool, reach, nearDistance, SpotFactor(offAxis, half));
+                float intensity = IntensityFor(mood.Pool, reach, nearDistance, SpotFactor(offAxis, half)) * (owner.Night ? NightPool : 1f); // MUTATION:NIGHT_POOL
                 float range = Mathf.Clamp(RangeOverReach * reach, 2.4f, 4.5f);
                 int rank = next++;
                 Light light = owner.AddLight(r, rank, at, direction, true, 2f * half, mood, intensity, range);

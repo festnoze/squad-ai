@@ -1,8 +1,15 @@
 {
   "id": "level15",
+  "rev": 1,
   "nameKey": "level15.name",
   "hintKey": "level15.hint",
-  "lesson": "robot",
+  "lesson": "rock",
+  "pace": {
+    "minShare": 0.22,
+    "maxShare": 0.45,
+    "minPauses": 4,
+    "maxPause": 6.0
+  },
   "rooms": [
     {
       "id": "bureau",
@@ -13,37 +20,9 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA",
-      "wallFinish": "sageribbed"
-    },
-    {
-      "id": "chambre",
-      "x": 2.2,
-      "z": 6.95,
-      "sizeX": 4.4,
-      "sizeZ": 3.9,
-      "wallHeight": 2.7,
-      "wallThickness": 0.1,
-      "floor": "hard",
-      "floorFinish": "lightoak",
-      "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA",
-      "wallFinish": "quatrefoil"
-    },
-    {
-      "id": "couloir",
-      "x": 8.95,
-      "z": 8.2,
-      "sizeX": 8.9,
-      "sizeZ": 1.4,
-      "wallHeight": 2.7,
-      "wallThickness": 0.1,
-      "floor": "hard",
-      "floorFinish": "lightoak",
-      "floorColor": "#B07A4E",
-      "wallColor": "#EDE6DA"
+      "wallColor": "#E3D9C6",
+      "wallFinish": "pinstripe"
     },
     {
       "id": "salon",
@@ -54,10 +33,9 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "lightoak",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
-      "wallFinish": "grasscloth"
+      "wallFinish": "quatrefoil"
     },
     {
       "id": "cuisine",
@@ -68,7 +46,7 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "tile",
+      "floorFinish": "ivorytile",
       "floorColor": "#EDE6DA",
       "wallColor": "#F7F4EE",
       "wallFinish": "subwaytile"
@@ -82,19 +60,13 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "verde",
-      "floorColor": "#B07A4E",
+      "floorFinish": "marble",
+      "floorColor": "#D8D4CC",
       "wallColor": "#EDE6DA",
-      "wallFinish": "travertine"
+      "wallFinish": "limewash"
     }
   ],
   "doors": [
-    {
-      "x": 2.25,
-      "z": 4.95,
-      "width": 1.0,
-      "top": 2.1
-    },
     {
       "x": 4.45,
       "z": 3.25,
@@ -102,26 +74,14 @@
       "top": 2.1
     },
     {
-      "x": 4.45,
-      "z": 8.25,
-      "width": 1.0,
-      "top": 2.1
-    },
-    {
-      "x": 6.25,
-      "z": 7.45,
-      "width": 1.0,
-      "top": 2.1
-    },
-    {
-      "x": 11.75,
-      "z": 7.45,
-      "width": 1.0,
-      "top": 2.1
-    },
-    {
-      "x": 8.25,
+      "x": 5.25,
       "z": 1.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 9.95,
+      "z": 5.75,
       "width": 1.0,
       "top": 2.1
     },
@@ -137,13 +97,6 @@
       "x": -0.05,
       "z": 2.25,
       "width": 1.2,
-      "bottom": 0.9,
-      "top": 2.1
-    },
-    {
-      "x": 2.2,
-      "z": 8.95,
-      "width": 1.6,
       "bottom": 0.9,
       "top": 2.1
     },
@@ -167,10 +120,10 @@
   },
   "exit": {
     "model": "kenney.doormat",
-    "x": 12.75,
+    "x": 11.75,
     "z": 0.75,
-    "sizeX": 0.9,
-    "sizeZ": 0.9,
+    "sizeX": 0.8,
+    "sizeZ": 0.8,
     "color": "#3F8F4F"
   },
   "props": [
@@ -188,23 +141,10 @@
       "accentColor": "#8C5A36"
     },
     {
-      "name": "Lit",
-      "kind": "bed",
-      "x": 0.85,
-      "z": 7.85,
-      "yaw": 0.0,
-      "sizeX": 1.6,
-      "sizeY": 0.55,
-      "sizeZ": 2.0,
-      "occluder": true,
-      "color": "#5B93D9",
-      "accentColor": "#F7F4EE"
-    },
-    {
       "name": "Canape",
       "kind": "sofa",
       "x": 8.75,
-      "z": 6.6,
+      "z": 6.7,
       "yaw": 0.0,
       "sizeX": 2.0,
       "sizeY": 0.85,
@@ -256,7 +196,7 @@
     {
       "name": "Console",
       "kind": "counter",
-      "x": 10.75,
+      "x": 10.65,
       "z": 0.3,
       "yaw": 0.0,
       "sizeX": 1.2,
@@ -265,166 +205,126 @@
       "occluder": true,
       "color": "#8C5A36",
       "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "CartonBureau",
+      "kind": "box",
+      "x": 2.75,
+      "z": 3.25,
+      "yaw": 0.0,
+      "sizeX": 0.25,
+      "sizeY": 0.5,
+      "sizeZ": 0.25,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
     }
   ],
   "designerRoute": [
-    { "x": 2.25, "z": 3.25, "at": 6.3 },
-    { "x": 3.25, "z": 3.25, "at": 6.3 },
-    { "x": 4.25, "z": 3.25, "at": 6.3 },
-    { "x": 5.25, "z": 3.25, "at": 6.3 },
-    { "x": 6.25, "z": 3.25, "at": 6.3 },
-    { "x": 7.25, "z": 3.25, "at": 6.3 },
-    { "x": 7.75, "z": 3.25, "at": 6.3 },
-    { "x": 7.75, "z": 2.75, "at": 6.3 },
-    { "x": 8.25, "z": 2.75, "at": 6.3 },
-    { "x": 8.25, "z": 1.75, "at": 6.3 },
-    { "x": 8.25, "z": 1.25, "at": 6.3 },
-    { "x": 7.25, "z": 1.25, "at": 6.3 },
-    { "x": 6.75, "z": 1.25, "at": 21.9 },
-    { "x": 7.75, "z": 1.25, "at": 23.4 },
-    { "x": 8.75, "z": 1.25, "at": 23.4 },
-    { "x": 9.75, "z": 1.25, "at": 23.4 },
-    { "x": 10.75, "z": 1.25, "at": 23.4 },
-    { "x": 11.75, "z": 1.25, "at": 23.4 },
-    { "x": 12.75, "z": 1.25, "at": 23.4 },
-    { "x": 12.75, "z": 0.75, "at": 23.4 },
-    { "x": 12.75, "z": 0.75, "at": 23.4 }
+    { "x": 1.25, "z": 3.75, "at": 1.8 },
+    { "x": 1.75, "z": 3.75, "at": 3.2 },
+    { "x": 2.75, "z": 3.75, "at": 4.7 },
+    { "x": 3.25, "z": 3.75, "at": 4.7 },
+    { "x": 3.75, "z": 3.75, "at": 7.0 },
+    { "x": 3.75, "z": 3.25, "at": 7.0 },
+    { "x": 4.75, "z": 3.25, "at": 7.0 },
+    { "x": 5.25, "z": 3.25, "at": 7.0 },
+    { "x": 5.25, "z": 2.25, "at": 7.0 },
+    { "x": 5.25, "z": 1.25, "at": 7.0 },
+    { "x": 6.25, "z": 1.25, "at": 7.0 },
+    { "x": 7.25, "z": 1.25, "at": 15.4 },
+    { "x": 8.25, "z": 1.25, "at": 15.4 },
+    { "x": 9.25, "z": 1.25, "at": 20.4 },
+    { "x": 10.25, "z": 1.25, "at": 20.4 },
+    { "x": 11.25, "z": 1.25, "at": 25.2 },
+    { "x": 11.75, "z": 1.25, "at": 25.2 },
+    { "x": 11.75, "z": 0.75, "at": 25.2 },
+    { "x": 11.75, "z": 0.75, "at": 25.2 }
   ],
   "designerRouteHard": [
-    { "x": 2.25, "z": 3.25, "at": 5.9 },
-    { "x": 3.25, "z": 3.25, "at": 5.9 },
-    { "x": 4.25, "z": 3.25, "at": 5.9 },
-    { "x": 5.25, "z": 3.25, "at": 5.9 },
-    { "x": 6.25, "z": 3.25, "at": 5.9 },
-    { "x": 7.25, "z": 3.25, "at": 5.9 },
-    { "x": 7.25, "z": 2.75, "at": 5.9 },
-    { "x": 8.25, "z": 2.75, "at": 5.9 },
-    { "x": 8.25, "z": 1.75, "at": 5.9 },
-    { "x": 8.25, "z": 1.25, "at": 5.9 },
-    { "x": 7.25, "z": 1.25, "at": 5.9 },
-    { "x": 7.25, "z": 0.75, "at": 19.9 },
-    { "x": 6.75, "z": 0.75, "at": 19.9 },
-    { "x": 6.75, "z": 1.25, "at": 19.9 },
-    { "x": 7.25, "z": 1.25, "at": 19.9 },
-    { "x": 7.25, "z": 0.75, "at": 19.9 },
-    { "x": 6.75, "z": 0.75, "at": 19.9 },
-    { "x": 6.75, "z": 1.25, "at": 19.9 },
-    { "x": 7.75, "z": 1.25, "at": 19.9 },
-    { "x": 8.75, "z": 1.25, "at": 19.9 },
-    { "x": 9.75, "z": 1.25, "at": 19.9 },
-    { "x": 10.75, "z": 1.25, "at": 19.9 },
-    { "x": 11.75, "z": 1.25, "at": 19.9 },
-    { "x": 12.75, "z": 1.25, "at": 19.9 },
-    { "x": 12.75, "z": 0.75, "at": 19.9 },
-    { "x": 12.75, "z": 0.75, "at": 19.9 }
+    { "x": 1.75, "z": 3.25, "at": 2.2 },
+    { "x": 1.75, "z": 3.75, "at": 3.6 },
+    { "x": 2.75, "z": 3.75, "at": 5.1 },
+    { "x": 3.25, "z": 3.75, "at": 5.1 },
+    { "x": 3.75, "z": 3.75, "at": 7.4 },
+    { "x": 3.75, "z": 3.25, "at": 7.4 },
+    { "x": 4.75, "z": 3.25, "at": 7.4 },
+    { "x": 5.25, "z": 3.25, "at": 7.4 },
+    { "x": 5.25, "z": 2.25, "at": 7.4 },
+    { "x": 5.25, "z": 1.25, "at": 7.4 },
+    { "x": 5.75, "z": 1.25, "at": 7.4 },
+    { "x": 6.75, "z": 1.25, "at": 15.4 },
+    { "x": 7.75, "z": 1.25, "at": 15.4 },
+    { "x": 8.75, "z": 1.25, "at": 20.4 },
+    { "x": 9.75, "z": 1.25, "at": 20.4 },
+    { "x": 10.75, "z": 1.25, "at": 25.2 },
+    { "x": 11.75, "z": 1.25, "at": 25.2 },
+    { "x": 11.75, "z": 0.75, "at": 25.2 },
+    { "x": 11.75, "z": 0.75, "at": 25.2 }
   ],
   "inhabitants": [
     {
-      "name": "Claire",
-      "personality": "watchful",
+      "name": "Mamie",
+      "personality": "granny",
       "pattern": "loop",
       "startStation": 0,
       "stations": [
         {
-          "x": 6.75,
-          "z": 4.25,
-          "facing": 0.0,
-          "dwell": 14.0,
+          "x": 8.75,
+          "z": 5.95,
+          "facing": 180.0,
+          "dwell": 3.5,
           "glances": [
             {
-              "offset": 3.0,
-              "yaw": -55.0,
-              "hold": 1.0
-            },
-            {
-              "offset": 9.0,
-              "yaw": 45.0,
-              "hold": 1.0
+              "offset": 1.5,
+              "yaw": 60.0,
+              "hold": 1.5
             }
-          ]
+          ],
+          "sit": "Canape"
         },
         {
-          "x": 6.75,
-          "z": 4.25,
-          "facing": 180.0,
+          "x": 12.25,
+          "z": 4.75,
+          "facing": 90.0,
           "dwell": 6.0,
+          "glances": []
+        },
+        {
+          "x": 5.75,
+          "z": 4.75,
+          "facing": 270.0,
+          "dwell": 5.0,
           "glances": [
             {
               "offset": 2.0,
-              "yaw": -40.0,
-              "hold": 1.0
-            },
-            {
-              "offset": 4.0,
-              "yaw": 40.0,
-              "hold": 1.0
+              "yaw": -60.0,
+              "hold": 1.5
             }
           ]
         }
       ]
     },
     {
-      "name": "Hugo",
-      "personality": "teen",
-      "pattern": "wander",
-      "seed": 4242,
-      "startStation": 0,
+      "name": "Rex",
+      "kind": "dog",
+      "pattern": "loop",
+      "startStation": 1,
       "stations": [
         {
-          "x": 1.75,
-          "z": 6.25,
-          "facing": 0.0,
-          "dwell": 8.0,
-          "glances": [
-            {
-              "offset": 4.0,
-              "yaw": 20.0,
-              "hold": 1.0
-            }
-          ]
-        },
-        {
-          "x": 8.75,
-          "z": 5.85,
-          "facing": 180.0,
-          "dwell": 6.0,
-          "glances": [],
-          "sit": "Canape"
-        },
-        {
-          "x": 11.25,
-          "z": 3.25,
-          "facing": 180.0,
-          "dwell": 4.0,
-          "glances": [
-            {
-              "offset": 2.0,
-              "yaw": -20.0,
-              "hold": 1.0
-            }
-          ]
-        },
-        {
-          "x": 12.25,
-          "z": 8.25,
-          "facing": 90.0,
-          "dwell": 5.0,
+          "x": 11.75,
+          "z": 1.25,
+          "facing": 270.0,
+          "dwell": 1.6,
           "glances": []
-        }
-      ]
-    }
-  ],
-  "robots": [
-    {
-      "name": "Robot",
-      "loop": [
-        {
-          "x": 5.25,
-          "z": 2.25
         },
         {
-          "x": 7.25,
-          "z": 2.25
+          "x": 11.75,
+          "z": 1.25,
+          "facing": 270.0,
+          "dwell": 2.8,
+          "glances": [],
+          "sleep": true
         }
       ]
     }

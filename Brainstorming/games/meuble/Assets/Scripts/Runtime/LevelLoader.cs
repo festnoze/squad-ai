@@ -10,7 +10,10 @@ namespace OutOfSight
     {
         public const string Folder = "Levels";
 
-        /// <summary>M2: Resources/Levels/levels.json, the play order (docs/CONTRACT_M2.md 4). It is not a level.</summary>
+        /// <summary>
+        /// M2: Resources/Levels/levels.json, the play order (docs/CONTRACT_M2.md 4). It is not a level. Levels v2 adds its
+        /// revision, the previous order and the acts (<see cref="LoadManifestDef"/>).
+        /// </summary>
         public const string ManifestName = "levels";
 
         /// <summary>Loads and validates a level. Throws with every validation issue listed when it is invalid.</summary>
@@ -50,6 +53,28 @@ namespace OutOfSight
                 }
             }
             return order;
+        }
+
+        /// <summary>
+        /// Levels v2 (docs/levels_v2/LEVELS_V2.md 7): the whole of levels.json, its revision, the previous play order and the
+        /// acts included (<see cref="LevelManifest.ParseFull"/>). Without the file, or when it cannot be read, an empty rev 1
+        /// manifest (no migration, no act). Never throws.
+        /// </summary>
+        public static ManifestDef LoadManifestDef()
+        {
+            try
+            {
+                var asset = Resources.Load<TextAsset>(Folder + "/" + ManifestName);
+                if (asset != null)
+                {
+                    return LevelManifest.ParseFull(asset.text) ?? new ManifestDef();
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[LevelLoader] levels.json cannot be read: " + e.Message);
+            }
+            return new ManifestDef();
         }
     }
 }

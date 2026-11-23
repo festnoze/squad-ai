@@ -26,7 +26,9 @@ namespace OutOfSight.Editor
     ///    player's kind explains the chair), never moves on a hard floor within earshot of an inhabitant,
     ///    keeps the creak gauge below 1, and never spends more than <see cref="Tuning.AuditMaxWait"/> within
     ///    1 m of where a wait began, spawn included (M2.2: a step out and back does not restart the clock). M5 5B.1: nor
-    ///    more than that within Tuning.AuditLoiterRadius of any of its own points (<see cref="LongestLoiter"/>).
+    ///    more than that within Tuning.AuditLoiterRadius of any of its own points (<see cref="LongestLoiter"/>). Levels v2
+    ///    RULEFIX (PO decision 2026-11-20): the loitering leaves out the spawn wait (held to <see cref="MaxSpawnWait"/>
+    ///    instead) and the samples pinned under a sitter.
     ///    Sight and hearing are dilated by a margin in time, so the schedule survives a global shift; the
     ///    audit prints the shift it really survives (its slack). A level with decoys must have a schedule
     ///    explained by a decoy at least once, and none at all with the decoys switched off (M2.2).
@@ -135,6 +137,34 @@ namespace OutOfSight.Editor
     ///   a leaf (fixture test_m6_audit_inhabdoor);
     /// - door memory ("doorMemory"), conservatively: a leaf the player opened is never seen standing open by a human, who
     ///   remembers it closed (<see cref="DoorsUnseen"/>, fixture test_m6_audit_doormemory); the put back is not modelled.
+    ///
+    /// Levels v2, audit A (docs/levels_v2/LEVELS_V2.md 1.3 and 6, task C5; the search itself is unchanged):
+    /// - the found schedule is post-processed (<see cref="PostProcess"/>): back-to-back toggles and hide/leave flickers become
+    ///   waits when the folded schedule still holds every rule and the fidelity replay (fixture test_v2_audit_flicker);
+    /// - its pace is printed at every difficulty ("rythme : ...", <see cref="PaceReport"/>) and held to the level's "pace" at
+    ///   Normal (fixtures test_v2_audit_pace_fail, and test_v2_audit_pace_pass audited as a level);
+    /// - a pause on an inhabitant's walk line is a warning (<see cref="WalkLineWarnings"/>); rooms nobody uses are warnings,
+    ///   defects with "-strictRooms" (<see cref="DeadRooms"/>, fixture test_v2_audit_deadroom);
+    /// - the dark lesson prints a time-synchronised, cone-aware check beside DarkFreePass (<see cref="DarkSync"/>);
+    /// - "-json file" writes the numbers of every level and difficulty (<see cref="WriteJsonReport"/>).
+    ///
+    /// Levels v2, audit B (LEVELS_V2.md 6, task C6):
+    /// - every id of "requires" must bind, one line per id (<see cref="RequiresFailures"/>, <see cref="RequireBinds"/>): the
+    ///   lesson checks by id, and the new ids rug, hum, contact, household, decoy, exitwatch and lit (also accepted as the
+    ///   lesson); an id the lesson already answered costs no search (fixtures test_v2_req_*, each with its companion);
+    /// - "viaChecks": a schedule through each zone (one Visit bit in the search key, <see cref="SearchOptions.MustVisit"/>),
+    ///   within its ratio of the best exit, or with "avoid" none as fast without it (<see cref="ViaFailures"/>, fixture
+    ///   test_v2_req_via); their schedules count for the dead rooms;
+    /// - a playerLocked leaf has no reach cell: only a walk opens it, and one no walk opens fails
+    ///   (<see cref="LockedLeafFailures"/>, fixture test_v2_req_locked_never);
+    /// - lit zones: at a lit cell the dark tables take the lit rows (<see cref="ApplyLit"/>), the fidelity replay sees a dark
+    ///   lamp there at the full range and the dark lesson's free pass ignores those cells.
+    ///
+    /// HUMANAUDIT (docs/next/progress/HUMANAUDIT.md), optional: "-profile human" searches the main schedule under
+    /// <see cref="HumanProfile"/>'s rules (reaction before setting off and before crossing a doorway an inhabitant opened, no
+    /// sub-second freeze, no one-cell dash, no back-to-back toggles; <see cref="SearchOptions.Human"/>), and so do the
+    /// searches compared with it (sweep, slack, vias, exit watch, diagnosis); the counterfactuals stay strict. Without the flag
+    /// (or with "-profile strict") nothing changes: same searches, same output, same JSON. The human profile writes no route.
     /// </summary>
     public static class LevelAudit
     {
@@ -201,6 +231,11 @@ namespace OutOfSight.Editor
         // step out and back does not restart the clock; only leaving this radius does. M5 5B.1 (CONTRACT_M5 19, M2): a 1.12 m
         // L-hop does, so the found schedule is also held to the loitering rule (LongestLoiter, Tuning.AuditLoiterRadius).
         private const float WaitAnchorRadius = 1f;
+        // Levels v2 RULEFIX (product owner decision 2026-11-20, LEVELS_V2.md 10.3): the spawn wait (every sample before the
+        // player's first move, pinned samples left out) has its own limit, this many seconds. It is left out of the max-pause
+        // rule and of the loitering rule (the search puts every spare second as early as possible, at the spawn), and it
+        // still counts in the waiting share and, as one pause or more, in the minimum pause count (SpawnWaitEnd, Pace).
+        private const float MaxSpawnWait = 8f;
         // Start delay sweep (M2.2): the player starts acting every this many samples (1 s) over one loop. CONTRACT_M5
         // 10: every Tuning.AuditSweepStep (3 s) on the other levels.
         private const int SweepEvery = 10;
@@ -273,6 +308,71 @@ namespace OutOfSight.Editor
             /// <summary>CONTRACT_M5 16.3: the occlusion rays cast for this level (capped).</summary>
             public long Rays;
             public bool Pass => Failures.Count == 0;
+
+            // ----- Levels v2 (LEVELS_V2.md 1.3 and 6, C5): the numbers of the -json report -----
+            /// <summary>The level file's id (LevelId gains "@difficile" at Difficile) and the difficulty it ran at.</summary>
+            public string BaseId;
+            public string Difficulty;
+            /// <summary>The pace of the found schedule (<see cref="PaceStats"/>), or null without a schedule.</summary>
+            public PaceStats Pace;
+            /// <summary>The slack report ran (-slack, or a level of act 1): <see cref="SlackSamples"/> is measured.</summary>
+            public bool SlackMeasured;
+            /// <summary>The rooms nobody uses (<see cref="DeadRooms"/>), by id.</summary>
+            public readonly List<string> DeadRooms = new List<string>();
+            /// <summary>Every lesson check that ran, by lesson id: true when it binds.</summary>
+            public readonly Dictionary<string, bool> Lessons = new Dictionary<string, bool>();
+            /// <summary>C6: the "requires" checks, by id: true when it binds (C5 leaves it empty).</summary>
+            public readonly Dictionary<string, bool> Requires = new Dictionary<string, bool>();
+            /// <summary>C6: the viaChecks, by zone name: true when the check holds (C5 leaves it empty).</summary>
+            public readonly Dictionary<string, bool> Vias = new Dictionary<string, bool>();
+            /// <summary>The draw calls (material slots) and the distinct materials of the built level, -1 when not counted.</summary>
+            public int DrawCalls = -1;
+            public int Materials = -1;
+            /// <summary>The habit warnings (<see cref="HabitWarnings"/>), without their "AVERTISSEMENT" prefix.</summary>
+            public readonly List<string> HabitWarnings = new List<string>();
+            /// <summary>The rest-on-a-walk-line warnings (<see cref="WalkLineWarnings"/>).</summary>
+            public readonly List<string> WalkLineWarnings = new List<string>();
+            /// <summary>The route post-process (<see cref="PostProcess"/>): back-to-back toggles and hide/leave pairs folded away.</summary>
+            public int TogglesFolded;
+            public int HidePairsRemoved;
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 1.3, C5): the pace of a schedule. Travel is every move sample (each leg at its own cost, a
+        /// lying stool's righting included) plus every stop sample (the office chair's glide, the rocking chair's rock); the
+        /// rest of the exit time is waiting, in-place actions (toggles, openings, hide, leave, time hidden) included, except
+        /// the samples pinned under a sitter, which are reported apart and left out of both sides of the share. A pause is a
+        /// run of at least <see cref="PauseSamples"/> waiting samples at one cell (a pinned sample ends a run); the run that
+        /// starts with the schedule is not a mid-route pause.
+        /// Levels v2 RULEFIX (PO decision 2026-11-20, LEVELS_V2.md 10.3): the spawn wait is every sample before the first
+        /// move (<see cref="SpawnWaitEnd"/>). Its pauses (one, or two when a sit at the spawn splits it) still count in
+        /// <see cref="Pauses"/> (the minimum pause count, as section 10.1 lists "spawn" pauses) and its samples in the share,
+        /// but not in <see cref="LongestPause"/> (the max-pause rule): it has its own limit, <see cref="MaxSpawnWait"/>.
+        /// Mid-route pauses are the pauses that start after the first move.
+        /// </summary>
+        public sealed class PaceStats
+        {
+            public int ExitSamples;
+            public int TravelSamples;
+            public int WaitSamples;
+            public int PinnedSamples;
+            public float Share;
+            public int Pauses;
+            public int MidPauses;
+            /// <summary>The longest mid-route pause (the spawn wait left out), the max-pause rule's measure.</summary>
+            public int LongestPause;
+            /// <summary>The spawn wait's samples, pinned ones left out, and its pauses (counted in <see cref="Pauses"/>).</summary>
+            public int SpawnWaitSamples;
+            public int SpawnPauses;
+            /// <summary>The pauses as (first sample, last sample, cell), in order.</summary>
+            public readonly List<(int from, int to, int cell)> Runs = new List<(int, int, int)>();
+
+            public float Exit => ExitSamples * SampleSeconds;
+            public float Travel => TravelSamples * SampleSeconds;
+            public float Wait => WaitSamples * SampleSeconds;
+            public float Pinned => PinnedSamples * SampleSeconds;
+            public float Longest => LongestPause * SampleSeconds;
+            public float SpawnWait => SpawnWaitSamples * SampleSeconds;
         }
 
         /// <summary>The level ids of levels.json, in play order.</summary>
@@ -304,6 +404,29 @@ namespace OutOfSight.Editor
         /// <summary>Design aid: "-checkSight" recomputes the sight tables ray by ray (no cache, no batch) and prints the
         /// differences with the cached tables, which must be none.</summary>
         public const string CheckSightFlag = "-checkSight";
+        /// <summary>Levels v2 (C5): "-strictRooms" turns every dead room warning into a defect (the wave 2 gate).</summary>
+        public const string StrictRoomsFlag = "-strictRooms";
+        /// <summary>
+        /// Levels v2 (C5): "-json file" writes the numbers of every audited level at every difficulty to that file (relative
+        /// to the project), one object per level and difficulty (<see cref="WriteJsonReport"/>).
+        /// </summary>
+        public const string JsonFlag = "-json";
+        /// <summary>
+        /// HUMANAUDIT: "-profile human" runs the main schedule search (and the searches compared with it: start delay sweep,
+        /// slack report, via checks, exit watch, diagnosis) under <see cref="HumanProfile"/>'s rules; "-profile strict" or no
+        /// flag is the audit unchanged. The lesson and requires counterfactuals stay strict (a superset: "no schedule even for a
+        /// perfect player"). The human profile never writes routes.
+        /// </summary>
+        public const string ProfileFlag = "-profile";
+        /// <summary>HUMANAUDIT: the human reaction time and the shortest freeze, in samples (<see cref="HumanProfile"/>).</summary>
+        private static readonly int HumanReactionSamples = HumanProfile.Samples(HumanProfile.ReactionTime, SampleSeconds);
+        private static readonly int HumanPauseSamples = HumanProfile.Samples(HumanProfile.MinPause, SampleSeconds);
+        /// <summary>Levels v2 (LEVELS_V2.md 1.3): a pause is a run of at least this many samples (0.5 s) at one cell.</summary>
+        private static readonly int PauseSamples = Mathf.RoundToInt(0.5f / SampleSeconds);
+        /// <summary>Levels v2 (LEVELS_V2.md 4.1, C5): a pause within this of an inhabitant's walk while it walks is a warning.</summary>
+        private const float WalkLineDistance = 0.6f;
+        /// <summary>Levels v2 (C5): a hide followed by a leave with less than this hidden is a flicker the post-process removes.</summary>
+        private static readonly int HideFlickerSamples = Mathf.RoundToInt(0.5f / SampleSeconds);
 
         /// <summary>One batch run's command line (CONTRACT_M5 16.3). Ids are comma separated.</summary>
         private sealed class RunOptions
@@ -318,9 +441,17 @@ namespace OutOfSight.Editor
             public bool SkipSweep;
             public bool CheckSight;
             public bool WriteRoutes;
+            /// <summary>Levels v2 (C5): a dead room is a defect, not a warning.</summary>
+            public bool StrictRooms;
+            /// <summary>Levels v2 (C5): the -json report's file, or null.</summary>
+            public string JsonPath;
             public List<int> DebugSamples = new List<int>();
             /// <summary>M7: the difficulties the levels run at, in order (Normal then Difficile by default).</summary>
             public List<string> Difficulties = new List<string> { DifficultyDef.Normal, DifficultyDef.Difficile };
+            /// <summary>HUMANAUDIT: the human profile (<see cref="ProfileFlag"/>); false is the strict audit.</summary>
+            public bool Human;
+            /// <summary>HUMANAUDIT: a "-profile" value that is neither strict nor human, or null.</summary>
+            public string BadProfile;
 
             public static RunOptions Parse(string[] args)
             {
@@ -355,7 +486,13 @@ namespace OutOfSight.Editor
                     SkipSweep = Has(SkipSweepFlag),
                     CheckSight = Has(CheckSightFlag),
                     WriteRoutes = Has(WriteRoutesFlag),
+                    StrictRooms = Has(StrictRoomsFlag),
                 };
+                int json = Array.IndexOf(args, JsonFlag);
+                if (json >= 0 && json + 1 < args.Length && !args[json + 1].StartsWith("-", StringComparison.Ordinal))
+                {
+                    o.JsonPath = args[json + 1];
+                }
                 List<string> difficulties = Ids(DifficultyFlag);
                 if (difficulties != null && difficulties.Count > 0)
                 {
@@ -364,6 +501,15 @@ namespace OutOfSight.Editor
                 foreach (string part in Ids(DebugSamplesFlag) ?? new List<string>())
                 {
                     o.DebugSamples.Add(int.Parse(part, CultureInfo.InvariantCulture));
+                }
+                int profile = Array.IndexOf(args, ProfileFlag);
+                if (profile >= 0)
+                {
+                    string value = profile + 1 < args.Length && !args[profile + 1].StartsWith("-", StringComparison.Ordinal) ? args[profile + 1] : null;
+                    if (!HumanProfile.TryParse(value, out o.Human))
+                    {
+                        o.BadProfile = value;
+                    }
                 }
                 // Naming fixtures without levels runs only those fixtures.
                 if (o.Levels == null && o.Fixtures != null)
@@ -397,6 +543,21 @@ namespace OutOfSight.Editor
         private static int RunAll(RunOptions options)
         {
             int code = 0;
+            var results = new List<Result>();
+            // HUMANAUDIT: an unknown profile is an error (nothing is audited); the human profile never writes routes.
+            if (options.BadProfile != null)
+            {
+                Debug.LogError($"[LevelAudit] {ProfileFlag} {options.BadProfile} : profil inconnu ({HumanProfile.Strict} ou {HumanProfile.Human})");
+                return 1;
+            }
+            if (options.Human)
+            {
+                Debug.Log(string.Format(CultureInfo.InvariantCulture,
+                    "[LevelAudit] profil humain : reaction {0:0.0} s, gel au moins {1:0.0} s, deplacement au moins {2} cases, pas deux bascules de suite{3}",
+                    HumanReactionSamples * SampleSeconds, HumanPauseSamples * SampleSeconds, HumanProfile.MinMoveCells,
+                    options.WriteRoutes ? " ; " + WriteRoutesFlag + " ignore (les routes s'ecrivent au profil strict)" : ""));
+                options.WriteRoutes = false;
+            }
             try
             {
                 List<string> ids = options.Levels ?? ManifestLevels();
@@ -420,6 +581,9 @@ namespace OutOfSight.Editor
                             continue;
                         }
                         Result r = Run(LevelJson.Parse(File.ReadAllText(file)));
+                        r.BaseId = r.LevelId;
+                        r.Difficulty = difficulty;
+                        results.Add(r);
                         r.LevelId = DifficultyDef.RecordKey(r.LevelId, difficulty);
                         string key = RouteKey(difficulty);
                         if (options.WriteRoutes && r.Pass && r.Route != null && key != null)
@@ -440,6 +604,19 @@ namespace OutOfSight.Editor
             {
                 Debug.LogError("[LevelAudit] audit threw: " + e);
                 code = 1;
+            }
+            if (options.JsonPath != null)
+            {
+                try
+                {
+                    WriteJsonReport(options.JsonPath, results);
+                    Debug.Log($"[LevelAudit] rapport JSON ecrit dans {options.JsonPath} ({results.Count} resultat(s))");
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError("[LevelAudit] rapport JSON impossible a ecrire : " + e);
+                    code = 1;
+                }
             }
             try
             {
@@ -703,6 +880,10 @@ namespace OutOfSight.Editor
         private static void CheckBudgets(LevelDef def, LevelInstance level, Result result)
         {
             result.Failures.AddRange(DrawBudgets(def, level, true, true, result.Notes));
+            // Levels v2 (C5): the -json report's budgets, counted as the rule counts them (material slots, cone colours).
+            DrawCount drawn = CountDraws(level, true);
+            result.DrawCalls = drawn.Slots;
+            result.Materials = drawn.Materials;
             for (int i = 0; i < level.Inhabitants.Count; i++)
             {
                 Inhabitant inhabitant = level.Inhabitants[i];
@@ -840,7 +1021,7 @@ namespace OutOfSight.Editor
             foreach (VisionConeView cone in cones)
             {
                 bool dog = coneColours && cone.Owner != null && cone.Owner.IsDog; // MUTATION:AUDIT_CONE_COLOURS
-                materials.Add(PrimitiveKit.UnlitTransparent(VisionConeView.ConeColor(dog, false, false)));
+                materials.Add(VisionConeView.ConeMaterial(VisionConeView.ConeColor(dog, false, false)));
             }
             // M7 walls pass: the see-through walls' one material (drawn by the wall fader, no renderer of its own) counts
             // whatever the Walls option, as the probe counts it.
@@ -1081,8 +1262,24 @@ namespace OutOfSight.Editor
             public int LoopSamples;
             /// <summary>The level has a wandering routine: it never loops, so there is no start delay sweep (CONTRACT_M5 16.3).</summary>
             public bool Wanders;
-            /// <summary>CONTRACT_M5 16.3: the noise tables built so far, per noise class and points (travel, 0 for the cells).</summary>
-            public readonly Dictionary<(NoiseKind kind, int travel, bool hum), NoiseTable> Noise = new Dictionary<(NoiseKind, int, bool), NoiseTable>();
+            /// <summary>
+            /// CONTRACT_M5 16.3: the noise tables built so far, per noise class and points (travel, 0 for the cells). Levels v2
+            /// (C6): not readonly, so the "rug" variant (<see cref="HardFloors"/>) gets tables of its own.
+            /// </summary>
+            public Dictionary<(NoiseKind kind, int travel, bool hum), NoiseTable> Noise = new Dictionary<(NoiseKind, int, bool), NoiseTable>();
+            /// <summary>Levels v2 (C6, requires "rug"): rugs and soft floors are hard, every furniture noise is emitted.</summary>
+            public bool HardFloors;
+
+            // ----- Levels v2 (C6): lit zones (LevelDef litZones), a floor lamp switched off gets no cover there -----
+            /// <summary>[cell]: the cell's center lies in a lit zone (null without a lamp body or without lit zones).</summary>
+            public bool[] Lit;
+            /// <summary>The lit cells, in cell order (null as <see cref="Lit"/>).</summary>
+            public int[] LitCells;
+            /// <summary>
+            /// The dark tables as the sight computed them, before the lit cells took the lit rows (<see cref="ApplyLit"/>): per
+            /// narrow dark table, [i * Samples + s] for the i-th lit cell. The "lit" check's schedule is searched with them.
+            /// </summary>
+            public Dictionary<bool[], bool[]> UnlitDark;
             /// <summary>[inhabitant]: the hearing factor that scales every noise radius it hears (0: it hears nothing).</summary>
             public float[] HearingFactor;
 
@@ -1613,7 +1810,7 @@ namespace OutOfSight.Editor
                 }
                 for (int p = 0; p < t.Points; p++)
                 {
-                    silent[p] = w.Def.IsSilentFloor(position[p]);
+                    silent[p] = SilentFloor(w, position[p]);
                 }
                 float radius = Hearing.RadiusOf(kind);
                 t.Narrow = new ulong[w.Samples * t.Words];
@@ -1757,6 +1954,15 @@ namespace OutOfSight.Editor
             return true;
         }
 
+        /// <summary>
+        /// CONTRACT_M4 10.6: a rug or a soft floor silences every furniture noise at <paramref name="p"/>; levels v2 (C6): not
+        /// in the "rug" check's world, where they are all hard (<see cref="World.HardFloors"/>).
+        /// </summary>
+        private static bool SilentFloor(World w, Vector3 p)
+        {
+            return !w.HardFloors && w.Def.IsSilentFloor(p);
+        }
+
         /// <summary>The robot's hum applies to this search: the level has a robot and neither the robot nor its hum is off.</summary>
         private static bool HumOn(World w, SearchOptions o)
         {
@@ -1839,6 +2045,13 @@ namespace OutOfSight.Editor
             public bool Careful { get => (bits & 16) != 0; set => SetBit(16, value); }
             /// <summary>M6: hidden in a wardrobe (unseen, silent, still; CONTRACT_M6 2.5). Its cell is the one it entered from.</summary>
             public bool Hidden { get => (bits & 32) != 0; set => SetBit(32, value); }
+            /// <summary>Levels v2 (C6): the schedule went through a cell of <see cref="SearchOptions.MustVisit"/> (a via check).</summary>
+            public bool Visited { get => (bits & 64) != 0; set => SetBit(64, value); }
+            /// <summary>
+            /// HUMANAUDIT (<see cref="SearchOptions.Human"/>): the first cell of a run of moves from rest; it may not stop or freeze
+            /// yet (no micro-dash). Always false in the strict search.
+            /// </summary>
+            public bool Dash { get => (bits & 128) != 0; set => SetBit(128, value); }
             public bool Move => Act == Act.Move;
 
             private void SetBit(int bit, bool value)
@@ -1887,28 +2100,57 @@ namespace OutOfSight.Editor
             result.Failures.AddRange(CheckSeparation(w, Separation, result.Notes));
             ToleranceWarnings(w, result);
             HabitWarnings(w, result);
-            var strict = new SearchOptions { NeedDecoy = w.NeedDecoy };
+            var strict = new SearchOptions { NeedDecoy = w.NeedDecoy, Human = run.Human };
+            if (run.Human)
+            {
+                result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
+                    "profil humain : reaction {0:0.0} s avant de partir et avant de passer une porte qu'un habitant vient d'ouvrir, gel d'au moins {1:0.0} s, au moins {2} cases avant de s'arreter, pas deux bascules de suite (les lecons et requires restent au profil strict)",
+                    HumanReactionSamples * SampleSeconds, HumanPauseSamples * SampleSeconds, HumanProfile.MinMoveCells));
+            }
             NodeList nodes = Search(w, strict, out int goal);
             if (goal < 0)
             {
                 result.Failures.Add($"aucun horaire du depart a la sortie en {w.Horizon * SampleSeconds:0} s{(w.NeedDecoy ? " qui se serve d'un leurre" : "")} : " +
                                     "jamais vu en mouvement, jamais vu deplace sans leurre, jamais entendu, grincement sous 1, " +
-                                    $"jamais plus de {Tuning.AuditMaxWait:0} s a moins de {WaitAnchorRadius:0} m du meme endroit");
+                                    $"jamais plus de {Tuning.AuditMaxWait:0} s a moins de {WaitAnchorRadius:0} m du meme endroit"
+                                    + (run.Human ? " (profil humain)" : ""));
             }
             if (goal < 0)
             {
                 Diagnose(def, level, w, result);
             }
             List<Node> path = goal >= 0 ? PathTo(nodes, goal) : new List<Node>();
+            if (run.Human && path.Count > 0)
+            {
+                // HUMANAUDIT: the freeze nodes back to still samples, then the search's own output checked against the rules.
+                path = UnrollFreezes(w, path);
+                List<HumanProfile.Breach> breaches = HumanBreaches(path);
+                foreach (HumanProfile.Breach b in breaches)
+                {
+                    result.Failures.Add(string.Format(CultureInfo.InvariantCulture,
+                        "profil humain : l'horaire trouve enfreint ses regles ({0} de {1} a {2:0.0} s, incoherence interne de l'audit)",
+                        b.Kind, b.Length, path[b.Index + 1].T * SampleSeconds));
+                }
+            }
             if (path.Count > 0)
             {
+                // Levels v2 (C5): back-to-back toggles and hide/leave flickers folded into waits when the folded schedule still
+                // passes every rule and the fidelity replay (the search itself is unchanged, so is the exit time).
+                path = PostProcess(w, strict, path, result.Notes, out int folded, out int removed, out string sighting, out string fidelity);
+                result.TogglesFolded = folded;
+                result.HidePairsRemoved = removed;
                 Describe(w, strict, path, result);
                 DescribeMechanicsOnPath(w, path, result);
+                PaceReport(w, path, result);
+                WalkLineWarnings(w, path, result);
                 result.Route = Route(w, path);
                 // M5 5B.1 (CONTRACT_M5 19, M6 and M7): the rocking body's route replayed through MotionProfile, then the schedule
-                // replayed against the game's own sight test.
+                // replayed against the game's own sight test (already replayed when the post-process changed it).
                 RockTimingGuard(w, path, result.Route, result);
-                string sighting = FidelityReplay(w, path, out string fidelity);
+                if (fidelity == null)
+                {
+                    sighting = FidelityReplay(w, path, out fidelity);
+                }
                 result.Notes.Add(fidelity);
                 if (sighting != null)
                 {
@@ -1932,11 +2174,13 @@ namespace OutOfSight.Editor
                     result.Notes.Add($"la {RouteKey(DifficultyDef.Current.Id) ?? "designerRoute"} du fichier differe de cet horaire (elle reste valable si la sonde la gagne) ; {WriteRoutesFlag} la remplace");
                 }
             }
+            bool? decoysNeeded = null;
             if (w.NeedDecoy)
             {
                 // M2.2 (d): with the decoys switched off (they still stand there, they explain nothing), the
                 // level must have no schedule at all. Otherwise "the decoys are required" is only a claim.
                 Search(w, new SearchOptions { Decoys = false }, out int without);
+                decoysNeeded = without < 0; // Levels v2 (C6): the "decoy" id of requires reads this answer
                 if (without >= 0)
                 {
                     result.Failures.Add("sans l'explication des leurres, un horaire existe encore : les leurres ne sont pas necessaires");
@@ -1946,7 +2190,19 @@ namespace OutOfSight.Editor
                     result.Notes.Add("leurres eteints : aucun horaire, les leurres sont necessaires");
                 }
             }
-            CheckLesson(def, level, w, path, result);
+            CheckLesson(def, level, w, path, result, decoysNeeded);
+            // Levels v2 (C6): every id of "requires" binds, then the via checks, whose schedules count for the dead rooms below.
+            // Both run at the audit's own margin (the slack report below changes it).
+            if (def.RequiredLessons != null && def.RequiredLessons.Count > 0)
+            {
+                result.Failures.AddRange(RequiresFailures(w, level, def.RequiredLessons, path, decoysNeeded, result, result.Notes));
+            }
+            var viaPaths = new List<List<Node>>();
+            if (def.ViaChecks != null && def.ViaChecks.Count > 0)
+            {
+                result.Failures.AddRange(ViaFailures(w, path, -1, viaPaths, result.Vias, result.Notes));
+            }
+            LitNote(w, path, result.Notes);
             foreach (int sample in run.DebugSamples)
             {
                 result.Notes.Add(SeenMap(w, sample));
@@ -1962,6 +2218,8 @@ namespace OutOfSight.Editor
             {
                 SlackReport(w, result);
             }
+            // Levels v2 (C5): rooms nobody uses; C6: the schedules of the via checks count as used.
+            DeadRoomReport(w, path, viaPaths, result);
             result.Map = Map(w, path);
         }
 
@@ -1970,7 +2228,7 @@ namespace OutOfSight.Editor
         /// schedule at full stool speed (every stop from a run tips it). glide: the schedule that ignores the glide is
         /// seen gliding (the stop samples bind). sit: moving the seat home 2 m away changes the schedule.
         /// </summary>
-        private static void CheckLesson(LevelDef def, LevelInstance level, World w, List<Node> path, Result result)
+        private static void CheckLesson(LevelDef def, LevelInstance level, World w, List<Node> path, Result result, bool? decoysNeeded = null)
         {
             switch (def.Lesson)
             {
@@ -1978,6 +2236,7 @@ namespace OutOfSight.Editor
                     return;
                 case LevelDef.LessonCareful:
                     NodeList fullNodes = Search(w, new SearchOptions { FullSpeed = true, MaxRun = UnlimitedRun }, out int fullSpeed);
+                    result.Lessons[def.Lesson] = fullSpeed < 0;
                     if (fullSpeed >= 0)
                     {
                         result.Failures.Add("lecon careful : un horaire existe aussi a pleine vitesse, sans le mode prudent : la lecon n'est pas requise ("
@@ -1991,6 +2250,7 @@ namespace OutOfSight.Editor
                 case LevelDef.LessonDark:
                 {
                     NodeList litNodes = Search(w, new SearchOptions { Toggles = false, MaxRun = UnlimitedRun }, out int lit);
+                    result.Lessons[def.Lesson] = lit < 0;
                     if (lit >= 0)
                     {
                         result.Failures.Add("lecon dark : un horaire existe aussi la lampe toujours allumee : la lecon n'est pas requise ("
@@ -2007,12 +2267,15 @@ namespace OutOfSight.Editor
                     string pass = DarkFreePass(w, path, true, out string text);
                     if (pass != null)
                     {
+                        result.Lessons[def.Lesson] = false;
                         result.Failures.Add(pass);
                     }
                     else
                     {
                         result.Notes.Add(text);
                     }
+                    // Levels v2 (C5): the same question asked at one sample: where the lamp really is, when, and in whose cone.
+                    result.Notes.AddRange(DarkSync(w, path));
                     return;
                 }
                 case LevelDef.LessonGlide:
@@ -2020,11 +2283,13 @@ namespace OutOfSight.Editor
                     NodeList naiveNodes = Search(w, new SearchOptions { StopSamples = 0, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int naive);
                     if (naive < 0)
                     {
+                        result.Lessons[def.Lesson] = false;
                         result.Failures.Add("lecon glide : aucun horaire meme en ignorant la glissade");
                         return;
                     }
                     List<Node> naivePath = PathTo(naiveNodes, naive);
                     int caught = FirstSeenGlide(w, naivePath);
+                    result.Lessons[def.Lesson] = caught >= 0;
                     if (caught < 0)
                     {
                         result.Failures.Add("lecon glide : l'horaire qui ignore la glissade n'est jamais vu en glissant : les arrets ne contraignent rien");
@@ -2046,6 +2311,7 @@ namespace OutOfSight.Editor
                     }
                     if (w.FirstSit < 0)
                     {
+                        result.Lessons[def.Lesson] = false;
                         result.Failures.Add("lecon sit : aucun habitant ne s'assoit sur le joueur pendant l'horaire");
                         return;
                     }
@@ -2057,6 +2323,7 @@ namespace OutOfSight.Editor
                     string earliest = freeGoal >= 0
                         ? string.Format(CultureInfo.InvariantCulture, "{0:0.0} s", freeNodes[freeGoal].T * SampleSeconds)
                         : "jamais";
+                    result.Lessons[def.Lesson] = !(freeGoal >= 0 && freeNodes[freeGoal].T <= w.FirstSit);
                     if (freeGoal >= 0 && freeNodes[freeGoal].T <= w.FirstSit)
                     {
                         result.Failures.Add(string.Format(CultureInfo.InvariantCulture,
@@ -2074,6 +2341,7 @@ namespace OutOfSight.Editor
                 case LevelDef.LessonSplit:
                 {
                     bool binds = LessonBinds(w, level, def.Lesson, out string text, out bool premise);
+                    result.Lessons[def.Lesson] = binds;
                     if (binds)
                     {
                         result.Notes.Add(text);
@@ -2097,11 +2365,13 @@ namespace OutOfSight.Editor
                     {
                         bool binds = MechanicBinds(w, level, lesson, out string text, out bool premise);
                         result.Notes.Add("lecon final, " + text);
+                        result.Lessons[lesson] = binds;
                         if (binds)
                         {
                             binding.Add(lesson);
                         }
                     }
+                    result.Lessons[def.Lesson] = binding.Count >= 3;
                     string which = binding.Count > 0 ? string.Join(", ", binding) : "aucune";
                     if (binding.Count < 3)
                     {
@@ -2118,6 +2388,7 @@ namespace OutOfSight.Editor
                 case LevelDef.LessonLoad:
                 {
                     bool binds = MechanicBinds(w, level, def.Lesson, out string text, out bool premise);
+                    result.Lessons[def.Lesson] = binds;
                     if (binds)
                     {
                         result.Notes.Add(text);
@@ -2136,6 +2407,7 @@ namespace OutOfSight.Editor
                 {
                     // M6 (CONTRACT_M6 2.5): the wardrobe is required: without hiding (and without the wait cap), no schedule.
                     NodeList hideless = Search(w, new SearchOptions { Hide = false, MaxRun = UnlimitedRun }, out int hidelessGoal);
+                    result.Lessons[def.Lesson] = hidelessGoal < 0;
                     if (hidelessGoal >= 0)
                     {
                         result.Failures.Add("lecon wardrobe : un horaire existe aussi sans se cacher dans l'armoire : la lecon n'est pas requise ("
@@ -2144,6 +2416,31 @@ namespace OutOfSight.Editor
                     else
                     {
                         result.Notes.Add("lecon wardrobe : sans se cacher dans l'armoire, aucun horaire : l'armoire est requise");
+                    }
+                    return;
+                }
+                case LevelDef.LessonRug:
+                case LevelDef.LessonHum:
+                case LevelDef.LessonContact:
+                case LevelDef.LessonHousehold:
+                case LevelDef.LessonDecoy:
+                case LevelDef.LessonExitWatch:
+                case LevelDef.LessonLit:
+                {
+                    // Levels v2 (C6): the new ids as the level's lesson, checked as "requires" checks them.
+                    bool binds = RequireBinds(w, level, def.Lesson, path, decoysNeeded, out string text);
+                    result.Lessons[def.Lesson] = binds;
+                    if (binds)
+                    {
+                        result.Notes.Add("lecon " + def.Lesson + " : " + text);
+                    }
+                    else if (def.LessonAdvisory)
+                    {
+                        result.Notes.Add("AVERTISSEMENT lecon indicative (derogation) : lecon " + def.Lesson + " : " + text);
+                    }
+                    else
+                    {
+                        result.Failures.Add("lecon " + def.Lesson + " : " + text);
                     }
                     return;
                 }
@@ -2183,6 +2480,10 @@ namespace OutOfSight.Editor
                     float darkRange = (strict ? w.Watchers[h].Range : Tuning.ViewRange) * Tuning.LampOffLight; // MUTATION:AUDIT_DARK_RANGE
                     foreach (Node n in path)
                     {
+                        if (w.Lit != null && w.Lit[n.Cell])
+                        {
+                            continue; // Levels v2 (C6): in a lit zone the dark is no cover at all, so no pass either
+                        }
                         float d = YawMath.Planar(w.Position[s, h] - w.Center[n.Cell]).magnitude;
                         if ((double)d - darkRange < best)
                         {
@@ -2276,10 +2577,20 @@ namespace OutOfSight.Editor
             var found = new List<string>();
             void Try(string what, World world, SearchOptions o)
             {
+                o.Human = o.Human || run.Human; // HUMANAUDIT: one rule relaxed at a time, the human rules kept
                 NodeList n = Search(world, o, out int g);
                 if (g >= 0)
                 {
                     found.Add(what + " (" + Summary(world, PathTo(n, g)) + ")");
+                }
+            }
+            if (run.Human)
+            {
+                // HUMANAUDIT: the strict search first (it ignores the profile), so the note says whether the human rules bind.
+                NodeList n = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy }, out int g);
+                if (g >= 0)
+                {
+                    found.Add("au profil strict (" + Summary(w, PathTo(n, g)) + ")");
                 }
             }
             Try("sans plafond d'attente", w, new SearchOptions { MaxRun = UnlimitedRun, NeedDecoy = w.NeedDecoy });
@@ -2390,14 +2701,31 @@ namespace OutOfSight.Editor
         /// <summary>
         /// CONTRACT_M4 10.7 (playtest data, not a gate): the largest margin, in samples each way, for which a schedule
         /// still exists. The audit's own margin is <see cref="MarginSamples"/>.
+        /// AUDFIX (levels v2): a margin search that runs out of the audit's node budget (Tuning.AuditSearchNodeCap or
+        /// Tuning.AuditNodeCap) answers nothing for its margin: the sweep stops there, the maximum is printed as a lower
+        /// bound ("au moins") and the budget flags are restored, so the overflow of this design report is not a defect of the
+        /// level (whose own searches ran before it, within budget). A failing margin is often not cut by the reachability
+        /// relaxation (it fails on the wait rule), so its search walks the whole horizon.
         /// </summary>
         private static void SlackReport(World w, Result result)
         {
             int best = w.Margin;
+            bool exhausted = Budget.NodesExhausted;
+            bool tooLarge = Budget.SearchTooLarge;
+            string overflow = "";
             for (int m = w.Margin + 1; m <= SlackReportMax; m++)
             {
                 SetMargin(w, m);
-                Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy }, out int goal);
+                Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy, Human = run.Human }, out int goal);
+                if (Budget.NodesExhausted)
+                {
+                    overflow = string.Format(CultureInfo.InvariantCulture,
+                        " ; la recherche a {0} echantillons depasse le budget de l'audit ({1}) : la marge au dela n'est pas mesuree (une note, pas un defaut)",
+                        m, Budget.SearchTooLarge ? $"plus de {Tuning.AuditSearchNodeCap} noeuds crees" : $"plus de {Tuning.AuditNodeCap} noeuds developpes");
+                    Budget.NodesExhausted = exhausted;
+                    Budget.SearchTooLarge = tooLarge;
+                    break;
+                }
                 if (goal < 0)
                 {
                     break;
@@ -2406,9 +2734,10 @@ namespace OutOfSight.Editor
             }
             SetMargin(w, MarginSamples);
             result.SlackSamples = best;
+            result.SlackMeasured = true;
             result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
-                "marge maximale : un horaire existe encore avec {0} echantillons de marge de chaque cote ({1:0.0} s ; l'audit en exige {2}){3}",
-                best, best * SampleSeconds, MarginSamples, best >= SlackReportMax ? ", au moins" : ""));
+                "marge maximale : un horaire existe encore avec {0} echantillons de marge de chaque cote ({1:0.0} s ; l'audit en exige {2}){3}{4}",
+                best, best * SampleSeconds, MarginSamples, best >= SlackReportMax || overflow.Length > 0 ? ", au moins" : "", overflow));
         }
 
         /// <summary>
@@ -2426,7 +2755,7 @@ namespace OutOfSight.Editor
             var failing = new List<string>();
             for (int d = 0; d < w.LoopSamples; d += w.SweepEvery)
             {
-                NodeList nodes = Search(w, new SearchOptions { Delay = d }, out int goal);
+                NodeList nodes = Search(w, new SearchOptions { Delay = d, Human = run.Human }, out int goal);
                 if (goal < 0)
                 {
                     failing.Add((d * SampleSeconds).ToString("0", CultureInfo.InvariantCulture));
@@ -2486,8 +2815,13 @@ namespace OutOfSight.Editor
         /// <summary>CONTRACT_M5_v3 15.3: the reach cells of every closed leaf, and a closed leaf no walkable cell reaches fails.</summary>
         private static void CheckLeaves(World w, Result result)
         {
+            result.Failures.AddRange(LockedLeafFailures(w, result.Notes));
             foreach (Leaf leaf in w.Closed)
             {
+                if (leaf.Door.PlayerLocked)
+                {
+                    continue; // Levels v2 (C6): no reach cell by design (LockedLeafFailures)
+                }
                 if (leaf.Reach.Count == 0)
                 {
                     result.Failures.Add($"porte {leaf.Door.Id} fermee sans case d'atteinte praticable (DoorGeometry.InReach) : elle ne peut pas s'ouvrir");
@@ -2500,6 +2834,33 @@ namespace OutOfSight.Editor
                 }
                 result.Notes.Add($"porte {leaf.Door.Id} : {leaf.Reach.Count} case(s) d'atteinte : {string.Join(" ", cells)}");
             }
+        }
+
+        /// <summary>
+        /// Levels v2 (C6, "a door only Dad opens"): a playerLocked leaf has no reach cell, so only an inhabitant's walk opens it
+        /// (<see cref="SetUpInhabitantDoors"/>). Returns a failure per such leaf that no walk ever opens; notes who opens the
+        /// others, and when.
+        /// </summary>
+        private static List<string> LockedLeafFailures(World w, List<string> notes)
+        {
+            var failures = new List<string>();
+            for (int l = 0; l < w.Closed.Count; l++)
+            {
+                Leaf leaf = w.Closed[l];
+                if (!leaf.Door.PlayerLocked)
+                {
+                    continue;
+                }
+                if (w.AutoFrom == null || w.AutoFrom[l] == int.MaxValue) // MUTATION:AUDIT_LOCKED_NEVER
+                {
+                    failures.Add($"porte verrouillee jamais ouverte : {leaf.Door.Id} (playerLocked) n'est sur la marche d'aucun habitant en {w.Horizon * SampleSeconds:0} s, le joueur ne peut pas l'ouvrir");
+                    continue;
+                }
+                string who = w.AutoOpener[l] >= 0 ? w.Watchers[w.AutoOpener[l]].Name : "un habitant";
+                notes.Add(string.Format(CultureInfo.InvariantCulture, "porte {0} verrouillee pour le joueur : {1} l'ouvre a {2:0.0} s (ouverte a {3:0.0} s)",
+                    leaf.Door.Id, who, w.AutoFrom[l] * SampleSeconds, w.AutoTo[l] * SampleSeconds));
+            }
+            return failures;
         }
 
         /// <summary>
@@ -2621,6 +2982,7 @@ namespace OutOfSight.Editor
                 void Warn(string what)
                 {
                     result.Notes.Add($"AVERTISSEMENT habitude ({h.Name}, {id}) : {what}");
+                    result.HabitWarnings.Add($"{h.Name}, {id} : {what}");
                 }
                 switch (id)
                 {
@@ -2852,6 +3214,656 @@ namespace OutOfSight.Editor
             return true;
         }
 
+        // ----- Levels v2, audit B (LEVELS_V2.md 6, C6): requires, the new lesson checks, via checks, lit zones -----
+
+        /// <summary>Levels v2 (C6): "exitwatch" binds when the exit seen by nobody is reached at least this much earlier (1 s).</summary>
+        private const int ExitWatchSamples = 10;
+
+        /// <summary>
+        /// Levels v2 (C6): every id of <paramref name="ids"/> (LevelDef "requires") must bind: a failure per id that does not, a
+        /// note under lessonAdvisory; one line per id either way. An id the level's lesson check already answered (the lesson
+        /// itself, the mechanics of "final") reuses that answer, and "decoy" reuses the decoy necessity search of
+        /// <see cref="CheckSchedule"/> (<paramref name="decoysNeeded"/>), so each id costs at most one more search.
+        /// <paramref name="result"/> may be null (the fixtures): nothing is reused nor recorded then.
+        /// </summary>
+        private static List<string> RequiresFailures(World w, LevelInstance level, List<string> ids, List<Node> path, bool? decoysNeeded,
+            Result result, List<string> notes)
+        {
+            var failures = new List<string>();
+            foreach (string id in ids)
+            {
+                if (string.IsNullOrEmpty(id))
+                {
+                    continue;
+                }
+                bool binds;
+                string text;
+                if (result != null && result.Lessons.TryGetValue(id, out bool known))
+                {
+                    binds = known;
+                    text = $"deja verifie par la lecon du niveau ({w.Def.Lesson})";
+                }
+                else
+                {
+                    binds = RequireBinds(w, level, id, path, decoysNeeded, out text);
+                }
+                if (result != null)
+                {
+                    result.Requires[id] = binds;
+                }
+                string line = $"requires {id} : {(binds ? "contraint" : "ne contraint pas")} ({text})";
+                if (!binds) // MUTATION:REQUIRES_BIND
+                {
+                    if (w.Def.LessonAdvisory)
+                    {
+                        notes.Add("AVERTISSEMENT requires indicatif (derogation) : " + line);
+                    }
+                    else
+                    {
+                        failures.Add(line);
+                    }
+                }
+                else
+                {
+                    notes.Add(line);
+                }
+            }
+            return failures;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): one "requires" id (or one of the new ids used as the lesson), as a counterfactual: true when it binds.
+        /// The existing lessons are asked as <see cref="CheckLesson"/> and <see cref="MechanicBinds"/> ask them; the new ids:
+        /// rug (rugs and soft floors heard as hard: no schedule), hum (the hum switched off: no schedule), contact (the schedule
+        /// computed without the robot meets it), household (the inhabitants' leaves never open: no schedule), decoy (the decoys
+        /// switched off: no schedule), exitwatch (<see cref="ExitWatchBinds"/>) and lit (<see cref="LitBinds"/>). Mechanics that
+        /// need a mistake (lures, barks, carries) cannot be required: the search never makes one. Every counterfactual runs
+        /// without the wait cap (M5 5B.1, M2), as the lessons' do; <paramref name="text"/> says what was found.
+        /// </summary>
+        private static bool RequireBinds(World w, LevelInstance level, string id, List<Node> path, bool? decoysNeeded, out string text)
+        {
+            bool NoSchedule(World world, SearchOptions o, string relaxed, string why, out string said)
+            {
+                NodeList nodes = Search(world, o, out int goal);
+                if (goal >= 0)
+                {
+                    said = $"un horaire existe aussi {relaxed} : {Summary(world, PathTo(nodes, goal))}";
+                    return false;
+                }
+                said = $"{relaxed}, aucun horaire : {why}";
+                return true;
+            }
+            switch (id)
+            {
+                case LevelDef.LessonCareful:
+                    if (!w.Body.Tips)
+                    {
+                        text = "le corps du joueur ne se renverse pas";
+                        return false;
+                    }
+                    return NoSchedule(w, new SearchOptions { FullSpeed = true, MaxRun = UnlimitedRun }, "a pleine vitesse", "le mode prudent est requis", out text);
+                case LevelDef.LessonDark:
+                    if (!w.Body.Lamp)
+                    {
+                        text = "le corps du joueur n'est pas la lampe";
+                        return false;
+                    }
+                    return NoSchedule(w, new SearchOptions { Toggles = false, MaxRun = UnlimitedRun }, "la lampe toujours allumee", "le noir est requis", out text);
+                case LevelDef.LessonGlide:
+                {
+                    if (!w.Body.Glides)
+                    {
+                        text = "le corps du joueur ne glisse pas";
+                        return false;
+                    }
+                    NodeList naiveNodes = Search(w, new SearchOptions { StopSamples = 0, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int naive);
+                    if (naive < 0)
+                    {
+                        text = "aucun horaire meme en ignorant la glissade";
+                        return false;
+                    }
+                    int caught = FirstSeenGlide(w, PathTo(naiveNodes, naive));
+                    text = caught >= 0
+                        ? string.Format(CultureInfo.InvariantCulture, "l'horaire qui ignore la glissade est vu en glissant a {0:0.0} s : les arrets sont requis", caught * SampleSeconds)
+                        : "l'horaire qui ignore la glissade n'est jamais vu en glissant";
+                    return caught >= 0;
+                }
+                case LevelDef.LessonSit:
+                {
+                    if (w.FirstSit < 0)
+                    {
+                        text = "aucun habitant ne s'assoit sur le joueur";
+                        return false;
+                    }
+                    World free = BuildWorld(w.Def, level, false);
+                    NodeList freeNodes = Search(free, new SearchOptions { NeedDecoy = free.NeedDecoy, MaxRun = UnlimitedRun }, out int freeGoal);
+                    bool avoided = freeGoal >= 0 && freeNodes[freeGoal].T <= w.FirstSit;
+                    text = string.Format(CultureInfo.InvariantCulture, "premiere assise a {0:0.0} s ; sans s'asseoir, sortie au plus tot {1}{2}",
+                        w.FirstSit * SampleSeconds, freeGoal >= 0 ? (freeNodes[freeGoal].T * SampleSeconds).ToString("0.0", CultureInfo.InvariantCulture) + " s" : "jamais",
+                        avoided ? " : la lecon peut etre evitee" : "");
+                    return !avoided;
+                }
+                case LevelDef.LessonWardrobe:
+                    if (w.HideFrom == null)
+                    {
+                        text = "aucune armoire ou le meuble tienne";
+                        return false;
+                    }
+                    return NoSchedule(w, new SearchOptions { Hide = false, MaxRun = UnlimitedRun }, "sans se cacher dans l'armoire", "l'armoire est requise", out text);
+                case LevelDef.LessonDoor:
+                case LevelDef.LessonPet:
+                case LevelDef.LessonSplit:
+                case LevelDef.LessonRobot:
+                case LevelDef.LessonRock:
+                case LevelDef.LessonLoad:
+                    return MechanicBinds(w, level, id, out text, out _);
+                case LevelDef.LessonFinal:
+                {
+                    var binding = new List<string>();
+                    foreach (string lesson in new[] { LevelDef.LessonDoor, LevelDef.LessonPet, LevelDef.LessonSplit,
+                                 LevelDef.LessonRobot, LevelDef.LessonRock, LevelDef.LessonLoad })
+                    {
+                        if (MechanicBinds(w, level, lesson, out _, out _))
+                        {
+                            binding.Add(lesson);
+                        }
+                    }
+                    text = $"{binding.Count} verification(s) de mecanique contraignent ({(binding.Count > 0 ? string.Join(", ", binding) : "aucune")}), il en faut au moins 3";
+                    return binding.Count >= 3;
+                }
+                case LevelDef.LessonRug:
+                {
+                    bool silent = false;
+                    for (int k = 0; k < w.Count && !silent; k++)
+                    {
+                        silent = w.Walkable[k] && w.Def.IsSilentFloor(w.Center[k]);
+                    }
+                    if (!silent)
+                    {
+                        text = "aucun tapis ni sol souple sous une case praticable";
+                        return false;
+                    }
+                    World hard = w.Clone();
+                    hard.HardFloors = true;
+                    hard.Noise = new Dictionary<(NoiseKind, int, bool), NoiseTable>();
+                    return NoSchedule(hard, new SearchOptions { NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun },
+                        "tapis et sols souples entendus comme des sols durs", "le sol silencieux est requis", out text);
+                }
+                case LevelDef.LessonHum:
+                    if (w.Robots == 0)
+                    {
+                        text = "aucun robot";
+                        return false;
+                    }
+                    return NoSchedule(w, new SearchOptions { Hum = false, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, "ronronnement coupe", "le ronronnement est requis", out text);
+                case LevelDef.LessonContact:
+                {
+                    if (w.Robots == 0)
+                    {
+                        text = "aucun robot";
+                        return false;
+                    }
+                    NodeList freeNodes = Search(w, new SearchOptions { Robots = false, NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out int free);
+                    if (free < 0)
+                    {
+                        text = "aucun horaire sans le robot (ni zone de contact ni ronronnement)";
+                        return false;
+                    }
+                    List<Node> freePath = PathTo(freeNodes, free);
+                    int hit = FirstContact(w, freePath, out float closest, out int when);
+                    text = hit >= 0
+                        ? string.Format(CultureInfo.InvariantCulture, "l'horaire calcule sans le robot le heurte a {0:0.0} s ({1}) : il faut esquiver le robot", hit * SampleSeconds, Summary(w, freePath))
+                        : string.Format(CultureInfo.InvariantCulture, "l'horaire calcule sans le robot ne le touche jamais (au plus pres {0:0.00} m a {1:0.0} s)", closest, when * SampleSeconds);
+                    return hit >= 0;
+                }
+                case LevelDef.LessonHousehold:
+                {
+                    if (w.AutoBits == 0)
+                    {
+                        text = "aucune porte que la marche d'un habitant ouvre (openedByInhabitants)";
+                        return false;
+                    }
+                    World shut = BuildWorld(w.Def, level, w.Sitting, false);
+                    return NoSchedule(shut, new SearchOptions { NeedDecoy = shut.NeedDecoy, MaxRun = UnlimitedRun },
+                        "les portes des habitants restant fermees", "la porte qu'un habitant ouvre est requise", out text);
+                }
+                case LevelDef.LessonDecoy:
+                {
+                    if (!w.NeedDecoy)
+                    {
+                        text = "aucun leurre de l'espece du joueur";
+                        return false;
+                    }
+                    bool needed;
+                    string found = null;
+                    if (decoysNeeded.HasValue)
+                    {
+                        needed = decoysNeeded.Value;
+                    }
+                    else
+                    {
+                        NodeList withoutNodes = Search(w, new SearchOptions { Decoys = false }, out int without);
+                        needed = without < 0;
+                        found = needed ? null : Summary(w, PathTo(withoutNodes, without));
+                    }
+                    text = needed ? "leurres eteints, aucun horaire : un leurre est requis"
+                        : "un horaire existe aussi les leurres eteints" + (found != null ? " : " + found : "");
+                    return needed;
+                }
+                case LevelDef.LessonExitWatch:
+                    return ExitWatchBinds(w, path, out text);
+                case LevelDef.LessonLit:
+                    return LitBinds(w, out text);
+                default:
+                    text = $"id '{id}' inconnu";
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (C6), "exitwatch": the schedule searched with the exit cells seen by nobody (every sight table, moving and
+        /// still, lit and dark, cleared there) reaches the exit at least <see cref="ExitWatchSamples"/> earlier than
+        /// <paramref name="path"/>: someone watches the exit, the last step is the puzzle. The note names the human who sees the
+        /// exit cell last before the schedule's arrival. The rest of the house is seen as it is, so the approach stays a puzzle.
+        /// </summary>
+        private static bool ExitWatchBinds(World w, List<Node> path, out string text)
+        {
+            if (path.Count == 0)
+            {
+                text = "aucun horaire a comparer";
+                return false;
+            }
+            var exits = new List<int>();
+            for (int k = 0; k < w.Count; k++)
+            {
+                if (w.InExit[k])
+                {
+                    exits.Add(k);
+                }
+            }
+            var patch = new SightPatch(w);
+            NodeList nodes;
+            int goal;
+            try
+            {
+                foreach (var (narrow, wide, _) in SightColumns(w))
+                {
+                    foreach (int k in exits)
+                    {
+                        patch.Set(narrow, k, s => false);
+                        patch.Set(wide, k, s => false);
+                    }
+                }
+                nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy, Human = run.Human }, out goal);
+            }
+            finally
+            {
+                patch.Restore();
+            }
+            Node last = path[path.Count - 1];
+            if (goal < 0)
+            {
+                text = "aucun horaire meme la sortie vue de personne (incoherence de l'audit)";
+                return false;
+            }
+            int unseen = nodes[goal].T;
+            int gain = last.T - unseen;
+            if (gain >= ExitWatchSamples) // MUTATION:AUDIT_EXIT_WATCH
+            {
+                text = string.Format(CultureInfo.InvariantCulture,
+                    "la sortie vue de personne, elle est atteinte a {0:0.0} s au lieu de {1:0.0} s ({2:0.0} s plus tot) : {3} surveille la sortie",
+                    unseen * SampleSeconds, last.T * SampleSeconds, gain * SampleSeconds, ExitWatcher(w, last, unseen));
+                return true;
+            }
+            text = string.Format(CultureInfo.InvariantCulture,
+                "la sortie vue de personne, elle est atteinte a {0:0.0} s, l'horaire a {1:0.0} s : moins de {2:0.0} s d'ecart, personne ne surveille la sortie a ce moment",
+                unseen * SampleSeconds, last.T * SampleSeconds, ExitWatchSamples * SampleSeconds);
+            return false;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): the human who sees the exit cell of <paramref name="last"/> at the latest sample before its arrival
+        /// (from <paramref name="from"/> on): the nearest human whose cone holds a sample point of the cell then, with the time.
+        /// </summary>
+        private static string ExitWatcher(World w, Node last, int from)
+        {
+            int k = last.Cell;
+            int h = w.Inhabitants;
+            for (int s = last.T - 1; s >= Mathf.Max(0, from); s--)
+            {
+                if (!w.HumanSeen(last.Off, last.Mask, s, k, false))
+                {
+                    continue;
+                }
+                int best = -1;
+                float nearest = float.MaxValue;
+                for (int i = 0; i < h; i++)
+                {
+                    Watcher watcher = w.Watchers[i];
+                    if (!watcher.Human || w.Asleep[s * h + i])
+                    {
+                        continue;
+                    }
+                    float range = watcher.Range * (w.Body.Lamp && last.Off && !(w.Lit != null && w.Lit[k]) ? Tuning.LampOffLight : 1f);
+                    foreach (Vector3 p in w.Rings[k])
+                    {
+                        if (VisionMath.IsInCone(w.Eye[s * h + i], w.Forward[s * h + i], p, range, watcher.HalfAngle))
+                        {
+                            float d = YawMath.Planar(w.Position[s, i] - w.Center[k]).magnitude;
+                            if (d < nearest)
+                            {
+                                nearest = d;
+                                best = i;
+                            }
+                            break;
+                        }
+                    }
+                }
+                return string.Format(CultureInfo.InvariantCulture, "{0} (la voit encore a {1:0.0} s)", best >= 0 ? w.Watchers[best].Name : "un habitant", s * SampleSeconds);
+            }
+            return "personne juste avant l'arrivee (c'est l'approche qui est vue)";
+        }
+
+        /// <summary>
+        /// Levels v2 (C6), "lit": the schedule searched as if there were no lit zone (the dark tables as the sight computed them,
+        /// <see cref="World.UnlitDark"/>) is seen, the lamp switched off, at a lit cell in the real tables
+        /// (<see cref="FirstSeenLit"/>, the glide check's pattern): the zone forces the route.
+        /// </summary>
+        private static bool LitBinds(World w, out string text)
+        {
+            if (w.LitCells == null || w.UnlitDark == null)
+            {
+                text = w.Body.Lamp ? "aucune case praticable dans une zone eclairee" : "le corps du joueur n'est pas la lampe";
+                return false;
+            }
+            int n = w.Count;
+            int samples = w.Samples;
+            int margin = w.Margin;
+            var patch = new SightPatch(w);
+            NodeList nodes;
+            int goal;
+            try
+            {
+                foreach (var (narrow, wide, dark) in SightColumns(w))
+                {
+                    if (!dark || !w.UnlitDark.TryGetValue(narrow, out bool[] unlit))
+                    {
+                        continue;
+                    }
+                    for (int i = 0; i < w.LitCells.Length; i++)
+                    {
+                        int k = w.LitCells[i];
+                        int row = i * samples;
+                        patch.Set(narrow, k, s => unlit[row + s]);
+                        patch.Set(wide, k, s =>
+                        {
+                            for (int q = Mathf.Max(0, s - margin); q <= Mathf.Min(samples - 1, s + margin); q++)
+                            {
+                                if (narrow[q * n + k])
+                                {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        });
+                    }
+                }
+                nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy, MaxRun = UnlimitedRun }, out goal);
+            }
+            finally
+            {
+                patch.Restore();
+            }
+            if (goal < 0)
+            {
+                text = "aucun horaire meme sans les zones eclairees";
+                return false;
+            }
+            List<Node> naive = PathTo(nodes, goal);
+            int seen = FirstSeenLit(w, naive, out int cell);
+            if (seen >= 0)
+            {
+                text = string.Format(CultureInfo.InvariantCulture,
+                    "l'horaire calcule sans les zones eclairees ({0}) est vu lampe eteinte en ({1:0.##}, {2:0.##}) a {3:0.0} s : la zone eclairee est requise",
+                    Summary(w, naive), w.Center[cell].x, w.Center[cell].z, seen * SampleSeconds);
+                return true;
+            }
+            text = "l'horaire calcule sans les zones eclairees n'y est jamais vu (" + Summary(w, naive) + ")";
+            return false;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): the first sample (or -1) at which a schedule, the lamp switched off, is seen at a lit cell in the real
+        /// tables: moving (a move, a stop, an opening, a hide or a leave, at either cell of the step that is lit) or still out of
+        /// place (<see cref="StillOk"/>). A switch uses the lit range anyway. <paramref name="cell"/> is that lit cell.
+        /// </summary>
+        private static int FirstSeenLit(World w, List<Node> path, out int cell)
+        {
+            cell = -1;
+            var options = new SearchOptions();
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node a = path[i - 1];
+                Node b = path[i];
+                if (!b.Off || b.Act == Act.Toggle)
+                {
+                    continue;
+                }
+                if (b.Act == Act.Still)
+                {
+                    if (!b.Hidden && w.Lit[b.Cell] && !StillOk(w, options, true, b.Lying, b.Cell, b.T, false, b.Mask))
+                    {
+                        cell = b.Cell;
+                        return b.T;
+                    }
+                    continue;
+                }
+                int from = b.Act == Act.Move ? a.Cell : b.Cell;
+                for (int s = a.T + 1; s <= b.T && s < w.Samples; s++)
+                {
+                    foreach (int k in new[] { from, b.Cell })
+                    {
+                        if (w.Lit[k] && w.MovingSeen(true, b.Mask, s, k, false))
+                        {
+                            cell = k;
+                            return s;
+                        }
+                    }
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): every sight table the search reads, each once (a level without a lamp, or whose humans share one
+        /// class, aliases some), as (narrow, wide, dark): the moving tables, then the still tables of every class.
+        /// </summary>
+        private static List<(bool[] narrow, bool[] wide, bool dark)> SightColumns(World w)
+        {
+            var columns = new List<(bool[], bool[], bool)>();
+            var known = new HashSet<bool[]>();
+            void Add(bool[][] narrow, bool[][] wide, bool dark)
+            {
+                for (int m = 0; narrow != null && wide != null && m < w.Masks; m++)
+                {
+                    if (narrow[m] != null && wide[m] != null && known.Add(narrow[m]))
+                    {
+                        columns.Add((narrow[m], wide[m], dark));
+                    }
+                }
+            }
+            Add(w.MoveSeen, w.MoveSeenWide, false);
+            Add(w.MoveDark, w.MoveDarkWide, true);
+            foreach (ToleranceClass c in w.Classes)
+            {
+                Add(c.Seen, c.SeenWide, false);
+                Add(c.SeenDark, c.SeenDarkWide, true);
+            }
+            return columns;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): a temporary edit of some cells' columns of the sight tables ([sample * Count + cell]), for one
+        /// counterfactual search: <see cref="Set"/> keeps the column and writes the new one, <see cref="Restore"/> puts every
+        /// column back, last edit first.
+        /// </summary>
+        private sealed class SightPatch
+        {
+            private readonly World w;
+            private readonly List<(bool[] table, int cell, bool[] column)> saved = new List<(bool[], int, bool[])>();
+
+            public SightPatch(World w)
+            {
+                this.w = w;
+            }
+
+            public void Set(bool[] table, int cell, Func<int, bool> value)
+            {
+                var column = new bool[w.Samples];
+                for (int s = 0; s < w.Samples; s++)
+                {
+                    column[s] = table[s * w.Count + cell];
+                }
+                saved.Add((table, cell, column));
+                for (int s = 0; s < w.Samples; s++)
+                {
+                    table[s * w.Count + cell] = value(s);
+                }
+            }
+
+            public void Restore()
+            {
+                for (int i = saved.Count - 1; i >= 0; i--)
+                {
+                    (bool[] table, int cell, bool[] column) = saved[i];
+                    for (int s = 0; s < w.Samples; s++)
+                    {
+                        table[s * w.Count + cell] = column[s];
+                    }
+                }
+                saved.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (C6, LevelDef viaChecks): for each zone (all, or only the one at index <paramref name="only"/>), the cells
+        /// whose center lies in it; then the search with <see cref="SearchOptions.MustVisit"/> those cells (one Visit bit). No
+        /// schedule is a failure "aucun horaire par name"; an exit later than maxRatio times the best one a warning. With
+        /// "avoid", the zone is barred instead: the schedule that skips it must not exist, or be slower than the best one. Every
+        /// schedule found joins <paramref name="viaPaths"/> (the dead rooms count them as used); <paramref name="vias"/> gets
+        /// true per zone whose check holds within its ratio.
+        /// </summary>
+        private static List<string> ViaFailures(World w, List<Node> path, int only, List<List<Node>> viaPaths, Dictionary<string, bool> vias, List<string> notes)
+        {
+            var failures = new List<string>();
+            List<ViaCheckDef> checks = w.Def.ViaChecks ?? new List<ViaCheckDef>();
+            int best = path.Count > 0 ? path[path.Count - 1].T : -1;
+            for (int i = 0; i < checks.Count; i++)
+            {
+                ViaCheckDef v = checks[i];
+                if (v == null || (only >= 0 && i != only))
+                {
+                    continue;
+                }
+                string name = string.IsNullOrEmpty(v.Name) ? "zone " + (i + 1).ToString(CultureInfo.InvariantCulture) : v.Name;
+                string where = string.Format(CultureInfo.InvariantCulture, "({0:0.##}, {1:0.##}) {2:0.##} x {3:0.##}", v.X, v.Z, v.SizeX, v.SizeZ);
+                var cells = new bool[w.Count];
+                int count = 0;
+                for (int k = 0; k < w.Count; k++)
+                {
+                    if (w.Walkable[k] && v.Contains(w.Center[k]))
+                    {
+                        cells[k] = true;
+                        count++;
+                    }
+                }
+                if (count == 0)
+                {
+                    vias[name] = false;
+                    failures.Add($"passage {name} : aucune case praticable dans la zone {where}");
+                    continue;
+                }
+                string bestText = best >= 0 ? (best * SampleSeconds).ToString("0.0", CultureInfo.InvariantCulture) + " s" : "aucune";
+                if (!v.Avoid)
+                {
+                    NodeList nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy, MustVisit = cells, Human = run.Human }, out int goal);
+                    if (goal < 0)
+                    {
+                        vias[name] = false;
+                        failures.Add($"aucun horaire par {name} : aucun horaire du depart a la sortie ne passe par la zone {where} ({count} case(s))");
+                        continue;
+                    }
+                    List<Node> via = PathTo(nodes, goal);
+                    viaPaths?.Add(via);
+                    int exit = via[via.Count - 1].T;
+                    bool within = best < 0 || exit <= v.MaxRatio * best + 1e-3f;
+                    vias[name] = within;
+                    notes.Add(string.Format(CultureInfo.InvariantCulture, "passage {0} : par la zone {1}, {2} ; {3} la meilleure sortie ({4}), au plus x{5:0.0#}",
+                        name, where, Summary(w, via), best > 0 ? "x" + (exit / (float)best).ToString("0.00", CultureInfo.InvariantCulture) : "sans", bestText, v.MaxRatio));
+                    if (!within)
+                    {
+                        notes.Add(string.Format(CultureInfo.InvariantCulture, "AVERTISSEMENT passage {0} : sortie a {1:0.0} s, plus de {2:0.0#} fois la meilleure ({3})",
+                            name, exit * SampleSeconds, v.MaxRatio, bestText));
+                    }
+                }
+                else
+                {
+                    NodeList nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy, Barred = cells, Human = run.Human }, out int goal);
+                    if (goal < 0)
+                    {
+                        vias[name] = true;
+                        notes.Add($"evitement {name} : la zone {where} interdite, aucun horaire : la zone est requise");
+                        continue;
+                    }
+                    List<Node> around = PathTo(nodes, goal);
+                    viaPaths?.Add(around);
+                    bool slower = best >= 0 && around[around.Count - 1].T > best;
+                    vias[name] = slower;
+                    if (slower)
+                    {
+                        notes.Add($"evitement {name} : la zone {where} interdite, {Summary(w, around)}, plus tard que la meilleure ({bestText})");
+                    }
+                    else
+                    {
+                        failures.Add($"evitement {name} : un horaire evite la zone {where} sans perdre de temps ({Summary(w, around)} ; meilleure {bestText})");
+                    }
+                }
+            }
+            return failures;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): on a level with lit zones, the lit cells and the samples the schedule spends on them (the cell a step
+        /// ends at), the lamp switched off among them; a zone on a level whose player is not the lamp is decoration.
+        /// </summary>
+        private static void LitNote(World w, List<Node> path, List<string> notes)
+        {
+            if (w.Def.LitZones == null || w.Def.LitZones.Count == 0)
+            {
+                return;
+            }
+            if (w.LitCells == null)
+            {
+                notes.Add(w.Body.Lamp ? "zones eclairees : aucune case praticable dedans" : "zones eclairees : decor seulement (le joueur n'est pas la lampe)");
+                return;
+            }
+            int samples = 0;
+            int dark = 0;
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node b = path[i];
+                if (!w.Lit[b.Cell])
+                {
+                    continue;
+                }
+                int length = b.T - path[i - 1].T;
+                samples += length;
+                dark += b.Off && b.Act != Act.Toggle ? length : 0;
+            }
+            notes.Add(string.Format(CultureInfo.InvariantCulture, "zones eclairees : {0} case(s) ; echantillons en zone eclairee : {1} (dont {2} lampe eteinte)",
+                w.LitCells.Length, samples, dark));
+        }
+
         /// <summary>
         /// The first sample (or -1) at which a schedule touches a robot on its fixed timeline: RobotPath.Overlaps of the robot's
         /// disc and the footprint (the body's size), the furniture at its planned place (the spawn until the schedule starts,
@@ -3005,12 +4017,13 @@ namespace OutOfSight.Editor
             if (w.RockSamples > 0)
             {
                 result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
-                    "bascule : chaque arret coute {0} echantillons vus en mouvement (le pas de repos et la bascule) ; {1} echantillons par case au depart et dans un virage, {2} en continuant tout droit, {3} quand le meuble prendrait plus d'un echantillon de retard sur le plan (cout reel : depart {4:0.00}, tout droit {5:0.00} a {6:0.00}, virage {7:0.00} a {8:0.00} echantillons) ; demi-tour en mouvement interdit ; la designerRoute enchaine les points d'une meme course",
+                    "bascule : chaque arret coute {0} echantillons vus en mouvement (le pas de repos et la bascule) ; {1} echantillons par case au depart et dans un virage, {2} en continuant tout droit, {3} quand le meuble prendrait plus d'un echantillon de retard sur le plan (cout reel : depart {4:0.00}, tout droit {5:0.00} a {6:0.00}, virage {7:0.00} a {8:0.00} echantillons ; redemarrage apres un arret {9:0.00}, depuis le repos du rejeu a 0.1 m avant le centre) ; demi-tour en mouvement interdit ; la designerRoute enchaine les points d'une meme course",
                     w.RockSamples, w.Body.MoveSamples, w.Body.ContinueSamples, w.Body.MoveSamples + 1, w.Rock.Start / (float)DeficitUnits,
                     Mathf.Min(w.Rock.Cost[0, 0], Mathf.Min(w.Rock.Cost[1, 0], w.Rock.Cost[2, 0])) / (float)DeficitUnits,
                     Mathf.Max(w.Rock.Cost[0, 0], Mathf.Max(w.Rock.Cost[1, 0], w.Rock.Cost[2, 0])) / (float)DeficitUnits,
                     Mathf.Min(Mathf.Min(w.Rock.Cost[0, 1], w.Rock.Cost[0, 2]), Mathf.Min(Mathf.Min(w.Rock.Cost[1, 1], w.Rock.Cost[1, 2]), Mathf.Min(w.Rock.Cost[2, 1], w.Rock.Cost[2, 2]))) / (float)DeficitUnits,
-                    Mathf.Max(Mathf.Max(w.Rock.Cost[0, 1], w.Rock.Cost[0, 2]), Mathf.Max(Mathf.Max(w.Rock.Cost[1, 1], w.Rock.Cost[1, 2]), Mathf.Max(w.Rock.Cost[2, 1], w.Rock.Cost[2, 2]))) / (float)DeficitUnits));
+                    Mathf.Max(Mathf.Max(w.Rock.Cost[0, 1], w.Rock.Cost[0, 2]), Mathf.Max(Mathf.Max(w.Rock.Cost[1, 1], w.Rock.Cost[1, 2]), Mathf.Max(w.Rock.Cost[2, 1], w.Rock.Cost[2, 2]))) / (float)DeficitUnits,
+                    w.Rock.Restart / (float)DeficitUnits));
             }
             if (w.HasLoad)
             {
@@ -3094,6 +4107,10 @@ namespace OutOfSight.Editor
         /// costs are the largest over every turn sequence of <see cref="ScenarioMoves"/> moves from rest: the first cell from
         /// rest, then by the turn that led to the cell before (straight, one side, the other) and the turn of this one. The
         /// search keeps the plan's lag behind the body (<see cref="RockStep"/>) within one sample with them.
+        /// AUDFIX (levels v2): the first cell after a stop has its own cost, <see cref="Restart"/>. The replay releases the
+        /// stop's waypoint within <see cref="ReleaseTolerance"/> and a rocking body stops on the release step (it does not
+        /// glide), so it rests up to that far short of the cell center along the move that led there; a hop that leaves the
+        /// stop in that same direction runs that much farther (0.1 m at 1.2 m/s is 5 of the 6 units of a sample).
         /// </summary>
         private sealed class RockPlan
         {
@@ -3107,8 +4124,14 @@ namespace OutOfSight.Editor
             /// at the rocking chair's 1.2 m/s, and must not round up to 26 on a few millionths of a second).
             /// </summary>
             private const float CostTolerance = 0.02f;
-            /// <summary>The cost of the first cell from rest, in units.</summary>
+            /// <summary>The cost of the first cell from rest at the cell center (the spawn, before any move), in units.</summary>
             public int Start;
+            /// <summary>
+            /// AUDFIX: the cost of the first cell from rest after a stop, in units: the departure from the worst rest pose the
+            /// replay leaves, <see cref="ReleaseTolerance"/> behind the center, straight on (a turned departure from that pose
+            /// is a little shorter, a reversal much shorter).
+            /// </summary>
+            public int Restart;
             /// <summary>[turn that led to the previous cell, turn of this cell]: the cost of a cell in motion, in units.</summary>
             public readonly int[,] Cost = new int[3, 3];
 
@@ -3180,8 +4203,19 @@ namespace OutOfSight.Editor
                         Vector2 d = LoadModel.DirVector(dirs[i]);
                         targets.Add((cells[i + 1], new Vector3(d.x, 0f, d.y), waypoint[i]));
                     }
-                    List<Vector3> positions = KinematicReplay(body, Vector3.zero, 90f, route, Mathf.RoundToInt((at + n * 1.5f) / Tuning.FixedStep));
+                    int steps = Mathf.RoundToInt((at + n * 1.5f) / Tuning.FixedStep);
+                    List<Vector3> positions = KinematicReplay(body, Vector3.zero, 90f, route, steps);
                     float[] passed = Passings(positions, targets);
+                    // AUDFIX: the same sequence restarted after a stop, from ReleaseTolerance behind the first center along the
+                    // first move: only its first cell is kept (Restart); the later cells cross at full speed as they do above.
+                    Vector2 first = LoadModel.DirVector(dirs[0]);
+                    Vector3 rest = -new Vector3(first.x, 0f, first.y) * ReleaseTolerance; // MUTATION:AUDIT_ROCK_RESTART
+                    float restarted = Passings(KinematicReplay(body, rest, 90f, route, steps), targets)[0];
+                    if (float.IsNaN(restarted))
+                    {
+                        throw new InvalidOperationException($"rock plan: the restart of turn sequence {c} never reached its first cell");
+                    }
+                    plan.Restart = Mathf.Max(plan.Restart, Mathf.CeilToInt((restarted - at) / SampleSeconds * DeficitUnits - CostTolerance));
                     float previous = at;
                     for (int i = 0; i < n; i++)
                     {
@@ -3220,7 +4254,8 @@ namespace OutOfSight.Editor
 
         /// <summary>
         /// M5 5B.1 (CONTRACT_M5 19, M6): a rocking body's next leg toward cell direction <paramref name="dir"/>, from a node whose
-        /// rock state is <paramref name="arrived"/> (0 at rest; else 1 + the direction it arrived in + 4 * (the turn that led
+        /// rock state is <paramref name="arrived"/> (0 at rest before any move, -1 at rest after a stop (AUDFIX: the
+        /// <see cref="RockPlan.Restart"/> cost); else 1 + the direction it arrived in + 4 * (the turn that led
         /// there + 3 * (its lag + <see cref="DeficitUnits"/>))). The lag is how far the body runs behind the plan, in units: a
         /// cell costs the plan its leg (the body's from rest and in a turn, the faster one going on straight) and the body its
         /// <see cref="RockPlan"/> cost; a cell is one sample longer whenever the lag would reach one sample, one shorter whenever
@@ -3237,7 +4272,7 @@ namespace OutOfSight.Editor
             int samples;
             if (arrived <= 0)
             {
-                cost = w.Rock.Start;
+                cost = arrived < 0 ? w.Rock.Restart : w.Rock.Start;
                 samples = travel;
             }
             else
@@ -3474,8 +4509,14 @@ namespace OutOfSight.Editor
         /// sat on, stopped, gliding, rocking, switching or opening), so a hop out and back inside the stay does not restart
         /// anything, and driving through the disc costs nothing. Returns the loitering of the worst stay, in samples, with its
         /// cell, its first sample and its length in samples.
+        /// Levels v2 RULEFIX (PO decision 2026-11-20): two kinds of still samples are not loitering. The spawn wait (every
+        /// sample up to <see cref="SpawnWaitEnd"/>) has its own limit (<see cref="SpawnWaitFailure"/>), and a sample pinned
+        /// under a sitter is the sitter's choice, not the player's (LEVELS_V2.md 1.3 already leaves it out of the waiting
+        /// share). <paramref name="spawnApart"/> and <paramref name="pinnedApart"/> false give the rule as it was before the
+        /// decision (the self-test fixtures compare both).
         /// </summary>
-        private static int LongestLoiter(World w, List<Node> path, out int center, out int from, out int span)
+        private static int LongestLoiter(World w, List<Node> path, out int center, out int from, out int span,
+            bool spawnApart = true, bool pinnedApart = true)
         {
             center = -1;
             from = -1;
@@ -3487,6 +4528,7 @@ namespace OutOfSight.Editor
             var at = new List<Vector3>();
             var waiting = new List<bool>();
             int first = path[0].T;
+            int spawnEnd = spawnApart ? SpawnWaitEnd(path) : first;
             at.Add(YawMath.Planar(w.Center[path[0].Cell]));
             waiting.Add(false);
             for (int i = 1; i < path.Count; i++)
@@ -3496,8 +4538,10 @@ namespace OutOfSight.Editor
                 int length = b.T - a.T;
                 for (int q = 1; q <= length; q++)
                 {
+                    int sample = a.T + q;
+                    bool sat = pinnedApart && sample < w.Pinned.Length && w.Pinned[sample]; // MUTATION:LOITER_PINNED
                     at.Add(YawMath.Planar(b.Move ? Vector3.Lerp(w.Center[a.Cell], w.Center[b.Cell], q / (float)length) : w.Center[b.Cell]));
-                    waiting.Add(!b.Move);
+                    waiting.Add(!b.Move && sample > spawnEnd && !sat);
                 }
             }
             int best = -1;
@@ -3534,17 +4578,59 @@ namespace OutOfSight.Editor
         /// one stay (<see cref="LongestLoiter"/>) is a defect, whatever hops the search's wait anchor saw. Returns the failure or
         /// null; <paramref name="note"/> prints the worst stay, where and when.
         /// </summary>
-        private static string LoiterFailure(World w, List<Node> path, out string note)
+        private static string LoiterFailure(World w, List<Node> path, out string note, bool spawnApart = true, bool pinnedApart = true)
         {
-            int loiter = LongestLoiter(w, path, out int cell, out int from, out int span);
+            int loiter = LongestLoiter(w, path, out int cell, out int from, out int span, spawnApart, pinnedApart);
             Vector3 c = cell >= 0 ? w.Center[cell] : Vector3.zero;
             string where = string.Format(CultureInfo.InvariantCulture,
                 "{0:0.0} s sans bouger sur un sejour de {1:0.0} s a moins de {2:0.0} m de ({3:0.##}, {4:0.##}), de {5:0.0} s a {6:0.0} s",
                 loiter * SampleSeconds, span * SampleSeconds, Tuning.AuditLoiterRadius, c.x, c.z, from * SampleSeconds, (from + span) * SampleSeconds);
-            note = "flanerie la plus longue : " + where + string.Format(CultureInfo.InvariantCulture, " (max {0:0} s)", Tuning.AuditMaxWait);
+            note = "flanerie la plus longue : " + where + string.Format(CultureInfo.InvariantCulture, " (max {0:0} s", Tuning.AuditMaxWait)
+                + (spawnApart && pinnedApart ? ", attente au depart et temps assis dessus non comptes)" : ")");
             bool loiters = loiter * SampleSeconds > Tuning.AuditMaxWait + 1e-3f; // MUTATION:AUDIT_LOITER
             return loiters ? "l'horaire trouve flane " + where + string.Format(CultureInfo.InvariantCulture,
                 ", plus de {0:0} s : attendre sur place, meme en sautillant d'une case a l'autre, n'est pas un horaire", Tuning.AuditMaxWait) : null;
+        }
+
+        /// <summary>
+        /// Levels v2 RULEFIX (PO decision 2026-11-20): the last sample of the spawn wait, the wait before the player's first
+        /// move (the sample the first move starts from). Every sample in (path[0].T, SpawnWaitEnd] is the spawn wait, in-place
+        /// actions (toggles, openings, a hide) and pinned samples included; a schedule without a move waits at the spawn to
+        /// its end.
+        /// </summary>
+        private static int SpawnWaitEnd(List<Node> path)
+        {
+            if (path.Count == 0)
+            {
+                return 0;
+            }
+            int first = path.FindIndex(1, n => n.Move);
+            int end = first > 0 ? path[first - 1].T : path[path.Count - 1].T; // MUTATION:PACE_SPAWN_WAIT
+            return end;
+        }
+
+        /// <summary>
+        /// Levels v2 RULEFIX (PO decision 2026-11-20): the spawn wait's own limit. The samples before the first move that are
+        /// not pinned under a sitter (<see cref="SpawnWaitEnd"/>) may not exceed <see cref="MaxSpawnWait"/>; a defect at every
+        /// difficulty, as the loitering rule it is taken out of. The search's wait anchor (Tuning.AuditMaxWait within 1 m,
+        /// pinned samples included) already keeps a found schedule within it: this is the measured guard. Returns the failure
+        /// or null; <paramref name="note"/> prints the spawn wait.
+        /// </summary>
+        private static string SpawnWaitFailure(World w, List<Node> path, out string note)
+        {
+            int start = path.Count > 0 ? path[0].T : 0;
+            int end = SpawnWaitEnd(path);
+            int pinned = 0;
+            for (int s = start + 1; s <= end; s++)
+            {
+                pinned += s < w.Pinned.Length && w.Pinned[s] ? 1 : 0;
+            }
+            float wait = (end - start - pinned) * SampleSeconds;
+            note = string.Format(CultureInfo.InvariantCulture, "attente au depart : {0:0.0} s avant le premier deplacement{1} (max {2:0} s)",
+                wait, pinned > 0 ? string.Format(CultureInfo.InvariantCulture, ", plus {0:0.0} s assis dessus", pinned * SampleSeconds) : "", MaxSpawnWait);
+            return wait > MaxSpawnWait + 1e-3f
+                ? string.Format(CultureInfo.InvariantCulture, "l'horaire trouve attend {0:0.0} s au depart avant de bouger, plus de {1:0} s", wait, MaxSpawnWait)
+                : null;
         }
 
         /// <summary>
@@ -3696,9 +4782,10 @@ namespace OutOfSight.Editor
                             }
                             Vector3 eye = w.Eye[s * h + i];
                             Vector3 forward = w.Forward[s * h + i];
-                            float range = watcher.Range * (w.Body.Lamp && item.Dark ? Tuning.LampOffLight : 1f);
                             for (int p = 0; p < item.Bases.Count && !sighted; p++)
                             {
+                                // Levels v2 (C6): a switched-off lamp whose center stands in a lit zone is seen at the full range.
+                                float range = watcher.Range * (w.Body.Lamp && item.Dark && !LitPoint(w, item.Bases[p]) ? Tuning.LampOffLight : 1f);
                                 if ((item.Bases[p] - eye).magnitude > range + 2f)
                                 {
                                     continue;
@@ -3910,6 +4997,11 @@ namespace OutOfSight.Editor
             /// own fixtures are test levels of its own, test_m5_audit_* (CONTRACT_M5 11).
             /// </summary>
             public string Id;
+            /// <summary>
+            /// Levels v2 (C6): with <see cref="Check"/>, the relaxed check runs on the world of this other level file (the same
+            /// rule where it holds: the id binds, the locked leaf is opened by a walk), the strict one on the fixture's own.
+            /// </summary>
+            public string Companion;
         }
 
         /// <summary>The fixture's id: <see cref="FixtureRule.Id"/>, or "test_" + its rule.</summary>
@@ -4090,7 +5182,156 @@ namespace OutOfSight.Editor
                 Check = GlideCheck,
                 Premise = l => l.PlayerBody().Glides ? null : "le corps du joueur ne glisse pas",
             },
+            // ----- Levels v2 (LEVELS_V2.md 6, C5): the pace gate, dead rooms, the toggle collapse -----
+            new FixtureRule
+            {
+                // RULEFIX: the watcher faces the way out 11 s, longer than the 8 s wait anchor: the chair waits at the spawn
+                // behind a long bookshelf, moves 1.5 m along it and waits again, a mid-route pause above the 2 s of its "pace".
+                // test_v2_audit_pace_pass is the C5 house (a 4.2 s spawn wait) with a pace it meets (audited as a level).
+                Rule = "pace", Id = "test_v2_audit_pace_fail",
+                Strict = "la cible de rythme du niveau", Relaxed = "sans cible de rythme",
+                Check = PaceCheck,
+                Premise = l => l.Pace != null ? null : "aucun champ pace",
+            },
+            new FixtureRule
+            {
+                // RULEFIX (PO decision 2026-11-20): the C5 pace house, whose only pause is a 4.2 s spawn wait, with a 2 s max
+                // pause. Before the decision the spawn wait broke the max pause; now it has its own limit (8 s) and passes.
+                Rule = "pace_spawn", Id = "test_v2_audit_pace_spawn",
+                Strict = "l'attente au depart comptee comme une pause et dans la flanerie (regle d'avant la decision)",
+                Relaxed = "l'attente au depart a part, limitee a 8 s",
+                Check = PaceSpawnCheck,
+                Premise = l => l.Pace != null && l.Pace.MaxPause.HasValue ? null : "aucun maxPause dans le champ pace",
+            },
+            new FixtureRule
+            {
+                // RULEFIX (PO decision 2026-11-20): test_sit's house; a schedule that hops off the seat and back and is sat on
+                // there: 7 s of its own waiting plus the pin within 1.5 m of the seat.
+                Rule = "loiter_pinned", Id = "test_v2_audit_loiter_pinned",
+                Strict = "le temps assis dessus compte dans la flanerie (regle d'avant la decision)",
+                Relaxed = "le temps assis dessus hors de la flanerie",
+                Check = LoiterPinnedCheck,
+                Premise = l => l.Inhabitants.Exists(h => h.Stations.Exists(s => s.SitsOnPlayer)) ? null : "aucune station ne s'assoit sur le joueur",
+            },
+            new FixtureRule
+            {
+                // A storeroom nobody enters: no route cell, no station, no robot, no inhabitant, no wardrobe.
+                Rule = "deadroom", Id = "test_v2_audit_deadroom",
+                Strict = "-strictRooms : une piece morte est un defaut", Relaxed = "une piece morte est un avertissement",
+                Check = DeadRoomCheck,
+                Premise = l => l.AllRooms().Count >= 2 ? null : "une seule piece",
+            },
+            new FixtureRule
+            {
+                // The lamp waits behind a bookshelf: the search toggles it back to back meanwhile; the post-process folds them.
+                Rule = "flicker", Id = "test_v2_audit_flicker",
+                Strict = "l'horaire tel que la recherche le trouve", Relaxed = "l'horaire apres le repli des bascules",
+                Check = FlickerCheck,
+                Premise = l => l.PlayerBody().HasLight ? null : "le corps du joueur n'a pas de lumiere",
+            },
+            // ----- Levels v2 (LEVELS_V2.md 6, C6): requires, via checks, locked leaves. Each new requires id fails (does not bind)
+            // on the fixture and binds on its companion, the same house where the mechanic is needed. -----
+            new FixtureRule
+            {
+                // A soft room, the listener 3.75 m from the path / test_noise's house on a soft floor (the hops 1.35 m from her).
+                Rule = "req_rug", Id = "test_v2_req_rug_far", Companion = "test_v2_req_rug",
+                Strict = "requires rug, l'auditrice loin du chemin", Relaxed = "requires rug, l'auditrice a 1.35 m du chemin (test_v2_req_rug)",
+                Check = RequiresCheck(LevelDef.LessonRug),
+            },
+            new FixtureRule
+            {
+                // test_robot's house on a soft floor (nothing to mask) / test_robot as it is (the hum masks the hops).
+                Rule = "req_hum", Id = "test_v2_req_robot_contact", Companion = "test_v2_req_robot_hum",
+                Strict = "requires hum, sol souple", Relaxed = "requires hum, sol dur pres de l'habitant (test_v2_req_robot_hum)",
+                Check = RequiresCheck(LevelDef.LessonHum),
+                Premise = l => l.Robots != null && l.Robots.Count > 0 ? null : "aucun robot",
+            },
+            new FixtureRule
+            {
+                // The robot sweeps beside the line / across the line when the straight schedule passes.
+                Rule = "req_contact", Id = "test_v2_req_robot_far", Companion = "test_v2_req_robot_contact",
+                Strict = "requires contact, le robot hors du chemin", Relaxed = "requires contact, le robot en travers du chemin (test_v2_req_robot_contact)",
+                Check = RequiresCheck(LevelDef.LessonContact),
+                Premise = l => l.Robots != null && l.Robots.Count > 0 ? null : "aucun robot",
+            },
+            new FixtureRule
+            {
+                // Papa opens the only door on his walk; the fixture adds an open doorway beside it.
+                Rule = "req_household", Id = "test_v2_req_household_free", Companion = "test_v2_req_household",
+                Strict = "requires household, un passage ouvert a cote", Relaxed = "requires household, la seule porte ouverte par Papa (test_v2_req_household)",
+                Check = RequiresCheck(LevelDef.LessonHousehold),
+                Premise = l => l.Doors.Exists(d => d.Leaf == OpeningDef.LeafClosed && d.OpenedByInhabitants) ? null : "aucune porte ouverte par les habitants",
+            },
+            new FixtureRule
+            {
+                // A 12 m corridor (8.5 m of it in sight range): nobody looks / the watcher looks 6 s, away 3.5 s (one back turn
+                // is too short for the whole corridor), the decoy explains the stop in the middle.
+                Rule = "req_decoy", Id = "test_v2_req_decoy_free", Companion = "test_v2_req_decoy",
+                Strict = "requires decoy, personne ne regarde le couloir", Relaxed = "requires decoy, le couloir trop long pour un seul dos tourne (test_v2_req_decoy)",
+                Check = RequiresCheck(LevelDef.LessonDecoy),
+            },
+            new FixtureRule
+            {
+                // A watcher sees the exit through a slit, never the approach: he looks away for good / for the first 4 s.
+                Rule = "req_exitwatch", Id = "test_v2_req_exit_free", Companion = "test_v2_req_exitwatch",
+                Strict = "requires exitwatch, la sortie jamais regardee", Relaxed = "requires exitwatch, la sortie regardee 4 s par la fente (test_v2_req_exitwatch)",
+                Check = RequiresCheck(LevelDef.LessonExitWatch),
+            },
+            new FixtureRule
+            {
+                // The lamp crosses a long room dark beyond the watcher's dark range: the lit zone lies aside / across the way.
+                Rule = "req_lit", Id = "test_v2_req_lit_free", Companion = "test_v2_req_lit",
+                Strict = "requires lit, la zone eclairee a l'ecart", Relaxed = "requires lit, la zone eclairee en travers (test_v2_req_lit)",
+                Check = RequiresCheck(LevelDef.LessonLit),
+                Premise = l => l.PlayerBody().HasLight ? null : "le corps du joueur n'a pas de lumiere",
+            },
+            new FixtureRule
+            {
+                // Zone 1 is a detour (x4 allowed), zone 2 a corner the watcher stares at.
+                Rule = "req_via", Id = "test_v2_req_via",
+                Strict = "viaChecks, la zone fixee par l'habitant", Relaxed = "viaChecks, la zone du detour",
+                Check = ViaCheck,
+                Premise = l => l.ViaChecks != null && l.ViaChecks.Count == 2 ? null : "il faut deux viaChecks (le detour, puis le coin surveille)",
+            },
+            new FixtureRule
+            {
+                // The playerLocked door no walk crosses / test_v2_req_household, where Papa's walk opens it.
+                Rule = "req_locked", Id = "test_v2_req_locked_never", Companion = "test_v2_req_household",
+                Strict = "porte playerLocked que personne n'ouvre", Relaxed = "porte playerLocked ouverte par la marche de Papa (test_v2_req_household)",
+                Check = (w, strict) => LockedLeafFailures(w, new List<string>()),
+                Premise = l => l.Doors.Exists(d => d.PlayerLocked) ? null : "aucune porte playerLocked",
+            },
         };
+
+        /// <summary>
+        /// Levels v2 (C6): the fixture check of one "requires" id: <see cref="RequiresFailures"/> for that id alone, on the
+        /// schedule the strict search finds (exitwatch compares with it). The fixture's level must make it fail (the id does not
+        /// bind), its companion must not.
+        /// </summary>
+        private static Func<World, bool, List<string>> RequiresCheck(string id)
+        {
+            // Only exitwatch and sit compare with the schedule: the others skip the strict search (on test_v2_req_decoy_free it
+            // would walk the whole horizon looking for a decoy nobody can see).
+            bool needsPath = id == LevelDef.LessonExitWatch || id == LevelDef.LessonSit;
+            return (w, strict) => RequiresFailures(w, w.Level, new List<string> { id }, (needsPath ? FoundPath(w) : null) ?? new List<Node>(), null, null,
+                new List<string>());
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): the test_v2_req_via fixture: strict, its second via check (a corner the watcher stares at: no
+        /// schedule goes through it); relaxed, its first (a detour within its ratio).
+        /// </summary>
+        private static List<string> ViaCheck(World w, bool strict)
+        {
+            var notes = new List<string>();
+            var vias = new Dictionary<string, bool>();
+            List<string> failures = ViaFailures(w, FoundPath(w) ?? new List<Node>(), strict ? 1 : 0, null, vias, notes);
+            if (failures.Count == 0 && vias.ContainsValue(false))
+            {
+                failures.Add("passage hors ratio : " + string.Join(" ; ", notes));
+            }
+            return failures;
+        }
 
         /// <summary>
         /// The test_m6_audit_inhabdoor fixture (CONTRACT_M6 2.7, 2.8): strict, the world where the leaf opens when the frozen walk
@@ -4334,7 +5575,32 @@ namespace OutOfSight.Editor
                     else if (!Budget.RaysExhausted && rule.Check != null)
                     {
                         strictFailures = rule.Check(w, true);
-                        looseFailures = rule.Check(w, false);
+                        if (rule.Companion == null)
+                        {
+                            looseFailures = rule.Check(w, false);
+                        }
+                        else
+                        {
+                            // Levels v2 (C6): the relaxed check runs on the companion level, built in place of the fixture's.
+                            string companion = Path.Combine(LevelsFolder, rule.Companion + ".json");
+                            LevelDef other = File.Exists(companion) ? LevelJson.Parse(File.ReadAllText(companion)) : null;
+                            List<string> otherIssues = other != null ? LevelValidator.Validate(other) : null;
+                            if (other == null || otherIssues.Count > 0)
+                            {
+                                looseFailures = new List<string> { other == null ? $"niveau compagnon {companion} absent" : $"niveau compagnon {rule.Companion} invalide : {otherIssues[0]}" };
+                            }
+                            else
+                            {
+                                LevelBuilder.Teardown(level);
+                                level = null;
+                                Budget.Sight = null;
+                                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                                level = LevelBuilder.Build(other);
+                                Physics.SyncTransforms();
+                                World companionWorld = BuildWorld(other, level, true);
+                                looseFailures = Budget.RaysExhausted ? new List<string> { "budget de rayons epuise" } : rule.Check(companionWorld, false);
+                            }
+                        }
                     }
                     else if (!Budget.RaysExhausted)
                     {
@@ -4384,7 +5650,10 @@ namespace OutOfSight.Editor
                 }
                 finally
                 {
-                    LevelBuilder.Teardown(level);
+                    if (level != null)
+                    {
+                        LevelBuilder.Teardown(level);
+                    }
                     var cost = new Result { LevelId = id, RuntimeSeconds = (float)clock.Elapsed.TotalSeconds, Nodes = Budget.Nodes, Rays = Budget.Rays };
                     sb.AppendLine($"  [temps] {id} : {Budget.RuntimeLine(cost)}");
                     Budget.Sight = null;
@@ -4789,6 +6058,9 @@ namespace OutOfSight.Editor
             ComputeSight(w, level, false);
             ComputeLeafSight(w, level);
             MergeInhabitantDoors(w, false);
+            // Levels v2 (C6): in a lit zone the dark lamp is seen as a lit one, before the tables are dilated.
+            SetUpLit(w);
+            ApplyLit(w, false);
             SetUpDoorMemory(w, level);
             SetUpSpot(w);
             SetMargin(w, MarginSamples);
@@ -4856,6 +6128,105 @@ namespace OutOfSight.Editor
             }
         }
 
+        // ----- Levels v2 (C6, LEVELS_V2.md D26): lit zones -----
+
+        /// <summary>
+        /// Levels v2 (C6): the lit cells (<see cref="World.Lit"/>): a walkable cell whose center lies in one of the level's lit
+        /// zones, on a level whose player body is the floor lamp (elsewhere a zone is decoration: FurnitureController's
+        /// SightRangeFactor only changes a lamp's range).
+        /// </summary>
+        private static void SetUpLit(World w)
+        {
+            w.Lit = null;
+            w.LitCells = null;
+            w.UnlitDark = null;
+            if (!w.Body.Lamp || w.Def.LitZones == null || w.Def.LitZones.Count == 0)
+            {
+                return;
+            }
+            var lit = new bool[w.Count];
+            var cells = new List<int>();
+            for (int k = 0; k < w.Count; k++)
+            {
+                if (w.Walkable[k] && LitPoint(w, w.Center[k]))
+                {
+                    lit[k] = true;
+                    cells.Add(k);
+                }
+            }
+            if (cells.Count > 0)
+            {
+                w.Lit = lit;
+                w.LitCells = cells.ToArray();
+            }
+        }
+
+        /// <summary>Levels v2 (C6): the planar point lies in a lit zone and the player body is the floor lamp.</summary>
+        private static bool LitPoint(World w, Vector3 p)
+        {
+            if (!w.Body.Lamp || w.Def.LitZones == null)
+            {
+                return false;
+            }
+            foreach (LitZoneDef z in w.Def.LitZones)
+            {
+                if (z != null && z.Contains(p))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Levels v2 (C6): in a lit zone a switched-off lamp gets no cover (SightRangeFactor is 1 there): at every lit cell, every
+        /// mask and every sample, the dark tables take the lit rows (moving, and with <paramref name="moveOnly"/> false the
+        /// still tables of every class), before the margin dilates them. The rows they had are kept in
+        /// <see cref="World.UnlitDark"/>, for the "lit" check's schedule searched as if the zones were not there.
+        /// </summary>
+        private static void ApplyLit(World w, bool moveOnly)
+        {
+            if (w.LitCells == null || !w.Body.Lamp) // MUTATION:AUDIT_LIT_CELLS
+            {
+                return;
+            }
+            int n = w.Count;
+            int samples = w.Samples;
+            int[] cells = w.LitCells;
+            // A variant (moveOnly) shares the world's still tables, already lit: their saved rows are kept as they are.
+            var saved = moveOnly && w.UnlitDark != null ? new Dictionary<bool[], bool[]>(w.UnlitDark) : new Dictionary<bool[], bool[]>();
+            void Copy(bool[][] lit, bool[][] dark)
+            {
+                for (int m = 0; m < w.Masks; m++)
+                {
+                    if (dark[m] == lit[m] || saved.ContainsKey(dark[m]))
+                    {
+                        continue;
+                    }
+                    var column = new bool[cells.Length * samples];
+                    for (int i = 0; i < cells.Length; i++)
+                    {
+                        for (int s = 0; s < samples; s++)
+                        {
+                            int index = s * n + cells[i];
+                            column[i * samples + s] = dark[m][index];
+                            dark[m][index] = lit[m][index];
+                        }
+                    }
+                    saved[dark[m]] = column;
+                }
+            }
+            Copy(w.MoveSeen, w.MoveDark);
+            if (!moveOnly)
+            {
+                foreach (ToleranceClass c in w.Classes)
+                {
+                    Copy(c.Seen, c.SeenDark);
+                }
+            }
+            w.UnlitDark = saved;
+        }
+
         // ----- M6 (CONTRACT_M6 2.5 to 2.8): the wardrobe, the inhabitants' doors, door memory -----
 
         /// <summary>M6 (CONTRACT_M6 2.5): a body of this size, without a load, fits the wardrobe (WardrobeRule.Fits).</summary>
@@ -4900,6 +6271,10 @@ namespace OutOfSight.Editor
                     w.HideCenter[k] = YawMath.Planar(prop.Position);
                     foreach (Leaf leaf in w.Closed)
                     {
+                        if (leaf.Door.PlayerLocked)
+                        {
+                            continue; // Levels v2 (C6): E skips a playerLocked leaf, the wardrobe takes it (GameState.ClaimActionKey)
+                        }
                         foreach (Vector3 offset in ReleaseOffsets)
                         {
                             for (int yaw = 0; yaw < 360; yaw += 45)
@@ -5383,7 +6758,8 @@ namespace OutOfSight.Editor
             Vector3 size = body.Body.Size;
             foreach (Leaf leaf in w.Closed)
             {
-                for (int k = 0; k < w.Count; k++)
+                // Levels v2 (C6): a playerLocked leaf has no reach cell (GameState.ClaimActionKey skips it): only a walk opens it.
+                for (int k = 0; k < w.Count && !leaf.Door.PlayerLocked; k++)
                 {
                     if (w.Walkable[k] && w.FreeIn(0, k) && w.FreeIn(leaf.Bit, k) && ReachableFrom(leaf, w.Center[k], size, body.Radius))
                     {
@@ -5807,6 +7183,7 @@ namespace OutOfSight.Editor
             ComputeSight(v, level, true);
             ComputeLeafSight(v, level);
             MergeInhabitantDoors(v, true);
+            ApplyLit(v, true); // Levels v2 (C6): the variant's own moving tables, the still ones are the world's
             SetMargin(v, w.Margin);
             return v;
         }
@@ -6218,7 +7595,7 @@ namespace OutOfSight.Editor
         /// </summary>
         private static bool Heard(World w, Vector3 p, int s, NoiseKind kind, bool wide, bool hum)
         {
-            if (w.Def.IsSilentFloor(p))
+            if (SilentFloor(w, p))
             {
                 return false;
             }
@@ -6529,6 +7906,17 @@ namespace OutOfSight.Editor
             /// the cell it stops at only, its fixture).
             /// </summary>
             public bool GlideFrom = true;
+            /// <summary>
+            /// Levels v2 (C6, viaChecks): [cell] the schedule must stand on one of these cells at least once before the exit (one
+            /// Visit bit in the node key), or null.
+            /// </summary>
+            public bool[] MustVisit;
+            /// <summary>
+            /// HUMANAUDIT: the human rules (<see cref="HumanProfile"/>): reaction before a move from rest and before crossing a
+            /// doorway an inhabitant opened, still runs of at least <see cref="HumanPauseSamples"/>, runs of moves of at least two
+            /// cells before a stop or a freeze, no toggle right after a toggle. False (the default) is the strict search.
+            /// </summary>
+            public bool Human;
         }
 
         /// <summary>
@@ -7023,13 +8411,25 @@ namespace OutOfSight.Editor
             bool glideKey = w.Body.Glides && options.GlideFrom;
             long Arrival(Node n) => glideKey ? (long)(w.Count + 1) * Key0(n) + (n.Motion && n.Parent >= 0 ? nodes[n.Parent].Cell + 1 : 0) : Key0(n);
             long Key0(Node n) => descriptors ? BaseKey(n) * 65536L + n.Load : BaseKey(n);
-            long Key(Node n) => Arrival(n) * (hides ? 2 : 1) + (n.Hidden ? 1 : 0);
+            // Levels v2 (C6): a via check's search keeps whether the schedule went through its zone (one more key bit; the
+            // other searches keep their key exactly).
+            bool[] mustVisit = options.MustVisit;
+            bool visits = mustVisit != null;
+            long StrictKey(Node n) => (Arrival(n) * (hides ? 2 : 1) + (n.Hidden ? 1 : 0)) * (visits ? 2 : 1) + (visits && n.Visited ? 1 : 0);
+            // HUMANAUDIT: the human search keeps whether a node is the first cell of a dash (one more key bit); the strict search
+            // keeps its key exactly.
+            bool human = options.Human;
+            long Key(Node n) => human ? StrictKey(n) * 2 + (n.Dash ? 1 : 0) : StrictKey(n);
             // M5 wave 5B: with a load, a node dominates another of its state only if its load state is at least as free.
             bool Freer(Node a, Node b) => load == null || load.Dominates(a.Load, b.Load);
 
             // Keeps n unless a node of its state dominates or equals it; drops the nodes it dominates or equals, in order.
             void Offer(Node n)
             {
+                if (visits)
+                {
+                    n.Visited = mustVisit[n.Cell] || (n.Parent >= 0 && nodes[n.Parent].Visited);
+                }
                 // M6 (CONTRACT_M6 2.7): the leaves an inhabitant opened by then are open; (2.6) the leaves the player opened stay
                 // unseen by the humans over the act that led here.
                 n.Mask = (byte)(n.Mask | (w.AutoOpen != null ? w.AutoOpen[n.T] : 0));
@@ -7138,6 +8538,41 @@ namespace OutOfSight.Editor
                 }
             }
 
+            // HUMANAUDIT: a human freeze, one node HumanPauseSamples later, each of its samples checked as a still sample of the
+            // strict search checks it (sight with the inhabitant leaves of that sample, the creak gauge, the load, the wait cap,
+            // the decoy flag). UnrollFreezes turns the node back into still samples on the found path.
+            void HumanFreeze(Node n, int idx, int t)
+            {
+                int k = n.Cell;
+                int end = t + HumanPauseSamples;
+                if (end > horizon || n.Run + HumanPauseSamples > options.MaxRun) // MUTATION:HUMAN_PAUSE
+                {
+                    return;
+                }
+                float gauge = n.Gauge;
+                bool flag = n.Flag;
+                int state = load != null ? n.Load : 0; // a still node has no rock plan state, as in the strict search
+                for (int s = t + 1; s <= end; s++)
+                {
+                    int mask = n.Mask | (w.AutoOpen != null ? w.AutoOpen[s] : 0);
+                    gauge += s >= creakDelay && !w.Pinned[s] ? fill : 0f;
+                    if (gauge >= options.GaugeCap || !StillOk(w, options, n.Off, n.Lying, k, s, true, mask))
+                    {
+                        return;
+                    }
+                    if (load != null && (state = load.Step(state, LoadModel.ActStill)) < 0)
+                    {
+                        return;
+                    }
+                    flag |= options.Decoys && !n.Lying && !(w.Body.Lamp && n.Off) && w.ExplainedAt(mask, k, s);
+                }
+                Offer(new Node
+                {
+                    Cell = k, T = end, Parent = idx, Moves = n.Moves, Run = waits ? n.Run + HumanPauseSamples : 0, Anchor = n.Anchor,
+                    Gauge = gauge, Flag = flag, Act = Act.Still, Off = n.Off, Lying = n.Lying, Mask = n.Mask, Load = state,
+                });
+            }
+
             Offer(new Node { Cell = w.Start, Anchor = waits ? w.Start : 0, T = start, Parent = -1, Gauge = gauge0, Act = Act.Start });
             try
             {
@@ -7157,6 +8592,7 @@ namespace OutOfSight.Editor
                             {
                                 Node n = nodes[idx];
                                 if (t > start && w.InExit[n.Cell] && !n.Hidden && !w.HumanSeen(n.Off, n.Mask, t, n.Cell, true) && (n.Flag || !options.NeedDecoy)
+                                    && ViaDone(mustVisit, n.Visited)
                                     && (goal < 0 || n.Moves < nodes[goal].Moves || (n.Moves == nodes[goal].Moves && n.Gauge < nodes[goal].Gauge)))
                                 {
                                     goal = idx;
@@ -7183,8 +8619,17 @@ namespace OutOfSight.Editor
                                     ExpandHidden(n, idx, t);
                                     continue;
                                 }
+                                // HUMANAUDIT: a human freeze starts as one block of HumanPauseSamples still samples (no sub-second
+                                // freeze), never on the first cell of a dash; once in a still run, it goes on sample by sample.
+                                if (human && !n.Motion && n.Act != Act.Still)
+                                {
+                                    if (!n.Dash)
+                                    {
+                                        HumanFreeze(n, idx, t);
+                                    }
+                                }
                                 // Still (a furniture still in motion must stop first). Sat on, the creak gauge pauses.
-                                if (!n.Motion)
+                                else if (!n.Motion)
                                 {
                                     float filled = n.Gauge + (t + 1 >= creakDelay && !w.Pinned[t + 1] ? fill : 0f);
                                     int still = ((k * 2 + (n.Off ? 1 : 0)) * 2 + (n.Lying ? 1 : 0)) * masks + n.Mask;
@@ -7213,7 +8658,8 @@ namespace OutOfSight.Editor
                                 if (n.Motion)
                                 {
                                     int stopLoad = 0;
-                                    if (t + stopCost <= horizon && n.Run + stopCost <= options.MaxRun
+                                    // HUMANAUDIT: the first cell of a dash may not stop yet.
+                                    if (!(human && n.Dash) && t + stopCost <= horizon && n.Run + stopCost <= options.MaxRun
                                         && CheckStop(w, options, ears, n, k, t, 0, true, n.Parent >= 0 ? nodes[n.Parent].Cell : -1)
                                         && (load == null || (stopLoad = load.Step(n.Load, LoadModel.ActStop)) >= 0))
                                     {
@@ -7225,7 +8671,8 @@ namespace OutOfSight.Editor
                                         });
                                     }
                                 }
-                                else if (toggles && t + ToggleSamples <= horizon && n.Run + ToggleSamples <= options.MaxRun
+                                // HUMANAUDIT: no toggle right after a toggle (a flicker is a sub-second freeze).
+                                else if (toggles && !(human && n.Act == Act.Toggle) && t + ToggleSamples <= horizon && n.Run + ToggleSamples <= options.MaxRun
                                          && CheckToggle(w, options, ears, n, k, t, 0, true))
                                 {
                                     Offer(new Node
@@ -7283,7 +8730,9 @@ namespace OutOfSight.Editor
                                     // a reversal in motion is refused. Only a node reached by a move carries a direction.
                                     int rockLeg = -1;
                                     int rockLoad = 0;
-                                    if (rockDirections && !RockStep(w, n.Act == Act.Move ? n.Load : 0, dir, travel, altTravel, extraTravel, out rockLeg, out rockLoad))
+                                    // AUDFIX: a node at rest after a move (a stop, an opening) restarts from the replay's rest pose.
+                                    int rockArrived = n.Act == Act.Move ? n.Load : n.Moves > 0 ? -1 : 0;
+                                    if (rockDirections && !RockStep(w, rockArrived, dir, travel, altTravel, extraTravel, out rockLeg, out rockLoad))
                                     {
                                         continue;
                                     }
@@ -7311,6 +8760,12 @@ namespace OutOfSight.Editor
                                         {
                                             continue;
                                         }
+                                        // HUMANAUDIT: a human crosses a doorway an inhabitant opened only after reacting to it, and sets
+                                        // off from rest only once both cells have been unseen for the reaction time.
+                                        if (human && !HumanReacts(w, n, k, o, edge, t))
+                                        {
+                                            continue;
+                                        }
                                         // M5 wave 5B: the load must hold over the leg; a rocking body remembers where it goes.
                                         int moveLoad = load != null ? load.Step(n.Load, LoadModel.Move(dir, leg, n.Lying)) : rockDirections ? rockLoad : 0;
                                         if (moveLoad < 0)
@@ -7329,6 +8784,7 @@ namespace OutOfSight.Editor
                                             Cell = o, T = t + length, Parent = idx, Moves = n.Moves + 1, Run = run, Anchor = !waits ? 0 : away ? o : n.Anchor,
                                             Gauge = Mathf.Max(0f, n.Gauge - length * drain), Flag = n.Flag, Act = Act.Move, Off = n.Off, Motion = tracksMotion,
                                             Mask = n.Mask, Load = moveLoad, Careful = carefulBase || (carefulLegs && leg == 1),
+                                            Dash = human && n.Act != Act.Move, // MUTATION:HUMAN_DASH
                                         });
                                     }
                                 }
@@ -7359,6 +8815,116 @@ namespace OutOfSight.Editor
         }
 
         /// <summary>
+        /// HUMANAUDIT (<see cref="SearchOptions.Human"/>): a move from k to o along <paramref name="edge"/> leaving node n at
+        /// sample t is one a human can make. A doorway an inhabitant opened is crossed only once it has been open for the
+        /// reaction time (<see cref="HumanProfile.ReactionMask"/>). From rest (n not reached by a move), both cells must also
+        /// have been unseen moving, at the search's margin, over the reaction time before the move starts: a human sets off a
+        /// reaction time after the cone turned away, not on the sample it did. The margin's own 0.3 s still comes on top.
+        /// </summary>
+        private static bool HumanReacts(World w, Node n, int k, int o, int edge, int t)
+        {
+            if (w.AutoOpen != null)
+            {
+                int mask = HumanProfile.ReactionMask(n.Mask, w.AutoOpen, t, HumanReactionSamples);
+                if (mask != n.Mask && !w.EdgeOpen(mask, edge, k, o))
+                {
+                    return false;
+                }
+            }
+            if (n.Act == Act.Move)
+            {
+                return true;
+            }
+            for (int q = 0; q < HumanReactionSamples; q++) // MUTATION:HUMAN_REACTION
+            {
+                int s = t - q;
+                if (s < 0)
+                {
+                    break;
+                }
+                if (w.MovingSeen(n.Off, n.Mask, s, k, true) || w.MovingSeen(n.Off, n.Mask, s, o, true))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// HUMANAUDIT: the found path with every human freeze node (<see cref="SearchOptions.Human"/>: a still node, not hidden,
+        /// more than one sample after its parent) turned back into one still node per sample, as the strict search builds them,
+        /// so every reader of a path (pace, fidelity, shifts, route, loitering) sees the samples it expects. The gauge and the
+        /// decoy flag are rebuilt sample by sample, the wait run counts up to the freeze node's own, and the load state of the
+        /// inner samples is the freeze node's (no reader uses a still node's load). A path without such a node is returned as is.
+        /// </summary>
+        private static List<Node> UnrollFreezes(World w, List<Node> path)
+        {
+            bool any = false;
+            for (int i = 1; i < path.Count && !any; i++)
+            {
+                any = path[i].Act == Act.Still && !path[i].Hidden && path[i].T - path[i - 1].T > 1;
+            }
+            if (!any)
+            {
+                return path;
+            }
+            int creakDelay = Mathf.RoundToInt(Tuning.CreakStartDelay / SampleSeconds);
+            float fill = SampleSeconds / DifficultyDef.Current.CreakFillTime;
+            var unrolled = new List<Node> { path[0] };
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node a = path[i - 1];
+                Node b = path[i];
+                if (b.Act != Act.Still || b.Hidden || b.T - a.T <= 1)
+                {
+                    unrolled.Add(b);
+                    continue;
+                }
+                float gauge = a.Gauge;
+                bool flag = a.Flag;
+                for (int s = a.T + 1; s < b.T; s++)
+                {
+                    int mask = a.Mask | (w.AutoOpen != null ? w.AutoOpen[s] : 0);
+                    gauge += s >= creakDelay && !w.Pinned[s] ? fill : 0f;
+                    flag |= !a.Lying && !(w.Body.Lamp && a.Off) && w.ExplainedAt(mask, a.Cell, s);
+                    Node inner = b;
+                    inner.T = s;
+                    inner.Run = b.Run > 0 ? Mathf.Max(0, b.Run - (b.T - s)) : 0;
+                    inner.Gauge = gauge;
+                    inner.Flag = flag && b.Flag;
+                    inner.Mask = (byte)mask;
+                    unrolled.Add(inner);
+                }
+                unrolled.Add(b);
+            }
+            return unrolled;
+        }
+
+        /// <summary>HUMANAUDIT: a path as the steps <see cref="HumanProfile.Breaches"/> reads, with their lengths in samples.</summary>
+        private static List<HumanProfile.Breach> HumanBreaches(List<Node> path)
+        {
+            var steps = new List<HumanProfile.Step>();
+            var lengths = new List<int>();
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node b = path[i];
+                steps.Add(b.Act == Act.Move ? HumanProfile.Step.Move
+                    : b.Act == Act.Stop ? HumanProfile.Step.Stop
+                    : b.Act == Act.Still && !b.Hidden ? HumanProfile.Step.Still
+                    : b.Act == Act.Toggle ? HumanProfile.Step.Toggle
+                    : HumanProfile.Step.Action);
+                lengths.Add(b.T - path[i - 1].T);
+            }
+            return HumanProfile.Breaches(steps, lengths, HumanPauseSamples, HumanProfile.MinMoveCells);
+        }
+
+        /// <summary>
+        /// Levels v2 (C6, viaChecks): a schedule may end in the exit only once it went through the zone of its via check (no zone:
+        /// always). <see cref="Search"/> and its relaxation <see cref="Reachable"/> both ask it.
+        /// </summary>
+        private static bool ViaDone(bool[] zone, bool visited) => zone == null || visited; // MUTATION:VIA_MUSTVISIT
+
+        /// <summary>
         /// The search's relaxation: breadth first over (cell, lamp off, lying, in motion, door mask) per sample, with every
         /// move, stop, toggle and opening checked exactly as <see cref="Search"/> checks them, but without the wait cap, the
         /// creak gauge and the explained-once flag. Every schedule is a path of this graph, so false proves there is none.
@@ -7371,7 +8937,11 @@ namespace OutOfSight.Editor
             // M6 (CONTRACT_M6 2.5): hidden in a wardrobe is one more state bit, only on a level where the player may hide.
             bool hides = options.Hide && w.HideFrom != null && !LoadRuleOn(w, options);
             int hb = hides ? 2 : 1;
-            int states = w.Count * 8 * hb * masks;
+            // Levels v2 (C6): a via check's relaxation tracks the zone too, so a zone no schedule can reach is answered here.
+            bool[] zone = options.MustVisit;
+            int vb = zone != null ? 2 : 1;
+            bool visited = false;
+            int states = w.Count * 8 * hb * vb * masks;
             bool tracksMotion = stopCost > 0;
             bool doors = options.Doors && w.Closed.Count > 0;
             // M5 wave 5B: both leg lengths are tried wherever the search may use them (the load is not tracked: a superset).
@@ -7386,7 +8956,8 @@ namespace OutOfSight.Editor
                 ring[i] = new bool[states];
             }
             int State(int k, bool off, bool lying, bool motion, int mask, bool hidden = false) =>
-                ((((k * 2 + (off ? 1 : 0)) * 2 + (lying ? 1 : 0)) * 2 + (motion ? 1 : 0)) * hb + (hidden ? 1 : 0)) * masks + mask;
+                (((((k * 2 + (off ? 1 : 0)) * 2 + (lying ? 1 : 0)) * 2 + (motion ? 1 : 0)) * hb + (hidden ? 1 : 0)) * vb
+                 + (zone != null && (visited || zone[k]) ? 1 : 0)) * masks + mask;
             void Mark(int t, int state)
             {
                 if (t <= horizon)
@@ -7408,13 +8979,15 @@ namespace OutOfSight.Editor
                     }
                     int mask = state % masks;
                     int rest = state / masks;
+                    visited = zone != null && (rest & 1) != 0;
+                    rest /= vb;
                     bool hidden = hides && (rest & 1) != 0;
                     rest /= hb;
                     bool motion = (rest & 1) != 0;
                     bool lying = (rest & 2) != 0;
                     bool off = (rest & 4) != 0;
                     int k = rest >> 3;
-                    if (t > start && w.InExit[k] && !hidden && !w.HumanSeen(off, mask, t, k, true))
+                    if (t > start && w.InExit[k] && !hidden && !w.HumanSeen(off, mask, t, k, true) && ViaDone(zone, visited))
                     {
                         return true;
                     }
@@ -7665,14 +9238,14 @@ namespace OutOfSight.Editor
             return w.Closed.FindIndex(l => l.Bit == bit);
         }
 
-        private static bool ValidShifted(World w, SearchOptions o, List<Node> path, int shift)
+        private static bool ValidShifted(World w, SearchOptions o, List<Node> path, int shift, bool wide = false)
         {
             for (int i = 1; i < path.Count; i++)
             {
                 Node a = path[i - 1];
                 Node b = path[i];
                 // M6 (CONTRACT_M6 2.6): the leaves the player opened stay unseen by the humans.
-                if (!DoorsUnseen(w, o, b.Mask, a.T + 1 + shift, b.T + shift, false))
+                if (!DoorsUnseen(w, o, b.Mask, a.T + 1 + shift, b.T + shift, wide))
                 {
                     return false;
                 }
@@ -7680,32 +9253,32 @@ namespace OutOfSight.Editor
                 {
                     case Act.Hide:
                     case Act.Leave:
-                        if (!CheckHide(w, o, a, a.Cell, a.T, shift, false))
+                        if (!CheckHide(w, o, a, a.Cell, a.T, shift, wide))
                         {
                             return false;
                         }
                         continue;
                     case Act.Move:
                         // The leg's own length (a careful leg, a rocking body going on straight), less a lying stool's righting.
-                        if (!CheckMove(w, o, null, a, a.Cell, -1, b.Cell, a.T, shift, false, b.T - a.T - (a.Lying ? RightSamples : 0)))
+                        if (!CheckMove(w, o, null, a, a.Cell, -1, b.Cell, a.T, shift, wide, b.T - a.T - (a.Lying ? RightSamples : 0)))
                         {
                             return false;
                         }
                         continue;
                     case Act.Stop:
-                        if (!CheckStop(w, o, null, a, a.Cell, a.T, shift, false, i >= 2 ? path[i - 2].Cell : -1))
+                        if (!CheckStop(w, o, null, a, a.Cell, a.T, shift, wide, i >= 2 ? path[i - 2].Cell : -1))
                         {
                             return false;
                         }
                         continue;
                     case Act.Toggle:
-                        if (!CheckToggle(w, o, null, a, a.Cell, a.T, shift, false))
+                        if (!CheckToggle(w, o, null, a, a.Cell, a.T, shift, wide))
                         {
                             return false;
                         }
                         continue;
                     case Act.Open:
-                        if (!CheckOpen(w, o, a, a.Cell, OpenedLeaf(w, a, b), a.T, shift, false))
+                        if (!CheckOpen(w, o, a, a.Cell, OpenedLeaf(w, a, b), a.T, shift, wide))
                         {
                             return false;
                         }
@@ -7721,25 +9294,25 @@ namespace OutOfSight.Editor
                     // M6: every sample of a hidden stay (a muffled creak's window included), and a creak's silence.
                     for (int q = a.T + 1 + shift; q <= s; q++)
                     {
-                        if (!HiddenOk(w, q, b.Mask, false))
+                        if (!HiddenOk(w, q, b.Mask, wide))
                         {
                             return false;
                         }
                     }
-                    if (b.T - a.T > 1 && !MuffledSilent(w, b.Cell, a.T + 1 + shift, s, false))
+                    if (b.T - a.T > 1 && !MuffledSilent(w, b.Cell, a.T + 1 + shift, s, wide))
                     {
                         return false;
                     }
                     continue;
                 }
-                if (s >= w.Samples || !StillOk(w, o, b.Off, b.Lying, b.Cell, s, false, b.Mask))
+                if (s >= w.Samples || !StillOk(w, o, b.Off, b.Lying, b.Cell, s, wide, b.Mask))
                 {
                     return false;
                 }
             }
             Node last = path[path.Count - 1];
             int end = last.T + shift;
-            return end >= 0 && end < w.Samples && !w.HumanSeen(last.Off, last.Mask, end, last.Cell, false);
+            return end >= 0 && end < w.Samples && !w.HumanSeen(last.Off, last.Mask, end, last.Cell, wide);
         }
 
         private static void Describe(World w, SearchOptions o, List<Node> path, Result result)
@@ -7798,6 +9371,13 @@ namespace OutOfSight.Editor
             {
                 result.Failures.Add(loitering);
             }
+            // Levels v2 RULEFIX (PO decision 2026-11-20): the spawn wait, out of the loitering rule, has its own limit.
+            string spawnWait = SpawnWaitFailure(w, path, out string spawnNote);
+            result.Notes.Add(spawnNote);
+            if (spawnWait != null)
+            {
+                result.Failures.Add(spawnWait);
+            }
             int early = 0;
             int late = 0;
             for (int m = 1; m <= SlackProbe && ValidShifted(w, o, path, -m); m++)
@@ -7823,6 +9403,1081 @@ namespace OutOfSight.Editor
                 + (pinned > 0 ? string.Format(CultureInfo.InvariantCulture, ", assis dessus {0:0.0} s", pinned * SampleSeconds) : "")
                 + (opens > 0 ? $", {opens} porte(s) ouverte(s)" : "")
                 + (hides > 0 ? string.Format(CultureInfo.InvariantCulture, ", {0} cachette(s) dans l'armoire ({1:0.0} s cache)", hides, hidden * SampleSeconds) : ""));
+        }
+
+        // ----- Levels v2 (LEVELS_V2.md 1.3, 4.1 and 6, C5): post-process, pace, walk lines, dead rooms, dark sync, JSON -----
+
+        /// <summary>
+        /// Levels v2 (C5): the found schedule cleaned of in-place flickers the search picks as free substitutes for waiting
+        /// (a toggle drains the creak gauge and is offered to a layer before the still samples it replaces, so a waiting lamp
+        /// flickers; level 20 toggled 17 times at its spawn). (1) An even run of back-to-back toggles at one cell (only still
+        /// samples at that cell between them) becomes a wait, an odd run a single toggle at the time of its last one. (2) A hide
+        /// followed by a leave with less than <see cref="HideFlickerSamples"/> hidden becomes a wait, pair by pair, when the
+        /// schedule without it still holds. A folded schedule is kept only when it passes every rule of the search at the
+        /// search's own margin (<see cref="ValidShifted"/> on the dilated tables, when the found schedule passes them), the
+        /// creak gauge (<see cref="GaugeHolds"/>) and the fidelity replay; otherwise the found one is kept with a warning
+        /// ("clignotement conserve", "cachette eclair conservee"). The exit time never changes. <paramref name="fidelity"/> is
+        /// the fidelity note of the returned schedule when this method replayed it (null otherwise), with its sighting.
+        /// </summary>
+        private static List<Node> PostProcess(World w, SearchOptions o, List<Node> path, List<string> notes, out int folded, out int removed,
+            out string sighting, out string fidelity)
+        {
+            folded = 0;
+            removed = 0;
+            sighting = null;
+            fidelity = null;
+            if (path.Count < 2)
+            {
+                return path;
+            }
+            if (ToggleRuns(path).Count == 0 && !FindHideFlicker(path, 1, out _, out _))
+            {
+                return path; // nothing to fold: no extra check, no extra cost
+            }
+            bool wideOk = ValidShifted(w, o, path, 0, true);
+            // The gauge is checked only if this model reproduces the found schedule's (it must; a note says so otherwise).
+            bool gaugeOk = GaugeHolds(w, o, new List<Node>(path));
+            if (!gaugeOk)
+            {
+                notes.Add("AVERTISSEMENT repli : le modele du grincement du repli ne reproduit pas l'horaire trouve ; le grincement n'est pas verifie sur l'horaire replie");
+            }
+            List<Node> result = path;
+            List<Node> toggled = FoldToggles(w, path, out int runs, out int toggles, out int kept, out string where);
+            if (toggled != null)
+            {
+                string why = Holds(w, o, toggled, wideOk, gaugeOk);
+                string note = null;
+                if (why == null)
+                {
+                    string seen = FidelityReplay(w, toggled, out note);
+                    why = seen != null ? "fidelite : " + seen : null;
+                }
+                if (why == null)
+                {
+                    result = toggled;
+                    folded = toggles - kept;
+                    fidelity = note;
+                    notes.Add(string.Format(CultureInfo.InvariantCulture,
+                        "clignotement replie : {0} course(s) de bascules dos a dos ({1} bascules) remplacee(s) par {2} bascule(s) et des attentes : {3} ; l'horaire replie tient toutes les regles et la fidelite",
+                        runs, toggles, kept, where));
+                }
+                else
+                {
+                    notes.Add(string.Format(CultureInfo.InvariantCulture,
+                        "AVERTISSEMENT clignotement conserve : {0} course(s) de bascules dos a dos ({1} bascules : {2}) ; repliee(s), l'horaire ne tient plus ({3})",
+                        runs, toggles, where, why));
+                }
+            }
+            // Hide/leave pairs, one at a time (the samples outside a replaced pair keep their indices' times).
+            List<Node> candidate = result;
+            var pairs = new List<string>();
+            var stays = new List<string>();
+            int scan = 1;
+            while (FindHideFlicker(candidate, scan, out int hide, out int leave))
+            {
+                Vector3 c = w.Center[candidate[hide].Cell];
+                string pair = string.Format(CultureInfo.InvariantCulture, "({0:0.##}, {1:0.##}) a {2:0.0} s, cache {3:0.0} s",
+                    c.x, c.z, candidate[hide - 1].T * SampleSeconds, (candidate[leave - 1].T - candidate[hide].T) * SampleSeconds);
+                List<Node> without = WaitInstead(w, candidate, hide, leave, candidate[hide - 1].Off, -1);
+                string why = Holds(w, o, without, wideOk, gaugeOk);
+                if (why == null)
+                {
+                    scan = hide + (candidate[leave].T - candidate[hide - 1].T);
+                    candidate = without;
+                    pairs.Add(pair);
+                }
+                else
+                {
+                    stays.Add(pair + " (" + why + ")");
+                    scan = leave + 1;
+                }
+            }
+            if (pairs.Count > 0)
+            {
+                string seen = FidelityReplay(w, candidate, out string note);
+                if (seen == null)
+                {
+                    result = candidate;
+                    removed = pairs.Count;
+                    fidelity = note;
+                    notes.Add("cachette eclair retiree : " + pairs.Count + " entree(s) suivie(s) d'une sortie a moins de 0.5 s remplacee(s) par une attente : "
+                        + string.Join(" ; ", pairs) + " ; l'horaire sans elles tient toutes les regles et la fidelite");
+                }
+                else
+                {
+                    stays.Add(string.Join(" ; ", pairs) + " (fidelite : " + seen + ")");
+                }
+            }
+            foreach (string stay in stays)
+            {
+                notes.Add("AVERTISSEMENT cachette eclair conservee : entree suivie d'une sortie a moins de 0.5 s en " + stay + " : l'horaire sans elle ne tient plus");
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the runs of back-to-back toggles of a schedule: (index of the first toggle, index of the last, toggles),
+        /// for every run of at least two toggles at one cell with only still samples (not hidden) at that cell between them.
+        /// </summary>
+        private static List<(int first, int last, int count)> ToggleRuns(List<Node> path)
+        {
+            var found = new List<(int, int, int)>();
+            for (int i = 1; i < path.Count; i++)
+            {
+                if (path[i].Act != Act.Toggle)
+                {
+                    continue;
+                }
+                int k = path[i].Cell;
+                int last = i;
+                int count = 1;
+                for (int m = i + 1; m < path.Count; m++)
+                {
+                    if (path[m].Act == Act.Still && !path[m].Hidden && path[m].Cell == k)
+                    {
+                        continue;
+                    }
+                    if (path[m].Act == Act.Toggle && path[m].Cell == k)
+                    {
+                        last = m;
+                        count++;
+                        continue;
+                    }
+                    break;
+                }
+                if (count >= 2) // MUTATION:TOGGLE_COLLAPSE
+                {
+                    found.Add((i, last, count));
+                }
+                i = last;
+            }
+            return found;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the schedule with every run of <see cref="ToggleRuns"/> folded (an even run waits with the lamp as it
+        /// was, an odd run waits then toggles once at the time of its last toggle), or null when it has no such run.
+        /// </summary>
+        private static List<Node> FoldToggles(World w, List<Node> path, out int runs, out int toggles, out int kept, out string where)
+        {
+            List<(int first, int last, int count)> found = ToggleRuns(path);
+            runs = found.Count;
+            toggles = 0;
+            kept = 0;
+            where = null;
+            if (found.Count == 0)
+            {
+                return null;
+            }
+            var parts = new List<string>();
+            List<Node> folded = path;
+            // From the last run back, so the indices of the earlier runs stay valid.
+            for (int r = found.Count - 1; r >= 0; r--)
+            {
+                (int first, int last, int count) = found[r];
+                toggles += count;
+                bool odd = count % 2 == 1;
+                kept += odd ? 1 : 0;
+                Vector3 c = w.Center[path[first].Cell];
+                parts.Insert(0, string.Format(CultureInfo.InvariantCulture, "{0} a ({1:0.##}, {2:0.##}) de {3:0.0} a {4:0.0} s{5}",
+                    count, c.x, c.z, path[first - 1].T * SampleSeconds, path[last].T * SampleSeconds, odd ? " (une seule bascule a la fin)" : " (une attente)"));
+                folded = WaitInstead(w, folded, first, last, path[first - 1].Off, odd ? last : -1);
+            }
+            where = string.Join(" ; ", parts);
+            return folded;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): <paramref name="path"/> with nodes <paramref name="from"/> to <paramref name="to"/> replaced by one
+        /// still sample each at the cell of node <paramref name="from"/> - 1, the lamp <paramref name="off"/> as given, except
+        /// node <paramref name="keep"/> (when not -1, the last of the range), kept as it is after the still samples that lead to
+        /// its start. The masks gain what inhabitants opened by each sample.
+        /// </summary>
+        private static List<Node> WaitInstead(World w, List<Node> path, int from, int to, bool off, int keep)
+        {
+            var copy = new List<Node>(path.Count + path[to].T - path[from - 1].T);
+            for (int i = 0; i < from; i++)
+            {
+                copy.Add(path[i]);
+            }
+            Node before = path[from - 1];
+            int until = keep >= 0 ? path[keep - 1].T : path[to].T;
+            Node prev = before;
+            for (int s = before.T + 1; s <= until; s++)
+            {
+                prev = new Node
+                {
+                    Cell = before.Cell, T = s, Parent = -1, Moves = before.Moves, Run = prev.Run + 1, Anchor = before.Anchor, Gauge = prev.Gauge,
+                    Flag = before.Flag, Act = Act.Still, Off = off, Lying = before.Lying,
+                    Mask = (byte)(before.Mask | (w.AutoOpen != null ? w.AutoOpen[s] : 0)),
+                };
+                copy.Add(prev);
+            }
+            if (keep >= 0)
+            {
+                copy.Add(path[keep]);
+            }
+            for (int i = to + 1; i < path.Count; i++)
+            {
+                copy.Add(path[i]);
+            }
+            return copy;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the next hide followed by a leave (only hidden still samples between them) with less than
+        /// <see cref="HideFlickerSamples"/> hidden, at or after node <paramref name="from"/>.
+        /// </summary>
+        private static bool FindHideFlicker(List<Node> path, int from, out int hide, out int leave)
+        {
+            for (int i = Mathf.Max(1, from); i < path.Count; i++)
+            {
+                if (path[i].Act != Act.Hide)
+                {
+                    continue;
+                }
+                int j = i + 1;
+                while (j < path.Count && path[j].Act == Act.Still && path[j].Hidden)
+                {
+                    j++;
+                }
+                if (j < path.Count && path[j].Act == Act.Leave && path[j - 1].T - path[i].T < HideFlickerSamples) // MUTATION:HIDE_FLICKER
+                {
+                    hide = i;
+                    leave = j;
+                    return true;
+                }
+            }
+            hide = -1;
+            leave = -1;
+            return false;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): null when a changed schedule holds every rule of the search (on the dilated tables when
+        /// <paramref name="wide"/>, as the search checks them) and the creak gauge, else what breaks.
+        /// </summary>
+        private static string Holds(World w, SearchOptions o, List<Node> path, bool wide, bool gauge)
+        {
+            if (!ValidShifted(w, o, path, 0, wide))
+            {
+                return "vu, entendu ou au contact a un echantillon";
+            }
+            if (!GaugeHolds(w, o, path) && gauge)
+            {
+                return "le grincement depasse le plafond";
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the creak gauge along a schedule, as the search fills and drains it (still and hidden samples fill
+        /// after Tuning.CreakStartDelay unless pinned, hide and leave fill, moves, stops, toggles and openings drain, a muffled
+        /// creak empties it); false when it reaches the cap. Each node's gauge is rewritten.
+        /// </summary>
+        private static bool GaugeHolds(World w, SearchOptions o, List<Node> path)
+        {
+            int creakDelay = Mathf.RoundToInt(Tuning.CreakStartDelay / SampleSeconds);
+            float fill = SampleSeconds / DifficultyDef.Current.CreakFillTime;
+            float drain = SampleSeconds / Tuning.CreakDrainTime;
+            float g = 0f;
+            for (int i = 1; i < path.Count; i++)
+            {
+                Node a = path[i - 1];
+                Node b = path[i];
+                int length = b.T - a.T;
+                switch (b.Act)
+                {
+                    case Act.Still:
+                        if (b.Hidden && length > 1)
+                        {
+                            g = 0f; // the muffled creak
+                        }
+                        else
+                        {
+                            g += b.T >= creakDelay && !w.Pinned[b.T] ? fill : 0f;
+                            if (g >= o.GaugeCap)
+                            {
+                                return false;
+                            }
+                        }
+                        break;
+                    case Act.Hide:
+                    case Act.Leave:
+                        g += HideSamples * fill;
+                        if (g >= o.GaugeCap)
+                        {
+                            return false;
+                        }
+                        break;
+                    default:
+                        g = Mathf.Max(0f, g - length * drain);
+                        break;
+                }
+                b.Gauge = g;
+                path[i] = b;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): a schedule sample by sample, from sample 0 to its exit: the cell it waits at (-1 on a travel sample:
+        /// a move, a lying stool's righting, a stop), hidden, the lamp switched off (a toggle's samples count as lit, as the
+        /// rules do), and its planar position (along a move, the cell center otherwise).
+        /// </summary>
+        private sealed class Timeline
+        {
+            public int Exit;
+            public int[] Cell;
+            public bool[] Travel;
+            public bool[] Hidden;
+            public bool[] Off;
+            public Vector3[] At;
+
+            public static Timeline Of(World w, List<Node> path)
+            {
+                int exit = path[path.Count - 1].T;
+                var t = new Timeline
+                {
+                    Exit = exit, Cell = new int[exit + 1], Travel = new bool[exit + 1], Hidden = new bool[exit + 1], Off = new bool[exit + 1],
+                    At = new Vector3[exit + 1],
+                };
+                for (int s = 0; s <= path[0].T && s <= exit; s++)
+                {
+                    t.Cell[s] = path[0].Cell;
+                    t.At[s] = YawMath.Planar(w.Center[path[0].Cell]);
+                }
+                for (int i = 1; i < path.Count; i++)
+                {
+                    Node a = path[i - 1];
+                    Node b = path[i];
+                    int length = b.T - a.T;
+                    int right = b.Move && a.Lying ? RightSamples : 0;
+                    for (int q = 1; q <= length; q++)
+                    {
+                        int s = a.T + q;
+                        bool travel = b.Act == Act.Move || b.Act == Act.Stop;
+                        t.Travel[s] = travel;
+                        t.Cell[s] = travel ? -1 : b.Cell;
+                        t.Hidden[s] = b.Hidden && b.Act == Act.Still;
+                        t.Off[s] = b.Act == Act.Toggle ? false : b.Off;
+                        t.At[s] = YawMath.Planar(b.Move && q > right
+                            ? Vector3.Lerp(w.Center[a.Cell], w.Center[b.Cell], (q - right) / (float)(length - right))
+                            : b.Move ? w.Center[a.Cell] : w.Center[b.Cell]);
+                    }
+                }
+                return t;
+            }
+        }
+
+        /// <summary>Levels v2 (LEVELS_V2.md 1.3, C5): the pace of a schedule (<see cref="PaceStats"/>).</summary>
+        /// <remarks>
+        /// <paramref name="spawnApart"/> false gives the measure as it was before the RULEFIX decision (the spawn run counted in
+        /// the longest pause and not a mid-route pause only when it starts the schedule): the self-test fixtures compare both.
+        /// </remarks>
+        private static PaceStats Pace(World w, List<Node> path, bool spawnApart = true)
+        {
+            var p = new PaceStats();
+            if (path.Count < 2)
+            {
+                return p;
+            }
+            Timeline line = Timeline.Of(w, path);
+            int start = path[0].T;
+            // Levels v2 RULEFIX: the spawn wait ends where the first move starts; before the decision only the run starting
+            // the schedule was apart (and only from the mid-route count).
+            int spawnEnd = spawnApart ? SpawnWaitEnd(path) : start;
+            p.ExitSamples = line.Exit;
+            int runCell = -1;
+            int runFrom = -1;
+            void Close(int end)
+            {
+                int length = end - runFrom + 1;
+                bool pause = runCell >= 0 && length >= PauseSamples; // MUTATION:PACE_PAUSE
+                if (pause)
+                {
+                    p.Runs.Add((runFrom, end, runCell));
+                    p.Pauses++;
+                    bool atSpawn = spawnApart ? runFrom <= spawnEnd : runFrom <= start + 1;
+                    p.SpawnPauses += atSpawn ? 1 : 0;
+                    p.MidPauses += atSpawn ? 0 : 1;
+                    if (!spawnApart || !atSpawn)
+                    {
+                        p.LongestPause = Mathf.Max(p.LongestPause, length);
+                    }
+                }
+                runCell = -1;
+            }
+            for (int s = start + 1; s <= line.Exit; s++)
+            {
+                bool pinned = s < w.Pinned.Length && w.Pinned[s];
+                if (line.Travel[s])
+                {
+                    p.TravelSamples++;
+                }
+                else if (pinned)
+                {
+                    p.PinnedSamples++;
+                }
+                bool waiting = !line.Travel[s] && !pinned;
+                p.SpawnWaitSamples += waiting && s <= spawnEnd ? 1 : 0;
+                if (runCell >= 0 && (!waiting || line.Cell[s] != runCell))
+                {
+                    Close(s - 1);
+                }
+                if (waiting && runCell < 0)
+                {
+                    runCell = line.Cell[s];
+                    runFrom = s;
+                }
+            }
+            if (runCell >= 0)
+            {
+                Close(line.Exit);
+            }
+            int counted = line.Exit - start;
+            p.WaitSamples = counted - p.TravelSamples - p.PinnedSamples;
+            p.Share = p.WaitSamples / (float)Mathf.Max(1, counted - p.PinnedSamples);
+            return p;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the level's pace gate ("pace": minShare, maxShare, minPauses, maxPause; a missing key is not
+        /// checked) against a schedule's pace: what is out of range, empty when it holds.
+        /// </summary>
+        private static List<string> PaceFailures(PaceDef pace, PaceStats p)
+        {
+            var out_ = new List<string>();
+            if (pace == null)
+            {
+                return out_;
+            }
+            if (pace.MinShare.HasValue && p.Share < pace.MinShare.Value - 1e-4f)
+            {
+                out_.Add(string.Format(CultureInfo.InvariantCulture, "part d'attente {0:0} % sous {1:0} %", p.Share * 100f, pace.MinShare.Value * 100f));
+            }
+            if (pace.MaxShare.HasValue && p.Share > pace.MaxShare.Value + 1e-4f)
+            {
+                out_.Add(string.Format(CultureInfo.InvariantCulture, "part d'attente {0:0} % au dessus de {1:0} %", p.Share * 100f, pace.MaxShare.Value * 100f));
+            }
+            if (pace.MinPauses.HasValue && p.Pauses < pace.MinPauses.Value)
+            {
+                out_.Add(string.Format(CultureInfo.InvariantCulture, "{0} pause(s), il en faut au moins {1}", p.Pauses, pace.MinPauses.Value));
+            }
+            if (pace.MaxPause.HasValue && p.Longest > pace.MaxPause.Value + 1e-3f) // MUTATION:PACE_GATE
+            {
+                out_.Add(string.Format(CultureInfo.InvariantCulture, "pause la plus longue {0:0.0} s, au dessus de {1:0.0} s", p.Longest, pace.MaxPause.Value));
+            }
+            return out_;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): prints the pace of the found schedule at every difficulty and applies the level's "pace" gate: a
+        /// defect at Normal, a note at the other difficulties.
+        /// </summary>
+        private static void PaceReport(World w, List<Node> path, Result result)
+        {
+            PaceStats p = Pace(w, path);
+            result.Pace = p;
+            result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
+                "rythme : attente {0:0.0} s ({1:0} %), {2} pauses ({3} en route), plus longue {4:0.0} s, assis dessus {5:0.0} s ; deplacement {6:0.0} s, sortie {7:0.0} s"
+                + " ; attente au depart {8:0.0} s ({9} pause(s), hors pause la plus longue)",
+                p.Wait, p.Share * 100f, p.Pauses, p.MidPauses, p.Longest, p.Pinned, p.Travel, p.Exit, p.SpawnWait, p.SpawnPauses));
+            // Levels v2 RULEFIX: the spawn wait still counts in the minimum pause count; say so when the minimum needs it.
+            PaceDef gate = w.Def.Pace;
+            if (gate != null && gate.MinPauses.HasValue && p.Pauses >= gate.MinPauses.Value && p.MidPauses < gate.MinPauses.Value)
+            {
+                result.Notes.Add(string.Format(CultureInfo.InvariantCulture,
+                    "minimum de pauses ({0}) atteint grace a l'attente au depart : {1} pause(s) en route seulement", gate.MinPauses.Value, p.MidPauses));
+            }
+            if (p.Runs.Count > 0)
+            {
+                var runs = new List<string>();
+                foreach ((int from, int to, int cell) in p.Runs)
+                {
+                    runs.Add(string.Format(CultureInfo.InvariantCulture, "{0:0.0}-{1:0.0} s ({2:0.0} s) en ({3:0.##}, {4:0.##})",
+                        (from - 1) * SampleSeconds, to * SampleSeconds, (to - from + 1) * SampleSeconds, w.Center[cell].x, w.Center[cell].z));
+                }
+                result.Notes.Add("pauses : " + string.Join(" ; ", runs));
+            }
+            List<string> off = PaceFailures(w.Def.Pace, p);
+            if (off.Count == 0)
+            {
+                if (w.Def.Pace != null)
+                {
+                    result.Notes.Add("rythme dans la cible du niveau");
+                }
+                return;
+            }
+            string text = "rythme hors cible : " + string.Join(" ; ", off);
+            if (DifficultyDef.Current.Id == DifficultyDef.Normal)
+            {
+                result.Failures.Add(text);
+            }
+            else
+            {
+                result.Notes.Add(text + " (" + DifficultyDef.Current.Id + " : une note, la cible porte sur Normal)");
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 4.1, C5): inhabitants walk through furniture (IDEAS bug 1), so a pause (at least 0.5 s at one
+        /// cell, not hidden) within <see cref="WalkLineDistance"/> of an inhabitant's walk while it walks there is a warning,
+        /// one per pause and inhabitant. A sitter coming to sit on the player at its seat is not counted.
+        /// </summary>
+        private static void WalkLineWarnings(World w, List<Node> path, Result result)
+        {
+            PaceStats p = result.Pace ?? Pace(w, path);
+            if (p.Runs.Count == 0)
+            {
+                return;
+            }
+            Timeline line = Timeline.Of(w, path);
+            int samples = w.Position.GetLength(0);
+            foreach ((int from, int to, int cell) in p.Runs)
+            {
+                Vector3 c = YawMath.Planar(w.Center[cell]);
+                for (int h = 0; h < w.Inhabitants; h++)
+                {
+                    float closest = float.MaxValue;
+                    int when = -1;
+                    for (int s = from; s <= to && s + 1 < samples; s++)
+                    {
+                        if (line.Hidden[s])
+                        {
+                            continue;
+                        }
+                        Vector3 a = YawMath.Planar(w.Position[s, h]);
+                        Vector3 b = YawMath.Planar(w.Position[s + 1, h]);
+                        if ((b - a).magnitude < 1e-4f)
+                        {
+                            continue; // not walking
+                        }
+                        bool sitter = false;
+                        for (int i = 0; i < w.SeatCellFlags.Count && !sitter; i++)
+                        {
+                            sitter = w.SeatCellFlags[i][cell] && YawMath.Planar(b - w.SeatHomes[i]).magnitude <= Tuning.SeatHomeTolerance + 0.25f;
+                        }
+                        if (sitter)
+                        {
+                            continue;
+                        }
+                        Vector3 ab = b - a;
+                        float f = Mathf.Clamp01(Vector3.Dot(c - a, ab) / ab.sqrMagnitude);
+                        float d = (a + ab * f - c).magnitude;
+                        if (d < closest)
+                        {
+                            closest = d;
+                            when = s;
+                        }
+                    }
+                    if (when >= 0 && closest <= WalkLineDistance + 1e-4f) // MUTATION:WALK_LINE
+                    {
+                        string text = string.Format(CultureInfo.InvariantCulture,
+                            "{0} passe a {1:0.00} m de la pause en ({2:0.##}, {3:0.##}) de {4:0.0} a {5:0.0} s, a {6:0.0} s (au moins {7:0.0} m : les habitants traversent les meubles)",
+                            w.Watchers[h].Name, closest, c.x, c.z, (from - 1) * SampleSeconds, to * SampleSeconds, when * SampleSeconds, WalkLineDistance);
+                        result.WalkLineWarnings.Add(text);
+                        result.Notes.Add("AVERTISSEMENT pause sur un trajet : " + text);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 1.1 rule 1, C5): the rooms nobody uses. A room is used when the schedule (or one of
+        /// <paramref name="extra"/>, C6's via schedules) has a cell in it, an inhabitant's station or a robot waypoint lies in
+        /// it, an inhabitant stands in it at some sample (up to the exit, the whole horizon without a schedule), or the
+        /// schedule hides in a wardrobe that stands in it. Returns the indices of the unused rooms.
+        /// </summary>
+        private static List<int> DeadRooms(World w, List<Node> path, List<List<Node>> extra)
+        {
+            var used = new bool[w.Rooms.Count];
+            int RoomOf(Vector3 p) => w.Rooms.IndexOf(w.Def.RoomAt(p));
+            void Use(int r)
+            {
+                if (r >= 0)
+                {
+                    used[r] = true;
+                }
+            }
+            var schedules = new List<List<Node>> { path };
+            if (extra != null)
+            {
+                schedules.AddRange(extra);
+            }
+            foreach (List<Node> schedule in schedules)
+            {
+                foreach (Node n in schedule)
+                {
+                    Use(w.Room[n.Cell]);
+                    if (n.Act == Act.Hide && w.HideCenter != null)
+                    {
+                        Use(RoomOf(w.HideCenter[n.Cell]));
+                    }
+                }
+            }
+            foreach (InhabitantDef h in w.Def.Inhabitants)
+            {
+                foreach (StationDef st in h.Stations)
+                {
+                    Use(RoomOf(st.Position));
+                }
+            }
+            foreach (RobotPath robot in w.RobotPaths)
+            {
+                foreach (Vector3 p in robot.Points)
+                {
+                    Use(RoomOf(p));
+                }
+            }
+            int until = Mathf.Min(w.Position.GetLength(0) - 1, path.Count > 0 ? path[path.Count - 1].T : w.Horizon);
+            for (int s = 0; s <= until; s++)
+            {
+                for (int h = 0; h < w.Inhabitants; h++)
+                {
+                    Use(RoomOf(w.Position[s, h]));
+                }
+            }
+            var dead = new List<int>();
+            for (int r = 0; r < used.Length; r++)
+            {
+                if (!used[r]) // MUTATION:DEAD_ROOM
+                {
+                    dead.Add(r);
+                }
+            }
+            return dead;
+        }
+
+        /// <summary>The id of room r (its index from 1 when it has none).</summary>
+        private static string RoomName(World w, int r)
+        {
+            return w.Rooms[r].Id ?? (r + 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>Levels v2 (C5): the dead rooms as warnings, or defects with -strictRooms.</summary>
+        private static void DeadRoomReport(World w, List<Node> path, List<List<Node>> extra, Result result)
+        {
+            foreach (int r in DeadRooms(w, path, extra))
+            {
+                string id = RoomName(w, r);
+                result.DeadRooms.Add(id);
+                const string why = " (ni case de l'horaire, ni station, ni point du robot, ni habitant avant la sortie, ni armoire utilisee)";
+                if (run.StrictRooms)
+                {
+                    result.Failures.Add("piece morte : " + id + why);
+                }
+                else
+                {
+                    result.Notes.Add("AVERTISSEMENT piece morte : " + id + why);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the dark lesson asked at one sample, as the game plays it: before the exit, some watcher with memory
+        /// (who would switch the lamp on) has the lamp, where it really is at that sample, within its dark range (its range times
+        /// Tuning.LampOffLight) and inside its cone (VisionMath.IsInCone, the lamp's center at half its height). Printed with the
+        /// time, the distance, the lamp's state and whether the walls hide it; a warning when it never happens. Also printed: when
+        /// the lamp, switched off, stands in a watcher's lit cone beyond its dark range and unhidden (the dark protects it there,
+        /// level 6's beat).
+        /// </summary>
+        private static List<string> DarkSync(World w, List<Node> path)
+        {
+            var notes = new List<string>();
+            if (!w.Body.Lamp || path.Count < 2)
+            {
+                return notes;
+            }
+            Timeline line = Timeline.Of(w, path);
+            int h = w.Inhabitants;
+            int found = -1;
+            int who = -1;
+            float distance = 0f;
+            float nearest = float.MaxValue;
+            int nearestAt = -1;
+            int nearestWho = -1;
+            int beatFrom = -1;
+            int beatTo = -1;
+            int beatWho = -1;
+            int beatSamples = 0;
+            float beatNearest = float.MaxValue;
+            for (int s = path[0].T + 1; s <= line.Exit && s < w.Samples; s++)
+            {
+                if (line.Hidden[s])
+                {
+                    continue;
+                }
+                Vector3 at = line.At[s];
+                var point = new Vector3(at.x, w.Def.FloorHeightAt(at.x, at.z) + w.Body.Height * 0.5f, at.z);
+                for (int i = 0; i < h; i++)
+                {
+                    Watcher watcher = w.Watchers[i];
+                    if (!watcher.Human || !watcher.Personality.Memory || w.Asleep[s * h + i])
+                    {
+                        continue;
+                    }
+                    Vector3 eye = w.Eye[s * h + i];
+                    Vector3 forward = w.Forward[s * h + i];
+                    float darkRange = watcher.Range * Tuning.LampOffLight;
+                    float d = YawMath.Planar(eye - point).magnitude;
+                    if (VisionMath.IsInCone(eye, forward, point, float.MaxValue, watcher.HalfAngle) && d - darkRange < nearest)
+                    {
+                        nearest = d - darkRange;
+                        nearestAt = s;
+                        nearestWho = i;
+                    }
+                    if (found < 0 && VisionMath.IsInCone(eye, forward, point, darkRange, watcher.HalfAngle)) // MUTATION:DARK_SYNC
+                    {
+                        found = s;
+                        who = i;
+                        distance = d;
+                    }
+                    if (line.Off[s] && !VisionMath.IsInCone(eye, forward, point, darkRange, watcher.HalfAngle)
+                        && VisionMath.IsInCone(eye, forward, point, watcher.Range, watcher.HalfAngle) && !Vision.Occluded(eye, point))
+                    {
+                        beatSamples++;
+                        if (beatFrom < 0 || (beatWho == i && beatTo == s - 1))
+                        {
+                            beatFrom = beatFrom < 0 ? s : beatFrom;
+                            beatTo = s;
+                            beatWho = i;
+                        }
+                        beatNearest = Mathf.Min(beatNearest, d);
+                    }
+                }
+            }
+            if (found >= 0)
+            {
+                Watcher x = w.Watchers[who];
+                Vector3 at = line.At[found];
+                var point = new Vector3(at.x, w.Def.FloorHeightAt(at.x, at.z) + w.Body.Height * 0.5f, at.z);
+                bool hidden = Vision.Occluded(w.Eye[found * h + who], point);
+                notes.Add(string.Format(CultureInfo.InvariantCulture,
+                    "lecon dark (synchronise) : {0} a la lampe dans son cone a {1:0.0} m, sous sa portee dans le noir de {2:0.0} m, a {3:0.0} s (lampe {4}{5}, en ({6:0.##}, {7:0.##})) : le noir seul ne la cache pas, il faut choisir le moment",
+                    x.Name, distance, x.Range * Tuning.LampOffLight, found * SampleSeconds, line.Off[found] ? "eteinte" : "allumee",
+                    hidden ? ", cachee par le decor" : "", at.x, at.z));
+            }
+            else
+            {
+                string closest = nearestWho >= 0
+                    ? string.Format(CultureInfo.InvariantCulture, "au plus pres dans un cone : {0} a {1:0.0} m au dela de sa portee dans le noir de {2:0.0} m, a {3:0.0} s",
+                        w.Watchers[nearestWho].Name, nearest, w.Watchers[nearestWho].Range * Tuning.LampOffLight, nearestAt * SampleSeconds)
+                    : "la lampe n'entre dans le cone d'aucun habitant avec memoire";
+                notes.Add("AVERTISSEMENT lecon dark (synchronise) : aucun habitant avec memoire n'a la lampe dans son cone a sa portee dans le noir avant la sortie (" + closest + ")");
+            }
+            notes.Add(beatWho >= 0
+                ? string.Format(CultureInfo.InvariantCulture,
+                    "lecon dark (synchronise) : eteinte dans le cone allume de {0} au dela de sa portee dans le noir de {1:0.0} m, sans decor entre eux : de {2:0.0} a {3:0.0} s ({4:0.0} s en tout), au plus pres {5:0.0} m",
+                    w.Watchers[beatWho].Name, w.Watchers[beatWho].Range * Tuning.LampOffLight, (beatFrom - 1) * SampleSeconds, beatTo * SampleSeconds,
+                    beatSamples * SampleSeconds, beatNearest)
+                : "lecon dark (synchronise) : jamais eteinte dans un cone allume au dela de la portee dans le noir sans decor entre eux");
+            return notes;
+        }
+
+        /// <summary>
+        /// Levels v2 (C5): the -json report, one object per level and difficulty: id, difficulty, key, pass, failures, exit,
+        /// travel, waitShare, pauses, midPauses, longestPause, pinned, spawnWait (seconds), spawnPauses, slack (the -slack maximum in samples, null when
+        /// not measured), margin (the found schedule's early and late shifts, seconds), deadRooms, lessons {id: binds},
+        /// requires and vias (C6), budgets {drawCalls, materials}, habitWarnings, walkLineWarnings, togglesFolded,
+        /// hidePairsRemoved, nodes and seconds. A value the run did not measure is null.
+        /// </summary>
+        private static void WriteJsonReport(string file, List<Result> results)
+        {
+            string S(string v)
+            {
+                if (v == null)
+                {
+                    return "null";
+                }
+                var sb = new StringBuilder("\"");
+                foreach (char ch in v)
+                {
+                    switch (ch)
+                    {
+                        case '"': sb.Append("\\\""); break;
+                        case '\\': sb.Append("\\\\"); break;
+                        case '\n': sb.Append("\\n"); break;
+                        case '\r': sb.Append("\\r"); break;
+                        case '\t': sb.Append("\\t"); break;
+                        default:
+                            if (ch < ' ')
+                            {
+                                sb.Append("\\u").Append(((int)ch).ToString("x4", CultureInfo.InvariantCulture));
+                            }
+                            else
+                            {
+                                sb.Append(ch);
+                            }
+                            break;
+                    }
+                }
+                return sb.Append('"').ToString();
+            }
+            string F(float v, string format) => float.IsNaN(v) || float.IsInfinity(v) ? "null" : v.ToString(format, CultureInfo.InvariantCulture);
+            string Strings(IEnumerable<string> items)
+            {
+                var parts = new List<string>();
+                foreach (string item in items)
+                {
+                    parts.Add(S(item));
+                }
+                return "[" + string.Join(", ", parts) + "]";
+            }
+            string Bools(Dictionary<string, bool> map)
+            {
+                var parts = new List<string>();
+                foreach (KeyValuePair<string, bool> kv in map)
+                {
+                    parts.Add(S(kv.Key) + ": " + (kv.Value ? "true" : "false"));
+                }
+                return "{" + string.Join(", ", parts) + "}";
+            }
+            var sbAll = new StringBuilder();
+            sbAll.Append("{\n  \"strictRooms\": ").Append(run.StrictRooms ? "true" : "false");
+            if (run.Human)
+            {
+                // HUMANAUDIT: only a human run names its profile (the strict report keeps its format exactly).
+                sbAll.Append(",\n  \"profile\": ").Append(S(HumanProfile.Human));
+            }
+            sbAll.Append(",\n  \"results\": [");
+            for (int i = 0; i < results.Count; i++)
+            {
+                Result r = results[i];
+                PaceStats p = r.Pace;
+                bool route = p != null && p.ExitSamples > 0;
+                sbAll.Append(i == 0 ? "\n" : ",\n").Append("    {");
+                sbAll.Append("\"id\": ").Append(S(r.BaseId)).Append(", \"difficulty\": ").Append(S(r.Difficulty)).Append(", \"key\": ").Append(S(r.LevelId));
+                sbAll.Append(", \"pass\": ").Append(r.Pass ? "true" : "false").Append(", \"failures\": ").Append(Strings(r.Failures));
+                sbAll.Append(", \"exit\": ").Append(route ? F(p.Exit, "0.0") : "null");
+                sbAll.Append(", \"travel\": ").Append(route ? F(p.Travel, "0.0") : "null");
+                sbAll.Append(", \"waitShare\": ").Append(route ? F(p.Share, "0.000") : "null");
+                sbAll.Append(", \"pauses\": ").Append(route ? p.Pauses.ToString(CultureInfo.InvariantCulture) : "null");
+                sbAll.Append(", \"midPauses\": ").Append(route ? p.MidPauses.ToString(CultureInfo.InvariantCulture) : "null");
+                sbAll.Append(", \"longestPause\": ").Append(route ? F(p.Longest, "0.0") : "null");
+                sbAll.Append(", \"pinned\": ").Append(route ? F(p.Pinned, "0.0") : "null");
+                // Levels v2 RULEFIX: the spawn wait (out of longestPause) and its pauses (in pauses, not in midPauses).
+                sbAll.Append(", \"spawnWait\": ").Append(route ? F(p.SpawnWait, "0.0") : "null");
+                sbAll.Append(", \"spawnPauses\": ").Append(route ? p.SpawnPauses.ToString(CultureInfo.InvariantCulture) : "null");
+                sbAll.Append(", \"slack\": ").Append(r.SlackMeasured ? r.SlackSamples.ToString(CultureInfo.InvariantCulture) : "null");
+                sbAll.Append(", \"margin\": ").Append(route ? "{\"early\": " + F(r.SlackEarly, "0.0") + ", \"late\": " + F(r.SlackLate, "0.0") + "}" : "null");
+                sbAll.Append(", \"deadRooms\": ").Append(Strings(r.DeadRooms));
+                sbAll.Append(", \"lessons\": ").Append(Bools(r.Lessons));
+                sbAll.Append(", \"requires\": ").Append(Bools(r.Requires));
+                sbAll.Append(", \"vias\": ").Append(Bools(r.Vias));
+                sbAll.Append(", \"budgets\": {\"drawCalls\": ").Append(r.DrawCalls >= 0 ? r.DrawCalls.ToString(CultureInfo.InvariantCulture) : "null")
+                    .Append(", \"materials\": ").Append(r.Materials >= 0 ? r.Materials.ToString(CultureInfo.InvariantCulture) : "null").Append("}");
+                sbAll.Append(", \"habitWarnings\": ").Append(Strings(r.HabitWarnings));
+                sbAll.Append(", \"walkLineWarnings\": ").Append(Strings(r.WalkLineWarnings));
+                sbAll.Append(", \"togglesFolded\": ").Append(r.TogglesFolded.ToString(CultureInfo.InvariantCulture));
+                sbAll.Append(", \"hidePairsRemoved\": ").Append(r.HidePairsRemoved.ToString(CultureInfo.InvariantCulture));
+                sbAll.Append(", \"nodes\": ").Append(r.Nodes.ToString(CultureInfo.InvariantCulture));
+                sbAll.Append(", \"seconds\": ").Append(F(r.RuntimeSeconds, "0.0"));
+                sbAll.Append("}");
+            }
+            sbAll.Append("\n  ]\n}\n");
+            string dir = Path.GetDirectoryName(Path.GetFullPath(file));
+            if (!string.IsNullOrEmpty(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+            File.WriteAllText(file, sbAll.ToString());
+        }
+
+        // ----- Levels v2 (C5): the fixtures' checks (test_v2_audit_*) -----
+
+        private static World foundWorld;
+        private static List<Node> foundPath;
+
+        /// <summary>The schedule the strict search finds on a fixture's world (once per world), or null.</summary>
+        private static List<Node> FoundPath(World w)
+        {
+            if (foundWorld != w)
+            {
+                foundWorld = w;
+                NodeList nodes = Search(w, new SearchOptions { NeedDecoy = w.NeedDecoy }, out int goal);
+                foundPath = goal >= 0 ? PathTo(nodes, goal) : null;
+            }
+            return foundPath;
+        }
+
+        /// <summary>
+        /// The test_v2_audit_pace_fail fixture (C5): the found schedule's pace against the fixture's "pace" field: strict (the
+        /// gate), out of range; relaxed (no gate), nothing. No schedule is a failure under both.
+        /// </summary>
+        private static List<string> PaceCheck(World w, bool strict)
+        {
+            List<Node> path = FoundPath(w);
+            if (path == null)
+            {
+                return new List<string> { "aucun horaire" };
+            }
+            List<string> off = strict ? PaceFailures(w.Def.Pace, Pace(w, path)) : new List<string>();
+            return off.Count > 0 ? new List<string> { "rythme hors cible : " + string.Join(" ; ", off) } : new List<string>();
+        }
+
+        /// <summary>
+        /// The test_v2_audit_pace_spawn fixture (RULEFIX, PO decision 2026-11-20): the found schedule, whose only pause is the
+        /// spawn wait. Strict (the rules before the decision: the spawn run in the longest pause and in the loitering), out of
+        /// range; relaxed (the rules in force: pace gate, loitering, spawn wait limit), nothing, and the spawn wait limit must
+        /// bite on the same schedule started <see cref="MaxSpawnWait"/> later. No schedule is a failure under both.
+        /// </summary>
+        private static List<string> PaceSpawnCheck(World w, bool strict)
+        {
+            List<Node> path = FoundPath(w);
+            if (path == null)
+            {
+                return new List<string> { "aucun horaire" };
+            }
+            var failures = new List<string>();
+            List<string> off = PaceFailures(w.Def.Pace, Pace(w, path, !strict));
+            if (off.Count > 0)
+            {
+                failures.Add("rythme hors cible : " + string.Join(" ; ", off));
+            }
+            string loiter = LoiterFailure(w, path, out _, !strict, true);
+            if (loiter != null)
+            {
+                failures.Add(loiter);
+            }
+            if (!strict)
+            {
+                string spawn = SpawnWaitFailure(w, path, out _);
+                if (spawn != null)
+                {
+                    failures.Add(spawn);
+                }
+                // The limit itself: the same schedule with every node after the spawn delayed past MaxSpawnWait.
+                int delay = Mathf.RoundToInt(MaxSpawnWait / SampleSeconds) + 1;
+                var late = new List<Node>(path);
+                for (int i = 1; i < late.Count; i++)
+                {
+                    Node n = late[i];
+                    n.T += delay;
+                    late[i] = n;
+                }
+                if (SpawnWaitFailure(w, late, out string lateNote) == null)
+                {
+                    failures.Add("la limite de l'attente au depart ne mord pas sur l'horaire retarde de " + (delay * SampleSeconds).ToString("0.0", CultureInfo.InvariantCulture) + " s (" + lateNote + ")");
+                }
+            }
+            return failures;
+        }
+
+        /// <summary>
+        /// The test_v2_audit_loiter_pinned fixture (RULEFIX, PO decision 2026-11-20): a schedule built on the fixture's world
+        /// (the measure is what is tested, not the search): leave the seat (the spawn) for the next cell and come back at once,
+        /// then stay on the seat 7 s of the player's own plus every pinned sample in that time. Strict (the pinned samples
+        /// counted, the rule before the decision), it loiters more than Tuning.AuditMaxWait; relaxed (the rule in force),
+        /// 7 s. No pinned sample after the first move is a failure under both.
+        /// </summary>
+        private static List<string> LoiterPinnedCheck(World w, bool strict)
+        {
+            int seat = -1;
+            int next = -1;
+            float best = float.MaxValue;
+            for (int c = 0; c < w.Center.Length; c++)
+            {
+                float d = YawMath.Planar(w.Center[c] - w.Spawn).magnitude;
+                if (d < best)
+                {
+                    best = d;
+                    seat = c;
+                }
+            }
+            best = float.MaxValue;
+            for (int c = 0; c < w.Center.Length && seat >= 0; c++)
+            {
+                float d = YawMath.Planar(w.Center[c] - w.Center[seat]).magnitude;
+                if (c != seat && d < best)
+                {
+                    best = d;
+                    next = c;
+                }
+            }
+            if (next < 0)
+            {
+                return new List<string> { "aucune case voisine du siege" };
+            }
+            const int Leg = 5;
+            int own = Mathf.RoundToInt((Tuning.AuditMaxWait - 1f) / SampleSeconds);
+            int back = 2 * Leg;
+            int end = back + own;
+            int pinned = -1;
+            while (end < w.Pinned.Length)
+            {
+                int count = 0;
+                for (int s = back + 1; s <= end; s++)
+                {
+                    count += w.Pinned[s] ? 1 : 0;
+                }
+                if (count == pinned)
+                {
+                    break;
+                }
+                pinned = count;
+                end = back + own + pinned;
+            }
+            if (pinned < 15 || end >= w.Pinned.Length)
+            {
+                return new List<string> { string.Format(CultureInfo.InvariantCulture, "{0} echantillon(s) assis dessus apres le premier deplacement : rien a mesurer", Mathf.Max(0, pinned)) };
+            }
+            var path = new List<Node>
+            {
+                new Node { Cell = seat, T = 0, Act = Act.Start, Parent = -1 },
+                new Node { Cell = next, T = Leg, Act = Act.Move },
+                new Node { Cell = seat, T = back, Act = Act.Move },
+                new Node { Cell = seat, T = end, Act = Act.Still },
+            };
+            string failure = LoiterFailure(w, path, out _, true, !strict);
+            return failure != null ? new List<string> { failure } : new List<string>();
+        }
+
+        /// <summary>
+        /// The test_v2_audit_deadroom fixture (C5): strict (-strictRooms), its empty room is a defect; relaxed (the warning),
+        /// nothing. No schedule is a failure under both.
+        /// </summary>
+        private static List<string> DeadRoomCheck(World w, bool strict)
+        {
+            List<Node> path = FoundPath(w);
+            if (path == null)
+            {
+                return new List<string> { "aucun horaire" };
+            }
+            var failures = new List<string>();
+            if (strict)
+            {
+                foreach (int r in DeadRooms(w, path, null))
+                {
+                    failures.Add("piece morte : " + RoomName(w, r));
+                }
+            }
+            return failures;
+        }
+
+        /// <summary>
+        /// The test_v2_audit_flicker fixture (C5): the lamp waits at its spawn for a watcher to turn away. Strict (the schedule
+        /// as the search finds it), back-to-back toggles; relaxed (after <see cref="PostProcess"/>), none, the folded schedule
+        /// kept (it passes the rules and the fidelity replay). No schedule is a failure under both.
+        /// </summary>
+        private static List<string> FlickerCheck(World w, bool strict)
+        {
+            List<Node> path = FoundPath(w);
+            if (path == null)
+            {
+                return new List<string> { "aucun horaire" };
+            }
+            var notes = new List<string>();
+            List<Node> checkedPath = strict ? path : PostProcess(w, new SearchOptions { NeedDecoy = w.NeedDecoy }, path, notes, out _, out _, out _, out _);
+            var failures = new List<string>();
+            foreach ((int first, int last, int count) in ToggleRuns(checkedPath))
+            {
+                Vector3 c = w.Center[checkedPath[first].Cell];
+                failures.Add(string.Format(CultureInfo.InvariantCulture, "{0} bascules dos a dos en ({1:0.##}, {2:0.##}) de {3:0.0} a {4:0.0} s{5}",
+                    count, c.x, c.z, checkedPath[first - 1].T * SampleSeconds, checkedPath[last].T * SampleSeconds,
+                    strict ? "" : " apres le repli (" + string.Join(" ; ", notes) + ")"));
+            }
+            return failures;
         }
 
         /// <summary>

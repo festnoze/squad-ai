@@ -18,16 +18,22 @@ namespace OutOfSight.Tests
         private static LevelDef Load(string id) => LevelJson.Parse(File.ReadAllText(Folder + id + ".json"));
 
         /// <summary>
-        /// The play order (CONTRACT_M2 4, CONTRACT_M4 9.13, CONTRACT_M5 8 and 16.2): levels 1 to 7, then the wave 5A levels
-        /// with their final ids (level12 stays level12). Wave 5B inserts its levels in play order: 11 levels after wave 5A,
-        /// 17 after wave 5B, level1 to level17 in number order; M6b adds level18 (18 levels).
+        /// The play order of levels v2 (docs/levels_v2/LEVELS_V2.md 3 and 7): 22 levels in three acts (7 + 9 + 6). The cut
+        /// level10, level16 and level23 stay on disk unlisted (D2); level12 (The Dog) plays before level15 (D4); the new
+        /// level25 (The Showroom) plays before the finale.
         /// </summary>
         private static readonly string[] PlayOrder =
         {
-            "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level10", "level11",
-            "level12", "level13", "level14", "level15", "level16", "level17", "level18", "level19", "level20", "level21",
-            "level22", "level23", "level24",
+            "level1", "level2", "level3", "level4", "level5", "level6", "level7",
+            "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17",
+            "level19", "level21", "level20", "level22", "level25", "level24",
         };
+
+        /// <summary>The first index of each act in <see cref="PlayOrder"/> (LEVELS_V2 3 and 7).</summary>
+        private static readonly int[] ActStarts = { 0, 7, 16 };
+
+        /// <summary>The levels cut in v2 (LEVELS_V2 5 "Cut levels", D2): never listed, their files kept and valid.</summary>
+        private static readonly string[] CutLevels = { "level10", "level16", "level23" };
 
         /// <summary>
         /// Room a: x in [-4, 0], hard. Room b: x in [0.1, 4.1], soft. Both z in [-2, 2], walls 0.1 thick, so
@@ -132,11 +138,13 @@ namespace OutOfSight.Tests
         public void Manifest_lists_the_levels_in_play_order_and_each_is_valid()
         {
             List<string> ids = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
-            // M4 (CONTRACT_M4 4, amendment 9.13): levels 4 to 7 follow the M2 levels. M5 (CONTRACT_M5 8 and 16.2): wave 5A
-            // added levels 8, 12, 14 and 16, wave 5B levels 9, 10, 11, 13, 15 and 17, all in number order; M6b (CONTRACT_M6 5)
-            // adds level 18 "L'armoire" after level 17: 18 levels.
-            Assert.AreEqual(24, ids.Count, "the manifest count after M7 (levels 19 to 24 added): " + string.Join(", ", ids));
+            // Levels v2 (LEVELS_V2 3 and 7): 22 levels in the v2 order, none of the cut ones.
+            Assert.AreEqual(PlayOrder.Length, ids.Count, "the manifest count of levels v2: " + string.Join(", ", ids));
             CollectionAssert.AreEqual(PlayOrder, ids);
+            foreach (string cut in CutLevels)
+            {
+                CollectionAssert.DoesNotContain(ids, cut, cut + " is cut in v2: it must not be listed");
+            }
             foreach (string id in ids)
             {
                 LevelDef level = Load(id);
@@ -144,6 +152,50 @@ namespace OutOfSight.Tests
                 List<string> issues = LevelValidator.Validate(level);
                 Assert.IsEmpty(issues, id + ": " + string.Join("\n", issues));
             }
+        }
+
+        [Test]
+        public void Manifest_is_the_v2_order_with_its_acts_and_the_v1_order_as_previous()
+        {
+            // LEVELS_V2 7: rev 2, the 24 v1 ids as "previous" (the one-shot save migration), the three acts.
+            ManifestDef m = LevelManifest.ParseFull(File.ReadAllText(Folder + "levels.json"));
+            Assert.AreEqual(2, m.Rev, "levels.json rev");
+            CollectionAssert.AreEqual(PlayOrder, m.Levels, "the v2 play order");
+            var previous = new List<string>();
+            for (int n = 1; n <= 24; n++)
+            {
+                previous.Add("level" + n);
+            }
+            CollectionAssert.AreEqual(previous, m.Previous, "previous is the v1 order, level1 to level24");
+            Assert.AreEqual(ActStarts.Length, m.Acts.Count, "three acts");
+            for (int i = 0; i < ActStarts.Length; i++)
+            {
+                Assert.AreEqual(ActStarts[i], m.Acts[i].From, $"act {i + 1} starts at index {ActStarts[i]}");
+                Assert.AreEqual($"act{i + 1}.name", m.Acts[i].NameKey, $"act {i + 1} name key");
+                Assert.AreNotEqual(m.Acts[i].NameKey, Strings.Get(m.Acts[i].NameKey), $"act {i + 1}: name string missing");
+            }
+        }
+
+        [Test]
+        public void Cut_levels_stay_on_disk_valid_with_their_routes_and_unlisted()
+        {
+            // LEVELS_V2 D2: level10, level16 and level23 leave levels.json only; tests and fixtures still load them by id.
+            List<string> order = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
+            foreach (string id in CutLevels)
+            {
+                Assert.IsTrue(File.Exists(Folder + id + ".json"), id + ": the file of a cut level stays on disk");
+                LevelDef l = Load(id);
+                Assert.AreEqual(id, l.Id, "the id inside the file matches its name");
+                List<string> issues = LevelValidator.Validate(l);
+                Assert.IsEmpty(issues, id + ": " + string.Join("\n", issues));
+                CollectionAssert.DoesNotContain(order, id, id + " is cut: it must not be listed");
+                Assert.GreaterOrEqual(l.DesignerRoute.Count, 2, id + ": the archived file keeps its designer route");
+                Assert.AreNotEqual(Strings.Get(l.NameKey), l.NameKey, id + ": the name string of a cut level stays");
+            }
+            // The archived rocking chair level (the wave 5B row of level10 before v2): its lesson moved to level15.
+            LevelDef ten = Load("level10");
+            Assert.AreEqual(BodyKinds.RockingChair, BodyKinds.Of(ten.Player.Kind), "level10: the rocking chair");
+            Assert.AreEqual(LevelDef.LessonRock, ten.Lesson, "level10: the rock lesson");
         }
 
         [Test]
@@ -183,7 +235,9 @@ namespace OutOfSight.Tests
             // Integrator decision (PRD v1.4, 6.3 M2 note): the inhabitant starts at station 3 (index 2),
             // looking out of the window, so the first move is possible at once: no dead time at spawn.
             Assert.AreEqual(2, h.StartStation);
-            float[,] stations = { { -1.5f, 2.2f, 0f, 6f }, { 1.2f, 1.4f, 180f, 3f }, { 0f, -2.3f, 180f, 5f }, { 2.2f, -0.7f, 180f, 4f } };
+            // Levels v2 (LEVELS_V2 D11, amendment of CONTRACT_M2 11.8 and PRD 6.3): the window station dwells 3.5 s (was 5),
+            // so a full-speed rush cannot win level 1 without its first mid-route freeze.
+            float[,] stations = { { -1.5f, 2.2f, 0f, 6f }, { 1.2f, 1.4f, 180f, 3f }, { 0f, -2.3f, 180f, 3.5f }, { 2.2f, -0.7f, 180f, 4f } };
             Assert.AreEqual(4, h.Stations.Count);
             for (int i = 0; i < 4; i++)
             {
@@ -240,7 +294,7 @@ namespace OutOfSight.Tests
             }
         }
 
-        // ----- M5 wave 5B: levels 9, 10, 11, 13, 15 and 17 (CONTRACT_M5 16.10) and their audit fixtures -----
+        // ----- M5 wave 5B: levels 9, 11, 13, 15 and 17 (CONTRACT_M5 16.10, as retuned by levels v2) and their audit fixtures -----
 
         /// <summary>
         /// One row of the revised level table (CONTRACT_M5 16.10): the body, the load, the room count bounds, the lesson, the
@@ -264,16 +318,16 @@ namespace OutOfSight.Tests
 
         private static readonly WaveBRow[] WaveB =
         {
-            new WaveBRow { Id = "level9", Body = BodyKinds.Chair, MinRooms = 4, MaxRooms = 4, Lesson = LevelDef.LessonRobot,
+            // Levels v2 (LEVELS_V2 5): level9 loses its kitchen (3 rooms); level15 is rebuilt as the rocker level (4 rooms,
+            // napping Rex and Mamie, no robot, D20); level10 is cut (Cut_levels_stay_on_disk_valid_with_their_routes_and_unlisted).
+            new WaveBRow { Id = "level9", Body = BodyKinds.Chair, MinRooms = 3, MaxRooms = 3, Lesson = LevelDef.LessonRobot,
                 People = new[] { "watchful:loop" }, Robots = 1 },
-            new WaveBRow { Id = "level10", Body = BodyKinds.RockingChair, MinRooms = 4, MaxRooms = 5, Lesson = LevelDef.LessonRock,
-                People = new[] { "granny:loop" } },
             new WaveBRow { Id = "level11", Body = BodyKinds.Chair, Load = "vase", MinRooms = 4, MaxRooms = 4, Lesson = LevelDef.LessonLoad,
                 People = new[] { "tidy:loop" } },
             new WaveBRow { Id = "level13", Body = BodyKinds.OfficeChair, Load = "vase", MinRooms = 5, MaxRooms = 5, Lesson = LevelDef.LessonLoad,
                 People = new[] { "hurried:pingpong", "watchful:loop" }, Decoys = 2 },
-            new WaveBRow { Id = "level15", Body = BodyKinds.RockingChair, MinRooms = 6, MaxRooms = 6, Lesson = LevelDef.LessonRobot,
-                People = new[] { "teen:wander", "watchful:loop" }, Robots = 1 },
+            new WaveBRow { Id = "level15", Body = BodyKinds.RockingChair, MinRooms = 4, MaxRooms = 4, Lesson = LevelDef.LessonRock,
+                People = new[] { "dog", "granny:loop" } },
             new WaveBRow { Id = "level17", Body = BodyKinds.Chair, Load = "vase", MinRooms = 4, MaxRooms = 7, Lesson = LevelDef.LessonFinal,
                 People = new[] { "dog", "granny:loop", "teen:wander", "tidy:loop" }, Robots = 1, ClosedLeaves = 2, Platform = true },
         };
@@ -322,24 +376,23 @@ namespace OutOfSight.Tests
             // Level 9: "hard floors and rugs".
             LevelDef nine = Load("level9");
             Assert.IsTrue(nine.Rugs.Count > 0 && nine.AllRooms().Exists(r => !r.IsSoft), "level9: hard floors and rugs");
-            Assert.AreEqual(6, checkedLevels, "premise: the six wave 5B levels are checked");
+            Assert.AreEqual(WaveB.Length, checkedLevels, "premise: every wave 5B level still played in v2 is checked");
         }
 
         [Test]
-        public void Wave5B_levels_are_valid_and_played_in_number_order()
+        public void Wave5B_levels_are_valid_and_listed_at_their_v2_slot()
         {
-            // CONTRACT_M5 8 and 16.2: at the end of wave 5B, levels.json plays the six new levels between the wave 5A ones,
-            // each right after the level whose number precedes its own.
+            // Levels v2 (LEVELS_V2 3): the number order is gone; each wave 5B level still played sits at its slot of the v2
+            // order (level15 after level11, level17 after level18) and validates.
             List<string> order = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
             foreach (WaveBRow row in WaveB)
             {
                 LevelDef l = Load(row.Id);
                 List<string> issues = LevelValidator.Validate(l);
                 Assert.IsEmpty(issues, row.Id + ": " + string.Join("\n", issues));
-                int n = int.Parse(row.Id.Substring("level".Length), System.Globalization.CultureInfo.InvariantCulture);
-                int at = order.IndexOf(row.Id);
-                Assert.GreaterOrEqual(at, 1, row.Id + " is not in the play order after level1: " + string.Join(", ", order));
-                Assert.AreEqual("level" + (n - 1), order[at - 1], row.Id + " does not follow level" + (n - 1) + ": " + string.Join(", ", order));
+                int slot = System.Array.IndexOf(PlayOrder, row.Id);
+                Assert.GreaterOrEqual(slot, 0, "premise: " + row.Id + " is in the v2 play order");
+                Assert.AreEqual(slot, order.IndexOf(row.Id), row.Id + " is not at its v2 slot in levels.json: " + string.Join(", ", order));
             }
         }
 

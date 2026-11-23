@@ -13,7 +13,6 @@
       "wallHeight": 2.7,
       "wallThickness": 0.1,
       "floor": "hard",
-      "floorFinish": "herringbone",
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
       "wallFinish": "limewash"

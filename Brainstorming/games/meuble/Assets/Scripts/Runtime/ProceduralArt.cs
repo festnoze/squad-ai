@@ -213,38 +213,99 @@ namespace OutOfSight
             return c;
         }
 
+        // Eye redesign (2026-11-20): the open eyes are drawn in the closed eye's line (ClosedEye): its cream ink, its 0.1
+        // lid stroke and its three 0.07 lashes leaning out, on an almond as wide as its arc (EyeHalfWidth). The lids meet
+        // at the corners (EyeCorner); the lower lid's curve is EyeLowLid, the upper lid's the eye's openness.
+        private const float EyeHalfWidth = 1.45f;
+        private const float EyeCorner = -0.18f;
+        private const float EyeLowLid = 0.34f;
+        private static readonly Color EyeInk = new Color(0.9f, 0.9f, 0.88f, 1f);
+
+        private static Sprite eyeHalf;
+
         /// <summary>
-        /// Almond shaped eye: white, dark outline, iris, pupil, highlight. <paramref name="openness"/> scales how far
-        /// the lid opens (CONTRACT_M6 2.3): 1 is the original fully open eye (the alarm state keeps it, "wide open"),
-        /// under 1 a half open eye (the calm/suspicious state), so the two differ by shape as well as by colour and
-        /// by the badge each one overlays ("?" or "!", see <see cref="OpenEye"/> and <see cref="AlarmEye"/>).
+        /// Eye redesign (2026-11-20): the half open eye, lids nearly shut and the iris peeking: the blink's in-between frame
+        /// that Hud shows for an instant when the eye opens or closes. Never a state of its own.
         /// </summary>
-        private static Color EyeShape(float u, float v, float pixel, float openness)
+        public static Sprite EyeHalf => eyeHalf != null ? eyeHalf : eyeHalf = Draw(192, 112, HalfEye, "EyeHalf");
+
+        /// <summary>Distance to a lid: the curve y = EyeCorner + height (1 - x^2), x = u / EyeHalfWidth, round at the corners.</summary>
+        private static float LidDistance(float u, float v, float height)
         {
-            const float w = 1.45f;
-            float x = u / w;
-            float lid = openness * 0.78f * (1f - x * x);
-            // Signed distance approximated by the vertical gap, good enough at this size.
-            float almond = Mathf.Abs(x) >= 1f ? 1f : Mathf.Abs(v) - lid;
-            float outline = 0.13f;
-            Color ink = new Color(0.08f, 0.08f, 0.1f, 1f);
+            float x = u / EyeHalfWidth;
+            if (Mathf.Abs(x) >= 1f)
+            {
+                return new Vector2(Mathf.Abs(u) - EyeHalfWidth, v - EyeCorner).magnitude;
+            }
+            float y = EyeCorner + height * (1f - x * x);
+            // The vertical gap over the slope's length: an even stroke weight along the whole curve.
+            float slope = -2f * height * x / EyeHalfWidth;
+            return Mathf.Abs(v - y) / Mathf.Sqrt(1f + slope * slope);
+        }
+
+        /// <summary>
+        /// The open eye in the closed eye's line: a dark almond between a cream upper and lower lid that meet in round
+        /// corners, a two tone amber iris (a darker rim), a round pupil of radius <paramref name="pupil"/> and two glints,
+        /// and the closed eye's three lashes turned up on the upper lid (<paramref name="lashLength"/> long, leaning out by
+        /// <paramref name="lashSpread"/>; none at 0). <paramref name="openness"/> is how high the upper lid arches
+        /// (CONTRACT_M6 2.3): the calm eye is half open, the alarm eye wide open, so they differ by shape.
+        /// </summary>
+        private static Color EyeShape(float u, float v, float pixel, float openness, float pupil, float lashLength, float lashSpread)
+        {
+            float x = u / EyeHalfWidth;
+            float upper = EyeCorner + openness * (1f - x * x);
+            float lower = EyeCorner - EyeLowLid * (1f - x * x);
+            float inside = Cover(Mathf.Abs(x) >= 1f ? 1f : Mathf.Max(v - upper, lower - v), pixel);
             Color c = new Color(0f, 0f, 0f, 0f);
-            c = Over(c, ink, Cover(almond - outline, pixel));
-            c = Over(c, new Color(0.98f, 0.98f, 0.96f, 1f), Cover(almond, pixel));
-            float r = Mathf.Sqrt(u * u + v * v);
-            float insideLid = Cover(almond, pixel);
-            c = Over(c, new Color(0.16f, 0.36f, 0.62f, 1f), Cover(r - 0.52f, pixel) * insideLid);
-            c = Over(c, ink, Cover(r - 0.26f, pixel) * insideLid);
-            float hr = Mathf.Sqrt((u - 0.17f) * (u - 0.17f) + (v - 0.17f) * (v - 0.17f));
-            c = Over(c, Color.white, Cover(hr - 0.09f, pixel) * insideLid);
+            c = Over(c, new Color(0.06f, 0.055f, 0.075f, 0.92f), inside);
+            // The iris sits between the lids (a nearly shut eye keeps it where the open eye has it: it peeks out).
+            float irisY = EyeCorner + (Mathf.Max(openness, 0.3f) - EyeLowLid) * 0.5f + 0.02f;
+            float r = new Vector2(u, v - irisY).magnitude;
+            c = Over(c, new Color(0.93f, 0.56f, 0.16f, 1f), Cover(r - 0.42f, pixel) * inside);
+            c = Over(c, new Color(1f, 0.8f, 0.34f, 1f), Cover(r - 0.34f, pixel) * inside);
+            c = Over(c, new Color(0.05f, 0.04f, 0.07f, 1f), Cover(r - pupil, pixel) * inside);
+            float glint = new Vector2(u - 0.15f, v - irisY - 0.14f).magnitude;
+            c = Over(c, Color.white, Cover(glint - 0.075f, pixel) * inside);
+            float glint2 = new Vector2(u + 0.11f, v - irisY + 0.15f).magnitude;
+            c = Over(c, new Color(1f, 1f, 1f, 0.85f), Cover(glint2 - 0.035f, pixel) * inside);
+            float lids = Mathf.Min(LidDistance(u, v, openness) - 0.1f, LidDistance(u, v, -EyeLowLid) - 0.085f);
+            c = Over(c, EyeInk, Cover(lids, pixel));
+            if (lashLength > 0f)
+            {
+                for (int i = -1; i <= 1; i++)
+                {
+                    float lx = i * 0.62f;
+                    float xl = lx / EyeHalfWidth;
+                    float baseY = EyeCorner + openness * (1f - xl * xl);
+                    float d = SegmentDistance(new Vector2(u, v), new Vector2(lx, baseY), new Vector2(lx * lashSpread, baseY + lashLength)) - 0.07f;
+                    c = Over(c, EyeInk, Cover(d, pixel));
+                }
+            }
             return c;
         }
 
-        // M6 2.3: the corner badge every open eye overlays ("?" for calm/suspicious, "!" for alarm), upper right so
-        // it never overlaps the lid at either openness nor AlarmEye's own alert strokes.
-        private const float BadgeX = 1.05f;
-        private const float BadgeY = 0.75f;
-        private const float BadgeScale = 0.28f;
+        /// <summary>The blink's in-between frame: the eye nearly shut, with shorter lashes (<see cref="EyeHalf"/>).</summary>
+        private static Color HalfEye(float u, float v, float pixel)
+        {
+            return EyeShape(u, v, pixel, 0.12f, 0.18f, 0.3f, 1.25f);
+        }
+
+        // M6 2.3: the corner badge every open eye overlays ("?" for calm/suspicious, "!" for alarm). Eye redesign: upper
+        // right beside the outer lash, clear of the lid at either openness and of AlarmEye's strokes, with a dark outline.
+        private const float BadgeX = 1.4f;
+        private const float BadgeY = 0.56f;
+        private const float BadgeScale = 0.3f;
+
+        /// <summary>The badge's point (u, v) in the glyph's own local units.</summary>
+        private static Vector2 BadgeLocal(float u, float v) => new Vector2(u - BadgeX, v - BadgeY) / BadgeScale;
+
+        /// <summary>A badge glyph (its local signed distance <paramref name="markLocal"/>) in <paramref name="fill"/>, outlined in the glyph ink.</summary>
+        private static Color EyeBadge(Color c, float markLocal, float pixel, Color fill)
+        {
+            float mark = markLocal * BadgeScale;
+            c = Over(c, GlyphInk, Cover(mark - 0.085f, pixel));
+            return Over(c, fill, Cover(mark - 0.03f, pixel));
+        }
 
         /// <summary>
         /// The calm/suspicious eye: half open (CONTRACT_M6 2.3), with a "?" badge, so it differs from the alarm eye by
@@ -252,9 +313,8 @@ namespace OutOfSight
         /// </summary>
         private static Color OpenEye(float u, float v, float pixel)
         {
-            Color c = EyeShape(u, v, pixel, 0.55f);
-            float mark = QuestionMarkSdf(new Vector2(u - BadgeX, v - BadgeY) / BadgeScale) * BadgeScale;
-            return Over(c, new Color(1f, 0.84f, 0.22f, 1f), Cover(mark - 0.05f, pixel));
+            Color c = EyeShape(u, v, pixel, 0.46f, 0.18f, 0.34f, 1.25f);
+            return EyeBadge(c, QuestionMarkSdf(BadgeLocal(u, v)), pixel, new Color(1f, 0.84f, 0.22f, 1f));
         }
 
         /// <summary>Signed distance (local, a roughly 2 unit tall glyph) to a "?": a hooked arc, a stem and a dot.</summary>
@@ -400,25 +460,24 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// The alarm eye: wide open (CONTRACT_M6 2.3, full openness, slightly smaller) with three alert strokes above
-        /// it and one on each side, and a "!" badge, so it differs from the calm/suspicious eye by openness and by
-        /// badge, never only by the backdrop colour.
+        /// The alarm eye: wide open (CONTRACT_M6 2.3) with a small pupil and longer, wider spread lashes, two shock strokes
+        /// beside each corner, and a "!" badge, so it differs from the calm/suspicious eye by openness, strokes and badge,
+        /// never only by the backdrop colour.
         /// </summary>
         private static Color AlarmEye(float u, float v, float pixel)
         {
-            // Wide open, drawn at 80 % so the strokes fit around it.
-            Color c = EyeShape(u / 0.8f, v / 0.8f + 0.12f, pixel / 0.8f, 1f);
+            // Wide open, drawn at 86 % so the side strokes fit beside its corners.
+            const float k = 0.86f;
+            Color c = EyeShape(u / k, (v + 0.06f) / k, pixel / k, 0.64f, 0.12f, 0.4f, 1.4f);
             Color stroke = new Color(1f, 0.95f, 0.85f, 1f);
             Vector2 p = new Vector2(u, v);
             float d = float.MaxValue;
-            d = Mathf.Min(d, SegmentDistance(p, new Vector2(0f, 0.64f), new Vector2(0f, 0.92f)));
-            d = Mathf.Min(d, SegmentDistance(p, new Vector2(-0.5f, 0.56f), new Vector2(-0.68f, 0.82f)));
-            d = Mathf.Min(d, SegmentDistance(p, new Vector2(0.5f, 0.56f), new Vector2(0.68f, 0.82f)));
-            d = Mathf.Min(d, SegmentDistance(p, new Vector2(-1.32f, 0.02f), new Vector2(-1.62f, 0.1f)));
-            d = Mathf.Min(d, SegmentDistance(p, new Vector2(1.32f, 0.02f), new Vector2(1.62f, 0.1f)));
+            d = Mathf.Min(d, SegmentDistance(p, new Vector2(-1.38f, 0f), new Vector2(-1.6f, 0.1f)));
+            d = Mathf.Min(d, SegmentDistance(p, new Vector2(1.38f, 0f), new Vector2(1.6f, 0.1f)));
+            d = Mathf.Min(d, SegmentDistance(p, new Vector2(-1.38f, -0.3f), new Vector2(-1.6f, -0.4f)));
+            d = Mathf.Min(d, SegmentDistance(p, new Vector2(1.38f, -0.3f), new Vector2(1.6f, -0.4f)));
             c = Over(c, stroke, Cover(d - 0.06f, pixel));
-            float mark = ExclamationMarkSdf(new Vector2(u - BadgeX, v - BadgeY) / BadgeScale) * BadgeScale;
-            return Over(c, new Color(1f, 0.32f, 0.22f, 1f), Cover(mark - 0.05f, pixel));
+            return EyeBadge(c, ExclamationMarkSdf(BadgeLocal(u, v)), pixel, stroke);
         }
 
         /// <summary>A magnifying glass: a lens ring and a handle.</summary>
@@ -617,8 +676,8 @@ namespace OutOfSight
             float inner = Mathf.Min(PolygonDistance(p, LeftInnerEar), PolygonDistance(p, RightInnerEar));
             c = Over(c, new Color(0.98f, 0.78f, 0.72f, 1f), Cover(inner, pixel) * c.a);
             // M6: the fully open eye with no badge (never OpenEye's calm/suspicious half open "?": the dog's own shape
-            // is the ears, not a badge shared with another state).
-            Color eye = EyeShape(u / 0.78f, (v + 0.2f) / 0.78f, pixel / 0.78f, 1f);
+            // is the ears, not a badge shared with another state). Eye redesign: no lashes, they would touch the ears.
+            Color eye = EyeShape(u / 0.78f, (v + 0.2f) / 0.78f, pixel / 0.78f, 0.62f, 0.15f, 0f, 1f);
             return Over(c, eye, eye.a);
         }
 

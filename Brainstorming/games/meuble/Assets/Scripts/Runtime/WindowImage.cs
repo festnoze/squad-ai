@@ -108,8 +108,14 @@ namespace OutOfSight
             }
         }
 
-        /// <summary>The windows' base colour (sRGB), the picture's neutral factor.</summary>
-        public static Color Colour => new Color(Intensity, Intensity, Intensity, 1f);
+        /// <summary>
+        /// Levels v2 (D25, C10): the night preset's factor on the picture (sRGB): a dark blue window, the garden behind it
+        /// under the moon (every channel well below 1, so a night window never feeds the bloom). Visual only.
+        /// </summary>
+        public static readonly Color NightColour = new Color(0.26f, 0.34f, 0.62f, 1f);
+
+        /// <summary>The windows' base colour (sRGB): the picture's neutral factor, or <see cref="NightColour"/> under the night preset (<see cref="Main.Night"/>, read as the level builds).</summary>
+        public static Color Colour => Main.Night ? NightColour : new Color(Intensity, Intensity, Intensity, 1f); // MUTATION:NIGHT_WINDOW
 
         /// <summary>True when <paramref name="properties"/> (a renderer's block) shows the window picture (the wall fader's copies).</summary>
         public static bool Shows(MaterialPropertyBlock properties)

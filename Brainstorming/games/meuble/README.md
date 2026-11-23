@@ -22,8 +22,14 @@ strings shown to the player are in French.
   mouse orbits the camera (click to capture the cursor), the wheel zooms, R restarts, Escape
   pauses (title, pause and end screens since M3). Since M4: Left Shift moves carefully (half
   speed), E switches the floor lamp. Gamepad: the left stick or the D-pad moves, the right stick
-  orbits, the left trigger is careful mode, X is the action, Start pauses, Y restarts, B goes back
+  orbits, the left trigger is careful mode, X switches the floor lamp, Start pauses, Y restarts, B goes back
   (closes the level select). A gamepad alone plays the whole game, menus included.
+- Doors and wardrobes (task DOORAUTO, docs/next/progress/DOORAUTO.md): no key. Standing still in reach of a
+  closed door, push the move input toward it (within 45 degrees, for 0.16 s) and it opens, exactly as E used to;
+  walking into a closed door opens it once the furniture stands pressed against it. In front of a wardrobe, push
+  into it to hide; hidden, push away to come out. A door only the household opens shows "Locked".
+- Touch: the left thumb moves (and pushes doors open), a drag on the right half orbits, the careful and pause
+  buttons stay; there is no action button any more: tap the floor lamp itself to switch it.
 
 ## Verify
 

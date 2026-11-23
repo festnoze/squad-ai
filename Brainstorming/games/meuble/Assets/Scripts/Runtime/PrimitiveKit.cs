@@ -138,6 +138,28 @@ namespace OutOfSight
             return m;
         }
 
+        private static readonly Dictionary<Texture2D, Material> MapCache = new Dictionary<Texture2D, Material>();
+
+        /// <summary>
+        /// DOGBIG: the one URP Lit material showing a painted colour map on a model's own UV0 (the dog's fur texture,
+        /// ModelKit.ApplyPetFurMap): a white base colour and <paramref name="colourMap"/> as base map, one per map. Its
+        /// <see cref="PaletteOf"/> is white (the picture carries the colours).
+        /// </summary>
+        public static Material MapMaterial(Texture2D colourMap, float smoothness)
+        {
+            if (colourMap == null)
+            {
+                return null;
+            }
+            if (MapCache.TryGetValue(colourMap, out Material cached) && cached != null)
+            {
+                return cached;
+            }
+            Material m = NewLit(Color.white, smoothness, 0f, null, colourMap, "Map " + colourMap.name);
+            MapCache[colourMap] = m;
+            return m;
+        }
+
         /// <summary>
         /// A URP Lit material registered with its palette colour <paramref name="color"/>. Without a colour map: the M4.2
         /// palette material (base colour compensated, the flat base map). With one (M7 real colours): a white base colour

@@ -1,0 +1,13 @@
+test_lights_bathroom: mean luma +1,85, max +205, 6,3% px brighter by more than 8, red px 2183 -> 2218
+test_lights_kitchen: mean luma +2,39, max +202, 7,7% px brighter by more than 8, red px 2273 -> 2270
+test_lights_dining: mean luma +1,29, max +182, 5,0% px brighter by more than 8, red px 2871 -> 2876
+test_lights_corridor: mean luma +0,68, max +197, 2,6% px brighter by more than 8, red px 541 -> 546
+test_lights_bedroom: mean luma +0,59, max +130, 2,1% px brighter by more than 8, red px 2291 -> 2294
+test_lights_study: mean luma +2,11, max +159, 8,3% px brighter by more than 8, red px 2551 -> 2563
+test_lights_living: mean luma +2,06, max +184, 8,8% px brighter by more than 8, red px 3084 -> 3168
+test_lights_hall: mean luma +0,97, max +201, 3,8% px brighter by more than 8, red px 914 -> 927
+test_lights_house: mean luma +1,01, max +196, 3,8% px brighter by more than 8, red px 706 -> 711
+level12_house: mean luma +1,88, max +200, 6,8% px brighter by more than 8, red px 669 -> 691
+level12_house_back: mean luma +1,41, max +207, 5,2% px brighter by more than 8, red px 866 -> 915
+level20_house: mean luma +1,26, max +182, 5,4% px brighter by more than 8, red px 1596 -> 1623
+level20_house_back: mean luma +0,95, max +203, 3,7% px brighter by more than 8, red px 535 -> 574

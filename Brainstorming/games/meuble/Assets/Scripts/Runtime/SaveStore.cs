@@ -52,6 +52,10 @@ namespace OutOfSight
     ///   so real progress is never overwritten.
     /// - No exception ever leaves SaveStore: every failure is a warning (a Recorded subscriber's own exception is
     ///   logged as an exception, never rethrown).
+    /// - Levels v2 (docs/levels_v2/LEVELS_V2.md 7): a save that parses (the file, its .bak or a restored .tmp) runs the
+    ///   one-shot order migration (<see cref="SaveData.MigrateOrder"/>) against levels.json; a migrated save file is written
+    ///   at once (a .bak restore is migrated before the write it already makes, a .tmp restore is migrated in memory and
+    ///   saved by the next write). A fresh save starts at the manifest's revision, so it never migrates.
     /// </summary>
     public static class SaveStore
     {
@@ -90,6 +94,59 @@ namespace OutOfSight
         /// (Android, M6) and the retries. Null uses File.Replace. Cleared by <see cref="ResetForTests"/>.
         /// </summary>
         public static Action<string, string, string> ReplaceForTests;
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7), tests only: the manifest the order migration reads instead of levels.json
+        /// (<see cref="LevelLoader.LoadManifestDef"/>). Null reads the real file. Cleared by <see cref="ResetForTests"/>.
+        /// </summary>
+        public static ManifestDef ManifestOverride;
+
+        /// <summary>The manifest the migration and a fresh save use: <see cref="ManifestOverride"/> or levels.json. Never null.</summary>
+        public static ManifestDef Manifest()
+        {
+            try
+            {
+                return ManifestOverride ?? LevelLoader.LoadManifestDef();
+            }
+            catch (Exception e)
+            {
+                Warn("cannot read the manifest: " + e.Message);
+                return new ManifestDef();
+            }
+        }
+
+        /// <summary>Levels v2: a fresh save already holds the current order revision, so it never runs the migration.</summary>
+        private static SaveData NewSave()
+        {
+            return new SaveData { Order = Mathf.Max(1, Manifest().Rev) };
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): runs <see cref="SaveData.MigrateOrder"/> on <paramref name="data"/> with the manifest's
+        /// revision, previous and current orders; true when it changed the save (the caller writes it). Logs
+        /// "[SaveStore] progress migrated to order rev N: +K unlocked" (plus <paramref name="note"/> when the save is not
+        /// written now). Never throws.
+        /// </summary>
+        private static bool Migrate(SaveData data, string note)
+        {
+            try
+            {
+                ManifestDef manifest = Manifest();
+                int before = data.Unlocked != null ? data.Unlocked.Count : 0;
+                if (!data.MigrateOrder(manifest.Rev, manifest.Previous, manifest.Levels))
+                {
+                    return false;
+                }
+                int added = (data.Unlocked != null ? data.Unlocked.Count : 0) - before;
+                Debug.Log($"[SaveStore] progress migrated to order rev {manifest.Rev}: +{added} unlocked{note}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Warn("cannot migrate the progress: " + e.Message);
+                return false;
+            }
+        }
 
         /// <summary>The file in use: <see cref="PathOverride"/>, or the path <see cref="ChoosePath"/> gives this run.</summary>
         public static string FilePath => PathOverride ?? DefaultPath();
@@ -316,6 +373,11 @@ namespace OutOfSight
             {
                 Current = data;
                 LastLoad = SaveLoadStatus.Loaded;
+                // Levels v2 (LEVELS_V2.md 7): the one-shot order migration, written at once with the usual atomic write.
+                if (Migrate(Current, null))
+                {
+                    Save();
+                }
                 return;
             }
 
@@ -340,6 +402,10 @@ namespace OutOfSight
                 InMemory = true;
                 LastLoad = SaveLoadStatus.ReadError;
                 Warn($"{path} is unusable ({problem}) and cannot be set aside: running in memory");
+                if (backup != null)
+                {
+                    Migrate(Current, " (in memory only)");
+                }
                 return;
             }
             if (backup != null)
@@ -347,11 +413,13 @@ namespace OutOfSight
                 Current = backup;
                 LastLoad = SaveLoadStatus.FromBackup;
                 Warn($"{path} is unusable ({problem}): restored from {bak}, the bad file is kept as {path + BadSuffix}");
+                // Levels v2: the restored data is migrated before the write below, which saves it too (no second write).
+                Migrate(Current, null);
                 // The save file again holds the recovered data (the .bak stays as it was).
                 Save();
                 return;
             }
-            Current = new SaveData();
+            Current = NewSave();
             LastLoad = SaveLoadStatus.Reset;
             Warn($"{path} is unusable ({problem}) and has no usable backup: kept as {path + BadSuffix}, starting fresh");
         }
@@ -380,6 +448,10 @@ namespace OutOfSight
             {
                 Current = fromTmp;
                 LastLoad = SaveLoadStatus.FromTmp;
+                // Levels v2: migrated in memory only. The .tmp is moved into place as it is (never rewritten: it may be the
+                // only copy), so the migration is persisted by the next write; until then the next load migrates it again,
+                // with the same result.
+                Migrate(Current, " (saved with the next write)");
                 // The .tmp already holds the data: moving it into place never truncates the only copy, as a rewrite would.
                 if (!PromoteTmp(tmp, path))
                 {
@@ -410,12 +482,14 @@ namespace OutOfSight
                 Warn(tmpText != null
                     ? $"{path} was missing and {tmp} is unusable ({tmpProblem}): restored from {bak}"
                     : $"{path} was missing (an interrupted write): restored from {bak}");
+                // Levels v2: migrated before the write below, which saves it too (no second write).
+                Migrate(Current, null);
                 // The save file again holds the recovered data (the .bak stays as it was).
                 Save();
                 return;
             }
 
-            Current = new SaveData();
+            Current = NewSave();
             LastLoad = SaveLoadStatus.Fresh;
             if (tmpText != null || bakText != null)
             {
@@ -504,10 +578,19 @@ namespace OutOfSight
         /// <summary>M7 design (CONTRACT_M7 4.1): a win at <paramref name="difficulty"/>, its record under that difficulty's key.</summary>
         public static RecordResult RecordWin(string levelId, float seconds, string difficulty)
         {
+            return RecordWin(levelId, levelId, seconds, difficulty);
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): a win of <paramref name="levelId"/> (it joins Won) whose record is kept under
+        /// <paramref name="recordId"/> (<see cref="LevelDef.RecordId"/>) at <paramref name="difficulty"/>.
+        /// </summary>
+        public static RecordResult RecordWin(string levelId, string recordId, float seconds, string difficulty)
+        {
             RecordResult result = default;
             try
             {
-                result = Current.RecordWin(levelId, seconds, difficulty);
+                result = Current.RecordWin(levelId, recordId, seconds, difficulty);
             }
             catch (Exception e)
             {
@@ -592,6 +675,7 @@ namespace OutOfSight
             LastProblem = null;
             WriteCount = 0;
             ReplaceForTests = null;
+            ManifestOverride = null;
             // M6: AudioListener.volume is global state; back to the default options' volume so no test leaks it to the next.
             ApplyVolume();
             // M7: so is the quality level: back to the platform default (Haut on PC).

@@ -22,9 +22,9 @@ namespace OutOfSight.Editor
     /// bounds (the facing test of probe step 22 checks them against the procedural backrests).
     ///
     /// M5 (docs/CONTRACT_M5_v3.md 15.5, CONTRACT_M5 3 and 16.11): every rigged entry has a kind ("human" or "pet") and a
-    /// target eye height (0 for the humans: Tuning.EyeHeight; the dog: Tuning.DogEyeHeight). A pet's eyes are the vertices
+    /// target eye height (0 for the humans: Tuning.EyeHeight; the dog: Tuning.DogModelEyeHeight). A pet's eyes are the vertices
     /// of its "Eyes_*" materials (anywhere on the body: a dog's head is not on top), and its clip map names its Idle and
-    /// Walk exactly (the Shiba stores every clip twice, plain and "AnimalArmature|": the plain set is used). Bones and
+    /// Walk exactly (the Husky stores every clip twice, plain and "AnimalArmature|": the plain set is used). Bones and
     /// triangles are checked against PRD 7.4 (a pet: Tuning.BudgetPetBones), with a warning when over.
     ///
     /// M4.2: it also builds Assets/Resources/TextureLibrary.asset (the detail textures and their measured means) and
@@ -88,7 +88,7 @@ namespace OutOfSight.Editor
             }
         }
 
-        /// <summary>M5: the prefix of a pet's eye materials (the Shiba: Eyes_White, Eyes_Pupil, Eyes_Black).</summary>
+        /// <summary>M5: the prefix of a pet's eye materials (the Husky: Eyes_White, Eyes_Black).</summary>
         public const string PetEyeMaterialPrefix = "Eyes_";
 
         // CONTRACT_M3 3: Kenney seats face -Z in glTF (backrest on +Z). The procedural chair's backrest is on -z,
@@ -115,7 +115,10 @@ namespace OutOfSight.Editor
             new Spec(ModelCatalog.QuaterniusManTshirt, RoundedHumans + "quaternius_man_tshirt.glb", 0f, true),
             new Spec(ModelCatalog.QuaterniusWomanJacket, RoundedHumans + "quaternius_woman_jacket.glb", 0f, true),
             new Spec(ModelCatalog.QuaterniusWomanDress, RoundedHumans + "quaternius_woman_dress.glb", 0f, true),
-            Spec.Pet(ModelCatalog.QuaterniusShiba, Quaternius + "quaternius_shiba.glb", Tuning.DogEyeHeight, "Idle", "Walk"),
+            // DOGBIG (2026-11-21): the Husky replaced the Shiba (same AnimalArmature rig, same clips, 3 more tail bones), its
+            // model fitted bigger than the gameplay eye (Tuning.DogModelEyeHeight). Its GLB is the staged poly.pizza file with
+            // the materials renamed to the Shiba's names and a UV0 atlas added (docs/next/progress/DOGBIG.md).
+            Spec.Pet(ModelCatalog.QuaterniusHusky, Quaternius + "quaternius_husky.glb", Tuning.DogModelEyeHeight, "Idle", "Walk"),
             // M8 room objects (docs/m8/ROOMS_PLAN.md 3): the Kenney bed's pillows are on +Z in glTF, the fridge's handles and the
             // nightstand's knob on -Z, as the procedural bed (headboard +z) and the doors of every cabinet (-z): 0.
             new Spec(ModelCatalog.KenneyBed, Kenney + "kenney_bed_double.glb", 0f, false),
