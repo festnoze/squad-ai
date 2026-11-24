@@ -8,7 +8,7 @@
 identity:
   name: "Etienne Millerioux"
   title: "Lead AI Engineer / Forward Deployed Engineer"
-  location: "Montpellier, France"        # relocation to Strasbourg planned — full-remote by design
+  location: "Srtasbourg, France"
   linkedin: "https://www.linkedin.com/in/etiennemillerioux34"
   phone: "+33 (0)6 68 42 23 88"
   email: ""                              # dedicated Gmail — fill once created (also in .env)
@@ -115,12 +115,12 @@ geo_rules:
                       Netherlands, Germany, Switzerland, Nordics, Remote-worldwide]
     note: "Any country is fine if the working environment is English-speaking."
   remote: full_remote_only        # hybrid/on-site → eliminatory
-  exceptions: "Occasional on-site kickoffs acceptable if mission is France (TGV: Montpellier/Paris/Strasbourg)."
+  exceptions: "Occasional on-site kickoffs acceptable if mission is France (TGV: Paris/Lyon/Strasbourg/Montpellier/Lille)."
 
 engagement:
   wanted: [freelance, contract, mission, "contract-to-hire (contract phase)"]
   excluded: [permanent, CDI, internship, part-time under 3 days/week]
-  availability: "See CPIR calendar — commercial start Oct 2026 (optimistic) / early 2027 (prudent). Mention availability honestly in letters when asked."
+  availability: "01/2027. Mention availability honestly in letters when asked."
 
 red_flags:                 # each subtracts score; 'eliminatory: true' kills the mission
   - { pattern: "on-site / hybrid mandatory",          eliminatory: true }

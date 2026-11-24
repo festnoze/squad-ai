@@ -76,8 +76,9 @@ namespace OutOfSight.Core
             // line; the door hint of a leaf only the household opens; the lamp's hint inside a lit zone; and the intro
             // card's line per inhabitant ({0} the data name, {1} the personality label).
             // STARTFIX: the start press (Space, gamepad A, a tap) starts without moving, so a spawn inside a cone can wait.
-            { "hud.start", new[] { "Press Space to start (or move)", "Appuie sur Espace pour commencer (ou bouge)" } },
-            { "hud.startGamepad", new[] { "Press A to start (or move)", "Appuie sur A pour commencer (ou bouge)" } },
+            // STARTTAP: one short line per device (keyboard and mouse, gamepad, touch); moving still starts too.
+            { "hud.start", new[] { "Space or click to start", "Espace ou clic pour commencer" } },
+            { "hud.startGamepad", new[] { "Press A to start", "Appuie sur A pour commencer" } },
             { "hud.startTouch", new[] { "Tap the screen to start", "Touche l'écran pour commencer" } },
             { "hud.door.locked", new[] { "Locked", "Fermée à clé" } },
             { "hud.lit", new[] { "In the light: the dark won't hide you", "Dans la lumière : le noir ne te cache plus" } },
@@ -139,25 +140,25 @@ namespace OutOfSight.Core
             { "level7.name", new[] { "The Office", "Le bureau" } },
             { "level7.hint", new[] { "An office chair never stops on a dime.", "Une chaise à roulettes ne s'arrête jamais tout de suite." } },
             { "level8.name", new[] { "The Doors", "Les portes" } },
-            { "level8.hint", new[] { "Two closed doors, two ways out: the kitchen is quicker, the corridor is safer. A door seen swinging gives you away.",
-                "Deux portes fermées, deux chemins : la cuisine est plus rapide, le couloir plus sûr. Une porte qu'on voit bouger te trahit." } },
+            { "level8.hint", new[] { "Two closed doors, two ways out. A door seen swinging gives you away.",
+                "Deux portes fermées, deux chemins. Une porte qu'on voit bouger te trahit." } },
             { "level9.name", new[] { "The Robot", "Le robot" } },
             { "level9.hint", new[] { "Claire hears every hop on the parquet, except right beside the robot. Don't let it bump into you.",
                 "Claire entend chaque saut sur le parquet, sauf tout près du robot. Ne le laisse pas te cogner." } },
             { "level10.name", new[] { "The Rocking Chair", "Le fauteuil à bascule" } },
             { "level10.hint", new[] { "It keeps rocking after every stop: brake early.", "Il se balance après chaque arrêt : arrête-toi tôt." } },
             { "level11.name", new[] { "The Vase", "Le vase" } },
-            { "level11.hint", new[] { "Slow down ({careful}) before every turn or the vase falls. Lea can see the doormat through the doorway.",
-                "Ralentis ({careful}) avant chaque virage, sinon le vase tombe. Lea voit le paillasson par la porte." } },
+            { "level11.hint", new[] { "Slow down ({careful}) before every turn or the vase falls. Lea faces the wall first, then makes her rounds.",
+                "Ralentis ({careful}) avant chaque virage, sinon le vase tombe. Lea fait d'abord face au mur, puis elle fait sa ronde." } },
             { "level12.name", new[] { "The Dog", "Le chien" } },
             { "level12.hint", new[] { "Rex sees low: the sofas hide you from him. Paul sees over them.",
                 "Rex voit bas : les canapés te cachent de lui. Paul, lui, voit par-dessus." } },
             { "level13.name", new[] { "Wheels and a Vase", "Roulettes et vase" } },
-            { "level13.hint", new[] { "Ease into every start and turn ({careful}): the vase falls at the slightest jolt. Max watches the front door, not the cafeteria.",
-                "Démarre et tourne en douceur ({careful}) : le vase tombe à la moindre secousse. Max surveille l'accueil, pas la cafétéria." } },
+            { "level13.hint", new[] { "Ease into every start and turn ({careful}): the vase falls at the slightest jolt. Max takes you for one of the desk chairs; Claire does not.",
+                "Démarre et tourne en douceur ({careful}) : le vase tombe à la moindre secousse. Max te prend pour une chaise de bureau parmi d'autres ; Claire, non." } },
             { "level14.name", new[] { "The Mezzanine", "La mezzanine" } },
-            { "level14.hint", new[] { "Mamie sits on you first, then comes back for more: be across the mezzanine before she does.",
-                "Mamie s'assoit d'abord sur toi, puis elle revient : traverse la mezzanine avant son retour." } },
+            { "level14.hint", new[] { "Mamie sits on you first, then walks through the bathroom to the living room window: let her go ahead, and cross the mezzanine while her back is turned.",
+                "Mamie s'assoit d'abord sur toi, puis passe par la salle de bain jusqu'à la fenêtre du séjour : laisse-la prendre de l'avance, et traverse la mezzanine pendant qu'elle te tourne le dos." } },
             { "level15.name", new[] { "Let Sleeping Dogs Lie", "Chien qui dort" } },
             { "level15.hint", new[] { "The rocker swings a moment after every stop, less if you brake gently ({careful}). Rex only sees what moves.",
                 "Le fauteuil se balance un instant après chaque arrêt, moins si tu freines en douceur ({careful}). Rex ne voit que ce qui bouge." } },
@@ -171,26 +172,26 @@ namespace OutOfSight.Core
             { "level18.hint", new[] { "The stool fits in the wardrobe: push into it to hide inside, push away to come back out.",
                 "Le tabouret tient dans l'armoire : pousse vers elle pour t'y cacher, pousse dans l'autre sens pour en sortir." } },
             { "level20.name", new[] { "Midnight Munchies", "Fringale de minuit" } },
-            { "level20.hint", new[] { "Switched off, you are only seen up close, and some eyes reach further than others: mind the distance, not the clock. Maman paces the corridor and notices every door you open.",
-                "Éteinte, on ne te voit que de près, et certains yeux portent plus loin que d'autres : surveille la distance, pas l'horloge. Maman fait les cent pas dans le couloir et remarque chaque porte que tu ouvres." } },
+            { "level20.hint", new[] { "Switched off, you are only seen up close, and some eyes reach further than others. Maman keeps watch at the end of the corridor and notices every door you open.",
+                "Éteinte, on ne te voit que de près, et certains yeux portent plus loin que d'autres. Maman monte la garde au bout du couloir et remarque chaque porte que tu ouvres." } },
             { "level23.name", new[] { "Upstairs, Downstairs", "Le haut et le bas" } },
             { "level23.hint", new[] { "Hugo opens the hall door for you. Odile looks away, but not long enough: hide halfway.", "Hugo t'ouvre le couloir. Odile détourne les yeux, mais pas assez longtemps : cache-toi à mi-chemin." } },
             { "level19.name", new[] { "Hide and Seek, Family Size", "Cache-cache en famille" } },
             { "level19.hint", new[] { "Maman watches the gallery, regular as clockwork. Now and then Papa leaves the sofa for the kitchen, and he takes the gallery too.",
                 "Maman surveille la galerie, réglée comme une horloge. De temps en temps, Papa quitte le canapé pour la cuisine, et lui aussi passe par la galerie." } },
             { "level21.name", new[] { "The Catwalk", "La passerelle" } },
-            { "level21.hint", new[] { "Bertrand and Sofia watch the catwalk from their desks. Kevin runs back and forth all day, and never looks twice at an office chair.",
-                "Bertrand et Sofia surveillent la passerelle depuis leurs bureaux. Kevin fait des allers-retours toute la journée, et ne regarde jamais deux fois une chaise de bureau." } },
+            { "level21.hint", new[] { "Bertrand and Sofia watch the catwalk from their desks. Kevin runs between the hall and the cafeteria, and a robot hums by the photocopier.",
+                "Bertrand et Sofia surveillent la passerelle depuis leurs bureaux. Kevin court entre l'accueil et la cafétéria, et un robot ronronne près de la photocopieuse." } },
             { "level22.name", new[] { "Skeletons in the Closet", "Des cadavres dans le placard" } },
-            { "level22.hint", new[] { "Alfred never stands still. Mamie never stays in one room. The Comtesse remembers every door in her house.",
-                "Alfred ne tient pas en place. Mamie change sans cesse de pièce. La Comtesse se souvient de chaque porte de sa maison." } },
+            { "level22.hint", new[] { "Alfred watches the east corridor and looks away now and then. Mamie never stays in one room. The Comtesse remembers every door in her house.",
+                "Alfred surveille le couloir est et détourne parfois le regard. Mamie change sans cesse de pièce. La Comtesse se souvient de chaque porte de sa maison." } },
             { "level25.name", new[] { "The Showroom", "Le magasin de meubles" } },
             // If LV12 falls back to a loop for Marcel, drop "at random" / "au hasard" (LEVELS_V2.md 8).
-            { "level25.hint", new[] { "Marcel does his rounds at random and never counts the chairs. Freeze only where a chair belongs.",
-                "Marcel fait sa ronde au hasard et ne compte jamais les chaises. Ne t'arrête que là où une chaise a sa place." } },
+            { "level25.hint", new[] { "Marcel zigzags through the shop, Nina sweeps by the door, and the lights stay on. Freeze only where a chair belongs.",
+                "Marcel zigzague dans la boutique, Nina passe et repasse près de la porte, et les lumières restent allumées. Ne t'arrête que là où une chaise a sa place." } },
             { "level24.name", new[] { "The Great Escape", "La grande évasion" } },
-            { "level24.hint", new[] { "The whole family is up. Rex walks the landing, Lea keeps the hall, Theo and Mamie come and go.",
-                "Toute la famille est debout. Rex arpente le palier, Lea garde l'entrée, Theo et Mamie vont et viennent." } },
+            { "level24.hint", new[] { "Rex watches the long corridor: stay behind the sideboards. Hide among the dining chairs while Theo and Mamie look away. Behind Theo the runner starts a step too late: cross that bare floor while the robot hums close by. Lea watches the doormat; go when she turns her head.",
+                "Rex surveille le long couloir : reste derrière les buffets. Cache-toi parmi les chaises de la salle à manger pendant que Theo et Mamie regardent ailleurs. Derrière Theo, le tapis commence un pas trop tard : traverse ce parquet nu quand le robot ronronne tout près. Lea surveille le paillasson ; file quand elle tourne la tête." } },
 
             { "person.dreamer", new[] { "The Daydreamer", "Le rêveur" } },
             { "person.dreamer.trait", new[] { "Dawdles along and hardly looks around.", "Il traîne et regarde peu autour de lui." } },
@@ -210,6 +211,17 @@ namespace OutOfSight.Core
 
             { "select.locked", new[] { "Locked", "Verrouillé" } },
             { "select.back", new[] { "Back", "Retour" } },
+            // SPECTATOR: the level select's checkbox, the HUD's tag and controls line per device, and the pause menu's way
+            // back to the level select. The keyboard line names the physical keys: Q on QWERTY is A on AZERTY.
+            { "select.spectator", new[] { "Spectator mode", "Mode spectateur" } },
+            { "hud.spectatorTag", new[] { "SPECTATOR", "SPECTATEUR" } },
+            { "hud.spectator", new[] { "WASD/Arrows: fly    Space/E: up    Ctrl/Q: down    Shift: faster    Wheel: speed    Mouse: look    Esc: pause",
+                "ZQSD/Flèches : voler    Espace/E : monter    Ctrl/A : descendre    Maj : plus vite    Molette : vitesse    Souris : regarder    Échap : pause" } },
+            { "hud.spectatorGamepad", new[] { "Left stick: fly    Right stick: look    RT/LT: up/down    L3: faster    Start: pause",
+                "Stick gauche : voler    Stick droit : regarder    RT/LT : monter/descendre    L3 : plus vite    Start : pause" } },
+            { "hud.spectatorTouch", new[] { "Left thumb: fly    Swipe right side: look    Pinch: up/down    II: pause",
+                "Pouce gauche : voler    Glisser à droite : regarder    Pincer : monter/descendre    II : pause" } },
+            { "pause.levels", new[] { "Level select", "Choix du niveau" } },
             { "select.best", new[] { "{0} s", "{0} s" } },
             { "select.none", new[] { "-", "-" } },
             // M7 level select: the title column's progress line and its legend of the miniatures.
@@ -573,6 +585,24 @@ namespace OutOfSight.Core
         public static string TitleLevels => Get("title.levels");
         public static string SelectLocked => Get("select.locked");
         public static string SelectBack => Get("select.back");
+
+        /// <summary>SPECTATOR: the level select's checkbox label.</summary>
+        public static string SelectSpectator => Get("select.spectator");
+
+        /// <summary>SPECTATOR: the HUD's tag while a level is watched in spectator mode.</summary>
+        public static string HudSpectatorTag => Get("hud.spectatorTag");
+
+        /// <summary>SPECTATOR: the free camera's controls line (keyboard and mouse).</summary>
+        public static string HudSpectator => Get("hud.spectator");
+
+        /// <summary>SPECTATOR: the free camera's controls line (gamepad).</summary>
+        public static string HudSpectatorGamepad => Get("hud.spectatorGamepad");
+
+        /// <summary>SPECTATOR: the free camera's controls line (touch).</summary>
+        public static string HudSpectatorTouch => Get("hud.spectatorTouch");
+
+        /// <summary>SPECTATOR: the pause menu's "Main menu" button in spectator mode, which goes back to the level select.</summary>
+        public static string PauseLevels => Get("pause.levels");
         public static string SelectBest => Get("select.best");
         public static string SelectNone => Get("select.none");
         public static string SelectProgress => Get("select.progress");

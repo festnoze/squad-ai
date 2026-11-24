@@ -44,7 +44,7 @@
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
       "wallFinish": "limewash",
-      "floorFinish": "verde"
+      "floorFinish": "ivorytile"
     },
     {
       "id": "sejour",
@@ -289,6 +289,7 @@
     {
       "name": "Plan",
       "kind": "kitchen_sink",
+      "dress": "kitchen_sink_cabinet",
       "x": 15.7,
       "z": 8.6,
       "yaw": 0.0,
@@ -337,7 +338,56 @@
       "occluder": true,
       "color": "#8C5A36",
       "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "PlanteCuisine",
+      "kind": "plant",
+      "x": 17.5,
+      "z": 8.5,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.5,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteBureau",
+      "kind": "plant",
+      "x": 0.4,
+      "z": 0.4,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.0,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteChambre",
+      "kind": "plant",
+      "x": 0.4,
+      "z": 5.4,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.35,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Canape", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "photo_frame", "host": "BuffetBas", "x": -0.5, "z": 0.1, "yaw": 172.0 },
+    { "kind": "tabletop_pothos", "host": "BuffetBas", "x": -0.75, "z": 0.07, "yaw": 180.0 },
+    { "kind": "key_dish", "host": "Meuble", "x": 0.25, "z": -0.0, "yaw": 180.0 },
+    { "kind": "open_book", "host": "BureauTable", "x": -0.24, "z": 0.06, "yaw": 0.0 },
+    { "kind": "ceramic_mug", "host": "BureauTable", "x": 0.06, "z": 0.03, "yaw": 0.0 },
+    { "kind": "clothes_heap", "host": "floor", "x": 2.0, "z": 8.35, "yaw": 90.0 },
+    { "kind": "odd_socks", "host": "floor", "x": 0.9, "z": 6.5, "yaw": 30.0 }
   ],
   "designerRoute": [
     { "x": 2.75, "z": 6.75, "at": 6.8 },

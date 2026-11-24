@@ -660,6 +660,108 @@ namespace OutOfSight.Tests
             AssertNoErrors();
         }
 
+        /// <summary>The samples of a mono clip (Decompress On Load, so GetData reads the decoded PCM).</summary>
+        private static float[] Samples(AudioClip clip)
+        {
+            var data = new float[clip.samples * clip.channels];
+            Assert.IsTrue(clip.GetData(data, 0), clip.name + ": GetData failed");
+            return data;
+        }
+
+        /// <summary>
+        /// The RMS frequency in Hz from the first difference, 2 asin(rms(dx) / (2 rms(x))) * rate / (2 pi): a pure tone reads its
+        /// own frequency, so it is a brightness measure (power weighted) without an FFT. tools/audio/make_sounds.py prints the
+        /// same number for every file (rms_frequency_hz).
+        /// </summary>
+        private static float RmsFrequency(float[] x, int rate)
+        {
+            double sum = 0, diff = 0;
+            for (int i = 0; i < x.Length; i++)
+            {
+                sum += (double)x[i] * x[i];
+                if (i > 0)
+                {
+                    double d = x[i] - x[i - 1];
+                    diff += d * d;
+                }
+            }
+            double ratio = System.Math.Sqrt(diff / System.Math.Max(1, x.Length - 1)) / (2 * System.Math.Sqrt(sum / x.Length) + 1e-20);
+            return (float)(2 * System.Math.Asin(System.Math.Min(1.0, ratio)) * rate / (2 * System.Math.PI));
+        }
+
+        /// <summary>No clipping, no DC, and the fades end on silence at both edges (no click when the clip starts or stops).</summary>
+        private static void AssertClean(string role, float[] x)
+        {
+            float peak = 0f;
+            double mean = 0;
+            foreach (float v in x)
+            {
+                peak = Mathf.Max(peak, Mathf.Abs(v));
+                mean += v;
+            }
+            mean /= x.Length;
+            Assert.Less(peak, 0.99f, role + ": clipped");
+            Assert.Greater(peak, 0.1f, role + ": premise, the clip is not silent");
+            Assert.Less(System.Math.Abs(mean), 0.005, role + ": DC offset");
+            Assert.Less(Mathf.Abs(x[0]), 0.02f, role + ": the clip does not start on silence (a click)");
+            Assert.Less(Mathf.Abs(x[x.Length - 1]), 0.02f, role + ": the clip does not end on silence (a click)");
+        }
+
+        /// <summary>
+        /// SOUNDS (2026-11-24, docs/next/progress/SOUNDS.md): the furniture's step (hop) and the caught stings, made for the game
+        /// by tools/audio/make_sounds.py. SOUNDS2: the step is a muffled carpet footstep (a padded thump, a low-mid pile body
+        /// and a faint fabric whisper, no glassy tick): darker than the felted wood with a tick it replaces (RMS frequency 770
+        /// to 1130 Hz, made 510 to 880 Hz), yet not a dull sub thump; each step ends before the next one starts; the muffled
+        /// step on a thick rug is darker still than every hard one (made 205 to 320 Hz). The short sting is a 1 to 1.5 s
+        /// "busted" hit, the long one longer. Every clip is clean.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Step27i_MoveStepAndCaughtStingsAreShaped()
+        {
+            AudioLibrary library = RequireLibrary();
+            Assert.AreEqual(4, library.hops.Length, "premise: four hop variants");
+            Assert.AreEqual(4, library.softHops.Length, "premise: four muffled hop variants");
+            float hopInterval = Mathf.PI / Tuning.HopFrequency;
+            float darkestHard = float.MaxValue;
+            float hardSum = 0f;
+            for (int v = 0; v < 4; v++)
+            {
+                AudioClip hard = library.hops[v].clip;
+                float[] x = Samples(hard);
+                AssertClean(hard.name, x);
+                Assert.Less(hard.length, hopInterval, hard.name + " still rings when the next hop starts");
+                float brightness = RmsFrequency(x, hard.frequency);
+                Debug.Log($"[Probe] Step27i: {hard.name} {hard.length:0.000} s, RMS frequency {brightness:0} Hz");
+                Assert.That(brightness, Is.InRange(380f, 950f), hard.name + ": the carpet step is a sub thump or too bright");
+                darkestHard = Mathf.Min(darkestHard, brightness);
+                hardSum += brightness;
+            }
+            // The four together stay darker than the old felted step with its glassy tick (mean about 950 Hz).
+            Assert.Less(hardSum / 4f, 800f, "the carpet steps are not muffled on average");
+            for (int v = 0; v < 4; v++)
+            {
+                AudioClip soft = library.softHops[v].clip;
+                float[] x = Samples(soft);
+                AssertClean(soft.name, x);
+                Assert.Less(soft.length, hopInterval, soft.name + " still rings when the next hop starts");
+                float brightness = RmsFrequency(x, soft.frequency);
+                Debug.Log($"[Probe] Step27i: {soft.name} {soft.length:0.000} s, RMS frequency {brightness:0} Hz");
+                Assert.Less(brightness, 0.7f * darkestHard, soft.name + ": the muffled step is not darker than the hard ones");
+                Assert.Less(brightness, 400f, soft.name + ": the step on a thick rug is not muffled");
+            }
+            // The muffled step also plays 10 dB under the hard one (the Tuning mixes, both files at the same loudness).
+            Assert.Less(Tuning.SfxSoftHopMix, Tuning.SfxHopMix * 0.5f, "the muffled step is not quieter than the hard one");
+
+            AudioClip shortSting = library.stingCaught.clip;
+            AudioClip longSting = library.stingCaughtLong.clip;
+            AssertClean(shortSting.name, Samples(shortSting));
+            AssertClean(longSting.name, Samples(longSting));
+            Assert.That(shortSting.length, Is.InRange(0.9f, 1.6f), "the caught sting is a short hit");
+            Assert.That(longSting.length, Is.InRange(shortSting.length, 3f), "the slow defeat sting is the longer one");
+            yield return Steps(2);
+            AssertNoErrors();
+        }
+
         [UnityTest]
         public IEnumerator Step27g_UiClickIgnoresTheListenerPause()
         {

@@ -135,7 +135,7 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// Step 90a: in the see-through and both looks, a long outer wall seen from close outside it (more than the enter
-        /// coverage of the screen) vanishes, its door frames standing opaque; the same wall from far (a small part of the screen) keeps
+        /// coverage of the screen) vanishes, its door frames with it (DOORFADE); the same wall from far (a small part of the screen) keeps
         /// the opacity option; both keeps the stubs; lowered and off ignore the coverage.
         /// </summary>
         [UnityTest]
@@ -167,7 +167,7 @@ namespace OutOfSight.Tests
                     Assert.IsTrue(fader.VanishingOf(cap), $"{id}: {cap.transform.parent.name} covers {near:0.00} of the screen and does not vanish");
                     Assert.AreEqual(0f, fader.AlphaOf(cap), 1e-4f, $"{id}: a near outer wall still shows at the opacity option");
                     Assert.AreEqual(0f, fader.LevelOf(cap), 1e-4f, $"{id}: a vanished wall reads as standing (its fixtures would show)");
-                    // Its door frames (registered on its plane) stand opaque in the vanished wall (M9 doors rule: doors never move).
+                    // Its door frames (registered on its plane) vanish with it (DOORFADE, replacing the M9 doors rule).
                     foreach (MeshRenderer r in renderers)
                     {
                         if (r.name != "DoorFrame" || !fader.IsOuter(r) || !fader.PlaneOf(r, out Vector3 fp, out Vector3 fn)
@@ -176,8 +176,8 @@ namespace OutOfSight.Tests
                             continue;
                         }
                         checkedFrames++;
-                        Assert.IsFalse(Cut(r), $"{id}: the door frame of a vanished wall is out of the way (doors never move)");
-                        Assert.AreEqual(1f, fader.AlphaOf(r), 1e-4f, $"{id}: the door frame of a vanished wall is not opaque");
+                        Assert.IsTrue(Cut(r), $"{id}: the door frame of a vanished wall still stands (DOORFADE)");
+                        Assert.AreEqual(0f, fader.AlphaOf(r), 1e-4f, $"{id}: the door frame of a vanished wall still shows");
                     }
 
                     SetWalls(SaveOptions.WallsBoth, 35);

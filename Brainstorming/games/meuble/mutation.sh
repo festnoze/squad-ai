@@ -73,8 +73,8 @@ MUTATIONS=(
   "tmp_restore|Assets/Scripts/Runtime/SaveStore.cs|SaveData fromTmp = tmpText != null ? SaveData.Parse(tmpText, out tmpProblem) : null; // MUTATION:TMP_RESTORE|SaveData fromTmp = null; // MUTATION:TMP_RESTORE|EditMode|A_missing_file_with_a_good_tmp_is_restored_from_it_before_the_bak A_locked_tmp_in_the_fallback_is_kept_and_restored_at_the_next_load"
   "missing_bak|Assets/Scripts/Runtime/SaveStore.cs|SaveData fromBak = bakText != null ? SaveData.Parse(bakText, out bakProblem) : null; // MUTATION:MISSING_BAK|SaveData fromBak = null; // MUTATION:MISSING_BAK|EditMode|Missing_file_"
   "leaf_last_step|Assets/Scripts/Runtime/DoorLeaf.cs|SwingProgress = 1f; // MUTATION:LEAF_LAST_STEP|SwingProgress = 1f; Swinging = false; // MUTATION:LEAF_LAST_STEP|PlayMode|Step36_LeafPosesAndTheColliderAndOcclusionSwap Step36c_EOpensTheLeafInExactlyThirtyMovingSteps"
-  # M9 doors rule: the leaf box rule (LEAF_FADE) no longer applies to any part (doors never move); DOORS_STAND guards the rule.
-  "doors_stand|Assets/Scripts/Runtime/WallFader.cs|hidden &= !e.Door; // MUTATION:DOORS_STAND|hidden &= true; // MUTATION:DOORS_STAND|PlayMode|Step36l_ Step36o_ Step70b_ Step70f_ Step90a_"
+  # DOORFADE (2026-11-24): door parts go with their wall's plane only; the leaf box rule (LEAF_FADE) never moves them.
+  "doors_no_box|Assets/Scripts/Runtime/WallFader.cs|if (!none && !hidden && !e.Door && e.Box != null) // MUTATION:DOORS_NO_BOX|if (!none && !hidden && e.Box != null) // MUTATION:DOORS_NO_BOX|PlayMode|Step36o_"
   "dog_asleep|Assets/Scripts/Runtime/Vision.cs|if (routine.Asleep) // MUTATION:DOG_ASLEEP|if (false) // MUTATION:DOG_ASLEEP|PlayMode|Step38g_"
   "draw_slots|Assets/Scripts/Runtime/Probe.cs|count.MaterialSlots++; // MUTATION:DRAW_SLOTS|// MUTATION:DRAW_SLOTS removed|PlayMode|Step22c_"
   "visual_slope|Assets/Scripts/Runtime/FurnitureController.cs|if (GroundFrame(position, yaw, ref ground, ref lift)) // MUTATION:VISUAL_SLOPE|if (false) // MUTATION:VISUAL_SLOPE|PlayMode|Step39k_"

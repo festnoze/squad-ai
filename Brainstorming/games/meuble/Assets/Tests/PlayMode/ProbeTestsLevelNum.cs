@@ -13,14 +13,14 @@ namespace OutOfSight.Tests
     /// <summary>
     /// LEVELNUM round 2 (docs/next/progress/LEVELNUM.md), on the real Boot scene with the start hold on (the player's
     /// case): the held intro card lays a greyish-black dim (0.6 since LEVELNUM2) over the scene, under every HUD text,
-    /// with the level select's number (level1 is 1, level20 is 19, level19 would be 17) as holes in it (nearly clear
+    /// with the level select's number (level1 is 1, level22 is 19, level19 is 18 since levels.json rev 3) as holes in it (nearly clear
     /// glass inside, digits from the baked Inter distance field). The number starts at startZoom (12.4) times its settled
     /// size and zooms out over zoomSeconds (2 s, expo ease-out) to settledHeight (half the screen height), centred, inside
     /// the screen's width on a 20:9 phone and a 16:9 PC screen. The zoom freezes while paused, a restart replays it,
     /// reduced motion shows the final state at once, and the first input takes the dim, the holes and the card away
     /// together in a short fade. It writes the zoom at t = 0, 0.15, 0.3, 0.6, 1.0 s and the final state to
-    /// Build/shots/levelnum (the HUD canvas rendered through the camera, ProbeTestsBars' way), on level1 and on the night
-    /// level20. The built player's own shots come from "-autoShot" (Menu.AutoShot).
+    /// Build/shots/levelnum (the HUD canvas rendered through the camera, ProbeTestsBars' way), on level1 and on level22 (a
+    /// two-digit card; the night level20 left the line-up in rev 3, ACT3A). The built player's own shots come from "-autoShot" (Menu.AutoShot).
     /// </summary>
     public sealed class ProbeTestsLevelNum
     {
@@ -213,18 +213,20 @@ namespace OutOfSight.Tests
             }
         }
 
-        /// <summary>LevelNum01: the number, the dim, the holes, the zoom and the layout on level1 and level20, with the shots.</summary>
+        /// <summary>LevelNum01: the number, the dim, the holes, the zoom and the layout on level1 and level22, with the shots.</summary>
         [UnityTest]
         [Timeout(300000)]
         public IEnumerator LevelNum01_NumberHolesInTheDimZoomAndFit()
         {
-            Assert.AreEqual(17, LevelSelect.DisplayNumber(Game.LevelOrder, "level19"), "level19 is not shown as the level select's 17");
+            Assert.AreEqual(18, LevelSelect.DisplayNumber(Game.LevelOrder, "level19"), "level19 is not shown as the level select's 18 (rev 3)");
+            Assert.AreEqual(17, LevelSelect.DisplayNumber(Game.LevelOrder, "level25"), "level25 (act 3 opener) is not shown as the level select's 17");
+            Assert.AreEqual(0, LevelSelect.DisplayNumber(Game.LevelOrder, "level20"), "the parked level20 got a number");
             Assert.AreEqual(0, LevelSelect.DisplayNumber(Game.LevelOrder, "test_v2_litzone"), "a level outside levels.json got a number");
             Assert.IsTrue(Hud.LevelNumberHolesReady, $"the dim has no holes: {CardNumber.DimShaderName} or {CardNumber.MaskShaderName} is missing");
             Assert.Less(Hud.transform.Find("CardBackdrop").GetSiblingIndex(), Hud.transform.Find("TitleCard").GetSiblingIndex(),
                 "the dim is not under the card's text");
             Directory.CreateDirectory(ShotDir);
-            foreach (string id in new[] { "level1", "level20" })
+            foreach (string id in new[] { "level1", "level22" })
             {
                 int expected = LevelSelect.DisplayNumber(Game.LevelOrder, id);
                 Assert.Greater(expected, 0, $"premise: {id} is not in levels.json");

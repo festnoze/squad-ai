@@ -42,7 +42,7 @@ namespace OutOfSight
             }
             Rect interior = level.InteriorBounds();
             float side = Mathf.Max(interior.width, interior.height);
-            float scaled = Tuning.OrbitDistanceMax * side / Tuning.CameraHouseReferenceSide;
+            float scaled = Mathf.Max(Tuning.OrbitDistanceMax * side / Tuning.CameraHouseReferenceSide, side * Tuning.CameraWholeHouseFit);
             return Mathf.Clamp(scaled, Tuning.OrbitDistanceMax, Tuning.CameraMaxDistanceHouse);
         }
 
@@ -179,7 +179,9 @@ namespace OutOfSight
                 Pitch = Mathf.Clamp(Pitch - drag.y * Tuning.TouchOrbitDegPerPixel * sens, Tuning.PitchMin, Tuning.PitchMax);
                 // M5: a notch moves the same fraction of the zoom range in every house (0.35 m on levels 1 to 7).
                 float notch = 0.35f * MaxDistance / Tuning.OrbitDistanceMax;
-                Distance = Mathf.Clamp(Distance - InputReader.ZoomNotches() * notch, Tuning.OrbitDistanceMin, MaxDistance);
+                // PINCH: two fingers spread apart zoom in, pinched together zoom out, scaled like the notch.
+                float pinch = InputReader.TouchPinchDelta() * Tuning.TouchPinchMetresPerPixel * MaxDistance / Tuning.OrbitDistanceMax;
+                Distance = Mathf.Clamp(Distance - InputReader.ZoomNotches() * notch - pinch, Tuning.OrbitDistanceMin, MaxDistance);
             }
 
             // Critically damped spring on the focus point (SmoothDamp is one), 0.12 s.

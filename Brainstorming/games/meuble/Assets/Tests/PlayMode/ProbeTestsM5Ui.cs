@@ -654,27 +654,26 @@ namespace OutOfSight.Tests
         // ----- 41h: levels v2, a v1 save migrated at boot, the act tags (docs/levels_v2/LEVELS_V2.md 7) -----
 
         /// <summary>
-        /// A v1 save (level1 to level10 won, no "order") booted with the v2 manifest: the migration opens level11 through
-        /// Unlocked and writes the save; the level select opens exactly the won levels, level12 (after level9) and level11,
-        /// selects Jouer's level (level12) by default, and the first card of each act wears its act tag.
+        /// A rev 2 save (the first 16 cards won, up to level17, "order": 2) booted with the rev 3 manifest (ACT3A: act 3 opens
+        /// on level25, then level19): the migration opens level19 through Unlocked (playable in rev 2 after level17) and writes
+        /// the save; the level select opens exactly the won levels, level25 (after level17) and level19, selects Jouer's level
+        /// (level25) by default, and the first card of each act wears its act tag. The v1 to v2 worked cases live in
+        /// SaveM5Tests on the rev 2 manifest.
         /// </summary>
         [UnityTest]
         public IEnumerator Step41h_MigratedSaveOpensTheExpectedCardsAndTheActTags()
         {
             ManifestDef manifest = LevelLoader.LoadManifestDef();
-            Assert.GreaterOrEqual(manifest.Rev, 2, "premise: levels.json is the v2 manifest");
+            Assert.GreaterOrEqual(manifest.Rev, 3, "premise: levels.json is the rev 3 manifest (ACT3A)");
             Assert.GreaterOrEqual(manifest.Acts.Count, 2, "premise: levels.json lists the acts");
             CollectionAssert.AreEqual(manifest.Levels, Order, "premise: the game plays the manifest's order");
             string file = Path.Combine(NewTempDir(), SaveStore.FileName);
-            var won = new List<string>();
-            for (int n = 1; n <= 10; n++)
-            {
-                won.Add("level" + n);
-            }
+            var won = manifest.Previous.GetRange(0, 16);
+            CollectionAssert.AreEqual(won, manifest.Levels.GetRange(0, 16), "premise: acts 1 and 2 kept their rev 2 order");
             // The record of level1 under its RecordId; when level1 has a rev, an older bare record beside it (never shown).
             string level1Record = RecordIdOf("level1");
             string best = "\"" + level1Record + "\": 8.5" + (level1Record != "level1" ? ", \"level1\": 3.0" : "");
-            File.WriteAllText(file, "{ \"version\": 1, \"won\": [\"" + string.Join("\", \"", won) + "\"], \"best\": { " + best + " } }");
+            File.WriteAllText(file, "{ \"version\": 1, \"order\": 2, \"won\": [\"" + string.Join("\", \"", won) + "\"], \"best\": { " + best + " } }");
             var infos = new List<string>();
             Application.LogCallback onInfo = (condition, stack, type) =>
             {
@@ -695,9 +694,9 @@ namespace OutOfSight.Tests
 
             Assert.AreEqual(file, SaveStore.FilePath, "premise: the boot did not keep the injected save path");
             Assert.AreEqual(0, main.FailedSteps);
-            Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the v1 save loads");
+            Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the rev 2 save loads");
             Assert.AreEqual(manifest.Rev, SaveStore.Current.Order, "the boot did not migrate the save");
-            CollectionAssert.AreEqual(new[] { "level11" }, SaveStore.Current.Unlocked);
+            CollectionAssert.AreEqual(new[] { "level19" }, SaveStore.Current.Unlocked);
             Assert.IsTrue(infos.Exists(l => l == $"[SaveStore] progress migrated to order rev {manifest.Rev}: +1 unlocked"),
                 "no migration log line: " + string.Join(" | ", infos.FindAll(l => l.StartsWith("[SaveStore]"))));
             SaveData disk = ReadSaveFile();
@@ -707,7 +706,7 @@ namespace OutOfSight.Tests
             SaveStore.UnlockAll = false;
             OpenSelect();
             yield return null;
-            var open = new HashSet<string>(won) { "level12", "level11" };
+            var open = new HashSet<string>(won) { "level25", "level19" };
             for (int i = 0; i < Order.Count; i++)
             {
                 LevelSelect.Card card = Select.Cards[i];
@@ -716,8 +715,8 @@ namespace OutOfSight.Tests
                 Assert.AreEqual(expected, card.Button.interactable, $"card {i + 1} ({card.LevelId}) interactable");
                 Assert.AreEqual(!expected, card.Locked.enabled, $"card {i + 1} ({card.LevelId}) lock line");
             }
-            LevelSelect.Card target = Select.Cards[manifest.Levels.IndexOf("level12")];
-            Assert.AreEqual(target.Button, Menu.DefaultButton, "the default selection is not Jouer's level (level12)");
+            LevelSelect.Card target = Select.Cards[manifest.Levels.IndexOf("level25")];
+            Assert.AreEqual(target.Button, Menu.DefaultButton, "the default selection is not Jouer's level (level25)");
             yield return UntilFrames(() => Selected == target.Button.gameObject, 10);
             Assert.AreEqual(target.Button.gameObject, Selected, "the card of Jouer's level is not selected on open");
             Assert.AreEqual(string.Format(Strings.SelectBest, Seconds(8.5f)), Select.Cards[0].Best.text, $"a migrated save lost its record (or showed a record not kept under {level1Record})");

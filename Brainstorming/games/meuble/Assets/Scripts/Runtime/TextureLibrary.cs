@@ -386,6 +386,21 @@ namespace OutOfSight
             }
         }
 
+        private static Texture2D bananaLeafColour;
+
+        /// <summary>The unit-UV albedo shared by the large leaves of the potted plant.</summary>
+        public static Texture2D BananaLeafColour
+        {
+            get
+            {
+                if (bananaLeafColour == null)
+                {
+                    bananaLeafColour = Resources.Load<Texture2D>("BananaLeaf");
+                }
+                return bananaLeafColour;
+            }
+        }
+
         /// <summary>
         /// The surface a texture shows: the detail or the colour map of that surface; Lacquer for the player's own colour
         /// map (it replaces the lacquer the player furniture showed); Plain for the flat map, null or any other texture.
@@ -404,6 +419,10 @@ namespace OutOfSight
             if (texture == library.rugColour)
             {
                 return Surface.Carpet;
+            }
+            if (texture == bananaLeafColour)
+            {
+                return Surface.Foliage;
             }
             foreach (Entry e in library.entries)
             {
@@ -472,7 +491,7 @@ namespace OutOfSight
             {
                 return true;
             }
-            if (texture == library.rugColour)
+            if (texture == library.rugColour || texture == bananaLeafColour)
             {
                 return true;
             }

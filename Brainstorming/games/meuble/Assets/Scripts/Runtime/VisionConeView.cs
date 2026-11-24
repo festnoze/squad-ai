@@ -206,6 +206,19 @@ namespace OutOfSight
         /// <summary>Height the rays aim at: the top sample height of the player furniture.</summary>
         public float TargetHeight = 0.87f;
 
+        /// <summary>
+        /// CONECLIP (docs/next/progress/CONECLIP.md): the planar half diagonal of the furniture's top samples around its
+        /// centre (LevelBuilder.ConeTargetRadius). A low cover's shadow ends this much nearer, so a furniture centred just
+        /// inside the shadow whose far top corner pokes out of it is still under the fan.
+        /// </summary>
+        public float TargetRadius;
+
+        /// <summary>
+        /// CONECLIP: the shadows of the low covers are taken out of the fan (<see cref="ShadowReach"/>). False only in the
+        /// ConeClipShots look tool, to render the old fan beside the new one.
+        /// </summary>
+        public static bool ClipShadows = true;
+
         /// <summary>Cones look: the fan's shader (Assets/Settings/VisionCone.shader; it ships with XRay_Cone.mat and in Always Included Shaders).</summary>
         public const string ConeShaderName = "OutOfSight/Vision Cone";
 
@@ -312,6 +325,21 @@ namespace OutOfSight
         // Cones look: per mesh vertex, the shader's two UV channels (see the class summary), and this watcher's phase seed.
         private Vector2[] meshLocal;
         private Vector4[] meshData;
+        // CONECLIP: per mesh vertex (UV2.x), 1 where the furniture top is hidden by a low cover in the middle of a ray (the
+        // shader cuts the fan there), 0 elsewhere. Per ray: its reach once the end shadow is cut, and its middle shadows.
+        private Vector2[] meshHidden;
+        private float[] rayReach;
+        private int[] gapCount;
+        private float[] gapStart;
+        private float[] gapEnd;
+        private const int MaxGaps = 4;
+        // CONECLIP: a collider whose bottom is higher than this above the eye's floor is not a cover standing on the floor
+        // (a lintel, a shelf): what lies under it may be seen, so it casts no shadow on the fan.
+        private const float CoverFloorGap = 0.05f;
+        private static readonly RaycastHit[] ShadowHits = new RaycastHit[16];
+        private static readonly RaycastHit[] BackHits = new RaycastHit[16];
+        private static readonly float[] SpanStart = new float[16];
+        private static readonly float[] SpanEnd = new float[16];
         private float seed;
         // M5B m14: a sample is raised to the floor of any other sample this many spacings away (diagonal neighbours included).
         private const float DrapeReach = Tuning.ConeDrapeReach;
@@ -325,6 +353,10 @@ namespace OutOfSight
             mesh = new Mesh { name = "VisionCone" };
             mesh.MarkDynamic();
             vertices = new Vector3[Tuning.ConeRayCount + 1];
+            rayReach = new float[Tuning.ConeRayCount];
+            gapCount = new int[Tuning.ConeRayCount];
+            gapStart = new float[Tuning.ConeRayCount * MaxGaps];
+            gapEnd = new float[Tuning.ConeRayCount * MaxGaps];
             // Cones look: each watcher's own phase, so two fans never pulse or sweep in step.
             seed = Mathf.Repeat(GetInstanceID() * 0.618034f, 1f);
             EnsureTopology(1);
@@ -540,6 +572,7 @@ namespace OutOfSight
             sampleDistances = new float[count];
             meshLocal = new Vector2[count];
             meshData = new Vector4[count];
+            meshHidden = new Vector2[count];
             var triangles = new List<int>((n - 1) * (2 * radial - 1) * 3);
             for (int i = 0; i < n - 1; i++)
             {
@@ -571,6 +604,7 @@ namespace OutOfSight
             mesh.normals = normals;
             mesh.SetUVs(0, meshLocal);
             mesh.SetUVs(1, meshData);
+            mesh.SetUVs(2, meshHidden);
             mesh.SetTriangles(triangles, 0);
         }
 
@@ -623,15 +657,36 @@ namespace OutOfSight
             Vector3 eye = Owner.VisualEyePosition;
             float yaw = Owner.VisualEyeYaw;
             FloorMap floor = Owner.Routine.Floor ?? FloorMap.Flat;
-            // M5B m14: a level with a platform or a ramp cuts each ray every ConeRadialStep of the watcher's own range.
-            int samples = floor.IsFlat ? 1 : Mathf.CeilToInt(Owner.Routine.ViewRange / Tuning.ConeRadialStep); // MUTATION:CONE_RADIAL
-            EnsureTopology(samples);
-            var origin = new Vector3(eye.x, 0f, eye.z);
-            rawHeights[0] = floor.HeightAt(eye.x, eye.z);
-            meshVertices[0] = new Vector3(eye.x, rawHeights[0] + FloorLift, eye.z);
             int n = Tuning.ConeRayCount;
             float range = Range;
             float half = HalfAngle;
+            // CONECLIP: every ray's reach first, then (on a flat floor) the shadows of the low covers it crosses: a shadow
+            // that runs to the end of the ray cuts it, one in the middle is cut out of the fill (UV2) on radial samples.
+            bool anyGap = false;
+            float eyeFloor = floor.HeightAt(eye.x, eye.z);
+            for (int i = 0; i < n; i++)
+            {
+                Vector3 dir = YawMath.Forward(yaw - half + 2f * half * i / (n - 1));
+                float r = RayReach(eye, dir, range, floor);
+                gapCount[i] = 0;
+                if (ClipShadows && floor.IsFlat)
+                {
+                    r = ShadowReach(eye, dir, r, eyeFloor, i);
+                    anyGap |= gapCount[i] > 0;
+                }
+                rayReach[i] = r;
+            }
+            // M5B m14: a level with a platform or a ramp cuts each ray every ConeRadialStep of the watcher's own range.
+            int samples = floor.IsFlat ? 1 : Mathf.CeilToInt(Owner.Routine.ViewRange / Tuning.ConeRadialStep); // MUTATION:CONE_RADIAL
+            if (anyGap)
+            {
+                // CONECLIP: a shadow in the middle of a ray needs samples along it to be cut out of the fill.
+                samples = Mathf.CeilToInt(Owner.Routine.ViewRange / Tuning.ConeRadialStep);
+            }
+            EnsureTopology(samples);
+            var origin = new Vector3(eye.x, 0f, eye.z);
+            rawHeights[0] = eyeFloor;
+            meshVertices[0] = new Vector3(eye.x, rawHeights[0] + FloorLift, eye.z);
             // The samples sit at the same distances on every ray (a ray cut short repeats its rim), so the samples of two
             // neighbour rays with the same index are neighbours on the floor too.
             spacing = Owner.Routine.ViewRange / radial;
@@ -648,7 +703,7 @@ namespace OutOfSight
             {
                 float a = yaw - half + 2f * half * i / (n - 1);
                 Vector3 h = YawMath.Forward(a);
-                float reach = RayReach(eye, h, range, floor);
+                float reach = rayReach[i];
                 float relative = (a - yaw) * Mathf.Deg2Rad;
                 float across = Mathf.Sin(relative) * unit;
                 float along = Mathf.Cos(relative) * unit;
@@ -675,9 +730,18 @@ namespace OutOfSight
                 vertices[i + 1] = meshVertices[MeshIndex(i, radial)];
             }
             vertices[0] = meshVertices[0];
+            for (int i = 0; i < n; i++)
+            {
+                for (int s = 1; s <= radial; s++)
+                {
+                    int k = MeshIndex(i, s);
+                    meshHidden[k] = new Vector2(anyGap && HiddenAround(i, sampleDistances[k]) ? 1f : 0f, 0f);
+                }
+            }
             mesh.vertices = meshVertices;
             mesh.SetUVs(0, meshLocal);
             mesh.SetUVs(1, meshData);
+            mesh.SetUVs(2, meshHidden);
             mesh.RecalculateBounds();
             if (Facing != null)
             {
@@ -795,6 +859,164 @@ namespace OutOfSight
                 d = clear - ClearMargin;
             }
             return d;
+        }
+
+        /// <summary>
+        /// CONECLIP (docs/next/progress/CONECLIP.md): <see cref="RayReach"/> casts one sight line, toward the furniture top
+        /// at the far end of the ray. With the eye above the top (a human, standing or seated) a cover lower than the eye but
+        /// higher than the top can let that far line pass over it (it then ends on a wall), while every nearer top lies on a
+        /// steeper line that the cover stops: the fan was drawn over a spot the vision test never sees (the salon buffet of
+        /// level4, seen from the sofa). This finds those shadows along the ray, on a flat floor, for covers standing on it:
+        /// one cast at the top's height finds every cover higher than the top (its near face), one cast back finds its far
+        /// face, and a top at planar distance x behind a cover of height c is hidden while
+        /// x &lt; far x (eye - top) / (eye - c) (always when c reaches the eye), less <see cref="TargetRadius"/>. A shadow that
+        /// runs to the end of the ray cuts the ray at the cover's near face (the returned reach); up to
+        /// <see cref="MaxGaps"/> shadows in the middle are kept for the fill (<see cref="GapCount"/>). An eye at or below the
+        /// top keeps <paramref name="reach"/> (M5B m20 already handles it). The fan stays a superset of what is seen.
+        /// </summary>
+        public float ShadowReach(Vector3 eye, Vector3 h, float reach, float floorY, int ray)
+        {
+            gapCount[ray] = 0;
+            float e = eye.y - floorY;
+            float t = TargetHeight;
+            if (e <= t + 1e-3f || reach <= 1e-3f)
+            {
+                return reach;
+            }
+            var origin = new Vector3(eye.x, floorY + t, eye.z);
+            int hits = Physics.RaycastNonAlloc(origin, h, ShadowHits, reach, Layers.OccluderMask, QueryTriggerInteraction.Ignore);
+            if (hits == 0)
+            {
+                return reach;
+            }
+            Vector3 back = origin + h * reach;
+            int backs = Physics.RaycastNonAlloc(back, -h, BackHits, reach, Layers.OccluderMask, QueryTriggerInteraction.Ignore);
+            int spans = 0;
+            for (int j = 0; j < hits && spans < SpanStart.Length; j++)
+            {
+                Collider c = ShadowHits[j].collider;
+                if (c == null)
+                {
+                    continue;
+                }
+                Bounds b = c.bounds;
+                float cover = b.max.y - floorY;
+                if (b.min.y > floorY + CoverFloorGap || cover <= t)
+                {
+                    continue;
+                }
+                float near = ShadowHits[j].distance;
+                // The far face: where the cast back meets the same collider (none: it runs past the end of the ray).
+                float far = reach;
+                for (int k = 0; k < backs; k++)
+                {
+                    if (BackHits[k].collider == c)
+                    {
+                        far = Mathf.Min(far, reach - BackHits[k].distance);
+                    }
+                }
+                float end = cover >= e - 1e-4f ? float.MaxValue : far * (e - t) / (e - cover) - TargetRadius;
+                if (end <= near)
+                {
+                    continue;
+                }
+                // The claim checked on two true sight lines (the vision test's own raycast), halfway into the shadow behind
+                // the cover and at its end: a collider that is no upright box (its bounds overstate its height) or a grazing
+                // hit casts no shadow on the fan.
+                float from = Mathf.Max(near, far);
+                float to = Mathf.Min(end, reach) - 0.02f;
+                if (to > from && (!TopHidden(eye, h, (from + to) * 0.5f, floorY + t) || !TopHidden(eye, h, to, floorY + t)))
+                {
+                    continue;
+                }
+                // Insert sorted by start.
+                int at = spans;
+                while (at > 0 && SpanStart[at - 1] > near)
+                {
+                    SpanStart[at] = SpanStart[at - 1];
+                    SpanEnd[at] = SpanEnd[at - 1];
+                    at--;
+                }
+                SpanStart[at] = near;
+                SpanEnd[at] = Mathf.Min(end, reach);
+                spans++;
+            }
+            // Merge the overlapping shadows.
+            int merged = 0;
+            for (int j = 0; j < spans; j++)
+            {
+                if (merged > 0 && SpanStart[j] <= SpanEnd[merged - 1])
+                {
+                    SpanEnd[merged - 1] = Mathf.Max(SpanEnd[merged - 1], SpanEnd[j]);
+                    continue;
+                }
+                SpanStart[merged] = SpanStart[j];
+                SpanEnd[merged] = SpanEnd[j];
+                merged++;
+            }
+            // A shadow that runs to the end of the ray cuts it at its start.
+            while (merged > 0 && SpanEnd[merged - 1] >= reach - 1e-3f)
+            {
+                reach = Mathf.Min(reach, SpanStart[merged - 1]);
+                merged--;
+            }
+            // The others are cut out of the fill; extra ones are dropped (the fan then still covers them: a superset).
+            int keep = Mathf.Min(merged, MaxGaps);
+            for (int j = 0; j < keep; j++)
+            {
+                gapStart[ray * MaxGaps + j] = SpanStart[j];
+                gapEnd[ray * MaxGaps + j] = SpanEnd[j];
+            }
+            gapCount[ray] = keep;
+            return Mathf.Max(0f, reach);
+        }
+
+        /// <summary>CONECLIP: the furniture top at planar distance <paramref name="d"/> along <paramref name="h"/> is hidden from the eye (Vision.Occluded).</summary>
+        private static bool TopHidden(Vector3 eye, Vector3 h, float d, float topY)
+        {
+            Vector3 p = new Vector3(eye.x, 0f, eye.z) + h * d;
+            return Vision.Occluded(eye, new Vector3(p.x, topY, p.z));
+        }
+
+        /// <summary>CONECLIP: the shadows in the middle of ray <paramref name="ray"/> on the last rebuild (tests, the look tool).</summary>
+        public int GapCount(int ray) => gapCount != null && ray >= 0 && ray < gapCount.Length ? gapCount[ray] : 0;
+
+        /// <summary>CONECLIP: the reach of ray <paramref name="ray"/> on the last rebuild, shadows cut (tests, the look tool).</summary>
+        public float ReachOf(int ray) => rayReach != null && ray >= 0 && ray < rayReach.Length ? rayReach[ray] : 0f;
+
+        /// <summary>CONECLIP: planar distance <paramref name="d"/> of ray <paramref name="ray"/> lies in one of its middle shadows.</summary>
+        private bool InGap(int ray, float d)
+        {
+            if (d < 0f || d > rayReach[ray])
+            {
+                return false;
+            }
+            for (int j = 0; j < gapCount[ray]; j++)
+            {
+                if (d >= gapStart[ray * MaxGaps + j] && d <= gapEnd[ray * MaxGaps + j])
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// CONECLIP: a sample is cut out of the fill only when its whole neighbourhood is in shadow (one spacing on either
+        /// side along its ray, and the same distance on the rays beside it), so the fade the mesh interpolates toward a cut
+        /// sample stays inside the shadow and never dims a spot that is seen.
+        /// </summary>
+        private bool HiddenAround(int ray, float d)
+        {
+            int n = Tuning.ConeRayCount;
+            for (int i = Mathf.Max(0, ray - 1); i <= Mathf.Min(n - 1, ray + 1); i++)
+            {
+                if (!InGap(i, d) || (i == ray && (!InGap(i, d - spacing) || !InGap(i, d + spacing))))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>

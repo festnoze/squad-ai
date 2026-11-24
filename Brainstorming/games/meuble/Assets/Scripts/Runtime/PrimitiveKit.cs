@@ -420,6 +420,27 @@ namespace OutOfSight
                 materials[slot] = shown;
                 renderer.sharedMaterials = materials;
             }
+            SetUnitMap(renderer, slot, texture);
+        }
+
+        /// <summary>Use the whole leaf chart once on each blade, over the existing foliage finish.</summary>
+        public static void BananaLeafDetail(Renderer renderer)
+        {
+            if (renderer == null || TextureLibrary.Disabled)
+            {
+                return;
+            }
+            Texture2D texture = TextureLibrary.BananaLeafColour;
+            if (texture == null)
+            {
+                ReportOnce("banana leaf texture", "[PrimitiveKit] missing Resources/BananaLeaf");
+                return;
+            }
+            SetUnitMap(renderer, 0, texture);
+        }
+
+        private static void SetUnitMap(Renderer renderer, int slot, Texture2D texture)
+        {
             if (detailBlock == null)
             {
                 detailBlock = new MaterialPropertyBlock();

@@ -310,7 +310,7 @@ namespace OutOfSight
                     Counter(parent, prop.Size, main, accent, layer, col, visual);
                     break;
                 case "plant":
-                    Plant(parent, prop.Size, main, accent, layer, col, visual);
+                    Plant(parent, prop.Size, main, accent, layer, col, visual, PlantStyleOf(prop), PlantVariant(prop));
                     break;
                 case BodyKinds.Armchair:
                     Armchair(parent, prop.Size, main, accent, layer, col, visual);
@@ -344,7 +344,7 @@ namespace OutOfSight
             Material body = Mat(main, 0.15f, visual);
             Material cushion = Mat(accent, 0.15f, visual);
             float baseH = s.y * 0.5f;
-            float backD = Mathf.Min(0.22f, s.z * 0.25f);
+            float backD = DecorKinds.SofaBackDepth(s);
             float armW = Mathf.Min(0.2f, s.x * 0.1f);
             float armH = s.y * 0.72f;
             PrimitiveKit.Box(p, "Base", new Vector3(0f, baseH * 0.5f, 0f), new Vector3(s.x, baseH, s.z), body, layer, col, visual, Surface.Upholstery);
@@ -790,16 +790,247 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// A potted plant (M2): a pot and a block of foliage, each with its collider. 2 boxes. M6 (CONTRACT_M6 2.4): the
-        /// foliage shows the Moss002 detail (Surface.Foliage) instead of staying plain.
+        /// A potted plant (M2): a pot and a block of foliage, each with its collider. PLANT (2026-11-24): the two boxes
+        /// stay as collider-only objects (exactly as under a model, so sight, hearing and the audit are unchanged, whatever
+        /// the style) and the visual is one of two plants (<see cref="PropDef.Style"/>, else picked by position): a ficus
+        /// (<see cref="FicusMeshes"/>) or a banana plant with seven broad leaf blades (<see cref="BananaMeshes"/>). Both
+        /// stand in the same plain glazed round pot in the pot colour (PotShape, no detail: a glaze shows no grain), with
+        /// the dark soil and the wood (Trunk, Surface.Soil) and the leaves (Canopy, Surface.Foliage; the banana's blades
+        /// carry the leaf chart once each). 3 renderers, meshes cached per size, style and variant.
         /// </summary>
-        private static void Plant(Transform p, Vector3 s, Color leaves, Color pot, int layer, bool col, bool visual)
+        private static void Plant(Transform p, Vector3 s, Color leaves, Color pot, int layer, bool col, bool visual, string style, int variant)
         {
             float potH = s.y * 0.3f;
-            Material leafMaterial = visual ? PrimitiveKit.LitSurface(leaves, Surface.Foliage) : null;
-            PrimitiveKit.Box(p, "Pot", new Vector3(0f, potH * 0.5f, 0f), new Vector3(s.x * 0.6f, potH, s.z * 0.6f), Mat(pot, 0.3f, visual), layer, col, visual, Surface.Plaster);
+            PrimitiveKit.Box(p, "Pot", new Vector3(0f, potH * 0.5f, 0f), new Vector3(s.x * 0.6f, potH, s.z * 0.6f), null, layer, col, false, Surface.Plaster);
             PrimitiveKit.Box(p, "Leaves", new Vector3(0f, potH + (s.y - potH) * 0.5f, 0f), new Vector3(s.x, s.y - potH, s.z),
-                leafMaterial, layer, col, visual, Surface.Foliage);
+                null, layer, col, false, Surface.Foliage);
+            if (!visual)
+            {
+                return;
+            }
+            bool banana = style == PropDef.PlantStyleBanana;
+            Mesh[] meshes = banana ? BananaMeshes(s, variant) : FicusMeshes(s, variant);
+            PrimitiveKit.Part(p, "PotShape", meshes[0], Vector3.zero, Quaternion.identity, Vector3.one, PrimitiveKit.Lit(pot, 0.6f), layer);
+            PrimitiveKit.Part(p, "Trunk", meshes[1], Vector3.zero, Quaternion.identity, Vector3.one, PrimitiveKit.LitSurface(BarkColor, Surface.Soil),
+                layer, Surface.Soil);
+            GameObject canopy = PrimitiveKit.Part(p, "Canopy", meshes[2], Vector3.zero, Quaternion.identity, Vector3.one,
+                PrimitiveKit.LitSurface(leaves, Surface.Foliage), layer, Surface.Foliage);
+            if (banana)
+            {
+                PrimitiveKit.BananaLeafDetail(canopy.GetComponent<MeshRenderer>());
+            }
+        }
+
+        /// <summary>The shared finish for the stalks and soil.</summary>
+        private static readonly Color BarkColor = new Color(0.30f, 0.22f, 0.15f);
+
+        /// <summary>The plant's style: the level's own, else ficus or banana from the prop's position (a deterministic mix).</summary>
+        public static string PlantStyleOf(PropDef prop)
+        {
+            if (!string.IsNullOrEmpty(prop.Style))
+            {
+                return prop.Style;
+            }
+            int h = Mathf.RoundToInt(prop.X * 10f) * 13 + Mathf.RoundToInt(prop.Z * 10f) * 7;
+            return (h & 1) == 0 ? PropDef.PlantStyleFicus : PropDef.PlantStyleBanana;
+        }
+
+        /// <summary>
+        /// The round pot both plants stand in, filling the pot box's width: a flared body, a rim band, the rim's top and
+        /// its inner lip down to the soil (10 around, as the banana's own pot: 110 triangles), and where the soil disc sits.
+        /// </summary>
+        private static MeshBuilder PotBuilder(Vector3 s, out float soilY, out float soilR)
+        {
+            float w = Mathf.Min(s.x, s.z);
+            float potH = s.y * 0.3f;
+            float top = w * 0.3f;
+            float foot = top * 0.74f;
+            float rim = Mathf.Min(0.03f, potH * 0.1f);
+            soilY = potH - rim * 1.4f;
+            soilR = top * 0.85f;
+            var pot = new MeshBuilder();
+            pot.AddLathe(Matrix4x4.identity, new[]
+            {
+                new Vector2(foot, 0f), new Vector2(top * 0.94f, potH - rim), new Vector2(top, potH - rim), new Vector2(top, potH),
+                new Vector2(top * 0.87f, potH), new Vector2(soilR, soilY),
+            }, 10, true, false);
+            return pot;
+        }
+
+        /// <summary>Names the plant's three meshes, keeps them across level rebuilds and caches them under <paramref name="key"/>.</summary>
+        private static Mesh[] KeepPlant(string key, MeshBuilder pot, MeshBuilder wood, MeshBuilder canopy)
+        {
+            var meshes = new[] { pot.Build(), wood.Build(), canopy.Build() };
+            string[] names = { "Plant pot", "Plant trunk", "Plant canopy" };
+            for (int i = 0; i < meshes.Length; i++)
+            {
+                meshes[i].name = names[i];
+                meshes[i].hideFlags = HideFlags.DontUnloadUnusedAsset;
+            }
+            PlantCache[key] = meshes;
+            return meshes;
+        }
+
+        /// <summary>
+        /// A ficus of <paramref name="s"/>: the pot (110 triangles); the soil, a thin trunk up to a fork, a leader to the
+        /// crown's top and three branches into its lower clusters (Trunk, 46); a rounded crown of twelve small overlapping
+        /// faceted leaf clusters (20 triangles each) spread over an ellipsoid shell (golden angle around, jittered by
+        /// <paramref name="variant"/>) inside the leaves box (Canopy, 240): 396 triangles, within the PRD 7.4 furniture
+        /// budget (Tuning.BudgetFurnitureTriangles) the audit and the built player probe check on every prop.
+        /// </summary>
+        private static Mesh[] FicusMeshes(Vector3 s, int variant)
+        {
+            string key = string.Format(CultureInfo.InvariantCulture, "ficus {0:0.###}x{1:0.###}x{2:0.###}v{3}", s.x, s.y, s.z, variant);
+            if (PlantCache.TryGetValue(key, out Mesh[] cached) && cached[0] != null && cached[1] != null && cached[2] != null)
+            {
+                return cached;
+            }
+            float w = Mathf.Min(s.x, s.z);
+            float potH = s.y * 0.3f;
+            float h = s.y - potH;
+            MeshBuilder pot = PotBuilder(s, out float soilY, out float soilR);
+
+            const int clusters = 12;
+            float radius = w * 0.21f;
+            float crownY = s.y - h * 0.33f;
+            float shellH = w * 0.5f - radius * 1.1f;
+            float shellV = s.y - crownY - radius * 0.9f;
+            var centres = new Vector3[clusters];
+            var canopy = new MeshBuilder();
+            for (int i = 0; i < clusters; i++)
+            {
+                float j0 = PlantNoise(variant, i, 0);
+                float j1 = PlantNoise(variant, i, 1);
+                float j2 = PlantNoise(variant, i, 2);
+                // From the top down to well under the crown's middle (the bottom of the shell is left to the branches).
+                float y = 1f - 1.75f * (i + 0.5f) / clusters;
+                float ring = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y));
+                float bearing = 137.5f * i + 90f * variant + (j0 - 0.5f) * 30f;
+                centres[i] = YawMath.Forward(bearing) * (ring * shellH * (0.85f + 0.3f * j1)) + Vector3.up * (crownY + y * shellV);
+                float size = 0.85f + 0.3f * j2;
+                var r = new Vector3(radius * size, radius * size * 0.8f, radius * size * (0.9f + 0.2f * j0));
+                int cluster = i;
+                Matrix4x4 m = Matrix4x4.TRS(centres[i], Quaternion.Euler(0f, PlantNoise(variant, i, 3) * 360f, 0f), Vector3.one);
+                canopy.AddBlob(m, r, 5, 3, (band, seg) => 0.86f + 0.28f * PlantNoise(variant, 100 + cluster, band * 16 + seg));
+            }
+
+            float trunk = w * 0.035f;
+            var fork = new Vector3(0f, potH + h * 0.3f, 0f);
+            var wood = new MeshBuilder();
+            wood.AddDisc(Matrix4x4.Translate(new Vector3(0f, soilY, 0f)), soilR, 10);
+            wood.AddRod(new Vector3(0f, soilY - 0.01f, 0f), fork, trunk, trunk * 0.8f, 5);
+            wood.AddRod(fork, Vector3.Lerp(fork, centres[0], 0.8f), trunk * 0.7f, trunk * 0.4f, 4);
+            for (int b = 0; b < 3; b++)
+            {
+                wood.AddRod(fork, Vector3.Lerp(fork, centres[clusters - 1 - b], 0.85f), trunk * 0.6f, trunk * 0.35f, 3);
+            }
+            return KeepPlant(key, pot, wood, canopy);
+        }
+
+        /// <summary>How many shapes of canopy the plants pick from (by their position), so two plants rarely look the same.</summary>
+        private const int PlantVariants = 4;
+
+        /// <summary>The canopy shape of a plant prop, from its position (deterministic, the same on every load).</summary>
+        private static int PlantVariant(PropDef prop)
+        {
+            int h = Mathf.RoundToInt(prop.X * 10f) * 31 + Mathf.RoundToInt(prop.Z * 10f) * 17;
+            return ((h % PlantVariants) + PlantVariants) % PlantVariants;
+        }
+
+        /// <summary>A deterministic value in [0, 1] for (variant, a, b): the plant's jitter.</summary>
+        private static float PlantNoise(int variant, int a, int b)
+        {
+            unchecked
+            {
+                uint h = (uint)((variant + 1) * 73856093) ^ (uint)((a + 7) * 19349663) ^ (uint)((b + 13) * 83492791);
+                h ^= h >> 13;
+                h *= 0x5bd1e995;
+                h ^= h >> 15;
+                return (h & 0xFFFF) / 65535f;
+            }
+        }
+
+        private static readonly Dictionary<string, Mesh[]> PlantCache = new Dictionary<string, Mesh[]>();
+
+        /// <summary>
+        /// BANANA (2026-11-24): the banana plant of <paramref name="s"/>, an open rosette. The pot (110 triangles, its width
+        /// capped at <see cref="BananaPotWidth"/> so a wide canopy keeps a sensible pot); the soil, a short pseudostem up to
+        /// the crown and one petiole per blade (Trunk, 62); seven broad rounded blades (32 triangles each) that rise from the
+        /// crown, arch over and droop outward, the lowest tips down to the pot rim (Canopy, 224): 396 triangles, within the
+        /// PRD 7.4 furniture budget (Tuning.BudgetFurnitureTriangles). The blades are laid out in the prop's footprint (a
+        /// disc of about 0.93 of its width), so the canopy always stays inside the Leaves box: a banana prop is sized to its
+        /// canopy (about 1 x 1 m in the levels, BANANA in docs/next/progress).
+        /// </summary>
+        private static Mesh[] BananaMeshes(Vector3 s, int variant)
+        {
+            string key = string.Format(CultureInfo.InvariantCulture, "banana {0:0.###}x{1:0.###}x{2:0.###}v{3}", s.x, s.y, s.z, variant);
+            if (PlantCache.TryGetValue(key, out Mesh[] cached) && cached[0] != null && cached[1] != null && cached[2] != null)
+            {
+                return cached;
+            }
+            float potW = Mathf.Min(Mathf.Min(s.x, s.z), BananaPotWidth);
+            float potH = s.y * 0.3f;
+            float h = s.y - potH;
+            MeshBuilder pot = PotBuilder(new Vector3(potW, s.y, potW), out float soilY, out float soilR);
+
+            var canopy = new MeshBuilder();
+            var wood = new MeshBuilder();
+            wood.AddDisc(Matrix4x4.Translate(new Vector3(0f, soilY, 0f)), soilR, 10);
+            float trunk = potW * 0.05f;
+            Vector3 crown = Vector3.up * (potH + h * 0.45f);
+            wood.AddRod(Vector3.up * soilY, crown, trunk, trunk * 0.7f, 5);
+            for (int i = 0; i < 7; i++)
+            {
+                Vector3[] ribs = BananaBlade(s, variant, i, potH, h);
+                canopy.AddLeafBlade(ribs);
+                Vector3 stem = Vector3.Lerp(Vector3.up * (potH + h * 0.12f), crown, 0.4f + i * 0.1f);
+                wood.AddRod(stem, ribs[1], trunk * 0.45f, trunk * 0.22f, 3);
+            }
+            return KeepPlant(key, pot, wood, canopy);
+        }
+
+        /// <summary>The widest pot box (metres) a banana plant stands in, however wide its canopy.</summary>
+        private const float BananaPotWidth = 0.6f;
+
+        /// <summary>The blade's half width along its length, base to tip: full and rounded, a blunt tip.</summary>
+        private static readonly float[] LeafWidths = { 0f, 0.8f, 1f, 0.98f, 0.8f, 0f };
+
+        /// <summary>
+        /// One banana blade as ribs (left edge, midrib, right edge per row, base to tip). Every blade leaves the crown
+        /// outward, rises, arches over and droops toward its tip: the outer (first) blades reach to 0.46 of the footprint
+        /// and droop to the pot rim, the inner ones stay a little higher and shorter, so the plant reads as a wide open
+        /// rosette rather than an upright bunch. Coordinates are fractions of the footprint (x, z) and of the height above
+        /// the pot (y), so the whole canopy stays inside the prop's Leaves box.
+        /// </summary>
+        private static Vector3[] BananaBlade(Vector3 size, int variant, int index, float potHeight, float height)
+        {
+            float tier = index / 6f;
+            float turn = 77f * variant + 137.5f * index + 18f * (PlantNoise(variant, index, 0) - 0.5f);
+            Vector3 outward = YawMath.Forward(turn);
+            var across = new Vector3(outward.z, 0f, -outward.x);
+            float halfWidth = Mathf.Lerp(0.17f, 0.21f, PlantNoise(variant, index, 1));
+            float twist = 0.27f * (2f * PlantNoise(variant, index, 2) - 1f);
+            float sweep = 0.05f * Mathf.Sin(turn * Mathf.Deg2Rad);
+            float reach = Mathf.Lerp(0.46f, 0.34f, tier) - 0.04f * PlantNoise(variant, index, 3);
+            float start = Mathf.Lerp(0.40f, 0.70f, tier);
+            float rise = Mathf.Lerp(0.30f, 0.28f, tier);
+            float droop = Mathf.Lerp(0.40f, 0.34f, tier);
+            var ribs = new Vector3[LeafWidths.Length * 3];
+            for (int row = 0; row < LeafWidths.Length; row++)
+            {
+                float t = row / (float)(LeafWidths.Length - 1);
+                float spread = Mathf.Lerp(0.07f, reach, t * (1.25f - 0.25f * t));
+                float lift = start + rise * Mathf.Sin(Mathf.PI * t) - droop * t * t;
+                float width = LeafWidths[row] * halfWidth;
+                Vector3 centre = outward * spread + across * (sweep * t * t);
+                for (int bladeSide = -1; bladeSide <= 1; bladeSide++)
+                {
+                    Vector3 footprint = centre + across * (bladeSide * width);
+                    float curl = (0.24f * Mathf.Abs(bladeSide) + twist * bladeSide * t) * width;
+                    ribs[3 * row + bladeSide + 1] = new Vector3(footprint.x * size.x, potHeight + (lift - curl) * height, footprint.z * size.z);
+                }
+            }
+            return ribs;
         }
 
         /// <summary>Dining table under a floor length cloth: solid up to its height, as the PRD occluder says.</summary>

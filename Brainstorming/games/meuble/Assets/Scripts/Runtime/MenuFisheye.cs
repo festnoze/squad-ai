@@ -82,6 +82,8 @@ namespace OutOfSight
             {
                 fisheye = tour.gameObject.AddComponent<MenuFisheye>();
             }
+            // FISHEYEUI: the "I" slider panel (Windows standalone and the editor only).
+            MenuFisheyeTuner.Attach(fisheye);
             return fisheye;
         }
 
@@ -129,7 +131,7 @@ namespace OutOfSight
                 // The title just opened over the title house: read the file again.
                 Reload();
             }
-            else if (open)
+            else if (open && !HoldFile)
             {
                 checkClock += Time.unscaledDeltaTime;
                 if (checkClock >= CheckSeconds)
@@ -143,6 +145,21 @@ namespace OutOfSight
                 }
             }
             wasActive = open;
+        }
+
+        /// <summary>
+        /// FISHEYEUI: true while <see cref="MenuFisheyeTuner"/>'s panel is shown: the 2 s file check is paused, so the
+        /// file never overrides the sliders' live values.
+        /// </summary>
+        public bool HoldFile { get; set; }
+
+        /// <summary>FISHEYEUI: uses <paramref name="settings"/> from now on (the tuner's sliders), until the next read of the file.</summary>
+        public void Override(MenuCameraSettings settings)
+        {
+            if (settings != null)
+            {
+                Settings = settings;
+            }
         }
 
         /// <summary>Reads menu_camera.json now (the title's opening does it; tests call it directly).</summary>
@@ -346,6 +363,52 @@ namespace OutOfSight
             return string.Format(CultureInfo.InvariantCulture,
                 "fisheyeStrength {0}, fisheyeZoom {1}, fisheyeVignette {2}, peripheralBlur {3}, peripheralBlurRadius {4}, peripheralBlurMotion {5}",
                 FisheyeStrength, FisheyeZoom, FisheyeVignette, PeripheralBlur, PeripheralBlurRadius, PeripheralBlurMotion);
+        }
+
+        /// <summary>FISHEYEUI: settings from explicit values (the tuner's sliders), each clamped to its range.</summary>
+        public static MenuCameraSettings From(float strength, float zoom, float vignette, float blur, float blurRadius, float blurMotion)
+        {
+            return new MenuCameraSettings
+            {
+                FisheyeStrength = Mathf.Clamp(strength, 0f, MaxStrength),
+                FisheyeZoom = Mathf.Clamp(zoom, MinZoom, MaxZoom),
+                FisheyeVignette = Mathf.Clamp01(vignette),
+                PeripheralBlur = Mathf.Clamp01(blur),
+                PeripheralBlurRadius = Mathf.Clamp01(blurRadius),
+                PeripheralBlurMotion = Mathf.Clamp01(blurMotion),
+            };
+        }
+
+        /// <summary>
+        /// FISHEYEUI: these values as the file's text. <paramref name="existing"/> (the current file, may be null or bad)
+        /// keeps its "_help" key and any other key, in its order; values are rounded to 3 decimals, a whole number written
+        /// without a decimal point; 2-space indentation, "\n" line ends and a final newline, like the shipped file.
+        /// </summary>
+        public string ToJson(string existing)
+        {
+            JObject o = null;
+            try
+            {
+                o = string.IsNullOrWhiteSpace(existing) ? null : JObject.Parse(existing);
+            }
+            catch (Exception)
+            {
+                o = null;
+            }
+            o ??= new JObject();
+            o["fisheyeStrength"] = Value(FisheyeStrength);
+            o["fisheyeZoom"] = Value(FisheyeZoom);
+            o["fisheyeVignette"] = Value(FisheyeVignette);
+            o["peripheralBlur"] = Value(PeripheralBlur);
+            o["peripheralBlurRadius"] = Value(PeripheralBlurRadius);
+            o["peripheralBlurMotion"] = Value(PeripheralBlurMotion);
+            return o.ToString(Newtonsoft.Json.Formatting.Indented).Replace("\r\n", "\n") + "\n";
+        }
+
+        private static JValue Value(float v)
+        {
+            double rounded = Math.Round(v, 3);
+            return Math.Abs(rounded - Math.Round(rounded)) < 1e-9 ? new JValue((long)Math.Round(rounded)) : new JValue(rounded);
         }
 
         /// <summary>The settings from <see cref="FilePath"/>, or the defaults (with a warning when the file is missing or bad).</summary>

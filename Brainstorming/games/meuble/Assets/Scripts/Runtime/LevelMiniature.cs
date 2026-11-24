@@ -71,6 +71,9 @@ namespace OutOfSight
             return def;
         }
 
+        /// <summary>LOADDOTS: the level was already parsed (or found unreadable) by <see cref="Def"/>, so a new call is a lookup.</summary>
+        public static bool IsParsed(string levelId) => !string.IsNullOrEmpty(levelId) && defs.ContainsKey(levelId);
+
         /// <summary>The watchers and the player furniture of a level (zeros and a chair when it cannot be read).</summary>
         public static Summary SummaryOf(string levelId)
         {

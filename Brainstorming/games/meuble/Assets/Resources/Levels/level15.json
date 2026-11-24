@@ -170,6 +170,7 @@
     {
       "name": "Plan",
       "kind": "kitchen_sink",
+      "dress": "kitchen_sink_cabinet",
       "x": 13.1,
       "z": 4.75,
       "yaw": 90.0,
@@ -218,7 +219,43 @@
       "occluder": true,
       "color": "#8C5A36",
       "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "TableBasse",
+      "kind": "coffee_table",
+      "dress": "walnut_coffee_table",
+      "x": 8.75,
+      "z": 5.15,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 0.42,
+      "sizeZ": 0.45,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#6B4226"
+    },
+    {
+      "name": "MeubleTV",
+      "kind": "counter",
+      "dress": "walnut_media_console",
+      "x": 8.6,
+      "z": 2.25,
+      "yaw": 180.0,
+      "sizeX": 2.4,
+      "sizeY": 0.7,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#F7F4EE"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Canape", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "key_dish", "host": "Console", "x": 0.3, "z": -0.0, "yaw": 180.0 },
+    { "kind": "photo_frame", "host": "Cheminee", "x": -0.38, "z": 0.09, "yaw": 172.0 },
+    { "kind": "open_book", "host": "BureauTable", "x": -0.24, "z": 0.06, "yaw": 0.0 },
+    { "kind": "ceramic_mug", "host": "BureauTable", "x": 0.06, "z": 0.03, "yaw": 0.0 },
+    { "kind": "tv_remote", "host": "TableBasse", "x": 0.2, "z": 0.0, "yaw": 165.0 }
   ],
   "designerRoute": [
     { "x": 1.25, "z": 3.75, "at": 1.8 },

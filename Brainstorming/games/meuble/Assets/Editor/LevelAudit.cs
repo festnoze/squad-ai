@@ -880,6 +880,14 @@ namespace OutOfSight.Editor
         private static void CheckBudgets(LevelDef def, LevelInstance level, Result result)
         {
             result.Failures.AddRange(DrawBudgets(def, level, true, true, result.Notes));
+            // DRESSING (docs/next/progress/DRESSING.md): what was dressed, and every decor item not built or standing in a lamp.
+            int decorCount = level.Dressing.FindAll(p => !p.Look).Count;
+            result.Notes.Add($"habillage : {decorCount} objet(s) de decor sur {def.Decor?.Count ?? 0}, {level.Dressing.Count - decorCount} meuble(s) habille(s) ou TV : "
+                + string.Join(", ", level.Dressing.ConvertAll(p => p.Id + "@" + p.Host)));
+            foreach (string problem in level.DressingProblems)
+            {
+                result.Failures.Add("habillage : " + problem);
+            }
             // Levels v2 (C5): the -json report's budgets, counted as the rule counts them (material slots, cone colours).
             DrawCount drawn = CountDraws(level, true);
             result.DrawCalls = drawn.Slots;

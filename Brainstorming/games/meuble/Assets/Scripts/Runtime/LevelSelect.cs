@@ -86,6 +86,27 @@ namespace OutOfSight
         /// <summary>"Retour".</summary>
         public Button BackButton { get; private set; }
 
+        /// <summary>SPECTATOR: the "Mode spectateur" checkbox, above Retour (a button that toggles its tick).</summary>
+        public Button SpectatorButton { get; private set; }
+
+        /// <summary>
+        /// SPECTATOR: the checkbox is ticked: a card pressed now loads its level in spectator mode (Menu.PlayLevel). Kept for
+        /// the session (a static, never saved); off at every launch.
+        /// </summary>
+        public bool SpectatorChecked
+        {
+            get => spectatorWanted;
+            set
+            {
+                spectatorWanted = value;
+                ShowSpectatorTick();
+            }
+        }
+
+        private static bool spectatorWanted;
+        private Image spectatorTick;
+        private Text spectatorLabel;
+
         /// <summary>
         /// The default selection while the page is open. Levels v2 (LEVELS_V2.md 7, IDEAS bug 20): the card of
         /// <see cref="SaveStore.FirstUnwonLevel"/> (Jouer's level), else the first playable card, else Retour.
@@ -245,6 +266,44 @@ namespace OutOfSight
                 back.rectTransform.offsetMax = new Vector2(-24f, 0f);
             }
             BackButton.onClick.AddListener(() => onBack?.Invoke());
+            BuildSpectatorBox(left);
+        }
+
+        /// <summary>
+        /// SPECTATOR: the "Mode spectateur" checkbox, a warm column button above Retour with a box on its left whose chair
+        /// red tick shows while it is ticked. A click, a tap, Enter or gamepad A toggles it (a Button, so the input module
+        /// submits it like Retour); it sits in the page's explicit navigation between the grid and Retour.
+        /// </summary>
+        private void BuildSpectatorBox(Vector2 left)
+        {
+            SpectatorButton = Hud.MenuButton(transform, "SelectSpectator", Strings.SelectSpectator, font, labels);
+            PlaceLeft((RectTransform)SpectatorButton.transform, left, new Vector2(Margin, -262f), new Vector2(BackSize.x, 64f));
+            StyleWarm(SpectatorButton);
+            if (labels != null && labels.TryGetValue("SelectSpectatorLabel", out Text label))
+            {
+                spectatorLabel = label;
+                label.fontSize = 30;
+                label.alignment = TextAnchor.MiddleLeft;
+                label.color = TitleInk;
+                label.rectTransform.offsetMin = new Vector2(84f, 0f);
+                label.rectTransform.offsetMax = new Vector2(-16f, 0f);
+            }
+            Image frame = NewImage(SpectatorButton.transform, "SelectSpectatorBox", null, TitleInk);
+            PlaceLeft(frame.rectTransform, left, new Vector2(28f, 0f), new Vector2(36f, 36f));
+            Image inner = NewImage(frame.transform, "SelectSpectatorBoxInner", null, new Color(0.1f, 0.066f, 0.05f, 1f));
+            Anchor(inner.rectTransform, Vector2.zero, Vector2.one, new Vector2(4f, 4f), new Vector2(-4f, -4f));
+            spectatorTick = NewImage(frame.transform, "SelectSpectatorTick", null, LevelMiniature.ChairRed);
+            Anchor(spectatorTick.rectTransform, Vector2.zero, Vector2.one, new Vector2(8f, 8f), new Vector2(-8f, -8f));
+            SpectatorButton.onClick.AddListener(() => SpectatorChecked = !SpectatorChecked);
+            ShowSpectatorTick();
+        }
+
+        private void ShowSpectatorTick()
+        {
+            if (spectatorTick != null)
+            {
+                spectatorTick.enabled = spectatorWanted;
+            }
         }
 
         private void LegendRow(string name, Sprite icon, Func<string> text, float y)
@@ -300,6 +359,42 @@ namespace OutOfSight
             }
         }
 
+        // LOADDOTS: the next level of the play order WarmStep works on.
+        private int warmIndex;
+
+        /// <summary>
+        /// LOADDOTS: the first-open work is done, so <see cref="SetOpen"/> only reads caches. That work is, for every level
+        /// of the play order, reading and parsing its JSON (<see cref="LevelMiniature.Def"/>, also the card's RecordId and
+        /// stars) and drawing its miniature on the CPU (<see cref="LevelMiniature.MiniatureOf"/>); both are cached for the
+        /// whole run.
+        /// </summary>
+        public bool Warm => warmIndex >= WarmOrder.Count;
+
+        private IReadOnlyList<string> WarmOrder => game != null && game.LevelOrder != null ? game.LevelOrder : order;
+
+        /// <summary>
+        /// LOADDOTS: one small piece of the first-open work, so <see cref="Menu"/> can spread it over frames: the next
+        /// level's parse, or (once parsed) its miniature and summary. Returns <see cref="Warm"/>.
+        /// </summary>
+        public bool WarmStep()
+        {
+            IReadOnlyList<string> levels = WarmOrder;
+            if (warmIndex >= levels.Count)
+            {
+                return true;
+            }
+            string id = levels[warmIndex];
+            if (!LevelMiniature.IsParsed(id))
+            {
+                LevelMiniature.Def(id);
+                return false;
+            }
+            LevelMiniature.MiniatureOf(id);
+            LevelMiniature.SummaryOf(id);
+            warmIndex++;
+            return warmIndex >= levels.Count;
+        }
+
         /// <summary>Opens or closes the page; opening refreshes every card from the save first.</summary>
         public void SetOpen(bool open)
         {
@@ -347,6 +442,11 @@ namespace OutOfSight
             {
                 Rebuild(levels);
             }
+            if (spectatorLabel != null)
+            {
+                spectatorLabel.text = Strings.SelectSpectator;
+            }
+            ShowSpectatorTick();
             foreach (Card card in cards)
             {
                 bool playable = IsPlayable(card.Index);
@@ -621,7 +721,7 @@ namespace OutOfSight
 
         /// <summary>
         /// LEVELNUM: the number the level select shows for <paramref name="levelId"/> (its card position in the levels.json
-        /// "levels" order, never the file name: level19 is 17), or 0 when the level is not in that order (a test level).
+        /// "levels" order, never the file name: level19 is 18 since rev 3), or 0 when the level is not in that order (a test level).
         /// The intro card shows the same number (Hud.ShowLevel).
         /// </summary>
         public static int DisplayNumber(IReadOnlyList<string> order, string levelId)
@@ -706,15 +806,27 @@ namespace OutOfSight
                     selectOnLeft = k > 0 ? playable[k - 1].Button : null,
                     selectOnRight = k + 1 < playable.Count ? playable[k + 1].Button : null,
                     selectOnUp = (Selectable)NearestInRow(playable, row, column, -1, columns) ?? BackButton,
-                    selectOnDown = (Selectable)NearestInRow(playable, row, column, +1, columns) ?? BackButton,
+                    // SPECTATOR: down past the last row reaches the checkbox, then Retour.
+                    selectOnDown = (Selectable)NearestInRow(playable, row, column, +1, columns) ?? (Selectable)SpectatorButton ?? BackButton,
                 };
             }
             Button first = playable.Count > 0 ? playable[0].Button : null;
             Button last = playable.Count > 0 ? playable[playable.Count - 1].Button : null;
+            if (SpectatorButton != null)
+            {
+                // SPECTATOR: the column reads checkbox then Retour; right goes back into the grid.
+                SpectatorButton.navigation = new Navigation
+                {
+                    mode = Navigation.Mode.Explicit,
+                    selectOnUp = last,
+                    selectOnDown = BackButton,
+                    selectOnRight = first,
+                };
+            }
             BackButton.navigation = new Navigation
             {
                 mode = Navigation.Mode.Explicit,
-                selectOnUp = last,
+                selectOnUp = SpectatorButton != null ? (Selectable)SpectatorButton : last,
                 selectOnDown = first,
             };
         }
@@ -784,6 +896,11 @@ namespace OutOfSight
             if (menu != null)
             {
                 menu.OpenLevelSelect();
+                // LOADDOTS: the first open may load over a few frames (the dots on Niveaux) before the page shows.
+                while (menu.LevelSelectLoading)
+                {
+                    yield return null;
+                }
             }
             yield return new WaitForSecondsRealtime(0.5f);
             if (cards.Count > 1 && EventSystem.current != null)

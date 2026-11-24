@@ -44,6 +44,8 @@ list. Adding a third party asset means a row here and, when its licence or autho
 | `Kenney/kenney_kitchen_fridge.glb` | Kitchen Fridge | Kenney (Furniture Kit) | https://poly.pizza/m/36ODvl4CIy | CC0 1.0 |
 | `Kenney/kenney_coffee_table.glb` | Coffee Table | Kenney (Furniture Kit) | https://poly.pizza/m/y4ZU5S7RuD | CC0 1.0 |
 | `Kenney/kenney_cabinet_bed_drawer_table.glb` | Cabinet Bed Drawer Table | Kenney (Furniture Kit) | https://poly.pizza/m/EcvXBrClPe | CC0 1.0 |
+| `RoomDressing/*.glb`, `*.png` | 7 room accessories and 3 images | product owner delivery (Build/room-dressing/RoomDressing.zip, ArtHandoff/RoomDressing) | - | project owned |
+| `LivingRoomFurniture/*.glb`, `*.png` | 5 living room models and 3 images | product owner delivery (Build/living-room-furniture/LivingRoomFurniture.zip, ArtHandoff/LivingRoomFurniture) | - | project owned |
 
 Packs: Kenney "Furniture Kit" (https://poly.pizza/bundle/Furniture-Kit-NoG1sEUD1z, also
 kenney.nl); Quaternius "Animated Men Pack" (https://poly.pizza/bundle/Animated-Men-Pack-DAC9SDgMQT),
@@ -201,10 +203,6 @@ from the same item pages, whose licence facts are in `ThirdParty_staging/audio/s
 
 | File | Title | Author | Source | Licence |
 |---|---|---|---|---|
-| `hop_01.wav`, `hop_02.wav` | 75 CC0 breaking / falling / hit sfx (bfh1_wood_hit_01, 02) | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
-| `hop_03.wav`, `hop_04.wav` | 100 CC0 metal and wood SFX (wood_hit_05, 09) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
-| `hop_soft_01.wav`, `hop_soft_02.wav` | 75 CC0 breaking / falling / hit sfx (bfh1_wood_hit_01, 02, low passed at 700 Hz) | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
-| `hop_soft_03.wav`, `hop_soft_04.wav` | 100 CC0 metal and wood SFX (wood_hit_05, 09, low passed at 700 Hz) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
 | `wardrobe_close.wav` | 100 CC0 metal and wood SFX (wood_close_01) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
 | `topple.wav` | 100 CC0 metal and wood SFX (wood_falling_02) | rubberduck | https://opengameart.org/content/100-cc0-metal-and-wood-sfx | CC0 1.0 |
 | `wardrobe_open.wav` | 100 CC0 SFX (wooded_box_open) | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
@@ -220,10 +218,16 @@ from the same item pages, whose licence facts are in `ThirdParty_staging/audio/s
 | `roomtone_airvent_loop.wav` | Airvent Loop (crossfaded loop) | Longor | https://opengameart.org/content/airvent-loop | CC0 1.0 |
 | `roomtone_clock_loop.wav` | Ticking clock. | bart | https://opengameart.org/content/ticking-clock | CC0 1.0 |
 | `thump.wav` | Door open, door close (door-05) | qubodup | https://opengameart.org/content/door-open-door-close | CC0 1.0 |
-| `sting_caught.wav` | 85 Short music jingles (jingles_SAX05) | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
-| `sting_caught_long.wav` | Game Over Trumpet SFX (losetrumpet) | 0new4y | https://opengameart.org/content/game-over-trumpet-sfx | CC0 1.0 |
 | `vocal_huh.wav` | huh? | TinyWorlds | https://opengameart.org/content/huh | CC0 1.0 |
 | `ui_click.wav` | Interface Sounds (click_001) | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+
+**Made for the game** (SOUNDS, 2026-11-24): `hop_01.wav`, `hop_02.wav`, `hop_03.wav`, `hop_04.wav` (the furniture's
+step: a muffled footstep on carpet, SOUNDS2), `hop_soft_01.wav`, `hop_soft_02.wav`, `hop_soft_03.wav`,
+`hop_soft_04.wav` (the same step on a rug, muffled), `sting_caught.wav` and `sting_caught_long.wav` (the caught stings: soft
+brass, marimba, pizzicato, a choked cymbal) are synthesized by `tools/audio/make_sounds.py` from code alone, no recording
+and no third party material, so they need no licence row. They replace rubberduck's wood hits (75 CC0 breaking / falling
+/ hit sfx, 100 CC0 metal and wood SFX), Kenney's jingles_SAX05 and 0new4y's "Game Over Trumpet SFX"; the replaced files are
+kept for comparison in `Build/sounds/old/` (not shipped).
 
 ## Music (`Assets/ThirdParty/Audio/Music`)
 

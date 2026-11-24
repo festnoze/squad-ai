@@ -44,8 +44,9 @@ namespace OutOfSight.Tests
         /// <summary>CONTRACT_M5 12 (step 45) and M2.1: every route is replayed this much early, on time and late.</summary>
         private static readonly float[] Offsets = { -0.2f, 0f, 0.2f };
 
-        /// <summary>Levels v2 (docs/levels_v2/LEVELS_V2.md 3, D1): the play order holds 22 levels (7 + 9 + 6).</summary>
-        private const int V2LevelCount = 22;
+        /// <summary>Levels v2 (docs/levels_v2/LEVELS_V2.md 3, D1): the play order holds 20 levels (7 + 9 + 4) since levels.json
+        /// rev 3 (ACT3A: level21 and level20 parked out of the line-up).</summary>
+        private const int V2LevelCount = 20;
 
         /// <summary>The wave 5A levels still played in v2, with the body and the lesson of CONTRACT_M5 16.10 (level16 is cut,
         /// LEVELS_V2 D2).</summary>
@@ -332,7 +333,8 @@ namespace OutOfSight.Tests
         /// Step 45h (CONTRACT_M5 17, critique 5A B1; PRD 7.2 "found instantly in any frame"): at the start view of each
         /// wave 5A level, once the WallFader ran, nothing drawn on the Occluder layer stands between the camera and the top
         /// of the player furniture (Probe.ChairBlockers, the check of the built player's start view). Control: level 14's
-        /// bookshelf at its wave 5A height (2 m) hides the armchair from the same view, so the check sees that blocker.
+        /// bookshelf, raised to 3 m and stood in front of the armchair on the camera side (L14START: the spawn is in the
+        /// bedroom now, away from the shelf), hides the armchair from the same view, so the check sees that blocker.
         /// </summary>
         [UnityTest]
         [Timeout(300000)]
@@ -354,12 +356,22 @@ namespace OutOfSight.Tests
             }
             Assert.IsEmpty(failures, string.Join("\n", failures));
 
-            // Control: the bookshelf of level 14 back at 2 m, rebuilt from the same definition.
+            // Control: the bookshelf of level 14 raised to 3 m and stood just in front of the armchair on the camera side,
+            // rebuilt from the same definition. L14START moved the spawn to the bedroom, away from the shelf, so the shelf
+            // is brought to the armchair: a blocker the check must see.
             yield return LoadFresh("level14");
             PropDef shelf = Game.Def.Props.FirstOrDefault(p => p.Name == "Etagere");
             Assert.IsNotNull(shelf, "premise: level 14 has its bookshelf");
             Assert.Less(shelf.SizeY, 2f, "premise: the bookshelf is lower than its wave 5A 2 m");
-            shelf.SizeY = 2f;
+            yield return StartView();
+            Vector3 eye = Game.Camera.transform.position;
+            var seat = new Vector2(Game.Def.Player.X, Game.Def.Player.Z);
+            Vector2 toward = (new Vector2(eye.x, eye.z) - seat).normalized;
+            shelf.X = seat.x + toward.x * 0.65f;
+            shelf.Z = seat.y + toward.y * 0.65f;
+            shelf.Yaw = Mathf.Atan2(toward.x, toward.y) * Mathf.Rad2Deg;
+            shelf.SizeY = 3f;
+            shelf.SizeZ = 0.1f;
             Game.Restart();
             yield return Steps(1);
             yield return StartView();
@@ -1200,13 +1212,13 @@ namespace OutOfSight.Tests
         public IEnumerator Step40_FullPlaythrough()
         {
             List<string> order = Game.LevelOrder.ToList();
-            // Levels v2 (LEVELS_V2 3 and 7): the count comes from the manifest; it must be the 22 v2 levels, none of them cut.
+            // Levels v2 (LEVELS_V2 3 and 7): the count comes from the manifest; it must be the 20 rev 3 levels, none cut or parked.
             ManifestDef manifest = LevelLoader.LoadManifestDef();
             CollectionAssert.AreEqual(manifest.Levels, order, "premise: the game plays the manifest's order");
             Assert.AreEqual(V2LevelCount, order.Count, "premise: levels.json lists the levels of v2: " + string.Join(", ", order));
-            foreach (string cut in new[] { "level10", "level16", "level23" })
+            foreach (string cut in new[] { "level10", "level16", "level23", "level21", "level20" })
             {
-                CollectionAssert.DoesNotContain(order, cut, "premise: a cut level is listed");
+                CollectionAssert.DoesNotContain(order, cut, "premise: a cut or parked level is listed");
             }
             Assert.AreEqual(order[0], Game.LevelId, "premise: the editor boot starts the first level");
             Assert.AreEqual(PlayState.Playing, Game.State, "premise: the first level is playing");

@@ -181,6 +181,12 @@ void WallSurface(WallVaryings input, out half3 albedo, out half3 normalTS, out h
     float vSign = 1.0;
     float2 at = input.band.x > 0.0 ? WallBandUv(input.uv, input.finish.y, input.band, vSign) : uv;
     albedo = SAMPLE_TEXTURE2D_ARRAY_GRAD(_WallColours, sampler_WallColours, at, slice, dx, dy).rgb * _BaseColor.rgb;
+    // DRESSING (WallArray.DressingTint): a decor or dressed furniture vertex tints its image by its own colour (UV2.yzw,
+    // linear), as the GLB's vertex colour did. A vertex attribute branch: a wall or floor vertex never has UV2.x below 0.
+    if (input.band.x < -0.5)
+    {
+        albedo *= input.band.yzw;
+    }
     normalTS = UnpackNormalRGB(SAMPLE_TEXTURE2D_ARRAY_GRAD(_WallNormals, sampler_WallNormals, at, slice, dx, dy), input.finish.w);
     normalTS.y *= vSign;
     smoothness = input.finish.z;
@@ -197,6 +203,8 @@ float4 _OosFloorDustRect; // x, z of the map's corner, 1 / its width and depth i
 
 // UV1.x (slice + 1) above this names a floor look (FloorDust.FirstFloorSlice: WallArray.Slices[12] is the parquet).
 #define FLOOR_DUST_FIRST_FINISH 12.5
+// DRESSING: UV1.x at or above this names a dressing image (WallArray.DressingSlices, after the 22 surface slices): never dusted.
+#define FLOOR_DUST_LAST_FINISH 22.5
 // The soft variation of the albedo (+-8 %) that breaks the repeat of the floor images.
 #define FLOOR_DUST_VARIATION 0.16
 // The dust film: a pale warm grey (linear), so it greys a dark floor and dulls a pale one; how much the patches and the
@@ -258,7 +266,7 @@ void WallFragment(
 #if defined(OOS_FLOOR_DUST) && !defined(WALL_SEE_THROUGH)
     // A vertex attribute branch: a floor's triangles all name a floor look and face up, a wall's never.
     UNITY_BRANCH
-    if (input.finish.x > FLOOR_DUST_FIRST_FINISH && input.normalWS.y > 0.5)
+    if (input.finish.x > FLOOR_DUST_FIRST_FINISH && input.finish.x < FLOOR_DUST_LAST_FINISH && input.normalWS.y > 0.5)
     {
         WallFloorDust(input.positionWS, albedo, normalTS, smoothness);
     }

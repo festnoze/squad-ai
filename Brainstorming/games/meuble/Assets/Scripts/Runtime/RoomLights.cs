@@ -339,6 +339,12 @@ namespace OutOfSight
             public bool Dirty;
         }
 
+        /// <summary>
+        /// DRESSING (docs/next/progress/DRESSING.md): the globe of every lamp standing on a prop top (table, desk and bedside
+        /// lamps), level root space, so the builder can check that no decor item stands in one.
+        /// </summary>
+        public readonly List<Bounds> Lamps = new List<Bounds>();
+
         private readonly List<WallGlowLine> wallLines = new List<WallGlowLine>();
         private readonly List<WallGlowPart> wallParts = new List<WallGlowPart>();
         private readonly GlowMesh[] glowMeshes = new GlowMesh[2];
@@ -1371,6 +1377,7 @@ namespace OutOfSight
             private void PlaceLamp(RoomDef r, string type, Mood mood, Style style, Vector3 on, Vector3 globe)
             {
                 owner.AddGlow(mood.Cool, PrimitiveKit.SphereMesh(8, 6), on + Vector3.up * (globe.y * 0.5f), Quaternion.identity, globe);
+                owner.Lamps.Add(new Bounds(on + Vector3.up * (globe.y * 0.5f), globe));
                 float floor = FloorAt(on);
                 float sourceY = Mathf.Min(on.y + SourceAboveLamp, r.WallHeight - 0.25f);
                 // The nearest wall: its distance and the direction away from it.
@@ -1412,7 +1419,16 @@ namespace OutOfSight
                 {
                     return false;
                 }
-                PlaceLamp(r, type, mood, Style.Bedside, new Vector3(stand.X, FloorAt(stand.Position) + stand.SizeY, stand.Z), new Vector3(0.2f, 0.24f, 0.2f));
+                var on = new Vector3(stand.X, FloorAt(stand.Position) + stand.SizeY, stand.Z);
+                var globe = new Vector3(0.2f, 0.24f, 0.2f);
+                // BEDROOM (docs/next/progress/BEDROOM.md): a bedside lamp item on this stand is the lamp: the glow becomes its bulb.
+                DecorDef item = def.Decor?.Find(d => d != null && d.Kind == DecorKinds.BedsideLamp && d.Host == stand.Name);
+                if (item != null)
+                {
+                    globe = Vector3.one * DecorKinds.BedsideLampBulbSize;
+                    on += YawMath.Rotate(new Vector3(item.X, 0f, item.Z), stand.Yaw) + Vector3.up * (DecorKinds.BedsideLampBulbY - globe.y * 0.5f);
+                }
+                PlaceLamp(r, type, mood, Style.Bedside, on, globe);
                 return true;
             }
             private PropDef Largest(RoomDef r, string kind)

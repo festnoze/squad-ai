@@ -250,6 +250,36 @@ namespace OutOfSight
         /// </summary>
         public bool Started { get; private set; } = true;
 
+        // ----- SPECTATOR (docs/next/progress/SPECTATOR.md): a level watched with a free camera, the furniture out of play -----
+
+        /// <summary>
+        /// SPECTATOR: the levels built while this holds are watched, not played. Set by Menu.PlayLevel from the level
+        /// select's checkbox (and cleared by every other way into a level: Jouer, the title house), kept by a restart.
+        /// Read by every build: <see cref="Started"/> then stays false for the whole session, so the AUTOSTART rule keeps
+        /// the furniture out of play (no input, unseen, never shoved, no clock, no creak, no tip, no win, no lose, nothing
+        /// saved), and the camera is the free <see cref="SpectatorCamera"/>. The world (inhabitants, pets, robots, doors)
+        /// runs as usual.
+        /// </summary>
+        public bool Spectator { get; set; }
+
+        /// <summary>SPECTATOR: the first input of a spectator session dropped the intro card (the level stays unstarted).</summary>
+        public bool SpectatorCardDismissed { get; private set; }
+
+        /// <summary>
+        /// The intro card waits for a first input: a held level not started yet, or a spectator session whose card is still
+        /// up (Hud.UpdateCardHold).
+        /// </summary>
+        public bool AwaitingStart => !Started && !SpectatorCardDismissed;
+
+        /// <summary>SPECTATOR: drops the intro card of a spectator session (the free camera's first input). Nothing otherwise.</summary>
+        public void DismissSpectatorCard()
+        {
+            if (Spectator)
+            {
+                SpectatorCardDismissed = true;
+            }
+        }
+
         /// <summary>Levels v2 (C3a): raised once when a held start is released (never by a build with the hold off).</summary>
         public event Action LevelStarted;
 
@@ -884,7 +914,9 @@ namespace OutOfSight
             State = PlayState.Playing;
             // Levels v2 (C3a), AUTOSTART: a held build waits for the player's first input to start the clock and drop the
             // title card (the world runs at once); a restart and the next level hold again.
-            Started = !HoldStart;
+            // SPECTATOR: a watched level never starts (the furniture stays out of play for the whole session).
+            Started = !HoldStart && !Spectator;
+            SpectatorCardDismissed = false;
             // STARTFIX: the Enter or gamepad A that built this level (Play, Next level, a level card) never also starts it.
             InputReader.BlockStartPresses();
             LoseReason = LoseReason.None;
@@ -1064,6 +1096,23 @@ namespace OutOfSight
             {
                 Level.Furniture.CameraYaw = () => Camera.Yaw;
                 Camera.SetTarget(Level.Furniture, Def.Player.Yaw);
+                // SPECTATOR: the free camera takes over from the orbit camera's pose, or hands it back.
+                SpectatorCamera free = Camera.GetComponent<SpectatorCamera>();
+                if (Spectator && free == null)
+                {
+                    free = Camera.gameObject.AddComponent<SpectatorCamera>();
+                }
+                if (free != null)
+                {
+                    if (Spectator)
+                    {
+                        free.Begin(this, Camera);
+                    }
+                    else
+                    {
+                        free.End();
+                    }
+                }
             }
             WireRoutines(Rules ?? NoRules);
             if (Hud != null)
@@ -1079,6 +1128,7 @@ namespace OutOfSight
                 GameRules rules = Rules ?? NoRules;
                 Hud.SetGauges(rules.Creak, rules.DisplacementMemory);
                 Hud.SetBodyHints(rules.Bodies, rules.Lamp && Level.Furniture.Body != null && Level.Furniture.Body.HasLight);
+                Hud.SetSpectator(Spectator);
             }
             Ghost?.Hide();
             Ghost?.ShowRings(false);
@@ -2120,13 +2170,22 @@ namespace OutOfSight
                 // the furniture is out of play (see Started): no input, unseen, never shoved, no clock, no creak. The first
                 // step with a move input past the dead zone or an action press starts the player (title card off, clock on)
                 // and that same step takes the input; the press stays latched for the furniture's own step. Camera input and
-                // the careful key alone do not. STARTFIX: a start press (Space, Enter, gamepad A, a touch tap) starts it too,
+                // the careful key alone do not. STARTFIX: a start press (Space, Enter, STARTTAP: a left click off the UI
+                // buttons, gamepad A, a touch tap) starts it too,
                 // with no move: the furniture stays put and a watcher looking at the spawn sees it still, which is allowed.
                 bool release = InputReader.AnyStartInput(); // MUTATION:HOLD_START
                 InputReader.ConsumeStartPress();
                 if (release)
                 {
-                    ReleaseStart();
+                    // SPECTATOR: the first input only drops the intro card; the furniture stays out of play.
+                    if (Spectator)
+                    {
+                        SpectatorCardDismissed = true;
+                    }
+                    else
+                    {
+                        ReleaseStart();
+                    }
                 }
             }
             // STARTFIX: a start press made while the level runs is no input at all (never kept for a later build).
@@ -2993,6 +3052,11 @@ namespace OutOfSight
 
         private void Win()
         {
+            // SPECTATOR: a watched level is never won (the rule gates already keep the unstarted furniture out of play).
+            if (Spectator)
+            {
+                return;
+            }
             State = PlayState.Won;
             Level.Furniture.CreakTremble = 0f;
             // Audio overhaul: the win jingle (the music fades out under it, MusicPlayer).
@@ -3014,6 +3078,11 @@ namespace OutOfSight
 
         private void Lose(LoseReason reason, int inhabitantIndex)
         {
+            // SPECTATOR: a watched level is never lost either.
+            if (Spectator)
+            {
+                return;
+            }
             State = PlayState.Caught;
             LoseReason = reason;
             LostTo = inhabitantIndex >= 0 ? Level.Inhabitants[inhabitantIndex] : null;

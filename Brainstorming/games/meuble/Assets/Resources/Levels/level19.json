@@ -167,6 +167,7 @@
     {
       "name": "Chevet",
       "kind": "nightstand",
+      "dress": "bedside_table",
       "x": 2.2,
       "z": 11.68,
       "yaw": 0.0,
@@ -179,12 +180,12 @@
     },
     {
       "name": "MeubleTV",
-      "kind": "tv_unit",
+      "kind": "counter", "dress": "walnut_media_console",
       "x": 7.75,
       "z": 11.675,
       "yaw": 0.0,
-      "sizeX": 1.4,
-      "sizeY": 1.1,
+      "sizeX": 2.8,
+      "sizeY": 0.7,
       "sizeZ": 0.45,
       "occluder": true,
       "color": "#6B4226",
@@ -192,7 +193,7 @@
     },
     {
       "name": "TableBasse",
-      "kind": "coffee_table",
+      "kind": "coffee_table", "dress": "walnut_coffee_table",
       "x": 7.75,
       "z": 11.0,
       "yaw": 0.0,
@@ -310,6 +311,7 @@
     {
       "name": "Plan",
       "kind": "counter",
+      "dress": "kitchen_base_cabinet",
       "x": 8.0,
       "z": 0.3,
       "yaw": 180.0,
@@ -323,6 +325,7 @@
     {
       "name": "Evier",
       "kind": "kitchen_sink",
+      "dress": "kitchen_sink_cabinet",
       "x": 8.95,
       "z": 0.3,
       "yaw": 180.0,
@@ -336,6 +339,7 @@
     {
       "name": "Cuisiniere",
       "kind": "stove",
+      "dress": "kitchen_range",
       "x": 9.85,
       "z": 0.3,
       "yaw": 180.0,
@@ -385,7 +389,59 @@
       "occluder": true,
       "color": "#F7F4EE",
       "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteCuisine",
+      "kind": "plant",
+      "x": 13.0,
+      "z": 0.4,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.45,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteSalon",
+      "kind": "plant",
+      "x": 17.5,
+      "z": 11.5,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.15,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteEntree",
+      "kind": "plant",
+      "x": 4.0,
+      "z": 0.4,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.1,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "CanapeSalon", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "magazine_stack", "host": "TableBasse", "x": 0.15, "z": -0.0, "yaw": 192.0 },
+    { "kind": "tv_remote", "host": "TableBasse", "x": -0.2, "z": -0.04, "yaw": 155.0 },
+    { "kind": "open_book", "host": "TableSalle", "x": 0.28, "z": -0.07, "yaw": 180.0 },
+    { "kind": "key_dish", "host": "EtagereMaman", "x": 0.66, "z": -0.0, "yaw": 180.0 },
+    { "kind": "ceramic_mug", "host": "TableSalle", "x": -0.02, "z": -0.04, "yaw": 180.0 },
+    { "kind": "frying_pan", "host": "Cuisiniere", "x": 0.0, "z": -0.14, "yaw": 0.0 },
+    { "kind": "cutting_board", "host": "Plan", "x": 0.0, "z": 0.02, "yaw": 0.0 },
+    { "kind": "bedside_lamp", "host": "Chevet", "x": 0.09, "z": 0.03, "yaw": 180.0 },
+    { "kind": "alarm_clock", "host": "Chevet", "x": -0.15, "z": -0.02, "yaw": 160.0 },
+    { "kind": "slippers", "host": "floor", "x": 2.2, "z": 10.9, "yaw": 270.0 }
   ],
   "designerRoute": [
     { "x": 1.25, "z": 9.75, "at": 2.1, "careful": true },

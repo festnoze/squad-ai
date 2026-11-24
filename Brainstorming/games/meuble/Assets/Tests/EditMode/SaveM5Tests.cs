@@ -742,11 +742,28 @@ namespace OutOfSight.Tests
 
         // ----- Levels v2: the order migration (docs/levels_v2/LEVELS_V2.md 7) -----
 
-        /// <summary>The shipped levels.json, checked to be the v2 manifest the worked cases of section 7 are written for.</summary>
+        /// <summary>The rev 2 play order (22 levels), shipped until ACT3A reordered act 3 (levels.json rev 3).</summary>
+        private static readonly string[] Rev2Order =
+        {
+            "level1", "level2", "level3", "level4", "level5", "level6", "level7",
+            "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17",
+            "level19", "level21", "level20", "level22", "level25", "level24",
+        };
+
+        /// <summary>
+        /// The v2 manifest the worked cases of section 7 are written for: rev 2, the 24 v1 ids as previous, the rev 2 order and
+        /// its acts. levels.json moved on to rev 3 (ACT3A), so this one is built here and handed to the store through
+        /// <see cref="SaveStore.ManifestOverride"/> (set again after every <see cref="SaveStore.ResetForTests"/>): the cases
+        /// keep checking the v1 to v2 migration exactly as shipped.
+        /// </summary>
         private static ManifestDef V2Manifest()
         {
-            ManifestDef m = LevelLoader.LoadManifestDef();
-            Assert.AreEqual(2, m.Rev, "premise: levels.json is the v2 order (rev 2)");
+            var m = new ManifestDef { Rev = 2, Levels = new List<string>(Rev2Order), Previous = Levels(1, 24) };
+            m.Acts.Add(new ActDef { From = 0, NameKey = "act1.name" });
+            m.Acts.Add(new ActDef { From = 7, NameKey = "act2.name" });
+            m.Acts.Add(new ActDef { From = 16, NameKey = "act3.name" });
+            SaveStore.ManifestOverride = m;
+            Assert.AreEqual(2, m.Rev, "premise: the v2 order (rev 2)");
             Assert.AreEqual(24, m.Previous.Count, "premise: previous lists the 24 v1 ids");
             for (int n = 1; n <= 24; n++)
             {
@@ -772,7 +789,8 @@ namespace OutOfSight.Tests
         [Test]
         public void Manifest_v2_acts_and_lists_are_consistent()
         {
-            ManifestDef m = V2Manifest();
+            ManifestDef m = LevelLoader.LoadManifestDef();
+            Assert.GreaterOrEqual(m.Rev, 2, "premise: levels.json is a v2 manifest (rev 2 or later)");
             Assert.AreEqual(m.Levels.Count, new HashSet<string>(m.Levels).Count, "a level is listed twice in the play order");
             Assert.AreEqual(m.Previous.Count, new HashSet<string>(m.Previous).Count, "a level is listed twice in previous");
             Assert.GreaterOrEqual(m.Acts.Count, 1, "the manifest has no act");
@@ -909,6 +927,7 @@ namespace OutOfSight.Tests
                 Assert.AreEqual(2, ReadBack(path).Order, "a fresh save was written without its revision");
                 SaveStore.ResetForTests();
                 SaveStore.PathOverride = path;
+                SaveStore.ManifestOverride = m;
                 SaveStore.Load();
                 Assert.AreEqual(0, SaveStore.WriteCount, "loading a rev 2 save wrote it");
                 Assert.IsEmpty(SaveStore.Current.Unlocked, "a rev 2 save was migrated");
@@ -924,7 +943,7 @@ namespace OutOfSight.Tests
         [Test]
         public void Migration_case4_a_migrated_save_loaded_again_changes_nothing_and_writes_nothing()
         {
-            V2Manifest();
+            ManifestDef m = V2Manifest();
             File.WriteAllText(path, V1Save(Levels(1, 10)));
             LogAssert.Expect(LogType.Log, MigratedLog(2, 1));
             SaveStore.Load();
@@ -936,6 +955,7 @@ namespace OutOfSight.Tests
             Application.LogCallback onLog = (condition, stack, type) => logs.Add(condition);
             SaveStore.ResetForTests();
             SaveStore.PathOverride = path;
+            SaveStore.ManifestOverride = m;
             Application.logMessageReceived += onLog;
             try
             {
@@ -952,6 +972,78 @@ namespace OutOfSight.Tests
             CollectionAssert.AreEqual(new[] { "level11" }, SaveStore.Current.Unlocked);
             Assert.AreEqual(2, SaveStore.Current.Order);
             Assert.IsFalse(logs.Exists(l => l.Contains("progress migrated")), "the migration ran twice: " + string.Join(" | ", logs));
+        }
+
+        /// <summary>A save already migrated to rev 2 ("order": 2) with these wins.</summary>
+        /// <summary>The rev 3 manifest (ACT3A) as shipped until rev 4 swapped cards 4 and 11; handed to the store.</summary>
+        private static ManifestDef Rev3Manifest()
+        {
+            var m = new ManifestDef
+            {
+                Rev = 3,
+                Levels = new List<string>
+                {
+                    "level1", "level2", "level3", "level4", "level5", "level6", "level7",
+                    "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17",
+                    "level25", "level19", "level22", "level24",
+                },
+                Previous = new List<string>(Rev2Order),
+            };
+            m.Acts.Add(new ActDef { From = 0, NameKey = "act1.name" });
+            m.Acts.Add(new ActDef { From = 7, NameKey = "act2.name" });
+            m.Acts.Add(new ActDef { From = 16, NameKey = "act3.name" });
+            SaveStore.ManifestOverride = m;
+            return m;
+        }
+
+        private static string Rev2Save(IEnumerable<string> won) =>
+            "{ \"version\": 1, \"order\": 2, \"won\": [\"" + string.Join("\", \"", won) + "\"] }";
+
+        /// <summary>
+        /// ACT3A (levels.json rev 3, previous = the rev 2 order): act 3 now opens on level25, then level19, level22 and the
+        /// finale level24; level21 and level20 are parked. A rev 2 save that won the first 16 cards (up to level17) could play
+        /// level19 next; after the migration level19 stays open through Unlocked although its new predecessor level25 is not
+        /// won, level25 opens after level17, and Jouer starts the new opener. A rev 2 save deep into act 3 (level19 and level21
+        /// won) loses nothing either: level22 opens after level19, and the parked level20 never joins Unlocked.
+        /// </summary>
+        [Test]
+        public void Migration_rev3_a_rev2_save_keeps_its_next_level_open_after_the_act3_reorder()
+        {
+            // levels.json moved on to rev 4 (cards 4 and 11 swapped, 2026-11-24), so the rev 3 manifest is built here.
+            ManifestDef m = Rev3Manifest();
+            Assert.AreEqual(3, m.Rev, "premise: the rev 3 manifest");
+            CollectionAssert.AreEqual(Rev2Order, m.Previous, "premise: previous is the rev 2 order");
+            CollectionAssert.AreEqual(new[] { "level25", "level19", "level22", "level24" }, m.Levels.GetRange(16, m.Levels.Count - 16),
+                "premise: the rev 3 act 3");
+            List<string> won = new List<string>(Rev2Order).GetRange(0, 16);
+            File.WriteAllText(path, Rev2Save(won));
+            LogAssert.Expect(LogType.Log, MigratedLog(3, 1));
+
+            SaveStore.Load();
+            Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the rev 2 save loads");
+            Assert.AreEqual(3, SaveStore.Current.Order, "the save was not migrated to rev 3");
+            CollectionAssert.AreEqual(new[] { "level19" }, SaveStore.Current.Unlocked, "the migration opened the wrong levels");
+            CollectionAssert.AreEqual(won, SaveStore.Current.Won, "the migration changed Won");
+            Assert.AreEqual(3, ReadBack(path).Order, "the migration is not on disk");
+            AssertPlayable(m, "level25", true, "the new act 3 opener does not open after level17");
+            AssertPlayable(m, "level19", true, "level19 (playable in rev 2) is locked behind the unwon level25");
+            AssertPlayable(m, "level22", false, "level22 opened (level19 not won)");
+            AssertPlayable(m, "level24", false, "the finale opened");
+            Assert.AreEqual("level25", SaveStore.FirstUnwonLevel(m.Levels), "Jouer does not start the new act 3 opener");
+
+            SaveStore.ResetForTests();
+            SaveStore.ManifestOverride = m;
+            string deep = Path.Combine(dir, "deep.json");
+            SaveStore.PathOverride = deep;
+            List<string> deepWon = new List<string>(Rev2Order).GetRange(0, 18);
+            File.WriteAllText(deep, Rev2Save(deepWon));
+            LogAssert.Expect(LogType.Log, MigratedLog(3, 0));
+            SaveStore.Load();
+            Assert.AreEqual(3, SaveStore.Current.Order);
+            Assert.IsEmpty(SaveStore.Current.Unlocked, "the parked level20 (playable in rev 2) joined Unlocked");
+            AssertPlayable(m, "level25", true, "level25 does not open after level17");
+            AssertPlayable(m, "level22", true, "level22 does not open after the won level19");
+            AssertPlayable(m, "level24", false, "the finale opened before level22 was won");
         }
 
         [Test]

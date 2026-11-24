@@ -490,7 +490,13 @@ namespace OutOfSight.Core
         public const int BudgetHouseRenderers = 160;
         public const int BudgetHouseMaterials = 32;
         public const int HouseBudgetRooms = 5;
-        public const float CameraMaxDistanceHouse = 16f;
+        /// <summary>The zoom's far bound cap (was 16; 40 since 2026-11-24 so the largest houses can be seen whole).</summary>
+        public const float CameraMaxDistanceHouse = 40f;
+        /// <summary>
+        /// The zoom's far bound is at least the house's longest interior side times this (2026-11-24, user request: zoom out
+        /// until every room is in view, from anywhere in the house, at the 55 degree field of view).
+        /// </summary>
+        public const float CameraWholeHouseFit = 1.6f;
         public const float FrameTimeFailMs = 33f;
         // The audit (CONTRACT_M5 16.3).
         public const int AuditOpenSamples = 6;
@@ -888,6 +894,13 @@ namespace OutOfSight.Core
         // ----- M7 touch (docs/CONTRACT_M7.md 1.5): the touch controls. Sizes in pixels of a 1080 pixel high screen. -----
         /// <summary>Camera degrees per pixel of orbit drag on the right half, times the sensitivity option.</summary>
         public const float TouchOrbitDegPerPixel = 0.15f;
+        /// <summary>
+        /// PINCH (2026-11-24): orbit zoom metres per pixel of change in the distance between two pinching fingers, on levels
+        /// 1 to 7 (scaled with the zoom range like a wheel notch). 440 pixels sweep the whole 2.5 to 6 m range.
+        /// </summary>
+        public const float TouchPinchMetresPerPixel = 0.008f;
+        /// <summary>PINCH: a second finger landing this soon after the first, the first not yet dragged, makes the two a pinch.</summary>
+        public const float TouchPinchPairSeconds = 0.25f;
         /// <summary>How far the thumb travels from where it landed for a full stick.</summary>
         public const float TouchStickRadius = 120f;
         /// <summary>The careful and pause buttons' diameter (at least 140 px at 1080p too).</summary>
@@ -1319,8 +1332,6 @@ namespace OutOfSight.Core
         // ----- M7 heads and clothes (CharacterLook): the product owner's head images and clothes on the human inhabitants. -----
         /// <summary>Resources name of the clothes atlas: shirt front and back over trousers front and back, in their real colours (sRGB, readable).</summary>
         public const string ClothesAtlasResource = "CharacterClothesAtlas";
-        /// <summary>Clothes: metres from the waist to the hem of the trousers print (shorts show its upper part).</summary>
-        public const float ClothesTrousersLength = 0.88f;
         /// <summary>
         /// Clothes: the personality's colour on the shirt (its prints keep their real colours): a collar band over the
         /// shoulders and a band at the hem, fractions of the shirt's height from its top and from its hem.
@@ -1336,7 +1347,7 @@ namespace OutOfSight.Core
         // a perfect schedule from the first fixed step, while a human reads the room, waits for a safe look-away and
         // arrives on the doormat 0.3 to 1.8 s after the last point's departure (docs/levels_v2/wave1/numbers.md 2).
         // Level 1 (route 11.6 s): 3 stars at or under 20.4 s, 2 stars under 34.0 s, 1 star for any win.
-        /// <summary>Stars per level: the win panel's row and the level select's total (22 levels, 66 stars).</summary>
+        /// <summary>Stars per level: the win panel's row and the level select's total (20 levels, 60 stars since levels.json rev 3).</summary>
         public const int StarsPerLevel = 3;
         /// <summary>Seconds added to the route's last point before the factors (the doormat arrival, the first look).</summary>
         public const float StarsReferenceSlack = 2f;

@@ -55,6 +55,17 @@ namespace OutOfSight
             public string idleClip;
             public string walkClip;
 
+            /// <summary>
+            /// THROWFIX: a seat with a backrest (the sofa), measured on its mesh: the height of the backrest's top in native root
+            /// space. Zero with <see cref="backrestSpan"/> empty: no backrest measured.
+            /// </summary>
+            public float backrestTop;
+
+            /// <summary>THROWFIX: the native z span (min, max) of the backrest's top: its side and its thickness.</summary>
+            public Vector2 backrestSpan;
+
+            public bool HasBackrest => backrestSpan.y - backrestSpan.x > 1e-4f;
+
             public bool IsHuman => kind == KindHuman;
             public bool IsPet => kind == KindPet;
 

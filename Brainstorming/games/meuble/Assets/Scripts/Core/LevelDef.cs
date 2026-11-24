@@ -35,6 +35,14 @@ namespace OutOfSight.Core
         public SpawnDef Player;
         public ZoneDef Exit;
         public List<PropDef> Props = new List<PropDef>();
+
+        /// <summary>
+        /// DRESSING (docs/next/progress/DRESSING.md): the decor items on the furniture tops, visual only (no collider, no
+        /// occluder, no noise). Written only when not empty.
+        /// </summary>
+        public List<DecorDef> Decor = new List<DecorDef>();
+        public bool ShouldSerializeDecor() => Decor != null && Decor.Count > 0;
+
         public List<InhabitantDef> Inhabitants = new List<InhabitantDef>();
 
         // ----- v2 (docs/CONTRACT_M2.md 4) -----
@@ -995,6 +1003,23 @@ namespace OutOfSight.Core
         public bool Occluder = true;
         public string Color;
         public string AccentColor;
+
+        /// <summary>
+        /// PLANT (2026-11-24): the look of a "plant" prop, <see cref="PlantStyleFicus"/> or <see cref="PlantStyleBanana"/>;
+        /// null picks one from the prop's position (a deterministic mix). Visual only: both share the same two colliders.
+        /// </summary>
+        public string Style;
+
+        /// <summary>
+        /// DRESSING (docs/next/progress/DRESSING.md): a furniture look (<see cref="DecorKinds.Looks"/>) drawn instead of the
+        /// procedural visual, fitted to the prop's box; the prop keeps exactly its colliders, occluder flag and position. Null
+        /// keeps the procedural visual. Never together with <see cref="Model"/>.
+        /// </summary>
+        public string Dress;
+
+        public const string PlantStyleFicus = "ficus";
+        public const string PlantStyleBanana = "banana";
+        public static readonly string[] PlantStyles = { PlantStyleFicus, PlantStyleBanana };
 
         [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
         [JsonIgnore] public Vector3 Size => new Vector3(SizeX, SizeY, SizeZ);

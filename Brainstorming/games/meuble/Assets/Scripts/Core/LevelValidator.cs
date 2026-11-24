@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace OutOfSight.Core
@@ -137,10 +138,15 @@ namespace OutOfSight.Core
                 {
                     issues.Add($"prop {prop.Name} kind '{prop.Kind}' is not a prop kind ({string.Join(", ", PropKinds.All)})");
                 }
+                if (prop.Style != null && (prop.Kind != PropKinds.Plant || System.Array.IndexOf(PropDef.PlantStyles, prop.Style) < 0))
+                {
+                    issues.Add($"prop {prop.Name} style '{prop.Style}' is not a plant style ({string.Join(", ", PropDef.PlantStyles)}), only a plant has one");
+                }
             }
 
             CheckDecoys(level, rooms, issues);
             CheckRugs(level, rooms, issues);
+            CheckDressing(level, rooms, issues);
             CheckRoute(level, rooms, body, issues);
             CheckRoute(level, level.DesignerRouteHard, "hard designer route", rooms, body, issues); // M7 design (CONTRACT_M7 4.1)
             CheckLesson(level, body, issues);
@@ -791,6 +797,227 @@ namespace OutOfSight.Core
                     issues.Add($"rug {i + 1} ({r.X}, {r.Z}) is not inside a room");
                 }
             }
+        }
+
+        /// <summary>
+        /// DRESSING (docs/next/progress/DRESSING.md): every decor item names a known kind and an existing host of a kind it may
+        /// stand on, lies within its host's top (a throw: within the sofa's width), overlaps no other item of its host, and never
+        /// stands in a bathroom; at most <see cref="DecorKinds.MaxPerLevel"/> items. A prop's "dress" names a known look for its
+        /// kind (a media console: a TV unit, or a counter or cabinet no taller than DecorKinds.ConsoleMaxHeight), never with a model.
+        /// </summary>
+        private static void CheckDressing(LevelDef level, List<RoomDef> rooms, List<string> issues)
+        {
+            foreach (PropDef prop in level.Props)
+            {
+                if (prop.Dress == null)
+                {
+                    continue;
+                }
+                if (!DecorKinds.IsLook(prop.Dress))
+                {
+                    issues.Add($"prop {prop.Name} dress '{prop.Dress}' is not a furniture look ({string.Join(", ", DecorKinds.Looks)})");
+                }
+                else if (System.Array.IndexOf(DecorKinds.LookKinds(prop.Dress), prop.Kind) < 0)
+                {
+                    issues.Add($"prop {prop.Name} ({prop.Kind}) cannot wear the look {prop.Dress} ({string.Join(", ", DecorKinds.LookKinds(prop.Dress))})");
+                }
+                else if (prop.Dress == DecorKinds.WalnutMediaConsole && prop.Kind != PropKinds.TvUnit && prop.SizeY > DecorKinds.ConsoleMaxHeight + LevelDef.Eps)
+                {
+                    issues.Add($"prop {prop.Name} is {prop.SizeY} m tall: too tall for the look {prop.Dress} (max {DecorKinds.ConsoleMaxHeight})");
+                }
+                else if (prop.Dress == DecorKinds.BedsideTable && !DecorKinds.BedsideTableFits(prop.Size))
+                {
+                    // BEDROOM: the bedside table look on a real bedside stand only, never stretched over a long console.
+                    issues.Add($"prop {prop.Name} is {prop.SizeX} x {prop.SizeY} m: too big for the look {prop.Dress} (max {DecorKinds.BedsideTableMaxWidth} x {DecorKinds.BedsideTableMaxHeight})");
+                }
+                else if (DecorKinds.IsKitchenLook(prop.Dress))
+                {
+                    // KITCHEN: a module run keeps its worktop near 0.9 m; the pantry needs a tall box.
+                    DecorKinds.KitchenHeights(prop.Dress, out float min, out float max);
+                    if (prop.SizeY < min - LevelDef.Eps || prop.SizeY > max + LevelDef.Eps)
+                    {
+                        issues.Add($"prop {prop.Name} is {prop.SizeY} m tall: the look {prop.Dress} needs {min} to {max} m");
+                    }
+                }
+                if (!string.IsNullOrEmpty(prop.Model))
+                {
+                    issues.Add($"prop {prop.Name} has both a model and a dress");
+                }
+            }
+            List<DecorDef> decor = level.Decor ?? new List<DecorDef>();
+            // BEDROOM: the floor items have their own cap on top of the items on hosts.
+            int onFloor = decor.Count(d => d != null && DecorKinds.IsFloor(d.Host));
+            if (decor.Count - onFloor > DecorKinds.MaxPerLevel)
+            {
+                issues.Add($"{decor.Count - onFloor} decor items on hosts, more than {DecorKinds.MaxPerLevel}");
+            }
+            if (onFloor > DecorKinds.MaxFloorPerLevel)
+            {
+                issues.Add($"{onFloor} decor items on the floor, more than {DecorKinds.MaxFloorPerLevel}");
+            }
+            var placed = new List<(PropDef host, Rect rect, int index)>();
+            var floorPlaced = new List<(Rect rect, int index)>();
+            for (int i = 0; i < decor.Count; i++)
+            {
+                DecorDef d = decor[i];
+                string label = $"decor {i + 1} ({d?.Kind} on {d?.Host})";
+                if (d == null || !DecorKinds.TryFootprint(d.Kind, out Rect footprint, out float _))
+                {
+                    issues.Add($"{label}: kind is not a decor kind ({string.Join(", ", DecorKinds.Items)})");
+                    continue;
+                }
+                if (DecorKinds.IsFloor(d.Host))
+                {
+                    CheckFloorDecor(level, rooms, d, footprint, label, floorPlaced, i, issues);
+                    continue;
+                }
+                PropDef host = level.Props.Find(p => p != null && p.Name == d.Host);
+                if (host == null)
+                {
+                    issues.Add($"{label}: no prop of that name");
+                    continue;
+                }
+                if (System.Array.IndexOf(DecorKinds.HostKinds(d.Kind), host.Kind) < 0)
+                {
+                    issues.Add($"{label}: a {host.Kind} cannot hold it ({string.Join(", ", DecorKinds.HostKinds(d.Kind))})");
+                    continue;
+                }
+                RoomDef room = rooms.Find(r => r.Contains(host.Position));
+                if (room != null && RoomTypes.Of(room) == RoomTypes.Bathroom)
+                {
+                    issues.Add($"{label}: decor never goes in a bathroom");
+                }
+                // The item's footprint in the host's frame (its yaw a right angle or not: the bounding box of the turned rect).
+                float z = d.Kind == DecorKinds.SofaThrow ? DecorKinds.BackrestCentre(host.Size) + d.Z : d.Z;
+                Rect rect = TurnedRect(footprint, d.Yaw, d.X, z);
+                float hx = host.SizeX * 0.5f + LevelDef.Eps;
+                float hz = host.SizeZ * 0.5f + LevelDef.Eps;
+                bool inside = d.Kind == DecorKinds.SofaThrow
+                    ? rect.xMin >= -hx && rect.xMax <= hx && Mathf.Abs(d.Z) <= DecorKinds.SofaBackDepth(host.Size) * 0.5f
+                    : rect.xMin >= -hx && rect.xMax <= hx && rect.yMin >= -hz && rect.yMax <= hz;
+                if (!inside)
+                {
+                    issues.Add($"{label}: not within its host's top");
+                }
+                foreach ((PropDef otherHost, Rect other, int j) in placed)
+                {
+                    if (otherHost == host && rect.Overlaps(other))
+                    {
+                        issues.Add($"{label}: overlaps decor {j + 1}");
+                    }
+                }
+                CheckDecorSense(level, rooms, d, host, rect, label, issues);
+                placed.Add((host, rect, i));
+            }
+        }
+
+        /// <summary>
+        /// BEDROOM (docs/next/progress/BEDROOM.md): a floor item (host "floor", X, Z and Yaw absolute) is a kind that may lie on
+        /// the floor, wholly inside one room (DecorKinds.FloorWallClearance off its bounds) that is not a bathroom, under no prop,
+        /// either wholly on a rug or off every rug, and clear of the other floor items.
+        /// </summary>
+        private static void CheckFloorDecor(LevelDef level, List<RoomDef> rooms, DecorDef d, Rect footprint, string label,
+            List<(Rect rect, int index)> placed, int index, List<string> issues)
+        {
+            if (!DecorKinds.AllowsFloor(d.Kind))
+            {
+                issues.Add($"{label}: never lies on the floor ({string.Join(", ", DecorKinds.HostKinds(d.Kind))})");
+                return;
+            }
+            Rect rect = TurnedRect(footprint, d.Yaw, d.X, d.Z);
+            float m = DecorKinds.FloorWallClearance;
+            var corners = new[]
+            {
+                new Vector3(rect.xMin - m, 0f, rect.yMin - m), new Vector3(rect.xMax + m, 0f, rect.yMin - m),
+                new Vector3(rect.xMin - m, 0f, rect.yMax + m), new Vector3(rect.xMax + m, 0f, rect.yMax + m),
+            };
+            RoomDef room = rooms.Find(r => System.Array.TrueForAll(corners, c => r.Contains(c)));
+            if (room == null)
+            {
+                issues.Add($"{label}: not wholly inside one room ({m} m off its walls)");
+            }
+            else if (RoomTypes.Of(room) == RoomTypes.Bathroom)
+            {
+                issues.Add($"{label}: decor never goes in a bathroom");
+            }
+            foreach (PropDef p in level.Props)
+            {
+                if (p != null && rect.Overlaps(TurnedRect(Rect.MinMaxRect(-p.SizeX * 0.5f, -p.SizeZ * 0.5f, p.SizeX * 0.5f, p.SizeZ * 0.5f), p.Yaw, p.X, p.Z)))
+                {
+                    issues.Add($"{label}: lies under the prop {p.Name}");
+                }
+            }
+            var points = new[]
+            {
+                new Vector3(rect.xMin, 0f, rect.yMin), new Vector3(rect.xMax, 0f, rect.yMin), new Vector3(rect.xMin, 0f, rect.yMax),
+                new Vector3(rect.xMax, 0f, rect.yMax), new Vector3(d.X, 0f, d.Z),
+            };
+            for (int k = 0; k < level.Rugs.Count; k++)
+            {
+                RugDef rug = level.Rugs[k];
+                int on = rug == null ? 0 : points.Count(rug.Contains);
+                if (on > 0 && on < points.Length)
+                {
+                    issues.Add($"{label}: straddles the edge of rug {k + 1}");
+                }
+            }
+            foreach ((Rect other, int j) in placed)
+            {
+                if (rect.Overlaps(other))
+                {
+                    issues.Add($"{label}: overlaps decor {j + 1}");
+                }
+            }
+            placed.Add((rect, index));
+        }
+
+        /// <summary>
+        /// COHERENCE (docs/next/progress/COHERENCE.md): the furnishing logic of one decor item. Nothing stands in the TV a
+        /// console look carries on its top; the key dish waits on a piece of furniture by the front door (the exit), never on a
+        /// TV stand; the remote stays in a room with a TV.
+        /// </summary>
+        private static void CheckDecorSense(LevelDef level, List<RoomDef> rooms, DecorDef d, PropDef host, Rect rect, string label, List<string> issues)
+        {
+            if (DecorKinds.CarriesTopTv(host.Kind, host.Dress) && rect.Overlaps(DecorKinds.TopTvFootprint(host.Size)))
+            {
+                issues.Add($"{label}: stands in the TV on its host's top");
+            }
+            if (d.Kind == DecorKinds.KeyDish)
+            {
+                if (host.Dress == DecorKinds.WalnutMediaConsole || host.Kind == PropKinds.TvUnit)
+                {
+                    issues.Add($"{label}: the key dish never goes on a TV stand");
+                }
+                else if (level.Exit != null && Vector3.Distance(host.Position, new Vector3(level.Exit.X, 0f, level.Exit.Z)) > DecorKinds.KeyDishMaxExitDistance + LevelDef.Eps)
+                {
+                    issues.Add($"{label}: the key dish goes by the front door (at most {DecorKinds.KeyDishMaxExitDistance} m from the exit)");
+                }
+            }
+            if (d.Kind == DecorKinds.TvRemote)
+            {
+                RoomDef room = rooms.Find(r => r.Contains(host.Position));
+                bool tv = level.Props.Exists(p => p != null && (p.Kind == PropKinds.TvUnit || p.Dress == DecorKinds.WalnutMediaConsole)
+                    && (room == null || room.Contains(p.Position)));
+                if (!tv)
+                {
+                    issues.Add($"{label}: a remote only goes in a room with a TV");
+                }
+            }
+        }
+
+        /// <summary>The axis aligned bounds, in the parent frame, of <paramref name="rect"/> turned by <paramref name="yaw"/> and moved to (x, z).</summary>
+        private static Rect TurnedRect(Rect rect, float yaw, float x, float z)
+        {
+            float xMin = float.MaxValue, zMin = float.MaxValue, xMax = float.MinValue, zMax = float.MinValue;
+            foreach (Vector2 c in new[] { rect.min, rect.max, new Vector2(rect.xMin, rect.yMax), new Vector2(rect.xMax, rect.yMin) })
+            {
+                Vector3 p = YawMath.Rotate(new Vector3(c.x, 0f, c.y), yaw);
+                xMin = Mathf.Min(xMin, p.x + x);
+                xMax = Mathf.Max(xMax, p.x + x);
+                zMin = Mathf.Min(zMin, p.z + z);
+                zMax = Mathf.Max(zMax, p.z + z);
+            }
+            return Rect.MinMaxRect(xMin, zMin, xMax, zMax);
         }
 
         private static void CheckRoute(LevelDef level, List<RoomDef> rooms, BodyDef body, List<string> issues)

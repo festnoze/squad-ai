@@ -132,7 +132,7 @@
     },
     {
       "name": "CoffeeTable",
-      "kind": "coffee_table",
+      "kind": "coffee_table", "dress": "walnut_coffee_table",
       "x": 2.0,
       "z": -0.3,
       "yaw": 0.0,
@@ -142,7 +142,71 @@
       "occluder": true,
       "color": "#8C5A36",
       "accentColor": "#6B4226"
+    },
+    {
+      "name": "PlanteSalon",
+      "kind": "plant",
+      "x": 4.6,
+      "z": -1.6,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.5,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteChambre",
+      "kind": "plant",
+      "x": -4.45,
+      "z": -2.65,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.0,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "PlanteChambre2",
+      "kind": "plant",
+      "x": -1.55,
+      "z": -2.95,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.05,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "MeubleTV",
+      "kind": "counter",
+      "dress": "walnut_media_console",
+      "x": 1.05,
+      "z": 1.75,
+      "yaw": 0.0,
+      "sizeX": 2.4,
+      "sizeY": 0.7,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#F7F4EE"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Sofa", "x": 0.3, "z": 0.0, "yaw": 180.0 },
+    { "kind": "magazine_stack", "host": "CoffeeTable", "x": -0.15, "z": 0.0, "yaw": 12.0 },
+    { "kind": "tv_remote", "host": "CoffeeTable", "x": 0.2, "z": 0.04, "yaw": 335.0 },
+    { "kind": "open_book", "host": "Table", "x": 0.21, "z": -0.06, "yaw": 180.0 },
+    { "kind": "ceramic_mug", "host": "Table", "x": -0.09, "z": -0.03, "yaw": 180.0 },
+    { "kind": "odd_socks", "host": "floor", "x": -1.65, "z": -3.625, "yaw": 0.0 },
+    { "kind": "slippers", "host": "floor", "x": -1.175, "z": -4.3, "yaw": 0.0 }
   ],
   "designerRoute": [
     { "x": -4.25, "z": -4.35, "at": 3.4, "action": "toggle" },

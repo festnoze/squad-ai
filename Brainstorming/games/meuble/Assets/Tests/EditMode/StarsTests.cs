@@ -10,7 +10,7 @@ namespace OutOfSight.Tests
     /// hard route at Difficile, the normal one otherwise, plus the slack), the save (only up, clamped, per difficulty and
     /// record revision, migration safe: a save without "stars" loads with none, a malformed "stars" never fails it, a round
     /// trip keeps it), the strings in both languages, and the real line-up (every level has a reference at both
-    /// difficulties, 22 levels hold 66 stars).
+    /// difficulties, 20 levels hold 60 stars since the rev 3 line-up, ACT3A).
     /// </summary>
     public sealed class StarsTests
     {
@@ -207,11 +207,11 @@ namespace OutOfSight.Tests
         }
 
         [Test]
-        public void LineUp_EveryLevelHasAReferenceAtBothDifficulties_And66Stars()
+        public void LineUp_EveryLevelHasAReferenceAtBothDifficulties_And60Stars()
         {
             ManifestDef manifest = LevelLoader.LoadManifestDef();
             Assert.Greater(manifest.Levels.Count, 0, "premise: levels.json lists levels");
-            Assert.AreEqual(66, Stars.Possible(manifest.Levels.Count), "the line-up holds 22 levels, 66 stars (update the task if it changed)");
+            Assert.AreEqual(60, Stars.Possible(manifest.Levels.Count), "the line-up holds 20 levels, 60 stars (rev 3, ACT3A; update the task if it changed)");
             foreach (string id in manifest.Levels)
             {
                 LevelDef def = LevelLoader.Load(id);

@@ -14,7 +14,7 @@ using Object = UnityEngine.Object;
 namespace OutOfSight.Tests
 {
     /// <summary>
-    /// L17HIDE (2026-11-23): a look test of the long gallery of level19, the 17th card of the level select (levels.json
+    /// L17HIDE (2026-11-23): a look test of the long gallery of level19, the 18th card of the level select since rev 3 (levels.json
     /// order), where the stool hides only in the three tall wardrobes. Its low cabinets read as small wardrobes a stool
     /// could fit in, so they became low open bookcases (same boxes, same colliders, so the same sight blocking). Shots go to
     /// Build/shots/l17 (or OOS_SHOT_DIR) from the real runtime path (Boot scene, GameState.LoadLevel), paused: the gallery

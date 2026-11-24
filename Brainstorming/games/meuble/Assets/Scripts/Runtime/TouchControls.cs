@@ -58,6 +58,11 @@ namespace OutOfSight
         private Vector2 stickOrigin;
         private int orbitFinger = int.MinValue;
         private Vector2 orbitLast;
+        // PINCH (2026-11-24): two fingers that zoom the orbit camera; they steer nothing else until they lift.
+        private int pinchA = int.MinValue;
+        private int pinchB = int.MinValue;
+        private float pinchLast;
+        private bool pinchStarted;
 
         // STARTFIX: a tap outside the buttons (a stick or orbit finger that lifts soon, having barely travelled) is a start
         // press: it releases a held level without moving. A drag (orbit) or a stick push past the slop is never a tap.
@@ -132,14 +137,27 @@ namespace OutOfSight
                     {
                         orbitFinger = int.MinValue;
                     }
+                    if (id == pinchA || id == pinchB)
+                    {
+                        // The finger left on the screen steers nothing until it lifts too (no jump into a drag).
+                        int other = id == pinchA ? pinchB : pinchA;
+                        if (current.Contains(other))
+                        {
+                            ignored.Add(other);
+                        }
+                        pinchA = pinchB = int.MinValue;
+                    }
                     if (taps.TryGetValue(id, out Tap tap))
                     {
                         taps.Remove(id);
-                        if (!tap.Travelled && Time.unscaledTime - tap.Landed <= TapMaxSeconds) // MUTATION:TOUCH_TAP_START
+                        // STARTTAP: while the level waits for its first input, any tap starts it, however long the finger
+                        // stayed (a drag still never does), and a tap on the player lamp only starts it (no switch).
+                        bool awaiting = AwaitingStart();
+                        if (!tap.Travelled && (awaiting || Time.unscaledTime - tap.Landed <= TapMaxSeconds)) // MUTATION:TOUCH_TAP_START
                         {
                             // DOORAUTO: a tap on the player lamp switches it (the E key, also a start input); any other
                             // tap is the start press.
-                            if (OnPlayerLamp(tap.Origin))
+                            if (!awaiting && OnPlayerLamp(tap.Origin))
                             {
                                 InputReader.PressTouchAction();
                             }
@@ -160,9 +178,11 @@ namespace OutOfSight
                 ignored.UnionWith(current);
                 stickFinger = int.MinValue;
                 orbitFinger = int.MinValue;
+                pinchA = pinchB = int.MinValue;
                 taps.Clear();
                 InputReader.SetTouchStick(Vector2.zero);
                 InputReader.SetTouchLook(Vector2.zero);
+                InputReader.SetTouchPinch(0f);
                 if (!InputReader.TouchUIActive)
                 {
                     InputReader.SetTouchCareful(false);
@@ -175,7 +195,7 @@ namespace OutOfSight
             Vector2 stick = Vector2.zero;
             foreach (InputReader.TouchPoint p in points)
             {
-                if (ignored.Contains(p.Id))
+                if (ignored.Contains(p.Id) || p.Id == pinchA || p.Id == pinchB)
                 {
                     continue;
                 }
@@ -204,8 +224,23 @@ namespace OutOfSight
                     }
                 }
             }
+            if (pinchStarted)
+            {
+                // The partner finger may have steered earlier in this frame's loop: the pinch's first frame steers nothing.
+                pinchStarted = false;
+                stick = Vector2.zero;
+                look = Vector2.zero;
+            }
             InputReader.SetTouchStick(stick);
             InputReader.SetTouchLook(look);
+            float pinch = 0f;
+            if (pinchA != int.MinValue && TryFind(pinchA, out Vector2 a) && TryFind(pinchB, out Vector2 b))
+            {
+                float distance = Vector2.Distance(a, b) / scale;
+                pinch = distance - pinchLast;
+                pinchLast = distance;
+            }
+            InputReader.SetTouchPinch(pinch);
 
             bool stickHeld = stickFinger != int.MinValue;
             stickBaseImage.color = stickHeld ? Held : Idle;
@@ -236,6 +271,33 @@ namespace OutOfSight
                 InputReader.PressTouchPause();
                 return;
             }
+            // PINCH: a second finger makes a pinch with the one finger already steering when that one landed a moment ago
+            // and has not dragged yet (two fingers put down together, anywhere), or with the orbit finger when it lands
+            // on the right half too (a pinch on the camera side, any time). The stick and the orbit stop for its length.
+            int partner = stickFinger != int.MinValue ? (orbitFinger == int.MinValue ? stickFinger : int.MinValue) : orbitFinger;
+            if (partner != int.MinValue && pinchA == int.MinValue && TryFind(partner, out Vector2 partnerPosition))
+            {
+                bool fresh = taps.TryGetValue(partner, out Tap first) && !first.Travelled
+                    && Time.unscaledTime - first.Landed <= Tuning.TouchPinchPairSeconds;
+                bool rightPair = partner == orbitFinger && p.Position.x >= Screen.width * 0.5f;
+                if (fresh || rightPair)
+                {
+                    pinchA = partner;
+                    pinchB = p.Id;
+                    pinchStarted = true;
+                    pinchLast = Vector2.Distance(partnerPosition, p.Position) / (Mathf.Max(1f, Screen.height) / ReferenceHeight);
+                    taps.Remove(partner);
+                    if (partner == stickFinger)
+                    {
+                        stickFinger = int.MinValue;
+                    }
+                    else
+                    {
+                        orbitFinger = int.MinValue;
+                    }
+                    return;
+                }
+            }
             bool left = p.Position.x < Screen.width * 0.5f; // MUTATION:TOUCH_HALF_SPLIT
             if (left && stickFinger == int.MinValue)
             {
@@ -253,6 +315,28 @@ namespace OutOfSight
             {
                 ignored.Add(p.Id);
             }
+        }
+
+        /// <summary>PINCH: the position of finger <paramref name="id"/> this frame, false when it is not down.</summary>
+        private bool TryFind(int id, out Vector2 position)
+        {
+            foreach (InputReader.TouchPoint p in points)
+            {
+                if (p.Id == id)
+                {
+                    position = p.Position;
+                    return true;
+                }
+            }
+            position = default;
+            return false;
+        }
+
+        /// <summary>STARTTAP: the level in play still waits for its first input (the held title card, or a spectator's card).</summary>
+        private static bool AwaitingStart()
+        {
+            GameState game = Main.Instance != null ? Main.Instance.Game : null;
+            return game != null && game.Level != null && game.AwaitingStart;
         }
 
         private static bool Hit(RectTransform button, Vector2 screen)

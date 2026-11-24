@@ -902,8 +902,9 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// The caught sting. M3: the two note sax "wah... wah" when seen moving, and the full "wah wah wah waaah"
-        /// when the household's suspicion ran out (the slow defeat gets the long one).
+        /// The caught sting. M3: a short sting when seen moving, and the long "wah wah wah waaah" when the household's
+        /// suspicion ran out (the slow defeat gets the long one). SOUNDS (2026-11-24): both made for the game by
+        /// tools/audio/make_sounds.py, a brass stab and a marimba run for the short one, a muted brass for the long one.
         /// </summary>
         public void PlayCaught()
         {

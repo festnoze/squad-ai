@@ -59,13 +59,13 @@
   "doors": [
     {
       "x": 4.45,
-      "z": 8.25,
+      "z": 5.25,
       "width": 1.0,
       "top": 2.1
     },
     {
       "x": 11.95,
-      "z": 8.25,
+      "z": 6.25,
       "width": 1.0,
       "top": 2.1
     },
@@ -139,7 +139,7 @@
     {
       "name": "Armoire",
       "kind": "cabinet",
-      "x": 3.6,
+      "x": 2.2,
       "z": 4.8,
       "yaw": 180.0,
       "sizeX": 1.2,
@@ -178,12 +178,12 @@
     },
     {
       "name": "Television",
-      "kind": "tv_unit",
-      "x": 6.25,
+      "kind": "counter", "dress": "walnut_media_console",
+      "x": 7.0,
       "z": 0.3,
       "yaw": 180.0,
-      "sizeX": 1.4,
-      "sizeY": 0.6,
+      "sizeX": 2.8,
+      "sizeY": 0.7,
       "sizeZ": 0.4,
       "occluder": true,
       "color": "#6B4226",
@@ -191,7 +191,7 @@
     },
     {
       "name": "TableBasse",
-      "kind": "coffee_table",
+      "kind": "coffee_table", "dress": "walnut_coffee_table",
       "x": 6.25,
       "z": 1.15,
       "yaw": 0.0,
@@ -205,6 +205,7 @@
     {
       "name": "TableDeChevet",
       "kind": "nightstand",
+      "dress": "bedside_table",
       "x": 1.95,
       "z": 8.4,
       "yaw": 0.0,
@@ -240,7 +241,73 @@
       "occluder": true,
       "color": "#6B4226",
       "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Bibliotheque",
+      "kind": "bookshelf",
+      "x": 10.0,
+      "z": 7.3,
+      "yaw": 90.0,
+      "sizeX": 1.2,
+      "sizeY": 2.0,
+      "sizeZ": 0.35,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#E3B23C"
+    },
+    {
+      "name": "PlanteSalon",
+      "kind": "plant",
+      "x": 5.025,
+      "z": 0.55,
+      "yaw": 0.0,
+      "sizeX": 0.95,
+      "sizeY": 1.45,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "PlanteChambre",
+      "kind": "plant",
+      "x": 0.55,
+      "z": 5.05,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.15,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "PlanteSalon2",
+      "kind": "plant",
+      "x": 11.35,
+      "z": 0.55,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.0,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Canape", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "magazine_stack", "host": "TableBasse", "x": -0.15, "z": 0.0, "yaw": 12.0 },
+    { "kind": "tv_remote", "host": "TableBasse", "x": 0.2, "z": 0.04, "yaw": 335.0 },
+    { "kind": "key_dish", "host": "MeubleChaussures", "x": 0.23, "z": -0.0, "yaw": 180.0 },
+    { "kind": "open_book", "host": "Bureau", "x": 0.24, "z": -0.06, "yaw": 180.0 },
+    { "kind": "ceramic_mug", "host": "Bureau", "x": -0.05, "z": -0.04, "yaw": 180.0 },
+    { "kind": "bedside_lamp", "host": "TableDeChevet", "x": -0.09, "z": 0.03, "yaw": 180.0 },
+    { "kind": "alarm_clock", "host": "TableDeChevet", "x": 0.15, "z": -0.02, "yaw": 200.0 },
+    { "kind": "slippers", "host": "floor", "x": 1.85, "z": 7.8, "yaw": 90.0 }
   ],
   "designerRoute": [
     { "x": 3.75, "z": 6.75, "at": 3.4 },
@@ -342,11 +409,19 @@
       "loop": [
         {
           "x": 5.25,
+          "z": 4.25
+        },
+        {
+          "x": 5.25,
           "z": 8.25
         },
         {
           "x": 11.25,
           "z": 8.25
+        },
+        {
+          "x": 11.25,
+          "z": 4.25
         }
       ],
       "speed": 0.45

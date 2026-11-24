@@ -10,10 +10,10 @@ namespace OutOfSight.Editor
     /// when a setting differs, and the asset is only written when its content changes.
     ///
     /// Import settings (the effects are mono 44.1 kHz 16-bit already, made by tools/audio/audio_pipeline.py):
-    /// - short percussive one-shots (hops, scrapes, footsteps, thump, short creak, UI, door, wardrobe, crash, topple, lamp):
+    /// - short percussive one-shots (hops, muffled hops, scrapes, footsteps, thump, short creak, UI, door, wardrobe, crash, topple, lamp):
     ///   Decompress On Load, ADPCM. No decode at trigger time, 3.5:1 on disk, and ADPCM noise hides under a transient;
-    /// - tonal one-shots (stings, long creak, vocal): Decompress On Load, Vorbis, where ADPCM hiss would show on a
-    ///   sustained tone;
+    /// - tonal one-shots (stings, long creak, vocal): Decompress On Load, Vorbis,
+    ///   where ADPCM hiss would show on a sustained tone;
     /// - the two ambience loops: Compressed In Memory, Vorbis (a few KB resident, decoded while playing);
     /// - the two music loops (stereo, Assets/ThirdParty/Audio/Music): Streaming, Vorbis at <see cref="MusicQuality"/>
     ///   (<see cref="MusicQualityAndroid"/> on Android, where the APK size counts), never forced to mono.
@@ -62,15 +62,20 @@ namespace OutOfSight.Editor
         // Loudness of each imported file in LUFS, from tools/audio/audio_report.json (written by
         // tools/audio/audio_pipeline.py on 2026-11-18): the 100 ms max for a one-shot, the integrated loudness for a loop
         // or the music. Rerunning the pipeline on new picks means copying its new numbers here.
+        // SOUNDS (2026-11-24, docs/next/progress/SOUNDS.md): the hops, the muffled hops and both caught stings are made for
+        // the game by tools/audio/make_sounds.py (numbers from its make_sounds_report.json, lufs_100ms_max).
+        // SOUNDS2 (2026-11-24): the hops are muffled carpet footsteps now (a padded thump, a low-mid pile body, a faint
+        // fabric whisper), all eight still at -12.0 (100 ms max). With the glassy tick gone the hard hops are plain
+        // OneShots again (ADPCM): the noise hides under the transient, like the muffled ones.
         private static readonly Spec[] Specs =
         {
-            new Spec("hop_01", Kind.OneShot, -14.3f),
+            new Spec("hop_01", Kind.OneShot, -12.0f),
             new Spec("hop_02", Kind.OneShot, -12.0f),
-            new Spec("hop_03", Kind.OneShot, -17.4f),
+            new Spec("hop_03", Kind.OneShot, -12.0f),
             new Spec("hop_04", Kind.OneShot, -12.0f),
-            new Spec("hop_soft_01", Kind.OneShot, -14.1f),
+            new Spec("hop_soft_01", Kind.OneShot, -12.0f),
             new Spec("hop_soft_02", Kind.OneShot, -12.0f),
-            new Spec("hop_soft_03", Kind.OneShot, -17.2f),
+            new Spec("hop_soft_03", Kind.OneShot, -12.0f),
             new Spec("hop_soft_04", Kind.OneShot, -12.0f),
             new Spec("scrape_01", Kind.OneShot, -12.0f),
             new Spec("scrape_02", Kind.OneShot, -12.0f),

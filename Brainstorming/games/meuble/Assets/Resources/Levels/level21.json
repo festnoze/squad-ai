@@ -521,6 +521,7 @@
     {
       "name": "Bertrand",
       "personality": "watchful",
+      "model": "quaternius.man",
       "pattern": "loop",
       "startStation": 0,
       "stations": [

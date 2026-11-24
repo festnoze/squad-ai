@@ -1,0 +1,35 @@
+{
+  "model": "wood_casement_window.glb",
+  "texture": "walnut_veneer.png",
+  "nominal_opening_m": [
+    1.32,
+    1.36
+  ],
+  "pivot": "Bas central, Y vers le haut, face intérieure +Z dans le GLB.",
+  "glazing": "Six carreaux identiques, trois par battant, avec joints et matériau transparent double face.",
+  "unity_glazing": {
+    "shader_file": "WindowGlass.shader",
+    "material_slot": "Clear glazing",
+    "description": "Fins reflets blancs dessinés dans les UV de chaque carreau et décalés selon l’angle de vue."
+  },
+  "hardware": "Poignée intérieure argentée en métal satiné et quatre charnières. Modèle en position fermée.",
+  "stats": {
+    "triangles": 892,
+    "material_slots": 4,
+    "bounds_min_m": [
+      -0.69,
+      0.0,
+      -0.105
+    ],
+    "bounds_max_m": [
+      0.69,
+      1.36,
+      0.148
+    ],
+    "dimensions_m": [
+      1.38,
+      1.36,
+      0.253
+    ]
+  }
+}

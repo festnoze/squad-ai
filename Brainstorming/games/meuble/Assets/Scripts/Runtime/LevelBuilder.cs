@@ -30,6 +30,12 @@ namespace OutOfSight
         /// <summary>Every element whose data names a model but got the procedural visual: "what (id)". The probe fails on any.</summary>
         public readonly List<string> ModelFallbacks = new List<string>();
 
+        // ----- DRESSING (docs/next/progress/DRESSING.md) -----
+        /// <summary>Every dressed element built (decor items, furniture looks, the TV), in build order.</summary>
+        public readonly List<DressingPlacement> Dressing = new List<DressingPlacement>();
+        /// <summary>Every decor item that stands in a lamp of RoomLights or was not built: "what: why". The audit fails on any.</summary>
+        public readonly List<string> DressingProblems = new List<string>();
+
         // ----- M5 (docs/CONTRACT_M5.md 16.12, CONTRACT_M5_v3.md 9 and 15.1) -----
         /// <summary>The door leaves, in level order (LevelDef.LeafDoors): leaf k has OpenMask bit k and area DoorAreaBase + k.</summary>
         public readonly List<DoorLeaf> Leaves = new List<DoorLeaf>();
@@ -151,6 +157,8 @@ namespace OutOfSight
             Decoys.Clear();
             ModelVisuals.Clear();
             ModelFallbacks.Clear();
+            Dressing.Clear();
+            DressingProblems.Clear();
             Leaves.Clear();
             Robots.Clear();
             LoadView = null;
@@ -230,7 +238,7 @@ namespace OutOfSight
     /// <see cref="Tuning.LoadHeight"/>); the rocking chair body shows its procedural visual (no Kenney model).</item>
     /// </list>
     /// </summary>
-    public static class LevelBuilder
+    public static partial class LevelBuilder
     {
         /// <summary>
         /// M5 (CONTRACT_M5_v3 15.8): combine the static decor renderers at level build. Off builds every part as its own
@@ -283,14 +291,21 @@ namespace OutOfSight
             {
                 BuildRug(level, def, def.Rugs[i], i, root);
             }
+            var hosts = new Dictionary<string, Transform>();
             foreach (PropDef prop in def.Props)
             {
                 GameObject go = PrimitiveKit.Group(root, prop.Name, floorMap.OnFloor(prop.Position), prop.Yaw);
                 go.layer = prop.Occluder ? Layers.Occluder : 0;
+                if (prop.Name != null)
+                {
+                    hosts[prop.Name] = go.transform;
+                }
                 // M3: a model is a visual only. The procedural parts keep exactly their colliders, collider-only.
                 GameObject model = Model(level, prop.Model, "prop " + prop.Name, go.transform, prop.Size, ModelFit.Box,
                     new ModelPaint { Red = FurnitureKit.AccentOf(prop) });
-                FurnitureKit.Build(prop, go.transform, go.layer, model == null, CombineRenderers);
+                // DRESSING: a furniture look is a visual only too (LevelBuilderDressing): the colliders stay the procedural ones.
+                bool dressed = model == null && DressProp(level, prop, go.transform, batch);
+                FurnitureKit.Build(prop, go.transform, go.layer, model == null && !dressed, CombineRenderers);
                 if (WardrobeRule.IsWardrobe(prop))
                 {
                     // M7 polish: one entry per LevelDef.Wardrobes() wardrobe, in the same order, so GameState can
@@ -303,6 +318,8 @@ namespace OutOfSight
             {
                 level.Decoys.Add(BuildDecoy(level, def, def.Decoys[i], i + 1, playerColor, root));
             }
+            // DRESSING: the decor items on their hosts' tops, merged into the floor renderer (no collider, no draw call).
+            BuildDecor(level, def, batch, hosts);
             BodyDef body = def.PlayerBody();
             level.Furniture = BuildPlayer(level, def, def.Player, body, root);
             fader.Target = level.Furniture.transform;
@@ -311,7 +328,8 @@ namespace OutOfSight
             RegisterWallLooks(root, fader);
             // M8 (docs/m8/ROOMS_PLAN.md 5): the secondary lights by room type, visual only (no collider, Default layer). M7
             // walls pass: the wall fixtures' glows go with their wall line (the fader's caps).
-            RoomLights.Build(def, root, fader);
+            RoomLights lights = RoomLights.Build(def, root, fader);
+            CheckDecorLamps(level, lights);
             // Levels v2 (C4): the lit zones (ceiling ring, unshadowed spot, floor pool), and their rule data handed to the player.
             LitZoneView.Build(def, root, level.Furniture);
             // Floor dust (docs/m9/FLOORS_WALLS.md section 10): the Haut tier's floor map, from the walls just built.
@@ -354,6 +372,7 @@ namespace OutOfSight
                 cone.Owner = inhabitant;
                 cone.Vision = vision;
                 cone.TargetHeight = coneTop;
+                cone.TargetRadius = ConeTargetRadius(body);
                 cone.Init();
                 level.Cones.Add(cone);
             }
@@ -494,7 +513,7 @@ namespace OutOfSight
         private static readonly string[] StandingWhenLowered = { "Baseboards" };
 
         /// <summary>
-        /// M9 doors rule (product owner 2026-11-19): the door parts, which never move in any look (WallFader.KeepDoor), by
+        /// The door parts (WallFader.KeepDoor; DOORFADE 2026-11-24: they go with their wall, never with the leaf box rule), by
         /// their renderer's name, combined or not: the door frames and the decorative outer leaf (a real leaf marks itself).
         /// </summary>
         private static readonly string[] DoorParts = { "DoorFrame", "DoorPostA", "DoorPostB", "DoorHead", "DoorLeaf" };
@@ -2048,6 +2067,17 @@ namespace OutOfSight
         }
 
         /// <summary>
+        /// CONECLIP: the planar half diagonal of the player's top samples around its centre (VisionConeView.TargetRadius),
+        /// the margin a low cover's shadow on the floor cone gives up at its far end.
+        /// </summary>
+        public static float ConeTargetRadius(BodyDef body)
+        {
+            float hx = Mathf.Max(0f, body.Size.x * 0.5f - Tuning.SampleInset);
+            float hz = Mathf.Max(0f, body.Size.z * 0.5f - Tuning.SampleInset);
+            return Mathf.Sqrt(hx * hx + hz * hz);
+        }
+
+        /// <summary>
         /// The player's load view (CONTRACT_M5 6, and 18: the load rule lives in GameState, which sways this view, drops the
         /// clue and emits the crash). Returns the view, or null without a load. Called once the body is set and the
         /// furniture stands at its spawn.
@@ -2064,8 +2094,8 @@ namespace OutOfSight
 
         /// <summary>
         /// One inhabitant, <paramref name="index"/> of the level's list (its seat owner id). M5 (CONTRACT_M5 3 and 16.12,
-        /// CONTRACT_M5_v3 15.1, 15.4 and 15.6): it shows its personality's model (<see cref="Inhabitant.ModelIdOf"/>: an
-        /// explicit model wins, a dog shows the dog), the rig tints its clothes; its routine comes from RoutineFactory
+        /// CONTRACT_M5_v3 15.1, 15.4 and 15.6): <see cref="Inhabitant.ModelIdOf"/> selects its model, the rig tints its
+        /// clothes, and its routine comes from RoutineFactory
         /// through the full <see cref="Inhabitant.Init(InhabitantDef, LevelDef, IPathPlanner, IPathPlanner, SeatRegistry, int, int)"/>:
         /// the level's floor, its station walks frozen on the level's NavMesh with the authored leaves
         /// (<see cref="LevelInstance.StationAreaMask"/>), every other walk planned with the leaves as they are (on a level

@@ -26,6 +26,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.sofa
     prefab: {fileID: 2107409826236812522, guid: 46c580fee62a6f44380b437add90e9bf, type: 3}
     nativeSize: {x: 0.98, y: 0.45999998, z: 0.41}
@@ -39,6 +41,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0.45999998
+    backrestSpan: {x: 0.3198286, y: 0.41}
   - id: kenney.rug
     prefab: {fileID: 2107409826236812522, guid: 39956ee364a7bfa48999e80b0ab5f0fa, type: 3}
     nativeSize: {x: 1.57, y: 0.01, z: 0.92}
@@ -52,6 +56,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.doormat
     prefab: {fileID: 2107409826236812522, guid: e83d6e7ffd0fa164086ab9c6b9cfd151, type: 3}
     nativeSize: {x: 0.9043259, y: 0.01, z: 0.92}
@@ -65,6 +71,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.armchair
     prefab: {fileID: 2107409826236812522, guid: af8fa6763209abe41b0bcf2531027b1d, type: 3}
     nativeSize: {x: 0.49, y: 0.45999998, z: 0.41}
@@ -78,6 +86,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.stool
     prefab: {fileID: 2107409826236812522, guid: 9283b8f827a83f344a06a6ca7b04b0b9, type: 3}
     nativeSize: {x: 0.26544, y: 0.435, z: 0.2298778}
@@ -91,6 +101,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.floorlamp
     prefab: {fileID: 2107409826236812522, guid: d3a90dca0642da444bf50ea1368d8064, type: 3}
     nativeSize: {x: 0.15203941, y: 0.86, z: 0.17556}
@@ -104,10 +116,12 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.man
     prefab: {fileID: 2242888416370347441, guid: 40e1141da2e6d714e9096a4c124ec055, type: 3}
-    nativeSize: {x: 1.4108887, y: 4.8082066, z: 0.88955534}
-    boundsCenter: {x: -0.009862125, y: 2.3998086, z: 0.05089152}
+    nativeSize: {x: 1.4108887, y: 4.8082066, z: 0.89135516}
+    boundsCenter: {x: -0.009862125, y: 2.3998086, z: 0.049991548}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -117,6 +131,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.woman
     prefab: {fileID: 2242888416370347441, guid: 671e718e2565341499f074b765dbfefc, type: 3}
     nativeSize: {x: 1.3914616, y: 4.6288385, z: 0.80106974}
@@ -130,10 +146,12 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.man_shorts
     prefab: {fileID: 2242888416370347441, guid: 8d2ae590109d65a4a83e395fa1471523, type: 3}
-    nativeSize: {x: 1.4230211, y: 4.823945, z: 0.80128145}
-    boundsCenter: {x: -0.0037959218, y: 2.4087424, z: 0.09121105}
+    nativeSize: {x: 1.4230211, y: 4.823945, z: 0.80281323}
+    boundsCenter: {x: -0.0037959218, y: 2.4087424, z: 0.09044513}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -143,10 +161,12 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.man_suit
     prefab: {fileID: 2242888416370347441, guid: 8aaadee9ea291c44b8e1e63019d4ab0a, type: 3}
-    nativeSize: {x: 1.4185038, y: 4.824891, z: 0.9021946}
-    boundsCenter: {x: -0.00605458, y: 2.409414, z: 0.03530869}
+    nativeSize: {x: 1.4185038, y: 4.824891, z: 0.9034395}
+    boundsCenter: {x: -0.00605458, y: 2.409414, z: 0.034686238}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -156,10 +176,12 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.man_tshirt
     prefab: {fileID: 2242888416370347441, guid: 91367e09f21e4c14f9dc172b662d7221, type: 3}
-    nativeSize: {x: 1.4245925, y: 4.8272977, z: 0.80032384}
-    boundsCenter: {x: -0.0030102134, y: 2.4106834, z: 0.090732455}
+    nativeSize: {x: 1.4245925, y: 4.8272977, z: 0.8015015}
+    boundsCenter: {x: -0.0030102134, y: 2.4106834, z: 0.09014359}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -169,10 +191,12 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.woman_jacket
     prefab: {fileID: 2242888416370347441, guid: 2cfec1b0de9663d4e81e7c2a1d960c7d, type: 3}
-    nativeSize: {x: 1.3943197, y: 4.646077, z: 0.79625297}
-    boundsCenter: {x: -0.018146574, y: 2.299789, z: 0.088279665}
+    nativeSize: {x: 1.3943198, y: 4.646077, z: 0.79625297}
+    boundsCenter: {x: -0.018146515, y: 2.299789, z: 0.088279665}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -182,10 +206,12 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.woman_dress
     prefab: {fileID: 2242888416370347441, guid: f1e7f8a48b1679d43a7299444ea68f2e, type: 3}
-    nativeSize: {x: 1.3824658, y: 4.6513023, z: 1.1367922}
-    boundsCenter: {x: -0.024073482, y: 2.2996686, z: 0.06699169}
+    nativeSize: {x: 1.3824658, y: 4.6513023, z: 1.1367952}
+    boundsCenter: {x: -0.024073482, y: 2.2996686, z: 0.06699318}
     yawOffset: 0
     rigged: 1
     headBone: Head
@@ -195,6 +221,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: quaternius.husky
     prefab: {fileID: 2242888416370347441, guid: 8c974b8612c648bd894e7d88b10be189, type: 3}
     nativeSize: {x: 0.9899646, y: 3.0763764, z: 3.6896315}
@@ -208,6 +236,8 @@ MonoBehaviour:
     targetEyeHeight: 0.525
     idleClip: Idle
     walkClip: Walk
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.bed
     prefab: {fileID: 2107409826236812522, guid: 731154180d93c114ca4b92c21ee8356a, type: 3}
     nativeSize: {x: 0.9560001, y: 0.375, z: 1.125}
@@ -221,6 +251,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.fridge
     prefab: {fileID: 2107409826236812522, guid: 45f018de5204bad408392dce9d73847e, type: 3}
     nativeSize: {x: 0.43, y: 0.92, z: 0.2919339}
@@ -234,6 +266,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.coffee_table
     prefab: {fileID: 2107409826236812522, guid: a47f5b78d9251ba49916e99b976db6a0, type: 3}
     nativeSize: {x: 0.6609961, y: 0.23, z: 0.4}
@@ -247,6 +281,8 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}
   - id: kenney.nightstand
     prefab: {fileID: 2107409826236812522, guid: 381e6886468d36648b192759e2899918, type: 3}
     nativeSize: {x: 0.266, y: 0.2632, z: 0.21730001}
@@ -260,3 +296,5 @@ MonoBehaviour:
     targetEyeHeight: 0
     idleClip: 
     walkClip: 
+    backrestTop: 0
+    backrestSpan: {x: 0, y: 0}

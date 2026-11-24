@@ -223,10 +223,10 @@ namespace OutOfSight.Tests
         public IEnumerator ChinLook_WomenUnderChinOnTheRuntimePath()
         {
             var report = new List<string>();
-            var seen = new HashSet<string>();
+            int womenShot = 0;
             bool shotMan = false;
 
-            // Before: the plain woman with the geometric normals under her jaw (TuckNormal 0), the dark band.
+            // Before: geometric normals under the jaw (TuckNormal 0) in the same lighting.
             SetTuckNormal(0f);
             try
             {
@@ -276,10 +276,11 @@ namespace OutOfSight.Tests
                 }
                 yield return Until(null, 0.5f);
                 var subjects = new List<Inhabitant>();
-                Inhabitant woman = humans.FirstOrDefault(h => CharacterLook.IsFemale(h.Rig.Entry) && !seen.Contains(h.Rig.Entry.id));
+                Inhabitant woman = humans.FirstOrDefault(h => CharacterLook.IsFemale(h.Rig.Entry));
                 if (woman != null)
                 {
-                    seen.Add(woman.Rig.Entry.id);
+                    Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, woman.Rig.Entry.id, $"{id}: the woman wears the dress");
+                    womenShot++;
                     subjects.Add(woman);
                 }
                 Inhabitant man = shotMan ? null : humans.FirstOrDefault(h => !CharacterLook.IsFemale(h.Rig.Entry));
@@ -329,7 +330,7 @@ namespace OutOfSight.Tests
             Directory.CreateDirectory(ShotDir);
             File.WriteAllLines(Path.Combine(ShotDir, "runtime_chin.txt"), report);
             Debug.Log("[ChinLook] " + string.Join(" | ", report));
-            Assert.GreaterOrEqual(seen.Count, 2, "premise: fewer than two woman models found: " + string.Join(", ", seen));
+            Assert.GreaterOrEqual(womenShot, 2, "premise: the dress should be photographed in multiple levels");
         }
     }
 }

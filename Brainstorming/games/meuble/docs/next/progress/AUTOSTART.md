@@ -107,3 +107,26 @@ chair simply undetectable is the rule a player expects while reading the title, 
 - A robot path through the spawn reverses on the out-of-play chair before the first input, which shifts its timeline
   against the audit's (the audit forbids that contact during the delay, so no audited level should have it).
 - mutation.sh rows `hold_start`, `unseen_before_start`, `shove_before_start` not run (no full suite asked).
+
+## STARTTAP (2026-11-24): click and tap start the level
+- PC: Space, Enter, gamepad A, and now a left click anywhere on the game view (`InputReader.LatchPresses`, the
+  start press). A click over an interactable UI button (any `Selectable`, found with `EventSystem.RaycastAll`) is left
+  to the button and does not start; a raycast-target image with no button (a plate, a catcher) never swallows it.
+  The mouse is not read while the touch controls are up (they read the fingers themselves). The starting click still
+  captures the cursor (`Main.Update`, the usual click to capture): that is the click that focuses the game, not a
+  camera move. The focus-loss pause is untouched: a held level still pauses on a focus loss, and the click that
+  comes back lands on the pause menu.
+- Android: any tap that does not travel starts the level while it is held, whatever its length (the 0.35 s short-tap
+  limit only applies once the level runs), and a tap on the player lamp only starts it (no lamp switch on that tap).
+  The careful and pause buttons keep their own job and do not start. A drag on the left half (the stick) still starts
+  by moving; an orbit drag on the right half still does not.
+- Move keys, stick, D-pad and the touch stick still start the level (unchanged): removing them would leave W/ZQSD
+  doing nothing on the card, which reads as a frozen game, and the AUTOSTART rules (the first move is taken on the
+  same step) rely on it. The prompt only names the dedicated start input.
+- Prompt (`Strings`, per device as before): keyboard "Espace ou clic pour commencer" / "Space or click to start";
+  gamepad "Appuie sur A pour commencer" / "Press A to start"; touch "Touche l'écran pour commencer" / "Tap the screen
+  to start" (unchanged).
+- Spectator: a click or tap only dismisses the card (same start press path as Space).
+- Tests (not run): new `HeldStart05b_ClickStartsAndALongTapStarts` (`InputReader.InjectClick`). HudV2_01 reads the
+  strings through `Strings.HudStart*`, so it follows the new text. Filter:
+  `HeldStart0|FocusPause0|HudV2_01_|Tips_0|Spectator`.

@@ -709,6 +709,37 @@ namespace OutOfSight
             Triangle(a, c, d, facing);
         }
 
+        /// <summary>Three vertices per rib from left edge to midrib to right edge, with pointed ends.</summary>
+        public void AddLeafBlade(Vector3[] ribs)
+        {
+            int rows = ribs.Length / 3;
+            for (int side = 1; side >= -1; side -= 2)
+            {
+                int start = vertices.Count;
+                for (int row = 0; row < rows; row++)
+                {
+                    int section = 3 * Mathf.Clamp(row, 1, rows - 2);
+                    Vector3 along = ribs[3 * Mathf.Min(rows - 1, row + 1) + 1] - ribs[3 * Mathf.Max(0, row - 1) + 1];
+                    for (int column = 0; column < 3; column++)
+                    {
+                        Vector3 across = ribs[section + Mathf.Min(2, column + 1)] - ribs[section + Mathf.Max(0, column - 1)];
+                        Vector3 normal = side * Vector3.Cross(along, across).normalized;
+                        Add(ribs[row * 3 + column], normal, new Vector2(column * 0.5f, row / (float)(rows - 1)));
+                    }
+                }
+                for (int row = 0; row < rows - 1; row++)
+                {
+                    for (int column = 0; column < 2; column++)
+                    {
+                        int a = start + 3 * row + column;
+                        int b = a + 3;
+                        if (row > 0) { Triangle(a, a + 1, b + 1, normals[a]); }
+                        if (row < rows - 2) { Triangle(a, b + 1, b, normals[b]); }
+                    }
+                }
+            }
+        }
+
         /// <summary>A box of <paramref name="size"/> centred on <paramref name="m"/>'s origin, its UVs projected per face in metres.</summary>
         public void AddBox(Matrix4x4 m, Vector3 size)
         {
@@ -809,6 +840,87 @@ namespace OutOfSight
             {
                 Triangle(centre, first + s, first + s + 1, n);
             }
+        }
+
+        /// <summary>
+        /// PLANT (2026-11-24): a faceted low-poly ellipsoid (a leaf cluster) of <paramref name="radii"/> centred on
+        /// <paramref name="m"/>'s origin: <paramref name="rings"/> bands from pole to pole, <paramref name="segments"/> points
+        /// around each ring (every other ring turned by half a step, so the facets read as an icosphere's), each point pushed
+        /// out or in by <paramref name="bulge"/>(ring, segment), a factor near 1. Flat normals; each face carries UVs in
+        /// metres in its own plane (exact, so the detail repeats at its tile). 2 * segments * (rings - 1) triangles.
+        /// </summary>
+        public void AddBlob(Matrix4x4 m, Vector3 radii, int segments, int rings, System.Func<int, int, float> bulge)
+        {
+            var grid = new Vector3[rings + 1, segments];
+            for (int r = 0; r <= rings; r++)
+            {
+                float polar = Mathf.PI * r / rings;
+                bool pole = r == 0 || r == rings;
+                for (int s = 0; s < segments; s++)
+                {
+                    float az = 2f * Mathf.PI * (s + 0.5f * (r % 2)) / segments;
+                    var dir = new Vector3(Mathf.Sin(polar) * Mathf.Sin(az), Mathf.Cos(polar), Mathf.Sin(polar) * Mathf.Cos(az));
+                    grid[r, s] = m.MultiplyPoint3x4(Vector3.Scale(dir, radii) * bulge(r, pole ? 0 : s));
+                }
+            }
+            Vector3 centre = m.MultiplyPoint3x4(Vector3.zero);
+            for (int r = 0; r < rings; r++)
+            {
+                // The ring turned by half a step sits between its neighbour's points: pair each point with the right ones.
+                bool upperTurned = r % 2 == 1;
+                for (int s = 0; s < segments; s++)
+                {
+                    int next = (s + 1) % segments;
+                    Vector3 a0 = grid[r, s];
+                    Vector3 a1 = grid[r, next];
+                    Vector3 b0 = grid[r + 1, s];
+                    Vector3 b1 = grid[r + 1, next];
+                    if (upperTurned)
+                    {
+                        Facet(a0, b1, b0, centre);
+                        Facet(a0, a1, b1, centre);
+                    }
+                    else
+                    {
+                        Facet(a0, a1, b0, centre);
+                        Facet(a1, b1, b0, centre);
+                    }
+                }
+            }
+        }
+
+        /// <summary>One flat triangle facing away from <paramref name="centre"/>, UVs in metres in its own plane (degenerate ones are skipped).</summary>
+        private void Facet(Vector3 a, Vector3 b, Vector3 c, Vector3 centre)
+        {
+            Vector3 n = Vector3.Cross(b - a, c - a);
+            if (n.sqrMagnitude < 1e-14f)
+            {
+                return;
+            }
+            n.Normalize();
+            if (Vector3.Dot(n, (a + b + c) / 3f - centre) < 0f)
+            {
+                n = -n;
+            }
+            Vector3 u = (b - a).normalized;
+            Vector3 v = Vector3.Cross(n, u);
+            // Offset each face by its position, so neighbouring faces do not all start the texture at the same corner.
+            var origin = new Vector2(a.x + a.z, a.y);
+            int ia = Add(a, n, origin);
+            int ib = Add(b, n, origin + new Vector2(Vector3.Dot(b - a, u), Vector3.Dot(b - a, v)));
+            int ic = Add(c, n, origin + new Vector2(Vector3.Dot(c - a, u), Vector3.Dot(c - a, v)));
+            Triangle(ia, ib, ic, n);
+        }
+
+        /// <summary>
+        /// PLANT: a tapered round rod from <paramref name="from"/> to <paramref name="to"/> (radius <paramref name="r0"/> then
+        /// <paramref name="r1"/>), open at both ends (they sit in the soil, a fork or a leaf cluster).
+        /// </summary>
+        public void AddRod(Vector3 from, Vector3 to, float r0, float r1, int segments)
+        {
+            Vector3 along = to - from;
+            Matrix4x4 m = Matrix4x4.TRS(from, Quaternion.FromToRotation(Vector3.up, along), Vector3.one);
+            AddLathe(m, new[] { new Vector2(r0, 0f), new Vector2(r1, along.magnitude) }, segments, false, false);
         }
 
         /// <summary>A flat irregular shard (a thin triangular prism) of about <paramref name="size"/> lying on its frame's floor.</summary>

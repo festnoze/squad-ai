@@ -26,6 +26,23 @@ Android: StreamingAssets is packed inside the APK, so the file is not read on a 
 values as the shipped file) apply. To change the phone's look, copy the tuned values into `MenuCameraSettings`
 (Assets/Scripts/Runtime/MenuFisheye.cs) and into the shipped file, then rebuild.
 
+## Live slider panel (FISHEYEUI, 2026-11-24)
+On Windows (standalone player and the editor; not Android), on the title's main page, press **I** to show or hide a
+dark panel along the bottom of the screen, right of the button column: one slider per key above (name, current value,
+range). A slider changes the background on the same frame.
+- **Save** writes the six values to `StreamingAssets/menu_camera.json` (the player's copy in a build, the source copy
+  `Assets/StreamingAssets/menu_camera.json` in the editor), keeping `_help` and any other key, 2-space indentation,
+  3 decimals, then reads the file back.
+- **Reset** puts the built-in defaults (`MenuCameraSettings` values) on the sliders and the effect, not saved.
+- **Copy** puts the six values as JSON on the clipboard (to paste to the coordinator).
+- While the panel is shown the 2 s file check is paused (`MenuFisheye.HoldFile`), so the file never snaps the sliders
+  back. Unsaved values stay in use until the title next opens (the file is read again then).
+- The panel hides itself when the main page goes away (Jouer, Niveaux, Options, Crédits). Hidden, its objects are
+  inactive; shown, its widgets have no navigation links and a click on one hands the selection back to the menu button
+  as soon as the mouse button is up, so the keyboard and the gamepad keep driving the menu. Nothing else reads I.
+- Files: new `Assets/Scripts/Runtime/MenuFisheyeTuner.cs`; `MenuFisheye.cs` (Attach adds the tuner, `HoldFile`,
+  `Override`, `MenuCameraSettings.From` and `ToJson`). The shipped defaults and file are unchanged.
+
 ## Request (2026-11-24)
 A fish-eye on the moving 3D background of the main menu (the TitleCameraTour loop), never on the menu UI, the title
 logo, the level-number card or gameplay; its intensity tunable on Windows without a rebuild, like card_number.json;

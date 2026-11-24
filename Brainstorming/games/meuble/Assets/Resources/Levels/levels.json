@@ -1,7 +1,7 @@
 {
-  "rev": 2,
-  "previous": ["level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level10", "level11", "level12", "level13", "level14", "level15", "level16", "level17", "level18", "level19", "level20", "level21", "level22", "level23", "level24"],
-  "levels": ["level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17", "level19", "level21", "level20", "level22", "level25", "level24"],
+  "rev": 4,
+  "previous": ["level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17", "level25", "level19", "level22", "level24"],
+  "levels": ["level1", "level2", "level3", "level11", "level5", "level6", "level7", "level8", "level9", "level12", "level4", "level15", "level13", "level14", "level18", "level17", "level25", "level19", "level22", "level24"],
   "acts": [
     { "from": 0, "nameKey": "act1.name" },
     { "from": 7, "nameKey": "act2.name" },

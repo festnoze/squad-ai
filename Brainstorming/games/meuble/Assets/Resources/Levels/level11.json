@@ -202,7 +202,7 @@
     },
     {
       "name": "TableBasse",
-      "kind": "coffee_table",
+      "kind": "coffee_table", "dress": "walnut_coffee_table",
       "x": 8.75,
       "z": 5.8,
       "yaw": 0.0,
@@ -216,9 +216,10 @@
     {
       "name": "Plan",
       "kind": "counter",
+      "dress": "kitchen_base_cabinet",
       "x": 8.25,
       "z": 0.35,
-      "yaw": 0.0,
+      "yaw": 180.0,
       "sizeX": 2.4,
       "sizeY": 0.9,
       "sizeZ": 0.6,
@@ -238,7 +239,61 @@
       "occluder": true,
       "color": "#F7F4EE",
       "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteChambre",
+      "kind": "plant",
+      "x": 3.85,
+      "z": 5.05,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.4,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "PlanteSalon",
+      "kind": "plant",
+      "x": 11.5,
+      "z": 8.5,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.25,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteCuisine",
+      "kind": "plant",
+      "x": 11.35,
+      "z": 0.55,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.25,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Canape", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "magazine_stack", "host": "TableBasse", "x": -0.15, "z": 0.0, "yaw": 12.0 },
+    { "kind": "tabletop_pothos", "host": "TableBasse", "x": 0.25, "z": 0.0, "yaw": 180.0 },
+    { "kind": "photo_frame", "host": "Coiffeuse", "x": -0.27, "z": 0.11, "yaw": 172.0 },
+    { "kind": "tabletop_pothos", "host": "Coiffeuse", "x": -0.05, "z": 0.08, "yaw": 180.0 },
+    { "kind": "cutting_board", "host": "Plan", "x": -0.55, "z": 0.0, "yaw": 0.0 },
+    { "kind": "saucepan", "host": "Plan", "x": 0.15, "z": 0.0, "yaw": 270.0 },
+    { "kind": "kettle", "host": "Plan", "x": 0.7, "z": 0.05, "yaw": 180.0 },
+    { "kind": "alarm_clock", "host": "Coiffeuse", "x": 0.3, "z": 0.0, "yaw": 180.0 },
+    { "kind": "slippers", "host": "floor", "x": 1.85, "z": 8.45, "yaw": 90.0 },
+    { "kind": "clothes_heap", "host": "floor", "x": 3.85, "z": 5.95, "yaw": 90.0 }
   ],
   "designerRoute": [
     { "x": 2.25, "z": 7.25, "at": 0.3 },

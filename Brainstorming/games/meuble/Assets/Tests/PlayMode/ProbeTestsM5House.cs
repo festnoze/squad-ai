@@ -19,7 +19,7 @@ namespace OutOfSight.Tests
     /// <list type="bullet">
     /// <item>Step 36 and 36l to 36n (doors, test_m5_house_door): the leaf poses, the collider and occlusion swap, the samples
     /// on all 30 steps of the swing, the leaf never moving with its wall (M9 doors rule), the area-mask paths over the one NavMesh.</item>
-    /// <item>Step 36o (level 8, wave 5A.1; M9 doors rule): an open leaf between the camera and the chair stays drawn (doors never move).</item>
+    /// <item>Step 36o (level 8, wave 5A.1; DOORFADE): an open leaf between the camera and the chair stays drawn while its wall stands (no box rule).</item>
     /// <item>Step 39 and 39e to 39g (the split level, test_m5_house_split): the ramp is climbable and the railing blocks; eyes,
     /// samples and plans add the floor height; a chair on the platform behind its edge is hidden from a low eye below.</item>
     /// <item>Step 39h: the renderer combining of the level builder on every manifest level and the 8 room mock, before and
@@ -272,7 +272,7 @@ namespace OutOfSight.Tests
         }
 
         [UnityTest]
-        public IEnumerator Step36l_LeafNeverMovesWithItsWall()
+        public IEnumerator Step36l_LeafMovesOnlyWithItsWall()
         {
             yield return Load(DoorLevel);
             LevelInstance level = Game.Level;
@@ -285,9 +285,15 @@ namespace OutOfSight.Tests
             ShadowCastingMode shown = ShadowCastingMode.On;
             Assert.AreEqual(Layers.Occluder, porte.Renderer.gameObject.layer, "premise: the leaf is drawn on the Occluder layer");
             SaveOptions o = SaveStore.Options;
-            // M9 doors rule (product owner, 2026-11-19): a door leaf never fades, sinks or hides, in any look, whatever side
-            // of its wall the camera stands on; only the wall around it moves.
+            // DOORFADE (2026-11-24, replaces the M9 doors rule): a door leaf goes out of the way exactly when its wall's plane
+            // separates the camera from the player (any look but off), and never for its box alone.
             Vector3[] eyes = { new Vector3(-3f, 2.5f, 0.25f), new Vector3(3f, 2.5f, 0.25f), new Vector3(-3f, 2.5f, 3f), new Vector3(2f, 2.5f, 5f) };
+            Vector3 player = fader.Target.position;
+            bool Separated(DoorLeaf leaf, Vector3 eye)
+            {
+                Assert.IsTrue(fader.PlaneOf(leaf.Renderer, out Vector3 lp, out Vector3 ln), "premise: the leaf is registered with its wall");
+                return Vector3.Dot(eye - lp, ln) * Vector3.Dot(player - lp, ln) < 0f;
+            }
             foreach (string walls in new[] { SaveOptions.WallsLowered, SaveOptions.WallsSeeThrough, SaveOptions.WallsBoth, SaveOptions.WallsNone })
             {
                 SaveStore.SetOptions(new SaveOptions
@@ -300,9 +306,14 @@ namespace OutOfSight.Tests
                     foreach (Vector3 eye in eyes)
                     {
                         fader.Apply(eye);
-                        Assert.AreEqual(shown, porte.Renderer.shadowCastingMode, $"{walls}: the leaf moved for the camera at {eye} (open {open})");
-                        Assert.AreEqual(shown, ouverte.Renderer.shadowCastingMode, $"{walls}: the open leaf moved for the camera at {eye}");
-                        Assert.AreEqual(1f, fader.LevelOf(porte.Renderer), 1e-4f, $"{walls}: the leaf does not stand whole");
+                        bool off = walls == SaveOptions.WallsNone;
+                        bool porteGoes = !off && Separated(porte, eye);
+                        bool ouverteGoes = !off && Separated(ouverte, eye);
+                        Assert.AreEqual(porteGoes ? ShadowCastingMode.ShadowsOnly : shown, porte.Renderer.shadowCastingMode,
+                            $"{walls}: the leaf does not follow its wall for the camera at {eye} (open {open})");
+                        Assert.AreEqual(ouverteGoes ? ShadowCastingMode.ShadowsOnly : shown, ouverte.Renderer.shadowCastingMode,
+                            $"{walls}: the open leaf does not follow its wall for the camera at {eye}");
+                        Assert.AreEqual(porteGoes ? 0f : 1f, fader.LevelOf(porte.Renderer), 1e-4f, $"{walls}: the leaf level at {eye}");
                     }
                     if (open == 0 && !porte.Open)
                     {
@@ -1073,13 +1084,15 @@ namespace OutOfSight.Tests
             foreach (string id in new List<string>(Game.LevelOrder).GetRange(0, 7))
             {
                 Game.LoadLevel(id);
-                Assert.AreEqual(Tuning.OrbitDistanceMax, cam.MaxDistance, 1e-4f, $"{id} keeps the M4 zoom range");
+                // 2026-11-24: every house zooms out until it is seen whole (Tuning.CameraWholeHouseFit), small ones included.
+                Assert.AreEqual(OrbitCamera.MaxDistanceFor(Game.Def), cam.MaxDistance, 1e-4f, $"{id} zooms out to its whole house");
             }
             yield return Load(MockLevel);
             Rect interior = Game.Def.InteriorBounds();
             float side = Mathf.Max(interior.width, interior.height);
             Assert.Greater(side, Tuning.CameraHouseReferenceSide, "premise: the mock house is larger than any M4 level");
-            float expected = Mathf.Min(Tuning.CameraMaxDistanceHouse, Tuning.OrbitDistanceMax * side / Tuning.CameraHouseReferenceSide);
+            float expected = Mathf.Clamp(Mathf.Max(Tuning.OrbitDistanceMax * side / Tuning.CameraHouseReferenceSide, side * Tuning.CameraWholeHouseFit),
+                Tuning.OrbitDistanceMax, Tuning.CameraMaxDistanceHouse);
             Assert.AreEqual(expected, cam.MaxDistance, 1e-4f, "the zoom bound scales with the house");
             Assert.Greater(cam.MaxDistance, Tuning.OrbitDistanceMax);
             Assert.AreEqual(Tuning.CameraMaxDistanceHouse, OrbitCamera.MaxDistanceFor(new LevelDef

@@ -598,7 +598,7 @@ namespace OutOfSight.Tests
                 CollectionAssert.IsEmpty(count.NonUrp, level + ": non URP shaders");
             }
 
-            // M3.1 S4: the woman (8 source materials) on level 3, the level with the most materials, stays within 24.
+            // The dress on level 3 stays within budget, including when an older model id is authored.
             yield return LoadLevel("level3");
             foreach (InhabitantDef h in Game.Def.Inhabitants)
             {
@@ -608,12 +608,13 @@ namespace OutOfSight.Tests
             yield return Steps(3);
             AssertModelsPresent("level3 with the woman");
             CollectionAssert.IsEmpty(Game.Level.ModelFallbacks, "level3 with the woman: fallbacks");
-            Mesh womanMesh = ModelCatalog.Lookup(ModelCatalog.QuaterniusWoman).prefab.GetComponentInChildren<SkinnedMeshRenderer>(true).sharedMesh;
+            var dressSkin = ModelCatalog.Lookup(ModelCatalog.QuaterniusWomanDress).prefab.GetComponentInChildren<SkinnedMeshRenderer>(true);
             foreach (Inhabitant h in Game.Level.Inhabitants)
             {
                 SkinnedMeshRenderer skin = h.GetComponentInChildren<SkinnedMeshRenderer>(true);
-                Assert.IsTrue(CharacterLook.UsesProjection(womanMesh, skin.sharedMesh), $"premise: {h.name} uses the woman model projection");
-                Assert.AreEqual(8, skin.sharedMaterials.Length, "premise: the woman has 8 material slots");
+                Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, h.Rig.Entry.id, $"{h.name}: the older model id resolves to the dress");
+                Assert.IsTrue(CharacterLook.UsesProjection(dressSkin.sharedMesh, skin.sharedMesh), $"{h.name}: the dress uses the runtime projection");
+                Assert.AreEqual(dressSkin.sharedMaterials.Length, skin.sharedMaterials.Length, $"{h.name}: the dress keeps its material slots");
                 Assert.LessOrEqual(Probe.TrianglesUnder(h.transform), Tuning.BudgetInhabitantTriangles, $"the woman {h.name}: triangles");
                 Assert.LessOrEqual(Probe.BonesUnder(h.transform), Tuning.BudgetInhabitantBones, $"the woman {h.name}: bones");
             }

@@ -8,7 +8,7 @@ namespace OutOfSight
     /// <summary>How the walls in the way get out of it (the Walls option, SaveOptions.Walls).</summary>
     public enum WallLook
     {
-        /// <summary>The wall sinks to its low solid stub; its door frames, leaves and baseboards stay standing (default).</summary>
+        /// <summary>The wall sinks to its low solid stub, its door frames and leaves with it; its baseboards stay standing.</summary>
         Lowered,
         /// <summary>The whole wall fades to the wall opacity option.</summary>
         SeeThrough,
@@ -28,17 +28,18 @@ namespace OutOfSight
     ///
     /// A fade unit is one wall line: its faces, its cap (with the closures that keep the junctions solid and, on an outer
     /// line, its outside faces), its door frames, its windows when it is shared, a shared line's baseboards. Every part of a
-    /// unit is registered with the same rule, so they go and come back together:
+    /// unit is registered with the same rule, so they go and come back together (DOORFADE 2026-11-24: its door frames and
+    /// leaves included, see <see cref="KeepDoor"/>):
     /// <list type="bullet">
     /// <item>a shared (two faced) line: out of the way when its centre plane separates the camera from the player
     /// (<see cref="Add(Renderer, Vector3, Vector3)"/>);</item>
     /// <item>an outer (one faced) line: out of the way whenever the camera is on its outer side (<see cref="AddOuter"/>),
     /// exactly when its single inward face is seen from behind and culled.</item>
     /// </list>
-    /// Lowered, a shared wall's baseboards (<see cref="KeepStandingWhenLowered"/>) stay standing. M9 doors rule (product
-    /// owner 2026-11-19): the door parts (<see cref="KeepDoor"/>: door frames, the decorative outer leaf, the door leaves)
-    /// never move in any look, near outer walls included: always opaque, at full height; only the wall around them (its
-    /// lintel over the doorway included) changes, so a doorway always reads as a standing door in its frame.
+    /// Lowered, a shared wall's baseboards (<see cref="KeepStandingWhenLowered"/>) stay standing. DOORFADE (user
+    /// 2026-11-24, replacing the M9 doors rule of 2026-11-19 where doors never moved): the door parts (<see cref="KeepDoor"/>:
+    /// door frames, the decorative outer leaf, the door leaves) go with their wall in every look, so a frame passed by the
+    /// player never stands between the camera and the player.
     ///
     /// A part out of the way goes ShadowsOnly: its collider stays, so the wall still blocks sight, the player and the
     /// NavMesh exactly as before, it keeps casting its shadow, so the lighting never changes with the camera, and it no
@@ -56,7 +57,7 @@ namespace OutOfSight
     /// M9 near walls (product owner 2026-11-19, docs/m9/FLOORS_WALLS.md section 8): in the see-through and both looks, an
     /// outer wall line between the camera and the house that covers more than <see cref="Tuning.NearWallEnterCoverage"/> of
     /// the screen (its quad clipped to the view) fades on to nothing, its cap and outside faces with it (the fixtures follow
-    /// its level, the door parts stand), and comes back to the opacity option under <see cref="Tuning.NearWallExitCoverage"/>;
+    /// its level, its door parts vanish with it), and comes back to the opacity option under <see cref="Tuning.NearWallExitCoverage"/>;
     /// the stubs keep their look. Interior lines keep the opacity option.
     ///
     /// M5 wave 5A.1 (critique m15): an entry may also carry a box (a transform and its size, read at its current pose every
@@ -78,7 +79,7 @@ namespace OutOfSight
             public bool Outer;
             /// <summary>Lowered, the plane rule leaves it standing (a door frame, a leaf, a baseboard).</summary>
             public bool KeepWhenLowered;
-            /// <summary>M9 doors rule: a door leaf or a door frame, which never moves in any look (only its wall does).</summary>
+            /// <summary>A door leaf or a door frame: goes with its wall's plane only, never with the leaf box rule (DOORFADE).</summary>
             public bool Door;
             /// <summary>M5: the box whose current pose also moves the renderer out of the way (null: the plane rule only).</summary>
             public Transform Box;
@@ -257,7 +258,7 @@ namespace OutOfSight
         /// <summary>True when <paramref name="renderer"/> stays standing in the lowered look (tests).</summary>
         public bool KeepsStandingWhenLowered(Renderer renderer) => Find(renderer)?.KeepWhenLowered ?? false;
 
-        /// <summary>M9 doors rule (tests): true when <paramref name="renderer"/> is a door part (a leaf or a frame), which never moves.</summary>
+        /// <summary>Tests: true when <paramref name="renderer"/> is a door part (a leaf or a frame), which goes with its wall only.</summary>
         public bool IsDoor(Renderer renderer) => Find(renderer)?.Door ?? false;
 
         /// <summary>
@@ -344,8 +345,8 @@ namespace OutOfSight
 
         /// <summary>
         /// M5: registers a door leaf with its wall's plane (point, normal) and its box (<paramref name="box"/> at its current
-        /// pose, <paramref name="size"/> in its local axes). M9 doors rule (product owner 2026-11-19): a leaf is a door part
-        /// (<see cref="KeepDoor"/>): it never moves, in any look, so neither its plane nor its box ever moves it.
+        /// pose, <paramref name="size"/> in its local axes). A leaf is a door part (<see cref="KeepDoor"/>): it goes with its
+        /// wall's plane only (DOORFADE), its box never moves it.
         /// </summary>
         public void Add(Renderer renderer, Vector3 point, Vector3 normal, Transform box, Vector3 size)
         {
@@ -354,8 +355,10 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// M9 doors rule (product owner 2026-11-19): a registered part is a door part (a leaf, a door frame, the decorative
-        /// outer leaf): never lowered, faded or hidden, in any look, near outer walls included; only its wall moves around it.
+        /// Marks a registered part as a door part (a leaf, a door frame, the decorative outer leaf). DOORFADE (user,
+        /// 2026-11-24, replaces the M9 doors rule): a door part goes out of the way exactly as its wall does (its plane, the
+        /// look, the timing, near outer walls included), so a frame never stands in the foreground once the player is past
+        /// its doorway; it only never uses the leaf box rule.
         /// </summary>
         public void KeepDoor(Renderer renderer)
         {
@@ -363,7 +366,6 @@ namespace OutOfSight
             if (e != null)
             {
                 e.Door = true;
-                e.KeepWhenLowered = true;
             }
         }
 
@@ -668,9 +670,11 @@ namespace OutOfSight
                 }
                 float side = Vector3.Dot(camera - e.Point, e.Normal);
                 bool plane = e.Outer ? side < 0f : side * Vector3.Dot(player - e.Point, e.Normal) < 0f;
+                // DOORFADE (2026-11-24): a door part (frame, leaf) goes exactly as its wall does, same plane, look and
+                // timing: once the player is past a doorway, its frame no longer stands in the foreground.
                 bool hidden = !none && plane && !(lowered && e.KeepWhenLowered); // MUTATION:WALLS_KEEP_FRAMES
-                hidden &= !e.Door; // MUTATION:DOORS_STAND
-                if (!none && !hidden && !e.Door && e.Box != null)
+                // A door part never uses the leaf box rule: only its wall's plane moves it (no flicker as a leaf swings).
+                if (!none && !hidden && !e.Door && e.Box != null) // MUTATION:DOORS_NO_BOX
                 {
                     bool crossed = CrossesBox(camera, points, count, e.Box, e.HalfSize); // MUTATION:LEAF_FADE
                     hidden = crossed;

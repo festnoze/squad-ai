@@ -47,7 +47,39 @@
       "name": "Table", "kind": "table", "x": 2.45, "z": -1.9, "yaw": 0.0,
       "sizeX": 1.4, "sizeY": 0.75, "sizeZ": 0.9, "occluder": true,
       "color": "#E3B23C", "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Plante",
+      "kind": "plant",
+      "x": 3.6,
+      "z": -2.6,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.1,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteNord",
+      "kind": "plant",
+      "x": -3.6,
+      "z": 2.6,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.35,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Sofa", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "open_book", "host": "Table", "x": -0.24, "z": 0.07, "yaw": 0.0 },
+    { "kind": "ceramic_mug", "host": "Table", "x": 0.06, "z": 0.04, "yaw": 0.0 },
+    { "kind": "tabletop_pothos", "host": "Table", "x": 0.42, "z": -0.14, "yaw": 0.0 }
   ],
   "designerRoute": [
     { "x": -2.25, "z": -2.25, "at": 3.2 },

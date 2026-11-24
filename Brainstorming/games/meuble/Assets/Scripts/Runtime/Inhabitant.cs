@@ -233,13 +233,14 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// M5: the catalog model an inhabitant shows: its personality's (CONTRACT_M5 3; the dog's Husky), an explicit
-        /// <see cref="InhabitantDef.Model"/> winning. Null for a default inhabitant that names none (the procedural body).
-        /// The level builder instantiates it.
+        /// The catalog model the level builder instantiates. Explicit models override the personality's choice.
+        /// The older women's outfits resolve to the dress. Null keeps the procedural body.
         /// </summary>
         public static string ModelIdOf(InhabitantDef def)
         {
-            return def != null ? PersonalityDef.ForInhabitant(def).Model : null;
+            string model = def != null ? PersonalityDef.ForInhabitant(def).Model : null;
+            return model == ModelCatalog.QuaterniusWoman || model == ModelCatalog.QuaterniusWomanJacket
+                ? ModelCatalog.QuaterniusWomanDress : model;
         }
 
         /// <summary>

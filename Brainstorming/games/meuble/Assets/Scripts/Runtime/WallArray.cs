@@ -48,6 +48,39 @@ namespace OutOfSight
             Surface.LightOak, Surface.Verde, Surface.IvoryTile, Surface.TealTile,
         };
 
+        /// <summary>
+        /// DRESSING (2026-11-24, docs/next/progress/DRESSING.md): the images of the room dressing packs, appended to the arrays
+        /// after <see cref="Slices"/> (slice Slices.Length + i), so the decor and the dressed furniture draw with the wall
+        /// material too: no material and no draw call of their own. Their source PNGs live in
+        /// <see cref="DressingFolders"/>; the normal array holds a flat normal for each. No Surface names them:
+        /// <see cref="SurfaceOf"/> reads a dressing vertex as Plain.
+        /// </summary>
+        public static readonly string[] DressingSlices =
+        {
+            "book_spread", "family_photo", "plaid_weave", "walnut_veneer", "pothos_leaf", "ivory_linen",
+            // KITCHEN (docs/next/progress/KITCHEN.md): the three shared albedos of the kitchen pack.
+            "kitchen_brushed_steel", "kitchen_worktop", "kitchen_oak",
+            // BEDROOM (docs/next/progress/BEDROOM.md): one atlas of denim, knit, pale oak and wicker for the whole pack.
+            "bedroom_textiles",
+        };
+
+        /// <summary>Where the dressing images (and their GLBs) were extracted, searched in this order.</summary>
+        public static readonly string[] DressingFolders =
+        {
+            "Assets/ThirdParty/Models/RoomDressing/", "Assets/ThirdParty/Models/LivingRoomFurniture/",
+            "Assets/ThirdParty/Models/Kitchen/", "Assets/ThirdParty/Models/Bedroom/",
+        };
+
+        /// <summary>The number of slices of each array: every surface slice, then every dressing slice.</summary>
+        public static int Depth => Slices.Length + DressingSlices.Length;
+
+        /// <summary>The array slice of a dressing image (<see cref="DressingSlices"/>), or -1.</summary>
+        public static int DressingSliceOf(string image)
+        {
+            int i = System.Array.IndexOf(DressingSlices, image);
+            return i < 0 ? -1 : Slices.Length + i;
+        }
+
         public const string ShaderName = "OutOfSight/Wall Finishes";
         public const string SeeThroughShaderName = "OutOfSight/Wall See-through";
 
@@ -106,7 +139,7 @@ namespace OutOfSight
         {
             if (library == null || library.wallMaterial == null || library.wallColours == null || library.wallNormals == null
                 || library.wallMaterial.shader == null || !library.wallMaterial.shader.isSupported || library.wallSlices == null
-                || library.wallSlices.Count != Slices.Length || library.wallColours.depth != Slices.Length)
+                || library.wallSlices.Count != Slices.Length || library.wallColours.depth != Depth || library.wallNormals.depth != Depth)
             {
                 return false;
             }
@@ -194,6 +227,12 @@ namespace OutOfSight
 
         /// <summary>UV1.x of a vertex that names a flat colour instead of a finish (<see cref="Flat"/>).</summary>
         public const float FlatFinish = -1f;
+
+        /// <summary>
+        /// DRESSING: UV2.x of a vertex that samples a dressing slice (<see cref="DressingSlices"/>) and tints it: UV2.yzw is
+        /// the linear tint (the GLB's vertex colour). Below 0, so the shader never reads it as a tiled wall's band.
+        /// </summary>
+        public const float DressingTint = -1f;
 
         private static readonly Dictionary<(int mesh, Color32 colour, int smoothness, int metallic), Mesh> Flats =
             new Dictionary<(int, Color32, int, int), Mesh>();

@@ -23,37 +23,45 @@ namespace OutOfSight
             public readonly List<int> Clothes = new List<int>();
         }
 
+        private struct GarmentBounds
+        {
+            public float HalfWidth, SleeveReach, Top, Bottom;
+            public bool Usable => HalfWidth > 0f && Top > Bottom;
+        }
+
         private static readonly Dictionary<Mesh, Projection> Projections = new Dictionary<Mesh, Projection>();
-        private static readonly Dictionary<(Color32, bool), Texture2D> ClothesVariants = new Dictionary<(Color32, bool), Texture2D>();
+        private static readonly Dictionary<(Texture2D, Color32?, bool), Texture2D> ClothesVariants =
+            new Dictionary<(Texture2D, Color32?, bool), Texture2D>();
+        private static readonly Dictionary<Texture2D, Color32[]> ClothesPixels = new Dictionary<Texture2D, Color32[]>();
         private static readonly HashSet<string> Reported = new HashSet<string>();
-        private static Texture2D clothes;
-        private static Color32[] clothesPixels;
+        private static readonly Texture2D[] ClothesSources = new Texture2D[2];
+        private const string WomanClothesResource = "CharacterWomanClothesAtlas";
         private static MaterialPropertyBlock block;
 
         public static bool IsFemale(ModelCatalog.Entry entry) =>
             entry?.id != null && entry.id.StartsWith(ModelCatalog.QuaterniusWoman, StringComparison.Ordinal);
 
-        public static Texture2D ClothesAtlas
+        private static Texture2D ClothesAtlas(bool female)
         {
-            get
+            int slot = female ? 1 : 0;
+            if (ClothesSources[slot] == null)
             {
-                if (clothes == null)
+                string resource = female ? WomanClothesResource : Tuning.ClothesAtlasResource;
+                ClothesSources[slot] = Resources.Load<Texture2D>(resource);
+                if (ClothesSources[slot] == null)
                 {
-                    clothes = Resources.Load<Texture2D>(Tuning.ClothesAtlasResource);
-                    if (clothes == null)
-                    {
-                        ReportOnce("clothes", $"[CharacterLook] missing Resources/{Tuning.ClothesAtlasResource}");
-                    }
+                    ReportOnce(resource, $"[CharacterLook] missing Resources/{resource}");
                 }
-                return clothes;
             }
+            return ClothesSources[slot];
         }
 
         public static bool IsCharacterTexture(Texture texture) =>
             texture != null && (CharacterHead.IsWrap(texture) || IsClothesTexture(texture));
 
         public static bool IsClothesTexture(Texture texture) =>
-            texture != null && (texture == clothes || ClothesVariants.ContainsValue(texture as Texture2D));
+            texture != null && (texture == ClothesSources[0] || texture == ClothesSources[1]
+                || ClothesVariants.ContainsValue(texture as Texture2D));
 
         public static bool UsesProjection(Mesh source, Mesh displayed) =>
             (Projections.TryGetValue(source, out Projection full) && full.Mesh == displayed)
@@ -67,7 +75,7 @@ namespace OutOfSight
             }
 
             Mesh source = rig.Skin.sharedMesh;
-            bool dressed = !TextureLibrary.Disabled && ClothesAtlas != null;
+            bool dressed = !TextureLibrary.Disabled && ClothesAtlas(IsFemale(rig.Entry)) != null;
             // Keep a separate projection when the visual comparison probe disables detail textures.
             var variants = dressed ? Projections : PlainProjections;
             if (!variants.TryGetValue(source, out Projection look) || look.Mesh == null)
@@ -166,8 +174,8 @@ namespace OutOfSight
             Matrix4x4 fromFace = toFace.inverse;
             int neckBone = Array.FindIndex(bones, b => b != null && b.name == "Neck");
             var sourceTris = new int[mesh.subMeshCount][];
-            float upperHalf = 0f, neck = float.MinValue, waist = float.MaxValue;
-            float lowerHalf = 0f, hip = float.MinValue;
+            var upper = new GarmentBounds { Top = float.MinValue, Bottom = float.MaxValue };
+            var lower = new GarmentBounds { Top = float.MinValue, Bottom = float.MaxValue };
             int skinSlot = -1;
             for (int slot = 0; slot < sourceTris.Length; slot++)
             {
@@ -179,25 +187,39 @@ namespace OutOfSight
                 }
                 foreach (int i in indices)
                 {
-                    if (IsUpper(name) && IsTrunk(DominantBone(weights, bones, i)))
+                    Vector3 point = body[i];
+                    float side = Mathf.Abs(point.x);
+                    if (IsUpper(name))
                     {
-                        upperHalf = Mathf.Max(upperHalf, Mathf.Abs(body[i].x));
-                        neck = Mathf.Max(neck, body[i].y);
-                        waist = Mathf.Min(waist, body[i].y);
+                        upper.SleeveReach = Mathf.Max(upper.SleeveReach, side);
+                        if (IsTrunk(DominantBone(weights, bones, i)))
+                        {
+                            upper.HalfWidth = Mathf.Max(upper.HalfWidth, side);
+                            upper.Top = Mathf.Max(upper.Top, point.y);
+                            upper.Bottom = Mathf.Min(upper.Bottom, point.y);
+                        }
                     }
                     if (IsLower(name))
                     {
-                        lowerHalf = Mathf.Max(lowerHalf, Mathf.Abs(body[i].x));
-                        hip = Mathf.Max(hip, body[i].y);
+                        lower.HalfWidth = Mathf.Max(lower.HalfWidth, side);
+                        lower.Top = Mathf.Max(lower.Top, point.y);
+                        lower.Bottom = Mathf.Min(lower.Bottom, point.y);
                     }
                 }
             }
             List<int> collar = skinSlot >= 0 && CharacterHead.HasSource(female)
                 ? CharacterHead.Collar(sourceTris[skinSlot], face, headWeight, female) : null;
             bool wrapHead = collar != null;
+            CharacterHead.Neck neckShape = wrapHead ? new CharacterHead.Neck(collar, face) : null;
             if (!wrapHead)
             {
                 ReportOnce(rig.Entry.id, $"[CharacterLook] {rig.Entry.id}: head wrap or neck boundary unavailable");
+            }
+
+            Vector3 NeckNormal(int index)
+            {
+                Vector3 normal = neckShape.BlendNormal(face[index], toFace.MultiplyVector(normals[index]).normalized);
+                return fromFace.MultiplyVector(normal).normalized;
             }
 
             var remap = new Dictionary<(int, Chart), int>();
@@ -217,8 +239,8 @@ namespace OutOfSight
                 var part = ModelKit.PartOf(name, false);
                 bool skin = part == ModelKit.CharacterPart.Skin;
                 bool hair = part == ModelKit.CharacterPart.Hair;
-                bool shirt = dressed && upperHalf > 0f && neck > waist && IsUpper(name);
-                bool pants = dressed && lowerHalf > 0f && IsLower(name);
+                bool shirt = dressed && upper.Usable && IsUpper(name);
+                bool pants = dressed && lower.Usable && IsLower(name);
                 if (skin && wrapHead) { look.Skin.Add(slot); }
                 if (shirt || pants) { look.Clothes.Add(slot); }
                 var indices = new List<int>(sourceTris[slot].Length);
@@ -247,15 +269,16 @@ namespace OutOfSight
                         int v = input[corner];
                         if (!remap.TryGetValue((v, chart), out int copy))
                         {
-                            Vector2 coord = ProjectUv(chart, uv[v], body[v], upperHalf, neck, waist, lowerHalf, hip);
+                            Vector2 coord = ProjectUv(chart, uv[v], body[v], upper, lower);
                             Vector4 tangent = hasTangents ? tangents[v] : default;
-                            var key = (vertices[v], normals[v], tangent, coord, weights[v]);
+                            Vector3 normal = chart == Chart.Skin ? NeckNormal(v) : normals[v];
+                            var key = (vertices[v], normal, tangent, coord, weights[v]);
                             if (!welded.TryGetValue(key, out copy))
                             {
                                 copy = positions.Count;
                                 welded.Add(key, copy);
                                 positions.Add(vertices[v]);
-                                newNormals.Add(normals[v]);
+                                newNormals.Add(normal);
                                 if (hasTangents) { newTangents.Add(tangent); }
                                 skinning.Add(weights[v]);
                                 coords.Add(coord);
@@ -277,7 +300,7 @@ namespace OutOfSight
                         skinning.Add(weight);
                         return index;
                     }
-                    CharacterHead.Append(indices, collar, face, female,
+                    CharacterHead.Append(indices, neckShape, face, female,
                         (point, normal, coord, tuck) =>
                         {
                             Vector3 vertexNormal = fromFace.MultiplyVector(normal).normalized;
@@ -292,7 +315,7 @@ namespace OutOfSight
                             return Append(fromFace.MultiplyPoint3x4(point), vertexNormal,
                                 new Vector4(tv.x, tv.y, tv.z, 1f), coord, weight);
                         },
-                        (v, coord) => Append(vertices[v], normals[v], hasTangents ? tangents[v] : default, coord, weights[v]));
+                        (v, coord) => Append(vertices[v], NeckNormal(v), hasTangents ? tangents[v] : default, coord, weights[v]));
                 }
                 triangles[slot] = indices.ToArray();
             }
@@ -313,8 +336,7 @@ namespace OutOfSight
             return look;
         }
 
-        private static Vector2 ProjectUv(Chart chart, Vector2 original, Vector3 body,
-            float upperHalf, float neck, float waist, float lowerHalf, float hip)
+        private static Vector2 ProjectUv(Chart chart, Vector2 original, Vector3 body, GarmentBounds upper, GarmentBounds lower)
         {
             switch (chart)
             {
@@ -323,15 +345,22 @@ namespace OutOfSight
                 case Chart.ShirtFront:
                 case Chart.ShirtBack:
                     bool shirtFront = chart == Chart.ShirtFront;
-                    float u = 0.5f + (shirtFront ? -body.x : body.x) / (2f * upperHalf);
-                    float v = Mathf.Clamp01((neck - body.y) / (neck - waist));
-                    return Tile(shirtFront ? 0 : 1, 0, Mathf.Clamp(u, 0.025f, 0.975f), v);
+                    float side = Mathf.Abs(body.x);
+                    float v = Mathf.InverseLerp(upper.Top, upper.Bottom, body.y);
+                    // A sleeve continues away from the torso in the bind pose. Use that length to
+                    // follow the cloth around the arm instead of stretching the collar texels to the cuff.
+                    float sleeve = Mathf.InverseLerp(0.86f * upper.HalfWidth, upper.SleeveReach, side);
+                    float sleeveBlend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.86f * upper.HalfWidth, upper.HalfWidth, side)
+                        * Mathf.InverseLerp(0.72f, 0.4f, v));
+                    float distance = Mathf.Lerp(Mathf.Min(0.47f, 0.5f * side / upper.HalfWidth), 0.47f - 0.07f * sleeve, sleeveBlend);
+                    float u = 0.5f + (shirtFront ? -Mathf.Sign(body.x) : Mathf.Sign(body.x)) * distance;
+                    return Tile(shirtFront ? 0 : 1, 0, u, Mathf.Lerp(v, 0.16f + 0.62f * sleeve, sleeveBlend));
                 case Chart.PantsFront:
                 case Chart.PantsBack:
                     bool pantsFront = chart == Chart.PantsFront;
-                    float p = 0.5f + (pantsFront ? -body.x : body.x) / (2.18f * lowerHalf);
+                    float p = 0.5f + (pantsFront ? -body.x : body.x) / (2.18f * lower.HalfWidth);
                     return Tile(pantsFront ? 0 : 1, 1, Mathf.Clamp(p, 0.015f, 0.985f),
-                        Mathf.Clamp01((hip - body.y) / Tuning.ClothesTrousersLength));
+                        Mathf.InverseLerp(lower.Top, lower.Bottom, body.y));
                 default:
                     return original;
             }
@@ -347,7 +376,7 @@ namespace OutOfSight
             {
                 return;
             }
-            Texture2D texture = ClothesTexture(tint, rig.Entry.id == ModelCatalog.QuaterniusWomanDress);
+            Texture2D texture = ClothesTexture(ClothesAtlas(IsFemale(rig.Entry)), tint, rig.Entry.id == ModelCatalog.QuaterniusWomanDress);
             if (texture == null)
             {
                 return;
@@ -359,28 +388,28 @@ namespace OutOfSight
         }
 
         /// <summary>Share one compact atlas per personality colour and outfit layout.</summary>
-        private static Texture2D ClothesTexture(Color? tint, bool dress)
+        private static Texture2D ClothesTexture(Texture2D atlas, Color? tint, bool dress)
         {
-            Texture2D atlas = ClothesAtlas;
             if (atlas == null || (!tint.HasValue && !dress))
             {
                 return atlas;
             }
             Color colour = tint.GetValueOrDefault();
-            var key = ((Color32)colour, dress);
+            Color32? bandTint = tint.HasValue ? (Color32)colour : null;
+            var key = (atlas, bandTint, dress);
             if (ClothesVariants.TryGetValue(key, out Texture2D cached) && cached != null)
             {
                 return cached;
             }
             if (!atlas.isReadable)
             {
-                ReportOnce("clothes read", $"[CharacterLook] Resources/{Tuning.ClothesAtlasResource} is not readable");
+                ReportOnce(atlas.name, $"[CharacterLook] Resources/{atlas.name} is not readable");
                 return atlas;
             }
-            // A 256 px view is enough for the on-screen size. Keep the original atlas for unmodified garments.
+            // A half-size view is enough for the on-screen size. Keep the original atlas for unmodified garments.
             int w = atlas.width / 2;
             int h = atlas.height / 2;
-            if (clothesPixels == null)
+            if (!ClothesPixels.TryGetValue(atlas, out Color32[] clothesPixels))
             {
                 Color32[] source = atlas.GetPixels32();
                 clothesPixels = new Color32[w * h];
@@ -393,6 +422,7 @@ namespace OutOfSight
                             + (Color)source[i + atlas.width] + (Color)source[i + atlas.width + 1]) * 0.25f);
                     }
                 }
+                ClothesPixels[atlas] = clothesPixels;
             }
             var pixels = (Color32[])clothesPixels.Clone();
             const float dressWaist = 0.52f;
@@ -419,13 +449,13 @@ namespace OutOfSight
             if (tint.HasValue)
             {
                 Color target = colour.linear;
-                PaintBand(pixels, w, h, TileV(0, Tuning.ClothesCollarBand), 1f, target);
+                PaintBand(pixels, w, h, TileV(0, 0.66f * Tuning.ClothesCollarBand), 1f, target);
                 float hem = dress ? dressWaist : 1f;
                 PaintBand(pixels, w, h, dress ? TileV(0, hem) : 0.5f, TileV(0, hem - Tuning.ClothesHemBand), target);
             }
             var texture = new Texture2D(w, h, TextureFormat.RGB24, true)
             {
-                name = (dress ? "Dress " : "Clothes ") + ColorUtility.ToHtmlStringRGB(colour),
+                name = (dress ? "Dress " : atlas.name + " ") + ColorUtility.ToHtmlStringRGB(colour),
                 wrapMode = TextureWrapMode.Clamp,
                 filterMode = FilterMode.Trilinear,
                 anisoLevel = 2,
@@ -465,12 +495,13 @@ namespace OutOfSight
                 float mean = Mathf.Max((float)(sum / n), 1e-4f);
                 for (int y = y0; y < y1; y++)
                 {
+                    float blend = 0.55f * Mathf.SmoothStep(0f, 1f, Mathf.Min(y - y0, y1 - 1 - y) / 3f);
                     for (int x = x0; x < x1; x++)
                     {
                         int i = y * w + x;
                         float shade = Mathf.Clamp(Mathf.Pow(LumaOf(pixels[i]) / mean, Tuning.ClothesBandContrast), 0.6f, 1.4f);
                         Color c = new Color(target.r * shade, target.g * shade, target.b * shade, 1f).gamma;
-                        pixels[i] = c;
+                        pixels[i] = Color.Lerp(pixels[i], c, blend);
                     }
                 }
             }

@@ -14,27 +14,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: OutOfSight.Runtime::OutOfSight.AudioLibrary
   hops:
   - clip: {fileID: 8300000, guid: 1a293ffdc5f63834fbad7966ff98e532, type: 3}
-    loudness: -14.3
-    gain: 1.3031669
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: 1899d418216ef5f44b0f06cba4ad896f, type: 3}
     loudness: -12
     gain: 1
   - clip: {fileID: 8300000, guid: 07df37b06afa36f479a44d3309db738f, type: 3}
-    loudness: -17.4
-    gain: 1.862087
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: b498d920f228fff4c80dea822149ef38, type: 3}
     loudness: -12
     gain: 1
   softHops:
   - clip: {fileID: 8300000, guid: b8315e66c486e6645a64d38ed1a7e178, type: 3}
-    loudness: -14.1
-    gain: 1.2735032
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: 4e621565d04d338469682f95d61cee04, type: 3}
     loudness: -12
     gain: 1
   - clip: {fileID: 8300000, guid: de6ac366c1e656e40b48a34869b87cbd, type: 3}
-    loudness: -17.2
-    gain: 1.8197011
+    loudness: -12
+    gain: 1
   - clip: {fileID: 8300000, guid: 0bc1db33bc178a848b30b00b1b83fa07, type: 3}
     loudness: -12
     gain: 1

@@ -18,16 +18,31 @@ namespace OutOfSight.Tests
         private static LevelDef Load(string id) => LevelJson.Parse(File.ReadAllText(Folder + id + ".json"));
 
         /// <summary>
-        /// The play order of levels v2 (docs/levels_v2/LEVELS_V2.md 3 and 7): 22 levels in three acts (7 + 9 + 6). The cut
-        /// level10, level16 and level23 stay on disk unlisted (D2); level12 (The Dog) plays before level15 (D4); the new
-        /// level25 (The Showroom) plays before the finale.
+        /// The play order of levels v2 (docs/levels_v2/LEVELS_V2.md 3 and 7), manifest rev 3 (ACT3A, docs/next/LEVEL_REVIEW.md
+        /// 5.3): 20 levels in three acts (7 + 9 + 4). The cut level10, level16 and level23 stay on disk unlisted (D2);
+        /// level12 (The Dog) plays before level15 (D4); act 3 opens on level25 (The Showroom) and ends on the finale level24;
+        /// level21 (The Catwalk) and level20 (Midnight Munchies) are parked out of the line-up, their files kept.
         /// </summary>
         private static readonly string[] PlayOrder =
         {
+            "level1", "level2", "level3", "level11", "level5", "level6", "level7",
+            "level8", "level9", "level12", "level4", "level15", "level13", "level14", "level18", "level17",
+            "level25", "level19", "level22", "level24",
+        };
+
+        /// <summary>
+        /// The play order of manifest rev 3 (20 levels), the "previous" list of rev 4 for the one-shot save migration. Rev 4
+        /// (2026-11-24, user request) swaps card 4 and card 11: level4 played much harder than everything before it.
+        /// </summary>
+        private static readonly string[] Rev3Order =
+        {
             "level1", "level2", "level3", "level4", "level5", "level6", "level7",
             "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17",
-            "level19", "level21", "level20", "level22", "level25", "level24",
+            "level25", "level19", "level22", "level24",
         };
+
+        /// <summary>ACT3A (rev 3): the act 3 levels taken out of the line-up for now, their files kept on disk and valid.</summary>
+        private static readonly string[] ParkedLevels = { "level21", "level20" };
 
         /// <summary>The first index of each act in <see cref="PlayOrder"/> (LEVELS_V2 3 and 7).</summary>
         private static readonly int[] ActStarts = { 0, 7, 16 };
@@ -138,12 +153,21 @@ namespace OutOfSight.Tests
         public void Manifest_lists_the_levels_in_play_order_and_each_is_valid()
         {
             List<string> ids = LevelManifest.Parse(File.ReadAllText(Folder + "levels.json"));
-            // Levels v2 (LEVELS_V2 3 and 7): 22 levels in the v2 order, none of the cut ones.
-            Assert.AreEqual(PlayOrder.Length, ids.Count, "the manifest count of levels v2: " + string.Join(", ", ids));
+            // Levels v2 (LEVELS_V2 3 and 7), rev 3: 20 levels in the play order, none of the cut or parked ones.
+            Assert.AreEqual(PlayOrder.Length, ids.Count, "the manifest count of levels: " + string.Join(", ", ids));
             CollectionAssert.AreEqual(PlayOrder, ids);
             foreach (string cut in CutLevels)
             {
                 CollectionAssert.DoesNotContain(ids, cut, cut + " is cut in v2: it must not be listed");
+            }
+            foreach (string parked in ParkedLevels)
+            {
+                CollectionAssert.DoesNotContain(ids, parked, parked + " is parked (rev 3): it must not be listed");
+                Assert.IsTrue(File.Exists(Folder + parked + ".json"), parked + ": the file of a parked level stays on disk");
+                LevelDef level = Load(parked);
+                Assert.AreEqual(parked, level.Id, "the id inside the file matches its name");
+                List<string> issues = LevelValidator.Validate(level);
+                Assert.IsEmpty(issues, parked + ": " + string.Join(", ", issues));
             }
             foreach (string id in ids)
             {
@@ -155,18 +179,14 @@ namespace OutOfSight.Tests
         }
 
         [Test]
-        public void Manifest_is_the_v2_order_with_its_acts_and_the_v1_order_as_previous()
+        public void Manifest_is_the_rev4_order_with_its_acts_and_the_rev3_order_as_previous()
         {
-            // LEVELS_V2 7: rev 2, the 24 v1 ids as "previous" (the one-shot save migration), the three acts.
+            // LEVELS_V2 7, ACT3A: rev 3, the 22 ids of the rev 2 order as "previous" (the one-shot save migration), the
+            // three acts.
             ManifestDef m = LevelManifest.ParseFull(File.ReadAllText(Folder + "levels.json"));
-            Assert.AreEqual(2, m.Rev, "levels.json rev");
-            CollectionAssert.AreEqual(PlayOrder, m.Levels, "the v2 play order");
-            var previous = new List<string>();
-            for (int n = 1; n <= 24; n++)
-            {
-                previous.Add("level" + n);
-            }
-            CollectionAssert.AreEqual(previous, m.Previous, "previous is the v1 order, level1 to level24");
+            Assert.AreEqual(4, m.Rev, "levels.json rev");
+            CollectionAssert.AreEqual(PlayOrder, m.Levels, "the rev 4 play order");
+            CollectionAssert.AreEqual(Rev3Order, m.Previous, "previous is the rev 3 order");
             Assert.AreEqual(ActStarts.Length, m.Acts.Count, "three acts");
             for (int i = 0; i < ActStarts.Length; i++)
             {

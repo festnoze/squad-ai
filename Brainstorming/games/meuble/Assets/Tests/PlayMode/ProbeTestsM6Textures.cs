@@ -248,8 +248,8 @@ namespace OutOfSight.Tests
             Transform plantT = Game.Level.Root.transform.Find(plant7.Name);
             Assert.IsNotNull(plantT, "level7: the plant prop was not built");
             List<Slot> plantSlots = LitSlots(plantT);
-            Slot leaves7 = plantSlots.FirstOrDefault(s => s.Renderer.name == "Leaves");
-            Assert.IsNotNull(leaves7.Renderer, "level7: the plant has no Leaves renderer");
+            Slot leaves7 = plantSlots.FirstOrDefault(s => s.Renderer.name == "Canopy");
+            Assert.IsNotNull(leaves7.Renderer, "level7: the plant has no Canopy renderer");
             Assert.AreEqual(Surface.Foliage, leaves7.Surface, "level7: the plant's leaves show no foliage detail");
             AssertFinish(leaves7, Surface.Foliage, "level7 plant leaves");
 

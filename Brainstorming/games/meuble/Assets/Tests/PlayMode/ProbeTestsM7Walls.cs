@@ -244,8 +244,8 @@ namespace OutOfSight.Tests
                         }
                     }
 
-                    // M9 doors rule (product owner, 2026-11-19): the door frames of an outer doorway never move, in any look,
-                    // while their wall's cap does.
+                    // DOORFADE (2026-11-24, replaces the M9 doors rule): the door frames of an outer doorway go with their
+                    // wall seen from outside, in every look but off, and stand with the camera inside it.
                     foreach (MeshRenderer r in Game.Level.Root.GetComponentsInChildren<MeshRenderer>(true))
                     {
                         if (r.name != "DoorFrame" || !fader.IsOuter(r) || !fader.PlaneOf(r, out Vector3 point, out Vector3 inward))
@@ -256,9 +256,10 @@ namespace OutOfSight.Tests
                         foreach (string walls in new[] { SaveOptions.WallsSeeThrough, SaveOptions.WallsBoth, SaveOptions.WallsLowered, SaveOptions.WallsNone })
                         {
                             SetWalls(walls, Tuning.WallOpacityDefault);
+                            bool off = walls == SaveOptions.WallsNone;
                             fader.Apply(point - inward * 4f + Vector3.up * 5f);
-                            Assert.IsFalse(Cut(r), $"{id} {walls}: an outer door frame moved with its wall seen from outside");
-                            Assert.AreEqual(1f, fader.LevelOf(r), 1e-4f, $"{id} {walls}: an outer door frame does not stand whole");
+                            Assert.AreEqual(!off, Cut(r), $"{id} {walls}: an outer door frame does not go with its wall seen from outside");
+                            Assert.AreEqual(off ? 1f : 0f, fader.LevelOf(r), 1e-4f, $"{id} {walls}: an outer door frame level seen from outside");
                             fader.Apply(point + inward * 1.5f + Vector3.up * 3f);
                             Assert.IsFalse(Cut(r), $"{id} {walls}: an outer door frame moved with the camera inside its wall");
                         }
@@ -483,14 +484,14 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// Step 70f (product owner, 2026-11-19): each look of the Walls option moves the right parts of a shared wall with a
-        /// doorway, the camera on the far side of it from the player: lowered, the wall sinks (its cap and faces) while its
-        /// door frame stays standing and the stubs show; see-through, the wall fades to the opacity option while its frame stays opaque (M9 doors rule) and
+        /// doorway, the camera on the far side of it from the player: lowered, the wall sinks (its cap and faces, its door
+        /// frame with it, DOORFADE) and the stubs show; see-through, the wall and its frame fade to the opacity option and
         /// the stubs hide; both, the same with the stubs shown; off, nothing moves, over a full orbit too. Each switch applies
         /// at once. The lowered doorway with an inhabitant walking through it is saved to TestResults/walls/doorway_lowered.png,
         /// the same view in the both look to doorway_both.png (the see-through copies drawn, so the two differ over the wall).
         /// </summary>
         [UnityTest]
-        public IEnumerator Step70f_EachLookMovesTheRightPartsAndLoweredDoorwaysStand()
+        public IEnumerator Step70f_EachLookMovesTheRightPartsWithTheirDoorFrames()
         {
             yield return Load("level12");
             WallFader fader = Fader;
@@ -540,8 +541,9 @@ namespace OutOfSight.Tests
             SetWalls(SaveOptions.WallsLowered, 20);
             fader.Apply(eye);
             Assert.IsTrue(Cut(cap), "lowered: the wall between the camera and the player is lowered");
-            Assert.IsFalse(Cut(frame), "lowered: its door frame stays standing, so the doorway reads");
+            Assert.IsTrue(Cut(frame), "lowered: its door frame sinks with it (DOORFADE)");
             Assert.IsTrue(fader.IsDoor(frame), "premise: the frame is marked as a door part");
+            Assert.IsFalse(fader.KeepsStandingWhenLowered(frame), "lowered: a door frame no longer stands in its lowered wall");
             Assert.AreEqual(0f, fader.AlphaOf(cap), "lowered: the wall shows nothing above its stub");
             // A shared wall's baseboards stand in its lowered wall (they fade with it in the other looks).
             Renderer boards = renderers.FirstOrDefault(r => r.name == "Baseboards" && fader.PlaneOf(r, out Vector3 bp, out Vector3 bn)
@@ -554,9 +556,9 @@ namespace OutOfSight.Tests
             SetWalls(SaveOptions.WallsSeeThrough, 20);
             fader.Apply(eye);
             Assert.IsTrue(Cut(cap), "see-through: the wall fades");
-            Assert.IsFalse(Cut(frame), "see-through: its door frame fades with it (doors never move)");
+            Assert.IsTrue(Cut(frame), "see-through: its door frame fades with it (DOORFADE)");
             Assert.AreEqual(0.2f, fader.AlphaOf(cap), 1e-4f, "see-through: the wall shows at the opacity option");
-            Assert.AreEqual(1f, fader.AlphaOf(frame), 1e-4f, "see-through: its frame stays opaque");
+            Assert.AreEqual(0.2f, fader.AlphaOf(frame), 1e-4f, "see-through: its frame shows at the opacity option too");
             Assert.IsTrue(Cut(boards), "see-through: the baseboards fade with their wall");
             Assert.IsTrue(stubs.All(s => !s.enabled), "see-through: no stub");
             SetWalls(SaveOptions.WallsSeeThrough, 50);
@@ -568,8 +570,8 @@ namespace OutOfSight.Tests
 
             SetWalls(SaveOptions.WallsBoth, 35);
             fader.Apply(eye);
-            Assert.IsTrue(Cut(cap) && !Cut(frame), "both: the wall above its stub fades, its frame stands opaque");
-            Assert.AreEqual(1f, fader.AlphaOf(frame), 1e-4f, "both: the frame stays opaque");
+            Assert.IsTrue(Cut(cap) && Cut(frame), "both: the wall above its stub fades, its frame with it");
+            Assert.AreEqual(0.35f, fader.AlphaOf(frame), 1e-4f, "both: the frame at the opacity option");
             Assert.AreEqual(0.35f, fader.AlphaOf(cap), 1e-4f, "both: at the opacity option");
             Assert.IsTrue(stubs.All(s => s.enabled), "both: the stubs show under the faded wall");
 

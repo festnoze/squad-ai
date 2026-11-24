@@ -69,16 +69,8 @@ SAW = "saw-or-wood-impact/saw_-_starninjas_0.ogg"
 # for a variant set that must keep its natural spread), "loop_xfade" s (ambience only), "notrim" (keep as cut),
 # "min_len" s (pad a very short blip with trailing silence).
 SFX = [
-    # Hops on a hard floor (rubberduck wood hits), unchanged picks of M3.
-    ("hop_01", RD_BFH + "bfh1_wood_hit_01.ogg", 0, None, 1, 25, "oneshot", {}),
-    ("hop_02", RD_BFH + "bfh1_wood_hit_02.ogg", 0, None, 1, 25, "oneshot", {}),
-    ("hop_03", RD_WM + "wood_hit_05.ogg", 0.03, None, 2, 25, "oneshot", {}),
-    ("hop_04", RD_WM + "wood_hit_09.ogg", 0.01, None, 2, 25, "oneshot", {}),
-    # New: the same hops muffled for a rug or a soft room (felt, not heard): a 700 Hz low pass, a felt thud.
-    ("hop_soft_01", RD_BFH + "bfh1_wood_hit_01.ogg", 0, None, 1, 25, "oneshot", {"lowpass": 700}),
-    ("hop_soft_02", RD_BFH + "bfh1_wood_hit_02.ogg", 0, None, 1, 25, "oneshot", {"lowpass": 700}),
-    ("hop_soft_03", RD_WM + "wood_hit_05.ogg", 0.03, None, 2, 25, "oneshot", {"lowpass": 700}),
-    ("hop_soft_04", RD_WM + "wood_hit_09.ogg", 0.01, None, 2, 25, "oneshot", {"lowpass": 700}),
+    # The hops (hop_01..04) and the muffled hops (hop_soft_01..04) are made for the game since SOUNDS (2026-11-24) by
+    # tools/audio/make_sounds.py, no longer cut from rubberduck's wood hits: not listed here, so "sfx" never overwrites them.
     ("scrape_01", SAW, 1.13, 1.45, 15, 40, "oneshot", {"notrim": True}),
     ("scrape_02", SAW, 1.96, 2.26, 15, 40, "oneshot", {"notrim": True}),
     ("scrape_03", SAW, 2.75, 3.10, 15, 40, "oneshot", {"notrim": True}),
@@ -92,8 +84,7 @@ SFX = [
     ("roomtone_airvent_loop", "airvent-loop/airvent-large-loop.wav", 0, None, 0, 0, "ambience", {"loop_xfade": 1.0}),
     ("roomtone_clock_loop", "ticking-clock/ticking_clock.wav", 0, None, 0, 0, "ambience", {}),
     ("thump", "door-open-door-close/x/door/door-05.flac", 0, None, 1, 30, "oneshot", {}),
-    ("sting_caught", K_JINGLE + "jingles_SAX/jingles_SAX05.ogg", 0.01, None, 3, 30, "oneshot", {}),
-    ("sting_caught_long", "game-over-trumpet-sfx/losetrumpet.wav", 0, None, 3, 40, "oneshot", {}),
+    # sting_caught and sting_caught_long: made for the game by tools/audio/make_sounds.py since SOUNDS (2026-11-24).
     ("vocal_huh", "huh/huh.wav", 0, None, 5, 20, "oneshot", {"highpass": 150}),
     ("ui_click", K_UI + "click_001.ogg", 0, None, 0, 5, "oneshot", {"notrim": True, "min_len": 0.06}),
     # ----- New recordings replacing a synthesized cue or filling a silent event (AUDIO_REPORT.md section 2) -----

@@ -103,6 +103,10 @@ namespace OutOfSight
         // M6 (docs/CONTRACT_M6.md 2.3): the pattern over the pulse, and 2.2's controls line (gamepad names swap in).
         private Image pulsePattern;
         private Text controls;
+        // SPECTATOR: the tag and the free camera's controls line, shown instead of the play band while a level is watched.
+        private Text spectatorTag;
+        private Text spectatorControls;
+        private bool spectatorOn;
         private bool controlsGamepad;
         private bool controlsTouch;
         private CanvasGroup titleCard;
@@ -444,7 +448,7 @@ namespace OutOfSight
         private const int CardHintSize = 38;
         private const int CardHintMinSize = 26;
         // The start line (hud.start) on the sat-on row: nothing else uses that row while the level is held.
-        // STARTFIX: wider for "Appuie sur Espace pour commencer (ou bouge)" (43 characters at size 40).
+        // STARTFIX: wide enough for 43 characters at size 40 (STARTTAP: the longest lines are now 29).
         private const float StartLineWidth = 1120f;
         private static readonly Color StartInk = new Color(1f, 0.93f, 0.66f, 1f);
         // The exit marker: its size, how far from the screen edge it clamps (reference pixels; the bottom margin clears the
@@ -559,6 +563,15 @@ namespace OutOfSight
 
             controls = NewText(transform, "Controls", Strings.HudControls, 30, TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.92f));
             Place(controls.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, ControlsY), new Vector2(1600f, 50f));
+            // SPECTATOR: the tag at the top centre in the title's display face and chair red, the controls on the play
+            // band's line; both hidden unless a level is watched (SetSpectator) and with the whole HUD under a menu.
+            spectatorTag = NewText(transform, "SpectatorTag", Strings.HudSpectatorTag, 44, TextAnchor.MiddleCenter, new Color(0.95f, 0.3f, 0.24f, 0.95f));
+            spectatorTag.font = DisplayFont;
+            Place(spectatorTag.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(900f, 60f));
+            spectatorTag.enabled = false;
+            spectatorControls = NewText(transform, "SpectatorControls", Strings.HudSpectator, 28, TextAnchor.LowerCenter, new Color(1f, 1f, 1f, 0.92f));
+            Place(spectatorControls.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, ControlsY), new Vector2(1800f, 50f));
+            spectatorControls.enabled = false;
 
             var cardGo = new GameObject("TitleCard", typeof(RectTransform));
             cardGo.transform.SetParent(transform, false);
@@ -1379,6 +1392,37 @@ namespace OutOfSight
         }
 
         /// <summary>
+        /// SPECTATOR: a level watched in spectator mode (GameState.Spectator, set at every build) swaps the play band and
+        /// every play hint for the "SPECTATEUR" tag and the free camera's controls line.
+        /// </summary>
+        public void SetSpectator(bool on)
+        {
+            SetSpectatorText();
+            if (spectatorOn != on)
+            {
+                spectatorOn = on;
+                ApplyCanvases();
+            }
+        }
+
+        /// <summary>SPECTATOR: a level is watched in spectator mode (tests).</summary>
+        public bool SpectatorShown => spectatorOn;
+
+        // SPECTATOR: the tag and the controls line in the current language and for the last device.
+        private void SetSpectatorText()
+        {
+            if (spectatorTag != null)
+            {
+                spectatorTag.text = Strings.HudSpectatorTag;
+            }
+            if (spectatorControls != null)
+            {
+                spectatorControls.text = InputReader.TouchUIActive ? Strings.HudSpectatorTouch
+                    : InputReader.LastInputWasGamepad ? Strings.HudSpectatorGamepad : Strings.HudSpectator;
+            }
+        }
+
+        /// <summary>
         /// M3: hides or shows the whole HUD. An open menu hides it by disabling its Canvas and every nested Canvas
         /// (PRD 8.4: never the GameObject); what each one should show is kept and comes back with the HUD.
         /// </summary>
@@ -1395,7 +1439,18 @@ namespace OutOfSight
             // End panel emphasis (2026-11-19): the play band (eye, gauges, controls line, body hints) hides under the fail
             // and win panels. Drawn under their translucent dim, on a 20:9 phone its labels showed between the panel
             // buttons and the controls line ran through the record line.
-            bool band = !failOn && !winOn;
+            // SPECTATOR: a watched level shows no play band and no play hint (the furniture is out of play), only its tag
+            // and the free camera's controls line.
+            bool band = !failOn && !winOn && !spectatorOn;
+            bool hints = !spectatorOn;
+            if (spectatorTag != null)
+            {
+                spectatorTag.enabled = spectatorOn && !failOn && !winOn;
+            }
+            if (spectatorControls != null)
+            {
+                spectatorControls.enabled = spectatorOn && !failOn && !winOn;
+            }
             if (eyeBackdrop != null)
             {
                 eyeBackdrop.enabled = band;
@@ -1423,13 +1478,13 @@ namespace OutOfSight
             SetEnabled(endCanvas, Visible && winOn && endOn);
             SetEnabled(carefulCanvas, Visible && carefulOn && band);
             SetEnabled(lampCanvas, Visible && lampOn && band);
-            SetEnabled(satOnCanvas, Visible && satOn && !failOn && !winOn);
-            SetEnabled(dogHoldCanvas, Visible && dogHoldOn && !satOn && !failOn && !winOn);
-            SetEnabled(tippedCanvas, Visible && tippedOn && !satOn && !dogHoldOn && !failOn && !winOn);
-            SetEnabled(doorCanvas, Visible && doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
+            SetEnabled(satOnCanvas, Visible && hints && satOn && !failOn && !winOn);
+            SetEnabled(dogHoldCanvas, Visible && hints && dogHoldOn && !satOn && !failOn && !winOn);
+            SetEnabled(tippedCanvas, Visible && hints && tippedOn && !satOn && !dogHoldOn && !failOn && !winOn);
+            SetEnabled(doorCanvas, Visible && hints && doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
             // Levels v2 (C3b): the locked hint never with the door hint (GameState wants it only with no openable leaf in
             // reach); the lit hint last on the row, under every other line of it (the wardrobe prompt included).
-            SetEnabled(lockedCanvas, Visible && lockedOn && !doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
+            SetEnabled(lockedCanvas, Visible && hints && lockedOn && !doorOn && !satOn && !dogHoldOn && !tippedOn && !failOn && !winOn);
             SetEnabled(litCanvas, Visible && litOn && !lockedOn && !doorOn && !satOn && !dogHoldOn && !tippedOn && !HideHintVisible
                 && !failOn && !winOn);
             SetEnabled(markerCanvas, Visible && markerWanted && !failOn && !winOn);
@@ -2133,6 +2188,7 @@ namespace OutOfSight
                 SetHintText();
                 SetStartLineText();
                 SetLampHintText();
+                SetSpectatorText();
             }
 
             titleTimer += Time.unscaledDeltaTime;
@@ -2337,7 +2393,8 @@ namespace OutOfSight
         /// </summary>
         private void UpdateCardHold()
         {
-            bool held = shownLevel != null && Game != null && Game.Level != null && !Game.Started
+            // SPECTATOR: a watched level never starts; its card goes on the first input (GameState.AwaitingStart).
+            bool held = shownLevel != null && Game != null && Game.Level != null && Game.AwaitingStart
                 && Game.State == PlayState.Playing && !failOn && !winOn;
             if (held)
             {
@@ -2506,8 +2563,9 @@ namespace OutOfSight
             }
             LevelDef def = Game != null && Game.Level != null ? Game.Def : null;
             FurnitureController f = def != null ? Game.Furniture : null;
+            // SPECTATOR: no exit marker for a watched level (nobody plays toward it).
             bool want = def != null && def.Exit != null && f != null && View != null && Game.State == PlayState.Playing
-                && !Game.Paused;
+                && !Game.Paused && !spectatorOn;
             if (want != markerWanted)
             {
                 markerWanted = want;

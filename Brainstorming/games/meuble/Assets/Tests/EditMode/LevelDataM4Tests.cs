@@ -604,7 +604,7 @@ namespace OutOfSight.Tests
                 Assert.IsEmpty(issues, id + ": " + string.Join("\n", issues));
             }
             // M5 (CONTRACT_M5 16.2): the manifest grows after level7; levels 1 to 7 keep the first seven places.
-            Assert.AreEqual(new[] { "level1", "level2", "level3", "level4", "level5", "level6", "level7" }, order.Take(7).ToArray(), "the play order");
+            Assert.AreEqual(new[] { "level1", "level2", "level3", "level11", "level5", "level6", "level7" }, order.Take(7).ToArray(), "the play order (rev 4: card 4 and card 11 swapped)");
         }
 
         [Test]

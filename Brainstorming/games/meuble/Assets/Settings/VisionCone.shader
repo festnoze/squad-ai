@@ -8,7 +8,8 @@
 //   UV0 = the fragment in the watcher's frame (x across the gaze, y along it), in units of the fan's range: exact under
 //         interpolation (linear in the floor position), so the distance and the angle are computed per pixel;
 //   UV1 = x the fraction of its own ray's reach (1 on the rim), y the half angle (radians), z a phase seed per watcher,
-//         w the watcher's state: 0 calm, 1 searching (alerted or investigating), 2 seeing the furniture.
+//         w the watcher's state: 0 calm, 1 searching (alerted or investigating), 2 seeing the furniture;
+//   UV2 = x 1 where a low cover hides the furniture top in the middle of a ray (CONECLIP): the fan is cut out there.
 // The states differ by pattern as well as by colour (colour-blind players): calm is a still soft gradient with a slow
 // shimmer, searching adds a bright band that sweeps from side to side, seeing sends sharp-fronted waves outward from the
 // eye with a quick pulse and stronger streaks. With _XRay = 1 (XRay_Cone.mat, the "XRay Cones" pass that redraws the part
@@ -48,6 +49,7 @@ Shader "OutOfSight/Vision Cone"
                 float4 positionOS : POSITION;
                 float2 local : TEXCOORD0;
                 float4 data : TEXCOORD1;
+                float2 shade : TEXCOORD2;
             };
 
             struct Varyings
@@ -56,6 +58,7 @@ Shader "OutOfSight/Vision Cone"
                 float2 local : TEXCOORD0;
                 float4 data : TEXCOORD1;
                 float2 floorXZ : TEXCOORD2;
+                float shade : TEXCOORD3;
             };
 
             Varyings Vert(Attributes input)
@@ -66,6 +69,7 @@ Shader "OutOfSight/Vision Cone"
                 output.local = input.local;
                 output.data = input.data;
                 output.floorXZ = world.xz;
+                output.shade = input.shade.x;
                 return output;
             }
 
@@ -104,6 +108,8 @@ Shader "OutOfSight/Vision Cone"
                 float rim = input.data.x;                     // 1 on the true outer edge (range or occluder)
                 float state = input.data.w;
                 float t = _Time.y + input.data.z * 37.0;
+                // CONECLIP: 0 where a low cover hides the furniture top in the middle of a ray, 1 elsewhere.
+                float keep = 1.0 - saturate(input.shade);
 
                 // The thin crisp edge line, on the rim and on both side edges, a constant width on screen.
                 float edge = max(EdgeLine(rim, 2.6, 0.6), EdgeLine(side, 2.6, 0.6) * step(0.02, d));
@@ -122,7 +128,7 @@ Shader "OutOfSight/Vision Cone"
                     float fade = lerp(1.15, 0.7, saturate(d));
                     float xa = _BaseColor.a * (0.4 + 0.9 * stripe) * fade;
                     xa = max(xa, edge * 0.6);
-                    return half4(_BaseColor.rgb, saturate(xa));
+                    return half4(_BaseColor.rgb, saturate(xa) * keep);
                 }
 
                 // The light: strongest at the eye, fading with distance and toward the side edges, softly started
@@ -168,7 +174,7 @@ Shader "OutOfSight/Vision Cone"
                 half3 lineColour = _BaseColor.rgb * _BaseColor.rgb;
                 colour = lerp(colour, lineColour, (half)saturate(lineA / max(a + lineA, 1e-3)));
                 a = a + lineA * (1.0 - a);
-                return half4(colour, min(a, 0.92));
+                return half4(colour, min(a, 0.92) * keep);
             }
             ENDHLSL
         }

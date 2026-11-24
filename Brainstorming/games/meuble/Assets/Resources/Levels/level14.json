@@ -3,7 +3,7 @@
   "nameKey": "level14.name",
   "hintKey": "level14.hint",
   "lesson": "split",
-  "rev": 1,
+  "rev": 2,
   "requires": [
     "sit"
   ],
@@ -82,7 +82,7 @@
       "floorColor": "#B07A4E",
       "wallColor": "#EDE6DA",
       "wallFinish": "pinstripe",
-      "floorFinish": "verde"
+      "floorFinish": "ivorytile"
     },
     {
       "id": "entree",
@@ -102,7 +102,7 @@
   "doors": [
     {
       "x": 4.45,
-      "z": 7.25,
+      "z": 3.75,
       "width": 1.0,
       "top": 2.1
     },
@@ -208,9 +208,9 @@
   ],
   "player": {
     "kind": "armchair",
-    "x": 5.75,
-    "z": 6.25,
-    "yaw": 270.0,
+    "x": 2.25,
+    "z": 7.75,
+    "yaw": 180.0,
     "sizeX": 0.85,
     "sizeY": 1.05,
     "sizeZ": 0.85,
@@ -267,20 +267,6 @@
       "accentColor": "#E3B23C"
     },
     {
-      "name": "FauteuilMamie",
-      "kind": "armchair",
-      "x": 2.25,
-      "z": 7.75,
-      "yaw": 180.0,
-      "sizeX": 0.9,
-      "sizeY": 0.95,
-      "sizeZ": 0.85,
-      "occluder": true,
-      "color": "#5B93D9",
-      "accentColor": "#F7F4EE",
-      "model": "kenney.armchair"
-    },
-    {
       "name": "Commode",
       "kind": "cabinet",
       "x": 0.3,
@@ -322,6 +308,7 @@
     {
       "name": "Plan",
       "kind": "kitchen_sink",
+      "dress": "kitchen_sink_cabinet",
       "x": 15.7,
       "z": 8.1,
       "yaw": 0.0,
@@ -344,7 +331,43 @@
       "occluder": true,
       "color": "#8C5A36",
       "accentColor": "#E3B23C"
+    },
+    {
+      "name": "PlanteChambre",
+      "kind": "plant",
+      "x": 0.4,
+      "z": 8.0,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.45,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteCuisine",
+      "kind": "plant",
+      "x": 17.4,
+      "z": 7.85,
+      "yaw": 0.0,
+      "sizeX": 0.9,
+      "sizeY": 1.15,
+      "sizeZ": 1.0,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
     }
+  ],
+  "decor": [
+    { "kind": "sofa_throw", "host": "Canape", "x": 0.3, "z": 0.0, "yaw": 0.0 },
+    { "kind": "photo_frame", "host": "Etagere", "x": -0.99, "z": 0.07, "yaw": 172.0 },
+    { "kind": "tabletop_pothos", "host": "Etagere", "x": -1.24, "z": 0.02, "yaw": 180.0 },
+    { "kind": "key_dish", "host": "Meuble", "x": 0.25, "z": -0.0, "yaw": 180.0 },
+    { "kind": "linen_table_lamp", "host": "Commode", "x": 0.36, "z": 0.07, "yaw": 180.0 },
+    { "kind": "alarm_clock", "host": "Commode", "x": -0.15, "z": 0.05, "yaw": 180.0 },
+    { "kind": "floor_book_stack", "host": "floor", "x": 1.55, "z": 7.8, "yaw": 10.0 }
   ],
   "designerRoute": [
     { "x": 5.75, "z": 5.75, "at": 6.8 },
@@ -432,38 +455,37 @@
       "startStation": 0,
       "stations": [
         {
-          "x": 5.25,
-          "z": 6.25,
-          "facing": 270.0,
+          "x": 2.25,
+          "z": 7.25,
+          "facing": 180.0,
           "dwell": 0.5,
           "glances": []
         },
         {
-          "x": 5.25,
-          "z": 6.25,
-          "facing": 270.0,
+          "x": 2.25,
+          "z": 7.25,
+          "facing": 180.0,
           "dwell": 2.0,
           "glances": [],
           "sit": "player",
           "seat": {
-            "x": 5.75,
-            "z": 6.25,
-            "yaw": 270.0
+            "x": 2.25,
+            "z": 7.75,
+            "yaw": 180.0
           }
         },
         {
           "x": 2.25,
-          "z": 7.0,
-          "facing": 180.0,
-          "dwell": 7.0,
-          "glances": [],
-          "sit": "FauteuilMamie"
-        },
-        {
-          "x": 3.25,
           "z": 2.25,
           "facing": 180.0,
-          "dwell": 7.0,
+          "dwell": 2.0,
+          "glances": []
+        },
+        {
+          "x": 5.25,
+          "z": 7.75,
+          "facing": 0.0,
+          "dwell": 20.0,
           "glances": []
         }
       ]

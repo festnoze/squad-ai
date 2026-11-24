@@ -19,6 +19,8 @@ namespace OutOfSight.Tests
     /// Next, idea 6 (task FOCUS): the same for the pause on a focus loss (GameState.AutoPause), so an editor window losing
     /// focus during a run never pauses a test's level (TestRunCallback allows one assembly attribute, hence one callback
     /// for both; ProbeTestsFocusPause turns it on itself).
+    /// LOADDOTS: and Menu.InstantLevelSelect on, so Niveaux opens the level select on the click's frame (no dots, no
+    /// pre-warm), as every level select test expects.
     /// </summary>
     public sealed class HeldStartTestRun : ITestRunCallback
     {
@@ -26,18 +28,21 @@ namespace OutOfSight.Tests
         {
             GameState.HoldStart = false;
             GameState.AutoPause = false;
+            Menu.InstantLevelSelect = true;
         }
 
         public void RunFinished(NUnit.Framework.Interfaces.ITestResult testResults)
         {
             GameState.ResetHoldStart();
             GameState.ResetAutoPause();
+            Menu.ResetInstantLevelSelect();
         }
 
         public void TestStarted(NUnit.Framework.Interfaces.ITest test)
         {
             GameState.HoldStart = false;
             GameState.AutoPause = false;
+            Menu.InstantLevelSelect = true;
         }
 
         public void TestFinished(NUnit.Framework.Interfaces.ITestResult result)
@@ -607,6 +612,50 @@ namespace OutOfSight.Tests
             Assert.IsTrue(Game.Started, "a tap outside the buttons did not start the held level");
             Assert.Less(Planar(Chair.transform.position, chair0), 1e-5f, "the chair moved after a tap start");
             Assert.AreEqual(PlayState.Playing, Game.State);
+            AssertClean();
+        }
+
+        /// <summary>
+        /// HeldStart05b (STARTTAP): a left click on the game view (no UI button under it) starts a held level without moving
+        /// the chair; on touch, a tap held well past the short-tap limit (in place) starts one too.
+        /// </summary>
+        [UnityTest]
+        [Timeout(300000)]
+        public IEnumerator HeldStart05b_ClickStartsAndALongTapStarts()
+        {
+            // PC: the click.
+            LoadHeld(SeenSpawnLevels[0]);
+            yield return null;
+            yield return null;
+            Vector3 chair0 = Chair.transform.position;
+            yield return FixedSteps(3);
+            Assert.IsFalse(Game.Started, "premise: the level is held");
+            InputReader.InjectClick(new Vector2(Screen.width * 0.5f, Screen.height * 0.5f));
+            yield return null;
+            yield return FixedSteps(2);
+            Assert.IsTrue(Game.Started, "a click on the game view did not start the held level");
+            Assert.Less(Planar(Chair.transform.position, chair0), 1e-5f, "the chair moved after a click start");
+            Assert.AreEqual(PlayState.Playing, Game.State);
+
+            // Touch: a long tap in place on the left half (the stick side) still starts.
+            InputReader.ForceTouchUI = true;
+            LoadHeld(SeenSpawnLevels[0]);
+            yield return null;
+            yield return null;
+            chair0 = Chair.transform.position;
+            Vector2 at = new Vector2(Screen.width * 0.25f, Screen.height * 0.5f);
+            InputReader.InjectTouch(0, at);
+            float until = Time.unscaledTime + 0.8f;
+            while (Time.unscaledTime < until)
+            {
+                yield return null;
+            }
+            Assert.IsFalse(Game.Started, "a finger resting in place started the held level before it lifted");
+            InputReader.ReleaseTouch(0);
+            yield return null;
+            yield return FixedSteps(2);
+            Assert.IsTrue(Game.Started, "a long tap did not start the held level");
+            Assert.Less(Planar(Chair.transform.position, chair0), 1e-5f, "the chair moved after a long tap start");
             AssertClean();
         }
 

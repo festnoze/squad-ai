@@ -142,6 +142,7 @@ namespace OutOfSight
             {
                 return;
             }
+            CancelLevelSelectLoad();
             CreditsOpen = true;
             RefreshCreditsTexts();
             CreditsScroll.StopMovement();
@@ -191,6 +192,7 @@ namespace OutOfSight
             {
                 return;
             }
+            CancelLevelSelectLoad();
             optionsFromPause = PauseOpen;
             OptionsOpen = true;
             RefreshOptionsTexts();
@@ -360,6 +362,12 @@ namespace OutOfSight
             Strings.LanguageChanged -= OnLanguageChanged;
         }
 
+        // LOADDOTS: a disabled behaviour loses its coroutines; never leave the dots or the loading flag behind.
+        private void OnDisable()
+        {
+            CancelLevelSelectLoad();
+        }
+
         private static string QualityLabel(string quality)
         {
             return quality == SaveOptions.QualityLow ? Strings.OptionsQualityLow
@@ -433,16 +441,222 @@ namespace OutOfSight
             }
         }
 
-        /// <summary>Niveaux: opens the level select over the title (ignored when the title is not up).</summary>
+        // ----- LOADDOTS: the first open of the level select, spread over frames behind "Niveaux..." -----
+
+        /// <summary>
+        /// LOADDOTS: Niveaux was pressed and the level select's first-open work (<see cref="LevelSelect.WarmStep"/>: every
+        /// level's JSON parsed and its miniature drawn) is being done a slice per frame while the button's label cycles
+        /// ".", "..", "...". The page opens when it is done; Escape or gamepad B, Jouer, Options, Crédits or leaving the
+        /// title cancel it (the work already done stays cached). Niveaux keeps the selection all along.
+        /// </summary>
+        public bool LevelSelectLoading { get; private set; }
+
+        /// <summary>
+        /// LOADDOTS: Niveaux opens the level select on the click's frame, with no dots and no pre-warm on the title (the
+        /// pre-LOADDOTS behaviour). Default (<see cref="DefaultInstantLevelSelect"/>): on under --probe, --look and in batch
+        /// mode; the PlayMode suite turns it on for every test (HeldStartTestRun), since its tests read
+        /// <see cref="LevelSelectOpen"/> right after the click. <see cref="ResetInstantLevelSelect"/> goes back to the default.
+        /// </summary>
+        public static bool InstantLevelSelect
+        {
+            get => instantLevelSelectOverride ?? DefaultInstantLevelSelect;
+            set => instantLevelSelectOverride = value;
+        }
+
+        private static bool? instantLevelSelectOverride;
+
+        /// <summary>LOADDOTS: <see cref="InstantLevelSelect"/>'s default (probe, look agent, batch mode).</summary>
+        public static bool DefaultInstantLevelSelect => Probe.Requested || SaveStore.LookRequested || Application.isBatchMode;
+
+        /// <summary>Tests: <see cref="InstantLevelSelect"/> goes back to <see cref="DefaultInstantLevelSelect"/>.</summary>
+        public static void ResetInstantLevelSelect()
+        {
+            instantLevelSelectOverride = null;
+        }
+
+        // The dots change every LoadDotSeconds; the load works at most LoadFrameBudgetMs per frame (one step at least).
+        private const float LoadDotSeconds = 0.3f;
+        private const double LoadFrameBudgetMs = 8.0;
+        // Pre-warm: once the title's main page has shown for PrewarmDelaySeconds, one step every PrewarmEveryFrames frames.
+        private const float PrewarmDelaySeconds = 1.5f;
+        private const int PrewarmEveryFrames = 3;
+        // Invisible dots that pad the label to three, so its width never changes while the dots cycle.
+        private const string HiddenDotsOpen = "<color=#00000000>";
+        private const string HiddenDotsClose = "</color>";
+
+        private Coroutine levelSelectLoad;
+        private Text levelsLabel;
+        // The label's text before the dots (null while no dots show).
+        private string levelsLabelText;
+        private int levelsDots;
+        // Realtime the title's main page started showing (-1 while hidden), and the pre-warm's measures.
+        private float titleShownSince = -1f;
+        private int prewarmSteps;
+        private double prewarmMs;
+        private double prewarmWorstMs;
+        private bool prewarmLogged;
+
+        /// <summary>
+        /// Niveaux: opens the level select over the title (ignored when the title is not up). LOADDOTS: when the page's
+        /// first-open work is not done yet (and <see cref="InstantLevelSelect"/> is off) the page opens a few frames later,
+        /// behind the loading dots (<see cref="LevelSelectLoading"/>); a second press meanwhile is ignored.
+        /// </summary>
         public void OpenLevelSelect()
         {
-            if (!TitleOpen || LevelSelectOpen || CreditsOpen || LevelSelect == null)
+            if (LevelSelectLoading || !TitleOpen || LevelSelectOpen || CreditsOpen || LevelSelect == null)
             {
                 return;
             }
+            if (InstantLevelSelect || LevelSelect.Warm || !isActiveAndEnabled)
+            {
+                OpenLevelSelectNow();
+                return;
+            }
+            levelSelectLoad = StartCoroutine(LoadLevelSelect());
+        }
+
+        private void OpenLevelSelectNow()
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
             LevelSelectOpen = true;
             Apply();
             SelectLater(null);
+            Debug.Log($"[LevelSelect] open took {watch.Elapsed.TotalMilliseconds:0.0} ms");
+        }
+
+        /// <summary>
+        /// LOADDOTS: the first dot shows and renders first, then the first-open work runs a slice per frame (dots cycling)
+        /// and the page opens on the frame it ends. Stops itself when the title's main page is no longer what shows.
+        /// </summary>
+        private IEnumerator LoadLevelSelect()
+        {
+            LevelSelectLoading = true;
+            float start = Time.realtimeSinceStartup;
+            var total = System.Diagnostics.Stopwatch.StartNew();
+            var slice = new System.Diagnostics.Stopwatch();
+            double work = 0.0;
+            double worst = 0.0;
+            int frames = 0;
+            ShowLoadDots(1);
+            // One frame first, so the first dot is on screen before any heavy work.
+            yield return null;
+            while (true)
+            {
+                if (!LoadStillWanted)
+                {
+                    EndLevelSelectLoad();
+                    yield break;
+                }
+                slice.Restart();
+                bool done;
+                do
+                {
+                    done = LevelSelect.WarmStep();
+                }
+                while (!done && slice.Elapsed.TotalMilliseconds < LoadFrameBudgetMs);
+                double ms = slice.Elapsed.TotalMilliseconds;
+                work += ms;
+                worst = System.Math.Max(worst, ms);
+                frames++;
+                if (done)
+                {
+                    break;
+                }
+                ShowLoadDots(1 + (int)((Time.realtimeSinceStartup - start) / LoadDotSeconds) % 3);
+                yield return null;
+            }
+            EndLevelSelectLoad();
+            OpenLevelSelectNow();
+            Debug.Log($"[LevelSelect] loaded behind the dots in {total.Elapsed.TotalMilliseconds:0} ms: {work:0.0} ms of work over "
+                + $"{frames} frames (worst frame {worst:0.0} ms)");
+        }
+
+        // The load goes on while the title's main page is what shows (nothing opened over it, the title not left).
+        private bool LoadStillWanted => TitleOpen && !PauseOpen && !LevelSelectOpen && !CreditsOpen && !OptionsOpen && LevelSelect != null;
+
+        /// <summary>LOADDOTS: stops a level select load in progress (nothing when none runs) and restores Niveaux's label.</summary>
+        private void CancelLevelSelectLoad()
+        {
+            if (levelSelectLoad != null)
+            {
+                StopCoroutine(levelSelectLoad);
+            }
+            EndLevelSelectLoad();
+        }
+
+        private void EndLevelSelectLoad()
+        {
+            levelSelectLoad = null;
+            LevelSelectLoading = false;
+            if (levelsLabel != null && levelsLabelText != null)
+            {
+                levelsLabel.text = levelsLabelText;
+            }
+            levelsLabelText = null;
+            levelsDots = 0;
+        }
+
+        /// <summary>Niveaux's label with <paramref name="dots"/> visible dots (1 to 3), padded to three with invisible ones.</summary>
+        private void ShowLoadDots(int dots)
+        {
+            if (levelsLabel == null && LevelsButton != null)
+            {
+                levelsLabel = LevelsButton.GetComponentInChildren<Text>(true);
+            }
+            if (levelsLabel == null || dots == levelsDots)
+            {
+                return;
+            }
+            if (levelsLabelText == null)
+            {
+                levelsLabelText = levelsLabel.text;
+            }
+            levelsDots = dots;
+            // Two spaces between the label and the dots (user request, 2026-11-24).
+            levelsLabel.text = levelsLabelText + "  " + new string('.', dots)
+                + (dots < 3 ? HiddenDotsOpen + new string('.', 3 - dots) + HiddenDotsClose : string.Empty);
+        }
+
+        /// <summary>
+        /// LOADDOTS pre-warm: once the title's main page has shown for <see cref="PrewarmDelaySeconds"/>, one step of the
+        /// level select's first-open work (one parse or one miniature) every <see cref="PrewarmEveryFrames"/> frames, so a
+        /// later Niveaux opens at once. Off under <see cref="InstantLevelSelect"/>, during a load, and once warm.
+        /// </summary>
+        private void PrewarmLevelSelect()
+        {
+            if (LevelSelect == null || LevelSelectLoading || InstantLevelSelect)
+            {
+                return;
+            }
+            if (LevelSelect.Warm)
+            {
+                if (!prewarmLogged && prewarmSteps > 0)
+                {
+                    prewarmLogged = true;
+                    Debug.Log($"[LevelSelect] pre-warm done: {prewarmMs:0.0} ms of work over {prewarmSteps} steps (worst step {prewarmWorstMs:0.0} ms)");
+                }
+                return;
+            }
+            float now = Time.realtimeSinceStartup;
+            if (!TitlePageShown || OptionsOpen || CreditsOpen)
+            {
+                titleShownSince = -1f;
+                return;
+            }
+            if (titleShownSince < 0f)
+            {
+                titleShownSince = now;
+            }
+            if (now - titleShownSince < PrewarmDelaySeconds || Time.frameCount % PrewarmEveryFrames != 0)
+            {
+                return;
+            }
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            LevelSelect.WarmStep();
+            double ms = watch.Elapsed.TotalMilliseconds;
+            prewarmMs += ms;
+            prewarmWorstMs = System.Math.Max(prewarmWorstMs, ms);
+            prewarmSteps++;
         }
 
         /// <summary>Retour, Escape or gamepad B: from the level select back to the title's main page, on Niveaux.</summary>
@@ -467,6 +681,8 @@ namespace OutOfSight
             LevelSelectOpen = false;
             TitleOpen = false;
             closedFrame = Time.frameCount;
+            // SPECTATOR: the level select's checkbox decides whether the level is played or watched.
+            Game.Spectator = LevelSelect != null && LevelSelect.SpectatorChecked;
             Apply();
             Game.LoadLevel(levelId);
             CaptureCursor();
@@ -1247,11 +1463,18 @@ namespace OutOfSight
             {
                 return;
             }
+            CancelLevelSelectLoad();
             PauseOpen = false;
             TitleOpen = true;
             LevelSelectOpen = false;
             CreditsOpen = false;
             string first = TitleCameraTour.LevelFor(Game); // M7 title camera: the title house, never played
+            // SPECTATOR: the title house is never watched with the free camera; a spectator level is always rebuilt.
+            if (Game.Spectator)
+            {
+                Game.Spectator = false;
+                reload = true;
+            }
             if (reload || Game.Level == null || Game.LevelId != first)
             {
                 Game.LoadLevel(first);
@@ -1275,6 +1498,11 @@ namespace OutOfSight
             {
                 closedFrame = Time.frameCount;
             }
+            else if (Labels.TryGetValue("MainMenuLabel", out Text mainMenu))
+            {
+                // SPECTATOR: from a watched level, "Menu principal" goes back to the level select and says so.
+                mainMenu.text = Game != null && Game.Spectator ? Strings.PauseLevels : Strings.PauseMenu;
+            }
             Apply();
             if (paused)
             {
@@ -1296,8 +1524,10 @@ namespace OutOfSight
             {
                 return;
             }
+            CancelLevelSelectLoad();
             TitleOpen = false;
             closedFrame = Time.frameCount;
+            Game.Spectator = false; // SPECTATOR: Jouer always plays
             Apply();
             Game.LoadLevel(PlayTarget);
             CaptureCursor();
@@ -1319,8 +1549,15 @@ namespace OutOfSight
         /// </summary>
         public void ToTitleFromPause()
         {
+            // SPECTATOR: from a watched level the button goes back to the level select (over the title house), with the
+            // checkbox still ticked for the next pick.
+            bool spectator = Game != null && Game.Spectator;
             PauseOpen = false;
             OpenTitle(true);
+            if (spectator)
+            {
+                OpenLevelSelect();
+            }
         }
 
         public void Quit()
@@ -1454,7 +1691,14 @@ namespace OutOfSight
                     Click();
                     CloseLevelSelect();
                 }
+                else if (LevelSelectLoading)
+                {
+                    // LOADDOTS: Escape or B during the dots cancels the load; Niveaux keeps the selection.
+                    Click();
+                    CancelLevelSelectLoad();
+                }
             }
+            PrewarmLevelSelect();
             // M6 (CONTRACT_M6 2.2): a test drives every menu with injected gamepad input alone (InputReader has no real
             // device to read here): D-pad/left stick moves the EventSystem selection along the same explicit
             // Navigation links a real press would follow, A invokes the selected widget. A real gamepad already

@@ -92,7 +92,8 @@ namespace OutOfSight
 
         private void OnStateChanged(PlayState state)
         {
-            if (state != PlayState.Won || game == null || game.Def == null)
+            // SPECTATOR: a spectator session never wins, and even then it would record nothing (no stars, no record, no win).
+            if (state != PlayState.Won || game == null || game.Def == null || game.Spectator)
             {
                 Hide();
                 return;

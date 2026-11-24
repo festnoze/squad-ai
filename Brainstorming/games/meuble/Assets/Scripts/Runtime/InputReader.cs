@@ -135,6 +135,59 @@ namespace OutOfSight
             return Mathf.Abs(y) >= 20f ? y / 120f : y;
         }
 
+        // ----- SPECTATOR (docs/next/progress/SPECTATOR.md): the free camera's own reads -----
+        // The free camera also reads Move (fly), LookDeltaPixels, LookStick, TouchLookDelta, ZoomNotches (speed) and
+        // ReadTouches (the pinch). Keys by physical position as everywhere: eKey is E on both layouts, qKey is Q on QWERTY
+        // and A on AZERTY, so neither clashes with WASD/ZQSD.
+
+        private static float? injectedSpectatorVertical;
+
+        /// <summary>
+        /// SPECTATOR: up (positive) or down (negative), -1 to 1: Space or E up, Ctrl or Q (A on AZERTY) down, the gamepad's
+        /// right trigger up and left trigger down. An injected value (<see cref="InjectSpectatorVertical"/>) wins.
+        /// </summary>
+        public static float SpectatorVertical()
+        {
+            if (injectedSpectatorVertical.HasValue)
+            {
+                return Mathf.Clamp(injectedSpectatorVertical.Value, -1f, 1f);
+            }
+            float v = 0f;
+            Keyboard k = Keyboard.current;
+            if (k != null)
+            {
+                if (k.spaceKey.isPressed || k.eKey.isPressed) v += 1f;
+                if (k.leftCtrlKey.isPressed || k.rightCtrlKey.isPressed || k.qKey.isPressed) v -= 1f;
+            }
+            Gamepad g = Gamepad.current;
+            if (g != null)
+            {
+                v += g.rightTrigger.ReadValue() - g.leftTrigger.ReadValue();
+            }
+            return Mathf.Clamp(v, -1f, 1f);
+        }
+
+        /// <summary>Tests: <see cref="SpectatorVertical"/> returns this value until <see cref="ResetInjections"/>.</summary>
+        public static void InjectSpectatorVertical(float value)
+        {
+            injectedSpectatorVertical = value;
+        }
+
+        /// <summary>SPECTATOR: Shift (either) or the gamepad's left stick press: the free camera flies faster.</summary>
+        public static bool SpectatorFast()
+        {
+            Keyboard k = Keyboard.current;
+            Gamepad g = Gamepad.current;
+            return (k != null && (k.leftShiftKey.isPressed || k.rightShiftKey.isPressed)) || (g != null && g.leftStickButton.isPressed);
+        }
+
+        /// <summary>SPECTATOR: the right mouse button is held (mouse look with a free cursor).</summary>
+        public static bool LookButtonHeld()
+        {
+            Mouse m = Mouse.current;
+            return m != null && m.rightButton.isPressed;
+        }
+
         // ----- M4 (docs/CONTRACT_M4.md 2 and amendment 9.7) -----
         // Careful mode is a held state, read in the fixed step. The action key (E, gamepad X = buttonWest; task DOORAUTO: it
         // only switches the floor lamp now, doors and wardrobes open by pushing toward them) and the
@@ -220,7 +273,7 @@ namespace OutOfSight
         /// Levels v2 (C3a, the held start): this fixed step carries an input that starts a held level: a move vector past
         /// the dead zone (<see cref="Move"/>: keys, stick, D-pad, touch stick, or an injected vector), a move press, an
         /// action press (E, gamepad X, a tap on the player lamp, or injected), an injected door push (DOORAUTO), or (task STARTFIX) a start press
-        /// (<see cref="StartPressPending"/>: Space, Enter, gamepad A, a tap outside the touch buttons, or injected), which
+        /// (<see cref="StartPressPending"/>: Space, Enter, a left click off the UI buttons, gamepad A, a tap outside the touch buttons, or injected), which
         /// starts the level without moving. Peeks only: nothing is consumed, so the furniture's step that runs next still
         /// reads the press. Camera input (mouse, wheel, right stick, touch orbit), the careful key, Escape, Start and R are
         /// not start inputs.
@@ -233,7 +286,7 @@ namespace OutOfSight
 
         // ----- Task STARTFIX: the start press, which releases a held start without moving. -----
         // A spawn can stand inside a watcher's cone at t = 0, and being seen still is allowed: the player must be able to
-        // start the clock and wait. Space, Enter (main or keypad), gamepad A (south) and a touch tap outside the buttons
+        // start the clock and wait. Space, Enter (main or keypad), a left click (STARTTAP), gamepad A (south) and a touch tap outside the buttons
         // are latched every rendered frame (LatchPresses) and consumed by the held FixedUpdate (ConsumeStartPress). None of
         // them is a gameplay verb (the action is E / X, a door is a push), so the press never also acts. A press on the frame a level is
         // built or a menu closes (the Enter or A that pressed Play, Resume or Next level) is dropped (BlockStartPresses).
@@ -268,6 +321,7 @@ namespace OutOfSight
             injectedStart = false;
             latchedStart = false;
             touchStartPending = false;
+            injectedClick = null;
             startBlockFrame = Time.frameCount;
         }
 
@@ -275,6 +329,43 @@ namespace OutOfSight
         public static void PressTouchStart()
         {
             touchStartPending = true;
+        }
+
+        // STARTTAP: an injected left click (tests), read by the next LatchPresses exactly as a real one at that position.
+        private static Vector2? injectedClick;
+
+        /// <summary>Tests: one left click at <paramref name="screenPosition"/> (pixels), read by the next frame's latch.</summary>
+        public static void InjectClick(Vector2 screenPosition)
+        {
+            injectedClick = screenPosition;
+        }
+
+        private static readonly List<UnityEngine.EventSystems.RaycastResult> uiHits = new List<UnityEngine.EventSystems.RaycastResult>();
+
+        /// <summary>
+        /// STARTTAP: an interactable UI button (any Selectable) is under <paramref name="screenPosition"/>. Only a Selectable
+        /// counts: a raycast-target image or plate with no button (a full-screen catcher, a HUD backdrop) never swallows
+        /// the start click.
+        /// </summary>
+        public static bool PointerOverButton(Vector2 screenPosition)
+        {
+            UnityEngine.EventSystems.EventSystem es = UnityEngine.EventSystems.EventSystem.current;
+            if (es == null)
+            {
+                return false;
+            }
+            var data = new UnityEngine.EventSystems.PointerEventData(es) { position = screenPosition };
+            uiHits.Clear();
+            es.RaycastAll(data, uiHits);
+            foreach (UnityEngine.EventSystems.RaycastResult hit in uiHits)
+            {
+                UnityEngine.UI.Selectable button = hit.gameObject != null ? hit.gameObject.GetComponentInParent<UnityEngine.UI.Selectable>() : null;
+                if (button != null && button.isActiveAndEnabled && button.IsInteractable())
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public static void InjectAction()
@@ -323,6 +414,20 @@ namespace OutOfSight
                     || k.numpadEnterKey.wasPressedThisFrame))
                 || (g != null && g.buttonSouth.wasPressedThisFrame) || touchStartPending;
             touchStartPending = false;
+            // STARTTAP: a left click anywhere on the game view is a start press too, unless a UI button is under the pointer
+            // (that button does its job instead). With the touch controls up, the overlay reads the fingers itself (and a
+            // Windows touch also arrives as a mouse click), so the mouse is not read then.
+            Vector2? click = injectedClick;
+            injectedClick = null;
+            Mouse m = Mouse.current;
+            if (!click.HasValue && m != null && m.leftButton.wasPressedThisFrame && !TouchUIActive)
+            {
+                click = m.position.ReadValue();
+            }
+            if (click.HasValue && !PointerOverButton(click.Value)) // MUTATION:CLICK_START
+            {
+                start = true;
+            }
             if (start && Time.frameCount > startBlockFrame)
             {
                 latchedStart = true;
@@ -357,8 +462,11 @@ namespace OutOfSight
             injectedStart = false;
             latchedStart = false;
             touchStartPending = false;
+            injectedClick = null;
             startBlockFrame = -1;
             injectedBack = false;
+            // SPECTATOR: the free camera's vertical override.
+            injectedSpectatorVertical = null;
             // M6: menu navigation injections, the right stick override and the last device (back to the keyboard,
             // hud.controls' default).
             injectedLookStick = null;
@@ -735,6 +843,20 @@ namespace OutOfSight
         public static Vector2 TouchLookDelta()
         {
             return touchLook;
+        }
+
+        private static float touchPinch;
+
+        /// <summary>PINCH: TouchControls: this frame's change in the pinching fingers' distance, pixels of a 1080 pixel high screen.</summary>
+        public static void SetTouchPinch(float delta)
+        {
+            touchPinch = delta;
+        }
+
+        /// <summary>PINCH: this frame's pinch, pixels of a 1080 pixel high screen (spread apart: positive, zoom in; zero with no pinch).</summary>
+        public static float TouchPinchDelta()
+        {
+            return touchPinch;
         }
     }
 

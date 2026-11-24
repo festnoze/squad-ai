@@ -64,6 +64,8 @@ namespace OutOfSight.Editor
             public bool PetEyes;
             public string IdleClip;
             public string WalkClip;
+            // THROWFIX: a seat whose backrest top is measured (the throw drapes over it).
+            public bool Backrest;
 
             public Spec(string id, string path, float yaw, bool rigged)
             {
@@ -76,6 +78,7 @@ namespace OutOfSight.Editor
                 PetEyes = false;
                 IdleClip = null;
                 WalkClip = null;
+                Backrest = false;
             }
 
             /// <summary>A pet: eyes from the "Eyes_*" materials, eyes fitted at <paramref name="targetEye"/>, its clip map.</summary>
@@ -101,7 +104,7 @@ namespace OutOfSight.Editor
         private static readonly Spec[] Specs =
         {
             new Spec(ModelCatalog.KenneyChair, Kenney + "kenney_chair.glb", 180f, false),
-            new Spec(ModelCatalog.KenneySofa, Kenney + "kenney_lounge_sofa.glb", 0f, false),
+            new Spec(ModelCatalog.KenneySofa, Kenney + "kenney_lounge_sofa.glb", 0f, false) { Backrest = true },
             new Spec(ModelCatalog.KenneyRug, Kenney + "kenney_rug_rectangle.glb", 0f, false),
             new Spec(ModelCatalog.KenneyDoormat, Kenney + "kenney_rug_square.glb", 0f, false),
             new Spec(ModelCatalog.KenneyArmchair, Kenney + "kenney_lounge_chair.glb", 180f, false),
@@ -161,6 +164,8 @@ namespace OutOfSight.Editor
                 log.Append("  unchanged ").Append(AssetPath).Append('\n');
             }
             BuildTextureLibrary(log);
+            // DRESSING (docs/next/progress/DRESSING.md): the decor meshes, baked from the dressing GLBs.
+            DressingBuilder.Build(log);
             AssetDatabase.SaveAssets();
             Debug.Log(log.ToString());
         }
@@ -304,6 +309,17 @@ namespace OutOfSight.Editor
                 colourFiles.Add(ColourFolder + "colour_" + Details[i].source + ".png");
                 normalFiles.Add(DetailFolder + Details[i].normalFile);
             }
+            // DRESSING (docs/next/progress/DRESSING.md): the dressing images after the surfaces, each with a flat normal (null).
+            foreach (string image in WallArray.DressingSlices)
+            {
+                string path = DressingBuilder.ImagePath(image);
+                if (path == null)
+                {
+                    throw new System.InvalidOperationException($"[ModelCatalogBuilder] dressing image {image}.png is in none of {string.Join(", ", WallArray.DressingFolders)}");
+                }
+                colourFiles.Add(path);
+                normalFiles.Add(null);
+            }
             Directory.CreateDirectory(ArrayFolder);
             colours = BuildFlipbook(colourFiles, WallColoursPath, true, log);
             normals = BuildFlipbook(normalFiles, WallNormalsPath, false, log);
@@ -318,6 +334,16 @@ namespace OutOfSight.Editor
             var pixels = new Color32[size * size * n];
             for (int i = 0; i < n; i++)
             {
+                // DRESSING: no file is a flat tangent space normal (a dressing slice's normal: the decor shows no bump).
+                if (files[i] == null)
+                {
+                    int flatOffset = (n - 1 - i) * size * size;
+                    for (int p = 0; p < size * size; p++)
+                    {
+                        pixels[flatOffset + p] = new Color32(128, 128, 255, 255);
+                    }
+                    continue;
+                }
                 var image = new Texture2D(2, 2, TextureFormat.RGBA32, false, true);
                 try
                 {
@@ -328,7 +354,11 @@ namespace OutOfSight.Editor
                     Color32[] source = image.GetPixels32();
                     if (image.width != size || image.height != size)
                     {
-                        Debug.LogWarning($"[ModelCatalogBuilder] {files[i]} is {image.width} x {image.height}: resampled to {size} for the wall array");
+                        // DRESSING: the dressing images come at their own sizes (768 x 512, 256, ...): resampled on purpose.
+                        if (!DressingBuilder.IsDressingImage(files[i]))
+                        {
+                            Debug.LogWarning($"[ModelCatalogBuilder] {files[i]} is {image.width} x {image.height}: resampled to {size} for the wall array");
+                        }
                         source = new Color32[size * size];
                         for (int y = 0; y < size; y++)
                         {
@@ -842,7 +872,14 @@ namespace OutOfSight.Editor
                     entry.nativeSize = b.size;
                     entry.boundsCenter = b.center;
                     entry.yawOffset = ModelMath.SnapYaw(spec.Yaw);
-                    log.Append($", size {Fmt(b.size)}, centre {Fmt(b.center)}, yaw {entry.yawOffset}, renderers {probe.GetComponentsInChildren<Renderer>(true).Length}\n");
+                    log.Append($", size {Fmt(b.size)}, centre {Fmt(b.center)}, yaw {entry.yawOffset}, renderers {probe.GetComponentsInChildren<Renderer>(true).Length}");
+                    if (spec.Backrest && MeasureBackrest(probe, b, out float top, out Vector2 span))
+                    {
+                        entry.backrestTop = top;
+                        entry.backrestSpan = span;
+                        log.Append($", backrest top {F(top)} over z {F(span.x)}..{F(span.y)}");
+                    }
+                    log.Append('\n');
                     return entry;
                 }
                 return MeasureRigged(spec, prefab, probe, entry, log);
@@ -875,6 +912,40 @@ namespace OutOfSight.Editor
                 }
             }
             return any;
+        }
+
+        /// <summary>The top band of a seat's height whose vertices are its backrest's top (THROWFIX).</summary>
+        private const float BackrestTopBand = 0.02f;
+
+        /// <summary>
+        /// THROWFIX: a seat's backrest, from its mesh vertices in root space: those within <see cref="BackrestTopBand"/> of the
+        /// model's height under its top are the backrest's top; their z span gives its side and thickness. False without any.
+        /// </summary>
+        private static bool MeasureBackrest(GameObject probe, Bounds bounds, out float top, out Vector2 span)
+        {
+            top = bounds.max.y;
+            float floor = bounds.max.y - BackrestTopBand * bounds.size.y;
+            float zMin = float.MaxValue;
+            float zMax = float.MinValue;
+            foreach (MeshFilter f in probe.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (f.sharedMesh == null)
+                {
+                    continue;
+                }
+                Matrix4x4 toRoot = f.transform.localToWorldMatrix;
+                foreach (Vector3 v in f.sharedMesh.vertices)
+                {
+                    Vector3 p = toRoot.MultiplyPoint3x4(v);
+                    if (p.y >= floor)
+                    {
+                        zMin = Mathf.Min(zMin, p.z);
+                        zMax = Mathf.Max(zMax, p.z);
+                    }
+                }
+            }
+            span = zMax > zMin ? new Vector2(zMin, zMax) : Vector2.zero;
+            return zMax > zMin;
         }
 
         private static ModelCatalog.Entry MeasureRigged(Spec spec, GameObject prefab, GameObject probe, ModelCatalog.Entry entry, StringBuilder log)
@@ -1053,7 +1124,8 @@ namespace OutOfSight.Editor
                     || !Near(x.nativeSize, y.nativeSize) || !Near(x.boundsCenter, y.boundsCenter) || !Near(x.eyeLocal, y.eyeLocal)
                     || Mathf.Abs(x.yawOffset - y.yawOffset) > 1e-4f || Mathf.Abs(x.eyeHeight - y.eyeHeight) > 1e-5f
                     || (x.kind ?? string.Empty) != (y.kind ?? string.Empty) || Mathf.Abs(x.targetEyeHeight - y.targetEyeHeight) > 1e-6f
-                    || (x.idleClip ?? string.Empty) != (y.idleClip ?? string.Empty) || (x.walkClip ?? string.Empty) != (y.walkClip ?? string.Empty))
+                    || (x.idleClip ?? string.Empty) != (y.idleClip ?? string.Empty) || (x.walkClip ?? string.Empty) != (y.walkClip ?? string.Empty)
+                    || Mathf.Abs(x.backrestTop - y.backrestTop) > 1e-5f || (x.backrestSpan - y.backrestSpan).sqrMagnitude > 1e-10f)
                 {
                     return false;
                 }

@@ -232,12 +232,13 @@ namespace OutOfSight.Tests
         /// <summary>
         /// The procedural parts that show no detail: the garden, books and leaves (small and saturated), the metal frames
         /// (the near-black), the procedural inhabitant's face and the brows of any inhabitant (on its skin's near-black).
-        /// M8 (docs/m8/ROOMS_PLAN.md 3): the room objects' white ceramic (glaze shows no grain).
+        /// M8 (docs/m8/ROOMS_PLAN.md 3): the room objects' white ceramic (glaze shows no grain). PLANT (2026-11-24): the plants'
+        /// glazed pot, in the pot colour, for the same reason.
         /// </summary>
         private bool PlainAllowed(Slot s)
         {
             string name = s.Renderer.name;
-            if (name == "Garden" || name.StartsWith("Books", StringComparison.Ordinal) || name == "Leaves")
+            if (name == "Garden" || name.StartsWith("Books", StringComparison.Ordinal) || name == "Leaves" || name == "PotShape")
             {
                 return true;
             }
@@ -265,7 +266,8 @@ namespace OutOfSight.Tests
             ["table"] = new[] { Surface.Wood, Surface.Linen },
             ["cabinet"] = new[] { Surface.Wood },
             ["counter"] = new[] { Surface.Wood, Surface.Plaster },
-            ["plant"] = new[] { Surface.Plaster, Surface.Foliage },
+            // PLANT (2026-11-24): ficus or banana, the dark soil and wood (Soil) and the leaves (Foliage); the pot is plain glaze.
+            ["plant"] = new[] { Surface.Soil, Surface.Foliage },
             // M8 room objects, procedural or with their Kenney model (ceramic and the near-black stay plain).
             [PropKinds.Bathtub] = new[] { Surface.Metal },
             [PropKinds.Washbasin] = new[] { Surface.Wood, Surface.Metal },
@@ -846,7 +848,9 @@ namespace OutOfSight.Tests
                 // M7 rug image (product owner, 2026-11-18): the rug's and the doormat's own picture is stretched over
                 // their own quad (PrimitiveKit.QuadMesh, scaled up directly by its transform, like the Garden above),
                 // never tiled at a metres-per-repeat: it is never measured against Carpet's tile here.
-                foreach (Slot s in LitSlots(Game.Level.Root.transform).Where(s => s.Texture != null && s.Texture != TextureLibrary.RugColour))
+                // PLANT (2026-11-24): the banana plant's leaf chart, like the rug's picture, shows once per blade (unit UVs).
+                foreach (Slot s in LitSlots(Game.Level.Root.transform).Where(s => s.Texture != null && s.Texture != TextureLibrary.RugColour
+                    && s.Texture != TextureLibrary.BananaLeafColour))
                 {
                     Assert.That(s.St.y, Is.EqualTo(s.St.x).Within(1e-5f), $"{id}: {Label(s)}: anisotropic tiling");
                     Mesh mesh = ModelKit.MeshOf(s.Renderer);
@@ -948,8 +952,10 @@ namespace OutOfSight.Tests
             // level sets player.load to "plant"; ProbeTestsM6Textures.Step50b_ exercises it directly), so it alone is
             // never seen here. M9 floors (docs/m9/FLOORS_WALLS.md, 2026-11-19): every floor finish (the M8 Marble,
             // Herringbone and CarpetFinish, the new LightOak, Verde, IvoryTile and TealTile) is used by at least one of
-            // the levels levels.json lists (22 in levels v2), so all of them must be seen here, at their own repeat.
-            Surface[] neverShipped = { Surface.Soil };
+            // the levels levels.json lists (20 since levels.json rev 3), so all of them must be seen here, at their own repeat.
+            // 2026-11-24: the Verde floor was replaced in every level at the user's request (halls and corridors now
+            // IvoryTile, the level22 office LightOak), so it is no longer shipped either.
+            Surface[] neverShipped = { Surface.Soil, Surface.Verde };
             int expectedSurfaces = TextureLibrary.Textured.Length - neverShipped.Count(s => !worst.ContainsKey(s));
             Assert.AreEqual(expectedSurfaces, worst.Count,
                 "premise: every surface but Soil was seen in the levels: " + string.Join(", ", worst.Keys));
@@ -1059,7 +1065,7 @@ namespace OutOfSight.Tests
             foreach ((Texture2DArray array, bool srgb, string label) in new[] { (library.wallColours, true, "wall colours"), (library.wallNormals, false, "wall normals") })
             {
                 Assert.IsNotNull(array, $"{label}: no array");
-                Assert.AreEqual(WallArray.Slices.Length, array.depth, $"{label}: slices");
+                Assert.AreEqual(WallArray.Depth, array.depth, $"{label}: slices (the surfaces, then DRESSING's images)");
                 Assert.AreEqual(512, array.width, $"{label}: width");
                 Assert.AreEqual(512, array.height, $"{label}: height");
                 Assert.Greater(array.mipmapCount, 5, $"{label}: mipmaps");

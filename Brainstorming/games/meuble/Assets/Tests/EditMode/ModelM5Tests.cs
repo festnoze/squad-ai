@@ -188,6 +188,10 @@ namespace OutOfSight.Tests
             // The inhabitant's view of it: the personality's model and tint, an explicit model or body colour winning,
             // and no tint for a default inhabitant whatever its body colour.
             Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, Inhabitant.ModelIdOf(new InhabitantDef { Personality = PersonalityDef.Granny }));
+            Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, Inhabitant.ModelIdOf(new InhabitantDef { Personality = PersonalityDef.Watchful }));
+            Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, Inhabitant.ModelIdOf(new InhabitantDef { Personality = PersonalityDef.Tidy }));
+            Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, Inhabitant.ModelIdOf(new InhabitantDef { Model = ModelCatalog.QuaterniusWomanJacket }));
+            Assert.AreEqual(ModelCatalog.QuaterniusWomanDress, Inhabitant.ModelIdOf(new InhabitantDef { Model = ModelCatalog.QuaterniusWoman }));
             Assert.AreEqual(ModelCatalog.QuaterniusHusky, Inhabitant.ModelIdOf(new InhabitantDef { Kind = PersonalityDef.Dog }));
             Assert.AreEqual(ModelCatalog.QuaterniusMan, Inhabitant.ModelIdOf(new InhabitantDef { Personality = PersonalityDef.Teen, Model = "quaternius.man" }));
             Assert.IsNull(Inhabitant.ModelIdOf(new InhabitantDef()), "a default inhabitant naming no model keeps the procedural body");

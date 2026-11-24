@@ -82,18 +82,18 @@ namespace OutOfSight.Core
             H("Sound effects", "Effets sonores"),
             D("CC0 1.0 (public domain), from OpenGameArt.org; cut, filtered and normalised for the game",
                 "CC0 1.0 (domaine public), sur OpenGameArt.org ; coupés, filtrés et normalisés pour le jeu"),
-            L("rubberduck: \"75 CC0 breaking / falling / hit sfx\", \"100 CC0 metal and wood SFX\", \"100 CC0 SFX\"",
-                "rubberduck : \"75 CC0 breaking / falling / hit sfx\", \"100 CC0 metal and wood SFX\", \"100 CC0 SFX\""),
+            L("rubberduck: \"100 CC0 metal and wood SFX\", \"100 CC0 SFX\"",
+                "rubberduck : \"100 CC0 metal and wood SFX\", \"100 CC0 SFX\""),
             L("Kenney (kenney.nl): \"50 RPG sound effects\", \"85 Short music jingles\", \"Interface Sounds\"",
                 "Kenney (kenney.nl) : \"50 RPG sound effects\", \"85 Short music jingles\", \"Interface Sounds\""),
             L("StarNinjas: \"Saw or Wood Impact\"", "StarNinjas : \"Saw or Wood Impact\""),
             L("Longor: \"Airvent Loop\"", "Longor : \"Airvent Loop\""),
             L("bart: \"Ticking clock.\"", "bart : \"Ticking clock.\""),
             L("qubodup: \"Door open, door close\"", "qubodup : \"Door open, door close\""),
-            L("0new4y: \"Game Over Trumpet SFX\"", "0new4y : \"Game Over Trumpet SFX\""),
             L("TinyWorlds: \"huh?\"", "TinyWorlds : \"huh?\""),
-            D("The other sounds (dog, robot, voices, creaks) are synthesized by the game.",
-                "Les autres sons (chien, robot, voix, grincements) sont synthétisés par le jeu."),
+            // SOUNDS (2026-11-24): the furniture's steps and the caught stings are made for the game (tools/audio/make_sounds.py).
+            D("The other sounds (the furniture's steps, the caught stings, dog, robot, voices, creaks) are made for the game.",
+                "Les autres sons (les pas du meuble, les jingles de défaite, chien, robot, voix, grincements) sont créés pour le jeu."),
 
             // docs/LICENSES.md, section Models: CC0 1.0, through poly.pizza.
             H("3D models", "Modèles 3D"),

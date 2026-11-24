@@ -378,7 +378,6 @@ namespace OutOfSight.Tests
             foreach (string[] pass in Passes)
             {
                 yield return LoadPeople(pass);
-                var seenModels = new HashSet<string>();
                 var seenTints = new HashSet<Color32>();
                 var characterMaterials = new HashSet<Material>();
                 int humans = 0;
@@ -394,14 +393,13 @@ namespace OutOfSight.Tests
                     PersonalityDef row = PersonalityDef.For(want);
                     Assert.IsNotNull(h.Rig, $"{h.name} ({want}) shows no model: the level builder must instantiate Inhabitant.ModelIdOf(def) "
                         + $"= {Inhabitant.ModelIdOf(def)} (CONTRACT_M5 3) and attach its rig");
-                    Assert.AreEqual(row.Model, h.Rig.Entry.id, $"{h.name}: model");
+                    Assert.AreEqual(Inhabitant.ModelIdOf(def), h.Rig.Entry.id, $"{h.name}: model");
                     Assert.AreEqual(def.Kind == PersonalityDef.Dog, h.Rig.IsPet, $"{h.name}: a pet rig exactly on the dog");
                     Assert.IsTrue(h.Tint.HasValue, $"{h.name}: no tint");
                     Assert.IsTrue(ColorUtility.TryParseHtmlString(row.Tint, out Color tint), $"premise: {want}'s tint parses");
                     Assert.IsTrue(Same(tint, h.Tint.Value), $"{h.name}: tint {h.Tint.Value}, expected {row.Tint}");
                     Assert.Greater(h.TintedSlots, 0, $"{h.name}: no clothes slot took the tint");
                     characterMaterials.UnionWith(AssertWears(ModelKit.ModelRootsUnder(h.transform).Single().gameObject, h.Rig.Entry, tint, h.name));
-                    Assert.IsTrue(seenModels.Add(h.Rig.Entry.id), $"{h.name}: model {h.Rig.Entry.id} is worn twice in the level");
                     Assert.IsTrue(seenTints.Add(h.Tint.Value), $"{h.name}: tint worn twice in the level");
                     humans += h.IsDog ? 0 : 1;
                 }
