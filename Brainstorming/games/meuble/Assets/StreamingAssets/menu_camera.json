@@ -1,0 +1,9 @@
+{
+  "_help": "Title menu's moving 3D background. Edit and save while the title is open: it shows within about 2 seconds. fisheyeStrength 0 (off) to 1; fisheyeZoom 0.5 to 2, 1 = auto-fit (no black or stretched edge), above 1 crops more, below 1 shows black borders; fisheyeVignette 0 (none) to 1; peripheralBlur 0 (off) to 1; peripheralBlurRadius 0 to 1, the sharp centre's size (share of the way to the screen edge, corners 1); peripheralBlurMotion 0 (soft blur) to 1 (radial streak). A missing or bad value uses the built-in default.",
+  "fisheyeStrength": 0.4,
+  "fisheyeZoom": 1,
+  "fisheyeVignette": 0.2,
+  "peripheralBlur": 0.5,
+  "peripheralBlurRadius": 0.4,
+  "peripheralBlurMotion": 0.6
+}

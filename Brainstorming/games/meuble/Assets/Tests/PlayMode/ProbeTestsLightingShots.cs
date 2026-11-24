@@ -172,6 +172,25 @@ namespace OutOfSight.Tests
                     yield return null;
                 }
                 Assert.IsTrue(tour.Active, "premise: the title tour never started");
+                // CEILING (2026-11-24): the title house now shows its rooms' own lit ceilings (RoomCeilings, SSAO in their
+                // corners on Haut) and the tour builds no lid of its own; the shaded lid below is the fallback without them.
+                RoomCeilings rooms = RoomCeilings.Of(main.Game.Level);
+                if (rooms != null)
+                {
+                    Assert.IsNull(tour.Ceiling, "the tour built its own lid over the rooms' ceilings");
+                    Assert.AreEqual(main.Game.Def.AllRooms().Count, rooms.Count, "one ceiling per room of the title house");
+                    for (int i = 0; i < 30; i++)
+                    {
+                        yield return null;
+                    }
+                    for (int i = 0; i < rooms.Count; i++)
+                    {
+                        Assert.AreEqual(1f, rooms.LevelOf(i), 1e-4f, $"{rooms.RoomOf(i).Id}: the ceiling does not show from the tour's eye level");
+                        Assert.IsTrue(rooms.RendererOf(i).enabled, $"{rooms.RoomOf(i).Id}: the shown ceiling's renderer is off");
+                    }
+                    CollectionAssert.IsEmpty(errors, "no error logged");
+                    yield break;
+                }
                 Assert.IsNotNull(tour.Ceiling, "the title house has no ceiling");
                 Assert.IsTrue(tour.CeilingShaded, "Haut (the editor default): the ceiling is not shaded");
                 MeshFilter filter = tour.Ceiling.GetComponent<MeshFilter>();

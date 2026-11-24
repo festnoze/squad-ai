@@ -1069,7 +1069,7 @@ namespace OutOfSight
         /// </summary>
         public void PlayRockCreak(float pan, float rockTime)
         {
-            if (rockSource == null)
+            if (rockSource == null || !Tuning.SfxRockCreakEnabled)
             {
                 return;
             }

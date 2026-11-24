@@ -329,7 +329,8 @@ namespace OutOfSight.Tests
             new WaveBRow { Id = "level15", Body = BodyKinds.RockingChair, MinRooms = 4, MaxRooms = 4, Lesson = LevelDef.LessonRock,
                 People = new[] { "dog", "granny:loop" } },
             new WaveBRow { Id = "level17", Body = BodyKinds.Chair, Load = "vase", MinRooms = 4, MaxRooms = 7, Lesson = LevelDef.LessonFinal,
-                People = new[] { "dog", "granny:loop", "teen:wander", "tidy:loop" }, Robots = 1, ClosedLeaves = 2, Platform = true },
+                // L16EASY (2026-11-23): Hugo (teen:wander) removed to make level17 more forgiving.
+                People = new[] { "dog", "granny:loop", "tidy:loop" }, Robots = 1, ClosedLeaves = 2, Platform = true },
         };
 
         /// <summary>The wave 5B audit fixtures (CONTRACT_M5 10): the robot's hum, its contact, the rock and the load.</summary>

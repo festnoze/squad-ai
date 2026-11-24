@@ -107,6 +107,12 @@ namespace OutOfSight
         /// <summary>UI units per metre of the logo's floor (the chair's and the spot's offsets are in metres).</summary>
         public float UiPerMetre { get; private set; }
 
+        /// <summary>TITLEMOVE2: the baked yaw (degrees) of the dog's frame on its layer at the last applied pose.</summary>
+        public float DogYawShown { get; private set; }
+
+        /// <summary>TITLEMOVE2: the baked yaw of the human's frame shown (his walking layer, or the pair while he holds the chair).</summary>
+        public float HumanYawShown { get; private set; }
+
         /// <summary>One moment of the loop. The chair, the dog and the spot move sideways on the floor; the chair also hops
         /// (a lift of its picture, never a deformation); the dog walks (two frames), bobs, wags and turns.</summary>
         public struct Pose : IEquatable<Pose>
@@ -129,8 +135,11 @@ namespace OutOfSight
             /// <summary>The dog's opacity: 0 at the frame's left edge, 1 once it is well inside.</summary>
             public float DogAlpha;
             /// <summary>1 while the dog faces right (toward the chair, also while it walks backwards dragging it), -1 once it
-            /// has turned round to leave.</summary>
+            /// has turned round to leave (<see cref="DogTurn"/> 1). Never a mirror of its picture (TITLEMOVE2).</summary>
             public float DogFacing;
+            /// <summary>TITLEMOVE2: how far the dog has turned round to leave, from 0 (facing right) to 1 (facing left); in
+            /// between, the baked turn frames (its yaw through the camera's side, its head leading).</summary>
+            public float DogTurn;
             /// <summary>The dog's baked walk frame (0 or 1), from the distance it has walked.</summary>
             public int DogFrame;
             /// <summary>The dog's trotting bob, in metres of the logo's frame.</summary>
@@ -145,8 +154,10 @@ namespace OutOfSight
             /// <summary>GRIP: the human's opacity, 0 at the frame's left edge.</summary>
             public float HumanAlpha;
             /// <summary>GRIP: 1 while the human faces right (also while he walks backwards pulling the chair), -1 once he
-            /// has turned round to leave.</summary>
+            /// has turned round to leave (<see cref="HumanTurn"/> 1).</summary>
             public float HumanFacing;
+            /// <summary>TITLEMOVE2: how far the human has turned round to leave, 0 to 1 (the baked turn frames in between).</summary>
+            public float HumanTurn;
             /// <summary>GRIP: the human's baked walk frame (0 or 1), from the distance he has walked.</summary>
             public int HumanFrame;
             /// <summary>GRIP: the human's walking bob, in metres of the logo's frame (none while he holds the chair).</summary>
@@ -158,17 +169,18 @@ namespace OutOfSight
                 && Hop == other.Hop && Dog == other.Dog && DogAlpha == other.DogAlpha
                 && DogFacing == other.DogFacing && DogFrame == other.DogFrame && DogHop == other.DogHop && DogWag == other.DogWag
                 && DogBite == other.DogBite && Human == other.Human && HumanAlpha == other.HumanAlpha && HumanFacing == other.HumanFacing
-                && HumanFrame == other.HumanFrame && HumanHop == other.HumanHop && Holding == other.Holding;
+                && HumanFrame == other.HumanFrame && HumanHop == other.HumanHop && Holding == other.Holding
+                && DogTurn == other.DogTurn && HumanTurn == other.HumanTurn;
 
             public override bool Equals(object obj) => obj is Pose other && Equals(other);
 
             public override int GetHashCode() => (Chair, Lean, Light, Spot, Hop, Dog).GetHashCode() ^ (DogAlpha, DogFacing, DogFrame, DogHop, DogWag).GetHashCode()
-                ^ (DogBite, Human, HumanAlpha, HumanFacing, HumanFrame, HumanHop, Holding).GetHashCode();
+                ^ (DogBite, Human, HumanAlpha, HumanFacing, HumanFrame, HumanHop, Holding).GetHashCode() ^ (DogTurn, HumanTurn).GetHashCode();
 
             public override string ToString() =>
                 $"chair {Chair:0.000} m, hop {Hop:0.000} m, lean {Lean:0.0} deg, light {Light:0.00}, spot {Spot:0.000} m; "
-                + $"dog {Dog:0.000} m, alpha {DogAlpha:0.00}, facing {DogFacing:0}, frame {DogFrame}, bite {DogBite}, bob {DogHop:0.000} m, wag {DogWag:0.0} deg; "
-                + $"human {Human:0.000} m, alpha {HumanAlpha:0.00}, facing {HumanFacing:0}, frame {HumanFrame}, holding {Holding}, bob {HumanHop:0.000} m";
+                + $"dog {Dog:0.000} m, alpha {DogAlpha:0.00}, facing {DogFacing:0}, turn {DogTurn:0.00}, frame {DogFrame}, bite {DogBite}, bob {DogHop:0.000} m, wag {DogWag:0.0} deg; "
+                + $"human {Human:0.000} m, alpha {HumanAlpha:0.00}, facing {HumanFacing:0}, turn {HumanTurn:0.00}, frame {HumanFrame}, holding {Holding}, bob {HumanHop:0.000} m";
         }
 
         /// <summary>Where the dog is hidden (Pose.Dog): its body's centre on the frame's left edge.</summary>
@@ -210,31 +222,41 @@ namespace OutOfSight
         public static readonly Pose Rest = new Pose { Light = 1f, Dog = DogEdge, DogFacing = 1f, Human = HumanEdge, HumanFacing = 1f };
 
         // The act (the last 1 - Tuning.TitleLogoStillFraction of the loop), in fractions of its own length (ActSeconds,
-        // 11 s at a 26 s loop; the seconds below are at that length):
+        // 16.2 s at a 31.2 s loop since TITLEMOVE2; the seconds below are at that length):
         // - the spot slides away to the left and dims, gone at LeaveEnd (0.70 s);
         // - the hops start at HopStart (0.60 s, the light already under a fifth), one every HopPitch (0.75 s), each a soft
-        //   lift (no squash, no tilt) for HopFlight of the pitch, then a pause on the floor (3 hops, the last lands at 2.70 s);
-        // - the spot comes back onto the chair where it now stands, from ReturnStart to ReturnEnd (3.10 to 3.80 s),
+        //   lift (no squash, no tilt) for HopFlight of the pitch, then a pause on the floor (4 hops, the last lands at 3.45 s);
+        // - the spot comes back onto the chair where it now stands, from ReturnStart to ReturnEnd (3.85 to 4.85 s),
         //   accelerating all the way, landing at full light; caught, the chair gives one startled jump (StartleStart to
-        //   StartleEnd, 3.95 to 4.35 s);
-        // - the dog trots in from the left edge (TrotStart to TrotEnd, 4.70 to 5.90 s), grabs the chair (a small jolt,
-        //   until DragStart, 6.30 s) and drags it home walking backwards (to DragEnd, 9.10 s), the light following it;
-        // - the dog lets go and backs off a step (ReleaseEnd, 9.40 s), wags (WagEnd, 10.00 s), turns round and trots out
-        //   through the left edge, gone at the act's end (11 s); then the still pose holds 15 s.
-        public const float LeaveEnd = 0.70f / 11f;
-        public const float HopStart = 0.60f / 11f;
-        public const float HopPitch = 0.75f / 11f;
+        //   StartleEnd, 5.00 to 5.40 s);
+        // - the dog trots in from the left edge (TrotStart to TrotEnd, 5.50 to 7.60 s), grabs the chair (a small jolt,
+        //   until DragStart, 8.00 s) and drags it home walking backwards (to DragEnd, 13.60 s), the light following it;
+        // - the dog lets go and backs off a step (ReleaseEnd, 13.90 s), wags (WagEnd, 14.50 s), turns round on the spot
+        //   (TurnEnd, 15.20 s) and trots out through the left edge, gone at the act's end (16.2 s); then the still pose
+        //   holds 15 s.
+        // TITLEMOVE (2026-11-23): the chair went twice as far (0.78 m) and the carriers pulled it home twice as fast.
+        // TITLEMOVE2 (2026-11-24): twice as far again (1.56 m, 4 hops), pulled home at TITLEMOVE's speed (peak 0.42 m/s),
+        // so the drag lasts twice as long (5.6 s, was 2.8); the hops' fourth takes 0.75 s, the spot's longer way back
+        // (2.01 m) 1.0 s (was 0.7: its square ease lands at 4.0 m/s, was 3.5), the walk in over the longer way 2.1 s
+        // (was 1.45: the dog's peak 1.62 m/s, the human's 1.81, as before); the turn round, a mirror flip before, now takes
+        // 0.7 s of baked frames. The rest kept: the light, the startle, the grab, the release, the wag, the walk out.
+        private const float Act = 16.2f;
+        public const float LeaveEnd = 0.70f / Act;
+        public const float HopStart = 0.60f / Act;
+        public const float HopPitch = 0.75f / Act;
         public const float HopFlight = 0.8f;
-        public const float ReturnStart = 3.10f / 11f;
-        public const float ReturnEnd = 3.80f / 11f;
-        public const float StartleStart = 3.95f / 11f;
-        public const float StartleEnd = 4.35f / 11f;
-        public const float TrotStart = 4.70f / 11f;
-        public const float TrotEnd = 5.90f / 11f;
-        public const float DragStart = 6.30f / 11f;
-        public const float DragEnd = 9.10f / 11f;
-        public const float ReleaseEnd = 9.40f / 11f;
-        public const float WagEnd = 10.00f / 11f;
+        public const float ReturnStart = 3.85f / Act;
+        public const float ReturnEnd = 4.85f / Act;
+        public const float StartleStart = 5.00f / Act;
+        public const float StartleEnd = 5.40f / Act;
+        public const float TrotStart = 5.50f / Act;
+        public const float TrotEnd = 7.60f / Act;
+        public const float DragStart = 8.00f / Act;
+        public const float DragEnd = 13.60f / Act;
+        public const float ReleaseEnd = 13.90f / Act;
+        public const float WagEnd = 14.50f / Act;
+        /// <summary>TITLEMOVE2: the end of the carrier's turn round (from WagEnd), before it walks out.</summary>
+        public const float TurnEnd = 15.20f / Act;
         /// <summary>The act's length in seconds.</summary>
         public const float ActSeconds = Tuning.TitleLogoCycleSeconds * (1f - Tuning.TitleLogoStillFraction);
         // In the air, the shadow on the floor shrinks and fades by these at the top of the highest jump.
@@ -244,10 +266,78 @@ namespace OutOfSight
         // as a share of the drag; the step the dog backs off when it lets go, in metres; the wag's rate.
         private const float DragWobbleHz = Tuning.DogDragWobbleHz;
         private const float DragEase = 0.12f;
-        private const float DogRelease = 0.05f;
+        // TITLESCALE: times 1.5 with the dog (from 0.05).
+        private const float DogRelease = 0.075f;
         private const float WagHz = 6f;
-        /// <summary>The dog's baked walk frames.</summary>
+        /// <summary>The dog's baked walk frames (per gait: also the human's).</summary>
         public const int DogFrames = 2;
+        // TITLEMOVE2: each carrier's baked frames, in this order: walking right (0, 1), holding the chair (the dog's bite,
+        // the human's hands on the rail: 2, 3), walking left (4, 5: baked facing left, never a mirror), then the turn round
+        // from right to left (6 on), its yaw stepping through the camera's side.
+        public const int HoldFrame = 2;
+        public const int WalkLeftFrame = 4;
+        public const int TurnFrame = 6;
+        /// <summary>TITLEMOVE2: the dog's turn frames (140 degrees, from its yaw facing right to its mirror facing left: 20
+        /// degrees apart) and the human's (190 degrees: 23.75 apart).</summary>
+        public const int DogTurnFrames = 6;
+        public const int HumanTurnFrames = 7;
+
+        /// <summary>TITLEMOVE2: where turn frame <paramref name="index"/> of <paramref name="count"/> lies in the turn, in (0, 1)
+        /// (0 is the walking right frame, 1 the walking left one).</summary>
+        public static float TurnShare(int index, int count) => (index + 1f) / (count + 1f);
+
+        /// <summary>TITLEMOVE2: the body's yaw (degrees, in the logo rig; 90 faces right) of the dog's baked frame
+        /// <paramref name="frame"/>.</summary>
+        public static float DogFrameYaw(int frame) => FrameYaw(frame, Tuning.TitleLogoDogYaw, DogTurnFrames);
+
+        /// <summary>TITLEMOVE2: the body's yaw of the human's baked frame <paramref name="frame"/>.</summary>
+        public static float HumanFrameYaw(int frame) => FrameYaw(frame, Tuning.TitleLogoHumanYaw, HumanTurnFrames);
+
+        private static float FrameYaw(int frame, float right, int turns)
+        {
+            if (frame < WalkLeftFrame)
+            {
+                return right;
+            }
+            // Facing left: the mirror of facing right across the screen's vertical (yaw -right).
+            if (frame < TurnFrame)
+            {
+                return 360f - right;
+            }
+            return Mathf.Lerp(right, 360f - right, TurnShare(frame - TurnFrame, turns));
+        }
+
+        /// <summary>
+        /// TITLEMOVE2: the baked frame a carrier shows: holding the chair (<paramref name="holding"/>), else walking right
+        /// (before the turn), the turn frame nearest <paramref name="turn"/>, or walking left (after it); the walk frames by
+        /// <paramref name="walkFrame"/>.
+        /// </summary>
+        public static int FrameOf(int walkFrame, bool holding, float turn, int turnFrames)
+        {
+            int f = Mathf.Clamp(walkFrame, 0, DogFrames - 1);
+            if (holding)
+            {
+                return HoldFrame + f;
+            }
+            int j = Mathf.RoundToInt(Mathf.Clamp01(turn) * (turnFrames + 1));
+            if (j <= 0)
+            {
+                return f;
+            }
+            if (j >= turnFrames + 1)
+            {
+                return WalkLeftFrame + f;
+            }
+            return TurnFrame + j - 1;
+        }
+
+        /// <summary>TITLEMOVE2: the walk frame the dog shows where it stands to turn (from the floor walked from the edge), so
+        /// the turn's steps start and end on its legs.</summary>
+        public static int DogStandFrame => (int)Mathf.Floor((-DogRelease - DogEdge) / (0.5f * Tuning.TitleLogoDogStride)) & 1;
+
+        /// <summary>TITLEMOVE2: the human's, likewise.</summary>
+        public static int HumanStandFrame =>
+            (int)Mathf.Floor((-HumanRelease - HumanEdge) / (0.5f * Tuning.RigWalkCycleMeters * Tuning.TitleLogoHumanScale)) & 1;
 
         private const string ChairModel = "kenney.chair";
         // GRIP: the human of the alternate loops, the level 1 man in his own clothes.
@@ -349,13 +439,14 @@ namespace OutOfSight
             }
             float far = Tuning.TitleLogoChairHops * Tuning.TitleLogoChairHopStride;
             Pose pose = Rest;
+            // TITLEMOVE: how much the dog's picture follows the chair's lift instead of its walk bob (the drag's envelope).
+            float biteLock = 0f;
             if (a < ReturnEnd)
             {
-                // Away to the left and dim, then back onto the chair where it now stands, accelerating all the way (a cubic
-                // ease in), landing at full light.
+                // Away to the left and dim, then back onto the chair where it now stands, accelerating all the way (an ease
+                // in), landing at full light.
                 float leave = Ease(a / LeaveEnd);
-                float back = Mathf.Clamp01((a - ReturnStart) / (ReturnEnd - ReturnStart));
-                back = back * back * back;
+                float back = ReturnEase(a);
                 pose.Spot = Mathf.Lerp(-Tuning.TitleLogoSpotDrift * leave, far, back);
                 pose.Light = Mathf.Lerp(1f - (1f - Tuning.TitleLogoSpotAway) * leave, 1f, back);
                 Hops(a, ref pose);
@@ -390,6 +481,7 @@ namespace OutOfSight
                 pose.Lean = Tuning.TitleLogoDragWobble * Mathf.Sin(2f * Mathf.PI * DragWobbleHz * t) * env;
                 pose.Hop = Tuning.TitleLogoDragLift * env * (0.75f + 0.25f * Mathf.Sin(4f * Mathf.PI * DragWobbleHz * t));
                 pose.DogBite = true;
+                biteLock = env;
             }
             else if (a < ReleaseEnd)
             {
@@ -403,11 +495,19 @@ namespace OutOfSight
                 pose.Dog = -DogRelease;
                 pose.DogWag = Tuning.TitleLogoDogWag * Mathf.Sin(2f * Mathf.PI * WagHz * (a - ReleaseEnd) * ActSeconds) * Mathf.Sin(Mathf.PI * w);
             }
+            else if (a < TurnEnd)
+            {
+                // TITLEMOVE2: it turns round where it stands (the baked turn frames: its head leading, its rump following,
+                // a step or two), eased in and out.
+                pose.Dog = -DogRelease;
+                pose.DogTurn = Ease((a - WagEnd) / (TurnEnd - WagEnd));
+            }
             else
             {
                 // Turned round, it trots out through the left edge, speeding up.
-                float e = (a - WagEnd) / (1f - WagEnd);
+                float e = (a - TurnEnd) / (1f - TurnEnd);
                 pose.DogFacing = -1f;
+                pose.DogTurn = 1f;
                 pose.Dog = Mathf.Lerp(-DogRelease, DogEdge, e * e);
             }
             pose.DogAlpha = Mathf.Clamp01((pose.Dog - DogEdge) / Tuning.TitleLogoDogFade);
@@ -416,6 +516,7 @@ namespace OutOfSight
                 // Out of sight, the dog waits at the edge as in the still pose (the act's first and last instants are Rest).
                 pose.Dog = DogEdge;
                 pose.DogFacing = 1f;
+                pose.DogTurn = 0f;
                 pose.DogWag = 0f;
             }
             else
@@ -424,9 +525,23 @@ namespace OutOfSight
                 float halfStride = Tuning.TitleLogoDogStride * 0.5f;
                 float walked = (pose.Dog - DogEdge) / halfStride;
                 pose.DogFrame = (int)Mathf.Floor(walked) & 1;
-                pose.DogHop = Tuning.TitleLogoDogBob * Mathf.Abs(Mathf.Sin(Mathf.PI * walked));
+                // TITLEMOVE: during the drag its picture rises and falls with the chair's tug lift instead of its own walk
+                // bob (which now runs twice as fast), so the snout stays locked on the leg; blended by the drag's envelope,
+                // so the bob neither jumps when the drag starts nor when it ends.
+                float bob = Tuning.TitleLogoDogBob * Mathf.Abs(Mathf.Sin(Mathf.PI * walked));
+                pose.DogHop = Mathf.Lerp(bob, pose.Hop, biteLock);
             }
             return pose;
+        }
+
+        /// <summary>The spot's way back onto the chair at <paramref name="a"/>: 0 before ReturnStart, 1 from ReturnEnd,
+        /// accelerating all the way. TITLEMOVE: a square (was a cube) since the way back is longer (1.23 m with the chair
+        /// 0.78 m away): a cube would land at 5.3 m/s, a square lands at 3.5 m/s (the cube's old 3.6 over 0.84 m).
+        /// TITLEMOVE2: 2.01 m now, over 1.0 s (was 0.7: 5.7 m/s, over the test's per sample limit), landing at 4.0 m/s.</summary>
+        private static float ReturnEase(float a)
+        {
+            float back = Mathf.Clamp01((a - ReturnStart) / (ReturnEnd - ReturnStart));
+            return back * back;
         }
 
         /// <summary>The startled jump's lift at <paramref name="a"/> (0 outside it): up fast, down a little slower (a sine
@@ -443,9 +558,13 @@ namespace OutOfSight
         }
 
         // GRIP: the step the human backs off when he lets go, and the floor between two swaps of his walk frames while he
-        // pulls the chair (short shuffling steps backwards), in metres.
-        private const float HumanRelease = 0.06f;
-        private const float HumanPullStep = 0.1f;
+        // pulls the chair (short shuffling steps backwards), in metres. TITLESCALE: times 1.5 with him (from 0.06 and 0.1).
+        // TITLEMOVE (2026-11-23): he pulls twice as fast (peak 0.42 m/s, was 0.21), so his steps are 1.4 times longer (from
+        // 0.15) and, since the frames swap by the floor covered, 1.4 times quicker (both by the square root of 2, as a
+        // person speeds up): about 3.7 steps over the pull (was 2.6), keeping pace with the floor covered. The dog's
+        // frames swap every half of its real stride, so its steps simply come twice as quick.
+        private const float HumanRelease = 0.09f;
+        private const float HumanPullStep = 0.21f;
 
         /// <summary>
         /// GRIP: the human's loop at <paramref name="a"/> (a fraction of the act): the same spot, hops, return and startle as
@@ -462,8 +581,7 @@ namespace OutOfSight
             if (a < ReturnEnd)
             {
                 float leave = Ease(a / LeaveEnd);
-                float back = Mathf.Clamp01((a - ReturnStart) / (ReturnEnd - ReturnStart));
-                back = back * back * back;
+                float back = ReturnEase(a);
                 pose.Spot = Mathf.Lerp(-Tuning.TitleLogoSpotDrift * leave, far, back);
                 pose.Light = Mathf.Lerp(1f - (1f - Tuning.TitleLogoSpotAway) * leave, 1f, back);
                 Hops(a, ref pose);
@@ -495,10 +613,17 @@ namespace OutOfSight
             {
                 pose.Human = -HumanRelease;
             }
+            else if (a < TurnEnd)
+            {
+                // TITLEMOVE2: he turns round on the spot (baked frames, his head and chest leading), eased in and out.
+                pose.Human = -HumanRelease;
+                pose.HumanTurn = Ease((a - WagEnd) / (TurnEnd - WagEnd));
+            }
             else
             {
-                float e = (a - WagEnd) / (1f - WagEnd);
+                float e = (a - TurnEnd) / (1f - TurnEnd);
                 pose.HumanFacing = -1f;
+                pose.HumanTurn = 1f;
                 pose.Human = Mathf.Lerp(-HumanRelease, edge, e * e);
             }
             pose.HumanAlpha = Mathf.Clamp01((pose.Human - edge) / Tuning.TitleLogoDogFade);
@@ -506,6 +631,7 @@ namespace OutOfSight
             {
                 pose.Human = edge;
                 pose.HumanFacing = 1f;
+                pose.HumanTurn = 0f;
                 pose.Holding = false;
             }
             else if (pose.Holding)
@@ -761,8 +887,8 @@ namespace OutOfSight
             if (layers.HasDog)
             {
                 dogRoot = new Vector2(layers.Width * (Tuning.TitleLogoChairInset + Tuning.TitleLogoDogGrip) / Tuning.TitleLogoFrameWidth, foot.y);
-                dogFrames = new LayerFrame[2 * DogFrames];
-                dogShadowFrames = new LayerFrame[2 * DogFrames];
+                dogFrames = new LayerFrame[layers.DogRect.Length];
+                dogShadowFrames = new LayerFrame[layers.DogRect.Length];
                 for (int k = 0; k < dogFrames.Length; k++)
                 {
                     RectInt body = layers.DogRect[k];
@@ -778,8 +904,8 @@ namespace OutOfSight
                 // Anchored on the floor line under his feet' x (any fixed point of the frame keeps the pictures where they
                 // were rendered; the walking ones pivot on their own centre so he turns round in place).
                 humanRoot = new Vector2(layers.Width * (Tuning.TitleLogoChairInset + HumanRoot.x) / Tuning.TitleLogoFrameWidth, foot.y);
-                humanFrames = new LayerFrame[2 * DogFrames];
-                humanShadowFrames = new LayerFrame[2 * DogFrames];
+                humanFrames = new LayerFrame[layers.HumanRect.Length];
+                humanShadowFrames = new LayerFrame[layers.HumanRect.Length];
                 for (int k = 0; k < humanFrames.Length; k++)
                 {
                     RectInt body = layers.HumanRect[k];
@@ -898,18 +1024,20 @@ namespace OutOfSight
             Chair.color = lit;
             if (Dog != null)
             {
-                // GRIP: the bite frames (its head lowered to the chair's leg) while it holds the chair.
-                int f = Mathf.Clamp(pose.DogFrame, 0, DogFrames - 1) + (pose.DogBite ? DogFrames : 0);
+                // GRIP: the bite frames (its head lowered to the chair's leg) while it holds the chair. TITLEMOVE2: the baked
+                // turn frames while it turns round, then the frames baked facing left (the picture is never mirrored).
+                int f = FrameOf(pose.DogFrame, pose.DogBite, pose.DogTurn, DogTurnFrames);
                 if (f != dogFrameShown)
                 {
                     Show(Dog, dogFrames[f]);
                     Show(DogShadow, dogShadowFrames[f]);
                     dogFrameShown = f;
                 }
+                DogYawShown = DogFrameYaw(f);
                 float dog = (pose.Dog - pose.Spot) * UiPerMetre;
                 RectTransform body = Dog.rectTransform;
                 body.anchoredPosition = new Vector2(dog + dogFrames[f].OffsetX, pose.DogHop * UiPerMetre);
-                body.localScale = new Vector3(pose.DogFacing, 1f, 1f);
+                body.localScale = Vector3.one;
                 body.localRotation = Quaternion.Euler(0f, 0f, pose.DogWag);
                 Color dogLit = lit;
                 dogLit.a = pose.DogAlpha;
@@ -930,6 +1058,9 @@ namespace OutOfSight
         private void ApplyHuman(Pose pose, Color lit)
         {
             int f = Mathf.Clamp(pose.HumanFrame, 0, DogFrames - 1);
+            // TITLEMOVE2: his frame (and its shadow): walking right, holding, turning round (baked) or walking left.
+            int s = FrameOf(pose.HumanFrame, pose.Holding, pose.HumanTurn, HumanTurnFrames);
+            HumanYawShown = HumanFrameYaw(s);
             float x = (pose.Human - pose.Spot) * UiPerMetre;
             Color shown = lit;
             shown.a = pose.HumanAlpha;
@@ -946,18 +1077,17 @@ namespace OutOfSight
             }
             else
             {
-                if (f != humanFrameShown)
+                if (s != humanFrameShown)
                 {
-                    Show(Human, humanFrames[f]);
-                    humanFrameShown = f;
+                    Show(Human, humanFrames[s]);
+                    humanFrameShown = s;
                 }
                 RectTransform body = Human.rectTransform;
-                body.anchoredPosition = new Vector2(x + humanFrames[f].OffsetX, pose.HumanHop * UiPerMetre);
-                body.localScale = new Vector3(pose.HumanFacing, 1f, 1f);
+                body.anchoredPosition = new Vector2(x + humanFrames[s].OffsetX, pose.HumanHop * UiPerMetre);
+                body.localScale = Vector3.one;
                 Human.color = shown;
                 HumanPair.color = Color.clear;
             }
-            int s = f + (pose.Holding ? DogFrames : 0);
             if (s != humanShadowShown)
             {
                 Show(HumanShadow, humanShadowFrames[s]);
@@ -1028,23 +1158,25 @@ namespace OutOfSight
             private RenderTexture shadowTarget;
             private Vector3 horizontal;
             private float shadowLength;
-            // The dog: one static copy of the dog per baked walk frame (its skinned mesh baked in that pose), each shown
-            // alone for its own pass into its two targets. Null when the dog could not be built (the logo then has none).
+            // The dog: one static copy of the dog per baked frame (its skinned mesh baked in that pose), each shown alone for
+            // its own pass. Null when the dog could not be built (the logo then has none).
             private GameObject[] dogPoses;
             private readonly List<Mesh> dogMeshes = new List<Mesh>();
-            private RenderTexture[] dogTargets;
-            private RenderTexture[] dogShadowTargets;
-            private Color32[][] dogPixels;
-            private Color32[][] dogShadowPixels;
-            // GRIP: the human's four static copies (walk 0 and 1, then holding the chair's rail 0 and 1), each rendered alone
-            // (colour and shadow); the two holding ones also with the chair (the pair). Null when he could not be built.
+            // GRIP: the human's static copies (walk, holding the chair's rail, TITLEMOVE2: walk left and the turn), each
+            // rendered alone (colour and shadow); the two holding ones also with the chair (the pair). Null when he could not
+            // be built.
             private GameObject[] humanPoses;
-            private RenderTexture[] humanTargets;
-            private RenderTexture[] humanShadowTargets;
-            private RenderTexture[] pairTargets;
-            private Color32[][] humanPixels;
-            private Color32[][] humanShadowPixels;
-            private Color32[][] pairPixels;
+            // TITLEMOVE2: the bodies' frames (25 with the turns) render a few at a time into this small pool of targets (a
+            // colour and a shadow per slot, a pair target where a holding frame needs one), read back and cropped on worker
+            // threads before the next few: the GPU holds 12 targets (it held 20 for 14 frames), the CPU only the crops.
+            private const int BakeSlots = 4;
+            private RenderTexture[] slotColour;
+            private RenderTexture[] slotShadow;
+            private RenderTexture[] slotPair;
+            private Crop[] dogCrops;
+            private Crop[] humanCrops;
+            private Crop[] pairCrops;
+            private bool alpha;
 
             private bool HasDog => dogPoses != null;
             private bool HasHuman => humanPoses != null;
@@ -1190,29 +1322,15 @@ namespace OutOfSight
 
                 chairTarget = NewTarget("TitleLogoChair");
                 shadowTarget = NewTarget("TitleLogoShadow");
-                if (HasDog)
+                if (HasDog || HasHuman)
                 {
-                    dogTargets = new RenderTexture[2 * DogFrames];
-                    dogShadowTargets = new RenderTexture[2 * DogFrames];
-                    for (int k = 0; k < dogTargets.Length; k++)
+                    slotColour = new RenderTexture[BakeSlots];
+                    slotShadow = new RenderTexture[BakeSlots];
+                    slotPair = new RenderTexture[BakeSlots];
+                    for (int k = 0; k < BakeSlots; k++)
                     {
-                        dogTargets[k] = NewTarget("TitleLogoDog" + k);
-                        dogShadowTargets[k] = NewTarget("TitleLogoDogShadow" + k);
-                    }
-                }
-                if (HasHuman)
-                {
-                    humanTargets = new RenderTexture[2 * DogFrames];
-                    humanShadowTargets = new RenderTexture[2 * DogFrames];
-                    pairTargets = new RenderTexture[DogFrames];
-                    for (int k = 0; k < humanTargets.Length; k++)
-                    {
-                        humanTargets[k] = NewTarget("TitleLogoHuman" + k);
-                        humanShadowTargets[k] = NewTarget("TitleLogoHumanShadow" + k);
-                    }
-                    for (int k = 0; k < pairTargets.Length; k++)
-                    {
-                        pairTargets[k] = NewTarget("TitleLogoPair" + k);
+                        slotColour[k] = NewTarget("TitleLogoSlot" + k);
+                        slotShadow[k] = NewTarget("TitleLogoSlotShadow" + k);
                     }
                 }
                 chairCamera = NewCamera("ChairCamera", chairTarget, true);
@@ -1227,9 +1345,15 @@ namespace OutOfSight
             /// The game's dog (the dog row's model, the Husky since DOGBIG, in its tint at Tuning.TitleLogoDogScale of its
             /// in-game size), standing where it holds the chair on its mark: its body Tuning.TitleLogoDogGrip from the chair's
             /// foot, facing right and a little toward the camera (Tuning.TitleLogoDogYaw), its snout at the chair's left edge.
-            /// For each walk frame, its Walk clip is sampled at a stride's foot contact and its skinned mesh baked into a static
+            /// For each baked frame, its Walk clip is sampled at a stride's foot contact and its skinned mesh baked into a static
             /// copy (hidden until its pass), so every frame renders in the same frame with the same light. The skinned model
             /// is then hidden.
+            /// TITLEMOVE2: two more walk frames facing left (yaw 360 - TitleLogoDogYaw, the mirror pose, baked and lit for
+            /// real), and the turn round between them (<see cref="DogTurnFrames"/>, the body's yaw through the camera's side):
+            /// at each, the spine (Torso, Torso2, Torso3) bends toward the turn and the neck turns further (the head leads, the
+            /// rump follows), the legs step on through the walk cycle with a short stride, and the copy steps back into the
+            /// depth as far as its nearest point would otherwise come lower on screen than the walking dog's (a dog facing the
+            /// camera reaches further toward it than one seen from the side), so it never comes down onto the letters.
             /// </summary>
             private void BuildDog(int layer)
             {
@@ -1252,6 +1376,7 @@ namespace OutOfSight
                 {
                     throw new InvalidOperationException("the dog has no Walk clip");
                 }
+                AnimationState idle = !string.IsNullOrEmpty(entry.idleClip) ? animation[entry.idleClip] : null;
                 animation.playAutomatically = false;
                 animation.Stop();
                 SkinnedMeshRenderer[] skins = model.GetComponentsInChildren<SkinnedMeshRenderer>(true);
@@ -1265,29 +1390,60 @@ namespace OutOfSight
                 // chair), scaled about the model's root, so the grip stays where the root stands.
                 float expected = entry.nativeSize.y * ModelKit.RiggedScale(entry);
                 // DOGBIG: the black Labrador's bigger head, hanging ears and low tail, as in the game (PetPose), on each sampled frame.
-                // GRIP: frames 0 and 1 walk (the trot in and out); frames 2 and 3 bite (the drag): the same strides with the
-                // bite's roll and open jaw and the neck bent nose down (GripMath) until the snout is at the chair's leg,
+                // GRIP: frames 0 and 1 walk (the trot in); frames 2 and 3 bite (the drag): the same strides with the bite's
+                // roll and open jaw and the neck bent nose down (GripMath) until the snout is at the chair's leg,
                 // Tuning.TitleLogoDogBiteHeight over the floor (in the model's own size: the copies are scaled afterwards).
                 PetPose petPose = PetPose.Find(model.transform, holder.transform.rotation);
                 bool hasNeck = InhabitantRig.NeckChain(model.transform, holder.transform, out Transform[] neck, out _, out _, out _);
-                var neckRest = new Quaternion[hasNeck ? neck.Length : 0];
-                var poses = new GameObject[2 * DogFrames];
+                Transform[] torso = Bones(model.transform, DogTorsoNames);
+                // TITLEMOVE2: every bone's rest, put back before each frame (each frame is posed from scratch), and the
+                // standing pose the turn's short steps blend toward.
+                Transform[] bones = model.GetComponentsInChildren<Transform>(true);
+                PoseSnapshot rest = PoseSnapshot.Take(bones);
+                PoseSnapshot stand = null;
+                if (idle != null && idle.clip != null)
+                {
+                    idle.clip.SampleAnimation(animation.gameObject, 0f);
+                    stand = PoseSnapshot.Take(bones);
+                    rest.Restore(bones);
+                }
+                var poses = new GameObject[TurnFrame + DogTurnFrames];
                 var walkFactors = new float[DogFrames];
+                var screenLows = new float[poses.Length];
                 var parts = new List<Transform>();
+                Vector3 up = root.transform.up;
                 for (int k = 0; k < poses.Length; k++)
                 {
-                    // Opposite strides: each frame at a foot contact, half a cycle apart.
-                    float time = walk.clip.length * Mathf.Repeat(Tuning.DogFootContactCycle + (k % DogFrames) / (float)DogFrames, 1f);
+                    rest.Restore(bones);
+                    bool bite = k >= HoldFrame && k < WalkLeftFrame;
+                    bool turning = k >= TurnFrame;
+                    float share = turning ? TurnShare(k - TurnFrame, DogTurnFrames) : 0f;
+                    // The turn's lead and short steps ease in and out with it (none at its ends, which meet the walk frames).
+                    float lead = turning ? Mathf.Sin(Mathf.PI * share) : 0f;
+                    // The hips lag half the spine's bend behind the frame's yaw, the chest leads it by the other half.
+                    holder.transform.localRotation = Quaternion.Euler(0f, DogFrameYaw(k) - 0.5f * Tuning.TitleLogoDogTurnBend * lead, 0f);
+                    // Opposite strides: each walk frame at a foot contact, half a cycle apart. The turn steps on from the frame
+                    // the dog stands on (DogStandFrame) through TitleLogoTurnSteps cycles, ending on it again.
+                    float cycle = turning ? DogStandFrame / (float)DogFrames + share * Tuning.TitleLogoTurnSteps : (k % DogFrames) / (float)DogFrames;
+                    float time = walk.clip.length * Mathf.Repeat(Tuning.DogFootContactCycle + cycle, 1f);
                     walk.clip.SampleAnimation(animation.gameObject, time);
-                    bool bite = k >= DogFrames;
+                    if (turning && stand != null)
+                    {
+                        stand.BlendWith(bones, 1f - (1f - Tuning.TitleLogoTurnStride) * lead);
+                    }
+                    if (turning)
+                    {
+                        // The body arcs: the spine's three bones share the bend toward the turn, the neck turns further.
+                        InhabitantRig.BendNeck(torso, up, Tuning.TitleLogoDogTurnBend * lead);
+                        if (hasNeck)
+                        {
+                            InhabitantRig.BendNeck(neck, up, Tuning.TitleLogoDogTurnHead * lead);
+                        }
+                    }
                     if (bite && hasNeck)
                     {
-                        // Measured on this stride's pose, then put back after the bake (no clip may key the neck).
+                        // Measured on this stride's pose (the rest is put back before the next frame).
                         InhabitantRig.NeckChain(model.transform, holder.transform, out neck, out _, out Vector2 neckBase, out Vector2[] segments);
-                        for (int i = 0; i < neck.Length; i++)
-                        {
-                            neckRest[i] = neck[i].localRotation;
-                        }
                         Vector2 headPlane = neckBase;
                         foreach (Vector2 s in segments)
                         {
@@ -1297,14 +1453,22 @@ namespace OutOfSight
                         // The head rides on the bent chain here (no rig resets it), which is a head following the neck fully.
                         float bend = GripMath.SolveNeckBend(neckBase, segments, snout, 1f, Tuning.TitleLogoDogBiteHeight / Tuning.TitleLogoDogScale);
                         InhabitantRig.BendNeck(neck, holder.transform.right, bend);
-                        if (k == DogFrames)
+                        if (k == HoldFrame)
                         {
+                            // TITLESCALE: also where the snout lands sideways from the chair's foot on screen (its reach turned
+                            // by the dog's yaw), which must stay on the chair's left back leg whatever the dog's size.
+                            Vector2 tip = GripMath.Tip(neckBase, segments, snout, bend, 1f);
+                            float sideways = Mathf.Sin(Tuning.TitleLogoDogYaw * Mathf.Deg2Rad);
                             Debug.Log($"[TitleLogo] the dog bites the chair's leg: neck bent {bend:0.0} deg, snout at "
-                                + $"{GripMath.Tip(neckBase, segments, snout, bend, 1f).y * Tuning.TitleLogoDogScale:0.000} m");
+                                + $"{tip.y * Tuning.TitleLogoDogScale:0.000} m, {tip.x * Tuning.TitleLogoDogScale:0.000} m ahead of its feet, "
+                                + $"{Tuning.TitleLogoDogGrip + sideways * tip.x * Tuning.TitleLogoDogScale:0.000} m sideways from the chair's foot "
+                                + "(the 0.8 dog's: -0.274 m)");
                         }
                     }
                     petPose.Bite = bite ? 1f : 0f;
-                    petPose.Apply(holder.transform.rotation, holder.transform.rotation);
+                    // The ears hang in the head's frame (it leads the turn), the tail in the hips'.
+                    Quaternion headFacing = Quaternion.AngleAxis((Tuning.TitleLogoDogTurnBend + Tuning.TitleLogoDogTurnHead) * lead, up) * holder.transform.rotation;
+                    petPose.Apply(headFacing, holder.transform.rotation);
                     var pose = new GameObject("DogPose" + k) { layer = layer };
                     pose.transform.SetParent(root.transform, false);
                     parts.Clear();
@@ -1330,10 +1494,11 @@ namespace OutOfSight
                     HeightOf(parts, out float low, out float high);
                     // The hanging ears make the posed dog up to about 15 % lower than its rest pose: only a gross mismatch is a
                     // scale convention error.
-                    // GRIP: a biting frame (its head lowered, so lower than it stands) takes the factor of its walking stride.
+                    // GRIP: a biting frame (its head lowered, so lower than it stands) takes the factor of its walking stride;
+                    // TITLEMOVE2: so do the frames facing left and the turn's.
                     bool wrongScale = high - low > 1e-4f && Mathf.Abs((high - low) / expected - 1f) > 0.25f;
-                    float factor = bite ? walkFactors[k - DogFrames] : (wrongScale ? expected / (high - low) : 1f) * Tuning.TitleLogoDogScale;
-                    if (!bite)
+                    float factor = k >= DogFrames ? walkFactors[k % DogFrames] : (wrongScale ? expected / (high - low) : 1f) * Tuning.TitleLogoDogScale;
+                    if (k < DogFrames)
                     {
                         walkFactors[k] = factor;
                     }
@@ -1346,27 +1511,109 @@ namespace OutOfSight
                         HeightOf(parts, out low, out high);
                     }
                     pose.transform.localPosition = new Vector3(0f, -low, 0f);
+                    screenLows[k] = ScreenLow(parts);
                     pose.SetActive(false);
                     poses[k] = pose;
-                    if (bite && hasNeck)
-                    {
-                        for (int i = 0; i < neck.Length; i++)
-                        {
-                            neck[i].localRotation = neckRest[i];
-                        }
-                    }
                 }
+                rest.Restore(bones);
                 petPose.Bite = 0f;
+                StepBack(poses, screenLows, "dog");
+                holder.transform.localRotation = Quaternion.Euler(0f, Tuning.TitleLogoDogYaw, 0f);
                 model.SetActive(false);
                 dogPoses = poses;
+            }
+
+            // TITLEMOVE2: the dog's spine, hips to chest (its neck chain and front legs hang from the last).
+            private static readonly string[] DogTorsoNames = { "Torso", "Torso2", "Torso3" };
+
+            /// <summary>TITLEMOVE2: the bones named <paramref name="names"/> under <paramref name="model"/> (null when one is missing).</summary>
+            private static Transform[] Bones(Transform model, string[] names)
+            {
+                var found = new Transform[names.Length];
+                for (int i = 0; i < names.Length; i++)
+                {
+                    found[i] = FindDeep(model, names[i]);
+                    if (found[i] == null)
+                    {
+                        return null;
+                    }
+                }
+                return found;
+            }
+
+            private static Transform FindDeep(Transform t, string name)
+            {
+                if (t.name == name)
+                {
+                    return t;
+                }
+                for (int i = 0; i < t.childCount; i++)
+                {
+                    Transform found = FindDeep(t.GetChild(i), name);
+                    if (found != null)
+                    {
+                        return found;
+                    }
+                }
+                return null;
+            }
+
+            /// <summary>
+            /// TITLEMOVE2: the lowest point of <paramref name="parts"/> on screen (along the logo camera's up, in the rig's
+            /// frame, metres): a point nearer the camera shows lower, so a body turned toward it reaches lower than one seen
+            /// from the side.
+            /// </summary>
+            private float ScreenLow(List<Transform> parts)
+            {
+                float pitch = Tuning.TitleLogoPitch * Mathf.Deg2Rad;
+                var screenUp = new Vector3(0f, Mathf.Cos(pitch), Mathf.Sin(pitch));
+                float low = float.MaxValue;
+                var vertices = new List<Vector3>();
+                Matrix4x4 toRig = root.transform.worldToLocalMatrix;
+                foreach (Transform part in parts)
+                {
+                    part.GetComponent<MeshFilter>().sharedMesh.GetVertices(vertices);
+                    Matrix4x4 m = toRig * part.localToWorldMatrix;
+                    foreach (Vector3 v in vertices)
+                    {
+                        low = Mathf.Min(low, Vector3.Dot(m.MultiplyPoint3x4(v), screenUp));
+                    }
+                }
+                return low;
+            }
+
+            /// <summary>
+            /// TITLEMOVE2: steps the frames facing left and the turn's back into the depth (up on screen) as far as their
+            /// lowest point would otherwise show below the walking frames' (never toward the camera): the two frames facing
+            /// left together, so the walk out does not bob, and each turn frame on its own (a smooth arc, since its reach
+            /// changes smoothly with its yaw). Logged for the record.
+            /// </summary>
+            private static void StepBack(GameObject[] poses, float[] screenLows, string who)
+            {
+                float sin = Mathf.Sin(Tuning.TitleLogoPitch * Mathf.Deg2Rad);
+                float reference = Mathf.Min(screenLows[0], screenLows[1]);
+                float leftLow = Mathf.Min(screenLows[WalkLeftFrame], screenLows[WalkLeftFrame + 1]);
+                var log = new System.Text.StringBuilder();
+                for (int k = WalkLeftFrame; k < poses.Length; k++)
+                {
+                    float low = k < TurnFrame ? leftLow : screenLows[k];
+                    float back = Mathf.Max(0f, reference - low) / sin;
+                    poses[k].transform.localPosition += new Vector3(0f, 0f, back);
+                    log.Append($" {k}:{back:0.000}");
+                }
+                Debug.Log($"[TitleLogo] the {who}'s frames facing left and turning step back into the depth (m):{log}");
             }
 
             /// <summary>
             /// GRIP: the human of the alternate loops (the level 1 man, his faces and clothes through the game's own rig and
             /// CharacterLook, at Tuning.TitleLogoHumanScale), standing where he holds the chair on its mark
-            /// (<see cref="HumanRoot"/>, turned Tuning.TitleLogoHumanYaw). Four static copies: walk frames 0 and 1 (his Walk
-            /// clip at its two foot contacts), then the same strides with his hands on the top rail of the backrest (the game's
-            /// arm IK, InhabitantRig.SolveArm, onto GripDef's chair wrists across the rail, the fingers over it).
+            /// (<see cref="HumanRoot"/>, turned Tuning.TitleLogoHumanYaw). Static copies: walk frames 0 and 1 (his Walk clip at
+            /// its two foot contacts), then the same strides with his hands on the top rail of the backrest (the game's arm IK,
+            /// InhabitantRig.SolveArm, onto GripDef's chair wrists across the rail, the fingers over it).
+            /// TITLEMOVE2: then two walk frames facing left (yaw 360 - TitleLogoHumanYaw, baked, never a mirror) and the turn
+            /// round between them (<see cref="HumanTurnFrames"/>, through the camera's side): his chest leads his hips (the
+            /// spine's bend), his head leads his chest, his legs take short steps, and the copy steps back into the depth if
+            /// it would otherwise reach lower on screen than his walk.
             /// </summary>
             private void BuildHuman(int layer)
             {
@@ -1416,13 +1663,49 @@ namespace OutOfSight
                 Vector3 leftFingers = chair.rotation * grip.LeftFingers;
                 Transform frame = visual.transform;
                 float expected = entry.nativeSize.y * ModelKit.RiggedScale(entry) * Tuning.TitleLogoHumanScale;
-                var poses = new GameObject[2 * DogFrames];
+                // TITLEMOVE2: every bone's rest, put back before each frame, and his standing pose for the turn's short steps.
+                Transform[] bones = model.GetComponentsInChildren<Transform>(true);
+                PoseSnapshot rest = PoseSnapshot.Take(bones);
+                PoseSnapshot stand = null;
+                AnimationState idle = rig.IdleState;
+                if (idle != null && idle.clip != null)
+                {
+                    idle.clip.SampleAnimation(rig.Animation.gameObject, 0f);
+                    stand = PoseSnapshot.Take(bones);
+                    rest.Restore(bones);
+                }
+                var poses = new GameObject[TurnFrame + HumanTurnFrames];
+                var screenLows = new float[poses.Length];
                 var parts = new List<Transform>();
+                Vector3 up = root.transform.up;
                 for (int k = 0; k < poses.Length; k++)
                 {
-                    float time = walk.clip.length * Mathf.Repeat(Tuning.RigFootContactCycle + (k % DogFrames) / (float)DogFrames, 1f);
+                    rest.Restore(bones);
+                    bool holding = k >= HoldFrame && k < WalkLeftFrame;
+                    bool turning = k >= TurnFrame;
+                    float share = turning ? TurnShare(k - TurnFrame, HumanTurnFrames) : 0f;
+                    float lead = turning ? Mathf.Sin(Mathf.PI * share) : 0f;
+                    go.transform.localRotation = Quaternion.Euler(0f, HumanFrameYaw(k) - 0.5f * Tuning.TitleLogoHumanTurnBend * lead, 0f);
+                    float cycle = turning ? HumanStandFrame / (float)DogFrames + share * Tuning.TitleLogoTurnSteps : (k % DogFrames) / (float)DogFrames;
+                    float time = walk.clip.length * Mathf.Repeat(Tuning.RigFootContactCycle + cycle, 1f);
                     walk.clip.SampleAnimation(rig.Animation.gameObject, time);
-                    if (k >= DogFrames)
+                    if (turning && stand != null)
+                    {
+                        stand.BlendWith(bones, 1f - (1f - Tuning.TitleLogoTurnStride) * lead);
+                    }
+                    if (turning)
+                    {
+                        // His chest leads his hips, his head his chest (the head is under the spine: it turns with it).
+                        if (rig.Spine != null)
+                        {
+                            rig.Spine.rotation = Quaternion.AngleAxis(Tuning.TitleLogoHumanTurnBend * lead, up) * rig.Spine.rotation;
+                        }
+                        if (rig.Head != null)
+                        {
+                            rig.Head.rotation = Quaternion.AngleAxis(Tuning.TitleLogoHumanTurnHead * lead, up) * rig.Head.rotation;
+                        }
+                    }
+                    if (holding)
                     {
                         // Which side each ".L" and ".R" arm hangs on, from the pose (the body's right is +x of its frame).
                         float leftSide = Vector3.Dot(rig.UpperArmLeft.position - frame.position, frame.right) > 0f ? 1f : -1f;
@@ -1431,7 +1714,7 @@ namespace OutOfSight
                             leftSide, frame);
                         Reach(rig.UpperArmRight, rig.LowerArmRight, rig.PalmRight, swap ? leftWrist : rightWrist, swap ? leftFingers : rightFingers,
                             -leftSide, frame);
-                        if (k == DogFrames && rig.PalmRight != null && rig.PalmLeft != null)
+                        if (k == HoldFrame && rig.PalmRight != null && rig.PalmLeft != null)
                         {
                             Debug.Log($"[TitleLogo] the human's hands on the rail: right {Vector3.Distance(rig.PalmRight.position, swap ? leftWrist : rightWrist):0.000} m, "
                                 + $"left {Vector3.Distance(rig.PalmLeft.position, swap ? rightWrist : leftWrist):0.000} m from their targets");
@@ -1463,11 +1746,65 @@ namespace OutOfSight
                     {
                         Debug.Log($"[TitleLogo] the human: {high - low:0.000} m tall (expected about {expected:0.000}), feet at {low:0.000} m");
                     }
+                    screenLows[k] = ScreenLow(parts);
                     pose.SetActive(false);
                     poses[k] = pose;
                 }
+                rest.Restore(bones);
+                StepBack(poses, screenLows, "human");
+                go.transform.localRotation = Quaternion.Euler(0f, Tuning.TitleLogoHumanYaw, 0f);
                 model.SetActive(false);
                 humanPoses = poses;
+            }
+
+            /// <summary>
+            /// TITLEMOVE2: the local pose of a set of bones, to put back (each baked frame is posed from scratch: nothing
+            /// carries over from the frame before) or to blend toward (the turn's short steps: the walk's stride drawn in
+            /// toward the standing pose).
+            /// </summary>
+            private sealed class PoseSnapshot
+            {
+                private Vector3[] positions;
+                private Quaternion[] rotations;
+                private Vector3[] scales;
+
+                public static PoseSnapshot Take(Transform[] bones)
+                {
+                    var snapshot = new PoseSnapshot
+                    {
+                        positions = new Vector3[bones.Length],
+                        rotations = new Quaternion[bones.Length],
+                        scales = new Vector3[bones.Length],
+                    };
+                    for (int i = 0; i < bones.Length; i++)
+                    {
+                        snapshot.positions[i] = bones[i].localPosition;
+                        snapshot.rotations[i] = bones[i].localRotation;
+                        snapshot.scales[i] = bones[i].localScale;
+                    }
+                    return snapshot;
+                }
+
+                public void Restore(Transform[] bones)
+                {
+                    for (int i = 0; i < bones.Length; i++)
+                    {
+                        bones[i].localPosition = positions[i];
+                        bones[i].localRotation = rotations[i];
+                        bones[i].localScale = scales[i];
+                    }
+                }
+
+                /// <summary>Keeps <paramref name="weight"/> of the bones' current pose, the rest from this one.</summary>
+                public void BlendWith(Transform[] bones, float weight)
+                {
+                    float w = Mathf.Clamp01(weight);
+                    for (int i = 0; i < bones.Length; i++)
+                    {
+                        bones[i].localPosition = Vector3.Lerp(positions[i], bones[i].localPosition, w);
+                        bones[i].localRotation = Quaternion.Slerp(rotations[i], bones[i].localRotation, w);
+                    }
+                }
             }
 
             /// <summary>GRIP: one arm onto its wrist target, the elbow out to its side, down and back, then its fingers.</summary>
@@ -1512,8 +1849,9 @@ namespace OutOfSight
                 }
             }
 
-            /// <summary>Renders both cameras into their targets now: the chair, then each dog frame alone; false (nothing
-            /// rendered, cameras left to the next frame, and no dog) where the pipeline cannot take a render request.</summary>
+            /// <summary>Renders both cameras into their targets now (the chair and its shadow; TITLEMOVE2: the bodies' frames
+            /// follow a few at a time in <see cref="ReadBack"/>); false (nothing rendered, cameras left to the next frame, and
+            /// no dog nor human) where the pipeline cannot take a render request.</summary>
             public bool Render()
             {
                 var chairRequest = new RenderPipeline.StandardRequest { destination = chairTarget };
@@ -1530,38 +1868,20 @@ namespace OutOfSight
                 shadowCamera.enabled = false;
                 RenderPipeline.SubmitRenderRequest(chairCamera, chairRequest);
                 RenderPipeline.SubmitRenderRequest(shadowCamera, shadowRequest);
+                return true;
+            }
+
+            /// <summary>TITLEMOVE2: shows one baked frame of one body (0 the dog, 1 the human), every other frame hidden.</summary>
+            private void ShowPose(int body, int frame)
+            {
                 if (HasDog)
                 {
-                    // Each request culls the scene anew: the chair hidden, one dog frame shown at a time.
-                    chairHolder.SetActive(false);
-                    for (int k = 0; k < dogTargets.Length; k++)
-                    {
-                        ShowDog(k);
-                        RenderPipeline.SubmitRenderRequest(chairCamera, new RenderPipeline.StandardRequest { destination = dogTargets[k] });
-                        RenderPipeline.SubmitRenderRequest(shadowCamera, new RenderPipeline.StandardRequest { destination = dogShadowTargets[k] });
-                    }
-                    ShowDog(-1);
-                    chairHolder.SetActive(true);
+                    ShowDog(body == 0 ? frame : -1);
                 }
                 if (HasHuman)
                 {
-                    // GRIP: each human frame alone (colour and shadow), then each holding frame with the chair (the pair).
-                    chairHolder.SetActive(false);
-                    for (int k = 0; k < humanTargets.Length; k++)
-                    {
-                        ShowHuman(k);
-                        RenderPipeline.SubmitRenderRequest(chairCamera, new RenderPipeline.StandardRequest { destination = humanTargets[k] });
-                        RenderPipeline.SubmitRenderRequest(shadowCamera, new RenderPipeline.StandardRequest { destination = humanShadowTargets[k] });
-                    }
-                    chairHolder.SetActive(true);
-                    for (int k = 0; k < pairTargets.Length; k++)
-                    {
-                        ShowHuman(DogFrames + k);
-                        RenderPipeline.SubmitRenderRequest(chairCamera, new RenderPipeline.StandardRequest { destination = pairTargets[k] });
-                    }
-                    ShowHuman(-1);
+                    ShowHuman(body == 1 ? frame : -1);
                 }
-                return true;
             }
 
             private void DropDog()
@@ -1662,31 +1982,42 @@ namespace OutOfSight
             private Vector2 gy;
 
             /// <summary>
-            /// Reads both targets back without stalling the frame where the platform can (AsyncGPUReadback), over a few
-            /// frames; a synchronous read otherwise, or if the request fails. Then takes the ground mapping from the camera,
-            /// so the composition needs nothing from the rig afterwards (it can be disposed).
+            /// Reads the chair's two targets back without stalling the frame where the platform can (AsyncGPUReadback), over a
+            /// few frames; a synchronous read otherwise, or if the request fails. Then takes the ground mapping from the camera,
+            /// so the composition needs nothing from the rig afterwards (it can be disposed). TITLEMOVE2: then renders the
+            /// bodies' frames a few at a time (<see cref="BakeBodies"/>).
             /// </summary>
             public IEnumerator ReadBack()
             {
-                // The chair's two targets, then each dog frame's two, then each human frame's two and the pairs.
-                var list = new List<RenderTexture> { chairTarget, shadowTarget };
-                for (int k = 0; HasDog && k < dogTargets.Length; k++)
+                var main = new Color32[2][];
+                IEnumerator read = ReadTargets(new[] { chairTarget, shadowTarget }, main);
+                while (read.MoveNext())
                 {
-                    list.Add(dogTargets[k]);
-                    list.Add(dogShadowTargets[k]);
+                    yield return read.Current;
                 }
-                for (int k = 0; HasHuman && k < humanTargets.Length; k++)
+                chairPixels = main[0];
+                shadowPixels = main[1];
+                // Should the target drop the alpha (all opaque), tell the chair from the cleared black by its colour.
+                alpha = chairPixels[0].a < 128;
+                // Ground coordinates of the pixel centres, affine in an orthographic view: three corners give the map.
+                g00 = Ground(0f, 0f);
+                gx = (Ground(1f, 0f) - g00) / Tuning.TitleLogoWidth;
+                gy = (Ground(0f, 1f) - g00) / Tuning.TitleLogoHeight;
+                if (HasDog || HasHuman)
                 {
-                    list.Add(humanTargets[k]);
-                    list.Add(humanShadowTargets[k]);
+                    IEnumerator bodies = BakeBodies();
+                    while (bodies.MoveNext())
+                    {
+                        yield return bodies.Current;
+                    }
                 }
-                for (int k = 0; HasHuman && k < pairTargets.Length; k++)
-                {
-                    list.Add(pairTargets[k]);
-                }
-                RenderTexture[] targets = list.ToArray();
+            }
+
+            /// <summary>Reads <paramref name="targets"/> back into <paramref name="into"/> (asynchronously where the platform
+            /// can, over at most 30 frames; synchronously otherwise or on an error).</summary>
+            private static IEnumerator ReadTargets(RenderTexture[] targets, Color32[][] into)
+            {
                 int count = targets.Length;
-                var pixels = new Color32[count][];
                 if (SystemInfo.supportsAsyncGPUReadback)
                 {
                     var requests = new AsyncGPUReadbackRequest[count];
@@ -1703,49 +2034,125 @@ namespace OutOfSight
                         requests[t].WaitForCompletion();
                         if (!requests[t].hasError)
                         {
-                            pixels[t] = requests[t].GetData<Color32>().ToArray();
+                            into[t] = requests[t].GetData<Color32>().ToArray();
                         }
                     }
                 }
                 for (int t = 0; t < count; t++)
                 {
-                    if (pixels[t] == null)
+                    if (into[t] == null)
                     {
-                        pixels[t] = Read(targets[t]);
+                        into[t] = Read(targets[t]);
                     }
                 }
-                chairPixels = pixels[0];
-                shadowPixels = pixels[1];
-                int next = 2;
+            }
+
+            /// <summary>
+            /// TITLEMOVE2: the bodies' frames, <see cref="BakeSlots"/> at a time: each shown alone (the chair hidden) for its
+            /// colour and its shadow, each of the human's holding frames also with the chair (the pair), all read back, then
+            /// cropped to their pixels on a worker thread (<see cref="CropBody"/>, <see cref="CropPair"/>) while the next few
+            /// render. A frame that fails leaves its crop empty: <see cref="Compose"/> then drops that body.
+            /// </summary>
+            private IEnumerator BakeBodies()
+            {
+                var jobs = new List<Vector2Int>();
                 if (HasDog)
                 {
-                    dogPixels = new Color32[dogTargets.Length][];
-                    dogShadowPixels = new Color32[dogTargets.Length][];
-                    for (int k = 0; k < dogTargets.Length; k++)
+                    dogCrops = new Crop[dogPoses.Length];
+                    for (int k = 0; k < dogPoses.Length; k++)
                     {
-                        dogPixels[k] = pixels[next++];
-                        dogShadowPixels[k] = pixels[next++];
+                        jobs.Add(new Vector2Int(0, k));
                     }
                 }
                 if (HasHuman)
                 {
-                    humanPixels = new Color32[humanTargets.Length][];
-                    humanShadowPixels = new Color32[humanTargets.Length][];
-                    pairPixels = new Color32[pairTargets.Length][];
-                    for (int k = 0; k < humanTargets.Length; k++)
+                    humanCrops = new Crop[humanPoses.Length];
+                    pairCrops = new Crop[DogFrames];
+                    for (int k = 0; k < humanPoses.Length; k++)
                     {
-                        humanPixels[k] = pixels[next++];
-                        humanShadowPixels[k] = pixels[next++];
-                    }
-                    for (int k = 0; k < pairTargets.Length; k++)
-                    {
-                        pairPixels[k] = pixels[next++];
+                        jobs.Add(new Vector2Int(1, k));
                     }
                 }
-                // Ground coordinates of the pixel centres, affine in an orthographic view: three corners give the map.
-                g00 = Ground(0f, 0f);
-                gx = (Ground(1f, 0f) - g00) / Tuning.TitleLogoWidth;
-                gy = (Ground(0f, 1f) - g00) / Tuning.TitleLogoHeight;
+                var tasks = new List<Task>();
+                for (int start = 0; start < jobs.Count; start += BakeSlots)
+                {
+                    int count = Mathf.Min(BakeSlots, jobs.Count - start);
+                    var targets = new List<RenderTexture>();
+                    var pairSlot = new int[count];
+                    // Each request culls the scene anew: the chair hidden, one frame shown at a time.
+                    chairHolder.SetActive(false);
+                    for (int s = 0; s < count; s++)
+                    {
+                        Vector2Int job = jobs[start + s];
+                        ShowPose(job.x, job.y);
+                        RenderPipeline.SubmitRenderRequest(chairCamera, new RenderPipeline.StandardRequest { destination = slotColour[s] });
+                        RenderPipeline.SubmitRenderRequest(shadowCamera, new RenderPipeline.StandardRequest { destination = slotShadow[s] });
+                        targets.Add(slotColour[s]);
+                        targets.Add(slotShadow[s]);
+                    }
+                    // GRIP: the human's holding frames with the chair (the pair).
+                    chairHolder.SetActive(true);
+                    for (int s = 0; s < count; s++)
+                    {
+                        Vector2Int job = jobs[start + s];
+                        pairSlot[s] = -1;
+                        if (job.x != 1 || job.y < HoldFrame || job.y >= WalkLeftFrame)
+                        {
+                            continue;
+                        }
+                        if (slotPair[s] == null)
+                        {
+                            slotPair[s] = NewTarget("TitleLogoSlotPair" + s);
+                        }
+                        ShowPose(1, job.y);
+                        RenderPipeline.SubmitRenderRequest(chairCamera, new RenderPipeline.StandardRequest { destination = slotPair[s] });
+                        pairSlot[s] = targets.Count;
+                        targets.Add(slotPair[s]);
+                    }
+                    ShowPose(-1, -1);
+                    var pixels = new Color32[targets.Count][];
+                    IEnumerator read = ReadTargets(targets.ToArray(), pixels);
+                    while (read.MoveNext())
+                    {
+                        yield return read.Current;
+                    }
+                    for (int s = 0; s < count; s++)
+                    {
+                        // Copies for the worker (a loop variable would be shared by every closure).
+                        Vector2Int job = jobs[start + s];
+                        Color32[] colour = pixels[2 * s];
+                        Color32[] shadow = pixels[2 * s + 1];
+                        Color32[] pair = pairSlot[s] >= 0 ? pixels[pairSlot[s]] : null;
+                        bool keepsAlpha = alpha;
+                        tasks.Add(Task.Run(() =>
+                        {
+                            Crop crop = CropBody(colour, shadow, keepsAlpha);
+                            if (job.x == 0)
+                            {
+                                dogCrops[job.y] = crop;
+                            }
+                            else
+                            {
+                                humanCrops[job.y] = crop;
+                                if (pair != null)
+                                {
+                                    pairCrops[job.y - HoldFrame] = CropPair(pair, colour, keepsAlpha);
+                                }
+                            }
+                        }));
+                    }
+                }
+                while (!tasks.TrueForAll(t => t.IsCompleted))
+                {
+                    yield return null;
+                }
+                foreach (Task task in tasks)
+                {
+                    if (task.IsFaulted && task.Exception != null)
+                    {
+                        Debug.LogWarning("[TitleLogo] a body frame could not be cropped: " + task.Exception.GetBaseException().Message);
+                    }
+                }
             }
 
             /// <summary>The logo's atlas from <see cref="Compose"/>'s layers (main thread).</summary>
@@ -1772,9 +2179,7 @@ namespace OutOfSight
             {
                 int w = Tuning.TitleLogoWidth;
                 int h = Tuning.TitleLogoHeight;
-                // Should the target drop the alpha (all opaque), tell the chair from the cleared black by its colour.
-                bool alpha = chairPixels[0].a < 128;
-
+                // (alpha: whether the targets kept their alpha, decided in ReadBack.)
                 var chair = new Color[w * h];
                 var mask = new float[w * h];
                 for (int y = 0; y < h; y++)
@@ -1879,43 +2284,24 @@ namespace OutOfSight
                 Bleed(chairLayer, w, chairRect, 3);
 
                 // The extra layers, in shelves above the chair's row: the dog's frames and their shadows (when the dog was
-                // baked), GRIP: then the human's frames and their shadows and the pairs (when he was).
+                // baked), GRIP: then the human's frames and their shadows and the pairs (when he was). TITLEMOVE2: from the
+                // crops BakeBodies made; a body with a missing crop is left out whole (the human's loops then show the dog's).
                 int row = h + Mathf.Max(chairRect.height, shadowRect.height);
                 var extra = new List<Color[]>();
                 var extraRects = new List<RectInt>();
-                int dogStart = 0;
+                bool hasDog = AddCrops(dogCrops, extra, extraRects, out int dogStart);
                 int humanStart = 0;
-                bool hasDog = dogPixels != null && dogShadowPixels != null && AddBodies(dogPixels, dogShadowPixels, alpha, extra, extraRects, out dogStart);
-                bool hasHuman = humanPixels != null && humanShadowPixels != null && pairPixels != null
-                    && AddBodies(humanPixels, humanShadowPixels, alpha, extra, extraRects, out humanStart);
+                bool hasHuman = pairCrops != null && Array.TrueForAll(pairCrops, c => c != null)
+                    && AddCrops(humanCrops, extra, extraRects, out humanStart);
                 int pairStart = extra.Count;
-                for (int k = 0; hasHuman && k < pairPixels.Length; k++)
+                for (int k = 0; hasHuman && k < pairCrops.Length; k++)
                 {
-                    Color[] pair = PairLayer(pairPixels[k], humanPixels[DogFrames + k], alpha);
-                    RectInt rect = Bounds(pair, w, h, 2);
-                    if (rect.width <= 0)
-                    {
-                        // Never half a human: the logo goes without him (his loops then show the dog's).
-                        hasHuman = false;
-                        break;
-                    }
-                    Bleed(pair, w, rect, 3);
-                    extra.Add(pair);
-                    extraRects.Add(rect);
-                }
-                if (!hasHuman)
-                {
-                    humanStart = 0;
-                }
-                if (!hasHuman && extra.Count > (hasDog ? 4 * DogFrames : 0))
-                {
-                    // Drop the human's half built layers.
-                    int keep = hasDog ? 4 * DogFrames : 0;
-                    extra.RemoveRange(keep, extra.Count - keep);
-                    extraRects.RemoveRange(keep, extraRects.Count - keep);
+                    extra.Add(pairCrops[k].Pixels);
+                    extraRects.Add(pairCrops[k].Rect);
                 }
                 // Shelves, left to right, a new one above when the next crop would pass the widest the atlas may grow.
-                int maxWidth = Mathf.Max(w, 1024);
+                // TITLEMOVE2: up to 2048 wide (was 1024) for the 52 crops, so the atlas stays about square.
+                int maxWidth = Mathf.Max(w, 2048);
                 var at = new Vector2Int[extra.Count];
                 int sx = 0;
                 int sy = row;
@@ -1956,15 +2342,17 @@ namespace OutOfSight
                 Blit(shadowLayer, w, shadowRect, layers.Atlas, layers.AtlasWidth, layers.ShadowAt);
                 for (int i = 0; i < extra.Count; i++)
                 {
-                    Blit(extra[i], w, extraRects[i], layers.Atlas, layers.AtlasWidth, at[i]);
+                    // Each crop holds only its rect's pixels.
+                    RectInt rect = extraRects[i];
+                    Blit(extra[i], rect.width, new RectInt(0, 0, rect.width, rect.height), layers.Atlas, layers.AtlasWidth, at[i]);
                 }
                 if (hasDog)
                 {
-                    Unpack(extraRects, at, dogStart, 2 * DogFrames, out layers.DogRect, out layers.DogAt, out layers.DogShadowRect, out layers.DogShadowAt);
+                    Unpack(extraRects, at, dogStart, dogCrops.Length, out layers.DogRect, out layers.DogAt, out layers.DogShadowRect, out layers.DogShadowAt);
                 }
                 if (hasHuman)
                 {
-                    Unpack(extraRects, at, humanStart, 2 * DogFrames, out layers.HumanRect, out layers.HumanAt, out layers.HumanShadowRect,
+                    Unpack(extraRects, at, humanStart, humanCrops.Length, out layers.HumanRect, out layers.HumanAt, out layers.HumanShadowRect,
                         out layers.HumanShadowAt);
                     layers.PairRect = new RectInt[DogFrames];
                     layers.PairAt = new Vector2Int[DogFrames];
@@ -2022,42 +2410,87 @@ namespace OutOfSight
             // The dog's shadow's softness, in logo pixels (its shadow is short and small).
             private const int DogShadowBlur = 2;
 
+            /// <summary>TITLEMOVE2: one body frame cropped to its pixels: its picture (straight alpha, bled) and its shadow, each
+            /// holding only its rect's pixels (rects in the logo's frame).</summary>
+            private sealed class Crop
+            {
+                public RectInt Rect;
+                public Color[] Pixels;
+                public RectInt ShadowRect;
+                public Color[] Shadow;
+            }
+
             /// <summary>
-            /// The layers of a body's frames (the dog's or the human's), each frame then its shadow, cropped and bled, appended to
-            /// <paramref name="extra"/> from <paramref name="start"/>; nothing appended and false when a frame did not render.
+            /// TITLEMOVE2: one body frame's layers (<see cref="DogLayers"/>) cropped to their pixels plus a transparent margin;
+            /// null when the frame did not render. Pure arithmetic, safe off the main thread.
             /// </summary>
-            private static bool AddBodies(Color32[][] colours, Color32[][] shadows, bool alpha, List<Color[]> extra, List<RectInt> rects, out int start)
+            private static Crop CropBody(Color32[] colour, Color32[] shadow, bool alpha)
             {
                 int w = Tuning.TitleLogoWidth;
                 int h = Tuning.TitleLogoHeight;
-                start = extra.Count;
-                var layers = new List<Color[]>();
-                var crops = new List<RectInt>();
-                for (int k = 0; k < colours.Length; k++)
+                DogLayers(colour, shadow, alpha, out Color[] body, out Color[] bodyShadow);
+                RectInt rect = Bounds(body, w, h, 2);
+                if (rect.width <= 0)
                 {
-                    DogLayers(colours[k], shadows[k], alpha, out Color[] body, out Color[] shadow);
-                    RectInt rect = Bounds(body, w, h, 2);
-                    if (rect.width <= 0)
-                    {
-                        return false;
-                    }
-                    Bleed(body, w, rect, 3);
-                    RectInt shadowRect = Bounds(shadow, w, h, 2);
-                    if (shadowRect.width <= 0)
-                    {
-                        shadowRect = new RectInt(0, 0, 1, 1);
-                    }
-                    layers.Add(body);
-                    crops.Add(rect);
-                    layers.Add(shadow);
-                    crops.Add(shadowRect);
+                    return null;
                 }
-                extra.AddRange(layers);
-                rects.AddRange(crops);
+                Bleed(body, w, rect, 3);
+                RectInt shadowRect = Bounds(bodyShadow, w, h, 2);
+                if (shadowRect.width <= 0)
+                {
+                    shadowRect = new RectInt(0, 0, 1, 1);
+                }
+                return new Crop { Rect = rect, Pixels = Cut(body, w, rect), ShadowRect = shadowRect, Shadow = Cut(bodyShadow, w, shadowRect) };
+            }
+
+            /// <summary>TITLEMOVE2: a pair frame (<see cref="PairLayer"/>) cropped likewise; null when empty.</summary>
+            private Crop CropPair(Color32[] pair, Color32[] human, bool alpha)
+            {
+                int w = Tuning.TitleLogoWidth;
+                int h = Tuning.TitleLogoHeight;
+                Color[] px = PairLayer(pair, human, alpha);
+                RectInt rect = Bounds(px, w, h, 2);
+                if (rect.width <= 0)
+                {
+                    return null;
+                }
+                Bleed(px, w, rect, 3);
+                return new Crop { Rect = rect, Pixels = Cut(px, w, rect) };
+            }
+
+            /// <summary>The pixels of <paramref name="px"/> (rows <paramref name="w"/> wide) inside <paramref name="r"/>.</summary>
+            private static Color[] Cut(Color[] px, int w, RectInt r)
+            {
+                var cut = new Color[r.width * r.height];
+                for (int y = 0; y < r.height; y++)
+                {
+                    Array.Copy(px, (r.y + y) * w + r.x, cut, y * r.width, r.width);
+                }
+                return cut;
+            }
+
+            /// <summary>
+            /// TITLEMOVE2: a body's crops, each frame then its shadow, appended to <paramref name="extra"/> from
+            /// <paramref name="start"/>; nothing appended and false when the body has none or a frame is missing.
+            /// </summary>
+            private static bool AddCrops(Crop[] crops, List<Color[]> extra, List<RectInt> rects, out int start)
+            {
+                start = extra.Count;
+                if (crops == null || crops.Length == 0 || !Array.TrueForAll(crops, c => c != null))
+                {
+                    return false;
+                }
+                foreach (Crop crop in crops)
+                {
+                    extra.Add(crop.Pixels);
+                    rects.Add(crop.Rect);
+                    extra.Add(crop.Shadow);
+                    rects.Add(crop.ShadowRect);
+                }
                 return true;
             }
 
-            /// <summary>The crops and atlas places of <paramref name="count"/> frames appended by <see cref="AddBodies"/>.</summary>
+            /// <summary>The crops and atlas places of <paramref name="count"/> frames appended by <see cref="AddCrops"/>.</summary>
             private static void Unpack(List<RectInt> rects, Vector2Int[] at, int start, int count, out RectInt[] frameRects, out Vector2Int[] frameAt,
                 out RectInt[] shadowRects, out Vector2Int[] shadowAt)
             {
@@ -2304,27 +2737,17 @@ namespace OutOfSight
                 }
                 Release(chairTarget);
                 Release(shadowTarget);
-                for (int k = 0; dogTargets != null && k < dogTargets.Length; k++)
+                for (int k = 0; slotColour != null && k < slotColour.Length; k++)
                 {
-                    Release(dogTargets[k]);
-                    Release(dogShadowTargets[k]);
-                }
-                for (int k = 0; humanTargets != null && k < humanTargets.Length; k++)
-                {
-                    Release(humanTargets[k]);
-                    Release(humanShadowTargets[k]);
-                }
-                for (int k = 0; pairTargets != null && k < pairTargets.Length; k++)
-                {
-                    Release(pairTargets[k]);
+                    Release(slotColour[k]);
+                    Release(slotShadow[k]);
+                    Release(slotPair[k]);
                 }
                 chairTarget = null;
                 shadowTarget = null;
-                dogTargets = null;
-                dogShadowTargets = null;
-                humanTargets = null;
-                humanShadowTargets = null;
-                pairTargets = null;
+                slotColour = null;
+                slotShadow = null;
+                slotPair = null;
                 foreach (Mesh mesh in dogMeshes)
                 {
                     if (mesh != null)

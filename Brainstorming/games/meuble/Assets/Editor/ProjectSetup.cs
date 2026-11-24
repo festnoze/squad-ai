@@ -463,8 +463,10 @@ namespace OutOfSight.Editor
             // kept here as well as by XRay_Cone.mat (a shader only named in code is stripped from the player).
             // LEVELNUM: the intro card's dim with the level number's holes (CardNumber) creates both its materials from code
             // (Assets/Settings/UiCardDim.shader, UiNumberMask.shader); UI/Default is a default Always Included shader, pinned.
+            // FISHEYE: the title background's barrel distortion (MenuFisheye) creates its material from code as well
+            // (Assets/Settings/MenuFisheye.shader).
             foreach (string name in new[] { PrimitiveKit.LitShaderName, PrimitiveKit.UnlitShaderName, VisionConeView.ConeShaderName,
-                CardNumber.DimShaderName, CardNumber.MaskShaderName, "UI/Default" })
+                CardNumber.DimShaderName, CardNumber.MaskShaderName, MenuFisheye.ShaderName, "UI/Default" })
             {
                 Shader shader = Shader.Find(name);
                 if (shader == null)

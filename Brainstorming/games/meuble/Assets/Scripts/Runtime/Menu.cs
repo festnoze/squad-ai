@@ -1181,6 +1181,7 @@ namespace OutOfSight
             yield return new WaitForSecondsRealtime(1.5f);
             PlayLevel(levelId);
             Debug.Log($"[AutoShot] {levelId}: number {Hud.LevelNumberShown}, holes ready {Hud.LevelNumberHolesReady}, "
+                + $"face {Hud.LevelNumberFont}, easing {Hud.CardSettings.Easing}, "
                 + $"screen {Screen.width} x {Screen.height}, held {Hud.CardHeld}");
             float[] ages = { 0.1f, 0.5f, 1f, Hud.NumberZoomSeconds + 1f };
             string[] names = { "t010", "t050", "t100", "settled" };

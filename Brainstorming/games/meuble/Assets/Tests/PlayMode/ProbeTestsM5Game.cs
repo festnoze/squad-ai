@@ -2628,11 +2628,19 @@ namespace OutOfSight.Tests
             Assert.AreEqual(rocks + 1, Game.RockCount, $"{which}: not one rock");
             float rockTime = careful ? Tuning.RockCarefulTime : Tuning.RockTime;
             Assert.AreEqual(Mathf.RoundToInt(rockTime / Dt), rockSteps, $"{which}: the rock's steps");
-            Assert.AreEqual(creaks + 1, Game.Sfx.RockCreaksPlayed, $"{which}: the rock did not play its creak once");
-            AudioClip creak = Game.Sfx.LastRockCreak;
-            Assert.IsNotNull(creak, $"{which}: no rock creak clip");
-            Assert.AreSame(careful ? Game.Sfx.RockCreakCareful : Game.Sfx.RockCreak, creak, $"{which}: the rock played the other rock's creak");
-            Assert.AreEqual(rockTime, creak.length, 0.01f, $"{which}: the creak does not last the rock");
+            if (!Tuning.SfxRockCreakEnabled)
+            {
+                // The rock creak is muted on purpose (Tuning.SfxRockCreakEnabled): the rock must stay silent.
+                Assert.AreEqual(creaks, Game.Sfx.RockCreaksPlayed, $"{which}: the muted rock still played its creak");
+            }
+            else
+            {
+                Assert.AreEqual(creaks + 1, Game.Sfx.RockCreaksPlayed, $"{which}: the rock did not play its creak once");
+                AudioClip creak = Game.Sfx.LastRockCreak;
+                Assert.IsNotNull(creak, $"{which}: no rock creak clip");
+                Assert.AreSame(careful ? Game.Sfx.RockCreakCareful : Game.Sfx.RockCreak, creak, $"{which}: the rock played the other rock's creak");
+                Assert.AreEqual(rockTime, creak.length, 0.01f, $"{which}: the creak does not last the rock");
+            }
             Assert.AreEqual(0, stillSteps, $"{which}: a rock step is not moving");
             Assert.Less(travel, 1e-4f, $"{which}: the rocking chair travelled while it rocked");
             Assert.AreEqual(PlayState.Playing, Game.State);

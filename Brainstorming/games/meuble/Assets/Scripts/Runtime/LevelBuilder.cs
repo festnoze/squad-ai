@@ -316,6 +316,10 @@ namespace OutOfSight
             LitZoneView.Build(def, root, level.Furniture);
             // Floor dust (docs/m9/FLOORS_WALLS.md section 10): the Haut tier's floor map, from the walls just built.
             FloorDust.LevelBuilt(def, level.Root);
+            // CEILING (2026-11-24, docs/next/progress/CEILING.md): one painted ceiling per room at its wall top, shown only
+            // while the camera is below it (the menu tour, a low orbit); visual only (no collider, no shadow, Default layer),
+            // built after the lights whose floor pools it bounces.
+            RoomCeilings.Build(def, root);
 
             Physics.SyncTransforms();
             Rect interior = def.InteriorBounds();

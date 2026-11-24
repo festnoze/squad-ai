@@ -718,6 +718,8 @@ namespace OutOfSight.Core
         public const float SfxCrashSynthVolume = 0.62f;
         /// <summary>The rocking chair's creak while it rocks, under the creak's 0.75.</summary>
         public const float SfxRockCreakSynthVolume = 0.4f;
+        /// <summary>The rocking chair's rock creak is muted entirely at the user's request (2026-11-24); true restores it.</summary>
+        public const bool SfxRockCreakEnabled = false;
         /// <summary>The robot bumping into the furniture (a soft thump), under the put-down thump's 0.6.</summary>
         public const float SfxBumpSynthVolume = 0.32f;
 
@@ -1067,8 +1069,11 @@ namespace OutOfSight.Core
         public const float HardCreakFillTime = 16f;
 
         // ----- M7 title camera (TitleCameraTour): the eye level tour of Resources/Levels/title_house.json behind the title. -----
-        /// <summary>Camera height above the floor, in metres: a piece of furniture's eye level.</summary>
-        public const float TitleTourHeight = 1.0f;
+        /// <summary>
+        /// Camera height above the floor, in metres: a piece of furniture's eye level. MENUCAM (2026-11-23): 0.7 (was 1.0,
+        /// lowered by 30 percent), then 0.55 at the user's request (45 percent under the original), under the window sills (0.9) and the counter tops; the waypoints' floor clearances are unchanged.
+        /// </summary>
+        public const float TitleTourHeight = 0.55f;
         /// <summary>Travel speed along the loop on straight stretches, in metres per second.</summary>
         public const float TitleTourSpeed = 0.5f;
         /// <summary>Fraction of <see cref="TitleTourSpeed"/> kept in the sharpest turn (a 90 degree turn over <see cref="TitleTourTurnProbe"/>).</summary>
@@ -1077,8 +1082,13 @@ namespace OutOfSight.Core
         public const float TitleTourTurnProbe = 1.2f;
         /// <summary>The view aims at points this far ahead along the path (and at half and one and a half times it), in metres.</summary>
         public const float TitleTourLookAhead = 1.4f;
-        /// <summary>Degrees the view looks down from the horizontal.</summary>
-        public const float TitleTourPitch = 7f;
+        /// <summary>
+        /// Degrees the view looks down from the horizontal. MENUCAM (2026-11-23): 5 (was 7), flattened with the lower height so
+        /// the view axis still meets the floor about 8 m ahead (atan(0.7 * tan 7 degrees / 1.0) = 4.9): the same things framed.
+        /// Then 4 with the 0.55 height (atan(0.55 * tan 7 degrees / 1.0) = 3.9). CEILING (2026-11-24): -4, a slight upward tilt at the
+        /// user's request, so the new room ceilings read in the menu background (negative = looking up).
+        /// </summary>
+        public const float TitleTourPitch = -4f;
         /// <summary>Horizontal lens shift in normalized device units: the vanishing point sits right of centre, clear of the title column.</summary>
         public const float TitleTourLensShift = 0.3f;
         /// <summary>Spline samples per waypoint segment for the arc length table.</summary>
@@ -1110,8 +1120,12 @@ namespace OutOfSight.Core
         // ----- M7 title logo (TitleLogo): the red chair rendered once at a three-quarter angle, with a short high-sun shadow. -----
         /// <summary>Size of the baked logo frame, in pixels (rendered at twice this and averaged down).</summary>
         // Grown from 400 x 280 with the frame (2026-11-20, the wider pool of light) at the same 190.5 pixels per metre.
-        public const int TitleLogoWidth = 438;
-        public const int TitleLogoHeight = 290;
+        // TITLESCALE (2026-11-23): from 438 x 290, 0.5 m wider on the left and 98 pixels taller on top (the frame's bottom
+        // and the chair's place and size on screen kept) for the dog and the human at 1.5 times their old size.
+        // TITLEMOVE2 (2026-11-24): from 533, 0.75 m wider on the RIGHT (the left edge, the chair's foot, the height and the
+        // scale kept) for the chair's hops, twice as far again (1.56 m).
+        public const int TitleLogoWidth = 676;
+        public const int TitleLogoHeight = 388;
         /// <summary>Elevation of the high (about 11 am) sun above the logo's ground, in degrees: the shadow is height / tan of it.</summary>
         public const float TitleLogoSunElevation = 62f;
         /// <summary>Heading of the sun's travel on the logo's ground, in degrees from the camera's right toward its depth.</summary>
@@ -1127,11 +1141,16 @@ namespace OutOfSight.Core
         /// <summary>Width of ground the orthographic logo camera frames, in metres, and the chair's distance from its left edge.</summary>
         // Widened from 1.8 for the pool of light (2026-11-19), which needs room to fade out inside the frame; then from 2.1
         // (inset 0.85, foot at 0.29) for the wider pool (2026-11-20): the chair keeps its place and size on screen.
-        public const float TitleLogoFrameWidth = 2.3f;
-        public const float TitleLogoChairInset = 1.02f;
+        // TITLESCALE (2026-11-23): from 2.3 and 1.02, 0.5 m more floor on the left (the chair's place and size on screen
+        // kept): room for the 1.5 times bigger dog's rump and the human's back while they hold the chair on its mark.
+        // TITLEMOVE2 (2026-11-24): from 2.8, 0.75 m more floor on the right (the inset from the left edge kept): the chair,
+        // hopped 1.56 m away, keeps its right edge about 16 units inside the frame.
+        public const float TitleLogoFrameWidth = 3.55f;
+        public const float TitleLogoChairInset = 1.52f;
         /// <summary>Where the chair's foot sits, as a fraction of the frame height from the bottom (raised so the pool's
         /// near edge fades out above the frame's bottom).</summary>
-        public const float TitleLogoFootHeight = 0.315f;
+        // TITLESCALE: from 0.315 of 290 pixels, the same 91 pixels (53 reference units) of the taller frame.
+        public const float TitleLogoFootHeight = 0.2352f;
         /// <summary>The pool of light on the floor: its centre along the shadow from the chair's foot and its radius, in
         /// metres, so it holds the whole short shadow; the fraction of the radius kept at full light before the falloff;
         /// and its opacity at full light over the title band.</summary>
@@ -1161,26 +1180,39 @@ namespace OutOfSight.Core
         // Grown with the frame (2026-11-20, from 232 x 162 at 128, 401): same scale, the chair's foot at the same point.
         // Raised by 1 unit (2026-11-20): the rounded chair's outline is a fraction of a unit taller, and its foot keeps
         // its 2 unit gap above the title's letters.
-        public const float TitleLogoUiWidth = 254f;
-        public const float TitleLogoUiHeight = 168f;
-        public const float TitleLogoUiX = 109f;
-        public const float TitleLogoUiY = 399f;
+        // TITLESCALE (2026-11-23): from 254 x 168 at 109, 399 (the frame from y 315 to 483, the top of a 20:9 phone): the
+        // frame grows 55 units to the left and up to 540, the top of a 16:9 screen, at the same 110.4 units per metre; its
+        // bottom, the chair's foot (x 221.6, y 368) and so the chair, the letters and the menu do not move. On a 20:9 phone
+        // the screen's own top edge crops the bigger human's head and shoulders (docs/next/progress/GRIP.md).
+        // TITLEMOVE2 (2026-11-24): from 309.2, the frame's 0.75 m more on the right at the same 110.4 units per metre (its
+        // left edge, height and centre line kept).
+        public const float TitleLogoUiWidth = 392f;
+        public const float TitleLogoUiHeight = 225f;
+        public const float TitleLogoUiX = 53.8f;
+        public const float TitleLogoUiY = 427.5f;
         // ----- Title logo loop (TitleLogo.Sample, 2026-11-20; reworked 2026-11-21): the chair hops off while the spot
         // looks away, gets caught in the light, and the house dog drags it home. -----
         /// <summary>Length of one loop of the title chair, in seconds, and the share of it spent perfectly still in the light.</summary>
         // From 10 s at 0.85 (2026-11-21): an 11 s act (it was 1.5 s), then the still pose held 15 s (the product owner's
         // minimum after the chair is back).
-        public const float TitleLogoCycleSeconds = 26f;
-        public const float TitleLogoStillFraction = 15f / 26f;
+        // TITLEMOVE2 (2026-11-24): from 26 s, a 16.2 s act (the chair goes twice as far again, the pull home at the same
+        // speed takes twice as long, the carriers turn round for 0.7 s), the still pose still held 15 s.
+        public const float TitleLogoCycleSeconds = 31.2f;
+        public const float TitleLogoStillFraction = 15f / 31.2f;
         /// <summary>Where in the loop the logo starts when it appears: inside the still part, so the first act comes 2.5 s in.</summary>
-        public const float TitleLogoStartPhase = 12.5f / 26f;
+        public const float TitleLogoStartPhase = 12.5f / 31.2f;
         /// <summary>The chair's gentle hops to the right while the spot is away: how many, the floor each covers and the
         /// top of each (a lift of the chair's picture, no squash, no tilt), in metres; and the top of its single startled
         /// jump when the light catches it.</summary>
         // Low on purpose: the chair's top has about 8 reference units left under the top of a 20:9 phone.
-        public const int TitleLogoChairHops = 3;
-        public const float TitleLogoChairHopStride = 0.13f;
-        public const float TitleLogoChairHopHeight = 0.045f;
+        // TITLEMOVE (2026-11-23, product owner): the stride doubled from 0.13 (3 hops, same rhythm, 0.78 m away instead of
+        // 0.39): the chair's right edge stays about 17 units inside the logo's frame (no frame change), and the carriers
+        // bring it home at twice their old speed in the same 2.8 s (TitleLogo's DragStart to DragEnd).
+        // TITLEMOVE2 (2026-11-24, product owner): twice as far again, 1.56 m: 4 hops of 0.39 m at the same pitch (three of
+        // 0.52 m with the same low lift read as a skid), a little higher (from 0.045; the startle stays the highest jump).
+        public const int TitleLogoChairHops = 4;
+        public const float TitleLogoChairHopStride = 0.39f;
+        public const float TitleLogoChairHopHeight = 0.05f;
         public const float TitleLogoChairStartle = 0.065f;
         /// <summary>How far the pool of light slides away to the left, in metres of floor, and the light left when it is away.</summary>
         public const float TitleLogoSpotDrift = 0.45f;
@@ -1194,21 +1226,28 @@ namespace OutOfSight.Core
         /// camera), in degrees.</summary>
         // DOGBIG: from -0.62 (the Shiba, snout 0.30 m ahead of its body on screen) to -0.67: the Husky at
         // TitleLogoDogScale reaches 0.355 m ahead, so its snout stays on the chair's left edge (0.32 m left of the foot).
-        public const float TitleLogoDogGrip = -0.67f;
+        // TITLESCALE (2026-11-23): the 1.5 times bigger dog stands further left so its lowered snout bites the same spot
+        // of the chair's left back leg (its head bends further down, so its reach grows less than 1.5 times): measured in the bake, its snout lands 0.274 m left of the chair's foot, as the 0.8 dog's did.
+        public const float TitleLogoDogGrip = -0.808f;
         public const float TitleLogoDogYaw = 110f;
         /// <summary>
         /// DOGBIG: the logo's dog at this share of its in-game size (the Husky at 1.5 times the Shiba): 0.8, so 1.2 times the
         /// old logo dog. At full size its 0.72 m on screen would not fit between the frame's left edge and the chair (0.70 m)
         /// with its rump inside the frame; at 0.8 its rump stays about 0.1 m inside while it holds the chair on its mark.
+        /// TITLESCALE (2026-11-23, product owner): 1.5 times bigger, 1.2 (the frame grew 0.5 m on the left for its rump).
         /// </summary>
-        public const float TitleLogoDogScale = 0.8f;
+        public const float TitleLogoDogScale = 1.2f;
         /// <summary>The dog's walk: the floor between two swaps of its two baked frames is half this stride; its bob, in
         /// metres; the floor over which it fades in and out at the frame's left edge, in metres; its wag, in degrees; and
         /// its shadow's darkness at full pool light.</summary>
-        // DOGBIG: from 0.24 for the Shiba, times the logo dog's 1.2 growth.
-        public const float TitleLogoDogStride = 0.29f;
-        public const float TitleLogoDogBob = 0.01f;
-        public const float TitleLogoDogFade = 0.35f;
+        // DOGBIG: from 0.24 for the Shiba, times the logo dog's 1.2 growth. TITLESCALE: stride and bob times 1.5 (from
+        // 0.29 and 0.01) with the dog.
+        public const float TitleLogoDogStride = 0.435f;
+        public const float TitleLogoDogBob = 0.015f;
+        // TITLESCALE: from 0.35 (also the human's): the 1.5 times bigger dog's picture reaches about 0.49 m behind its feet, so
+        // it turns opaque only once wholly inside the frame; it stays opaque where it backs off the chair (0.637 m in); and
+        // the human's faster walk out (0.5 m more floor in the same time) still fades to nothing at the loop's end.
+        public const float TitleLogoDogFade = 0.55f;
         public const float TitleLogoDogWag = 6f;
         public const float TitleLogoDogShadow = 0.7f;
         /// <summary>
@@ -1221,18 +1260,38 @@ namespace OutOfSight.Core
         /// the left, puts his hands on the top of the chair's backrest (the in-game grip, GripDef) and pulls it home. The
         /// human at this share of his in-game size: at the full 1.74 m his head would leave the top of a 20:9 phone (the
         /// frame has 1.04 m of floor above the chair's foot); at 0.6 his head stays about 5 units under it.
+        /// TITLESCALE (2026-11-23, product owner): 1.5 times bigger, 0.9. He no longer fits between the title's letters
+        /// and the top of a 20:9 phone, so the frame now reaches the top of a 16:9 screen (where he shows whole) and on a
+        /// phone the screen's top edge crops his head and shoulders, as a close camera would (GRIP.md).
         /// </summary>
-        public const float TitleLogoHumanScale = 0.6f;
+        public const float TitleLogoHumanScale = 0.9f;
         /// <summary>The logo human's yaw (90 faces right; less turns him a little away from the camera, toward the chair's
         /// back), and how far his feet stand behind the middle of his two hands, metres.</summary>
         public const float TitleLogoHumanYaw = 85f;
-        public const float TitleLogoHumanReach = 0.30f;
+        // TITLESCALE: from 0.30 at 0.6, where the rail was above his shoulders and his left hand at the end of his reach.
+        // At 0.9 the rail is 0.29 m under his 1.22 m shoulders: 0.32 m keeps both elbows bent (wrists at 0.91 and 0.76 of
+        // his 0.50 m arm) and the rail 0.13 m ahead of his belly.
+        public const float TitleLogoHumanReach = 0.32f;
         /// <summary>Where the logo human's hands rest across the top rail of the chair's backrest (the chair's frame, x;
         /// the height and depth are GripDef's chair wrists): the right hand on the rail's near end, the left further along.</summary>
         public const float TitleLogoHumanRightX = 0.17f;
         public const float TitleLogoHumanLeftX = 0.03f;
         /// <summary>The logo human's walk bob, metres (none while he holds the chair: his picture then carries it).</summary>
-        public const float TitleLogoHumanBob = 0.006f;
+        // TITLESCALE: times 1.5 with him (from 0.006).
+        public const float TitleLogoHumanBob = 0.009f;
+        /// <summary>
+        /// TITLEMOVE2 (2026-11-24, product owner): the carriers turn round to leave through baked frames of the real model
+        /// (no more mirrored picture). At the turn's middle the chest leads the hips by TitleLogo*TurnBend degrees (the dog's
+        /// spine, the human's) and the head leads the chest by TitleLogo*TurnHead more, both easing in and out with the turn;
+        /// the legs step through TitleLogoTurnSteps walk cycles, their stride damped to TitleLogoTurnStride of the walk's at
+        /// the middle (short steps on the spot, not a walk in place).
+        /// </summary>
+        public const float TitleLogoDogTurnBend = 36f;
+        public const float TitleLogoDogTurnHead = 24f;
+        public const float TitleLogoHumanTurnBend = 26f;
+        public const float TitleLogoHumanTurnHead = 18f;
+        public const float TitleLogoTurnSteps = 1f;
+        public const float TitleLogoTurnStride = 0.45f;
 
         // ----- M7 options page (Menu.BuildOptions, OptionsRow): the title page's left column style, reused. -----
         /// <summary>Left margin of the title and every row, in reference pixels (the title page's own margin).</summary>

@@ -21,8 +21,9 @@ namespace OutOfSight
     /// - Framing: a horizontal lens shift (Tuning.TitleTourLensShift) puts the vanishing point right of centre, clear of
     ///   the title column on the left.
     /// - While the tour runs over the title house, its vision cones are hidden, the wall fader never hides a wall (its
-    ///   target follows the camera) and an unlit ceiling closes the rooms above the camera. All of it belongs to the level
-    ///   instance, rebuilt when Jouer or the level select loads a level.
+    ///   target follows the camera) and the rooms' own ceilings (RoomCeilings, CEILING 2026-11-24) close them above the
+    ///   camera, which is always below them; an unlit title ceiling is built only when those are switched off
+    ///   (RoomCeilings.Disabled). All of it belongs to the level instance, rebuilt when Jouer or the level select loads a level.
     /// - "--titletour &lt;dir&gt;" (a built player): screenshots of the title at several points of the loop, then quits.
     /// </summary>
     [DefaultExecutionOrder(250)] // after OrbitCamera (200), before WallFader (300)
@@ -89,6 +90,8 @@ namespace OutOfSight
             }
             tour.menu = menu;
             tour.game = game;
+            // FISHEYE: the barrel distortion of this background, on this camera only while the tour runs.
+            MenuFisheye.Attach(tour);
             return tour;
         }
 
@@ -286,7 +289,9 @@ namespace OutOfSight
         {
             ceiling = null;
             ceilingTier = null;
-            if (level.Root == null || level.Def == null)
+            // CEILING (2026-11-24): every level now has its own lit ceiling per room (RoomCeilings), which shows from the
+            // tour's eye level; the unlit title lid below is only the fallback when those are switched off.
+            if (level.Root == null || level.Def == null || RoomCeilings.Of(level) != null)
             {
                 return;
             }
@@ -344,7 +349,7 @@ namespace OutOfSight
         private static string shadedKey;
         private static Mesh ceilingQuad;
 
-        /// <summary>The title ceiling's renderer while the tour has built one (tests and tools).</summary>
+        /// <summary>The title ceiling's renderer while the tour has built one (tests and tools); null over room ceilings (RoomCeilings).</summary>
         public MeshRenderer Ceiling => ceiling;
 
         /// <summary>True while the ceiling shows its Haut contact shade (tests and tools).</summary>
@@ -490,6 +495,10 @@ namespace OutOfSight
             yield return new WaitForSecondsRealtime(1.5f);
             lines.Add($"active={Active} level={(game != null ? game.LevelId : "none")} length={Length:0.00} m loop={LoopSeconds():0.0} s"
                 + $" screen={Screen.width}x{Screen.height}");
+            MenuFisheye fisheye = GetComponent<MenuFisheye>();
+            lines.Add(fisheye == null ? "fisheye: none"
+                : $"fisheye: active={fisheye.Active} file={MenuCameraSettings.FilePath} {fisheye.Settings} loads={fisheye.Loads}"
+                    + $" enqueued frame {MenuFisheye.EnqueuedFrame} recorded frame {MenuFisheye.RecordedFrame} params {MenuFisheye.LastParams} lens {MenuFisheye.LastLens}");
             float[] at = { 0.03f, 0.19f, 0.35f, 0.52f, 0.68f, 0.85f };
             for (int i = 0; i < at.Length; i++)
             {

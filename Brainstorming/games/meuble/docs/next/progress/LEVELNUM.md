@@ -9,14 +9,25 @@ clamped. The `_help` key is only a reminder and is ignored.
 
 | Key | Meaning | Range | Default |
 |---|---|---|---|
-| `dimOpacity` | opacity of the dark layer around the digits | 0 to 1 | 0.55 |
-| `dimColor` | colour of that layer, `[r, g, b]` | each 0 to 1 | `[0.07, 0.07, 0.08]` |
-| `washOpacity` | white wash inside the digits (0 = perfectly clear holes) | 0 to 1 | 0.05 |
+| `dimOpacity` | opacity of the dark layer around the digits | 0 to 1 | 0.6 |
+| `dimColor` | colour of that layer, `[r, g, b]` (also the inner shade's colour) | each 0 to 1 | `[0.07, 0.07, 0.08]` |
+| `washOpacity` | wash inside the digits (0 = perfectly clear glass) | 0 to 1 | 0.04 |
 | `washColor` | colour of that wash, `[r, g, b]` | each 0 to 1 | `[1.0, 1.0, 1.0]` |
-| `startZoom` | size of the number when the card appears, in times its settled size | 1 to 30 | 10 |
-| `zoomSeconds` | length of the zoom-out, in seconds (0 = no zoom) | 0 to 10 | 1.75 |
-| `settledHeight` | height of the settled digits, as a share of the screen height | 0.1 to 1.2 | 0.62 |
+| `startZoom` | size of the number when the card appears, in times its settled size | 1 to 30 | 12.4 |
+| `zoomSeconds` | length of the zoom-out, in seconds (0 = no zoom) | 0 to 10 | 2.0 |
+| `settledHeight` | height of the settled digits, as a share of the screen height | 0.1 to 1.2 | 0.5 |
 | `fadeSeconds` | fade-out of the card, dim and number after the first input, in seconds | 0.05 to 5 | 0.4 |
+| `font` | face of the digits: `inter` (Inter Display Bold), `montserrat` (Montserrat Bold), `bebas` (Bebas Neue), `dmserif` (DM Serif Display, the round 2 and 3 face) | one of the four | `"inter"` |
+| `easing` | curve of the zoom-out (ease-out, no overshoot): `expo`, `quint`, `quart`, `cubic` (round 2 and 3), `sine`, `linear` | one of the six | `"expo"` |
+| `fadeInSeconds` | fade-in of the dim and the digits when the card appears, in seconds (0 = none) | 0 to 2 | 0.2 |
+| `edgeOpacity` | hairline light edge just inside the digits' outline (0 = none) | 0 to 1 | 0.25 |
+| `edgeWidth` | width of that hairline, in pixels of a 1080 pixel tall screen | 0.5 to 8 | 1.5 |
+| `edgeColor` | colour of the hairline, `[r, g, b]` | each 0 to 1 | `[1.0, 1.0, 1.0]` |
+| `innerShadeOpacity` | soft shade (the dim's colour) inside the outline, fading inward (0 = none) | 0 to 1 | 0.2 |
+| `innerShadeWidth` | how far inward that shade fades, in pixels of a 1080 pixel tall screen | 1 to 40 | 24 |
+
+The start size is `startZoom` times `settledHeight` screen heights (12.4 x 0.5 = 6.2, as round 3's 10 x 0.62): change
+both together to keep it.
 
 Android: StreamingAssets is packed inside the APK, so the file is not read on a phone; the built-in defaults (the same
 values as the shipped file) apply. To change the phone's look, copy the tuned values into `CardNumberSettings`
@@ -136,15 +147,85 @@ Shaders. Lesson: an editor shot in camera space says nothing about an overlay ca
      HudV2_01, HeldStart01).
   4. BuildAndroid: Build/Android/OutOfSight.apk built, 55.7 MB (limit 150 MB), Build/apk.log.
 
+## LEVELNUM2 (2026-11-24): a cleaner, more professional number
+Request: nearly clear glass digits cut out of the dim (the scene shows, no white shapes), a clean modern face, crisp
+edges at every zoom step, a subtle definition at the edge but no heavy outline, a refined ease-out, settled at about
+half the screen height (start size kept), every new look value tunable.
+
+Design choices:
+- Face: Inter Display Bold (Inter, opsz 32, wght 700, OFL): a neutral grotesk with even strokes and open numerals,
+  set against the DM Serif title. Montserrat Bold, Bebas Neue and DM Serif Display (the old face) are baked too and
+  switchable with `font`.
+- Edges: the digits are a signed distance field baked offline (tools/bake_level_digits.py: Pillow renders each digit
+  4x supersampled, scipy measures the distance, 256 texels per figure height, spread 28 texels). The mask shader turns
+  the field into a one-pixel anti-aliased edge with an exact field-to-pixel factor from the zoom's scale (no screen
+  derivatives, so no dependency on filtering precision), and the mask is now drawn at full resolution (was half). No
+  stair steps or halos at 0.1 s (about 6 screen heights) or settled.
+- Glass: wash 0.04 (was 0.05), a 1.5 px hairline light edge at 0.25 just inside the outline (it carries the shape on a
+  bright room as on a night one), and a soft inner shade (the dim's colour, 0.2, fading over 24 px) for a slight inset.
+  Widths are pixels of a 1080 pixel tall screen and scale with the screen.
+- Dim: 0.6 (round 3's last value was 0.7 in the code and 0.5 in the shipped file: the two disagreed, now both 0.6).
+- Motion: expo ease-out in log scale (normalized to land exactly on 1, no jump, no overshoot) over 2 s (was cubic over
+  1.75 s: expo is done to the eye by about 1.2 s, then glides), from 12.4 times the settled size (6.2 screen heights,
+  as before) to `settledHeight` 0.5. The dim and the glass fade in over the first 0.2 s (smoothstep, on the real
+  clock; reduced motion skips it).
+
+Changes:
+- `tools/bake_level_digits.py` (new) and `tools/fonts/` (the source TTFs and their OFL files, not shipped). Output in
+  `Assets/ThirdParty/Fonts/Resources/LevelDigits/`: `<face>.json` (metrics, em/1000 units), `<face>_sdf.bytes` (raw R8,
+  bottom row first: no texture import setting can compress or sRGB-convert the field on any platform) and
+  `<face>-OFL.txt`. About 0.8 MB per face. Rebake: `python tools/bake_level_digits.py` (needs Pillow, numpy, scipy).
+- `CardNumber.cs`: `LevelDigitFont` (loads a face once, R8 texture, RGBA32 fallback), the mesh from its glyphs (no
+  TextGenerator, no `Font.textureRebuilt` hook any more), `Ease(kind, t)` (replaces `ZoomEase`), `FadeIn`, `FontName`;
+  `CardNumberSettings` has the eight new keys (`font`, `easing`, `fadeInSeconds`, `edgeOpacity`, `edgeWidth`,
+  `edgeColor`, `innerShadeOpacity`, `innerShadeWidth`; text keys checked against their lists) and the new defaults.
+- `UiNumberMask.shader`: distance field to coverage (r), hairline (g) and inner shade (b). `UiCardDim.shader`: the glass
+  is wash, then shade, then hairline, premultiplied, mixed with the dim by the coverage as before.
+- `Hud.LevelNumberFont` (test hook); `Menu.AutoShot` logs the face and the easing.
+- `card_number.json`: every key, the new defaults (identical to the code's).
+- Tests (`ProbeTestsLevelNum.cs`): LevelNum01 dim 0.5 to 0.7, the face loaded, settled ink height = settledHeight
+  (within 1 unit), holes 1 to 60 % of the screen; LevelNum03 compares the new keys, checks all four faces load with
+  ten digits, the easings are monotonic, land on 1 and never overshoot, a bad `font` or `easing` falls back with a
+  problem line, an edited file switches the face (bebas) and the easing at the next restart (its dim check was wrong,
+  0.7 for a file saying 0.8: fixed).
+
+Shots:
+- Built player (Build/PlayTest, edge 0.3): Build/shots/levelnum4/{level13,level1,level20}_{t010,t050,t100,settled}.png,
+  1920 x 1080 windowed. Settled ink 540 of 1080 px, centred; ages 0.10 / 0.50 / 1.00 / 3.0 s, scales (level13)
+  4.09 / 1.11 / 0.77 / 0.72 (final 0.72). Edges crisp at every step; the glass reads on the bright living room
+  (level1), level13 and the night level20; the hairline was a touch strong on the night level, hence 0.25.
+- Final build (Build/Play, edge 0.25): Build/shots/levelnum4_final/, same names.
+- Editor, 20:9 and 16:9: Build/shots/levelnum/{level1,level20}_{2400x1080,1920x1080}_{t000,...,final}.png: centred,
+  inside the width.
+
+Runs (4 Unity runs):
+1. BuildWindows to Build/PlayTest (Build/levelnum4_build.log): built, both shaders compiled; player shots above, no
+   [CardNumber] warning.
+2. PlayMode `--filter LevelNum0|HudV2_01_|HeldStart01_` (TestResults/levelnum4.xml): 5/5 green. Holes: level1 2.7 %
+   (20:9) and 3.4 % (16:9), level20 7.5 % and 9.3 %, highest coverage 1.00.
+3. BuildWindows to Build/Play/OutOfSight.exe (no OutOfSight process was running at that moment; one was running at the
+   start of the task and had closed): built (Build/levelnum4_play.log), card_number.json in StreamingAssets.
+4. BuildAndroid: Build/Android/OutOfSight.apk built, 56.3 MB (limit 150 MB), Build/apk.log.
+The final build was also shot (player runs, not Unity runs): Build/shots/levelnum4_final/, clean on all three levels.
+
 ## A VERIFIER
+- LEVELNUM2: the digit atlas is an R8 texture loaded from raw bytes; on a phone without R8 sampling the RGBA32
+  fallback is used. Not seen on a device yet.
+- LEVELNUM2: the hairline (0.25) and the inner shade (0.2) were judged on three levels at 1920 x 1080; if the user
+  still sees "an outline", lower `edgeOpacity` (0 removes it).
 - Android (Vulkan or GLES3 on the phone): the mask's y flip relies on UNITY_UV_STARTS_AT_TOP and Unity's Vulkan
   conversion. If the number shows upside down on the phone only, the flip in UiNumberMask.shader is the place.
 - Round 3 values (dim 0.55, wash 0.05) were judged on level13 and level1 in the built player; the night levels were not
   shot again in round 3 (round 2's level20 shot had wash 0.2).
 - Values tuned in card_number.json do not reach Android: copy them into CardNumberSettings and rebuild the APK.
-- The settled number (62 % of the height, centred) sits behind the title, the hint and the player's furniture at the
+- The settled number (62 % of the height in round 3, 50 % since LEVELNUM2, centred) sits behind the title, the hint and the player's furniture at the
   screen centre while the card is held; the chair stays visible through the hole or the dim.
 - The hold-off card (probe, look, tests) also shows the dim and the zoom for its 5 s: look shots taken in the first 5 s
   of a level are dimmed.
 - No reduced-motion option exists in the game; `Hud.ReducedMotion` is only a hook.
 - Speech bubbles and other canvases sorted under the HUD canvas are dimmed with the scene while the card shows.
+
+- User tuning (2026-11-23): the digits more white than clear (wash 0.6) on a lighter dim (0.35); shipped file, built-in defaults and LevelNum01 bounds updated. A VERIFIER: LevelNum tests not rerun; the wash at 0.6 on very bright rooms.
+- User tuning (2026-11-23): wash halved to 0.3 (0.6 read too white).
+- User tuning (2026-11-23, final): dim 0.7, wash 0.05 (the user's values from the built file), copied into the shipped file, the defaults and LevelNum01's bounds.
+- User choice (2026-11-24): the default face back to DM Serif Display (dmserif); every other LEVELNUM2 value kept.

@@ -2391,6 +2391,9 @@ namespace OutOfSight
         /// <summary>LEVELNUM: the dim and the holes use their shaders (false: a plain dim, the shaders are missing).</summary>
         public bool LevelNumberHolesReady => cardNumber != null && cardNumber.Ready;
 
+        /// <summary>LEVELNUM2: the digit face in use (card_number.json "font"), null when none could be loaded.</summary>
+        public string LevelNumberFont => cardNumber != null ? cardNumber.FontName : null;
+
         /// <summary>LEVELNUM: the number's scale now, and the scale it settles at on the current canvas.</summary>
         public float LevelNumberScale => cardNumber != null ? cardNumber.Scale : 0f;
         public float LevelNumberFinalScale => cardNumber != null ? cardNumber.FinalScale : 0f;

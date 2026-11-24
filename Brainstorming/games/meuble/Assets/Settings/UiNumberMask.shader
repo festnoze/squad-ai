@@ -2,13 +2,22 @@
 // The positions go to clip space through _NumberToClip (set by CardNumber: the zoom's scale over the canvas size), not
 // through the camera matrices. Rendering into a texture on a platform whose texture rows start at the top (D3D, Metal,
 // Vulkan through Unity's conversion) flips y, as Unity's own projection does, so the mask is sampled upright with
-// ordinary UVs. Output: the font atlas coverage in every channel, kept at the maximum where glyphs overlap. No keyword;
-// created from code only, so ProjectSetup lists it in Always Included Shaders.
+// ordinary UVs. No keyword; created from code only, so ProjectSetup lists it in Always Included Shaders.
+// LEVELNUM2: _MainTex is a signed distance field atlas (LevelDigitFont: 0.5 on the outline, rising inward). The distance
+// to the outline in mask pixels is (field - 0.5) * _DistanceToPixels (exact, computed by CardNumber from the zoom's
+// scale, so no screen derivatives and no dependency on the filtering precision). Output, kept at the maximum where
+// glyph quads overlap:
+//   r (and a): coverage, a one-pixel anti-aliased edge at any zoom;
+//   g: a hairline band from the outline to _EdgeWidth pixels inside;
+//   b: an inner shade, 1 at the outline fading to 0 at _ShadeWidth pixels inside (squared, so it is soft).
 Shader "OutOfSight/UI Number Mask"
 {
     Properties
     {
-        _MainTex ("Font atlas", 2D) = "white" {}
+        _MainTex ("Digit distance field", 2D) = "black" {}
+        _DistanceToPixels ("Field to mask pixels", Float) = 100
+        _EdgeWidth ("Hairline width (mask pixels)", Float) = 1.5
+        _ShadeWidth ("Inner shade width (mask pixels)", Float) = 24
     }
     SubShader
     {
@@ -43,6 +52,9 @@ Shader "OutOfSight/UI Number Mask"
 
             sampler2D _MainTex;
             float4x4 _NumberToClip;
+            float _DistanceToPixels;
+            float _EdgeWidth;
+            float _ShadeWidth;
 
             v2f vert(appdata v)
             {
@@ -56,10 +68,16 @@ Shader "OutOfSight/UI Number Mask"
                 return o;
             }
 
-            fixed4 frag(v2f i) : SV_Target
+            float4 frag(v2f i) : SV_Target
             {
-                fixed a = tex2D(_MainTex, i.uv).a;
-                return fixed4(a, a, a, a);
+                float field = tex2D(_MainTex, i.uv).r;
+                // Signed distance to the outline in mask pixels, positive inside.
+                float d = (field - 0.5) * _DistanceToPixels;
+                float coverage = saturate(d + 0.5);
+                float hairline = coverage * saturate(_EdgeWidth - d + 0.5);
+                float fall = saturate(1.0 - d / max(_ShadeWidth, 1e-3));
+                float shade = coverage * fall * fall;
+                return float4(coverage, hairline, shade, coverage);
             }
             ENDCG
         }

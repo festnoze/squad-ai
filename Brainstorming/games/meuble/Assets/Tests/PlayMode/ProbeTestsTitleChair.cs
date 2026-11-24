@@ -26,6 +26,8 @@ namespace OutOfSight.Tests
     {
         // A 20:9 phone at the menu's CanvasScaler (1920 x 1080 reference, match 0.5): 966 reference units high.
         private const float PhoneHalfHeight = 966f / 2f;
+        // TITLESCALE: a 16:9 screen shows the whole 1080 reference units.
+        private const float ScreenHalfHeight16x9 = 1080f / 2f;
 
         private static string ShotDir
         {
@@ -209,8 +211,11 @@ namespace OutOfSight.Tests
         [UnityTest]
         public IEnumerator Step74b_TitleChairHopsAndTheDogOrAHumanBringsItBack()
         {
-            // The choreography, sampled finely over both loops (the dog's, then the human's).
-            const int samples = 12000;
+            // The choreography, sampled finely over both loops (the dog's, then the human's). TITLEMOVE2: one sample every
+            // 26/6000 s whatever the loop's length (it was 12000 samples over two 26 s loops), so the per sample limits below
+            // stay the same speeds (0.02 m per sample: 4.6 m/s) now the loop lasts 31.2 s.
+            const float sampleSeconds = 26f / 6000f;
+            int samples = Mathf.RoundToInt(2f * Tuning.TitleLogoCycleSeconds / sampleSeconds);
             Assert.AreEqual(TitleLogo.Rest, TitleLogo.Sample(0f), "the loop does not start on the still pose");
             Assert.AreEqual(TitleLogo.Rest, TitleLogo.Sample(1f), "the human's loop does not start on the still pose");
             Assert.AreEqual(TitleLogo.Rest, TitleLogo.Sample(2f), "the two loops' end is not their start");
@@ -236,6 +241,13 @@ namespace OutOfSight.Tests
             bool dragged = false;
             bool pulled = false;
             bool bit = false;
+            // TITLEMOVE: the carriers' fastest homeward pull (m/s) and the time the chair spends coming home (s, both loops).
+            float fastestPull = 0f;
+            // TITLEMOVE2: the largest step of a carrier's turn round per sample, and whether each turns while fully shown.
+            float maxTurn = 0f;
+            bool dogTurnsShown = false;
+            bool humanTurnsShown = false;
+            float pullSeconds = 0f;
             TitleLogo.Pose previous = TitleLogo.Sample(0f);
             for (int i = 1; i <= samples; i++)
             {
@@ -260,6 +272,8 @@ namespace OutOfSight.Tests
                     Assert.IsTrue(previous.Light >= 1f && previous.Spot == previous.Chair, $"the chair is brought home out of the light at {u:0.0000}: {previous}");
                     dragged |= byDog;
                     pulled |= byHuman;
+                    fastestPull = Mathf.Max(fastestPull, -step / sampleSeconds);
+                    pullSeconds += sampleSeconds;
                 }
                 bool nobody = pose.DogAlpha == 0f && pose.HumanAlpha == 0f;
                 if (pose.Hop > 0f && previous.Hop == 0f)
@@ -321,11 +335,32 @@ namespace OutOfSight.Tests
                     Assert.IsFalse(pose.Holding, $"a hidden human holds the chair at {u:0.0000}: {pose}");
                 }
                 Assert.LessOrEqual(Mathf.Abs(pose.Lean), Tuning.TitleLogoDragWobble + 1e-4f, $"the chair tilts too far at {u:0.0000}: {pose}");
-                float dogStep = pose.DogAlpha > 0f && previous.DogAlpha > 0f ? Mathf.Abs(pose.Dog - previous.Dog) : 0f;
+                // TITLEMOVE: the dog's bob (which follows the chair's lift during the drag) is continuous too.
+                float dogStep = pose.DogAlpha > 0f && previous.DogAlpha > 0f ? Mathf.Max(Mathf.Abs(pose.Dog - previous.Dog), Mathf.Abs(pose.DogHop - previous.DogHop)) : 0f;
                 float humanStep = pose.HumanAlpha > 0f && previous.HumanAlpha > 0f ? Mathf.Abs(pose.Human - previous.Human) : 0f;
                 maxStep = Mathf.Max(maxStep, Mathf.Max(Mathf.Abs(step), Mathf.Max(Mathf.Abs(pose.Spot - previous.Spot), Mathf.Max(Mathf.Abs(pose.Hop - previous.Hop), Mathf.Max(dogStep, humanStep)))));
                 maxLight = Mathf.Max(maxLight, Mathf.Max(Mathf.Abs(pose.Light - previous.Light), Mathf.Max(Mathf.Abs(pose.DogAlpha - previous.DogAlpha), Mathf.Abs(pose.HumanAlpha - previous.HumanAlpha))));
                 maxBody = Mathf.Max(maxBody, Mathf.Max(Mathf.Abs(pose.Lean - previous.Lean), Mathf.Abs(pose.DogWag - previous.DogWag)) * 0.01f);
+                maxTurn = Mathf.Max(maxTurn, Mathf.Max(Mathf.Abs(pose.DogTurn - previous.DogTurn) * (pose.DogAlpha > 0f ? 1f : 0f),
+                    Mathf.Abs(pose.HumanTurn - previous.HumanTurn) * (pose.HumanAlpha > 0f ? 1f : 0f)));
+                if (pose.DogTurn > 0f && pose.DogTurn < 1f)
+                {
+                    // TITLEMOVE2: it turns round on the spot, fully shown, neither biting nor moving.
+                    Assert.AreEqual(1f, pose.DogAlpha, $"the dog turns round while fading at {u:0.0000}: {pose}");
+                    Assert.AreEqual(previous.Dog, pose.Dog, 1e-6f, $"the dog slides while it turns round at {u:0.0000}: {pose}");
+                    Assert.IsFalse(pose.DogBite, $"the dog turns round biting at {u:0.0000}: {pose}");
+                    dogTurnsShown = true;
+                }
+                if (pose.HumanTurn > 0f && pose.HumanTurn < 1f)
+                {
+                    Assert.AreEqual(1f, pose.HumanAlpha, $"the human turns round while fading at {u:0.0000}: {pose}");
+                    Assert.AreEqual(previous.Human, pose.Human, 1e-6f, $"the human slides while he turns round at {u:0.0000}: {pose}");
+                    Assert.IsFalse(pose.Holding, $"the human turns round holding the chair at {u:0.0000}: {pose}");
+                    humanTurnsShown = true;
+                }
+                // Leaving, they face left (turned), never before the turn is over.
+                Assert.IsTrue(pose.DogFacing > 0f || pose.DogTurn >= 1f, $"the dog faces left before it has turned at {u:0.0000}: {pose}");
+                Assert.IsTrue(pose.HumanFacing > 0f || pose.HumanTurn >= 1f, $"the human faces left before he has turned at {u:0.0000}: {pose}");
                 farthest = Mathf.Max(farthest, pose.Chair);
                 mostDog = Mathf.Max(mostDog, pose.DogAlpha);
                 mostHuman = Mathf.Max(mostHuman, pose.HumanAlpha);
@@ -335,9 +370,11 @@ namespace OutOfSight.Tests
             float loopSeconds = Tuning.TitleLogoCycleSeconds;
             TestContext.WriteLine($"[Step74b] loop {loopSeconds:0.0} s: still {stillShare:P1} ({stillShare * loopSeconds:0.0} s), act {(1f - stillShare) * loopSeconds:0.0} s; "
                 + $"{hops} hops up to {highestHop:0.000} m, {startles} startled jumps up to {startleTop:0.000} m over both loops; farthest {farthest:0.000} m right; "
-                + $"largest step {maxStep:0.0000} m, light {maxLight:0.0000}, tilt {maxBody * 100f:0.00} deg per 1/{samples / 2} loop; human root {TitleLogo.HumanRoot}, edge {TitleLogo.HumanEdge:0.000}");
+                + $"largest step {maxStep:0.0000} m, light {maxLight:0.0000}, tilt {maxBody * 100f:0.00} deg per 1/{samples / 2} loop; human root {TitleLogo.HumanRoot}, edge {TitleLogo.HumanEdge:0.000}; "
+                + $"pulled home at up to {fastestPull:0.000} m/s over {pullSeconds * 0.5f:0.00} s per loop; turn round step {maxTurn:0.0000} per sample");
             Assert.GreaterOrEqual(stillShare * loopSeconds, 14.95f, "the still pose does not hold 15 s after the chair is back");
-            Assert.That((1f - stillShare) * loopSeconds, Is.InRange(8f, 13f), "the act does not last about 11 s");
+            // TITLEMOVE2: the act grew from 11 to 16.2 s (the longer way off, the longer pull home, the turn round).
+            Assert.That((1f - stillShare) * loopSeconds, Is.InRange(15f, 17.5f), "the act does not last about 16 s");
             Assert.Less(maxStep, 0.02f, "the loop jumps (chair, spot, hop, dog or human)");
             Assert.Less(maxLight, 0.03f, "the light or a carrier's fade jumps");
             Assert.Less(maxBody, 0.03f, "the chair's tilt or the dog's wag jumps");
@@ -346,6 +383,23 @@ namespace OutOfSight.Tests
             Assert.Greater(highestHop, 0.02f, "the hops do not leave the floor");
             Assert.Greater(startleTop, highestHop, "the startled jump is not higher than the hops");
             Assert.Greater(farthest, 0.25f, "the chair barely moves");
+            // TITLEMOVE (2026-11-23): twice the old way off (0.39 m, three hops of 0.13 m), brought home at twice the old
+            // speed (peak 0.209 m/s, a smoothstep over 2.8 s), so in about the same time.
+            // TITLEMOVE2 (2026-11-24): twice as far again (1.56 m, four hops of 0.39 m), pulled home at TITLEMOVE's speed, so
+            // in twice its time (5.6 s).
+            Assert.AreEqual(1.56f, farthest, 0.005f, "the chair does not hop twice TITLEMOVE's 0.78 m away");
+            Assert.AreEqual(2f * 0.209f, fastestPull, 0.02f, "the carriers do not pull the chair home at TITLEMOVE's speed");
+            Assert.AreEqual(5.6f, pullSeconds * 0.5f, 0.1f, "the pull home does not last twice TITLEMOVE's 2.8 s");
+            Assert.Less(maxTurn, 0.03f, "a carrier's turn round jumps");
+            Assert.IsTrue(dogTurnsShown, "the dog never turns round (baked turn frames) before it leaves");
+            Assert.IsTrue(humanTurnsShown, "the human never turns round (baked turn frames) before he leaves");
+            // Mid drag, the dog's picture rises and falls with the chair's lift: its bite stays locked on the leg.
+            for (float m = 0.65f; m <= 0.75f; m += 0.01f)
+            {
+                TitleLogo.Pose drag = TitleLogo.Sample(Tuning.TitleLogoStillFraction + (1f - Tuning.TitleLogoStillFraction) * m);
+                Assert.IsTrue(drag.DogBite && drag.Dog == drag.Chair, $"premise: the dog does not drag the chair at {m:0.00} of the act: {drag}");
+                Assert.AreEqual(drag.Hop, drag.DogHop, 1e-5f, $"the dog's bite slides on the chair's leg at {m:0.00} of the act: {drag}");
+            }
             Assert.IsTrue(dragged, "the dog never drags the chair home");
             Assert.IsTrue(bit, "the dog never bites the chair's leg");
             Assert.IsTrue(pulled, "the human never pulls the chair home");
@@ -388,6 +442,7 @@ namespace OutOfSight.Tests
             frame.GetWorldCorners(corners);
             float frameLeft = canvas.InverseTransformPoint(corners[0]).x;
             float frameRight = canvas.InverseTransformPoint(corners[2]).x;
+            float frameTop = canvas.InverseTransformPoint(corners[2]).y;
             float restY = canvas.InverseTransformPoint(chair.position).y;
             float shadowY = canvas.InverseTransformPoint(shadow.position).y;
             float top = float.MinValue;
@@ -435,6 +490,9 @@ namespace OutOfSight.Tests
                     {
                         Extent(dog, canvas, corners, pose.DogAlpha >= 0.99f, ref dogTop, ref dogBottom, ref dogLeft, ref dogRight);
                     }
+                    // TITLEMOVE2: never a mirrored picture (the frames facing left and the turn's are baked).
+                    Assert.AreEqual(Vector3.one, dog.localScale, $"the dog's picture is mirrored or squashed at loop {loop} step {k}: {pose}");
+                    Assert.AreEqual(Vector3.one, human.localScale, $"the human's picture is mirrored or squashed at loop {loop} step {k}: {pose}");
                     if (pose.HumanAlpha > 0.01f)
                     {
                         Extent(pose.Holding ? pair : human, canvas, corners, pose.HumanAlpha >= 0.99f, ref humanTop, ref humanBottom, ref humanLeft, ref humanRight);
@@ -452,17 +510,27 @@ namespace OutOfSight.Tests
             TestContext.WriteLine($"[Step74b] chair between y {bottom:0.0} and {top:0.0} (at rest top {topAtRest:0.0}; title glyphs top {glyphTop:0.0}, phone top {PhoneHalfHeight:0}), "
                 + $"travels {travel:0.0} units right, right edge {screenRight - right:0.0} from the screen's right; dog between y {dogBottom:0.0} and {dogTop:0.0}, "
                 + $"opaque between x {dogLeft:0.0} and {dogRight:0.0}; human between y {humanBottom:0.0} and {humanTop:0.0}, opaque between x {humanLeft:0.0} "
-                + $"and {humanRight:0.0} (frame {frameLeft:0.0} to {frameRight:0.0})");
+                + $"and {humanRight:0.0} (frame {frameLeft:0.0} to {frameRight:0.0}, top {frameTop:0.0}); a 20:9 phone crops the human's top "
+                + $"{Mathf.Max(0f, humanTop - PhoneHalfHeight):0.0} units ({Mathf.Max(0f, humanTop - PhoneHalfHeight) / Mathf.Max(1f, humanTop - restY):P0} of his height over the chair's foot)");
             // (The layers' rects carry 2 transparent logo pixels, about 1.2 units, around their pictures.)
             Assert.Less(top, PhoneHalfHeight - 2f, "the jumping chair reaches the top of a 20:9 phone");
             Assert.Greater(bottom, glyphTop + 2f, "the moving chair touches the title's letters");
             Assert.Greater(travel, 20f, "the chair's motion is too small to read at the logo's size");
             Assert.Greater(screenRight - right, 16f, "the chair leaves the screen on the right");
+            // TITLEMOVE: twice as far, the chair still stays inside the logo's frame (at rest) on the right.
+            TestContext.WriteLine($"[Step74b] TITLEMOVE: the chair's right edge at most {right:0.0}, {frameRight - right:0.0} units inside the frame's right edge ({frameRight:0.0})");
+            Assert.LessOrEqual(right, frameRight + 2f, "the hopping chair leaves the logo's frame on the right");
             Assert.Less(dogTop, PhoneHalfHeight - 2f, "the dog reaches the top of a 20:9 phone");
             Assert.Greater(dogBottom, glyphTop + 2f, "the dog covers the title's letters");
             Assert.GreaterOrEqual(dogLeft, frameLeft - 2f, "the opaque dog leaves the logo's frame on the left");
             Assert.LessOrEqual(dogRight, frameRight + 2f, "the opaque dog leaves the logo's frame on the right");
-            Assert.Less(humanTop, PhoneHalfHeight - 2f, "the human reaches the top of a 20:9 phone");
+            // TITLESCALE (2026-11-23): the human at 0.9 is taller than the room between the letters and the top of a 20:9
+            // phone, whose top edge crops his head and shoulders (as a close camera would). The logo's frame reaches the top
+            // of a 16:9 screen, where he shows whole: never cut by the frame itself, and his head under that screen's top.
+            Assert.Less(humanTop, frameTop - 0.5f, "the human is cut by the logo's frame (his head at its top edge)");
+            Assert.Less(humanTop, ScreenHalfHeight16x9 - 2f, "the human reaches the top of a 16:9 screen");
+            Assert.Greater(humanTop, PhoneHalfHeight, "premise: the 0.9 human fits under the top of a 20:9 phone (the frame need not reach the 16:9 top)");
+            Assert.LessOrEqual(frameTop, ScreenHalfHeight16x9 + 0.5f, "the logo's frame reaches above a 16:9 screen");
             Assert.Greater(humanBottom, glyphTop + 2f, "the human covers the title's letters");
             Assert.GreaterOrEqual(humanLeft, frameLeft - 2f, "the opaque human leaves the logo's frame on the left");
             Assert.LessOrEqual(humanRight, frameRight + 2f, "the opaque human leaves the logo's frame on the right");
@@ -482,13 +550,16 @@ namespace OutOfSight.Tests
                 Assert.Less(logo.Human.color.a + logo.HumanPair.color.a, 0.01f, "the human is still there at the loop's end");
             }
             // In the dark, after its hops, it has moved right and darkened, with the pool dimmed away to the left.
-            logo.Pin(Tuning.TitleLogoStillFraction + act * 0.29f);
+            // (TITLEMOVE2: the moments from the act's own marks, which moved with its new timing.)
+            float away = TitleLogo.ReturnStart - 0.005f;
+            float caught = TitleLogo.StartleStart + 0.25f * (TitleLogo.StartleEnd - TitleLogo.StartleStart);
+            logo.Pin(Tuning.TitleLogoStillFraction + act * away);
             Assert.Greater(chair.position.x - first.x, 1f, "the chair does not hop off to the right during the act");
             Assert.Less(frame.position.x, firstFrame.x - 1f, "the light does not slide away to the left");
             Assert.Less(logo.Chair.color.r, 0.8f, "the chair does not darken out of the light");
             Assert.Less(logo.Image.color.a, 0.5f, "the pool of light does not dim while the spot is away");
             // Caught: the light is back on the chair where it stands, and it jumps.
-            logo.Pin(Tuning.TitleLogoStillFraction + act * 0.37f);
+            logo.Pin(Tuning.TitleLogoStillFraction + act * caught);
             Assert.Greater(logo.Image.color.a, 0.99f, "the light does not come back onto the chair");
             Assert.AreEqual(chair.position.x - first.x, frame.position.x - firstFrame.x, 0.05f, "the light does not land on the chair where it stands");
             Assert.Greater(logo.Current.Hop, 0.5f * Tuning.TitleLogoChairStartle, "the chair does not jump when the light catches it");
@@ -516,9 +587,48 @@ namespace OutOfSight.Tests
             logo.Pin(1f + Tuning.TitleLogoStillFraction + act * 0.80f);
             Assert.AreEqual(pairToChair, pair.position.x - chair.position.x, 0.05f, "the pair's picture slides off the chair's");
 
+            // TITLEMOVE2: the turn round, on screen: through the baked turn frames, the yaw of the frame shown steps from
+            // facing right to facing left, never back, never by more than about 30 degrees at once (no flip), every frame
+            // shown; the picture never mirrored.
+            for (int loop = 0; loop < 2; loop++)
+            {
+                bool isDog = loop == 0;
+                float rightYaw = isDog ? Tuning.TitleLogoDogYaw : Tuning.TitleLogoHumanYaw;
+                int turnFrames = isDog ? TitleLogo.DogTurnFrames : TitleLogo.HumanTurnFrames;
+                float from = TitleLogo.WagEnd - 0.01f;
+                float to = TitleLogo.TurnEnd + 0.01f;
+                float last = float.NaN;
+                float biggest = 0f;
+                var seen = new HashSet<float>();
+                for (int k = 0; k <= 400; k++)
+                {
+                    logo.Pin(loop + Tuning.TitleLogoStillFraction + act * Mathf.Lerp(from, to, k / 400f));
+                    float yaw = isDog ? logo.DogYawShown : logo.HumanYawShown;
+                    Assert.AreEqual(1f, (isDog ? dog : human).localScale.x, $"the {(isDog ? "dog" : "human")}'s picture is mirrored in its turn: {logo.Current}");
+                    if (!float.IsNaN(last))
+                    {
+                        Assert.GreaterOrEqual(yaw, last - 1e-3f, $"the {(isDog ? "dog" : "human")} turns back in its turn round: {logo.Current}");
+                        biggest = Mathf.Max(biggest, yaw - last);
+                    }
+                    last = yaw;
+                    seen.Add(yaw);
+                }
+                TestContext.WriteLine($"[Step74b] TITLEMOVE2: the {(isDog ? "dog" : "human")} turns from {rightYaw:0} to {last:0} deg through {seen.Count} baked yaws, "
+                    + $"at most {biggest:0.0} deg from one frame to the next");
+                Assert.AreEqual(360f - rightYaw, last, 0.01f, $"the {(isDog ? "dog" : "human")} does not end its turn facing left");
+                Assert.LessOrEqual(biggest, 30f, $"the {(isDog ? "dog" : "human")}'s yaw jumps in its turn round (a flip, not a turn)");
+                Assert.AreEqual(turnFrames + 2, seen.Count, $"the {(isDog ? "dog" : "human")} skips some of its turn frames");
+            }
+
             // The frame sequence: one still moment, then each act (leaving, hops, the light back, the startle, the carrier in,
-            // the grab, the drag, home, the beat, the carrier out), the dog's loop then the human's.
-            float[] moments = { 0.03f, 0.065f, 0.2f, 0.37f, 0.48f, 0.55f, 0.62f, 0.72f, 0.88f, 0.95f };
+            // the grab, the drag, home, the beat, the turn round, the carrier out), the dog's loop then the human's.
+            // TITLEMOVE2: in seconds of the 16.2 s act.
+            float[] seconds = { 0.35f, 1.0f, 2.4f, 4.6f, 5.1f, 6.5f, 7.8f, 10.8f, 14.2f, 14.85f, 15.6f };
+            var moments = new float[seconds.Length];
+            for (int k = 0; k < seconds.Length; k++)
+            {
+                moments[k] = seconds[k] / TitleLogo.ActSeconds;
+            }
             var phases = new List<float> { 0.5f };
             for (int loop = 0; loop < 2; loop++)
             {
@@ -568,10 +678,10 @@ namespace OutOfSight.Tests
             Object.Destroy(sheet);
             // The whole menu at the key moments: away in the dark, caught, dragged home by the dog, pulled home by the human
             // (both ratios for the extremes), and a close crop of each carrier holding the chair.
-            logo.Pin(Tuning.TitleLogoStillFraction + act * 0.30f);
+            logo.Pin(Tuning.TitleLogoStillFraction + act * away);
             yield return Shoot("title_chair_away_1920x1080.png", 1920, 1080);
             yield return Shoot("title_chair_away_2400x1080.png", 2400, 1080);
-            logo.Pin(Tuning.TitleLogoStillFraction + act * 0.37f);
+            logo.Pin(Tuning.TitleLogoStillFraction + act * caught);
             yield return Shoot("title_chair_caught_1920x1080.png", 1920, 1080);
             logo.Pin(Tuning.TitleLogoStillFraction + act * 0.62f);
             yield return Shoot("title_chair_dog_1920x1080.png", 1920, 1080);
@@ -581,8 +691,64 @@ namespace OutOfSight.Tests
             yield return Shoot("title_chair_human_1920x1080.png", 1920, 1080);
             yield return Shoot("title_chair_human_2400x1080.png", 2400, 1080);
             yield return Crop("title_chair_human_close.png", x0, y0, cw, ch);
-            logo.Pin(1f + Tuning.TitleLogoStillFraction + act * 0.50f);
+            logo.Pin(1f + Tuning.TitleLogoStillFraction + act * 0.5f * (TitleLogo.TrotStart + TitleLogo.TrotEnd));
             yield return Crop("title_chair_human_walkin_close.png", x0, y0, cw, ch);
+
+            // TITLEMOVE2: the turn strips, each turn frame in turn (and the frames before and after it), cropped around the
+            // carrier where it stands, at 1920 x 1080; and a doubled close crop of the turn's middle.
+            logo.Pin(0f);
+            float chairX = canvas.InverseTransformPoint(chair.position).x;
+            int tx0 = Mathf.Clamp(Mathf.RoundToInt(lo.x + leftEdge - 12f), 0, 1919);
+            int tx1 = Mathf.Clamp(Mathf.RoundToInt(chairX + leftEdge + 0.25f * logo.UiPerMetre), 0, 1919);
+            for (int loop = 0; loop < 2; loop++)
+            {
+                string who = loop == 0 ? "dog" : "human";
+                int turnFrames = loop == 0 ? TitleLogo.DogTurnFrames : TitleLogo.HumanTurnFrames;
+                var turnPhases = new List<float>();
+                for (int i = 0; i <= turnFrames + 1; i++)
+                {
+                    // Where the eased turn reaches frame i (the smoothstep inverted by bisection), clamped inside the turn.
+                    float target = i / (turnFrames + 1f);
+                    float lo01 = 0f;
+                    float hi01 = 1f;
+                    for (int b = 0; b < 30; b++)
+                    {
+                        float mid = 0.5f * (lo01 + hi01);
+                        if (mid * mid * (3f - 2f * mid) < target)
+                        {
+                            lo01 = mid;
+                        }
+                        else
+                        {
+                            hi01 = mid;
+                        }
+                    }
+                    float x = Mathf.Clamp(lo01, 0.002f, 0.998f);
+                    turnPhases.Add(loop + Tuning.TitleLogoStillFraction + act * Mathf.Lerp(TitleLogo.WagEnd, TitleLogo.TurnEnd, x));
+                }
+                // And early in the walk out.
+                turnPhases.Add(loop + Tuning.TitleLogoStillFraction + act * Mathf.Lerp(TitleLogo.TurnEnd, 1f, 0.3f));
+                int sw = tx1 - tx0;
+                var strip = new Texture2D(turnPhases.Count * (sw + margin) + margin, ch + 2 * margin, TextureFormat.RGB24, false);
+                var stripFill = new Color32[strip.width * strip.height];
+                for (int i = 0; i < stripFill.Length; i++)
+                {
+                    stripFill[i] = new Color32(40, 40, 44, 255);
+                }
+                strip.SetPixels32(stripFill);
+                for (int i = 0; i < turnPhases.Count; i++)
+                {
+                    logo.Pin(turnPhases[i]);
+                    yield return Capture(1920, 1080);
+                    strip.SetPixels(margin + i * (sw + margin), margin, sw, ch, lastShot.GetPixels(tx0, y0, sw, ch));
+                    TestContext.WriteLine($"[Step74b] {who} turn {i}: yaw {(loop == 0 ? logo.DogYawShown : logo.HumanYawShown):0.0}, {logo.Current}");
+                }
+                strip.Apply();
+                File.WriteAllBytes(Path.Combine(ShotDir, $"title_chair_{who}_turn_strip.png"), strip.EncodeToPNG());
+                Object.Destroy(strip);
+                logo.Pin(turnPhases[(turnFrames + 1) / 2]);
+                yield return Crop($"title_chair_{who}_turn_mid.png", tx0, y0, sw, ch);
+            }
 
             // Unpinned, the loop runs on its own clock.
             logo.Unpin();

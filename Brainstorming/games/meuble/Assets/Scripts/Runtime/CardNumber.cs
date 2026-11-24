@@ -12,16 +12,18 @@ namespace OutOfSight
     /// <summary>
     /// LEVELNUM (docs/next/progress/LEVELNUM.md): the intro card's full-screen layer with the level number as holes in it.
     /// A greyish-black dim covers the scene behind the card; the digits of the level select's number are holes through
-    /// which the scene shows, nearly clear (a faint white wash). The number starts several times its final size (only part
-    /// of a digit shows) and zooms out with a smooth ease-out to its settled size, a fraction of the screen height, centred
-    /// on the screen. The HUD draws it first, so every HUD text stays on top. Round 3: every value comes from
-    /// <see cref="CardNumberSettings"/>, read again from StreamingAssets/card_number.json each time the card is shown.
-    /// How (round 2): the first version cut the digits out with a uGUI stencil mask; in the built player the overlay
-    /// canvas had no working stencil and the digits showed dimmed with their rim. Now nothing depends on stencil, depth or
-    /// destination colour. The digits' glyph quads (the display face, from a TextGenerator) are drawn by a command buffer
-    /// into a small mask texture (<see cref="MaskShaderName"/>), and the layer is a RawImage whose shader
-    /// (<see cref="DimShaderName"/>) mixes dim and wash by that mask, with plain alpha blending. Both shaders are created
+    /// which the scene shows, nearly clear glass (a faint wash, a hairline light edge and a soft inner shade along the
+    /// outline). The number starts several times its final size (only part of a digit shows) and zooms out with a smooth
+    /// ease-out to its settled size, a fraction of the screen height, centred on the screen. The HUD draws it first, so
+    /// every HUD text stays on top. Round 3: every value comes from <see cref="CardNumberSettings"/>, read again from
+    /// StreamingAssets/card_number.json each time the card is shown.
+    /// How (round 2): nothing depends on stencil, depth or destination colour. The digits' glyph quads are drawn by a
+    /// command buffer into a mask texture (<see cref="MaskShaderName"/>), and the layer is a RawImage whose shader
+    /// (<see cref="DimShaderName"/>) mixes dim and glass by that mask, with plain alpha blending. Both shaders are created
     /// from code only: ProjectSetup lists them in Always Included Shaders.
+    /// LEVELNUM2: the digits come from a baked signed distance field atlas (<see cref="LevelDigitFont"/>, Inter Display
+    /// Bold by default), so the edge stays crisp and one pixel anti-aliased at every zoom step. The mask is drawn at the
+    /// full screen resolution and carries three channels: coverage (r), the hairline inner edge (g) and the inner shade (b).
     /// </summary>
     public sealed class CardNumber
     {
@@ -31,10 +33,12 @@ namespace OutOfSight
         /// <summary>The values in use, read again at every <see cref="SetNumber"/> (each card shown, so each restart).</summary>
         public CardNumberSettings Settings { get; private set; } = CardNumberSettings.Defaults;
 
-        // The glyphs are generated at this size (canvas units at scale 1); the mask texture is this fraction of the
-        // canvas's pixel size (bilinear upsampling softens the hole's edge by about a pixel).
-        private const int FontSize = 480;
-        private const float MaskResolution = 0.5f;
+        /// <summary>Edge and shade widths in the settings are pixels on a screen this tall (they scale with the screen).</summary>
+        public const float ReferenceHeight = 1080f;
+
+        // The mask texture is this fraction of the canvas's pixel size: 1, so the distance field's one-pixel edge is not
+        // softened again by an upsampling.
+        private const float MaskResolution = 1f;
 
         private readonly RawImage layer;
         private readonly CanvasGroup group;
@@ -47,9 +51,9 @@ namespace OutOfSight
         private Mesh mesh;
         private RenderTexture mask;
         private Vector2 inkSize;
+        private LevelDigitFont font;
         private string digits = string.Empty;
         private bool disposed;
-        private bool building;
 
         /// <summary>The number shown (0: none, the layer is a plain dim).</summary>
         public int Number { get; private set; }
@@ -57,7 +61,7 @@ namespace OutOfSight
         /// <summary>Seconds of the zoom played.</summary>
         public float Age { get; set; } = 99f;
 
-        /// <summary>The number's scale now, and the scale it settles at for the current canvas height.</summary>
+        /// <summary>The number's scale now (canvas units per glyph unit), and the scale it settles at for the current canvas height.</summary>
         public float Scale { get; private set; }
         public float FinalScale { get; private set; }
 
@@ -66,6 +70,12 @@ namespace OutOfSight
 
         /// <summary>The layer group's alpha (the card's).</summary>
         public float Alpha => group != null ? group.alpha : 0f;
+
+        /// <summary>The fade-in of the layer at the card's start, 0 to 1 (multiplies the card's alpha).</summary>
+        public float FadeIn { get; private set; } = 1f;
+
+        /// <summary>The digit face in use (null: none could be loaded, the layer is a plain dim).</summary>
+        public string FontName => font != null ? font.Name : null;
 
         /// <summary>The digits' ink in canvas units, centred on the screen centre.</summary>
         public Rect InkRect
@@ -121,14 +131,12 @@ namespace OutOfSight
                 layer.texture = null;
             }
             ApplyColours();
-            Font.textureRebuilt += OnFontRebuilt;
         }
 
-        /// <summary>Releases the mask texture and the font hook (the HUD is destroyed).</summary>
+        /// <summary>Releases the mask texture and the materials (the HUD is destroyed). The digit atlases stay cached.</summary>
         public void Dispose()
         {
             disposed = true;
-            Font.textureRebuilt -= OnFontRebuilt;
             commands.Release();
             if (mask != null)
             {
@@ -156,10 +164,15 @@ namespace OutOfSight
         /// </summary>
         public void SetNumber(int number)
         {
+            if (disposed)
+            {
+                return;
+            }
             Settings = CardNumberSettings.Load();
             ApplyColours();
             Number = Mathf.Max(0, number);
-            digits = Number > 0 ? Number.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+            digits = Number > 0 ? Number.ToString(CultureInfo.InvariantCulture) : string.Empty;
+            font = LevelDigitFont.Get(Settings.Font) ?? LevelDigitFont.Get(CardNumberSettings.Defaults.Font);
             BuildMesh();
             Age = 0f;
         }
@@ -175,26 +188,42 @@ namespace OutOfSight
             bool shown = alpha > 0f;
             layer.enabled = shown;
             float height = canvas.y > 1f ? canvas.y : 1080f;
-            FinalScale = inkSize.y > 1f ? Settings.SettledHeight * height / inkSize.y : 1f;
+            FinalScale = inkSize.y > 1e-3f ? Settings.SettledHeight * height / inkSize.y : 1f;
             float t = Settings.ZoomSeconds > 0f ? Mathf.Clamp01(age / Settings.ZoomSeconds) : 1f;
-            Scale = FinalScale * Mathf.Exp(Mathf.Log(Settings.StartZoom) * (1f - ZoomEase(t)));
+            Scale = FinalScale * Mathf.Exp(Mathf.Log(Settings.StartZoom) * (1f - Ease(Settings.Easing, t)));
+            // The fade-in runs on the real clock (reduced motion skips it with the zoom).
+            FadeIn = Hud.ReducedMotion || Settings.FadeInSeconds <= 0f ? 1f : Mathf.SmoothStep(0f, 1f, Age / Settings.FadeInSeconds);
+            Color c = layer.color;
+            float a = Ready ? FadeIn : Settings.DimOpacity * FadeIn;
+            if (!Mathf.Approximately(c.a, a))
+            {
+                // Only on a change: setting the colour dirties the layer's vertices (a canvas rebuild).
+                c.a = a;
+                layer.color = c;
+            }
             if (shown && Ready)
             {
                 DrawMask(canvas, pixels);
             }
         }
 
-        /// <summary>The dim's and the wash's colours and opacities from <see cref="Settings"/> (a plain dim without the shaders).</summary>
+        /// <summary>The colours and opacities from <see cref="Settings"/> (a plain dim without the shaders).</summary>
         private void ApplyColours()
         {
             Color dim = Settings.DimColor;
             dim.a = Settings.DimOpacity;
             Color wash = Settings.WashColor;
             wash.a = Settings.WashOpacity;
+            Color edge = Settings.EdgeColor;
+            edge.a = Settings.EdgeOpacity;
+            Color shade = Settings.DimColor;
+            shade.a = Settings.InnerShadeOpacity;
             if (dimMaterial != null)
             {
                 dimMaterial.SetColor("_DimColor", dim);
                 dimMaterial.SetColor("_WashColor", wash);
+                dimMaterial.SetColor("_EdgeColor", edge);
+                dimMaterial.SetColor("_ShadeColor", shade);
             }
             else
             {
@@ -202,11 +231,32 @@ namespace OutOfSight
             }
         }
 
-        /// <summary>The zoom's curve: a smooth ease-out (cubic), no overshoot, applied to the scale in log space.</summary>
-        public static float ZoomEase(float t)
+        /// <summary>The easing names accepted by card_number.json's "easing" key.</summary>
+        public static readonly string[] Easings = { "expo", "quint", "quart", "cubic", "sine", "linear" };
+
+        /// <summary>
+        /// The zoom's curve, 0 at <paramref name="t"/> = 0 to exactly 1 at 1, ease-out with no overshoot, applied to the
+        /// scale in log space (steady to the eye). "expo" is normalized so it lands on 1 with no jump.
+        /// </summary>
+        public static float Ease(string kind, float t)
         {
-            float u = 1f - Mathf.Clamp01(t);
-            return 1f - u * u * u;
+            t = Mathf.Clamp01(t);
+            float u = 1f - t;
+            switch (kind)
+            {
+                case "linear":
+                    return t;
+                case "sine":
+                    return Mathf.Sin(t * Mathf.PI * 0.5f);
+                case "cubic":
+                    return 1f - u * u * u;
+                case "quart":
+                    return 1f - u * u * u * u;
+                case "quint":
+                    return 1f - u * u * u * u * u;
+                default:
+                    return (1f - Mathf.Pow(2f, -10f * t)) / (1f - Mathf.Pow(2f, -10f));
+            }
         }
 
         /// <summary>
@@ -240,16 +290,7 @@ namespace OutOfSight
             return pixels.Length > 0 ? covered / (float)pixels.Length : 0f;
         }
 
-        private void OnFontRebuilt(Font font)
-        {
-            if (!disposed && !building && font == Hud.DisplayFont && Number > 0)
-            {
-                // The atlas moved the glyphs: their UVs are stale.
-                BuildMesh();
-            }
-        }
-
-        /// <summary>The digits' glyph quads in the display face at <see cref="FontSize"/>, their ink centred on the origin.</summary>
+        /// <summary>The digits' quads from the baked atlas, laid out on their advances, their ink centred on the origin.</summary>
         private void BuildMesh()
         {
             positions.Clear();
@@ -261,67 +302,44 @@ namespace OutOfSight
                 mesh = new Mesh { name = "LevelNumber", hideFlags = HideFlags.HideAndDontSave };
             }
             mesh.Clear();
-            Font font = Hud.DisplayFont;
             if (string.IsNullOrEmpty(digits) || font == null)
             {
                 return;
             }
-            // A request that grows the atlas raises Font.textureRebuilt at once: no rebuild from inside this one.
-            building = true;
-            try
-            {
-                font.RequestCharactersInTexture(digits, FontSize, FontStyle.Normal);
-            }
-            finally
-            {
-                building = false;
-            }
-            var settings = new TextGenerationSettings
-            {
-                font = font,
-                fontSize = FontSize,
-                fontStyle = FontStyle.Normal,
-                color = Color.white,
-                lineSpacing = 1f,
-                richText = false,
-                scaleFactor = 1f,
-                textAnchor = TextAnchor.MiddleCenter,
-                alignByGeometry = false,
-                resizeTextForBestFit = false,
-                updateBounds = false,
-                verticalOverflow = VerticalWrapMode.Overflow,
-                horizontalOverflow = HorizontalWrapMode.Overflow,
-                generationExtents = new Vector2(FontSize * 4f, FontSize * 2f),
-                pivot = new Vector2(0.5f, 0.5f),
-                generateOutOfBounds = true,
-            };
-            var generator = new TextGenerator();
-            generator.Populate(digits, settings);
-            IList<UIVertex> verts = generator.verts;
-            int quads = verts.Count / 4;
             var min = new Vector2(float.MaxValue, float.MaxValue);
             var max = new Vector2(float.MinValue, float.MinValue);
-            for (int i = 0; i < quads * 4; i++)
+            float pen = 0f;
+            var placed = new List<(LevelDigitFont.Glyph glyph, float x)>();
+            foreach (char ch in digits)
             {
-                Vector3 p = verts[i].position;
-                min = Vector2.Min(min, p);
-                max = Vector2.Max(max, p);
+                if (!font.TryGetGlyph(ch, out LevelDigitFont.Glyph g))
+                {
+                    continue;
+                }
+                placed.Add((g, pen));
+                min = Vector2.Min(min, new Vector2(g.Ink.xMin + pen, g.Ink.yMin));
+                max = Vector2.Max(max, new Vector2(g.Ink.xMax + pen, g.Ink.yMax));
+                pen += g.Advance;
             }
-            if (quads == 0)
+            if (placed.Count == 0)
             {
                 return;
             }
             Vector2 centre = (min + max) * 0.5f;
             inkSize = max - min;
-            for (int q = 0; q < quads; q++)
+            foreach ((LevelDigitFont.Glyph g, float x) in placed)
             {
-                for (int k = 0; k < 4; k++)
-                {
-                    UIVertex v = verts[q * 4 + k];
-                    positions.Add(new Vector3(v.position.x - centre.x, v.position.y - centre.y, 0f));
-                    uvs.Add(v.uv0);
-                }
-                int b = q * 4;
+                int b = positions.Count;
+                Rect q = g.Quad;
+                Rect uv = g.Uv;
+                positions.Add(new Vector3(q.xMin + x - centre.x, q.yMin - centre.y, 0f));
+                positions.Add(new Vector3(q.xMin + x - centre.x, q.yMax - centre.y, 0f));
+                positions.Add(new Vector3(q.xMax + x - centre.x, q.yMax - centre.y, 0f));
+                positions.Add(new Vector3(q.xMax + x - centre.x, q.yMin - centre.y, 0f));
+                uvs.Add(new Vector2(uv.xMin, uv.yMin));
+                uvs.Add(new Vector2(uv.xMin, uv.yMax));
+                uvs.Add(new Vector2(uv.xMax, uv.yMax));
+                uvs.Add(new Vector2(uv.xMax, uv.yMin));
                 indices.Add(b);
                 indices.Add(b + 1);
                 indices.Add(b + 2);
@@ -334,7 +352,7 @@ namespace OutOfSight
             mesh.SetTriangles(indices, 0);
             if (maskMaterial != null)
             {
-                maskMaterial.mainTexture = font.material.mainTexture;
+                maskMaterial.mainTexture = font.Atlas;
             }
         }
 
@@ -363,6 +381,16 @@ namespace OutOfSight
             float cw = canvas.x > 1f ? canvas.x : 1920f;
             float ch = canvas.y > 1f ? canvas.y : 1080f;
             maskMaterial.SetMatrix("_NumberToClip", Matrix4x4.Scale(new Vector3(2f * Scale / cw, 2f * Scale / ch, 1f)));
+            if (font != null)
+            {
+                // Distance field value to mask pixels: one field unit is 2 * spread atlas texels; a texel is
+                // (mask pixels per glyph unit) / (texels per glyph unit) mask pixels. Exact, so no screen derivatives.
+                float pixelsPerUnit = Scale * h / ch;
+                maskMaterial.SetFloat("_DistanceToPixels", 2f * font.SpreadTexels * pixelsPerUnit / font.TexelsPerUnit);
+            }
+            float referencePixels = h / ReferenceHeight;
+            maskMaterial.SetFloat("_EdgeWidth", Settings.EdgeWidth * referencePixels);
+            maskMaterial.SetFloat("_ShadeWidth", Settings.InnerShadeWidth * referencePixels);
             commands.Clear();
             commands.SetRenderTarget(mask);
             commands.ClearRenderTarget(false, true, Color.clear);
@@ -375,13 +403,144 @@ namespace OutOfSight
     }
 
     /// <summary>
+    /// LEVELNUM2: the digits 0 to 9 of one face as a signed distance field atlas, baked offline by
+    /// tools/bake_level_digits.py from an OFL font into Resources/LevelDigits/&lt;name&gt;.json (metrics) and
+    /// &lt;name&gt;_sdf.bytes (one byte per texel, bottom row first; 0.5 is the outline, 1 is <see cref="SpreadTexels"/>
+    /// texels inside). Raw bytes rather than an imported image: no import setting (compression, sRGB, mipmaps) can spoil
+    /// the field on any platform. Units are em/1000, y up from the baseline. Loaded once per face and kept.
+    /// </summary>
+    public sealed class LevelDigitFont
+    {
+        public const string ResourceFolder = "LevelDigits/";
+
+        /// <summary>The faces baked in the project (card_number.json's "font").</summary>
+        public static readonly string[] Names = { "inter", "montserrat", "bebas", "dmserif" };
+
+        public struct Glyph
+        {
+            public float Advance;
+            public Rect Ink;
+            public Rect Quad;
+            public Rect Uv;
+        }
+
+        private static readonly Dictionary<string, LevelDigitFont> Cache = new Dictionary<string, LevelDigitFont>();
+
+        private readonly Dictionary<char, Glyph> glyphs = new Dictionary<char, Glyph>();
+
+        public string Name { get; private set; }
+        public Texture2D Atlas { get; private set; }
+        public float SpreadTexels { get; private set; }
+
+        /// <summary>Atlas texels per glyph unit (the same for every glyph of the face).</summary>
+        public float TexelsPerUnit { get; private set; }
+
+        public bool TryGetGlyph(char c, out Glyph glyph) => glyphs.TryGetValue(c, out glyph);
+
+        /// <summary>The face <paramref name="name"/>, loaded once; null (with a warning) when it is not in the build.</summary>
+        public static LevelDigitFont Get(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+            if (Cache.TryGetValue(name, out LevelDigitFont cached))
+            {
+                return cached != null && cached.Atlas != null ? cached : null;
+            }
+            LevelDigitFont loaded = null;
+            try
+            {
+                loaded = Load(name);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[CardNumber] digit face {name} cannot be loaded: {e.Message}");
+            }
+            Cache[name] = loaded;
+            return loaded;
+        }
+
+        private static LevelDigitFont Load(string name)
+        {
+            var meta = Resources.Load<TextAsset>(ResourceFolder + name);
+            var data = Resources.Load<TextAsset>(ResourceFolder + name + "_sdf");
+            if (meta == null || data == null)
+            {
+                Debug.LogWarning($"[CardNumber] digit face {name} not found in Resources/{ResourceFolder}");
+                return null;
+            }
+            JObject o = JObject.Parse(meta.text);
+            int width = o.Value<int>("atlasWidth");
+            int height = o.Value<int>("atlasHeight");
+            byte[] bytes = data.bytes;
+            if (width <= 0 || height <= 0 || bytes.Length != width * height)
+            {
+                Debug.LogWarning($"[CardNumber] digit face {name}: atlas {width} x {height} does not match {bytes.Length} bytes");
+                return null;
+            }
+            var font = new LevelDigitFont { Name = name, SpreadTexels = o.Value<float>("spreadTexels") };
+            Texture2D atlas;
+            if (SystemInfo.SupportsTextureFormat(TextureFormat.R8))
+            {
+                atlas = new Texture2D(width, height, TextureFormat.R8, false, true);
+                atlas.LoadRawTextureData(bytes);
+            }
+            else
+            {
+                atlas = new Texture2D(width, height, TextureFormat.RGBA32, false, true);
+                var pixels = new Color32[bytes.Length];
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    pixels[i] = new Color32(bytes[i], bytes[i], bytes[i], 255);
+                }
+                atlas.SetPixels32(pixels);
+            }
+            atlas.name = "LevelDigits_" + name;
+            atlas.filterMode = FilterMode.Bilinear;
+            atlas.wrapMode = TextureWrapMode.Clamp;
+            atlas.hideFlags = HideFlags.HideAndDontSave;
+            atlas.Apply(false, true);
+            font.Atlas = atlas;
+            foreach (JToken g in (JArray)o["glyphs"])
+            {
+                string c = g.Value<string>("c");
+                if (string.IsNullOrEmpty(c))
+                {
+                    continue;
+                }
+                var glyph = new Glyph
+                {
+                    Advance = g.Value<float>("advance"),
+                    Ink = Box(g["ink"]),
+                    Quad = Box(g["quad"]),
+                    Uv = Box(g["uv"]),
+                };
+                font.glyphs[c[0]] = glyph;
+                if (font.TexelsPerUnit <= 0f && glyph.Quad.width > 0f)
+                {
+                    font.TexelsPerUnit = glyph.Uv.width * width / glyph.Quad.width;
+                }
+            }
+            return font.glyphs.Count > 0 && font.TexelsPerUnit > 0f ? font : null;
+        }
+
+        private static Rect Box(JToken t)
+        {
+            var a = (JArray)t;
+            float x0 = a[0].Value<float>(), y0 = a[1].Value<float>(), x1 = a[2].Value<float>(), y1 = a[3].Value<float>();
+            return Rect.MinMaxRect(x0, y0, x1, y1);
+        }
+    }
+
+    /// <summary>
     /// LEVELNUM round 3: the intro card number's tunable values, read from an optional JSON file so they can be tuned on
     /// Windows without a rebuild: StreamingAssets/card_number.json (in a Windows build:
     /// OutOfSight_Data/StreamingAssets/card_number.json; in the editor: Assets/StreamingAssets/card_number.json, shipped
     /// with these defaults). Read at every card shown (each level start and restart, R). A missing file, a missing key, a
     /// wrong type or bad JSON falls back to the built-in default with a warning; every value is clamped to a sane range.
     /// On Android StreamingAssets is inside the APK: the file is not read there and the built-in defaults (the same
-    /// values as the shipped file) apply.
+    /// values as the shipped file) apply. LEVELNUM2 added the face, the easing, the fade-in, the edge and the inner shade.
     /// </summary>
     public sealed class CardNumberSettings
     {
@@ -394,28 +553,52 @@ namespace OutOfSight
         public static readonly CardNumberSettings Defaults = new CardNumberSettings();
 
         /// <summary>dimOpacity: the dim's opacity outside the digits, 0 to 1.</summary>
-        public float DimOpacity { get; private set; } = 0.55f;
+        public float DimOpacity { get; private set; } = 0.6f;
 
-        /// <summary>dimColor: the dim's colour, [r, g, b] each 0 to 1.</summary>
+        /// <summary>dimColor: the dim's colour, [r, g, b] each 0 to 1 (also the inner shade's colour).</summary>
         public Color DimColor { get; private set; } = new Color(0.07f, 0.07f, 0.08f, 1f);
 
-        /// <summary>washOpacity: the white wash inside the digits, 0 (clear hole) to 1.</summary>
-        public float WashOpacity { get; private set; } = 0.05f;
+        /// <summary>washOpacity: the wash inside the digits, 0 (clear glass) to 1.</summary>
+        public float WashOpacity { get; private set; } = 0.04f;
 
         /// <summary>washColor: the wash's colour, [r, g, b] each 0 to 1.</summary>
         public Color WashColor { get; private set; } = new Color(1f, 1f, 1f, 1f);
 
         /// <summary>startZoom: the number's size at the card's appearance in multiples of its settled size, 1 to 30.</summary>
-        public float StartZoom { get; private set; } = 10f;
+        public float StartZoom { get; private set; } = 12.4f;
 
         /// <summary>zoomSeconds: the zoom-out's length, 0 (none) to 10 s.</summary>
-        public float ZoomSeconds { get; private set; } = 1.75f;
+        public float ZoomSeconds { get; private set; } = 2f;
 
         /// <summary>settledHeight: the settled digits' height as a fraction of the screen height, 0.1 to 1.2.</summary>
-        public float SettledHeight { get; private set; } = 0.62f;
+        public float SettledHeight { get; private set; } = 0.5f;
 
         /// <summary>fadeSeconds: the card's fade-out from the first input, 0.05 to 5 s.</summary>
         public float FadeSeconds { get; private set; } = 0.4f;
+
+        /// <summary>font: the digits' face, one of <see cref="LevelDigitFont.Names"/>.</summary>
+        public string Font { get; private set; } = "dmserif";
+
+        /// <summary>easing: the zoom's ease-out curve, one of <see cref="CardNumber.Easings"/>.</summary>
+        public string Easing { get; private set; } = "expo";
+
+        /// <summary>fadeInSeconds: the dim's and the digits' fade-in when the card appears, 0 (none) to 2 s.</summary>
+        public float FadeInSeconds { get; private set; } = 0.2f;
+
+        /// <summary>edgeOpacity: the hairline light edge just inside the digits' outline, 0 (none) to 1.</summary>
+        public float EdgeOpacity { get; private set; } = 0.25f;
+
+        /// <summary>edgeWidth: that hairline's width in pixels of a 1080 pixel tall screen, 0.5 to 8.</summary>
+        public float EdgeWidth { get; private set; } = 1.5f;
+
+        /// <summary>edgeColor: the hairline's colour, [r, g, b] each 0 to 1.</summary>
+        public Color EdgeColor { get; private set; } = new Color(1f, 1f, 1f, 1f);
+
+        /// <summary>innerShadeOpacity: the soft shade (the dim's colour) inside the outline, fading inward, 0 (none) to 1.</summary>
+        public float InnerShadeOpacity { get; private set; } = 0.2f;
+
+        /// <summary>innerShadeWidth: how far inward that shade fades, in pixels of a 1080 pixel tall screen, 1 to 40.</summary>
+        public float InnerShadeWidth { get; private set; } = 24f;
 
         /// <summary>The file read on this platform, or null where it is not read (Android: inside the APK).</summary>
         public static string FilePath
@@ -487,12 +670,21 @@ namespace OutOfSight
             s.ZoomSeconds = Number(o, "zoomSeconds", s.ZoomSeconds, 0f, 10f, problems);
             s.SettledHeight = Number(o, "settledHeight", s.SettledHeight, 0.1f, 1.2f, problems);
             s.FadeSeconds = Number(o, "fadeSeconds", s.FadeSeconds, 0.05f, 5f, problems);
+            s.Font = Choice(o, "font", s.Font, LevelDigitFont.Names, problems);
+            s.Easing = Choice(o, "easing", s.Easing, CardNumber.Easings, problems);
+            s.FadeInSeconds = Number(o, "fadeInSeconds", s.FadeInSeconds, 0f, 2f, problems);
+            s.EdgeOpacity = Number(o, "edgeOpacity", s.EdgeOpacity, 0f, 1f, problems);
+            s.EdgeWidth = Number(o, "edgeWidth", s.EdgeWidth, 0.5f, 8f, problems);
+            s.EdgeColor = Rgb(o, "edgeColor", s.EdgeColor, problems);
+            s.InnerShadeOpacity = Number(o, "innerShadeOpacity", s.InnerShadeOpacity, 0f, 1f, problems);
+            s.InnerShadeWidth = Number(o, "innerShadeWidth", s.InnerShadeWidth, 1f, 40f, problems);
             return s;
         }
 
         private static string Text(float v) => v.ToString(CultureInfo.InvariantCulture);
 
-        private static float Number(JObject o, string key, float fallback, float min, float max, List<string> problems)
+        // Internal: MenuCameraSettings (FISHEYE) reads its numbers the same way.
+        internal static float Number(JObject o, string key, float fallback, float min, float max, List<string> problems)
         {
             JToken t = o[key];
             if (t == null)
@@ -517,6 +709,28 @@ namespace OutOfSight
                 problems?.Add($"{key} {Text(v)} clamped to {Text(clamped)}");
             }
             return clamped;
+        }
+
+        private static string Choice(JObject o, string key, string fallback, string[] allowed, List<string> problems)
+        {
+            JToken t = o[key];
+            if (t == null)
+            {
+                problems?.Add($"{key} missing, \"{fallback}\" used");
+                return fallback;
+            }
+            if (t.Type != JTokenType.String)
+            {
+                problems?.Add($"{key} is not a text, \"{fallback}\" used");
+                return fallback;
+            }
+            string v = t.Value<string>().Trim().ToLowerInvariant();
+            if (Array.IndexOf(allowed, v) < 0)
+            {
+                problems?.Add($"{key} \"{v}\" is not one of {string.Join(", ", allowed)}, \"{fallback}\" used");
+                return fallback;
+            }
+            return v;
         }
 
         private static Color Rgb(JObject o, string key, Color fallback, List<string> problems)

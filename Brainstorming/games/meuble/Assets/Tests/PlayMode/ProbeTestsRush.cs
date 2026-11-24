@@ -454,6 +454,24 @@ namespace OutOfSight.Tests
         }
 
         /// <summary>
+        /// L16EASY (2026-11-23): level17 (card 16, the chair with the vase) was made more forgiving (Hugo removed, wider
+        /// windows). The short probe on that level alone: no rush (a, b, c) wins and every run keeps its premise. Not Slow.
+        /// </summary>
+        [UnityTest]
+        [Timeout(1800000)]
+        public IEnumerator Rush03_Level17RushesLose()
+        {
+            var runs = new List<Run>();
+            CollectionAssert.Contains(Game.LevelOrder.ToList(), "level17", "premise: level17 is listed in levels.json");
+            yield return PlayAll(new[] { "level17" }, Variants, runs);
+            string table = Table(runs);
+            Debug.Log("[Rush03] table\n" + table);
+            Assert.IsTrue(runs.Any(r => r.Level == "level17" && r.Variant == WaitsRemoved && r.Result != null), "premise: level17 (a) ran");
+            List<string> failures = Failures(runs);
+            Assert.IsEmpty(failures, string.Join("\n", failures) + "\n" + table);
+        }
+
+        /// <summary>
         /// Control: with nobody home (the level's inhabitants and robots removed, then rebuilt), the drivers reach the
         /// exit: level 1's (a) and (c) and level 5's (a) (the armchair route, no sitter to wait for) win, and the first load
         /// level of level11, level13, level17 drops its load in (b) and still wins. A "lost" in

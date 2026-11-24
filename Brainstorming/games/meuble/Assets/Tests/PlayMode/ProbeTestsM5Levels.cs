@@ -660,7 +660,7 @@ namespace OutOfSight.Tests
             ("level11", BodyKinds.Chair, LevelDef.LessonLoad, 1, 0, 0, LoadView.Vase),
             ("level13", BodyKinds.OfficeChair, LevelDef.LessonLoad, 2, 0, 0, LoadView.Vase),
             ("level15", BodyKinds.RockingChair, LevelDef.LessonRock, 1, 1, 0, null),
-            ("level17", BodyKinds.Chair, LevelDef.LessonFinal, 3, 1, 1, LoadView.Vase),
+            ("level17", BodyKinds.Chair, LevelDef.LessonFinal, 2, 1, 1, LoadView.Vase), // L16EASY: Mamie and Lea (Hugo removed)
         };
 
         /// <summary>

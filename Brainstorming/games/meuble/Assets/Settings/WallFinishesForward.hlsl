@@ -11,7 +11,8 @@
 // - the tangent frame is rebuilt per pixel from the screen derivatives of the position and the UV (no mesh tangent: the
 //   combined wall meshes carry none), its handedness kept whatever the platform's screen orientation;
 // - the ambient light is the probe's spherical harmonics per pixel (no lightmap: the levels are built at run time);
-// - a vertex may name a flat colour instead of a finish (WallArray.Flat: the fixture housings in a wall cap).
+// - a vertex may name a flat colour instead of a finish (WallArray.Flat: the fixture housings in a wall cap); a flat
+//   vertex may also glow by UV2.w times its colour (RoomCeilings: the light the lit floor below bounces onto a ceiling).
 #ifndef OUTOFSIGHT_WALL_FINISHES_FORWARD_INCLUDED
 #define OUTOFSIGHT_WALL_FINISHES_FORWARD_INCLUDED
 
@@ -139,10 +140,12 @@ float2 WallBandUv(float2 metres, float repeatsPerMetre, float4 band, out float v
     return float2(u, v);
 }
 
-// What the pixel shows: albedo, tangent space normal, smoothness, metallic, and the continuous UV the tangent frame
-// follows.
-void WallSurface(WallVaryings input, out half3 albedo, out half3 normalTS, out half smoothness, out half metallic, out float2 uv)
+// What the pixel shows: albedo, tangent space normal, smoothness, metallic, the continuous UV the tangent frame
+// follows, and the glow over the albedo (emission = albedo * glow; 0 but on a flat vertex that names one).
+void WallSurface(WallVaryings input, out half3 albedo, out half3 normalTS, out half smoothness, out half metallic, out float2 uv,
+    out half glow)
 {
+    glow = 0;
 #if defined(WALL_SEE_THROUGH)
     // A faded part that is no wall of the wall material (_ArrayFinish 0, its property block): its own 2D maps, as the URP
     // Lit see-through material showed them. A uniform branch: one value per draw.
@@ -167,6 +170,8 @@ void WallSurface(WallVaryings input, out half3 albedo, out half3 normalTS, out h
         normalTS = half3(0.0, 0.0, 1.0);
         smoothness = input.finish.z;
         metallic = input.finish.y;
+        // Ceilings (RoomCeilings): UV2.w is the bounce glow over the colour (0 for a fixture housing, WallArray.Flat).
+        glow = max(input.band.w, 0.0);
         return;
     }
     float slice = round(input.finish.x) - 1.0;
@@ -248,7 +253,8 @@ void WallFragment(
     half smoothness;
     half metallic;
     float2 uv;
-    WallSurface(input, albedo, normalTS, smoothness, metallic, uv);
+    half glow;
+    WallSurface(input, albedo, normalTS, smoothness, metallic, uv, glow);
 #if defined(OOS_FLOOR_DUST) && !defined(WALL_SEE_THROUGH)
     // A vertex attribute branch: a floor's triangles all name a floor look and face up, a wall's never.
     UNITY_BRANCH
@@ -291,6 +297,7 @@ void WallFragment(
     surfaceData.smoothness = smoothness;
     surfaceData.normalTS = normalTS;
     surfaceData.occlusion = 1;
+    surfaceData.emission = albedo * glow;
     surfaceData.alpha = _BaseColor.a;
 
     half4 color = UniversalFragmentPBR(inputData, surfaceData);

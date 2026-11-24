@@ -12,9 +12,10 @@ namespace OutOfSight.Tests
 {
     /// <summary>
     /// LEVELNUM round 2 (docs/next/progress/LEVELNUM.md), on the real Boot scene with the start hold on (the player's
-    /// case): the held intro card lays a greyish-black dim (0.5) over the scene, under every HUD text, with the level
-    /// select's number (level1 is 1, level20 is 19, level19 would be 17) as holes in it (a white wash inside). The number
-    /// starts at 10 times its settled size and zooms out over 1.75 s to more than half the screen height, centred, inside
+    /// case): the held intro card lays a greyish-black dim (0.6 since LEVELNUM2) over the scene, under every HUD text,
+    /// with the level select's number (level1 is 1, level20 is 19, level19 would be 17) as holes in it (nearly clear
+    /// glass inside, digits from the baked Inter distance field). The number starts at startZoom (12.4) times its settled
+    /// size and zooms out over zoomSeconds (2 s, expo ease-out) to settledHeight (half the screen height), centred, inside
     /// the screen's width on a 20:9 phone and a 16:9 PC screen. The zoom freezes while paused, a restart replays it,
     /// reduced motion shows the final state at once, and the first input takes the dim, the holes and the card away
     /// together in a short fade. It writes the zoom at t = 0, 0.15, 0.3, 0.6, 1.0 s and the final state to
@@ -108,8 +109,43 @@ namespace OutOfSight.Tests
             Assert.AreEqual(d.FadeSeconds, s.FadeSeconds, 1e-6f, "fadeSeconds differs from the built-in default");
             Assert.AreEqual(d.DimColor, s.DimColor, "dimColor differs from the built-in default");
             Assert.AreEqual(d.WashColor, s.WashColor, "washColor differs from the built-in default");
-            Assert.That(d.WashOpacity, Is.InRange(0.03f, 0.07f), "the wash is not about 0.05");
-            Assert.That(d.DimOpacity, Is.InRange(0.5f, 0.6f), "the dim is not about 0.55");
+            // LEVELNUM2 keys.
+            Assert.AreEqual(d.Font, s.Font, "font differs from the built-in default");
+            Assert.AreEqual(d.Easing, s.Easing, "easing differs from the built-in default");
+            Assert.AreEqual(d.FadeInSeconds, s.FadeInSeconds, 1e-6f, "fadeInSeconds differs from the built-in default");
+            Assert.AreEqual(d.EdgeOpacity, s.EdgeOpacity, 1e-6f, "edgeOpacity differs from the built-in default");
+            Assert.AreEqual(d.EdgeWidth, s.EdgeWidth, 1e-6f, "edgeWidth differs from the built-in default");
+            Assert.AreEqual(d.EdgeColor, s.EdgeColor, "edgeColor differs from the built-in default");
+            Assert.AreEqual(d.InnerShadeOpacity, s.InnerShadeOpacity, 1e-6f, "innerShadeOpacity differs from the built-in default");
+            Assert.AreEqual(d.InnerShadeWidth, s.InnerShadeWidth, 1e-6f, "innerShadeWidth differs from the built-in default");
+            Assert.That(d.WashOpacity, Is.InRange(0.03f, 0.07f), "the wash is not nearly clear (about 0.04)");
+            Assert.That(d.DimOpacity, Is.InRange(0.55f, 0.65f), "the dim is not about 0.6");
+            Assert.AreEqual(0.5f, d.SettledHeight, 1e-6f, "the settled height is not half the screen");
+            Assert.AreEqual(6.2f, d.StartZoom * d.SettledHeight, 0.05f, "the start size is not about 6.2 screen heights");
+            Assert.That(d.EdgeOpacity, Is.InRange(0.05f, 0.5f), "the hairline edge is not subtle");
+            foreach (string face in LevelDigitFont.Names)
+            {
+                LevelDigitFont f = LevelDigitFont.Get(face);
+                Assert.IsNotNull(f, $"the digit face {face} is not in Resources/LevelDigits");
+                Assert.IsNotNull(f.Atlas, $"the digit face {face} has no atlas");
+                for (char c = '0'; c <= '9'; c++)
+                {
+                    Assert.IsTrue(f.TryGetGlyph(c, out _), $"the digit face {face} has no '{c}'");
+                }
+            }
+            Assert.AreEqual(0f, CardNumber.Ease("expo", 0f), 1e-6f, "expo does not start at 0");
+            Assert.AreEqual(1f, CardNumber.Ease("expo", 1f), 1e-6f, "expo does not land exactly on 1");
+            foreach (string e in CardNumber.Easings)
+            {
+                float previous = 0f;
+                for (int i = 1; i <= 50; i++)
+                {
+                    float v = CardNumber.Ease(e, i / 50f);
+                    Assert.GreaterOrEqual(v, previous - 1e-6f, $"{e} goes back");
+                    Assert.LessOrEqual(v, 1f + 1e-6f, $"{e} overshoots");
+                    previous = v;
+                }
+            }
 
             problems.Clear();
             s = CardNumberSettings.Parse("{ not json", problems);
@@ -117,9 +153,18 @@ namespace OutOfSight.Tests
             Assert.AreEqual(d.DimOpacity, s.DimOpacity, 1e-6f, "bad JSON did not give the defaults");
 
             problems.Clear();
-            s = CardNumberSettings.Parse("{ \"washOpacity\": 0.3, \"dimOpacity\": \"dark\", \"startZoom\": 99, "
+            s = CardNumberSettings.Parse("{ \"font\": \"Comic\", \"easing\": 3, \"edgeWidth\": 99, \"edgeOpacity\": 0.5 }", problems);
+            Assert.AreEqual(d.Font, s.Font, "an unknown font did not fall back");
+            Assert.AreEqual(d.Easing, s.Easing, "a number as easing did not fall back");
+            Assert.AreEqual(8f, s.EdgeWidth, 1e-6f, "edgeWidth was not clamped to 8");
+            Assert.AreEqual(0.5f, s.EdgeOpacity, 1e-6f, "edgeOpacity was not read");
+            Assert.IsTrue(problems.Exists(p => p.StartsWith("font")), "an unknown font gave no problem line");
+            Assert.IsTrue(problems.Exists(p => p.StartsWith("easing")), "a bad easing gave no problem line");
+
+            problems.Clear();
+            s = CardNumberSettings.Parse("{ \"washOpacity\": 0.45, \"dimOpacity\": \"dark\", \"startZoom\": 99, "
                 + "\"zoomSeconds\": -1, \"dimColor\": [2, 0.5, -1], \"washColor\": [1, 1] }", problems);
-            Assert.AreEqual(0.3f, s.WashOpacity, 1e-6f, "washOpacity was not read");
+            Assert.AreEqual(0.45f, s.WashOpacity, 1e-6f, "washOpacity was not read");
             Assert.AreEqual(d.DimOpacity, s.DimOpacity, 1e-6f, "a text dimOpacity did not fall back");
             Assert.AreEqual(30f, s.StartZoom, 1e-6f, "startZoom was not clamped to 30");
             Assert.AreEqual(0f, s.ZoomSeconds, 1e-6f, "zoomSeconds was not clamped to 0");
@@ -134,12 +179,15 @@ namespace OutOfSight.Tests
             Game.LoadLevel("level1");
             Assert.AreEqual(d.WashOpacity, Hud.CardSettings.WashOpacity, 1e-6f, "premise: the shipped values are not in use");
             string temp = Path.Combine(Application.temporaryCachePath, "card_number_test.json");
-            File.WriteAllText(temp, "{ \"dimOpacity\": 0.7, \"washOpacity\": 0.25, \"startZoom\": 4, \"zoomSeconds\": 0.8, "
-                + "\"settledHeight\": 0.4, \"fadeSeconds\": 1.2, \"dimColor\": [0.1, 0.1, 0.1], \"washColor\": [1, 1, 1] }");
+            File.WriteAllText(temp, "{ \"dimOpacity\": 0.8, \"washOpacity\": 0.25, \"startZoom\": 4, \"zoomSeconds\": 0.8, "
+                + "\"settledHeight\": 0.4, \"fadeSeconds\": 1.2, \"dimColor\": [0.1, 0.1, 0.1], \"washColor\": [1, 1, 1], "
+                + "\"font\": \"bebas\", \"easing\": \"linear\" }");
             CardNumberSettings.PathOverride = temp;
             Game.Restart();
             Assert.AreEqual(0.25f, Hud.CardSettings.WashOpacity, 1e-6f, "the restart did not read the edited file");
-            Assert.AreEqual(0.7f, Hud.CardDimAlpha, 1e-6f, "the dim does not follow the file");
+            Assert.AreEqual(0.8f, Hud.CardDimAlpha, 1e-6f, "the dim does not follow the file");
+            Assert.AreEqual("bebas", Hud.LevelNumberFont, "the face does not follow the file");
+            Assert.AreEqual("linear", Hud.CardSettings.Easing, "the easing does not follow the file");
             Assert.AreEqual(0.8f, Hud.NumberZoomSeconds, 1e-6f, "the zoom length does not follow the file");
             Assert.AreEqual(1.2f, Hud.HeldCardFadeSeconds, 1e-6f, "the fade does not follow the file");
             Hud.ShotStep = 1e-6f;
@@ -152,6 +200,7 @@ namespace OutOfSight.Tests
             File.Delete(temp);
             Game.Restart();
             Assert.AreEqual(d.WashOpacity, Hud.CardSettings.WashOpacity, 1e-6f, "a missing file did not give the defaults");
+            Assert.AreEqual(d.Font, Hud.LevelNumberFont, "a missing file did not give the default face");
             yield return Frames(2);
             Assert.AreEqual(0, exceptions, "errors were logged: " + string.Join(" | ", logged));
         }
@@ -186,7 +235,8 @@ namespace OutOfSight.Tests
                 Assert.IsTrue(Hud.CardHeld, $"{id}: the card is not held");
                 Assert.AreEqual(expected, Hud.LevelNumberShown, $"{id}: the card does not show the level select's number");
                 Assert.AreEqual(1f, Hud.CardBackdropAlpha, 1e-4f, $"{id}: the backdrop does not follow the held card");
-                Assert.That(Hud.CardDimShown, Is.InRange(0.4f, 0.6f), $"{id}: the dim is not about half opaque");
+                Assert.That(Hud.CardDimShown, Is.InRange(0.5f, 0.7f), $"{id}: the dim is not about 0.6");
+                Assert.AreEqual(Hud.CardSettings.Font, Hud.LevelNumberFont, $"{id}: the digit face was not loaded");
 
                 foreach (Vector2Int screen in Screens)
                 {
@@ -312,7 +362,8 @@ namespace OutOfSight.Tests
                 if (age >= Hud.NumberZoomSeconds)
                 {
                     Assert.AreEqual(Hud.LevelNumberFinalScale, Hud.LevelNumberScale, 1e-4f, $"{file}: the number did not settle");
-                    Assert.Greater(ink.height, canvas.height * 0.5f, $"{file}: the settled number is not over half the screen height");
+                    Assert.AreEqual(canvas.height * Hud.CardSettings.SettledHeight, ink.height, 1f, $"{file}: the settled number is not settledHeight tall");
+                    Assert.Greater(ink.height, canvas.height * 0.4f, $"{file}: the settled number is small");
                     Assert.LessOrEqual(ink.yMax, canvas.yMax, $"{file}: the settled number is cut at the top");
                     Assert.GreaterOrEqual(ink.xMin, canvas.xMin + EdgeMargin, $"{file}: the number is cut on the left");
                     Assert.LessOrEqual(ink.xMax, canvas.xMax - EdgeMargin, $"{file}: the number is cut on the right");
@@ -322,7 +373,7 @@ namespace OutOfSight.Tests
                     float share = Hud.LevelNumberCoveredShare(out float highest);
                     TestContext.WriteLine($"  holes: {share:P1} of the screen, highest coverage {highest:0.00}");
                     Assert.Greater(highest, 0.9f, $"{file}: the mask has no solid hole");
-                    Assert.That(share, Is.InRange(0.02f, 0.6f), $"{file}: the holes cover {share:P1} of the screen");
+                    Assert.That(share, Is.InRange(0.01f, 0.6f), $"{file}: the holes cover {share:P1} of the screen");
                 }
 
                 cam.ResetProjectionMatrix();
