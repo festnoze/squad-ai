@@ -214,10 +214,20 @@ namespace OutOfSight.Tests
             sfx.PlayUiClick();
             Assert.AreSame(library.uiClick.clip, sfx.LastClip, "UI click");
             // Kept synthesized (contract 7): "hm ?", the tension loop, and "hein ?" until the listening pass.
+            AudioClip beforeHm = sfx.LastClip;
             sfx.PlayHm(0f);
-            Assert.AreSame(sfx.Hm, sfx.LastClip, "hm stays synthesized");
+            Assert.AreSame(Tuning.SfxHmEnabled ? sfx.Hm : beforeHm, sfx.LastClip,
+                Tuning.SfxHmEnabled ? "hm stays synthesized" : "the removed hm still played a clip");
+            AudioClip beforeHein = sfx.LastClip;
             sfx.PlayHein(0f);
-            Assert.AreSame(sfx.RecordedHein ? library.vocalHuh.clip : sfx.Hein, sfx.LastClip, "hein");
+            if (Tuning.SfxHeinEnabled)
+            {
+                Assert.AreSame(sfx.RecordedHein ? library.vocalHuh.clip : sfx.Hein, sfx.LastClip, "hein");
+            }
+            else
+            {
+                Assert.AreSame(beforeHein, sfx.LastClip, "the removed hein still played a clip");
+            }
             Assert.IsFalse(sfx.RecordedHein, "hein switched to vocal_huh before the product owner's listening pass");
 
             // The creak warning starts with one short creak, not one per step.
@@ -580,8 +590,11 @@ namespace OutOfSight.Tests
             try
             {
                 sfx.PlayHein(0f);
-                Assert.AreSame(library.vocalHuh.clip, sfx.LastClip, "premise: the recorded hein played");
-                AssertEffective("vocalHuh", library.vocalHuh, Tuning.SfxHeinMix, sfx.LastVolume);
+                if (Tuning.SfxHeinEnabled)
+                {
+                    Assert.AreSame(library.vocalHuh.clip, sfx.LastClip, "premise: the recorded hein played");
+                    AssertEffective("vocalHuh", library.vocalHuh, Tuning.SfxHeinMix, sfx.LastVolume);
+                }
             }
             finally
             {

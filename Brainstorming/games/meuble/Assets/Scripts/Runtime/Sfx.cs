@@ -855,7 +855,7 @@ namespace OutOfSight
         /// <summary>The "hein ?" of a discovery, panned toward the inhabitant.</summary>
         public void PlayHein(float pan)
         {
-            if (heinSource == null)
+            if (heinSource == null || !Tuning.SfxHeinEnabled)
             {
                 return;
             }
@@ -894,7 +894,7 @@ namespace OutOfSight
         /// <summary>Plays the telegraph, panned toward the inhabitant as seen from the camera (always synthesized).</summary>
         public void PlayHm(float pan)
         {
-            if (hmSource != null)
+            if (hmSource != null && Tuning.SfxHmEnabled)
             {
                 hmSource.panStereo = Mathf.Clamp(pan, -0.8f, 0.8f);
                 Play(hmSource, Hm, HmVolume);

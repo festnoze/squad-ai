@@ -718,8 +718,14 @@ namespace OutOfSight.Core
         public const float SfxCrashSynthVolume = 0.62f;
         /// <summary>The rocking chair's creak while it rocks, under the creak's 0.75.</summary>
         public const float SfxRockCreakSynthVolume = 0.4f;
-        /// <summary>The rocking chair's rock creak is muted entirely at the user's request (2026-11-24); true restores it.</summary>
-        public const bool SfxRockCreakEnabled = false;
+        /// <summary>The rocking chair's rock creak; false mutes it entirely (muted then restored at the user's request, 2026-11-24).</summary>
+        public const bool SfxRockCreakEnabled = true;
+        /// <summary>The "hein ?" of a discovery (synthesized or vocal_huh): removed entirely at the user's request (2026-11-24);
+        /// true restores it.</summary>
+        public const bool SfxHeinEnabled = false;
+        /// <summary>The human telegraph's "hm ?" before a turn or glance: removed at the user's request (2026-11-24); true
+        /// restores it. The dog's sniff telegraph is unaffected.</summary>
+        public const bool SfxHmEnabled = false;
         /// <summary>The robot bumping into the furniture (a soft thump), under the put-down thump's 0.6.</summary>
         public const float SfxBumpSynthVolume = 0.32f;
 
