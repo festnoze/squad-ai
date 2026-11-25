@@ -324,23 +324,23 @@ namespace OutOfSight
         public float FisheyeStrength { get; private set; } = 0.3f;
 
         /// <summary>fisheyeZoom: 1 = auto-fit (the farthest corner on its corner: no black, no stretched edge), above 1 crops more, below 1 shows black borders; 0.5 to 2.</summary>
-        public float FisheyeZoom { get; private set; } = 1f;
+        public float FisheyeZoom { get; private set; } = 0.834f;
 
         /// <summary>fisheyeVignette: darkening towards the corners, 0 (none) to 1.</summary>
-        public float FisheyeVignette { get; private set; } = 0.2f;
+        public float FisheyeVignette { get; private set; } = 0.399f;
 
         /// <summary>peripheralBlur: the blur of the periphery (the centre stays sharp), 0 (off, no extra tap) to 1.</summary>
-        public float PeripheralBlur { get; private set; } = 0.3f;
+        public float PeripheralBlur { get; private set; } = 1f;
 
         /// <summary>
         /// peripheralBlurRadius: the sharp centre's size, where the blur starts, as a share of the way from the lens centre
         /// to the screen's edge on each side (each corner is 1, the middle of each edge 0.71), 0 to 1; the blur then ramps
         /// up smoothly over 0.45 more.
         /// </summary>
-        public float PeripheralBlurRadius { get; private set; } = 0.4f;
+        public float PeripheralBlurRadius { get; private set; } = 0.203f;
 
         /// <summary>peripheralBlurMotion: 0 = a plain soft blur, 1 = a radial (zoom) streak, in between a mix; 0 to 1.</summary>
-        public float PeripheralBlurMotion { get; private set; } = 0.6f;
+        public float PeripheralBlurMotion { get; private set; } = 0.667f;
 
         /// <summary>True when the pass changes the picture at all.</summary>
         public bool Visible => FisheyeStrength > 0f || FisheyeVignette > 0f || !Mathf.Approximately(FisheyeZoom, 1f) || PeripheralBlur > 0f;

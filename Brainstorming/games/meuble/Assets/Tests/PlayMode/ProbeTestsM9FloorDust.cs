@@ -141,7 +141,7 @@ namespace OutOfSight.Tests
                 Assert.AreEqual(i >= FloorDust.FirstFloorSlice, floors.Contains(WallArray.Slices[i]),
                     $"slice {i} ({WallArray.Slices[i]}): the floor dust's first floor slice no longer splits walls from floors");
             }
-            Assert.AreEqual(SaveOptions.QualityMedium, SaveOptions.DefaultQuality(true), "premise: Android starts on Moyen");
+            Assert.AreEqual(SaveOptions.QualityHigh, SaveOptions.DefaultQuality(true), "premise: Android starts on Haut (2026-11-25)");
 
             Assert.AreEqual(SaveOptions.QualityHigh, QualityTier.Applied, "premise: the editor plays on Haut");
             Assert.IsTrue(FloorDust.TierOn, "Haut: the floor dust tier is off");

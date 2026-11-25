@@ -29,8 +29,11 @@ namespace OutOfSight
     /// M5 wave 5B (docs/CONTRACT_M5.md 6, 16.5): the balance gauge (hud.balance), shown only while the furniture carries a
     /// load (<see cref="SetBalance"/>): |dv| over the fall threshold, red above <see cref="Tuning.BalanceWarning"/>. It sits in
     /// the bottom band beside the creak gauge, on its left (the band has no room under the creak gauge: the controls line).
+    /// TOUCHTUTO (docs/next/progress/TOUCHTUTO.md): while the level 1 touch tutorial shows (<see cref="TouchControls.TutorialShowing"/>,
+    /// drawn over the HUD by TouchControls), it replaces the start line, the controls line and the intro card (title, level
+    /// name, hint, people and the level number, which its items would overlap): see <see cref="TutorialCovering"/>.
     /// </summary>
-    public sealed class Hud : MonoBehaviour
+    public sealed partial class Hud : MonoBehaviour
     {
         /// <summary>Open in both seen states (calm and alarm), closed when unseen.</summary>
         public bool EyeOpen { get; private set; }
@@ -371,6 +374,10 @@ namespace OutOfSight
         private Vector2 markerScreen;
         // The card was held at least once since ShowLevel: its fade then starts at the release instead of after 4 s.
         private bool cardWasHeld;
+        // TOUCHTUTO: the level 1 touch tutorial shows (read every frame from TouchControls), and the intro card stays hidden
+        // under it, then after it when the level started from it (no card popping back only to fade out).
+        private bool tutorialOn;
+        private bool cardCovered;
 
         private Canvas endCanvas;
         private Text winTitle;
@@ -661,6 +668,8 @@ namespace OutOfSight
 
             BuildEndGroup();
             HidePanels();
+            // BIGBUTTONS: the touch layout of the panels' rows from the start on a phone or under -touch (HudTouchLayout.cs).
+            RefreshPanelLayout();
         }
 
         /// <summary>M8 touch redesign: explicit left/right Navigation between two buttons of the same row.</summary>
@@ -705,7 +714,7 @@ namespace OutOfSight
         /// <see cref="PanelButtonGap"/> apart; the first is the primary action (<see cref="PanelPrimaryWidth"/> x
         /// <see cref="PanelPrimaryHeight"/>), the others secondary (<see cref="PanelButtonWidth"/> x <see cref="PanelButtonHeight"/>).
         /// </summary>
-        private static void PlaceRow(Button primary, params Button[] secondary)
+        private void PlaceRow(Button primary, params Button[] secondary)
         {
             var row = new Button[secondary.Length + 1];
             row[0] = primary;
@@ -716,24 +725,25 @@ namespace OutOfSight
         /// <summary>
         /// One centred row of panel buttons, <paramref name="row"/> left to right, <see cref="PanelButtonGap"/> apart:
         /// <paramref name="primary"/> (anywhere in the row, or null for none) at the primary size, the others at the
-        /// secondary size. The same sizes, gap and height on every end panel.
+        /// secondary size. The same sizes, gap and height on every end panel. BIGBUTTONS: in the touch layout the row is
+        /// a bottom bar with bigger plates and labels (HudTouchLayout.cs); the PC row is unchanged.
         /// </summary>
-        private static void PlaceButtons(Button primary, params Button[] row)
+        private void PlaceButtons(Button primary, params Button[] row)
         {
-            float total = -PanelButtonGap;
+            float gap = PanelGap;
+            float total = -gap;
             foreach (Button button in row)
             {
-                total += (button == primary ? PanelPrimaryWidth : PanelButtonWidth) + PanelButtonGap;
+                total += PanelWidth(button == primary) + gap;
             }
             float x = -total * 0.5f;
             foreach (Button button in row)
             {
                 bool isPrimary = button == primary;
-                float width = isPrimary ? PanelPrimaryWidth : PanelButtonWidth;
-                float height = isPrimary ? PanelPrimaryHeight : PanelButtonHeight;
-                Place((RectTransform)button.transform, new Vector2(0.5f, 0.5f), new Vector2(x + width * 0.5f, PanelButtonY),
-                    new Vector2(width, height));
-                x += width + PanelButtonGap;
+                float width = PanelWidth(isPrimary);
+                PlacePanelButton(button, x + width * 0.5f, width, PanelHeight(isPrimary));
+                SizePanelLabel(button, isPrimary);
+                x += width + gap;
             }
         }
 
@@ -1465,7 +1475,8 @@ namespace OutOfSight
             }
             if (controls != null)
             {
-                controls.enabled = band;
+                // TOUCHTUTO: the touch tutorial's bottom line takes the controls line's place while it shows.
+                controls.enabled = band && !tutorialOn;
             }
             SetEnabled(creakCanvas, Visible && creakOn && band);
             SetEnabled(suspicionCanvas, Visible && suspicionOn && band);
@@ -1965,9 +1976,12 @@ namespace OutOfSight
             }
             SetHintText();
             titleTimer = 0f;
+            // TOUCHTUTO: a rebuild under the shown tutorial (a restart of level 1) keeps the card hidden; Update uncovers it
+            // on the next frame if the tutorial is gone.
+            cardCovered = tutorialOn;
             if (titleCard != null)
             {
-                titleCard.alpha = 1f;
+                titleCard.alpha = cardCovered ? 0f : 1f;
             }
             // Levels v2 (C3b): the held card follows GameState.Started from the next frame (Update); a level shown
             // started keeps the M1 timing (4 s, then the 1 s fade). No locked or lit line until GameState wants one.
@@ -2094,7 +2108,8 @@ namespace OutOfSight
             }
             if (winAction != null)
             {
-                winAction.rectTransform.anchoredPosition = new Vector2(0f, EndActionY);
+                // BIGBUTTONS: a little lower in the touch layout, under the record and new stars lines (HudTouchLayout.cs).
+                winAction.rectTransform.anchoredPosition = new Vector2(0f, EndActionYNow);
             }
             endOn = true;
             ApplyCanvases();
@@ -2190,6 +2205,17 @@ namespace OutOfSight
                 SetLampHintText();
                 SetSpectatorText();
             }
+            // BIGBUTTONS: the panels' rows follow the touch layout switch (a bottom bar on touch, HudTouchLayout.cs).
+            RefreshPanelLayout();
+
+            // TOUCHTUTO: the level 1 touch tutorial (decided by TouchControls earlier in the frame) takes the controls line's
+            // place (ApplyCanvases) and covers the intro card below.
+            bool tutorial = TouchControls.TutorialShowing;
+            if (tutorial != tutorialOn)
+            {
+                tutorialOn = tutorial;
+                ApplyCanvases();
+            }
 
             titleTimer += Time.unscaledDeltaTime;
             UpdateCardHold();
@@ -2199,6 +2225,21 @@ namespace OutOfSight
                 // started keeps the M1 timing (4 s, then 1 s).
                 float fade = cardWasHeld ? HeldCardFadeSeconds : 1f;
                 titleCard.alpha = titleTimer < CardHoldSeconds ? 1f : Mathf.Clamp01(1f - (titleTimer - CardHoldSeconds) / fade);
+                // TOUCHTUTO: the card (its start line and level number with it) is hidden while the tutorial covers it, and
+                // stays hidden through its fade when the level started from the tutorial; a card the tutorial left while
+                // still held (the device changed) shows again.
+                if (tutorialOn)
+                {
+                    cardCovered = true;
+                }
+                else if (cardHeld)
+                {
+                    cardCovered = false;
+                }
+                if (cardCovered) // MUTATION:TUTO_COVERS_CARD
+                {
+                    titleCard.alpha = 0f;
+                }
             }
             AnimateLevelNumber(gaugeDt);
             if (cardHeld && startLine != null)
@@ -2242,6 +2283,15 @@ namespace OutOfSight
 
         /// <summary>Levels v2 (C3b): the intro card is held fully visible now (the level waits for its first input; tests).</summary>
         public bool CardHeld => cardHeld;
+
+        /// <summary>
+        /// TOUCHTUTO: the level 1 touch tutorial covers the HUD now: the controls line is off and the intro card (with its
+        /// start line and level number) is hidden (tests).
+        /// </summary>
+        public bool TutorialCovering => tutorialOn;
+
+        /// <summary>The controls line is drawn now (the HUD shows and the line is on; tests).</summary>
+        public bool ControlsVisible => Visible && controls != null && controls.enabled;
 
         /// <summary>Levels v2 (C3b): the held card's start line shows (hud.start, label StartLine; tests).</summary>
         public bool StartLineVisible => startLine != null && startLine.enabled && TitleCardAlpha > 0f;

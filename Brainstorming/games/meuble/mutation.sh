@@ -184,6 +184,10 @@ MUTATIONS=(
   "hold_start|Assets/Scripts/Runtime/GameState.cs|bool release = InputReader.AnyStartInput(); // MUTATION:HOLD_START|bool release = true; // MUTATION:HOLD_START|PlayMode|HeldStart01_ FocusPause03_ Tips_07_"
   "unseen_before_start|Assets/Scripts/Runtime/GameState.cs|started /*MUTATION:UNSEEN_BEFORE_START*/|true /*MUTATION:UNSEEN_BEFORE_START*/|PlayMode|HeldStart04_"
   "shove_before_start|Assets/Scripts/Runtime/GameState.cs|playing && started /*MUTATION:SHOVE_BEFORE_START*/|playing /*MUTATION:SHOVE_BEFORE_START*/|PlayMode|HeldStart06_"
+  # WINDOWS3D (docs/next/progress/WINDOWS3D.md): every window is the 3D model (one glass per window, the frames combined per
+  # wall line), and the night preset lowers the glass reflections.
+  "window_model|Assets/Scripts/Runtime/LevelBuilder.cs|WindowModel windowModel = WindowModel.Usable; // MUTATION:WINDOW_MODEL|WindowModel windowModel = null; // MUTATION:WINDOW_MODEL|PlayMode|Step39h_ Step50a_"
+  "night_glass|Assets/Scripts/Runtime/WindowModel.cs|block.SetFloat(ReflectionId, glassMaterial.GetFloat(ReflectionId) * Tuning.WindowGlassNightReflection); // MUTATION:NIGHT_GLASS|block.SetFloat(ReflectionId, glassMaterial.GetFloat(ReflectionId)); // MUTATION:NIGHT_GLASS|PlayMode|Night_b_"
 )
 
 # Refuse to start on a tree that still holds a mutation (an interrupted run), and snapshot the sources.

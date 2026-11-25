@@ -12,11 +12,13 @@ namespace OutOfSight.Tests
 {
     /// <summary>
     /// M7 (docs/CONTRACT_M7.md 1.5), on the real Boot scene: the touch controls driven by injected fingers with
-    /// <see cref="InputReader.ForceTouchUI"/> (no touchscreen in a headless run). Step63a: a drag on the left half moves
-    /// the furniture like the left stick, a drag on the right half orbits the camera (sensitivity option included), a tap
-    /// on the player lamp switches it (task DOORAUTO: it replaced the action button, which is gone), and the careful and
+    /// <see cref="InputReader.ForceTouchUI"/> (no touchscreen in a headless run). Step63a: a drag on the left third moves
+    /// the furniture like the left stick, a drag on the right two thirds orbits the camera (sensitivity option included), a
+    /// tap on the player lamp switches it (task DOORAUTO: it replaced the action button, which is gone), and the careful and
     /// pause buttons work. Step63b: the overlay is hidden with no touch and shown when forced, the controls line swaps to the
-    /// touch names, and every button is at least 140 px at 1080p.
+    /// touch names, and every button is at least 140 px at 1080p. Step63c (TOUCHTUTO): the split is in thirds
+    /// (Tuning.TouchStickZoneShare), and a pinch only starts in the camera zone with the orbit finger: the stick finger
+    /// never pinches.
     /// Touch processing is per rendered frame (TouchControls.Update); every game wait is bounded by fixed steps.
     /// </summary>
     public sealed class ProbeTestsM7Touch
@@ -158,13 +160,13 @@ namespace OutOfSight.Tests
             InputReader.InjectTouch(0, land + new Vector2(0f, radius * 1.5f));
             yield return Frames(1);
             Vector2 move = InputReader.Move();
-            Assert.AreEqual(0f, move.x, 0.01f, "a drag up on the left half gave a sideways stick");
-            Assert.AreEqual(1f, move.y, 0.01f, "a drag up past the rim on the left half is not a full stick forward");
+            Assert.AreEqual(0f, move.x, 0.01f, "a drag up on the left third gave a sideways stick");
+            Assert.AreEqual(1f, move.y, 0.01f, "a drag up past the rim on the left third is not a full stick forward");
 
             yield return StepUntil(() => (YawMath.Planar(Furniture.transform.position) - start).magnitude > 0.3f, StepsFor(2f));
             float travelled = (YawMath.Planar(Furniture.transform.position) - start).magnitude;
             Assert.Greater(travelled, 0.3f, "the touch stick did not move the furniture");
-            Assert.AreEqual(yaw0, main.OrbitCamera.Yaw, 0.01f, "a drag on the left half orbited the camera");
+            Assert.AreEqual(yaw0, main.OrbitCamera.Yaw, 0.01f, "a drag on the left third orbited the camera");
 
             InputReader.ReleaseTouch(0);
             yield return Frames(1);
@@ -187,8 +189,8 @@ namespace OutOfSight.Tests
             yield return Frames(2);
             float turned = Mathf.DeltaAngle(yaw0, cam.Yaw);
             float expected = 100f * Tuning.TouchOrbitDegPerPixel * 2.0f;
-            Assert.AreEqual(expected, turned, 0.5f, $"a 100 px drag on the right half at sensitivity 2 turned {turned:0.00} deg, not {expected:0.00}");
-            Assert.AreEqual(Vector2.zero, InputReader.Move(), "a drag on the right half moved the stick");
+            Assert.AreEqual(expected, turned, 0.5f, $"a 100 px drag on the right two thirds at sensitivity 2 turned {turned:0.00} deg, not {expected:0.00}");
+            Assert.AreEqual(Vector2.zero, InputReader.Move(), "a drag on the right two thirds moved the stick");
 
             // A finger held still does not orbit.
             float held = cam.Yaw;
@@ -249,6 +251,82 @@ namespace OutOfSight.Tests
             Assert.IsTrue(Game.Paused, "the pause button did not pause");
             Assert.IsTrue(main.Menu.PauseOpen, "the pause button did not open the pause menu");
             Assert.IsFalse(Touch.Visible, "the touch overlay shows over the pause menu");
+            AssertClean();
+        }
+
+        // ----- 63c (TOUCHTUTO): the thirds split and the pinch in the camera zone only -----
+
+        [UnityTest]
+        public IEnumerator Step63c_ThirdsSplitAndPinchOnlyInTheCameraZone()
+        {
+            yield return ShowTouch();
+            FreezeInhabitantsAway();
+            yield return Steps(2);
+            OrbitCamera cam = main.OrbitCamera;
+            float k = Screen.height / 1080f;
+            Assert.AreEqual(Screen.width / 3f, TouchControls.StickZoneRight, 1f, "the stick zone is not the left third");
+
+            // Between the third and the half (the stick side of the old half split): the camera's. A drag there orbits.
+            Vector2 mid = new Vector2(Screen.width * 0.42f, Screen.height * 0.5f);
+            InputReader.InjectTouch(0, mid);
+            yield return Frames(1);
+            float yaw0 = cam.Yaw;
+            InputReader.InjectTouch(0, mid + new Vector2(100f * k, 0f));
+            yield return Frames(2);
+            Assert.AreEqual(Vector2.zero, InputReader.Move(), "a drag right of the left third moved the stick");
+            Assert.Greater(Mathf.Abs(Mathf.DeltaAngle(yaw0, cam.Yaw)), 1f, "a drag right of the left third did not orbit");
+            InputReader.ReleaseTouch(0);
+            yield return Frames(1);
+
+            // The stick finger never pinches: a thumb on the left third and, one frame later (the removed "fresh pair" rule
+            // made these two a pinch), a finger on the camera zone are a stick and an orbit, each steering.
+            Vector2 thumb = new Vector2(Screen.width * 0.15f, Screen.height * 0.4f);
+            Vector2 finger = new Vector2(Screen.width * 0.7f, Screen.height * 0.5f);
+            InputReader.InjectTouch(1, thumb);
+            yield return Frames(1);
+            InputReader.InjectTouch(2, finger);
+            yield return Frames(1);
+            float yaw1 = cam.Yaw;
+            InputReader.InjectTouch(1, thumb + new Vector2(0f, Tuning.TouchStickRadius * k * 1.5f));
+            InputReader.InjectTouch(2, finger + new Vector2(100f * k, 0f));
+            yield return Frames(1);
+            Assert.AreEqual(1f, InputReader.Move().y, 0.01f, "the thumb did not steer beside a camera finger");
+            Assert.AreEqual(0f, InputReader.TouchPinchDelta(), 1e-4f, "a thumb and a camera finger pinched");
+            yield return Frames(1);
+            Assert.Greater(Mathf.Abs(Mathf.DeltaAngle(yaw1, cam.Yaw)), 1f, "the camera finger did not orbit beside the thumb");
+            InputReader.ReleaseTouch(1);
+            InputReader.ReleaseTouch(2);
+            yield return Frames(1);
+
+            // A second finger landing in the camera zone while the orbit finger is held pinches: spreading zooms, no orbit.
+            Vector2 a = new Vector2(Screen.width * 0.6f, Screen.height * 0.5f);
+            Vector2 b = new Vector2(Screen.width * 0.75f, Screen.height * 0.5f);
+            InputReader.InjectTouch(3, a);
+            yield return Frames(2);
+            InputReader.InjectTouch(4, b);
+            yield return Frames(1);
+            float yaw2 = cam.Yaw;
+            InputReader.InjectTouch(4, b + new Vector2(80f * k, 0f));
+            yield return Frames(1);
+            Assert.Greater(InputReader.TouchPinchDelta(), 1f, "spreading two fingers in the camera zone did not pinch");
+            Assert.AreEqual(Vector2.zero, InputReader.TouchLookDelta(), "a pinch orbited");
+            yield return Frames(1);
+            Assert.AreEqual(yaw2, cam.Yaw, 0.01f, "a pinch turned the camera");
+            InputReader.ReleaseTouch(3);
+            InputReader.ReleaseTouch(4);
+            yield return Frames(1);
+
+            // Two fingers put down together in the camera zone pinch too (the first is the orbit finger, the second joins it).
+            InputReader.InjectTouch(5, a);
+            InputReader.InjectTouch(6, b);
+            yield return Frames(1);
+            InputReader.InjectTouch(6, b + new Vector2(80f * k, 0f));
+            yield return Frames(1);
+            Assert.Greater(InputReader.TouchPinchDelta(), 1f, "two fingers put down together in the camera zone did not pinch");
+            InputReader.ReleaseTouch(5);
+            InputReader.ReleaseTouch(6);
+            yield return Frames(1);
+            Assert.AreEqual(0f, InputReader.TouchPinchDelta(), 1e-4f, "the pinch went on after the fingers lifted");
             AssertClean();
         }
 

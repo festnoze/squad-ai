@@ -49,6 +49,16 @@ namespace OutOfSight
         private const float RowHeight = 56f;
         private const float Gap = 40f;
         private const int FontSize = 40;
+        // BIGBUTTONS (docs/next/progress/BIGBUTTONS.md): in the touch layout the panels' buttons form a bottom bar over the
+        // place of this line, so it moves up beside the time: right aligned, its right edge where the star row's left edge
+        // is mirrored (the stars span x 238 to 422, right of the time; Hud.WinStarsX 330, three 56 stars 8 apart), on the
+        // time's own row (the win body at y -10, EndTime at y -82), "Nouveau record !" right under it, as the new stars
+        // line sits under the stars.
+        private const float TouchRightX = -238f;
+        private const float TouchWinY = -10f;
+        private const float TouchEndY = -82f;
+        private const float TouchNewOffset = -46f;
+        private const float TouchRowHeight = 44f;
         private static readonly Color BestInk = new Color(1f, 1f, 1f, 0.95f);
         private static readonly Color NewBestInk = new Color(1f, 0.82f, 0.3f, 1f);
 
@@ -129,7 +139,55 @@ namespace OutOfSight
             best.text = string.Format(Strings.WinBest, Strings.FormatSeconds(result.Best));
             best.enabled = true;
             newBest.enabled = result.NewBest;
-            Layout(endScreen ? EndY : WinY, result.NewBest);
+            LayoutForMode();
+        }
+
+        // BIGBUTTONS: the layout the line was last placed for (true: the touch layout, beside the time).
+        private bool laidTouch;
+
+        /// <summary>BIGBUTTONS: the line is placed for the touch layout (beside the time) now.</summary>
+        public bool TouchLayoutOn => laidTouch;
+
+        // BIGBUTTONS: follows the HUD's own layout switch (its rows move to a bottom bar on touch), the frame it happens.
+        private void LateUpdate()
+        {
+            if (HasRecord && TouchWanted != laidTouch)
+            {
+                LayoutForMode();
+            }
+        }
+
+        // The HUD's applied layout (it waits for a held finger to lift), else the switch itself.
+        private bool TouchWanted => hud != null ? hud.TouchLayoutOn : TouchLayout.Active;
+
+        /// <summary>The PC row under the buttons, or (touch layout) the column left of the time.</summary>
+        private void LayoutForMode()
+        {
+            laidTouch = TouchWanted;
+            if (laidTouch)
+            {
+                LayoutTouch(OnEndScreen ? TouchEndY : TouchWinY);
+            }
+            else
+            {
+                Layout(OnEndScreen ? EndY : WinY, Last.NewBest);
+            }
+        }
+
+        /// <summary>BIGBUTTONS: the record right aligned left of the time at <paramref name="y"/>, "Nouveau record !" under it.</summary>
+        private void LayoutTouch(float y)
+        {
+            PlaceRight(best, y);
+            PlaceRight(newBest, y + TouchNewOffset);
+        }
+
+        private static void PlaceRight(Text text, float y)
+        {
+            RectTransform rect = text.rectTransform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(1f, 0.5f);
+            rect.anchoredPosition = new Vector2(TouchRightX, y);
+            rect.sizeDelta = new Vector2(Mathf.Max(1f, text.preferredWidth) + 8f, TouchRowHeight);
         }
 
         /// <summary>The language changed: "New record!" and the record line again, in the new language.</summary>

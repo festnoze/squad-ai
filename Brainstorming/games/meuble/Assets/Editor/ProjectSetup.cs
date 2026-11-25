@@ -682,8 +682,8 @@ namespace OutOfSight.Editor
             for (int i = 0; defaults != null && i < defaults.arraySize; i++)
             {
                 SerializedProperty entry = defaults.GetArrayElementAtIndex(i);
-                string platform = entry.FindPropertyRelative("first").stringValue;
-                entry.FindPropertyRelative("second").intValue = platform == "Android" || platform == "iPhone" ? 1 : 2;
+                // Haut everywhere (2026-11-25, user request; mobile used to start on Moyen), like SaveOptions.DefaultQuality.
+                entry.FindPropertyRelative("second").intValue = 2;
             }
             so.FindProperty("m_CurrentQuality").intValue = 2;
             if (so.ApplyModifiedPropertiesWithoutUndo())

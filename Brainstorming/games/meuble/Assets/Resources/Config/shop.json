@@ -1,0 +1,50 @@
+{
+  "_comment": "Out of Sight shop (docs/next/progress/ADSSHOP.md). provider: none | simulated (free local purchases, development only) | unity_iap (Google Play Billing, needs the define symbol OOS_IAP_UNITY). storeId is the Google Play Console product id (the id when left out). type: nonconsumable | consumable. grants: no_ads, all_levels. priceLabel shows only when the store gives no localized price. titleKey and descriptionKey are Core/Strings.cs keys (English and French). The page shows the first 5 enabled products.",
+  "enabled": true,
+  "provider": "simulated",
+  "showOnAndroid": true,
+  "showOnWindows": false,
+  "showInEditor": false,
+  "products": [
+    {
+      "id": "no_ads",
+      "storeId": "no_ads",
+      "type": "nonconsumable",
+      "priceLabel": "2,99 €",
+      "titleKey": "shop.noAds.title",
+      "descriptionKey": "shop.noAds.desc",
+      "grants": ["no_ads"],
+      "enabled": true
+    },
+    {
+      "id": "premium_pack",
+      "storeId": "premium_pack",
+      "type": "nonconsumable",
+      "priceLabel": "3,99 €",
+      "titleKey": "shop.premium.title",
+      "descriptionKey": "shop.premium.desc",
+      "grants": ["no_ads", "all_levels"],
+      "enabled": true
+    },
+    {
+      "id": "all_levels",
+      "storeId": "all_levels",
+      "type": "nonconsumable",
+      "priceLabel": "1,99 €",
+      "titleKey": "shop.allLevels.title",
+      "descriptionKey": "shop.allLevels.desc",
+      "grants": ["all_levels"],
+      "enabled": true
+    },
+    {
+      "id": "tip_coffee",
+      "storeId": "tip_coffee",
+      "type": "consumable",
+      "priceLabel": "0,99 €",
+      "titleKey": "shop.coffee.title",
+      "descriptionKey": "shop.coffee.desc",
+      "grants": [],
+      "enabled": true
+    }
+  ]
+}

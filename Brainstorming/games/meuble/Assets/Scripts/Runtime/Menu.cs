@@ -30,8 +30,10 @@ namespace OutOfSight
     /// is built here too; it records every win in the save.
     /// Credits page (2026-11-19): "Crédits" on the title, between Options and Quitter, opens a scrollable page of
     /// <see cref="Credits.All"/> (the licence attributions of docs/LICENSES.md); Retour, Escape or gamepad B come back.
+    /// ADSSHOP (docs/next/progress/ADSSHOP.md): where the shop shows (StoreService.ShopVisible, Android by default), a Shop
+    /// button at the top right of the title opens the Shop page (<see cref="ShopPage"/>); Back, Escape or gamepad B come back.
     /// </summary>
-    public sealed class Menu : MonoBehaviour
+    public sealed partial class Menu : MonoBehaviour
     {
         public bool IsOpen => TitleOpen || PauseOpen;
 
@@ -135,10 +137,46 @@ namespace OutOfSight
         // One label per Core.Credits.All entry, in order (relabelled in place when the language changes).
         private readonly List<Text> creditsLines = new List<Text>();
 
+        // ----- ADSSHOP (docs/next/progress/ADSSHOP.md): the Shop page, a page of the title's main page (BuildShop). -----
+
+        /// <summary>The Shop page is open (a page of the title: <see cref="TitleOpen"/> stays true under it).</summary>
+        public bool ShopOpen { get; private set; }
+
+        /// <summary>"Shop" at the top right of the title page; null where the shop is hidden (StoreService.ShopVisible).</summary>
+        public Button TitleShopButton { get; private set; }
+
+        /// <summary>The Shop page; null where the shop is hidden.</summary>
+        public ShopPage ShopPage { get; private set; }
+
+        /// <summary>Shop: opens the Shop page over the title's main page (ignored otherwise, or where there is no shop).</summary>
+        public void OpenShop()
+        {
+            if (!TitleOpen || LevelSelectOpen || OptionsOpen || CreditsOpen || ShopOpen || ShopPage == null)
+            {
+                return;
+            }
+            CancelLevelSelectLoad();
+            ShopOpen = true;
+            Apply();
+            SelectLater(null);
+        }
+
+        /// <summary>Back, Escape or gamepad B: from the Shop page back to the title's main page, on Shop.</summary>
+        public void CloseShop()
+        {
+            if (!ShopOpen)
+            {
+                return;
+            }
+            ShopOpen = false;
+            Apply();
+            SelectLater(TitleShopButton);
+        }
+
         /// <summary>Crédits: opens the Credits page over the title's main page, scrolled to the top (ignored otherwise).</summary>
         public void OpenCredits()
         {
-            if (!TitleOpen || LevelSelectOpen || OptionsOpen || CreditsOpen || creditsCanvas == null)
+            if (!TitleOpen || LevelSelectOpen || OptionsOpen || CreditsOpen || ShopOpen || creditsCanvas == null)
             {
                 return;
             }
@@ -187,7 +225,7 @@ namespace OutOfSight
         /// already open, or neither menu up).</summary>
         public void OpenOptions()
         {
-            bool fromTitle = TitleOpen && !LevelSelectOpen && !CreditsOpen;
+            bool fromTitle = TitleOpen && !LevelSelectOpen && !CreditsOpen && !ShopOpen;
             if (OptionsOpen || (!fromTitle && !PauseOpen))
             {
                 return;
@@ -343,6 +381,10 @@ namespace OutOfSight
             }
             RefreshOptionsTexts();
             RefreshCreditsTexts();
+            if (ShopPage != null)
+            {
+                ShopPage.Relocalize();
+            }
             if (Hud != null)
             {
                 Hud.Relocalize();
@@ -503,7 +545,7 @@ namespace OutOfSight
         /// </summary>
         public void OpenLevelSelect()
         {
-            if (LevelSelectLoading || !TitleOpen || LevelSelectOpen || CreditsOpen || LevelSelect == null)
+            if (LevelSelectLoading || !TitleOpen || LevelSelectOpen || CreditsOpen || ShopOpen || LevelSelect == null)
             {
                 return;
             }
@@ -572,7 +614,7 @@ namespace OutOfSight
         }
 
         // The load goes on while the title's main page is what shows (nothing opened over it, the title not left).
-        private bool LoadStillWanted => TitleOpen && !PauseOpen && !LevelSelectOpen && !CreditsOpen && !OptionsOpen && LevelSelect != null;
+        private bool LoadStillWanted => TitleOpen && !PauseOpen && !LevelSelectOpen && !CreditsOpen && !ShopOpen && !OptionsOpen && LevelSelect != null;
 
         /// <summary>LOADDOTS: stops a level select load in progress (nothing when none runs) and restores Niveaux's label.</summary>
         private void CancelLevelSelectLoad()
@@ -759,6 +801,7 @@ namespace OutOfSight
             BuildPause();
             BuildOptions();
             BuildCredits();
+            BuildShop();
             LevelSelect = LevelSelect.Create(transform, Game, font, Labels, id =>
             {
                 Click();
@@ -793,6 +836,8 @@ namespace OutOfSight
             }
             Strings.LanguageChanged -= OnLanguageChanged;
             Strings.LanguageChanged += OnLanguageChanged;
+            // BIGBUTTONS: the touch layout from the start on a phone or under -touch (MenuTouchLayout.cs).
+            RefreshTouchLayout();
             Apply();
         }
 
@@ -1362,6 +1407,56 @@ namespace OutOfSight
             }
         }
 
+        // ----- ADSSHOP (docs/next/progress/ADSSHOP.md): the Shop button and page -----
+
+        // The Shop button sits at the top right of the title page, clear of the column and of the author line, so the
+        // column keeps its five buttons and its metrics (they fill a 20:9 phone already).
+        private const float ShopButtonMarginX = 64f;
+        private const float ShopButtonMarginY = 44f;
+        private static readonly Vector2 ShopButtonSize = new Vector2(320f, 72f);
+
+        /// <summary>
+        /// ADSSHOP: the Shop button and its page, built only where <see cref="StoreService.ShopVisible"/> (Android by
+        /// default, never in batch mode: the title column and its chain stay exactly as they were in the test runs). The
+        /// button is a column button (same plate, face and states) at the top right; it joins the title's up and down cycle
+        /// above Jouer (up from Jouer, down from Quitter), and right from any column button reaches it, left goes back to Jouer.
+        /// </summary>
+        private void BuildShop()
+        {
+            if (!StoreService.ShopVisible || titleCanvas == null)
+            {
+                return;
+            }
+            TitleShopButton = ColumnButton(titleCanvas.transform, "TitleShop", Strings.ShopTitle, Hud.DisplayFont, 0f, 0f);
+            Place((RectTransform)TitleShopButton.transform, new Vector2(1f, 1f), new Vector2(-ShopButtonMarginX, -ShopButtonMarginY), ShopButtonSize);
+            if (Labels.TryGetValue("TitleShopLabel", out Text label))
+            {
+                label.alignment = TextAnchor.MiddleCenter;
+                label.rectTransform.offsetMin = new Vector2(16f, 0f);
+                label.rectTransform.offsetMax = new Vector2(-16f, 0f);
+            }
+            Chain(TitleShopButton, PlayButton, LevelsButton, TitleOptionsButton, TitleCreditsButton, QuitButton);
+            foreach (Button column in new[] { PlayButton, LevelsButton, TitleOptionsButton, TitleCreditsButton, QuitButton })
+            {
+                Navigation nav = column.navigation;
+                nav.selectOnRight = TitleShopButton;
+                column.navigation = nav;
+            }
+            Navigation shopNav = TitleShopButton.navigation;
+            shopNav.selectOnLeft = PlayButton;
+            TitleShopButton.navigation = shopNav;
+            TitleShopButton.onClick.AddListener(() =>
+            {
+                Click();
+                OpenShop();
+            });
+            ShopPage = ShopPage.Create(transform, font, Labels, Click, () =>
+            {
+                Click();
+                CloseShop();
+            });
+        }
+
         private void Start()
         {
             // "--optionsshot <dir>" (a built player): a screenshot of this page over the title, then quit (the same
@@ -1468,6 +1563,7 @@ namespace OutOfSight
             TitleOpen = true;
             LevelSelectOpen = false;
             CreditsOpen = false;
+            ShopOpen = false;
             string first = TitleCameraTour.LevelFor(Game); // M7 title camera: the title house, never played
             // SPECTATOR: the title house is never watched with the free camera; a spectator level is always rebuilt.
             if (Game.Spectator)
@@ -1520,7 +1616,7 @@ namespace OutOfSight
         /// </summary>
         public void Play()
         {
-            if (!TitleOpen || LevelSelectOpen || CreditsOpen)
+            if (!TitleOpen || LevelSelectOpen || CreditsOpen || ShopOpen)
             {
                 return;
             }
@@ -1663,6 +1759,7 @@ namespace OutOfSight
         /// </summary>
         public Selectable DefaultButton => OptionsOpen ? OptionsSensitivityButton
             : CreditsOpen ? CreditsBackButton
+            : ShopOpen && ShopPage != null ? ShopPage.DefaultSelectable
             : LevelSelectOpen && LevelSelect != null ? LevelSelect.DefaultSelectable
             : TitleOpen ? PlayButton
             : PauseOpen ? ResumeButton
@@ -1672,6 +1769,8 @@ namespace OutOfSight
 
         private void Update()
         {
+            // BIGBUTTONS: the menus follow the touch layout switch (bigger buttons on touch, MenuTouchLayout.cs).
+            RefreshTouchLayout();
             // M5 (M6: and Options): Escape or gamepad B leaves the topmost page. Read every frame, so a press made
             // elsewhere never waits for a page to open.
             if (InputReader.BackPressed())
@@ -1685,6 +1784,11 @@ namespace OutOfSight
                 {
                     Click();
                     CloseCredits();
+                }
+                else if (ShopOpen)
+                {
+                    Click();
+                    CloseShop();
                 }
                 else if (LevelSelectOpen)
                 {
@@ -1791,10 +1895,19 @@ namespace OutOfSight
             {
                 CreditsOpen = false;
             }
-            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen && !CreditsOpen && !(OptionsOpen && !optionsFromPause));
+            // ADSSHOP: so is the Shop page.
+            if (ShopOpen && (!TitleOpen || LevelSelectOpen))
+            {
+                ShopOpen = false;
+            }
+            SetEnabled(titleCanvas, TitleOpen && !LevelSelectOpen && !CreditsOpen && !ShopOpen && !(OptionsOpen && !optionsFromPause));
             SetEnabled(pauseCanvas, PauseOpen && !(OptionsOpen && optionsFromPause));
             SetEnabled(optionsCanvas, OptionsOpen);
             SetEnabled(creditsCanvas, CreditsOpen);
+            if (ShopPage != null && ShopPage.IsOpen != ShopOpen)
+            {
+                ShopPage.SetOpen(ShopOpen);
+            }
             if (LevelSelect != null && LevelSelect.IsOpen != LevelSelectOpen)
             {
                 LevelSelect.SetOpen(LevelSelectOpen);

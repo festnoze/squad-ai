@@ -1,0 +1,32 @@
+{
+  "triangles": 2970,
+  "joints": 50,
+  "clips": [
+    "Attack",
+    "Death",
+    "Eating",
+    "Gallop",
+    "Gallop_Jump",
+    "Idle_HitReact_Left",
+    "Idle_HitReact_Right",
+    "Jump_ToIdle",
+    "Walk",
+    "Idle_2",
+    "Idle_2_HeadLow",
+    "Idle",
+    "AnimalArmature|Attack",
+    "AnimalArmature|Death",
+    "AnimalArmature|Eating",
+    "AnimalArmature|Gallop",
+    "AnimalArmature|Gallop_Jump",
+    "AnimalArmature|Idle",
+    "AnimalArmature|Idle_2",
+    "AnimalArmature|Idle_2_HeadLow",
+    "AnimalArmature|Idle_HitReact_Left",
+    "AnimalArmature|Idle_HitReact_Right",
+    "AnimalArmature|Jump_ToIdle",
+    "AnimalArmature|Walk"
+  ],
+  "eye_marker": "Head/LabradorEyeCenter",
+  "jaw_vertices": 39
+}

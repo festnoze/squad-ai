@@ -894,7 +894,10 @@ namespace OutOfSight.Tests
                 // Walls 4 (WallArray): a wall of the wall material repeats each finish at its tile too: per finish named by
                 // its vertices (UV1), UV0's metres per unit (measured on its triangles as drawn) over the repeats per metre
                 // the vertices carry, the same on both axes (UV0 is metric both ways).
-                foreach (Renderer r in Game.Level.Root.GetComponentsInChildren<Renderer>(false).Where(r => r.enabled && WallArray.IsWallMaterial(r.sharedMaterial)))
+                // WINDOWS3D (2026-11-24): the 3D windows' frames are drawn with the wall material too, but their vertices name the
+                // walnut image (a dressing slice, at the GLB's own UVs) or flat gasket and hardware colours: no tiled finish.
+                foreach (Renderer r in Game.Level.Root.GetComponentsInChildren<Renderer>(false).Where(r => r.enabled && WallArray.IsWallMaterial(r.sharedMaterial)
+                    && r.name != LevelBuilder.WindowFrameName))
                 {
                     Mesh mesh = ModelKit.MeshOf(r);
                     var finish = new List<Vector4>();

@@ -9,7 +9,8 @@ namespace OutOfSight.Tests
     /// lowered onto its bite (GripMath). The human's arm is the Quaternius man's, measured on its GLB at the game's 1.6 m eye
     /// (scratchpad man.py): the upper arm joint 1.357 m up, 0.17 m out and 0.045 m ahead of the feet, the arm 0.559 m from that
     /// joint to the wrist (0.263 upper, 0.296 fore), the spine's pivot (Abdomen) 0.825 m up; the belly at most 0.15 m ahead
-    /// of the feet. The dog's neck chain is the Husky's rest pose at its fitted size (scratchpad dog.py).
+    /// of the feet. The dog's neck chain is the Husky's rest pose at its fitted size (scratchpad dog.py), LABRADOR: rescaled to
+    /// the final Labrador's fit (same skeleton and clips).
     /// </summary>
     public sealed class GripTests
     {
@@ -22,10 +23,15 @@ namespace OutOfSight.Tests
         private const float SpinePivot = 0.825f;
         private const float BellyAhead = 0.15f;
 
-        // The Husky's rest neck chain in its body plane (x forward, y up, metres): Neck1, then to Neck2, Neck3 and the head bone.
-        private static readonly Vector2 NeckBase = new Vector2(0.257f, 0.376f);
-        private static readonly Vector2[] NeckSegments = { new Vector2(0.034f, 0.044f), new Vector2(0.030f, 0.050f), new Vector2(0.033f, 0.046f) };
-        private static readonly Vector2 SnoutFromHead = new Vector2(0.077f, -Tuning.DogSnoutDrop) * Tuning.DogHeadScale;
+        // The dog's rest neck chain in its body plane (x forward, y up, metres): Neck1, then to Neck2, Neck3 and the head bone.
+        // LABRADOR (2026-11-25): the final Labrador has the Husky's skeleton and Idle clip byte for byte, fitted at scale
+        // 0.19344 (its marker eyes, 2.7140 native units high in Idle, at Tuning.DogModelEyeHeight) instead of the Husky's
+        // 0.19629: the Husky's chain (0.257, 0.376), (0.034, 0.044), (0.030, 0.050), (0.033, 0.046) times 0.9855. The snout tip
+        // ahead of the head bone: the catalog's rest reach (front 2.2168 native) less the head bone's 1.8232, at that scale
+        // (the Husky's: 0.077).
+        private static readonly Vector2 NeckBase = new Vector2(0.253f, 0.371f);
+        private static readonly Vector2[] NeckSegments = { new Vector2(0.0335f, 0.0434f), new Vector2(0.0296f, 0.0493f), new Vector2(0.0325f, 0.0453f) };
+        private static readonly Vector2 SnoutFromHead = new Vector2(0.076f, -Tuning.DogSnoutDrop) * Tuning.DogHeadScale;
 
         [Test]
         public void Every_body_kind_has_its_own_grip_and_unknown_kinds_get_the_chairs()
@@ -112,7 +118,7 @@ namespace OutOfSight.Tests
         public void The_dogs_neck_brings_its_snout_down_to_every_bite()
         {
             float rest = GripMath.Tip(NeckBase, NeckSegments, SnoutFromHead, 0f, Tuning.DogGripHeadFollow).y;
-            Assert.That(rest, Is.InRange(0.45f, 0.55f), "premise: the Husky's snout is not at its rest height");
+            Assert.That(rest, Is.InRange(0.45f, 0.55f), "premise: the dog's snout is not at its rest height");
             foreach (string kind in Kinds)
             {
                 float height = GripDef.For(kind).Snout.y + Tuning.DogDragLift;

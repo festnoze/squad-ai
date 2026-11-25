@@ -154,10 +154,12 @@ namespace OutOfSight.Tests
                 Assert.AreEqual(ShadowCastingMode.Off, r.shadowCastingMode, $"{r.name} casts a shadow");
             }
             CollectionAssert.IsEmpty(main.LookProblems(), "the look's checks (one shadowed light, the sun)");
-            // Budgets: at most two glow renderers, the warm one the lamp glow's material, the cool one the window pane's.
+            // Budgets: at most two glow renderers, the warm one the lamp glow's material, the cool one the cached pane material's.
+            // WINDOWS3D (2026-11-24): the 3D windows no longer draw with it; the garden backdrop still does.
             Assert.That(lights.Glows.Count, Is.InRange(1, 2), "glow renderers");
-            Material pane = Game.Level.Root.GetComponentsInChildren<MeshRenderer>(true).Where(r => r.name == "WindowPane").Select(r => r.sharedMaterial).FirstOrDefault();
-            Assert.IsNotNull(pane, "premise: test_lights has window panes");
+            Material pane = LevelBuilder.PaneMaterial;
+            Assert.IsTrue(Game.Level.Root.GetComponentsInChildren<MeshRenderer>(true).Any(r => r.sharedMaterial == pane),
+                "premise: test_lights draws the cached pane material (the garden backdrop)");
             foreach (MeshRenderer g in lights.Glows)
             {
                 bool cool = g.name.EndsWith("Cool", StringComparison.Ordinal);

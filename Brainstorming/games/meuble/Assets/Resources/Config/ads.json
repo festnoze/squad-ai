@@ -1,0 +1,36 @@
+{
+  "_comment": "Out of Sight ads (docs/next/progress/ADSSHOP.md). Android only: Windows and the editor never show ads unless forceSimulated is true (testing). A key left out keeps its code default (Assets/Scripts/Core/Monetization/AdConfig.cs). provider: none | simulated | applovin_max. Before release: provider applovin_max, the define symbol OOS_ADS_APPLOVIN_MAX, the real ad unit ids below.",
+  "enabled": true,
+  "provider": "simulated",
+  "forceSimulated": false,
+  "format": "interstitial",
+  "placement": "both",
+  "firstEligibleLevel": 4,
+  "everyNLevelEnds": 2,
+  "minSecondsBetweenAds": 120,
+  "minSecondsAfterLaunch": 90,
+  "minSecondsInLevel": 20,
+  "maxAdsPerSession": 0,
+  "showDelaySeconds": 1.2,
+  "onlyLevels": [],
+  "excludedLevels": [],
+  "preferredMaxDurationSeconds": 15,
+  "skippableAfterSeconds": 5,
+  "simulatedVideo": "Ads/out_of_sight_ad",
+  "_simulatedEveryLevelEndComment": "Simulated provider only: true shows an ad at every level end (win and fail, from level 1, the finale included), ignoring placement, the level lists, firstEligibleLevel, everyNLevelEnds, maxAdsPerSession and every minSeconds* gate. enabled and the No ads purchase still apply. A real provider always keeps the rules above.",
+  "simulatedEveryLevelEnd": true,
+  "showMediationDebugger": false,
+  "providers": {
+    "applovin_max": {
+      "_comment": "The SDK key goes in AppLovin > Integration Manager, not here. Ad unit ids: MAX dashboard > Manage > Ad Units (Android).",
+      "interstitialAdUnitId": "REPLACE_WITH_MAX_ANDROID_INTERSTITIAL_AD_UNIT_ID",
+      "rewardedAdUnitId": "REPLACE_WITH_MAX_ANDROID_REWARDED_AD_UNIT_ID"
+    },
+    "admob": {
+      "_comment": "Plan B, no adapter written yet. These are Google's official TEST ids (safe for development only, never for release).",
+      "appId": "ca-app-pub-3940256099942544~3347511713",
+      "interstitialAdUnitId": "ca-app-pub-3940256099942544/1033173712",
+      "rewardedAdUnitId": "ca-app-pub-3940256099942544/5224354917"
+    }
+  }
+}

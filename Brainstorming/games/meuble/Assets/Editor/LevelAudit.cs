@@ -59,7 +59,7 @@ namespace OutOfSight.Editor
     /// - every level prints its seconds, expanded nodes and cast rays, warns above Tuning.AuditLevelWarnSeconds, and
     ///   fails deterministically above Tuning.AuditNodeCap nodes or Tuning.AuditRayCap rays (never on seconds).
     /// Flags (after -executeMethod): "-auditLevels id1,id2", "-fixtures test_a,test_b", "-skipFixtures", "-sweep",
-    /// "-slack" (see <see cref="RunOptions"/>).
+    /// "-slack" (see <see cref="RunOptions"/>), and "-forceRoutes" beside "-writeRoutes" (<see cref="ForceRoutesFlag"/>).
     ///
     /// M5 wave 5A (CONTRACT_M5 10 and 16, CONTRACT_M5_v3 8 and 15.1 to 15.5, 15.10):
     /// - every routine is built by RoutineFactory (personality, pattern, seats, frozen walks); the loop is the longest
@@ -170,6 +170,13 @@ namespace OutOfSight.Editor
     {
         public const string LevelsFolder = "Assets/Resources/Levels";
         public const string WriteRoutesFlag = "-writeRoutes";
+        /// <summary>
+        /// CARD4FIX (docs/next/progress/CARD4.md): with <see cref="WriteRoutesFlag"/>, "-forceRoutes" also writes the route of
+        /// a level that has defects, as long as a schedule was found and was not refused afterwards
+        /// (<see cref="Result.RouteRefused"/>): the defects are then lint on top of a valid schedule (pace, loitering,
+        /// inhabitants who never meet, a lesson), printed as usual, and the level still fails the run. Opt-in, design aid only.
+        /// </summary>
+        public const string ForceRoutesFlag = "-forceRoutes";
 
         // PRD 7.4 budgets (the built player probe checks the same numbers).
         private const int BudgetRenderers = Tuning.BudgetRenderers;
@@ -308,6 +315,11 @@ namespace OutOfSight.Editor
             /// <summary>CONTRACT_M5 16.3: the occlusion rays cast for this level (capped).</summary>
             public long Rays;
             public bool Pass => Failures.Count == 0;
+            /// <summary>
+            /// CARD4FIX (docs/next/progress/CARD4.md): the found schedule itself was refused after the search (the fidelity
+            /// replay saw it, or the rocking body's replay ran late), so <see cref="ForceRoutesFlag"/> never writes it.
+            /// </summary>
+            public bool RouteRefused;
 
             // ----- Levels v2 (LEVELS_V2.md 1.3 and 6, C5): the numbers of the -json report -----
             /// <summary>The level file's id (LevelId gains "@difficile" at Difficile) and the difficulty it ran at.</summary>
@@ -441,6 +453,8 @@ namespace OutOfSight.Editor
             public bool SkipSweep;
             public bool CheckSight;
             public bool WriteRoutes;
+            /// <summary>CARD4FIX: <see cref="ForceRoutesFlag"/>, the route of a level with lint defects is written too.</summary>
+            public bool ForceRoutes;
             /// <summary>Levels v2 (C5): a dead room is a defect, not a warning.</summary>
             public bool StrictRooms;
             /// <summary>Levels v2 (C5): the -json report's file, or null.</summary>
@@ -486,6 +500,7 @@ namespace OutOfSight.Editor
                     SkipSweep = Has(SkipSweepFlag),
                     CheckSight = Has(CheckSightFlag),
                     WriteRoutes = Has(WriteRoutesFlag),
+                    ForceRoutes = Has(ForceRoutesFlag),
                     StrictRooms = Has(StrictRoomsFlag),
                 };
                 int json = Array.IndexOf(args, JsonFlag);
@@ -586,10 +601,13 @@ namespace OutOfSight.Editor
                         results.Add(r);
                         r.LevelId = DifficultyDef.RecordKey(r.LevelId, difficulty);
                         string key = RouteKey(difficulty);
-                        if (options.WriteRoutes && r.Pass && r.Route != null && key != null)
+                        // CARD4FIX: -forceRoutes also writes a valid schedule whose level only has lint defects.
+                        bool forced = options.ForceRoutes && !r.Pass && !r.RouteRefused;
+                        if (options.WriteRoutes && (r.Pass || forced) && r.Route != null && key != null)
                         {
                             WriteRoute(file, r.Route, key);
-                            r.Notes.Add($"{key} ecrite dans {file} ({r.Route.Count} points)");
+                            r.Notes.Add($"{key} ecrite dans {file} ({r.Route.Count} points)"
+                                + (forced ? $", malgre {r.Failures.Count} defaut(s) ({ForceRoutesFlag})" : ""));
                         }
                         Debug.Log(Format(r));
                         if (!r.Pass)
@@ -2154,6 +2172,7 @@ namespace OutOfSight.Editor
                 result.Route = Route(w, path);
                 // M5 5B.1 (CONTRACT_M5 19, M6 and M7): the rocking body's route replayed through MotionProfile, then the schedule
                 // replayed against the game's own sight test (already replayed when the post-process changed it).
+                int failuresBeforeGuard = result.Failures.Count;
                 RockTimingGuard(w, path, result.Route, result);
                 if (fidelity == null)
                 {
@@ -2164,6 +2183,8 @@ namespace OutOfSight.Editor
                 {
                     result.Failures.Add(sighting);
                 }
+                // CARD4FIX: a late rocking replay or a sighting refuses the schedule itself (-forceRoutes never writes it).
+                result.RouteRefused = result.Failures.Count > failuresBeforeGuard;
                 if (w.Closed.Count > 0)
                 {
                     // CONTRACT_M5 8: the "open" steps the designerRoute gets (-writeRoutes).

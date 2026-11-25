@@ -53,24 +53,24 @@ namespace OutOfSight.Tests
 
         // ----- Qualité (1.4) -----
 
-        /// <summary>The mutation killer of QUALITY_PLATFORM_DEFAULT: Moyen on Android, Haut on PC (the PC look and probe).</summary>
+        /// <summary>Haut by default on every platform (2026-11-25, user request; mobile used to start on Moyen).</summary>
         [Test]
-        public void Quality_defaults_to_Moyen_on_mobile_and_Haut_on_PC()
+        public void Quality_defaults_to_Haut_on_mobile_and_on_PC()
         {
             SaveOptions fresh = SaveOptions.Default();
             Assert.IsNull(fresh.Quality, "premise: a fresh options object holds no quality choice");
             Assert.AreNotEqual(SaveOptions.QualityMedium, SaveOptions.QualityHigh, "premise: two distinct tiers");
-            Assert.AreEqual(SaveOptions.QualityMedium, fresh.QualityFor(true), "the mobile default is not Moyen");
+            Assert.AreEqual(SaveOptions.QualityHigh, fresh.QualityFor(true), "the mobile default is not Haut");
             Assert.AreEqual(SaveOptions.QualityHigh, fresh.QualityFor(false), "the PC default is not Haut");
             Assert.AreEqual(SaveOptions.QualityHigh, SaveOptions.DefaultQuality(false));
-            Assert.AreEqual(SaveOptions.QualityMedium, SaveOptions.DefaultQuality(true));
+            Assert.AreEqual(SaveOptions.QualityHigh, SaveOptions.DefaultQuality(true));
             // An unknown value is no choice: the platform default again, after a clamp and after a parse.
             var odd = new SaveOptions { Quality = "ultra" };
             Assert.AreEqual(SaveOptions.QualityHigh, odd.QualityFor(false));
             Assert.IsNull(odd.Clamped().Quality, "an unknown tier survived the clamp");
             SaveData parsed = SaveData.Parse("{ \"version\": 1, \"options\": { \"quality\": 3 } }", out string problem);
             Assert.IsNotNull(parsed, problem);
-            Assert.AreEqual(SaveOptions.QualityMedium, parsed.Options.QualityFor(true), "a malformed quality did not fall back");
+            Assert.AreEqual(SaveOptions.QualityHigh, parsed.Options.QualityFor(true), "a malformed quality did not fall back");
         }
 
         [Test]
@@ -82,7 +82,7 @@ namespace OutOfSight.Tests
             Assert.AreEqual(SaveLoadStatus.Loaded, SaveStore.LastLoad, "premise: the M6 save loads");
             Assert.IsNull(SaveStore.Options.Quality);
             Assert.AreEqual(SaveOptions.QualityHigh, SaveStore.Options.QualityFor(false));
-            Assert.AreEqual(SaveOptions.QualityMedium, SaveStore.Options.QualityFor(true));
+            Assert.AreEqual(SaveOptions.QualityHigh, SaveStore.Options.QualityFor(true));
             Assert.AreEqual(40, SaveStore.Options.Volume, "premise: the other options were read");
 
             // No choice is written as no field at all (the file stays an M6 file).

@@ -22,22 +22,26 @@ namespace OutOfSight.Tests
         /// 5.3): 20 levels in three acts (7 + 9 + 4). The cut level10, level16 and level23 stay on disk unlisted (D2);
         /// level12 (The Dog) plays before level15 (D4); act 3 opens on level25 (The Showroom) and ends on the finale level24;
         /// level21 (The Catwalk) and level20 (Midnight Munchies) are parked out of the line-up, their files kept.
+        /// HARDLEVELS (2026-11-25, user request): act 4 appended at the end, four long maze houses (level26 to level29);
+        /// the manifest keeps rev 5 and its previous list.
         /// </summary>
         private static readonly string[] PlayOrder =
         {
             "level1", "level2", "level3", "level11", "level5", "level6", "level7",
-            "level8", "level9", "level12", "level4", "level15", "level13", "level14", "level18", "level17",
+            "level8", "level9", "level4", "level12", "level15", "level13", "level14", "level18", "level17",
             "level25", "level19", "level22", "level24",
+            "level26", "level27", "level28", "level29",
         };
 
         /// <summary>
-        /// The play order of manifest rev 3 (20 levels), the "previous" list of rev 4 for the one-shot save migration. Rev 4
-        /// (2026-11-24, user request) swaps card 4 and card 11: level4 played much harder than everything before it.
+        /// The play order of manifest rev 4 (20 levels), the "previous" list of rev 5 for the one-shot save migration. Rev 4
+        /// (2026-11-24, user request) swapped card 4 and card 11: level4 played much harder than everything before it. Rev 5
+        /// (2026-11-25, user request) swaps cards 10 and 11 so level4 teaches the stool before level12 needs it.
         /// </summary>
-        private static readonly string[] Rev3Order =
+        private static readonly string[] Rev4Order =
         {
-            "level1", "level2", "level3", "level4", "level5", "level6", "level7",
-            "level8", "level9", "level12", "level11", "level15", "level13", "level14", "level18", "level17",
+            "level1", "level2", "level3", "level11", "level5", "level6", "level7",
+            "level8", "level9", "level12", "level4", "level15", "level13", "level14", "level18", "level17",
             "level25", "level19", "level22", "level24",
         };
 
@@ -45,7 +49,7 @@ namespace OutOfSight.Tests
         private static readonly string[] ParkedLevels = { "level21", "level20" };
 
         /// <summary>The first index of each act in <see cref="PlayOrder"/> (LEVELS_V2 3 and 7).</summary>
-        private static readonly int[] ActStarts = { 0, 7, 16 };
+        private static readonly int[] ActStarts = { 0, 7, 16, 20 };
 
         /// <summary>The levels cut in v2 (LEVELS_V2 5 "Cut levels", D2): never listed, their files kept and valid.</summary>
         private static readonly string[] CutLevels = { "level10", "level16", "level23" };
@@ -179,15 +183,14 @@ namespace OutOfSight.Tests
         }
 
         [Test]
-        public void Manifest_is_the_rev4_order_with_its_acts_and_the_rev3_order_as_previous()
+        public void Manifest_is_the_rev5_order_with_its_acts_and_the_rev4_order_as_previous()
         {
-            // LEVELS_V2 7, ACT3A: rev 3, the 22 ids of the rev 2 order as "previous" (the one-shot save migration), the
-            // three acts.
+            // LEVELS_V2 7, ACT3A: the rev 4 order as "previous" (the one-shot save migration), the three acts.
             ManifestDef m = LevelManifest.ParseFull(File.ReadAllText(Folder + "levels.json"));
-            Assert.AreEqual(4, m.Rev, "levels.json rev");
-            CollectionAssert.AreEqual(PlayOrder, m.Levels, "the rev 4 play order");
-            CollectionAssert.AreEqual(Rev3Order, m.Previous, "previous is the rev 3 order");
-            Assert.AreEqual(ActStarts.Length, m.Acts.Count, "three acts");
+            Assert.AreEqual(5, m.Rev, "levels.json rev");
+            CollectionAssert.AreEqual(PlayOrder, m.Levels, "the rev 5 play order");
+            CollectionAssert.AreEqual(Rev4Order, m.Previous, "previous is the rev 4 order");
+            Assert.AreEqual(ActStarts.Length, m.Acts.Count, "four acts");
             for (int i = 0; i < ActStarts.Length; i++)
             {
                 Assert.AreEqual(ActStarts[i], m.Acts[i].From, $"act {i + 1} starts at index {ActStarts[i]}");

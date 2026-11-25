@@ -133,7 +133,12 @@ namespace OutOfSight.Core
 
         // Budgets of PRD 7.4, shared by the audit and the built player probe.
         public const int BudgetRenderers = 120;
-        public const int BudgetMaterials = 24;
+        // WINDOWS3D (2026-11-24, docs/next/progress/WINDOWS3D.md): 24 to 25. The 3D windows of the art handoff draw their
+        // panes with the handoff's own glass shader (Out of Sight/Window Glass: transparent, its streaks drawn per pane), one
+        // material shared by every window of the game; their frames cost none (drawn by the wall material). The flat window
+        // picture they replace was drawn by the unlit pane material, which the garden backdrop still uses, so nothing frees
+        // a material: a level with windows pays exactly one more (level11 stood at 24 of 24 with three windows).
+        public const int BudgetMaterials = 25;
         public const int BudgetFurnitureTriangles = 400;
 
         /// <summary>The width (metres along x) of a bookshelf that the plain furniture budget covers.</summary>
@@ -385,6 +390,13 @@ namespace OutOfSight.Core
         /// </summary>
         public const string DogFurTextureResource = "DogFur";
         /// <summary>
+        /// LABRADOR (2026-11-25): the Resources name of the final Labrador's head and neck atlas (its eyes, nose and muzzle
+        /// painted; Assets/Art/Characters/Resources/LabradorHeadAtlas.png, from ArtHandoff/LabradorFinal). ModelKit.ApplyPetFurMap
+        /// shows it on the model's "Tete profil et face" slot and <see cref="DogFurTextureResource"/> on its "Main" slot, in game
+        /// and in the title logo; the dog's tint never multiplies either.
+        /// </summary>
+        public const string DogHeadAtlasResource = "LabradorHeadAtlas";
+        /// <summary>
         /// DOGBIG, presentation only: while the dog drags the furniture (and wags after the drop) its model steps back along
         /// its facing so its snout, which now reaches past the near edge of the held furniture, stays on that edge; the step
         /// eases in and out at this rate (1 per second).
@@ -392,11 +404,13 @@ namespace OutOfSight.Core
         public const float DogHoldBackRate = 4f;
         /// <summary>
         /// GRIP (2026-11-22), presentation only (GripDef, GripMath): the dog's snout tip stands this far below its head bone
-        /// with the head level (metres at the fitted model's size, before Tuning.DogHeadScale; measured on the GLB's rest pose:
-        /// the tip 0.082 m ahead of the head bone and 0.010 m below it), and the head pitches down this many times the neck's
-        /// bend when it lowers its head onto the point it bites (1: the muzzle continues the neck's curve).
+        /// with the head level (metres at the fitted model's size, before Tuning.DogHeadScale), and the head pitches down this
+        /// many times the neck's bend when it lowers its head onto the point it bites (1: the muzzle continues the neck's curve).
+        /// LABRADOR (2026-11-25): from 0.010 (the Husky, measured on its rest pose) to 0.015, the final Labrador's nose tip
+        /// measured in the bind pose (the head orientation InhabitantRig holds): 0.079 m ahead of the head bone and 0.0148 m
+        /// below it at its fitted scale (the Husky in the same pose: 0.080 ahead, 0.013 below).
         /// </summary>
-        public const float DogSnoutDrop = 0.010f;
+        public const float DogSnoutDrop = 0.015f;
         public const float DogGripHeadFollow = 1f;
         /// <summary>
         /// GRIP, presentation only: how far the dog's model may step toward the furniture it bites while it is still on the
@@ -488,7 +502,9 @@ namespace OutOfSight.Core
         public const float PutAwayTime = 0.6f;
         // Houses, budgets and the camera (PRD 7.4 v1.7, CONTRACT_M5 9, 16.11).
         public const int BudgetHouseRenderers = 160;
-        public const int BudgetHouseMaterials = 32;
+        // WINDOWS3D (2026-11-24): 32 to 33 for the windows' one shared glass material (see BudgetMaterials); the title
+        // house stood at 32 of 32 with three windows.
+        public const int BudgetHouseMaterials = 33;
         public const int HouseBudgetRooms = 5;
         /// <summary>The zoom's far bound cap (was 16; 40 since 2026-11-24 so the largest houses can be seen whole).</summary>
         public const float CameraMaxDistanceHouse = 40f;
@@ -497,6 +513,32 @@ namespace OutOfSight.Core
         /// until every room is in view, from anywhere in the house, at the 55 degree field of view).
         /// </summary>
         public const float CameraWholeHouseFit = 1.6f;
+
+        /// <summary>
+        /// GARDENFIT (2026-11-24, user request: too much lawn before the garden picture): the garden ring's radius is the
+        /// house's (its farthest point from the interior centre: the walls, the exit, the props) times 1 + this, 0.50 = the
+        /// house plus 50% (first 0.10, then 0.50 after a look, user request). This is the ring's default size: GARDENZOOM
+        /// (2026-11-25) enlarges it past this when the camera zooms out beyond it (<see cref="GardenRingCameraMargin"/>).
+        /// </summary>
+        public const float GardenRingHouseMargin = 0.50f;
+
+        /// <summary>
+        /// GARDENZOOM (2026-11-25, user request: the camera stays inside the garden ring whatever the zoom, the ring back to
+        /// its default size once zoomed in again): metres kept between the camera and the ring's wall. Each frame the ring
+        /// (GardenBackdropFit) is scaled so its radius is max(the default radius, the camera's horizontal distance from the
+        /// ring's axis + this); its ceiling stays GardenBackdrop.HeadRoom above the camera. 2 m: the near plane (0.05 m) and
+        /// the wide view's side edges stay well clear of the wall, and the ring starts to grow only just before the camera
+        /// would reach it. Visual only (the ring blocks nothing).
+        /// </summary>
+        public const float GardenRingCameraMargin = 2f;
+
+        /// <summary>
+        /// GARDENZOOM: the time constant (seconds) of the ring's easing toward its fitted size, growing or shrinking, so a
+        /// wheel notch (a jump of the camera) moves the ring smoothly. It never lags behind a zooming out camera by more
+        /// than the margin above: closer than GardenBackdropFit.MinClearance to the wall or the ceiling, the ring is pushed
+        /// out at once. Zoomed in, it settles in about half a second and then lands exactly on the default size.
+        /// </summary>
+        public const float GardenRingFitTime = 0.15f;
         public const float FrameTimeFailMs = 33f;
         // The audit (CONTRACT_M5 16.3).
         public const int AuditOpenSamples = 6;
@@ -891,16 +933,36 @@ namespace OutOfSight.Core
         /// <summary>The window pane (2.4): no texture (Surface.Plain), but its own smoothness; metallic stays 0.</summary>
         public const float WindowPaneSmoothness = 0.95f;
 
+        // ----- WINDOWS3D (2026-11-24, docs/next/progress/WINDOWS3D.md): the art handoff's 3D wood window (WindowModel) -----
+        /// <summary>
+        /// The wall's visual opening is cut this far inside the window's JSON rectangle (sides, top and bottom, metres), so the
+        /// window's outer frame, which fills the JSON rectangle and the wall's whole thickness, covers the cut edges and the
+        /// inside of the wall never shows. Visual only: the wall's colliders stay whole.
+        /// </summary>
+        public const float WindowOpeningOverlap = 0.01f;
+        /// <summary>How far the window's outer frame stands proud of each wall face (metres; no depth fighting with the face).</summary>
+        public const float WindowFrameProud = 0.003f;
+        /// <summary>
+        /// The glass reflections under the night preset, a fraction of the day's (the streaks are unlit: at full strength they
+        /// would glow over the dark garden). Visual only.
+        /// </summary>
+        public const float WindowGlassNightReflection = 0.45f;
+
         // ----- M7 touch (docs/CONTRACT_M7.md 1.5): the touch controls. Sizes in pixels of a 1080 pixel high screen. -----
-        /// <summary>Camera degrees per pixel of orbit drag on the right half, times the sensitivity option.</summary>
+        /// <summary>
+        /// TOUCHTUTO (2026-11-25, docs/next/progress/TOUCHTUTO.md): the share of the screen width, from the left edge, where
+        /// a finger landing becomes the floating move stick; a finger landing on the rest of the screen (the right two
+        /// thirds) orbits the camera, and a second one landing there while the orbit finger is held pinches. The level 1
+        /// touch tutorial draws its two zone panels on the same split. Decided where the finger lands, never where it moves.
+        /// </summary>
+        public const float TouchStickZoneShare = 1f / 3f;
+        /// <summary>Camera degrees per pixel of orbit drag on the camera zone (the right two thirds), times the sensitivity option.</summary>
         public const float TouchOrbitDegPerPixel = 0.15f;
         /// <summary>
         /// PINCH (2026-11-24): orbit zoom metres per pixel of change in the distance between two pinching fingers, on levels
         /// 1 to 7 (scaled with the zoom range like a wheel notch). 440 pixels sweep the whole 2.5 to 6 m range.
         /// </summary>
         public const float TouchPinchMetresPerPixel = 0.008f;
-        /// <summary>PINCH: a second finger landing this soon after the first, the first not yet dragged, makes the two a pinch.</summary>
-        public const float TouchPinchPairSeconds = 0.25f;
         /// <summary>How far the thumb travels from where it landed for a full stick.</summary>
         public const float TouchStickRadius = 120f;
         /// <summary>The careful and pause buttons' diameter (at least 140 px at 1080p too).</summary>
@@ -1247,7 +1309,11 @@ namespace OutOfSight.Core
         // TitleLogoDogScale reaches 0.355 m ahead, so its snout stays on the chair's left edge (0.32 m left of the foot).
         // TITLESCALE (2026-11-23): the 1.5 times bigger dog stands further left so its lowered snout bites the same spot
         // of the chair's left back leg (its head bends further down, so its reach grows less than 1.5 times): measured in the bake, its snout lands 0.274 m left of the chair's foot, as the 0.8 dog's did.
-        public const float TitleLogoDogGrip = -0.808f;
+        // LABRADOR (2026-11-25): from -0.808 to -0.797: the final Labrador is fitted 1.5 % smaller (its marker eyes) with its
+        // nose 5 mm lower (Tuning.DogSnoutDrop), so its lowered snout comes 8 to 13 mm shorter at its size (GripMath on its neck
+        // chain), 0.011 m on screen at the logo's scale and yaw: the dog stands that much closer so its snout keeps the same
+        // spot of the leg. The bake logs where it lands ("[TitleLogo] the dog bites the chair's leg"), to compare with -0.274.
+        public const float TitleLogoDogGrip = -0.797f;
         public const float TitleLogoDogYaw = 110f;
         /// <summary>
         /// DOGBIG: the logo's dog at this share of its in-game size (the Husky at 1.5 times the Shiba): 0.8, so 1.2 times the

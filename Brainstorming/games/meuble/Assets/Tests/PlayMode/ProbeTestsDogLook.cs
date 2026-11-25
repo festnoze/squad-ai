@@ -212,7 +212,8 @@ namespace OutOfSight.Tests
         {
             var sb = new StringBuilder();
             InhabitantRig rig = dog.Rig;
-            sb.Append($"model {(rig != null ? rig.Entry.id : "none")}, fur map {(ModelKit.PetFurMap != null ? ModelKit.PetFurMap.name + " " + ModelKit.PetFurMap.width + "px mipBias " + ModelKit.PetFurMap.mipMapBias : "MISSING")}; ");
+            sb.Append($"model {(rig != null ? rig.Entry.id : "none")}, fur map {(ModelKit.PetFurMap != null ? ModelKit.PetFurMap.name + " " + ModelKit.PetFurMap.width + "px mipBias " + ModelKit.PetFurMap.mipMapBias : "MISSING")}, "
+                + $"head atlas {(ModelKit.PetHeadMap != null ? ModelKit.PetHeadMap.name + " " + ModelKit.PetHeadMap.width + "px" : "MISSING")}; ");
             if (rig != null && rig.Skin != null)
             {
                 Renderer r = rig.Skin;
@@ -239,6 +240,12 @@ namespace OutOfSight.Tests
             Assert.IsNotNull(ModelKit.PetFurMap, "the fur map is not in the build's Resources");
             Material fur = dog.Rig.Skin.sharedMaterials.FirstOrDefault(m => m != null && m.HasProperty("_BaseMap") && m.GetTexture("_BaseMap") == ModelKit.PetFurMap);
             Assert.IsNotNull(fur, "no slot of the dog shows the fur map: " + Describe(dog));
+            // LABRADOR: the final Labrador's head shows its own atlas (the painted eyes), untinted, beside the fur map.
+            Assert.IsNotNull(ModelKit.PetHeadMap, "the head atlas is not in the build's Resources");
+            Material headAtlas = dog.Rig.Skin.sharedMaterials.FirstOrDefault(m => m != null && m.HasProperty("_BaseMap") && m.GetTexture("_BaseMap") == ModelKit.PetHeadMap);
+            Assert.IsNotNull(headAtlas, "no slot of the dog shows the head atlas: " + Describe(dog));
+            Assert.AreEqual(Color.white, headAtlas.GetColor("_BaseColor"), "the head atlas is tinted");
+            Assert.AreEqual(Color.white, fur.GetColor("_BaseColor"), "the fur map is tinted");
             Debug.Log($"[DogLook] snout reach {dog.Rig.SnoutReach:0.000} m (rest {ModelKit.ForwardReach(dog.Rig.Entry):0.000}), jaw {dog.Rig.HasJaw}, hold back {dog.DogHoldBack:0.000} m");
 
             // Only the dog watches: every human frozen where it stands (a frozen pin observes nothing).

@@ -13,17 +13,28 @@ namespace OutOfSight
     /// panorama garden_open_horizontal_tile_wide.png and the ceiling showing sky_disc_sun_glow.png.
     ///
     /// <list type="bullet">
-    /// <item>Size (<see cref="RingFor"/>): centred on the house's interior centre (as the garden quad); its radius is the
-    /// farthest point the camera's focus can reach (the interior, the props, the exit zone, plus
-    /// <see cref="FootprintMargin"/>) plus the camera's longest horizontal arm (OrbitCamera.MaxDistanceFor at the arm's
-    /// lowest pitch, Tuning.OrbitArmPitchMin) plus <see cref="CameraClearance"/>; its height is at least the camera's
-    /// highest eye (the highest floor, half the player's body, Tuning.CameraTargetHeight, the arm at Tuning.PitchMax) plus
-    /// <see cref="HeadRoom"/>, so the camera always stands inside the closed volume. The picture keeps its aspect: its
-    /// repeat count is the circumference over <see cref="PictureRatio"/> of the radius times the picture's aspect, rounded
-    /// (three on every level), its height then follows (<see cref="Ring.PictureHeight"/>, 0.52 of the radius); the straight
-    /// wall is at least the picture's height, and where it is taller the band above the picture shows its uniform top sky
-    /// (the texture is clamped in V).
-    /// OrbitCamera keeps the camera inside (<see cref="ClampArm"/>) and its far clip past the ring (<see cref="Ring.FarClip"/>).</item>
+    /// <item>Default size (<see cref="RingFor"/>, the size "defined by config"): centred on the house's interior centre (as
+    /// the garden quad); GARDENFIT (2026-11-24): its radius is the house's farthest point (<see cref="HouseReach"/>: the
+    /// interior, the props, the exit zone) times 1 + Tuning.GardenRingHouseMargin. The camera space
+    /// (<see cref="Ring.CameraRadius"/>) keeps the old bound: the farthest point the camera's focus can reach
+    /// (<see cref="FocusReach"/>) plus the camera's longest horizontal arm (OrbitCamera.MaxDistanceFor at the arm's lowest
+    /// pitch, Tuning.OrbitArmPitchMin); its height is at least the camera's highest eye (the highest floor, half the
+    /// player's body, Tuning.CameraTargetHeight, the arm at Tuning.PitchMax) plus <see cref="HeadRoom"/>. The picture keeps
+    /// its aspect: its repeat count is the circumference over <see cref="PictureRatio"/> of the radius times the picture's
+    /// aspect, rounded (three on every level), its height then follows (<see cref="Ring.PictureHeight"/>, 0.52 of the
+    /// radius); the straight wall is at least the picture's height, and where it is taller the band above the picture
+    /// shows its uniform top sky (the texture is clamped in V).
+    /// OrbitCamera fences the camera into its space (<see cref="ClampArm"/>) and sets its far clip past the largest ring
+    /// (<see cref="Ring.FarClip"/>).</item>
+    /// <item>Zoom fit (GARDENZOOM, 2026-11-25, user request: the camera stays inside the ring whatever the zoom): the
+    /// ring is no longer fixed at its default size. <see cref="GardenBackdropFit"/>, on the ring, scales it every frame
+    /// (one uniform transform scale about the centre of its foot, which stays on the ground; no mesh rebuilt, the picture
+    /// keeps its aspect) to the smallest size, never below the default, that holds the game camera
+    /// (<see cref="ScaleToHold(Ring, Vector3)"/>): the radius is max(the default, the camera's horizontal distance from the
+    /// axis + Tuning.GardenRingCameraMargin) and the ceiling stays <see cref="HeadRoom"/> above the camera, its rounded rim
+    /// included. Zoomed in again, it eases back to exactly the default. The largest size any camera of the level can ask
+    /// for (<see cref="Ring.MaxScale"/>: the orbit camera's space and the spectator's flight box) sizes the far clip and the
+    /// lawn (LevelBuilder: 2 x <see cref="Ring.MaxRadius"/> + 20).</item>
     /// <item>Ceiling (<see cref="SkyMesh"/>): a flat disc whose rim rounds down onto the ring's top edge (a quarter circle of
     /// <see cref="Fillet"/>: no crease for the screen space ambient occlusion, which URP's Unlit shader also applies, to
     /// darken), seen from below, its lowest vertices the ring's own top vertices (no gap), the sky picture projected once
@@ -33,12 +44,13 @@ namespace OutOfSight
     /// <item>Look: unlit (no shadow cast or received, no dark side). The garden's top sky and the disc's rim are one
     /// uniform colour (<see cref="SkyTop"/>), so the seam between the ring and its ceiling does not show; the camera's
     /// clear colour (<see cref="ClearColour"/>, Main) is that colour too.</item>
-    /// <item>Budget (PRD 7.4): two renderers of one slot each (the ring and its ceiling), both drawn with the window
-    /// pane's own material (the cached unlit PrimitiveKit.Emissive one every level already has for its windows) through a
-    /// property block each (<see cref="Block"/>, <see cref="SkyBlock"/>), as <see cref="WindowImage"/>: no level gains a
-    /// material, two draw calls.</item>
+    /// <item>Budget (PRD 7.4): two renderers of one slot each (the ring and its ceiling), both drawn with the cached unlit
+    /// pane material (LevelBuilder.PaneMaterial, shared with the cool fixture glows) through a property block each
+    /// (<see cref="Block"/>, <see cref="SkyBlock"/>): two draw calls. WINDOWS3D (2026-11-24): the windows no longer draw
+    /// with that material (the 3D window's glass has its own), so a level without a cool fixture now pays it for the ring;
+    /// the ring is what the windows show through their glass.</item>
     /// <item>Gameplay: no collider, the Default layer (no occluder, chair blocker or NavMesh source), never registered
-    /// with the wall fader: vision, raycasts and navigation never see it.</item>
+    /// with the wall fader: vision, raycasts and navigation never see it (so its zoom fit changes no rule).</item>
     /// </list>
     ///
     /// Shipped files: Assets/Resources/GardenBackdrop.png (4096 x 1024, wraps horizontally, repeat in U and clamp in V)
@@ -171,8 +183,14 @@ namespace OutOfSight
             public readonly float CameraRadius;
             /// <summary>The camera's eye may stand this high at most.</summary>
             public readonly float CameraTop;
+            /// <summary>
+            /// GARDENZOOM: the largest zoom fit scale (<see cref="GardenBackdropFit"/>) a camera of this level can ask for:
+            /// the orbit camera anywhere in its space and the spectator's free camera anywhere in its flight box. At least 1.
+            /// </summary>
+            public readonly float MaxScale;
 
-            public Ring(Vector3 center, float radius, float height, float pictureHeight, int repeats, float cameraRadius, float cameraTop)
+            public Ring(Vector3 center, float radius, float height, float pictureHeight, int repeats, float cameraRadius, float cameraTop,
+                float maxScale = 1f)
             {
                 Center = center;
                 Radius = radius;
@@ -181,7 +199,14 @@ namespace OutOfSight
                 Repeats = repeats;
                 CameraRadius = cameraRadius;
                 CameraTop = cameraTop;
+                MaxScale = Mathf.Max(1f, maxScale);
             }
+
+            /// <summary>GARDENZOOM: the radius of the ring at its largest zoom fit (<see cref="MaxScale"/>).</summary>
+            public float MaxRadius => Radius * MaxScale;
+
+            /// <summary>GARDENZOOM: the height (foot to top) of the ring at its largest zoom fit.</summary>
+            public float MaxHeight => Height * MaxScale;
 
             /// <summary>The ceiling's height (y), its flat part.</summary>
             public float Top => Height - Sink;
@@ -200,8 +225,22 @@ namespace OutOfSight
                 return Radius - Fillet + Mathf.Sqrt(Mathf.Max(0f, Fillet * Fillet - up * up));
             }
 
-            /// <summary>A far clip that holds the whole ring and its ceiling from any camera inside it.</summary>
-            public float FarClip => Mathf.Sqrt(4f * Radius * Radius + Height * Height) + 2f;
+            /// <summary>
+            /// GARDENZOOM: the closed volume's inside radius at height <paramref name="y"/> once the ring is scaled by
+            /// <paramref name="scale"/> about the centre of its foot (the zoom fit, <see cref="GardenBackdropFit"/>).
+            /// </summary>
+            public float InnerRadiusAt(float y, float scale)
+            {
+                float s = Mathf.Max(1e-3f, scale);
+                return s * InnerRadiusAt((y + Sink) / s - Sink);
+            }
+
+            /// <summary>
+            /// A far clip that holds the whole ring and its ceiling from any camera inside it. GARDENZOOM: the ring at its
+            /// largest zoom fit (<see cref="MaxRadius"/>, <see cref="MaxHeight"/>), the camera anywhere inside it: across
+            /// its diameter and its whole height.
+            /// </summary>
+            public float FarClip => Mathf.Sqrt(4f * MaxRadius * MaxRadius + MaxHeight * MaxHeight) + 2f;
 
             /// <summary>True when <paramref name="point"/> lies inside the ring's camera space (radius and top).</summary>
             public bool HoldsCamera(Vector3 point)
@@ -223,7 +262,10 @@ namespace OutOfSight
             float arm = OrbitCamera.MaxDistanceFor(def);
             // The arm's lowest pitch gives its longest horizontal reach (the view may tilt higher, the camera does not move).
             float horizontal = arm * Mathf.Cos(Mathf.Clamp(Tuning.OrbitArmPitchMin, 0f, Tuning.PitchMax) * Mathf.Deg2Rad);
-            float radius = reach + horizontal + CameraClearance;
+            // GARDENFIT (2026-11-24): the ring hugs the house (Tuning.GardenRingHouseMargin), not the camera's reach: the
+            // camera space below keeps the old bound. GARDENZOOM (2026-11-25): this is the default size; the ring grows
+            // past it with the camera (GardenBackdropFit), up to MaxScale below.
+            float radius = HouseReach(def, c) * (1f + Tuning.GardenRingHouseMargin);
             float eye = FocusTop(def) + arm * Mathf.Sin(Tuning.PitchMax * Mathf.Deg2Rad);
             float wanted = eye + HeadRoom + Sink;
             float circumference = 2f * Mathf.PI * radius;
@@ -231,12 +273,89 @@ namespace OutOfSight
             float picture = circumference / (repeats * ImageAspect);
             // The straight wall holds the whole picture (its uniform top sky meets the rounded rim), the ceiling the highest eye.
             float height = Mathf.Max(picture + Fillet, wanted);
-            return new Ring(new Vector3(c.x, 0f, c.y), radius, height, picture, repeats, reach + horizontal + 0.5f * CameraClearance,
-                eye + 0.5f * HeadRoom);
+            var center = new Vector3(c.x, 0f, c.y);
+            float cameraRadius = reach + horizontal + 0.5f * CameraClearance;
+            float cameraTop = eye + 0.5f * HeadRoom;
+            var ring = new Ring(center, radius, height, picture, repeats, cameraRadius, cameraTop);
+            // GARDENZOOM: the largest zoom fit a camera of this level can ask for, which the far clip and the lawn cover. The
+            // orbit camera: its farthest reach and its highest eye together (a bound: no pose has both). The spectator's free
+            // camera (SpectatorCamera.Clamp): the interior grown by its margin, up to its ceiling, the box's corner.
+            float orbit = ScaleToHold(ring, cameraRadius, cameraTop);
+            float halfX = interior.width * 0.5f + SpectatorCamera.BoundsMargin;
+            float halfZ = interior.height * 0.5f + SpectatorCamera.BoundsMargin;
+            float spectator = ScaleToHold(ring, Mathf.Sqrt(halfX * halfX + halfZ * halfZ), SpectatorCamera.MaxHeight);
+            return new Ring(center, radius, height, picture, repeats, cameraRadius, cameraTop, Mathf.Max(orbit, spectator));
+        }
+
+        /// <summary>
+        /// GARDENZOOM: the zoom fit scale (at least 1) of <paramref name="ring"/> that holds a camera at
+        /// <paramref name="eye"/> (in the ring's parent space, the level root's): the radius at least the camera's horizontal
+        /// distance from the axis plus Tuning.GardenRingCameraMargin, the ceiling at least <see cref="HeadRoom"/> above it.
+        /// </summary>
+        public static float ScaleToHold(Ring ring, Vector3 eye)
+        {
+            return ScaleToHold(ring, Mathf.Sqrt(HorizontalSqr(ring, eye)), eye.y);
+        }
+
+        /// <summary>GARDENZOOM: <see cref="ScaleToHold(Ring, Vector3)"/> for a camera <paramref name="horizontal"/> metres from the axis, <paramref name="height"/> high.</summary>
+        public static float ScaleToHold(Ring ring, float horizontal, float height)
+        {
+            return ScaleToHold(ring, horizontal, height, Tuning.GardenRingCameraMargin, HeadRoom);
+        }
+
+        /// <summary>
+        /// GARDENZOOM: the smallest scale, at least 1, of <paramref name="ring"/>, uniform about the centre of its foot
+        /// (which stays at y = -<see cref="Sink"/>), whose closed volume holds the point <paramref name="horizontal"/>
+        /// metres from the axis and <paramref name="height"/> high grown by <paramref name="side"/> toward the wall and
+        /// <paramref name="above"/> toward the ceiling. The grown point is checked against the volume's profile (the wall,
+        /// the rounded rim, the flat ceiling): the radius at the camera's height is then at least its distance plus
+        /// <paramref name="side"/>, the ceiling at least <paramref name="above"/> over it. Continuous and monotonic in both
+        /// distances (the profile is convex and holds its foot's centre: this is its gauge), so a smooth camera gives a
+        /// smooth ring. Pure, a few float operations, no allocation.
+        /// </summary>
+        public static float ScaleToHold(Ring ring, float horizontal, float height, float side, float above)
+        {
+            // The grown point, measured from the foot's centre (the scale's fixed point).
+            float q = Mathf.Max(0f, horizontal) + Mathf.Max(0f, side);
+            float h = Mathf.Max(0f, height + Sink + Mathf.Max(0f, above));
+            float radius = Mathf.Max(1e-3f, ring.Radius);
+            float tall = Mathf.Max(1e-3f, ring.Height);
+            float wall = tall - Fillet;
+            // The square profile's answer: the scale at which the wall or the flat ceiling reaches the point.
+            float s = Mathf.Max(q / radius, h / tall);
+            float inner = radius - Fillet;
+            if (q > s * inner && h > s * wall)
+            {
+                // There the ray from the foot's centre meets the rounded rim first, a quarter circle of centre
+                // c = (inner, wall) and radius Fillet: |P - s c| = s Fillet, i.e. a s^2 - 2 b s + cc = 0, whose smaller
+                // root is its outer arc; written cc / (b + sqrt(b^2 - a cc)) (the same root, without cancellation).
+                float a = inner * inner + wall * wall - Fillet * Fillet;
+                float b = q * inner + h * wall;
+                if (a > 1e-6f && b > 1e-6f)
+                {
+                    float cc = q * q + h * h;
+                    s = cc / (b + Mathf.Sqrt(Mathf.Max(0f, b * b - a * cc))); // MUTATION:GARDENZOOM_RIM
+                }
+            }
+            return Mathf.Max(1f, s);
+        }
+
+        /// <summary>The squared horizontal distance from <paramref name="ring"/>'s axis to <paramref name="point"/>.</summary>
+        public static float HorizontalSqr(Ring ring, Vector3 point)
+        {
+            float dx = point.x - ring.Center.x;
+            float dz = point.z - ring.Center.z;
+            return dx * dx + dz * dz;
         }
 
         /// <summary>The farthest the camera's focus can be from <paramref name="c"/> (horizontal), margin included.</summary>
         public static float FocusReach(LevelDef def, Vector2 c)
+        {
+            return HouseReach(def, c) + FootprintMargin;
+        }
+
+        /// <summary>GARDENFIT: the house's farthest point from <paramref name="c"/> (horizontal): the interior, the exit, the props.</summary>
+        public static float HouseReach(LevelDef def, Vector2 c)
         {
             Rect interior = def.InteriorBounds();
             float reach = Corner(interior, c);
@@ -249,7 +368,7 @@ namespace OutOfSight
                 float half = 0.5f * Mathf.Sqrt(p.SizeX * p.SizeX + p.SizeZ * p.SizeZ);
                 reach = Mathf.Max(reach, Vector2.Distance(new Vector2(p.X, p.Z), c) + half);
             }
-            return reach + FootprintMargin;
+            return reach;
         }
 
         /// <summary>The highest the camera's focus can be: the highest floor, half the player's body, the target height.</summary>
@@ -451,6 +570,8 @@ namespace OutOfSight
                 ceiling.AddComponent<MeshFilter>().sharedMesh = SkyMesh(ring, SunAzimuth());
                 Unlit(ceiling, material, sky);
             }
+            // GARDENZOOM: the ring (and its ceiling, a child) follows the game camera's zoom (play mode only).
+            go.AddComponent<GardenBackdropFit>().Init(ring);
             return renderer;
         }
 

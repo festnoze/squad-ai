@@ -14,7 +14,7 @@ namespace OutOfSight
     /// E up, Ctrl or Q (A on AZERTY) down, Shift faster, the wheel scales the speed; the mouse looks while the cursor is
     /// captured (as the game camera) or while the right button is held.</item>
     /// <item>Gamepad: left stick flies, right stick looks, right trigger up, left trigger down, left stick press faster.</item>
-    /// <item>Touch (TouchControls' overlay): the left thumb stick flies, a drag on the right half looks, a two-finger pinch
+    /// <item>Touch (TouchControls' overlay): the left thumb stick flies, a drag on the right two thirds looks, a two-finger pinch
     /// goes up (spread) or down (pinch in).</item>
     /// </list>
     /// It starts at the pose the orbit camera has after the build, so the switch is seamless. It holds still while the
@@ -176,7 +176,7 @@ namespace OutOfSight
             float pinch = ReadPinch();
             if (pinchA == int.MinValue)
             {
-                // No pinch: a one-finger drag on the right half looks (two fingers never also turn the view).
+                // No pinch: a one-finger drag on the right two thirds looks (two fingers never also turn the view).
                 Vector2 drag = InputReader.TouchLookDelta();
                 if (drag.sqrMagnitude > 0f)
                 {

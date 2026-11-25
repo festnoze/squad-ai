@@ -38,6 +38,8 @@ namespace OutOfSight
     /// - Any failure returns null after exactly one warning, so the caller falls back to the procedural visual.
     /// - A character draws its catalog mesh with its own slots (CONTRACT_M5 19: no slot merge; every level holds its draw
     ///   call budget with the unmerged characters).
+    /// - DOGBIG and LABRADOR: the dog's slots then show its painted maps (<see cref="ApplyPetFurMap"/>: the fur map on "Main",
+    ///   the head atlas on "Tete profil et face"), whatever its tint and palette colours were.
     /// </summary>
     public static class ModelKit
     {
@@ -381,6 +383,9 @@ namespace OutOfSight
                 case "dress":
                     return CharacterPart.Clothes;
                 case "main":
+                // LABRADOR: the final Labrador's head and neck seam (its head atlas). Without its maps the whole coat wears
+                // the dog's tint, so the head never shows a palette colour against a tinted body.
+                case "tete profil et face":
                     return pet ? CharacterPart.Clothes : CharacterPart.Other;
                 case "skin":
                     return CharacterPart.Skin;
@@ -527,19 +532,29 @@ namespace OutOfSight
             {
                 pair.Key.sharedMaterials = pair.Value;
             }
-            // DOGBIG: once the dog's fur texture exists, it wins over the tint (the picture carries the colours).
+            // DOGBIG: once the dog's fur texture exists, it wins over the tint (the picture carries the colours). LABRADOR: so
+            // does its head atlas on the head slot.
             ApplyPetFurMap(instance, entry);
             return count;
         }
 
-        // ----- DOGBIG: the dog's fur texture (docs/next/progress/DOGBIG.md) -----
+        // ----- DOGBIG: the dog's fur texture (docs/next/progress/DOGBIG.md); LABRADOR: and its head atlas -----
+
+        /// <summary>
+        /// LABRADOR (2026-11-25): the final Labrador's head material in its GLB: the head and the neck seam, painted in its head
+        /// atlas (<see cref="PetHeadMap"/>). Its other material, "Main" (the body and the mouth's inside), shows the fur map.
+        /// </summary>
+        public const string PetHeadMaterial = "Tete profil et face";
 
         private static bool petFurLooked;
         private static Texture2D petFurMap;
+        private static bool petHeadLooked;
+        private static Texture2D petHeadMap;
+        private static bool petHeadMissingReported;
 
         /// <summary>
-        /// The dog's fur texture (Resources/<see cref="Tuning.DogFurTextureResource"/>, painted on the Husky's UV0 atlas), or
-        /// null while none is in the project (the dog then keeps its plain tint and palette slots: no new material).
+        /// The dog's fur texture (Resources/<see cref="Tuning.DogFurTextureResource"/>, painted on the dog's UV0 atlas: the
+        /// Labrador's body and mouth), or null while none is in the project (the dog then keeps its plain tint: no new material).
         /// </summary>
         public static Texture2D PetFurMap
         {
@@ -548,25 +563,81 @@ namespace OutOfSight
                 if (!petFurLooked)
                 {
                     petFurLooked = true;
-                    petFurMap = Resources.Load<Texture2D>(Tuning.DogFurTextureResource);
-                    if (petFurMap != null)
-                    {
-                        // DOGBIG v3: a sharper mip at game distance and anisotropic filtering at the camera's slant, so the
-                        // strands are not averaged into flat black.
-                        petFurMap.mipMapBias = Tuning.DogFurMipBias;
-                        petFurMap.anisoLevel = Mathf.Max(petFurMap.anisoLevel, 4);
-                    }
+                    petFurMap = LoadPetMap(Tuning.DogFurTextureResource);
                 }
                 return petFurMap;
             }
         }
 
         /// <summary>
+        /// LABRADOR: the dog's head and neck atlas (Resources/<see cref="Tuning.DogHeadAtlasResource"/>, the eyes, nose and
+        /// muzzle painted on the UV0 of its <see cref="PetHeadMaterial"/> slot), or null while none is in the project.
+        /// </summary>
+        public static Texture2D PetHeadMap
+        {
+            get
+            {
+                if (!petHeadLooked)
+                {
+                    petHeadLooked = true;
+                    petHeadMap = LoadPetMap(Tuning.DogHeadAtlasResource);
+                }
+                return petHeadMap;
+            }
+        }
+
+        private static Texture2D LoadPetMap(string resource)
+        {
+            var map = Resources.Load<Texture2D>(resource);
+            if (map != null)
+            {
+                // DOGBIG v3: a sharper mip at game distance and anisotropic filtering at the camera's slant, so the strands
+                // are not averaged into flat black (LABRADOR: and the painted eyes stay readable).
+                map.mipMapBias = Tuning.DogFurMipBias;
+                map.anisoLevel = Mathf.Max(map.anisoLevel, 4);
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// LABRADOR: the painted map a pet slot shows, by its source material's name: the head atlas for the Labrador's head
+        /// (<see cref="PetHeadMaterial"/>, case ignored), the fur map for every other slot ("Main"; the old Husky's
+        /// Main_Light, Black and Eyes_Black). Null without the fur map. A head slot without its atlas falls back to the fur map
+        /// (logged once).
+        /// </summary>
+        public static Texture2D PetSlotMap(string sourceMaterial)
+        {
+            if (IsPetHead(sourceMaterial))
+            {
+                Texture2D head = PetHeadMap;
+                if (head != null)
+                {
+                    return head;
+                }
+                if (!petHeadMissingReported)
+                {
+                    petHeadMissingReported = true;
+                    Debug.LogWarning($"[ModelKit] no dog head atlas at Resources/{Tuning.DogHeadAtlasResource}: the dog's head shows the fur map");
+                }
+            }
+            return PetFurMap;
+        }
+
+        /// <summary>LABRADOR: a pet's head slot (by its source material's name), shown with the head atlas.</summary>
+        public static bool IsPetHead(string sourceMaterial)
+        {
+            return string.Equals((sourceMaterial ?? "").Trim(), PetHeadMaterial, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// DOGBIG: with a fur texture in the project (<see cref="PetFurMap"/>), every material slot of a pet instance takes the
-        /// one URP Lit material that shows it (white base colour, the texture as base map, on the model's own UV0), so the
-        /// fur, mask, nose and eyes come from the painting. Returns true when the texture was applied; without it nothing
-        /// changes. Called after the paint and after the tint, so the game, the catalog prefab's instances and the title
-        /// logo's baked dog all pick it up.
+        /// URP Lit material that shows its painted map (<see cref="PetSlotMap"/>: white base colour, the texture as base map, on
+        /// the model's own UV0, one shared material per map), so the coat, face, nose and eyes come from the paintings, never
+        /// from the tint or the palette. LABRADOR (2026-11-25): the final Labrador's "Main" slot shows the fur map (its body and
+        /// the mouth's inside), its "Tete profil et face" slot the head atlas (its head and the neck seam). No property block is
+        /// involved: the materials carry the maps, so a copy of the renderer's sharedMaterials (the title logo's baked frames)
+        /// shows the same dog. Returns true when the maps were applied; without the fur map nothing changes. Called after the
+        /// paint and after the tint, so the game, the catalog prefab's instances and the title logo's baked dog all pick it up.
         /// </summary>
         public static bool ApplyPetFurMap(GameObject instance, ModelCatalog.Entry entry)
         {
@@ -574,31 +645,28 @@ namespace OutOfSight
             {
                 return false;
             }
-            Texture2D map = PetFurMap;
-            if (map == null)
+            if (PetFurMap == null)
             {
                 return false;
             }
-            Material fur = PrimitiveKit.MapMaterial(map, Tuning.DogFurSmoothness);
-            // DOGBIG v3: the eye whites keep their palette white (a material every character already uses), so the eyes read
-            // at game distance; every other slot shows the map (the irises and pupils come from the face picture).
-            var keep = new HashSet<(Renderer, int)>();
+            var sources = new Dictionary<(Renderer, int), string>();
             foreach ((Renderer r, int slot, string source) in SourceSlots(instance, entry))
             {
-                if (IsPetEyeWhite(source))
-                {
-                    keep.Add((r, slot));
-                }
+                sources[(r, slot)] = source;
             }
             foreach (Renderer r in instance.GetComponentsInChildren<Renderer>(true))
             {
                 Material[] slots = r.sharedMaterials;
                 for (int i = 0; i < slots.Length; i++)
                 {
-                    if (!keep.Contains((r, i)))
+                    sources.TryGetValue((r, i), out string source);
+                    // DOGBIG v3: the old Husky's eye whites keep their palette white, so its eyes read at game distance (the
+                    // Labrador has none: its eyes are painted in its head atlas).
+                    if (IsPetEyeWhite(source))
                     {
-                        slots[i] = fur;
+                        continue;
                     }
+                    slots[i] = PrimitiveKit.MapMaterial(PetSlotMap(source), Tuning.DogFurSmoothness);
                 }
                 r.sharedMaterials = slots;
             }
@@ -614,7 +682,7 @@ namespace OutOfSight
         /// <summary>
         /// DOGBIG: how far ahead of its root a fitted rigged model reaches, metres along its facing: the front of the catalog's
         /// rest pose bounds (native units, root space), turned by the entry's yaw as the instance is, at
-        /// <see cref="RiggedScale"/>. For the dog, its snout (the Husky: 0.47 m). 0 for a static model.
+        /// <see cref="RiggedScale"/>. For the dog, its snout (the Husky: 0.43 m; LABRADOR, the final Labrador: 0.429 m). 0 for a static model.
         /// </summary>
         public static float ForwardReach(ModelCatalog.Entry entry)
         {

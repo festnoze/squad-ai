@@ -9,11 +9,17 @@ namespace OutOfSight
     /// M7 (docs/CONTRACT_M7.md 1.5): the touch controls, on their own overlay canvas, shown while
     /// <see cref="InputReader.TouchUIActive"/> holds, the game is not paused and no fail or win panel is up (the menus and
     /// those panels are uGUI, driven by tap through
-    /// the InputSystemUIInputModule). Left half of the screen: a floating stick that appears where the thumb lands and
-    /// moves the furniture like the left stick. Right half: a drag orbits the camera. Bottom right: the careful toggle;
+    /// the InputSystemUIInputModule). TOUCHTUTO: the screen is split in thirds (<see cref="Tuning.TouchStickZoneShare"/>,
+    /// decided where a finger lands). The left third: a floating stick that appears where the thumb lands and moves the
+    /// furniture like the left stick. The right two thirds: a drag orbits the camera, and a second finger landing there
+    /// while the orbit finger is held pinches (PINCH); the stick finger never pinches. Bottom right: the careful toggle;
     /// top right: the pause button. Task DOORAUTO: there is no action button any more (doors and wardrobes open by pushing
     /// the stick toward them); the floor lamp is switched by a tap on the player lamp itself (<see cref="OnPlayerLamp"/>),
     /// which is the E key.
+    ///
+    /// TOUCHTUTO: while level 1 waits for its first input, this object also shows the touch tutorial
+    /// (<see cref="TouchTutorial"/>, its own canvas over this overlay). While it shows, every finger that lands belongs to
+    /// it: it steers nothing and presses no button, and its lift is the start press (it dismisses the tutorial).
     ///
     /// Nothing here is a raycast target: the fingers are read through <see cref="InputReader.ReadTouches"/> (the real
     /// touchscreen plus the fingers a test injects) and hit tested here, so the overlay never takes a tap from a menu, and
@@ -30,6 +36,18 @@ namespace OutOfSight
 
         public RectTransform CarefulButton { get; private set; }
         public RectTransform PauseButton { get; private set; }
+
+        /// <summary>TOUCHTUTO: the level 1 touch tutorial shows now (tests, and Hud, which hides what it replaces).</summary>
+        public bool TutorialVisible => tutorial != null && tutorial.Visible;
+
+        /// <summary>TOUCHTUTO: the tutorial overlay, null until it first shows (built on demand: a PC never draws its art).</summary>
+        public TouchTutorial Tutorial => tutorial;
+
+        /// <summary>TOUCHTUTO: <see cref="TutorialVisible"/> of the run's touch controls, false when there are none.</summary>
+        public static bool TutorialShowing => Instance != null && Instance.TutorialVisible;
+
+        /// <summary>TOUCHTUTO: the x (screen pixels) where the stick zone (the left third) ends and the camera zone begins.</summary>
+        public static float StickZoneRight => Screen.width * Tuning.TouchStickZoneShare;
 
         /// <summary>The screen pixel at the centre of <paramref name="button"/> (tests tap there).</summary>
         public static Vector2 ScreenCenter(RectTransform button)
@@ -63,6 +81,11 @@ namespace OutOfSight
         private int pinchB = int.MinValue;
         private float pinchLast;
         private bool pinchStarted;
+        // TOUCHTUTO: the tutorial overlay (built the first time it shows) and the fingers that landed while it showed: each
+        // is also in "ignored" (it steers nothing), and its lift is the start press while the tutorial still shows.
+        private TouchTutorial tutorial;
+        private readonly HashSet<int> tutorialFingers = new HashSet<int>();
+        private bool tutorialShown;
 
         // STARTFIX: a tap outside the buttons (a stick or orbit finger that lifts soon, having barely travelled) is a start
         // press: it releases a held level without moving. A drag (orbit) or a stick push past the slop is never a tap.
@@ -117,6 +140,14 @@ namespace OutOfSight
             {
                 overlay.SetActive(show);
             }
+            // TOUCHTUTO: the level 1 tutorial, over this overlay, while level 1 waits for its first input on touch (never
+            // while this overlay is hidden: no touch, a pause or a menu, an end panel).
+            tutorialShown = show && TouchTutorial.Wanted(Main.Instance); // MUTATION:TOUCH_TUTO_GATE
+            if (tutorialShown && tutorial == null)
+            {
+                tutorial = new TouchTutorial(transform);
+            }
+            tutorial?.SetVisible(tutorialShown);
             InputReader.ReadTouches(points);
             current.Clear();
             foreach (InputReader.TouchPoint p in points)
@@ -129,6 +160,13 @@ namespace OutOfSight
                 if (!current.Contains(id))
                 {
                     ignored.Remove(id);
+                    // TOUCHTUTO: a finger that landed on the tutorial lifts: the start press, however long it stayed and
+                    // however far it travelled (it never steered, so no move and no camera turn). The tutorial goes with
+                    // the wait, on the fixed step that reads the press.
+                    if (tutorialFingers.Remove(id) && tutorialShown) // MUTATION:TOUCH_TUTO_TAP
+                    {
+                        InputReader.PressTouchStart();
+                    }
                     if (id == stickFinger)
                     {
                         stickFinger = int.MinValue;
@@ -180,6 +218,7 @@ namespace OutOfSight
                 orbitFinger = int.MinValue;
                 pinchA = pinchB = int.MinValue;
                 taps.Clear();
+                tutorialFingers.Clear();
                 InputReader.SetTouchStick(Vector2.zero);
                 InputReader.SetTouchLook(Vector2.zero);
                 InputReader.SetTouchPinch(0f);
@@ -188,6 +227,12 @@ namespace OutOfSight
                     InputReader.SetTouchCareful(false);
                 }
                 return;
+            }
+
+            if (tutorialShown)
+            {
+                // TOUCHTUTO: a finger already steering when the tutorial came up stops; it steers nothing until it lifts.
+                DropRoles();
             }
 
             float scale = Mathf.Max(1f, Screen.height) / ReferenceHeight;
@@ -226,9 +271,9 @@ namespace OutOfSight
             }
             if (pinchStarted)
             {
-                // The partner finger may have steered earlier in this frame's loop: the pinch's first frame steers nothing.
+                // The orbit finger may have orbited earlier in this frame's loop: the pinch's first frame turns nothing.
+                // TOUCHTUTO: the stick finger is never part of a pinch, so it keeps steering through it (no dropped frame).
                 pinchStarted = false;
-                stick = Vector2.zero;
                 look = Vector2.zero;
             }
             InputReader.SetTouchStick(stick);
@@ -254,11 +299,18 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// A finger lands: a button, else the stick on the left half or the orbit on the right half (a short tap of either,
-        /// on lift: the player lamp's switch, or the start press).
+        /// A finger lands: a button, else the stick on the left third or the orbit on the right two thirds (a short tap of
+        /// either, on lift: the player lamp's switch, or the start press), or a pinch with the orbit finger. TOUCHTUTO: while
+        /// the tutorial shows, it is the tutorial's finger instead (no button, no steering; its lift starts the level).
         /// </summary>
         private void Land(InputReader.TouchPoint p)
         {
+            if (tutorialShown)
+            {
+                ignored.Add(p.Id);
+                tutorialFingers.Add(p.Id);
+                return;
+            }
             if (Hit(CarefulButton, p.Position))
             {
                 ignored.Add(p.Id);
@@ -271,41 +323,28 @@ namespace OutOfSight
                 InputReader.PressTouchPause();
                 return;
             }
-            // PINCH: a second finger makes a pinch with the one finger already steering when that one landed a moment ago
-            // and has not dragged yet (two fingers put down together, anywhere), or with the orbit finger when it lands
-            // on the right half too (a pinch on the camera side, any time). The stick and the orbit stop for its length.
-            int partner = stickFinger != int.MinValue ? (orbitFinger == int.MinValue ? stickFinger : int.MinValue) : orbitFinger;
-            if (partner != int.MinValue && pinchA == int.MinValue && TryFind(partner, out Vector2 partnerPosition))
+            // TOUCHTUTO: the left third is the stick zone, the right two thirds the camera zone (Tuning.TouchStickZoneShare).
+            bool left = p.Position.x < StickZoneRight; // MUTATION:TOUCH_ZONE_SPLIT
+            // PINCH, TOUCHTUTO: a second finger landing in the camera zone while the orbit finger is held makes the two a
+            // pinch (two fingers put down together there work the same way: the first became the orbit finger, the second
+            // joins it). The orbit stops for its length. The stick finger never pinches, and keeps steering meanwhile.
+            if (!left && orbitFinger != int.MinValue && pinchA == int.MinValue && TryFind(orbitFinger, out Vector2 orbitPosition)) // MUTATION:TOUCH_PINCH_ZONE
             {
-                bool fresh = taps.TryGetValue(partner, out Tap first) && !first.Travelled
-                    && Time.unscaledTime - first.Landed <= Tuning.TouchPinchPairSeconds;
-                bool rightPair = partner == orbitFinger && p.Position.x >= Screen.width * 0.5f;
-                if (fresh || rightPair)
-                {
-                    pinchA = partner;
-                    pinchB = p.Id;
-                    pinchStarted = true;
-                    pinchLast = Vector2.Distance(partnerPosition, p.Position) / (Mathf.Max(1f, Screen.height) / ReferenceHeight);
-                    taps.Remove(partner);
-                    if (partner == stickFinger)
-                    {
-                        stickFinger = int.MinValue;
-                    }
-                    else
-                    {
-                        orbitFinger = int.MinValue;
-                    }
-                    return;
-                }
+                pinchA = orbitFinger;
+                pinchB = p.Id;
+                pinchStarted = true;
+                pinchLast = Vector2.Distance(orbitPosition, p.Position) / (Mathf.Max(1f, Screen.height) / ReferenceHeight);
+                taps.Remove(orbitFinger);
+                orbitFinger = int.MinValue;
+                return;
             }
-            bool left = p.Position.x < Screen.width * 0.5f; // MUTATION:TOUCH_HALF_SPLIT
             if (left && stickFinger == int.MinValue)
             {
                 stickFinger = p.Id;
                 stickOrigin = p.Position;
                 taps[p.Id] = new Tap { Origin = p.Position, Landed = Time.unscaledTime };
             }
-            else if (!left && orbitFinger == int.MinValue)
+            else if (!left && orbitFinger == int.MinValue && pinchA == int.MinValue)
             {
                 orbitFinger = p.Id;
                 orbitLast = p.Position;
@@ -314,6 +353,31 @@ namespace OutOfSight
             else
             {
                 ignored.Add(p.Id);
+            }
+        }
+
+        /// <summary>
+        /// TOUCHTUTO: the stick, orbit and pinch fingers (all down this frame: a lifted one already freed its role) steer
+        /// nothing more until they lift, and no tap is pending.
+        /// </summary>
+        private void DropRoles()
+        {
+            Ignore(stickFinger);
+            Ignore(orbitFinger);
+            Ignore(pinchA);
+            Ignore(pinchB);
+            stickFinger = int.MinValue;
+            orbitFinger = int.MinValue;
+            pinchA = pinchB = int.MinValue;
+            taps.Clear();
+        }
+
+        /// <summary>Finger <paramref name="id"/> steers nothing until it lifts (only a finger down now: none other would ever lift).</summary>
+        private void Ignore(int id)
+        {
+            if (id != int.MinValue && current.Contains(id))
+            {
+                ignored.Add(id);
             }
         }
 

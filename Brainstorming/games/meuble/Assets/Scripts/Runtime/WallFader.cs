@@ -27,9 +27,10 @@ namespace OutOfSight
     /// modes, registered with <see cref="AddStub"/>), so no hole or garden ever shows where a wall stands.
     ///
     /// A fade unit is one wall line: its faces, its cap (with the closures that keep the junctions solid and, on an outer
-    /// line, its outside faces), its door frames, its windows when it is shared, a shared line's baseboards. Every part of a
-    /// unit is registered with the same rule, so they go and come back together (DOORFADE 2026-11-24: its door frames and
-    /// leaves included, see <see cref="KeepDoor"/>):
+    /// line, its outside faces), its door frames, its windows (WINDOWS3D 2026-11-24: the 3D window's frame and glass on every
+    /// line, the glass drawn see-through by its own material, see <see cref="MarkGlass"/>; the flat M3 window only when the
+    /// line is shared), a shared line's baseboards. Every part of a unit is registered with the same rule, so they go and
+    /// come back together (DOORFADE 2026-11-24: its door frames and leaves included, see <see cref="KeepDoor"/>):
     /// <list type="bullet">
     /// <item>a shared (two faced) line: out of the way when its centre plane separates the camera from the player
     /// (<see cref="Add(Renderer, Vector3, Vector3)"/>);</item>
@@ -81,6 +82,11 @@ namespace OutOfSight
             public bool KeepWhenLowered;
             /// <summary>A door leaf or a door frame: goes with its wall's plane only, never with the leaf box rule (DOORFADE).</summary>
             public bool Door;
+            /// <summary>WINDOWS3D: a window's glass: see-through, drawn with its own glass material at the copy's opacity (<see cref="MarkGlass"/>).</summary>
+            public bool Glass;
+            /// <summary>WINDOWS3D: the glass's own reflection strength and tint opacity, read once (its block, else its material).</summary>
+            public float GlassReflection;
+            public float GlassVeil;
             /// <summary>M5: the box whose current pose also moves the renderer out of the way (null: the plane rule only).</summary>
             public Transform Box;
             public Vector3 HalfSize;
@@ -368,6 +374,24 @@ namespace OutOfSight
                 e.Door = true;
             }
         }
+
+        /// <summary>
+        /// WINDOWS3D (docs/next/progress/WINDOWS3D.md): marks a registered part as a window's glass (LevelBuilder.Window3D). It
+        /// goes out of the way exactly as its wall does; see-through, its copy is drawn with its own glass material, its
+        /// reflections and tint scaled by the copy's opacity (<see cref="DrawGlass"/>), never with the one see-through
+        /// material, which would fill the panes as an opaque looking sheet; lowered, it sinks with its wall like any part.
+        /// </summary>
+        public void MarkGlass(Renderer renderer)
+        {
+            Entry e = Find(renderer);
+            if (e != null)
+            {
+                e.Glass = true;
+            }
+        }
+
+        /// <summary>Tests: true when <paramref name="renderer"/> is a window's glass (<see cref="MarkGlass"/>).</summary>
+        public bool IsGlass(Renderer renderer) => Find(renderer)?.Glass ?? false;
 
         /// <summary>Lowered, the plane rule leaves a registered part standing (door frames, baseboards: the doorways read).</summary>
         public void KeepStandingWhenLowered(Renderer renderer)
@@ -734,7 +758,11 @@ namespace OutOfSight
                 {
                     continue;
                 }
-                if (seeThrough)
+                if (seeThrough && e.Glass)
+                {
+                    DrawGlass(e, r, mesh, only);
+                }
+                else if (seeThrough)
                 {
                     DrawGhost(e, r, mesh, only);
                 }
@@ -775,6 +803,51 @@ namespace OutOfSight
             {
                 Graphics.RenderMesh(parameters, mesh, sub, matrix);
             }
+        }
+
+        /// <summary>
+        /// WINDOWS3D: a window glass's see-through copy, drawn with its own glass material (the panes stay clear), its
+        /// reflections and tint opacity at the copy's opacity (the wall opacity option once faded, nothing once a near outer
+        /// wall vanished), from a property block built once from the glass's own block (the night preset's) or material.
+        /// </summary>
+        private void DrawGlass(Entry e, Renderer r, Mesh mesh, Camera only)
+        {
+            Material material = r.sharedMaterial;
+            if (material == null)
+            {
+                return;
+            }
+            if (e.Ghost == null)
+            {
+                var block = new MaterialPropertyBlock();
+                r.GetPropertyBlock(block);
+                e.GlassReflection = block.HasFloat(WindowModel.ReflectionId) ? block.GetFloat(WindowModel.ReflectionId)
+                    : material.HasProperty(WindowModel.ReflectionId) ? material.GetFloat(WindowModel.ReflectionId) : 0f;
+                e.GlassVeil = block.HasFloat(WindowModel.VeilId) ? block.GetFloat(WindowModel.VeilId)
+                    : material.HasProperty(WindowModel.VeilId) ? material.GetFloat(WindowModel.VeilId) : 0f;
+                e.Ghost = block;
+                e.Applied = -1f;
+            }
+            float alpha = GhostAlpha(e);
+            if (alpha <= 1e-3f)
+            {
+                return;
+            }
+            if (e.Applied != alpha)
+            {
+                e.Applied = alpha;
+                e.Ghost.SetFloat(WindowModel.ReflectionId, e.GlassReflection * alpha);
+                e.Ghost.SetFloat(WindowModel.VeilId, e.GlassVeil * alpha);
+            }
+            var parameters = new RenderParams(material)
+            {
+                layer = r.gameObject.layer,
+                camera = only,
+                shadowCastingMode = ShadowCastingMode.Off,
+                receiveShadows = false,
+                matProps = e.Ghost,
+            };
+            Graphics.RenderMesh(parameters, mesh, 0, r.localToWorldMatrix);
         }
 
         /// <summary>
@@ -848,9 +921,7 @@ namespace OutOfSight
                 }
                 block.SetFloat(SmoothnessId, own.HasProperty(SmoothnessId) ? own.GetFloat(SmoothnessId) : 0.1f);
                 block.SetFloat(MetallicId, own.HasProperty(MetallicId) ? own.GetFloat(MetallicId) : 0f);
-                // Window picture (2026-11-19): a window shows its picture's neutral colour, not the pane material's blue.
-                e.BaseColor = WindowImage.Shows(block) ? WindowImage.Colour
-                    : own.HasProperty(BaseColorId) ? own.GetColor(BaseColorId) : Color.white;
+                e.BaseColor = own.HasProperty(BaseColorId) ? own.GetColor(BaseColorId) : Color.white;
             }
             else
             {

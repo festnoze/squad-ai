@@ -340,8 +340,9 @@ namespace OutOfSight
             (int)Mathf.Floor((-HumanRelease - HumanEdge) / (0.5f * Tuning.RigWalkCycleMeters * Tuning.TitleLogoHumanScale)) & 1;
 
         private const string ChairModel = "kenney.chair";
-        // GRIP: the human of the alternate loops, the level 1 man in his own clothes.
-        private const string HumanModel = "quaternius.man";
+        // GRIP: the human of the alternate loops in her own clothes. TITLEWOMAN (2026-11-24, user request): the game's woman
+        // (every woman inhabitant shows the dress model, Inhabitant.ModelIdOf), was the level 1 man.
+        private const string HumanModel = ModelCatalog.QuaterniusWomanDress;
         private static readonly Color ChairRed = new Color32(0xD7, 0x26, 0x3D, 0xFF);
         // DOGBIG: the game's dog, whatever it is: the dog row's model and fur tint (PersonalityDef), never a copy of them.
         private static string DogModel => PersonalityDef.For(PersonalityDef.Dog).Model;
@@ -1342,7 +1343,7 @@ namespace OutOfSight
             }
 
             /// <summary>
-            /// The game's dog (the dog row's model, the Husky since DOGBIG, in its tint at Tuning.TitleLogoDogScale of its
+            /// The game's dog (the dog row's model, the final Labrador since LABRADOR, in its painted maps at Tuning.TitleLogoDogScale of its
             /// in-game size), standing where it holds the chair on its mark: its body Tuning.TitleLogoDogGrip from the chair's
             /// foot, facing right and a little toward the camera (Tuning.TitleLogoDogYaw), its snout at the chair's left edge.
             /// For each baked frame, its Walk clip is sampled at a stride's foot contact and its skinned mesh baked into a static
@@ -1368,7 +1369,9 @@ namespace OutOfSight
                 {
                     throw new InvalidOperationException("the dog model did not load");
                 }
-                // The paint gave the fur the dog row's tint (and the fur texture once it exists), as in the game.
+                // The paint gave the coat the dog row's tint, then (as in the game, ModelKit.ApplyPetFurMap) the painted maps
+                // replaced it: LABRADOR, the fur map on "Main" and the head atlas on "Tete profil et face", untinted. They are
+                // materials, not property blocks, so each baked copy below shows them through the skin's sharedMaterials.
                 ModelCatalog.Entry entry = ModelCatalog.Lookup(dogModel);
                 Animation animation = model.GetComponentInChildren<Animation>(true);
                 AnimationState walk = animation != null && entry != null && !string.IsNullOrEmpty(entry.walkClip) ? animation[entry.walkClip] : null;
@@ -1486,6 +1489,7 @@ namespace OutOfSight
                         part.AddComponent<MeshFilter>().sharedMesh = mesh;
                         MeshRenderer renderer = part.AddComponent<MeshRenderer>();
                         renderer.sharedMaterials = skin.sharedMaterials;
+                        CopyPrints(skin, renderer);
                         renderer.shadowCastingMode = ShadowCastingMode.On;
                         renderer.receiveShadows = true;
                         parts.Add(part.transform);
@@ -1605,15 +1609,34 @@ namespace OutOfSight
             }
 
             /// <summary>
-            /// GRIP: the human of the alternate loops (the level 1 man, his faces and clothes through the game's own rig and
-            /// CharacterLook, at Tuning.TitleLogoHumanScale), standing where he holds the chair on its mark
-            /// (<see cref="HumanRoot"/>, turned Tuning.TitleLogoHumanYaw). Static copies: walk frames 0 and 1 (his Walk clip at
-            /// its two foot contacts), then the same strides with his hands on the top rail of the backrest (the game's arm IK,
+            /// TITLEWOMAN: CharacterLook paints the head (hair, face) and the clothes through per-slot property blocks on the
+            /// skinned renderer, not through its materials: a baked copy needs them too, or it shows a bald, blank head.
+            /// </summary>
+            private static void CopyPrints(Renderer from, Renderer to)
+            {
+                var block = new MaterialPropertyBlock();
+                int slots = from.sharedMaterials.Length;
+                for (int slot = 0; slot < slots; slot++)
+                {
+                    from.GetPropertyBlock(block, slot);
+                    if (!block.isEmpty)
+                    {
+                        to.SetPropertyBlock(block, slot);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// GRIP: the human of the alternate loops (TITLEWOMAN: the title house's woman, Claire's model and clothes tint;
+            /// her face, hair and clothes through the game's own rig and CharacterLook, at Tuning.TitleLogoHumanScale),
+            /// standing where she holds the chair on its mark
+            /// (<see cref="HumanRoot"/>, turned Tuning.TitleLogoHumanYaw). Static copies: walk frames 0 and 1 (her Walk clip at
+            /// its two foot contacts), then the same strides with her hands on the top rail of the backrest (the game's arm IK,
             /// InhabitantRig.SolveArm, onto GripDef's chair wrists across the rail, the fingers over it).
             /// TITLEMOVE2: then two walk frames facing left (yaw 360 - TitleLogoHumanYaw, baked, never a mirror) and the turn
-            /// round between them (<see cref="HumanTurnFrames"/>, through the camera's side): his chest leads his hips (the
-            /// spine's bend), his head leads his chest, his legs take short steps, and the copy steps back into the depth if
-            /// it would otherwise reach lower on screen than his walk.
+            /// round between them (<see cref="HumanTurnFrames"/>, through the camera's side): her chest leads her hips (the
+            /// spine's bend), her head leads her chest, her legs take short steps, and the copy steps back into the depth if
+            /// it would otherwise reach lower on screen than her walk.
             /// </summary>
             private void BuildHuman(int layer)
             {
@@ -1643,6 +1666,14 @@ namespace OutOfSight
                 }
                 rig.enabled = false;
                 inhabitant.enabled = false;
+                // TITLEWOMAN: she wears Claire's look (the title house's woman, the watchful row): the same clothes tint on
+                // the model and on the printed collar and hem bands, as Inhabitant.ApplyIdentity does in the house.
+                if (ColorUtility.TryParseHtmlString(PersonalityDef.For(PersonalityDef.Watchful).Tint, out Color clothes))
+                {
+                    clothes.a = 1f;
+                    ModelKit.TintClothes(rig.Model, entry, clothes);
+                    CharacterLook.Identify(rig, clothes);
+                }
                 AnimationState walk = rig.WalkState;
                 if (walk == null || walk.clip == null || rig.Animation == null)
                 {
@@ -1737,6 +1768,7 @@ namespace OutOfSight
                         part.AddComponent<MeshFilter>().sharedMesh = mesh;
                         MeshRenderer renderer = part.AddComponent<MeshRenderer>();
                         renderer.sharedMaterials = skin.sharedMaterials;
+                        CopyPrints(skin, renderer);
                         renderer.shadowCastingMode = ShadowCastingMode.On;
                         renderer.receiveShadows = true;
                         parts.Add(part.transform);

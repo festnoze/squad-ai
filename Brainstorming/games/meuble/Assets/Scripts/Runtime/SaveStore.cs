@@ -617,14 +617,66 @@ namespace OutOfSight
             return result;
         }
 
-        /// <summary>Level index i of <paramref name="order"/> may be played: every level under UnlockAll, else the save's rule.</summary>
+        /// <summary>
+        /// Level index i of <paramref name="order"/> may be played: every level under UnlockAll or once the shop's
+        /// "all levels" entitlement is owned (ADSSHOP), else the save's rule.
+        /// </summary>
         public static bool IsUnlocked(System.Collections.Generic.IReadOnlyList<string> order, int index)
         {
             if (order == null || index < 0 || index >= order.Count)
             {
                 return false;
             }
-            return UnlockAll || Current.IsUnlocked(order, index);
+            return UnlockAll || HasEntitlement(Entitlements.AllLevels) || Current.IsUnlocked(order, index);
+        }
+
+        // ----- ADSSHOP (docs/next/progress/ADSSHOP.md): the shop purchases, kept in SaveData.purchases. -----
+
+        /// <summary>Raised after a purchase was recorded and saved (the shop page and the ads read it).</summary>
+        public static event Action PurchasesChanged;
+
+        /// <summary>True when a purchase granted the entitlement <paramref name="key"/> (<see cref="Entitlements"/>).</summary>
+        public static bool HasEntitlement(string key)
+        {
+            return Current.Purchases != null && Current.Purchases.HasEntitlement(key);
+        }
+
+        /// <summary>True when <paramref name="product"/> needs no new purchase (<see cref="SavePurchases.CoveredBy"/>).</summary>
+        public static bool IsCovered(ShopProduct product)
+        {
+            return Current.Purchases != null && Current.Purchases.CoveredBy(product);
+        }
+
+        /// <summary>
+        /// Records a purchase the store delivered (<see cref="SavePurchases.Grant"/>), saves when it changed something, then
+        /// raises <see cref="PurchasesChanged"/>. True when the save changed. Never throws.
+        /// </summary>
+        public static bool RecordPurchase(ShopProduct product)
+        {
+            bool changed;
+            try
+            {
+                Current.Purchases = Current.Purchases ?? new SavePurchases();
+                changed = Current.Purchases.Grant(product);
+            }
+            catch (Exception e)
+            {
+                Warn("cannot record the purchase: " + e.Message);
+                return false;
+            }
+            if (changed)
+            {
+                Save();
+            }
+            try
+            {
+                PurchasesChanged?.Invoke();
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+            return changed;
         }
 
         /// <summary>True when the save holds a win of <paramref name="levelId"/>.</summary>
@@ -670,6 +722,7 @@ namespace OutOfSight
             PathOverride = null;
             UnlockAll = false;
             Recorded = null;
+            PurchasesChanged = null;
             InMemory = false;
             LastLoad = SaveLoadStatus.None;
             LastProblem = null;

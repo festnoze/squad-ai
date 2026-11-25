@@ -141,6 +141,8 @@ namespace OutOfSight
         /// <summary>
         /// The Husky (the dog, a pet: 49 bones, its model's eyes at Tuning.DogModelEyeHeight). DOGBIG (2026-11-21): it replaced
         /// the Shiba Inu (quaternius.shiba), a bigger breed drawn 1.5 times the Shiba's size, on the same rig and clips.
+        /// LABRADOR (2026-11-25): the id now names the final black Labrador (quaternius_labrador.glb: the same rig, Jaw and clips),
+        /// kept so every level naming the dog's model still works.
         /// </summary>
         public const string QuaterniusHusky = "quaternius.husky";
 

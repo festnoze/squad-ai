@@ -172,6 +172,8 @@ namespace OutOfSight.Tests
             yield return null;
             yield return null;
             Assert.IsTrue(InputReader.TouchUIActive, "premise: the touch UI is not active");
+            // BIGBUTTONS: the touch UI switches the panels' rows to their touch layout (a bottom bar of bigger buttons).
+            Assert.IsTrue(Hud.TouchLayoutOn, "the end panels did not switch to their touch layout");
             Assert.IsTrue(TouchControls.Instance == null || !TouchControls.Instance.Visible, "the touch overlay shows over the win panel");
             Assert.IsFalse(Hud.CreakGaugeVisible || Hud.SuspicionGaugeVisible || Hud.BalanceVisible, "the play band's gauges show under the win panel");
             Assert.IsTrue(Hud.Labels.TryGetValue("Controls", out Text controls) && !controls.enabled, "the controls line shows under the win panel");
@@ -371,6 +373,12 @@ namespace OutOfSight.Tests
                     Assert.GreaterOrEqual(a.xMin, canvas.xMin + EdgeMargin, $"{buttons[i].name} is cut on the left at {width} x {height}");
                     Assert.LessOrEqual(a.xMax, canvas.xMax - EdgeMargin, $"{buttons[i].name} is cut on the right at {width} x {height}");
                     Assert.GreaterOrEqual(a.yMin, canvas.yMin + EdgeMargin, $"{buttons[i].name} is cut at the bottom at {width} x {height}");
+                    if (Hud.TouchLayoutOn)
+                    {
+                        // BIGBUTTONS: on touch every panel button is finger sized, at least 15 % of the screen's height
+                        // (190 to 210 units: 20 % of a 20:9 phone, 15 % of a 4:3 tablet).
+                        Assert.GreaterOrEqual(a.height, canvas.height * 0.15f, $"{buttons[i].name} is not finger sized at {width} x {height}");
+                    }
                     Text label = Label(buttons[i]);
                     Assert.LessOrEqual(label.preferredWidth, ((RectTransform)buttons[i].transform).rect.width - 24f,
                         $"{buttons[i].name}'s label \"{label.text}\" overflows its plate");

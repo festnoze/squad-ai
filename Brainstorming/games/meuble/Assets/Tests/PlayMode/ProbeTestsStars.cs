@@ -215,10 +215,10 @@ namespace OutOfSight.Tests
             LevelSelect select = Menu.LevelSelect;
             Assert.IsNotNull(select, "premise: no level select");
             Assert.IsTrue(select.IsOpen, "premise: the level select did not open");
-            Assert.AreEqual(66, select.StarsPossible, "the line-up does not hold 66 stars");
+            Assert.AreEqual(72, select.StarsPossible, "the line-up does not hold 72 stars");
             Assert.AreEqual(3, select.StarsEarned, "the total does not count the win's stars");
-            Assert.AreEqual(string.Format(Strings.StarsTotal, 3, 66), select.StarsLineText, "the total line is wrong");
-            StringAssert.Contains("3 / 66", select.StarsLineText);
+            Assert.AreEqual(string.Format(Strings.StarsTotal, 3, 72), select.StarsLineText, "the total line is wrong");
+            StringAssert.Contains("3 / 72", select.StarsLineText);
 
             LevelSelect.Card first = select.Cards[0];
             Assert.IsNotNull(first.Stars, "the card has no star row");

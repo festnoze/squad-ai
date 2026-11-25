@@ -939,5 +939,167 @@ namespace OutOfSight
             float outline = Mathf.Abs(faded) - 0.03f;
             return Over(c, WallGlyphFill, Cover(outline, pixel) * 0.9f);
         }
+
+        // ----- TOUCHTUTO (docs/next/progress/TOUCHTUTO.md): the level 1 touch tutorial's art (TouchTutorial). White, so an
+        // Image tints it the tutorial's cream, the alpha holding each part's own opacity. Drawn from the validated mockup's
+        // SVG (tuto.html): the coordinates below are its viewBox units, y down, one unit per texture pixel. Drawn the first
+        // time the tutorial shows, so a PC never pays for them. -----
+
+        private static Sprite tutorialStick;
+        private static Sprite tutorialDrag;
+        private static Sprite tutorialPinch;
+        private static Sprite tutorialZone;
+
+        /// <summary>
+        /// TOUCHTUTO: the move stick, 300 x 300: a base ring with a faint fill, its knob pushed up and right, four chevrons on
+        /// the rim, and two small dashed landing spots (the stick appears wherever the thumb lands).
+        /// </summary>
+        public static Sprite TutorialStick => tutorialStick != null ? tutorialStick : tutorialStick = Draw(300, 300, TutorialStickGlyph, "TutorialStick");
+
+        /// <summary>TOUCHTUTO: drag to turn, 260 x 260: a finger dot in a faint ring under a curved two-way arrow.</summary>
+        public static Sprite TutorialDrag => tutorialDrag != null ? tutorialDrag : tutorialDrag = Draw(260, 260, TutorialDragGlyph, "TutorialDrag");
+
+        /// <summary>TOUCHTUTO: pinch to zoom, 260 x 260: two finger dots on a diagonal, with arrows pointing apart.</summary>
+        public static Sprite TutorialPinch => tutorialPinch != null ? tutorialPinch : tutorialPinch = Draw(260, 260, TutorialPinchGlyph, "TutorialPinch");
+
+        /// <summary>
+        /// TOUCHTUTO: a zone panel, nine sliced with 56 px borders (one texture pixel per canvas unit at the default
+        /// multiplier): a 3 px outline with 48 px corners around a faint fill, the fill at 0.05 / 0.18 of the outline's
+        /// opacity, so a 0.18 tint gives the mockup's outline (0.18) and fill (0.05).
+        /// </summary>
+        public static Sprite TutorialZone => tutorialZone != null ? tutorialZone : tutorialZone = Draw(128, 128, TutorialZoneFrame, "TutorialZone", new Vector4(56f, 56f, 56f, 56f));
+
+        // The drag arrow's ellipse (the mockup's "M40 120 A 100 70 0 0 1 220 120"): its two ends at y 120, 90 units either
+        // side of its centre, so the centre is 70 * sqrt(1 - 0.9^2) below them.
+        private const float DragArcRadiusX = 100f;
+        private const float DragArcRadiusY = 70f;
+        private static readonly float DragArcCentreY = 120f + DragArcRadiusY * Mathf.Sqrt(1f - 0.81f);
+
+        /// <summary>A sprite pixel's centre in SVG viewBox units (y down) for a square sprite <paramref name="half"/> x 2 units wide.</summary>
+        private static Vector2 SvgPoint(float u, float v, float half)
+        {
+            return new Vector2((u + 1f) * half, (1f - v) * half);
+        }
+
+        /// <summary>Alpha <paramref name="over"/> laid over alpha <paramref name="under"/> (white over white: only the alpha adds up).</summary>
+        private static float Stack(float under, float over)
+        {
+            return over + under * (1f - over);
+        }
+
+        /// <summary>The distance to a two-segment polyline: round caps and a round join, like the mockup's strokes.</summary>
+        private static float PolylineDistance(Vector2 p, Vector2 a, Vector2 b, Vector2 c)
+        {
+            return Mathf.Min(SegmentDistance(p, a, b), SegmentDistance(p, b, c));
+        }
+
+        /// <summary>
+        /// The coverage of a dashed circle's stroke: <paramref name="dashes"/> dashes and as many gaps, each half of a period of
+        /// the circumference, <paramref name="halfWidth"/> either side of <paramref name="radius"/>.
+        /// </summary>
+        private static float DashedRing(Vector2 p, Vector2 centre, float radius, float halfWidth, int dashes, float pixel)
+        {
+            Vector2 d = p - centre;
+            float ring = Mathf.Abs(d.magnitude - radius) - halfWidth;
+            if (ring > pixel)
+            {
+                return 0f;
+            }
+            float period = 2f * Mathf.PI * radius / dashes;
+            float along = Mathf.Repeat((Mathf.Atan2(d.y, d.x) + Mathf.PI) * radius, period);
+            // Each dash is centred in its period: negative on the dash, continuous across the period's wrap.
+            float dash = Mathf.Abs(along - period * 0.5f) - period * 0.25f;
+            return Cover(Mathf.Max(ring, dash), pixel);
+        }
+
+        /// <summary>
+        /// The distance to the upper arc (y down: above the centre) of an axis-aligned ellipse between two points of it, with
+        /// round caps at both ends. A first order distance (the implicit function over its gradient), exact enough for a
+        /// stroke a few pixels wide.
+        /// </summary>
+        private static float UpperEllipseArcDistance(Vector2 p, Vector2 centre, float rx, float ry, Vector2 from, Vector2 to)
+        {
+            var q = new Vector2((p.x - centre.x) / rx, (p.y - centre.y) / ry);
+            float length = q.magnitude;
+            float angle = Mathf.Atan2(q.y, q.x);
+            float start = Mathf.Atan2((from.y - centre.y) / ry, (from.x - centre.x) / rx);
+            float end = Mathf.Atan2((to.y - centre.y) / ry, (to.x - centre.x) / rx);
+            if (length > 1e-4f && angle >= start && angle <= end)
+            {
+                float gradient = new Vector2(q.x / rx, q.y / ry).magnitude / length;
+                return Mathf.Abs(length - 1f) / Mathf.Max(gradient, 1e-6f);
+            }
+            return Mathf.Min((p - from).magnitude, (p - to).magnitude);
+        }
+
+        private static Color TutorialStickGlyph(float u, float v, float pixel)
+        {
+            const float half = 150f;
+            Vector2 p = SvgPoint(u, v, half);
+            float px = pixel * half;
+            // Two dashed landing spots (r 16, 4 wide, at 0.35).
+            float a = DashedRing(p, new Vector2(40f, 60f), 16f, 2f, 8, px) * 0.35f;
+            a = Stack(a, DashedRing(p, new Vector2(268f, 250f), 16f, 2f, 8, px) * 0.35f);
+            // The base: a faint fill (0.12) and its ring (r 110, 6 wide).
+            float r = (p - new Vector2(150f, 150f)).magnitude;
+            a = Stack(a, Cover(r - 110f, px) * 0.12f);
+            a = Stack(a, Cover(Mathf.Abs(r - 110f) - 3f, px));
+            // The knob (r 46, at 0.9), pushed up and right.
+            a = Stack(a, Cover((p - new Vector2(185f, 125f)).magnitude - 46f, px) * 0.9f);
+            // Four chevrons on the rim, 8 wide.
+            float up = PolylineDistance(p, new Vector2(132f, 58f), new Vector2(150f, 40f), new Vector2(168f, 58f));
+            float down = PolylineDistance(p, new Vector2(132f, 242f), new Vector2(150f, 260f), new Vector2(168f, 242f));
+            float left = PolylineDistance(p, new Vector2(58f, 132f), new Vector2(40f, 150f), new Vector2(58f, 168f));
+            float right = PolylineDistance(p, new Vector2(242f, 132f), new Vector2(260f, 150f), new Vector2(242f, 168f));
+            a = Stack(a, Cover(Mathf.Min(Mathf.Min(up, down), Mathf.Min(left, right)) - 4f, px));
+            return new Color(1f, 1f, 1f, a);
+        }
+
+        private static Color TutorialDragGlyph(float u, float v, float pixel)
+        {
+            const float half = 130f;
+            Vector2 p = SvgPoint(u, v, half);
+            float px = pixel * half;
+            // The curved two-way arrow, 8 wide: the ellipse's upper arc from (40, 120) to (220, 120), a head at each end.
+            float arc = UpperEllipseArcDistance(p, new Vector2(130f, DragArcCentreY), DragArcRadiusX, DragArcRadiusY,
+                new Vector2(40f, 120f), new Vector2(220f, 120f));
+            float heads = Mathf.Min(PolylineDistance(p, new Vector2(22f, 98f), new Vector2(40f, 124f), new Vector2(66f, 108f)),
+                PolylineDistance(p, new Vector2(194f, 108f), new Vector2(220f, 124f), new Vector2(238f, 98f)));
+            float a = Cover(Mathf.Min(arc, heads) - 4f, px);
+            // The finger: a faint ring (r 54, 5 wide, at 0.4) around its dot (r 34, at 0.9).
+            float r = (p - new Vector2(130f, 170f)).magnitude;
+            a = Stack(a, Cover(Mathf.Abs(r - 54f) - 2.5f, px) * 0.4f);
+            a = Stack(a, Cover(r - 34f, px) * 0.9f);
+            return new Color(1f, 1f, 1f, a);
+        }
+
+        private static Color TutorialPinchGlyph(float u, float v, float pixel)
+        {
+            const float half = 130f;
+            Vector2 p = SvgPoint(u, v, half);
+            float px = pixel * half;
+            // Two arrows pointing apart along the diagonal, 8 wide.
+            float lowArrow = Mathf.Min(SegmentDistance(p, new Vector2(62f, 198f), new Vector2(26f, 234f)),
+                PolylineDistance(p, new Vector2(26f, 204f), new Vector2(26f, 234f), new Vector2(56f, 234f)));
+            float highArrow = Mathf.Min(SegmentDistance(p, new Vector2(198f, 62f), new Vector2(234f, 26f)),
+                PolylineDistance(p, new Vector2(204f, 26f), new Vector2(234f, 26f), new Vector2(234f, 56f)));
+            float a = Cover(Mathf.Min(lowArrow, highArrow) - 4f, px);
+            // The two finger dots (r 30, at 0.9).
+            a = Stack(a, Cover((p - new Vector2(90f, 170f)).magnitude - 30f, px) * 0.9f);
+            a = Stack(a, Cover((p - new Vector2(170f, 90f)).magnitude - 30f, px) * 0.9f);
+            return new Color(1f, 1f, 1f, a);
+        }
+
+        private static Color TutorialZoneFrame(float u, float v, float pixel)
+        {
+            const float half = 64f;
+            Vector2 p = SvgPoint(u, v, half) - new Vector2(half, half);
+            float px = pixel * half;
+            // The outer edge half a pixel inside the texture's, so the slices meet the rect's edge with a smooth rim.
+            float outside = RoundedBoxDistance(p, new Vector2(half - 0.5f, half - 0.5f), 48f);
+            float outline = Cover(Mathf.Max(outside, -outside - 3f), px);
+            float fill = Cover(outside + 3f, px) * (0.05f / 0.18f);
+            return new Color(1f, 1f, 1f, Stack(fill, outline));
+        }
     }
 }

@@ -45,8 +45,8 @@ namespace OutOfSight.Tests
         private static readonly float[] Offsets = { -0.2f, 0f, 0.2f };
 
         /// <summary>Levels v2 (docs/levels_v2/LEVELS_V2.md 3, D1): the play order holds 20 levels (7 + 9 + 4) since levels.json
-        /// rev 3 (ACT3A: level21 and level20 parked out of the line-up).</summary>
-        private const int V2LevelCount = 20;
+        /// rev 3 (ACT3A: level21 and level20 parked out of the line-up); 24 since HARDLEVELS appended act 4 (level26 to level29).</summary>
+        private const int V2LevelCount = 24;
 
         /// <summary>The wave 5A levels still played in v2, with the body and the lesson of CONTRACT_M5 16.10 (level16 is cut,
         /// LEVELS_V2 D2).</summary>
@@ -1052,18 +1052,18 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// The schedule the audit finds on level 11 with the load rule off: the counter-route its load lesson prints ("lecon
-        /// load : ... contre-route : [...]", LevelAudit on level11; the wave 5A audit wrote the same one): at full speed
-        /// through the bedroom door, down the corridor and across the kitchen, turning every corner at full speed. Step 45q
-        /// replays it as the load's counter-route. Rows are x, z, at. A new layout of level 11 needs a new one, copied from
-        /// the same audit note.
+        /// load : ... contre-route : [...]", LevelAudit on level11): at full speed through the bedroom door, down the
+        /// corridor, along the living room lane behind the two bookcases (waiting behind each while Lea turns around) and
+        /// through the kitchen, turning every corner at full speed. Step 45q replays it as the load's counter-route. Rows are
+        /// x, z, at. A new layout of level 11 needs a new one, copied from the same audit note (CARD4, 2026-11-25:
+        /// Build/card4fix.log, level11 rev 2).
         /// </summary>
         private static readonly float[,] Level11RouteAtFullSpeed =
         {
-            { 3.25f, 6.25f, 0.3f }, { 3.75f, 6.25f, 1.1f }, { 3.75f, 7.25f, 1.5f }, { 3.75f, 7.75f, 2.3f }, { 4.75f, 7.75f, 2.7f },
-            { 5.25f, 7.75f, 3.5f }, { 5.25f, 6.75f, 3.9f }, { 5.25f, 5.75f, 4.7f }, { 5.25f, 4.75f, 5.5f }, { 5.25f, 3.75f, 6.3f },
-            { 5.25f, 2.75f, 7.1f }, { 5.25f, 1.75f, 7.9f }, { 5.25f, 1.25f, 8.7f }, { 6.25f, 1.25f, 9.1f }, { 7.25f, 1.25f, 9.9f },
-            { 8.25f, 1.25f, 10.7f }, { 9.25f, 1.25f, 11.5f }, { 10.25f, 1.25f, 12.3f }, { 11.25f, 1.25f, 13.1f }, { 11.25f, 1.75f, 13.9f },
-            { 11.25f, 1.75f, 13.9f },
+            { 3.25f, 6.25f, 1.2f }, { 3.75f, 6.25f, 2.0f }, { 3.75f, 7.25f, 2.4f }, { 3.75f, 7.75f, 3.2f }, { 4.75f, 7.75f, 3.6f },
+            { 5.25f, 7.75f, 4.4f }, { 5.25f, 6.75f, 4.8f }, { 5.25f, 5.75f, 5.6f }, { 5.25f, 4.75f, 6.4f }, { 6.25f, 4.75f, 7.2f },
+            { 6.75f, 4.75f, 8.0f }, { 7.75f, 4.75f, 12.2f }, { 8.75f, 4.75f, 13.0f }, { 9.75f, 4.75f, 13.8f }, { 10.25f, 4.75f, 14.6f },
+            { 11.25f, 4.75f, 18.6f }, { 11.25f, 3.75f, 19.4f }, { 11.25f, 2.75f, 20.2f }, { 11.25f, 1.75f, 21.0f }, { 11.25f, 1.75f, 21.0f },
         };
 
         /// <summary>

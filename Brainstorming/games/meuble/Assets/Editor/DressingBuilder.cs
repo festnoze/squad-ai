@@ -197,7 +197,12 @@ namespace OutOfSight.Editor
 
         // ----- The GLB reader and the bake -----
 
-        private static Mesh Bake(string id, string path, string image, out int triangleCount)
+        /// <summary>
+        /// The mesh of the GLB at <paramref name="path"/> drawn with the wall material (see the class summary). WINDOWS3D
+        /// (WindowModelBuilder): with <paramref name="keepMaterial"/>, only the primitives whose material name it keeps (the
+        /// window's frame without its glazing slot).
+        /// </summary>
+        internal static Mesh Bake(string id, string path, string image, out int triangleCount, Predicate<string> keepMaterial = null)
         {
             byte[] glb = File.ReadAllBytes(path);
             if (glb.Length < 20 || BitConverter.ToUInt32(glb, 0) != 0x46546C67)
@@ -228,6 +233,14 @@ namespace OutOfSight.Editor
                 }
                 foreach (JToken primitive in gltf["meshes"][(int)node["mesh"]]["primitives"])
                 {
+                    if (keepMaterial != null)
+                    {
+                        JToken kept = primitive["material"] != null ? materials[(int)primitive["material"]] : null;
+                        if (!keepMaterial((string)kept?["name"] ?? string.Empty))
+                        {
+                            continue;
+                        }
+                    }
                     JToken attributes = primitive["attributes"];
                     float[] p = Read(gltf, glb, bin, (int)attributes["POSITION"], out _);
                     float[] n = Read(gltf, glb, bin, (int)attributes["NORMAL"], out _);
@@ -345,7 +358,7 @@ namespace OutOfSight.Editor
         }
 
         /// <summary>An accessor's components as floats (float, or normalised unsigned byte or short), and its component count.</summary>
-        private static float[] Read(JObject gltf, byte[] glb, int bin, int accessorIndex, out int components)
+        internal static float[] Read(JObject gltf, byte[] glb, int bin, int accessorIndex, out int components)
         {
             JToken accessor = gltf["accessors"][accessorIndex];
             JToken view = gltf["bufferViews"][(int)accessor["bufferView"]];
@@ -369,7 +382,7 @@ namespace OutOfSight.Editor
             return values;
         }
 
-        private static int[] ReadIndices(JObject gltf, byte[] glb, int bin, int accessorIndex)
+        internal static int[] ReadIndices(JObject gltf, byte[] glb, int bin, int accessorIndex)
         {
             JToken accessor = gltf["accessors"][accessorIndex];
             JToken view = gltf["bufferViews"][(int)accessor["bufferView"]];

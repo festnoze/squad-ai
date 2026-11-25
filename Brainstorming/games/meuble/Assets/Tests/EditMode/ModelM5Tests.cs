@@ -54,7 +54,8 @@ namespace OutOfSight.Tests
                 Assert.IsTrue(c.HasValue, $"{e.id}: material {m.name} has no base colour");
                 list.Add((m.name, c.Value));
             }
-            Assert.Greater(list.Count, 2, e.id + ": premise: few source materials");
+            // LABRADOR: the final Labrador has two materials (its body on the fur map, its head on the head atlas).
+            Assert.GreaterOrEqual(list.Count, e.IsPet ? 2 : 3, e.id + ": premise: few source materials");
             return list;
         }
 
@@ -159,6 +160,38 @@ namespace OutOfSight.Tests
                     Assert.Greater(bones, Tuning.BudgetInhabitantBones, "premise: the Husky needs the pet bone budget");
                 }
             }
+        }
+
+        /// <summary>
+        /// LABRADOR (2026-11-25): the dog's catalog model is the final Labrador. Its two source materials, "Main" (body and
+        /// mouth) and "Tete profil et face" (head and neck seam), each show their own painted map from Resources (the fur map,
+        /// the head atlas), and without the maps both would wear the dog's tint. Its eyes come from its "Head/LabradorEyeCenter"
+        /// marker (the name ModelCatalogBuilder.LabradorEyeMarker gives it): eyeLocal is the marker in head bone space, and the
+        /// eyes face +z.
+        /// </summary>
+        [Test]
+        public void The_dog_is_the_final_Labrador_with_its_two_maps_and_its_eye_marker()
+        {
+            ModelCatalog.Entry dog = Entry(ModelCatalog.QuaterniusHusky);
+            string[] names = Skin(dog).sharedMaterials.Select(m => m != null ? m.name : string.Empty).ToArray();
+            CollectionAssert.AreEqual(new[] { "Main", ModelKit.PetHeadMaterial }, names, "the dog's source materials");
+            Assert.IsNotNull(ModelKit.PetFurMap, $"no fur map at Resources/{Tuning.DogFurTextureResource}");
+            Assert.IsNotNull(ModelKit.PetHeadMap, $"no head atlas at Resources/{Tuning.DogHeadAtlasResource}");
+            Assert.AreSame(ModelKit.PetFurMap, ModelKit.PetSlotMap("Main"), "the body does not show the fur map");
+            Assert.AreSame(ModelKit.PetHeadMap, ModelKit.PetSlotMap(ModelKit.PetHeadMaterial), "the head does not show the head atlas");
+            Assert.AreNotSame(ModelKit.PetFurMap, ModelKit.PetHeadMap, "the head atlas is the fur map");
+            foreach (string name in names)
+            {
+                Assert.AreEqual(ModelKit.CharacterPart.Clothes, ModelKit.PartOf(name, true), $"{name}: without its map it would not wear the dog's tint");
+                Assert.IsFalse(ModelKit.IsPetEyeWhite(name), $"{name}: kept out of the maps");
+            }
+            Transform head = dog.prefab.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == dog.headBone);
+            Assert.IsNotNull(head, "premise: the dog's head bone");
+            Transform marker = head.Find("LabradorEyeCenter");
+            Assert.IsNotNull(marker, "no Head/LabradorEyeCenter eye marker in the dog's model");
+            Assert.That(Vector3.Distance(dog.eyeLocal, head.InverseTransformPoint(marker.position)), Is.LessThan(1e-6f),
+                $"eyeLocal {dog.eyeLocal} is not the marker's position in head bone space");
+            Assert.AreEqual(0f, dog.yawOffset, 1e-4f, "the dog's eyes do not face +z");
         }
 
         // ----- The personalities -----

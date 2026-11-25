@@ -238,8 +238,8 @@ namespace OutOfSight
         // Warm: exactly the floor lamp's glow (LampLight.GlowColor x GlowIntensity), so a lamp level shares it.
         private static readonly Color WarmGlow = new Color(1f, 0.8f, 0.46f);
         private const float WarmGlowIntensity = 1.9f;
-        // Cool: exactly the window pane's (LevelBuilder.WindowPane x Tuning.WindowPaneEmission, its smoothness): every level
-        // with a window shares it.
+        // Cool: exactly the window pane's (LevelBuilder.WindowPane x Tuning.WindowPaneEmission, its smoothness,
+        // LevelBuilder.PaneMaterial): every level with the garden backdrop shares it (WINDOWS3D: the 3D windows no longer do).
         private static readonly Color CoolGlow = new Color32(0xBF, 0xE3, 0xF5, 0xFF);
 
         /// <summary>A light mood of a room type: the light's colour, the light its pool centre gets, and its glow family.</summary>

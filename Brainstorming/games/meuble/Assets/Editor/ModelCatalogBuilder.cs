@@ -26,6 +26,9 @@ namespace OutOfSight.Editor
     /// of its "Eyes_*" materials (anywhere on the body: a dog's head is not on top), and its clip map names its Idle and
     /// Walk exactly (the Husky stores every clip twice, plain and "AnimalArmature|": the plain set is used). Bones and
     /// triangles are checked against PRD 7.4 (a pet: Tuning.BudgetPetBones), with a warning when over.
+    /// LABRADOR (2026-11-25): a spec may name an eye marker instead, an empty node under the head bone at the centre of the
+    /// eyes (the final Labrador paints its eyes in its head atlas and has no eye submesh: "Head/LabradorEyeCenter"). The
+    /// marker then gives the eye centre (eyeLocal), the facing and the eye height; the eye materials are not needed.
     ///
     /// M4.2: it also builds Assets/Resources/TextureLibrary.asset (the detail textures and their measured means) and
     /// enforces their import settings (<see cref="BuildTextureLibrary()"/>).
@@ -66,6 +69,8 @@ namespace OutOfSight.Editor
             public string WalkClip;
             // THROWFIX: a seat whose backrest top is measured (the throw drapes over it).
             public bool Backrest;
+            // LABRADOR: the name of an eye marker node under the head bone (null: the eyes come from the eye materials).
+            public string EyeMarker;
 
             public Spec(string id, string path, float yaw, bool rigged)
             {
@@ -79,17 +84,28 @@ namespace OutOfSight.Editor
                 IdleClip = null;
                 WalkClip = null;
                 Backrest = false;
+                EyeMarker = null;
             }
 
-            /// <summary>A pet: eyes from the "Eyes_*" materials, eyes fitted at <paramref name="targetEye"/>, its clip map.</summary>
-            public static Spec Pet(string id, string path, float targetEye, string idleClip, string walkClip)
+            /// <summary>
+            /// A pet: eyes from the "Eyes_*" materials, or (LABRADOR) from the <paramref name="eyeMarker"/> node under the head
+            /// bone when one is named; eyes fitted at <paramref name="targetEye"/>, its clip map.
+            /// </summary>
+            public static Spec Pet(string id, string path, float targetEye, string idleClip, string walkClip, string eyeMarker = null)
             {
                 return new Spec(id, path, 0f, true)
                 {
                     Kind = ModelCatalog.KindPet, TargetEye = targetEye, PetEyes = true, IdleClip = idleClip, WalkClip = walkClip,
+                    EyeMarker = eyeMarker,
                 };
             }
         }
+
+        /// <summary>
+        /// LABRADOR (2026-11-25): the final Labrador's eye marker, an empty node under its head bone at the centre of its
+        /// painted eyes (ArtHandoff/LabradorFinal/inventory.json "eye_marker": "Head/LabradorEyeCenter").
+        /// </summary>
+        public const string LabradorEyeMarker = "LabradorEyeCenter";
 
         /// <summary>M5: the prefix of a pet's eye materials (the Husky: Eyes_White, Eyes_Black).</summary>
         public const string PetEyeMaterialPrefix = "Eyes_";
@@ -121,7 +137,12 @@ namespace OutOfSight.Editor
             // DOGBIG (2026-11-21): the Husky replaced the Shiba (same AnimalArmature rig, same clips, 3 more tail bones), its
             // model fitted bigger than the gameplay eye (Tuning.DogModelEyeHeight). Its GLB is the staged poly.pizza file with
             // the materials renamed to the Shiba's names and a UV0 atlas added (docs/next/progress/DOGBIG.md).
-            Spec.Pet(ModelCatalog.QuaterniusHusky, Quaternius + "quaternius_husky.glb", Tuning.DogModelEyeHeight, "Idle", "Walk"),
+            // LABRADOR (2026-11-25): the id now names the final Labrador (the same rig, Jaw and 24 clips; two materials, "Main"
+            // on DogFur and "Tete profil et face" on LabradorHeadAtlas; its eyes painted, found by their marker), staged from
+            // ArtHandoff/LabradorFinal by tools/assets/dog/stage_labrador.py (docs/next/progress/LABRADOR.md). The id is kept
+            // so every level naming it still works; quaternius_husky.glb stays as the art pipeline's source body.
+            Spec.Pet(ModelCatalog.QuaterniusHusky, Quaternius + "quaternius_labrador.glb", Tuning.DogModelEyeHeight, "Idle", "Walk",
+                LabradorEyeMarker),
             // M8 room objects (docs/m8/ROOMS_PLAN.md 3): the Kenney bed's pillows are on +Z in glTF, the fridge's handles and the
             // nightstand's knob on -Z, as the procedural bed (headboard +z) and the doors of every cabinet (-z): 0.
             new Spec(ModelCatalog.KenneyBed, Kenney + "kenney_bed_double.glb", 0f, false),
@@ -166,6 +187,8 @@ namespace OutOfSight.Editor
             BuildTextureLibrary(log);
             // DRESSING (docs/next/progress/DRESSING.md): the decor meshes, baked from the dressing GLBs.
             DressingBuilder.Build(log);
+            // WINDOWS3D (docs/next/progress/WINDOWS3D.md): the 3D window's frame and glass, after the dressing (its bake and arrays).
+            WindowModelBuilder.Build(log);
             AssetDatabase.SaveAssets();
             Debug.Log(log.ToString());
         }
@@ -957,10 +980,17 @@ namespace OutOfSight.Editor
                 Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: skinned mesh or bone '{HeadBoneName}' missing in {spec.Path}");
                 return null;
             }
-            // The eye materials: "Eyes" for a human, every "Eyes_*" for a pet (M5).
-            var eyeSlots = new List<int>();
             Material[] slots = skin.sharedMaterials;
-            for (int i = 0; i < slots.Length && i < skin.sharedMesh.subMeshCount; i++)
+            // LABRADOR: the eye marker under the head bone, when the spec names one, is the eye centre itself.
+            Transform marker = string.IsNullOrEmpty(spec.EyeMarker) ? null : FindDeep(head, spec.EyeMarker);
+            if (!string.IsNullOrEmpty(spec.EyeMarker) && marker == null)
+            {
+                Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: no eye marker '{HeadBoneName}/{spec.EyeMarker}' in {spec.Path}; "
+                    + "the eyes are looked for in the eye materials");
+            }
+            // The eye materials: "Eyes" for a human, every "Eyes_*" for a pet (M5); not needed with a marker.
+            var eyeSlots = new List<int>();
+            for (int i = 0; marker == null && i < slots.Length && i < skin.sharedMesh.subMeshCount; i++)
             {
                 string n = slots[i] != null ? slots[i].name : string.Empty;
                 if (spec.PetEyes ? n.StartsWith(PetEyeMaterialPrefix, System.StringComparison.Ordinal) : n == EyeMaterialName)
@@ -968,7 +998,7 @@ namespace OutOfSight.Editor
                     eyeSlots.Add(i);
                 }
             }
-            if (eyeSlots.Count == 0)
+            if (marker == null && eyeSlots.Count == 0)
             {
                 Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: no '{(spec.PetEyes ? PetEyeMaterialPrefix + "*" : EyeMaterialName)}' material on the skinned mesh");
                 return null;
@@ -988,32 +1018,44 @@ namespace OutOfSight.Editor
                 {
                     bounds.Encapsulate(toRoot.MultiplyPoint3x4(v));
                 }
-                // The "Eyes" material is the near-black of the model: the man's shoes use it too. Only its vertices
-                // in the head region (the top fifth of the body) are eyes. A pet's "Eyes_*" are only eyes (its head is
-                // at the front, not on top): all of their vertices.
-                float headRegion = spec.PetEyes ? float.MinValue : bounds.min.y + (1f - HeadRegion) * bounds.size.y;
-                var eyeVertices = new HashSet<int>();
-                foreach (int eyeSlot in eyeSlots)
+                Vector3 eyeRest;
+                string eyeSource;
+                if (marker != null)
                 {
-                    foreach (int i in baked.GetIndices(eyeSlot))
+                    // LABRADOR: the marker where the rest pose puts it (the probe's root is at the origin: world is root space).
+                    eyeRest = marker.position;
+                    eyeSource = $"marker '{HeadBoneName}/{marker.name}'";
+                }
+                else
+                {
+                    // The "Eyes" material is the near-black of the model: the man's shoes use it too. Only its vertices
+                    // in the head region (the top fifth of the body) are eyes. A pet's "Eyes_*" are only eyes (its head is
+                    // at the front, not on top): all of their vertices.
+                    float headRegion = spec.PetEyes ? float.MinValue : bounds.min.y + (1f - HeadRegion) * bounds.size.y;
+                    var eyeVertices = new HashSet<int>();
+                    foreach (int eyeSlot in eyeSlots)
                     {
-                        if (toRoot.MultiplyPoint3x4(vertices[i]).y >= headRegion)
+                        foreach (int i in baked.GetIndices(eyeSlot))
                         {
-                            eyeVertices.Add(i);
+                            if (toRoot.MultiplyPoint3x4(vertices[i]).y >= headRegion)
+                            {
+                                eyeVertices.Add(i);
+                            }
                         }
                     }
+                    if (eyeVertices.Count == 0)
+                    {
+                        Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: no '{EyeMaterialName}' vertex in the head region");
+                        return null;
+                    }
+                    Vector3 eyeSum = Vector3.zero;
+                    foreach (int i in eyeVertices)
+                    {
+                        eyeSum += toRoot.MultiplyPoint3x4(vertices[i]);
+                    }
+                    eyeRest = eyeSum / eyeVertices.Count;
+                    eyeSource = $"{eyeVertices.Count} vertices";
                 }
-                if (eyeVertices.Count == 0)
-                {
-                    Debug.LogWarning($"[ModelCatalogBuilder] {spec.Id}: no '{EyeMaterialName}' vertex in the head region");
-                    return null;
-                }
-                Vector3 eyeSum = Vector3.zero;
-                foreach (int i in eyeVertices)
-                {
-                    eyeSum += toRoot.MultiplyPoint3x4(vertices[i]);
-                }
-                Vector3 eyeRest = eyeSum / eyeVertices.Count;
 
                 entry.nativeSize = bounds.size;
                 entry.boundsCenter = bounds.center;
@@ -1028,10 +1070,19 @@ namespace OutOfSight.Editor
                 float idleHeight = IdleEyeHeight(spec.Path, probe, head, entry.eyeLocal, spec.IdleClip, out string clipName);
                 entry.eyeHeight = idleHeight > 0f ? idleHeight : restHeight;
                 log.Append($", size {Fmt(bounds.size)}, centre {Fmt(bounds.center)}, head '{head.name}' lossy scale {Fmt(head.lossyScale)}, ")
-                    .Append($"head y {F(head.position.y)}, eye {Fmt(eyeRest)} local {Fmt(entry.eyeLocal, "0.#####")} ({eyeVertices.Count} vertices), ")
+                    .Append($"head y {F(head.position.y)}, eye {Fmt(eyeRest)} local {Fmt(entry.eyeLocal, "0.#######")} ({eyeSource}), ")
                     .Append($"facing {Fmt(ahead)} so yaw {entry.yawOffset}, ")
                     .Append($"eye height rest {F(restHeight)} idle {F(idleHeight)} ({clipName ?? "no clip"}), bones {skin.bones.Length}, ")
-                    .Append($"triangles {ModelKit.Triangles(skin.sharedMesh)}, slots {slots.Length}\n");
+                    .Append($"triangles {ModelKit.Triangles(skin.sharedMesh)}, slots {slots.Length}");
+                if (spec.Kind == ModelCatalog.KindPet)
+                {
+                    // LABRADOR: the fitted model, as ModelKit draws it (its idle eyes at the target eye).
+                    float scale = ModelKit.RiggedScale(entry);
+                    log.Append($", fitted at scale {F(scale)}: eyes {F(restHeight * scale)} m at rest, {F(entry.eyeHeight * scale)} m in Idle, ")
+                        .Append($"{F(bounds.size.y * scale)} m tall, {F(bounds.size.z * scale)} m long, snout reach {F(ModelKit.ForwardReach(entry))} m, ")
+                        .Append($"materials {string.Join(", ", System.Linq.Enumerable.Select(slots, m => m != null ? "'" + m.name + "'" : "null"))}");
+                }
+                log.Append('\n');
                 CheckBudgets(spec, prefab, skin, log);
                 return entry;
             }

@@ -834,11 +834,12 @@ namespace OutOfSight.Tests
                             continue;
                         }
                         combined++;
-                        // Window picture (2026-11-19, WindowImage): the panes show the owner's window once per window, their
-                        // UVs in the picture's own 0 to 1 (sliced), never in metres; still the only unlit combined renderer.
-                        if (r.name == "WindowPane" && WindowImage.Texture != null)
+                        // WINDOWS3D (2026-11-24): the 3D windows' frames of one wall line combine, drawn with the wall material,
+                        // their UVs the walnut image's own (the GLB's), never in metres; no property block.
+                        if (r.name == LevelBuilder.WindowFrameName)
                         {
-                            Assert.IsNull(PrimitiveKit.PaletteOf(r.sharedMaterial), $"{id}: the window panes lost their unlit pane material");
+                            Assert.IsTrue(WallArray.IsWallMaterial(r.sharedMaterial), $"{id}: the window frames are not drawn with the wall material");
+                            Assert.IsFalse(r.HasPropertyBlock(), $"{id}: the window frames carry a property block");
                             continue;
                         }
                         Assert.AreEqual(1f, PrimitiveKit.MetresPerUv(r, 0), 1e-3f, $"{id}: {r.name}: combined UVs are not in metres");
@@ -883,29 +884,44 @@ namespace OutOfSight.Tests
                         Assert.AreEqual(1, frames, $"{id}: bookshelf {prop.Name} draws its frame as one renderer");
                         Assert.Greater(bookMaterials.Count, 1, $"{id}: premise: bookshelf {prop.Name} has books of several colours");
                     }
-                    // M7 walls pass: the panes of the outer walls never fade, one renderer; a window on a line shared over part of
-                    // its length cuts with that line, so its pane combines with that line's (one more renderer per such line).
-                    int panes = 0;
-                    var paneLines = new HashSet<string>();
+                    // WINDOWS3D (2026-11-24, replacing the M7 panes): every window is the 3D model, one glass renderer per
+                    // window (its own object space for the glass shader, its own transparent sort) with the one shared glass
+                    // material, and the frames of one wall line one renderer of the wall material; frame and glass go with their
+                    // wall line (registered with its rule, the glass marked for its own see-through copy). No flat pane is left.
+                    // Visual only: a ray through each window's middle, across the wall, still hits the wall's own collider.
+                    Assert.IsNotNull(WindowModel.Usable, $"{id}: premise: the 3D window model is usable (Resources/{WindowModel.ResourcePath})");
+                    int glasses = 0;
+                    var frameLines = new HashSet<string>();
                     var paneFader = level.Root.GetComponent<WallFader>();
                     foreach (MeshRenderer r in level.Root.GetComponentsInChildren<MeshRenderer>(false))
                     {
-                        if (r.name != "WindowPane")
+                        Assert.AreNotEqual("WindowPane", r.name, $"{id}: a flat window pane is still drawn");
+                        if (r.name == LevelBuilder.WindowGlassName)
                         {
-                            continue;
+                            glasses++;
+                            Assert.AreSame(WindowModel.Usable.glassMaterial, r.sharedMaterial, $"{id}: a window glass is not the shared glass material");
+                            Assert.IsTrue(paneFader.PlaneOf(r, out _, out _), $"{id}: a window glass does not go with its wall");
+                            Assert.IsTrue(paneFader.IsGlass(r), $"{id}: a window glass is not marked as glass for its see-through copy");
+                            Assert.IsEmpty(r.GetComponentsInChildren<Collider>(true), $"{id}: a window glass carries a collider");
+                            Vector3 across = r.transform.forward;
+                            Vector3 middle = r.bounds.center;
+                            bool walled = false;
+                            foreach (RaycastHit hit in Physics.RaycastAll(middle - across * 0.5f, across, 1f, Layers.OccluderMask, QueryTriggerInteraction.Ignore))
+                            {
+                                walled |= hit.collider.name == "Segment";
+                            }
+                            Assert.IsTrue(walled, $"{id}: no wall collider behind the window at {middle}: the window must stay visual only");
                         }
-                        if (paneFader.PlaneOf(r, out Vector3 panePoint, out Vector3 paneNormal))
+                        else if (r.name == LevelBuilder.WindowFrameName)
                         {
-                            Assert.IsTrue(paneLines.Add(panePoint.ToString("F3") + " " + paneNormal.ToString("F3")),
-                                $"{id}: two pane renderers cut with the same wall line");
-                        }
-                        else
-                        {
-                            panes++;
+                            Assert.IsTrue(paneFader.PlaneOf(r, out Vector3 framePoint, out Vector3 frameNormal), $"{id}: a window frame does not go with its wall");
+                            Assert.IsTrue(frameLines.Add(framePoint.ToString("F3") + " " + frameNormal.ToString("F3") + " " + paneFader.IsOuter(r)),
+                                $"{id}: two window frame renderers go with the same wall line");
+                            Assert.IsEmpty(r.GetComponentsInChildren<Collider>(true), $"{id}: a window frame carries a collider");
                         }
                     }
-                    Assert.LessOrEqual(panes, 1, $"{id}: the window panes of the outer walls are one renderer");
-                    Assert.AreEqual(Game.Def.Windows.Count > 0, panes + paneLines.Count > 0, $"{id}: the windows draw no pane");
+                    Assert.AreEqual(Game.Def.Windows.Count, glasses, $"{id}: not one glass per window");
+                    Assert.AreEqual(Game.Def.Windows.Count > 0, frameLines.Count > 0, $"{id}: the windows draw no frame");
 
                     // A shared wall's faces and baseboards fade with its centre plane (a wall root's plane), so the parts of one
                     // material on both sides of a wall line are one renderer: no two share a material and a plane.

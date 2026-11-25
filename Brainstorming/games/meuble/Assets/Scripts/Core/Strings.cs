@@ -117,6 +117,8 @@ namespace OutOfSight.Core
             { "act1.name", new[] { "One piece, one rule", "Un meuble, une règle" } },
             { "act2.name", new[] { "The household", "La maisonnée" } },
             { "act3.name", new[] { "Far from home", "Loin de chez soi" } },
+            // HARDLEVELS (docs/next/progress/HARDLEVELS.md): act 4, four long maze houses after the finale.
+            { "act4.name", new[] { "The long way round", "Le chemin le plus long" } },
 
             // Level names and hints. Levels v2 (LEVELS_V2.md 8, D22, D29): hints describe the threat, never the route,
             // use the inhabitant names exactly as in the level data, say "tu" in French, and name no key: {action} (the lamp
@@ -148,8 +150,8 @@ namespace OutOfSight.Core
             { "level10.name", new[] { "The Rocking Chair", "Le fauteuil à bascule" } },
             { "level10.hint", new[] { "It keeps rocking after every stop: brake early.", "Il se balance après chaque arrêt : arrête-toi tôt." } },
             { "level11.name", new[] { "The Vase", "Le vase" } },
-            { "level11.hint", new[] { "Slow down ({careful}) before every turn or the vase falls. Lea faces the wall first, then makes her rounds.",
-                "Ralentis ({careful}) avant chaque virage, sinon le vase tombe. Lea fait d'abord face au mur, puis elle fait sa ronde." } },
+            { "level11.hint", new[] { "Slow down ({careful}) before every turn or the vase falls. Lea dusts her bookshelf but keeps turning around to check the living room.",
+                "Ralentis ({careful}) avant chaque virage, sinon le vase tombe. Lea époussette sa bibliothèque, mais se retourne sans cesse pour surveiller le salon." } },
             { "level12.name", new[] { "The Dog", "Le chien" } },
             { "level12.hint", new[] { "Rex sees low: the sofas hide you from him. Paul sees over them.",
                 "Rex voit bas : les canapés te cachent de lui. Paul, lui, voit par-dessus." } },
@@ -192,6 +194,19 @@ namespace OutOfSight.Core
             { "level24.name", new[] { "The Great Escape", "La grande évasion" } },
             { "level24.hint", new[] { "Rex watches the long corridor: stay behind the sideboards. Hide among the dining chairs while Theo and Mamie look away. Behind Theo the runner starts a step too late: cross that bare floor while the robot hums close by. Lea watches the doormat; go when she turns her head.",
                 "Rex surveille le long couloir : reste derrière les buffets. Cache-toi parmi les chaises de la salle à manger pendant que Theo et Mamie regardent ailleurs. Derrière Theo, le tapis commence un pas trop tard : traverse ce parquet nu quand le robot ronronne tout près. Lea surveille le paillasson ; file quand elle tourne la tête." } },
+            // HARDLEVELS: act 4 (level26 to level29). Hints name the threats, never the route, with the data's names.
+            { "level26.name", new[] { "Lights Out", "Extinction des feux" } },
+            { "level26.hint", new[] { "Switch off ({action}) and the dark hides you, except up close. The Comtesse watches the long corridor from the bathroom door. Alfred keeps circling the kitchen. Rex naps in the library.",
+                "Éteins-toi ({action}) : dans le noir, on ne te voit que de près. La Comtesse surveille le long couloir depuis la porte de la salle de bain. Alfred tourne sans cesse autour de la cuisine. Rex fait la sieste dans la bibliothèque." } },
+            { "level27.name", new[] { "Rush Hour", "L'heure de pointe" } },
+            { "level27.hint", new[] { "Theo hurries between his doorway and the sofa. Papa reads in the dining room and looks up now and then. Only Maman opens the garage door on her way out, then she keeps an eye on the car.",
+                "Theo file de la porte de sa chambre au canapé, et retour. Papa lit dans la salle à manger et lève parfois les yeux. Seule Maman ouvre la porte du garage en partant, puis elle garde un œil sur la voiture." } },
+            { "level28.name", new[] { "The Labyrinth", "Le labyrinthe" } },
+            { "level28.hint", new[] { "Odile paces the long corridor and is never fooled: let her pass from inside a wardrobe. Hugo reads in the library. At the bar, Paul never counts the stools.",
+                "Odile arpente le long couloir et ne se laisse jamais tromper : laisse-la passer, caché dans une armoire. Hugo lit dans la bibliothèque. Au bar, Paul ne compte jamais les tabourets." } },
+            { "level29.name", new[] { "Moving Day", "Le jour du déménagement" } },
+            { "level29.hint", new[] { "Theo works in the home office and never counts the office chairs. Rex naps in the west corridor and only sees what moves. Mind the robot in the salon. Lea keeps an eye on the east corridor.",
+                "Theo travaille dans le bureau et ne compte jamais les fauteuils de bureau. Rex fait la sieste dans le couloir ouest et ne voit que ce qui bouge. Attention au robot du salon. Lea garde un œil sur le couloir est." } },
 
             { "person.dreamer", new[] { "The Daydreamer", "Le rêveur" } },
             { "person.dreamer.trait", new[] { "Dawdles along and hardly looks around.", "Il traîne et regarde peu autour de lui." } },
@@ -265,10 +280,60 @@ namespace OutOfSight.Core
             // Credits page (2026-11-19): the title page's button and the page's own heading; the lines are Core.Credits.
             { "credits.title", new[] { "Credits", "Crédits" } },
 
+            // ADSSHOP (docs/next/progress/ADSSHOP.md): the Shop page (title page button, its rows and status lines) and the
+            // catalog's product names (Resources/Config/shop.json titleKey and descriptionKey point here).
+            { "shop.title", new[] { "Shop", "Boutique" } },
+            { "shop.restore", new[] { "Restore purchases", "Restaurer les achats" } },
+            { "shop.privacy", new[] { "Ad privacy choices", "Confidentialité des pubs" } },
+            { "shop.owned", new[] { "Owned", "Acquis" } },
+            { "shop.busy", new[] { "One moment...", "Un instant..." } },
+            { "shop.purchased", new[] { "Thank you! Purchase complete.", "Merci ! Achat effectué." } },
+            { "shop.thanks", new[] { "Thank you so much for your support!", "Merci beaucoup pour ton soutien !" } },
+            { "shop.cancelled", new[] { "Purchase cancelled.", "Achat annulé." } },
+            { "shop.pending", new[] { "Purchase pending: it unlocks once approved.", "Achat en attente : il se débloque une fois validé." } },
+            { "shop.failed", new[] { "The purchase did not go through. Please try again later.", "L'achat n'a pas abouti. Réessaie plus tard." } },
+            { "shop.unavailable", new[] { "The store is not available right now.", "La boutique n'est pas disponible pour le moment." } },
+            { "shop.alreadyOwned", new[] { "You already own this.", "Tu possèdes déjà cet article." } },
+            { "shop.restored", new[] { "Purchases restored.", "Achats restaurés." } },
+            { "shop.restoreFailed", new[] { "Could not restore purchases. Please try again later.", "Impossible de restaurer les achats. Réessaie plus tard." } },
+            { "shop.privacyFailed", new[] { "The privacy choices could not open.", "Les choix de confidentialité n'ont pas pu s'ouvrir." } },
+            { "shop.noAds.title", new[] { "Remove ads", "Supprimer les pubs" } },
+            { "shop.noAds.desc", new[] { "No more video ads between levels, for good.", "Plus aucune pub vidéo entre les niveaux, pour de bon." } },
+            { "shop.premium.title", new[] { "Premium pack", "Pack premium" } },
+            { "shop.premium.desc", new[] { "No ads and every level unlocked, for less.", "Sans pub et tous les niveaux débloqués, pour moins cher." } },
+            { "shop.allLevels.title", new[] { "Unlock all levels", "Débloquer tous les niveaux" } },
+            { "shop.allLevels.desc", new[] { "Play any level right away, in any order.", "Joue à n'importe quel niveau, tout de suite." } },
+            { "shop.coffee.title", new[] { "Buy the developer a coffee", "Offrir un café au développeur" } },
+            { "shop.coffee.desc", new[] { "A small tip to support the game. Thank you!", "Un petit pourboire pour soutenir le jeu. Merci !" } },
+
+            // ADSSHOP: the Simulated ad provider's full-screen fake ad (development only; a real network draws its own).
+            // {0} is the ad format, {1} the placement; {0} in the countdowns is whole seconds.
+            { "ads.label", new[] { "Advertisement", "Publicité" } },
+            { "ads.simulated", new[] { "Simulated ad", "Pub simulée" } },
+            { "ads.simulatedBody", new[] { "Out of Sight test ad: {0}, {1}", "Pub de test Out of Sight : {0}, {1}" } },
+            { "ads.skipIn", new[] { "Skip in {0} s", "Passer dans {0} s" } },
+            { "ads.skip", new[] { "Skip ad", "Passer la pub" } },
+            { "ads.endsIn", new[] { "Ad ends in {0} s", "Fin de la pub dans {0} s" } },
+            { "ads.reward", new[] { "Reward earned!", "Récompense obtenue !" } },
+            { "ads.privacyTitle", new[] { "Simulated privacy choices", "Choix de confidentialité simulés" } },
+            { "ads.privacyBody", new[] { "A real network shows its consent form here (Google UMP).",
+                "Une vraie régie affiche ici son formulaire de consentement (Google UMP)." } },
+            { "ads.close", new[] { "Close", "Fermer" } },
+
             // DOORAUTO: the touch name of the lamp switch in a hint's {action} (the action button is gone).
             { "touch.lamp", new[] { "tap the lamp", "touche la lampe" } },
             { "touch.careful", new[] { "Careful", "Prudence" } },
             { "touch.pause", new[] { "II", "II" } },
+
+            // TOUCHTUTO (docs/next/progress/TOUCHTUTO.md): the level 1 touch tutorial over the held start, on touch only. One
+            // title (shown in capitals) and one caption per item of the two zones, and the line that replaces hud.startTouch.
+            { "tuto.move.title", new[] { "Move", "Se déplacer" } },
+            { "tuto.move.caption", new[] { "Thumb anywhere here", "Pouce n'importe où ici" } },
+            { "tuto.turn.title", new[] { "Turn", "Tourner" } },
+            { "tuto.turn.caption", new[] { "Drag one finger", "Glisse un doigt" } },
+            { "tuto.zoom.title", new[] { "Zoom", "Zoomer" } },
+            { "tuto.zoom.caption", new[] { "Pinch with two fingers", "Pince avec deux doigts" } },
+            { "tuto.tap", new[] { "Tap the screen to play", "Touche l'écran pour jouer" } },
 
             // Stars (idea 5, docs/next/progress/STARS.md): the level select's total line ({0} the stars earned at the current
             // difficulty, {1} the levels times three) and the win panel's line under the stars when this win raised them.
@@ -665,6 +730,16 @@ namespace OutOfSight.Core
         public static string TouchCareful => Get("touch.careful");
         public static string TouchPause => Get("touch.pause");
 
+        // TOUCHTUTO: the level 1 touch tutorial (Runtime.TouchTutorial shows the titles in capitals).
+        public static string TutoMoveTitle => Get("tuto.move.title");
+        public static string TutoMoveCaption => Get("tuto.move.caption");
+        public static string TutoTurnTitle => Get("tuto.turn.title");
+        public static string TutoTurnCaption => Get("tuto.turn.caption");
+        public static string TutoZoomTitle => Get("tuto.zoom.title");
+        public static string TutoZoomCaption => Get("tuto.zoom.caption");
+        /// <summary>The tutorial's bottom line, which replaces the touch start line (hud.startTouch) while it shows.</summary>
+        public static string TutoTap => Get("tuto.tap");
+
         // M7 android: the quality option.
         public static string OptionsQuality => Get("options.quality");
         public static string OptionsQualityLow => Get("options.qualityLow");
@@ -685,6 +760,15 @@ namespace OutOfSight.Core
 
         /// <summary>"Crédits", the title page's button and the Credits page's heading (its lines are <see cref="Credits"/>).</summary>
         public static string CreditsTitle => Get("credits.title");
+
+        // ADSSHOP: the Shop page and the Simulated ad (product names are looked up by the catalog's keys with Get).
+        public static string ShopTitle => Get("shop.title");
+        public static string ShopRestore => Get("shop.restore");
+        public static string ShopPrivacy => Get("shop.privacy");
+        public static string ShopOwned => Get("shop.owned");
+        public static string AdsLabel => Get("ads.label");
+        public static string AdsSkip => Get("ads.skip");
+        public static string AdsClose => Get("ads.close");
 
         // Stars (idea 5): the level select's total line and the win panel's "New stars!".
         public static string StarsTotal => Get("stars.total");

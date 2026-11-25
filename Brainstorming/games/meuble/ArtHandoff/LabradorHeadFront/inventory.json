@@ -1,0 +1,43 @@
+{
+  "labrador_head_refined": {
+    "triangles": 12720,
+    "material_slots": 7,
+    "bounds_min_m": [
+      -0.086,
+      0.0,
+      -0.1578
+    ],
+    "bounds_max_m": [
+      0.086,
+      0.2284,
+      0.1585
+    ],
+    "rigged": false,
+    "dimensions_m": [
+      0.172,
+      0.2284,
+      0.3163
+    ]
+  },
+  "labrador_head_low_poly": {
+    "triangles": 2282,
+    "material_slots": 7,
+    "bounds_min_m": [
+      -0.0861,
+      0.0,
+      -0.1578
+    ],
+    "bounds_max_m": [
+      0.0861,
+      0.2282,
+      0.1585
+    ],
+    "profile_overlap": 0.9931,
+    "rigged": false,
+    "dimensions_m": [
+      0.1722,
+      0.2282,
+      0.3163
+    ]
+  }
+}

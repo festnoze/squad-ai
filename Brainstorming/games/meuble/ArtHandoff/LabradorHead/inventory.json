@@ -1,0 +1,21 @@
+{
+  "triangles": 12496,
+  "material_slots": 7,
+  "bounds_min_m": [
+    -0.0996,
+    0.0,
+    -0.1578
+  ],
+  "bounds_max_m": [
+    0.0996,
+    0.2284,
+    0.1571
+  ],
+  "profile_overlap": 0.9968,
+  "rigged": false,
+  "dimensions_m": [
+    0.1992,
+    0.2284,
+    0.3149
+  ]
+}

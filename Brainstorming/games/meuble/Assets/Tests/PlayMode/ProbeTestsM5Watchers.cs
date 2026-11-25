@@ -249,9 +249,9 @@ namespace OutOfSight.Tests
             Assert.Greater(slots.Count, 2, $"{label}: premise: the model's slots are matched to its source materials");
             if (entry.IsPet && ModelKit.PetFurMap != null)
             {
-                // DOGBIG: with its fur map (the black Labrador) every slot of the dog shows the one map material instead of
-                // its tint and palette colours (ModelKit.ApplyPetFurMap): one material for the dog.
-                Material fur = PrimitiveKit.MapMaterial(ModelKit.PetFurMap, 0.25f);
+                // DOGBIG: with its fur map (the black Labrador) every slot of the dog shows a map material instead of its tint
+                // and palette colours (ModelKit.ApplyPetFurMap). LABRADOR: the final Labrador's "Main" shows the fur map and its
+                // "Tete profil et face" the head atlas: two materials for the dog, both untinted.
                 var furUsed = new HashSet<Material>();
                 foreach ((Renderer r, int slot, string source) in slots)
                 {
@@ -263,9 +263,17 @@ namespace OutOfSight.Tests
                     }
                     else
                     {
-                        Assert.AreSame(fur, m, $"{label}: slot {slot} ({source}) does not show the fur map");
+                        Texture2D map = ModelKit.PetSlotMap(source);
+                        Assert.AreSame(PrimitiveKit.MapMaterial(map, Tuning.DogFurSmoothness), m,
+                            $"{label}: slot {slot} ({source}) does not show its map {(map != null ? map.name : "null")}");
+                        Assert.AreSame(map, m.GetTexture("_BaseMap"), $"{label}: slot {slot} ({source}) lost its map");
+                        Assert.AreEqual(Color.white, m.GetColor("_BaseColor"), $"{label}: slot {slot} ({source}) tints its map");
                     }
                     furUsed.Add(m);
+                }
+                if (ModelKit.PetHeadMap != null && slots.Any(s => ModelKit.IsPetHead(s.source)))
+                {
+                    Assert.IsTrue(furUsed.Any(m => m.GetTexture("_BaseMap") == ModelKit.PetHeadMap), $"{label}: no slot shows the head atlas");
                 }
                 return furUsed;
             }
@@ -339,7 +347,10 @@ namespace OutOfSight.Tests
             var all = new HashSet<Material>(materials.Values.SelectMany(m => m));
             int shared = all.Count(m => InPalette(PaletteColour(m)));
             Assert.LessOrEqual(shared, Tuning.CharacterPalette.Length, "the characters use more than the 8 shared colours");
-            Assert.AreEqual(all.Count, shared + models.Count, "every material is a shared colour or a personality's tint");
+            // LABRADOR: the dog's own materials are its painted maps (the fur map and the head atlas; its tint without them).
+            int dogOwn = materials[PersonalityDef.Dog].Count(m => !InPalette(PaletteColour(m)));
+            Assert.LessOrEqual(dogOwn, 2, "the dog shows more than its two maps");
+            Assert.AreEqual(all.Count, shared + (models.Count - 1) + dogOwn, "every material is a shared colour, a personality's tint or the dog's maps");
             // Any three humans and the dog.
             string[] humans = models.Keys.Where(k => k != PersonalityDef.Dog).ToArray();
             int worst = 0;

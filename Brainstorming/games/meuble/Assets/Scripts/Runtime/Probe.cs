@@ -410,6 +410,19 @@ namespace OutOfSight
                     failures.Add("shader not resolved in the build: " + name);
                 }
             }
+            // WINDOWS3D (2026-11-24): the windows' glass shader ships through its material (Resources/WindowModel.asset ->
+            // Assets/Settings/WindowGlass.mat), never through Always Included Shaders: the built player checks that material
+            // reached it with its own, supported shader (a stripped or missing one would leave every window on its flat look).
+            {
+                WindowModel windows = WindowModel.Load();
+                Shader glass = windows != null && windows.glassMaterial != null ? windows.glassMaterial.shader : null;
+                bool ok = glass != null && glass.name == WindowModel.GlassShaderName && glass.isSupported && windows.Ready;
+                audit["shader " + WindowModel.GlassShaderName] = glass == null ? "NULL" : ok ? "ok" : glass.isSupported ? glass.name : "unsupported";
+                if (!ok)
+                {
+                    failures.Add("window glass shader not resolved in the build: " + WindowModel.GlassShaderName);
+                }
+            }
 
             // The start level's numbers stay at the top level of the audit, as in M1 (verify.sh prints them).
             foreach (KeyValuePair<string, object> pair in startBudgets)
@@ -465,12 +478,14 @@ namespace OutOfSight
         /// Walls 4 (WallArray): the project's own wall shaders (OutOfSight/Wall Finishes and Wall See-through), written for
         /// URP (its passes, its lighting, Forward and Forward+), shipped by the library's material assets: no glTFast graph.
         /// Cones look (2026-11-20): the vision cone shader (VisionConeView.ConeShaderName) is a project URP shader too,
-        /// shipped through Always Included Shaders and XRay_Cone.mat.
+        /// shipped through Always Included Shaders and XRay_Cone.mat. WINDOWS3D (2026-11-24): the windows' glass shader
+        /// (WindowModel.GlassShaderName, the art handoff's URP glazing), shipped by Assets/Settings/WindowGlass.mat, which
+        /// Resources/WindowModel.asset references.
         /// </summary>
         public static bool IsProjectWallShader(Shader shader)
         {
             return shader != null && (shader.name == WallArray.ShaderName || shader.name == WallArray.SeeThroughShaderName
-                || shader.name == VisionConeView.ConeShaderName);
+                || shader.name == VisionConeView.ConeShaderName || shader.name == WindowModel.GlassShaderName);
         }
 
         /// <summary>Counts the enabled, active renderers of <paramref name="renderers"/>.</summary>

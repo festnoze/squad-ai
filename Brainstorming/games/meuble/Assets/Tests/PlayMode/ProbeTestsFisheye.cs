@@ -101,12 +101,14 @@ namespace OutOfSight.Tests
             Assert.AreEqual(d.FisheyeZoom, s.FisheyeZoom, 1e-6f, "shipped fisheyeZoom differs from the default");
             Assert.AreEqual(d.FisheyeVignette, s.FisheyeVignette, 1e-6f, "shipped fisheyeVignette differs from the default");
             Assert.AreEqual(0.3f, d.FisheyeStrength, 1e-6f, "default strength");
-            Assert.AreEqual(1f, d.FisheyeZoom, 1e-6f, "default zoom (auto-fit)");
+            // User tuning (2026-11-24): a little below auto-fit (the lens shows a touch of its rim).
+            Assert.AreEqual(0.834f, d.FisheyeZoom, 1e-6f, "default zoom (the user's tuning)");
             Assert.That(d.FisheyeVignette, Is.InRange(0f, 0.5f), "default vignette");
             Assert.AreEqual(d.PeripheralBlur, s.PeripheralBlur, 1e-6f, "shipped peripheralBlur differs from the default");
             Assert.AreEqual(d.PeripheralBlurRadius, s.PeripheralBlurRadius, 1e-6f, "shipped peripheralBlurRadius differs from the default");
             Assert.AreEqual(d.PeripheralBlurMotion, s.PeripheralBlurMotion, 1e-6f, "shipped peripheralBlurMotion differs from the default");
-            Assert.That(d.PeripheralBlur, Is.InRange(0.05f, 0.5f), "default blur: subtle but on");
+            // User tuning (2026-11-24): the full periphery blur.
+            Assert.That(d.PeripheralBlur, Is.InRange(0.05f, 1f), "default blur: on");
             Assert.That(d.PeripheralBlurRadius, Is.InRange(0.2f, 0.7f), "default sharp centre");
             Assert.IsTrue(d.Visible, "the default is not visible");
 

@@ -207,11 +207,11 @@ namespace OutOfSight.Tests
         }
 
         [Test]
-        public void LineUp_EveryLevelHasAReferenceAtBothDifficulties_And60Stars()
+        public void LineUp_EveryLevelHasAReferenceAtBothDifficulties_And72Stars()
         {
             ManifestDef manifest = LevelLoader.LoadManifestDef();
             Assert.Greater(manifest.Levels.Count, 0, "premise: levels.json lists levels");
-            Assert.AreEqual(60, Stars.Possible(manifest.Levels.Count), "the line-up holds 20 levels, 60 stars (rev 3, ACT3A; update the task if it changed)");
+            Assert.AreEqual(72, Stars.Possible(manifest.Levels.Count), "the line-up holds 24 levels, 72 stars (rev 5 plus act 4, HARDLEVELS; update the task if it changed)");
             foreach (string id in manifest.Levels)
             {
                 LevelDef def = LevelLoader.Load(id);

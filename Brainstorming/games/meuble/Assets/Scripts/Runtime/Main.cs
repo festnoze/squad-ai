@@ -63,6 +63,10 @@ namespace OutOfSight
             Run("time", () => Time.fixedDeltaTime = Tuning.FixedStep);
             // M5 (CONTRACT_M5_v3 15.7): the editor, --probe and --look use a test save deleted here; then the load.
             Run("save", SaveStore.Boot);
+            // ADSSHOP (docs/next/progress/ADSSHOP.md): the shop and the ads read the save (the purchases); the Menu reads
+            // StoreService.ShopVisible when it builds the title.
+            Run("store", StoreService.Boot);
+            Run("ads", AdService.Boot);
             Run("layers", Layers.Resolve);
             // The chair and the inhabitant never push each other: a still chair must never be displaced
             // (PRD 3.2 M1 note) and a chair leaving an overlap must not jump. Vision uses Occluder only.
@@ -76,6 +80,7 @@ namespace OutOfSight
             Run("hud", BuildHud);
             Run("game", BuildGame);
             Run("menu", BuildMenu);
+            Run("ad director", BuildAdDirector);
             Run("probe", BuildProbe);
         }
 
@@ -290,8 +295,8 @@ namespace OutOfSight
         // the one shadowed key light (the same yaw as the sun, so the sky picture's glow and every cached sky mesh keep
         // their place), the ambient trilight at about NightAmbientFactor of the day's and pushed toward blue, a cool
         // grade and a deeper vignette. The room lights carry the warm pools (RoomLights.NightAllowance, NightPool), the
-        // player's floor lamp shines brighter and further (LampLight.NightIntensity), the windows and the garden go dark
-        // blue (WindowImage.NightColour, GardenBackdrop.NightTint).
+        // player's floor lamp shines brighter and further (LampLight.NightIntensity), the garden goes dark blue
+        // (GardenBackdrop.NightTint) and the windows' glass reflects less (WINDOWS3D: WindowModel.NightBlock).
         // NIGHT pass (2026-11-22, first look at it in real captures): the first values (moon 0.5, ambient 0.35) read as a
         // blue dusk, the light walls still pale and the pools faint. The moon and the ambient now go lower, so walls and
         // floors read dark and the warm pools carry the rooms; the cones (unlit shader) and the HUD (overlay) do not
@@ -313,7 +318,7 @@ namespace OutOfSight
         /// <summary>The preset applied last (<see cref="LevelDef.LightingDay"/> or <see cref="LevelDef.LightingNight"/>).</summary>
         public static string AppliedLighting { get; private set; } = LevelDef.LightingDay;
 
-        /// <summary>True while the night preset is applied (WindowImage and GardenBackdrop read it as they build).</summary>
+        /// <summary>True while the night preset is applied (WindowModel and GardenBackdrop read it as they build).</summary>
         public static bool Night => AppliedLighting == LevelDef.LightingNight;
 
         /// <summary>True when <paramref name="def"/> asks for the night preset ("lighting": "night"); null or "day" is day.</summary>
@@ -327,7 +332,7 @@ namespace OutOfSight
 
         /// <summary>
         /// Levels v2 (D25, C10): applies the lighting preset of <paramref name="def"/> (GardenBackdrop.Build calls it, the
-        /// first level build step that sees the level, before any window reads <see cref="WindowImage.Colour"/>). Day puts
+        /// first level build step that sees the level, before any window reads it, <see cref="WindowModel.NightBlock"/>). Day puts
         /// back exactly the look of BuildLighting and BuildVolume; night dims and cools the sun into a moon, the ambient and
         /// the grade, and turns the camera's clear colour to the night sky. Without a Main (edit mode tools) only the flag
         /// the windows and the backdrop read changes. Visual only: no rule, no vision and no audit reads it.
@@ -488,6 +493,15 @@ namespace OutOfSight
             Menu = go.AddComponent<Menu>();
             Menu.Init(Game, Hud, OrbitCamera, Sfx);
             Game.Menu = Menu;
+        }
+
+        /// <summary>ADSSHOP: the end-of-level ad hook (it only listens to GameState.StateChanged).</summary>
+        public AdDirector Ads { get; private set; }
+
+        private void BuildAdDirector()
+        {
+            Ads = Child("Ads").AddComponent<AdDirector>();
+            Ads.Init(Game, Menu, Hud);
         }
 
         private void BuildProbe()

@@ -178,7 +178,8 @@ namespace OutOfSight.Tests
         /// seen at least once): the garden shows Grass, the player furniture shows Lacquer (its own colour kept) on
         /// both the procedural path (level7's office chair) and the Kenney model path (level9's chair), the metal
         /// frame and the robot shell show Metal, the robot bumper shows Plastic, a potted plant's leaves show
-        /// Foliage, the window pane carries its own smoothness with no texture; a decoy never shows Lacquer. Then
+        /// Foliage, the windows are the 3D model (WINDOWS3D: its glass material, its frame of the wall material, no flat
+        /// pane); a decoy never shows Lacquer. Then
         /// every level 1 to 17 holds the PRD 7.4 material and draw call budgets. A few screenshots are saved for the
         /// product owner's playtest (reported, not asserted on).
         /// </summary>
@@ -253,7 +254,7 @@ namespace OutOfSight.Tests
             Assert.AreEqual(Surface.Foliage, leaves7.Surface, "level7: the plant's leaves show no foliage detail");
             AssertFinish(leaves7, Surface.Foliage, "level7 plant leaves");
 
-            AssertWindowPane(Game.Level.Root.transform, "level7");
+            AssertWindows3D(Game.Level.Root.transform, Game, "level7");
             AssertMaterialBudget(Game, "level7");
             shots.Add(Shoot("step50a_level7"));
 
@@ -281,7 +282,7 @@ namespace OutOfSight.Tests
             Assert.That(bumper.sharedMaterial.GetFloat("_Smoothness"), Is.EqualTo(Tuning.PlasticSmoothness).Within(1e-4f), "robot bumper smoothness");
             Assert.That(bumper.sharedMaterial.GetFloat("_Metallic"), Is.EqualTo(0f).Within(1e-4f), "robot bumper metallic");
 
-            AssertWindowPane(Game.Level.Root.transform, "level9");
+            AssertWindows3D(Game.Level.Root.transform, Game, "level9");
             AssertMaterialBudget(Game, "level9");
             shots.Add(Shoot("step50a_level9"));
 
@@ -309,20 +310,36 @@ namespace OutOfSight.Tests
         }
 
         /// <summary>
-        /// The window pane: no library texture (Surface.Plain), but its own smoothness (CONTRACT_M6 2.4). Window picture
-        /// (product owner image of 2026-11-19): it shows the owner's window picture (WindowImage), through its block only,
-        /// on the pane's own material (no new material).
+        /// WINDOWS3D (2026-11-24, replacing the M6 window pane and the 2026-11-19 window picture): every window is the art
+        /// handoff's 3D window. Its glass draws with the one shared glass material (the handoff's shader and reference values,
+        /// no library texture, no detail block by day), its frame with the wall material (its vertices name the walnut image
+        /// of the dressing slices and the flat gasket and hardware colours: no URP Lit slot, no block). No flat pane is left.
         /// </summary>
-        private static void AssertWindowPane(Transform root, string id)
+        private static void AssertWindows3D(Transform root, GameState game, string id)
         {
-            Renderer pane = root.GetComponentsInChildren<Renderer>(false).FirstOrDefault(r => r.name == "WindowPane");
-            Assert.IsNotNull(pane, $"{id}: premise: no WindowPane renderer");
-            Assert.AreEqual(Surface.Plain, TextureLibrary.SurfaceOf(ShownTexture(pane)), $"{id}: the window pane shows a library texture");
-            Assert.IsNotNull(WindowImage.Texture, $"{id}: premise: no window picture (Resources/{WindowImage.ResourcePath})");
-            Assert.AreSame(WindowImage.Texture, ShownTexture(pane), $"{id}: the window pane does not show the window picture");
-            Assert.IsNull(pane.sharedMaterial.GetTexture(BaseMap), $"{id}: the picture is on the shared pane material (the glows would show it)");
-            Assert.That(pane.sharedMaterial.GetFloat("_Smoothness"), Is.EqualTo(Tuning.WindowPaneSmoothness).Within(1e-4f), $"{id}: window pane smoothness");
-            Assert.That(pane.sharedMaterial.GetFloat("_Metallic"), Is.EqualTo(0f).Within(1e-4f), $"{id}: window pane metallic");
+            WindowModel model = WindowModel.Usable;
+            Assert.IsNotNull(model, $"{id}: premise: the 3D window model is usable (Resources/{WindowModel.ResourcePath})");
+            Renderer[] drawn = root.GetComponentsInChildren<Renderer>(false);
+            Assert.IsFalse(drawn.Any(r => r.name == "WindowPane"), $"{id}: a flat window pane is still drawn");
+            List<Renderer> glasses = drawn.Where(r => r.name == LevelBuilder.WindowGlassName).ToList();
+            Assert.AreEqual(game.Def.Windows.Count, glasses.Count, $"{id}: not one glass per window");
+            Assert.Greater(glasses.Count, 0, $"{id}: premise: the level has windows");
+            foreach (Renderer glass in glasses)
+            {
+                Assert.AreSame(model.glassMaterial, glass.sharedMaterial, $"{id}: a window glass is not the shared glass material");
+                Assert.AreEqual(WindowModel.GlassShaderName, glass.sharedMaterial.shader.name, $"{id}: the glass shader");
+                Assert.IsTrue(glass.sharedMaterial.shader.isSupported, $"{id}: the glass shader is not supported here");
+                Assert.AreEqual(Surface.Plain, TextureLibrary.SurfaceOf(ShownTexture(glass)), $"{id}: a window glass shows a library texture");
+                Assert.AreEqual(ShadowCastingMode.Off, glass.shadowCastingMode, $"{id}: a window glass casts a shadow");
+            }
+            List<Renderer> frames = drawn.Where(r => r.name == LevelBuilder.WindowFrameName).ToList();
+            Assert.Greater(frames.Count, 0, $"{id}: the windows draw no frame");
+            foreach (Renderer frame in frames)
+            {
+                Assert.IsTrue(WallArray.IsWallMaterial(frame.sharedMaterial), $"{id}: a window frame is not drawn with the wall material");
+                Assert.AreEqual(1, frame.sharedMaterials.Length, $"{id}: a window frame has several slots");
+                Assert.IsFalse(frame.HasPropertyBlock(), $"{id}: a window frame carries a property block");
+            }
         }
 
         /// <summary>Renders the current camera view to a PNG under the agent's scratch folder; returns its path.</summary>

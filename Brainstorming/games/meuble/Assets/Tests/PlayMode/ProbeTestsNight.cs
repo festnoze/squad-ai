@@ -22,8 +22,8 @@ namespace OutOfSight.Tests
     /// identical (no rule reads the preset) and the sun stays the one shadowed light. The shots go to Build/shots/night.
     /// Night_b checks the preset's parts on test_lights (one room of each type, windows): the moon, the ambient at about
     /// Main.NightAmbientFactor of the day's, every room light on at its full built intensity, Bas keeping one light per
-    /// room, the dark blue windows, the tinted garden and sky, the clear colour; then a day level puts the day look back
-    /// exactly.
+    /// room, the windows' glass reflecting less (WINDOWS3D), the tinted garden and sky, the clear colour; then a day level
+    /// puts the day look back exactly.
     /// </summary>
     public sealed class ProbeTestsNight
     {
@@ -272,8 +272,7 @@ namespace OutOfSight.Tests
             Color dayGround = RenderSettings.ambientGroundColor;
             Color dayClear = main.Camera.backgroundColor;
             Assert.AreEqual(Tuning.LookSunIntensity, daySunIntensity, 1e-6f, "premise: the day sun");
-            AssertOutside(WindowImage.Colour, GardenBackdrop.Tint, "day");
-            Assert.AreEqual(new Color(WindowImage.Intensity, WindowImage.Intensity, WindowImage.Intensity, 1f), WindowImage.Colour, "day: the window's neutral factor");
+            AssertOutside(1f, GardenBackdrop.Tint, "day");
 
             yield return Build(TestLevel, LevelDef.LightingNight);
             // The moon: the same one shadowed directional light, dimmer, cooler, lower.
@@ -301,12 +300,11 @@ namespace OutOfSight.Tests
             Assert.IsTrue(lights.Night, "night: the room lights were not built for the night");
             Assert.AreEqual(lights.Fixtures.Count, lights.EnabledLights, "night on Haut: a room light is off");
             Assert.IsTrue(lights.Fixtures.All(f => Mathf.Approximately(f.Light.intensity, f.Intensity)), "night: a room light is not at its full intensity");
-            // The dark blue windows, the tinted garden and sky, the clear colour.
-            Assert.AreEqual(WindowImage.NightColour, WindowImage.Colour, "night: the windows' factor");
+            // WINDOWS3D: the windows' glass reflects less (its unlit streaks never glow over the dark garden), the tinted
+            // garden and sky seen through it, the clear colour.
             Assert.AreEqual(GardenBackdrop.NightTint, GardenBackdrop.Tint, "night: the garden's tint");
-            AssertOutside(WindowImage.NightColour, GardenBackdrop.NightTint, "night");
-            Assert.Greater(WindowImage.NightColour.b, WindowImage.NightColour.r + 0.2f, "night: the windows are not blue");
-            Assert.Less(WindowImage.NightColour.maxColorComponent, 1f, "night: a window feeds the bloom");
+            Assert.Less(Tuning.WindowGlassNightReflection, 1f, "night: the glass reflects as much as by day");
+            AssertOutside(Tuning.WindowGlassNightReflection, GardenBackdrop.NightTint, "night");
             Assert.AreEqual(GardenBackdrop.ClearColour, main.Camera.backgroundColor, "night: the clear colour is not the night sky");
             Assert.Less(main.Camera.backgroundColor.grayscale, dayClear.grayscale * 0.5f, "night: the clear colour is not dark");
 
@@ -340,27 +338,37 @@ namespace OutOfSight.Tests
             Assert.AreEqual(dayEquator, RenderSettings.ambientEquatorColor, "day level: the ambient equator");
             Assert.AreEqual(dayGround, RenderSettings.ambientGroundColor, "day level: the ambient ground");
             Assert.AreEqual(dayClear, main.Camera.backgroundColor, "day level: the clear colour");
-            AssertOutside(WindowImage.Colour, GardenBackdrop.Tint, "day level");
+            AssertOutside(1f, GardenBackdrop.Tint, "day level");
             Assert.IsFalse(Lights.Night, "day level: the room lights think it is night");
             CollectionAssert.IsEmpty(errors, "no error logged");
         }
 
-        /// <summary>Every window picture and the garden ring of the level carry <paramref name="window"/> and <paramref name="garden"/>.</summary>
-        private void AssertOutside(Color window, Color garden, string when)
+        /// <summary>
+        /// WINDOWS3D: every window glass of the level shows its reflections at <paramref name="reflection"/> of its glass
+        /// material's (1 by day: no block, the material as is; the night preset's block below it), and the garden ring
+        /// carries <paramref name="garden"/>.
+        /// </summary>
+        private void AssertOutside(float reflection, Color garden, string when)
         {
             int baseColor = Shader.PropertyToID("_BaseColor");
             int windows = 0;
             var block = new MaterialPropertyBlock();
             foreach (MeshRenderer r in Game.Level.Root.GetComponentsInChildren<MeshRenderer>(true))
             {
-                if (r.name == "WindowPane" && r.HasPropertyBlock())
+                if (r.name == LevelBuilder.WindowGlassName)
                 {
-                    r.GetPropertyBlock(block, 0);
-                    if (WindowImage.Shows(block))
+                    windows++;
+                    float own = r.sharedMaterial.GetFloat(WindowModel.ReflectionId);
+                    float shown = own;
+                    if (r.HasPropertyBlock())
                     {
-                        windows++;
-                        AssertClose(window, block.GetColor(baseColor), $"{when}: a window's factor");
+                        r.GetPropertyBlock(block);
+                        if (block.HasFloat(WindowModel.ReflectionId))
+                        {
+                            shown = block.GetFloat(WindowModel.ReflectionId);
+                        }
                     }
+                    Assert.AreEqual(own * reflection, shown, 1e-4f, $"{when}: a window glass's reflections");
                 }
                 else if (r.name == GardenBackdrop.RendererName && r.HasPropertyBlock())
                 {
@@ -370,7 +378,7 @@ namespace OutOfSight.Tests
             }
             if (Game.LevelId == TestLevel)
             {
-                Assert.Greater(windows, 0, $"premise: {TestLevel} shows window pictures ({when})");
+                Assert.Greater(windows, 0, $"premise: {TestLevel} shows 3D windows ({when})");
             }
         }
 

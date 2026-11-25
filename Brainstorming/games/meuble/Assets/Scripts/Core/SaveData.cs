@@ -42,8 +42,11 @@ namespace OutOfSight.Core
 
         [JsonProperty("quality", NullValueHandling = NullValueHandling.Ignore)] public string Quality;
 
-        /// <summary>M7 1.4: the tier a save without a quality choice gets, Moyen on a mobile platform, Haut on PC.</summary>
-        public static string DefaultQuality(bool mobile) => mobile ? QualityMedium : QualityHigh; // MUTATION:QUALITY_PLATFORM_DEFAULT
+        /// <summary>
+        /// M7 1.4: the tier a save without a quality choice gets. Haut on every platform since 2026-11-25 (user request; it
+        /// was Moyen on mobile). <paramref name="mobile"/> is kept so a platform split can come back without touching callers.
+        /// </summary>
+        public static string DefaultQuality(bool mobile) => QualityHigh;
 
         /// <summary>True for "low", "medium" and "high".</summary>
         public static bool IsQuality(string value) => value == QualityLow || value == QualityMedium || value == QualityHigh;
@@ -263,6 +266,13 @@ namespace OutOfSight.Core
         /// since has 0 stars. Never fails a load: a malformed object or entry is skipped (<see cref="Parse"/>).
         /// </summary>
         [JsonProperty("stars")] public Dictionary<string, int> Stars = new Dictionary<string, int>();
+
+        /// <summary>
+        /// ADSSHOP (docs/next/progress/ADSSHOP.md): the shop purchases (owned products, granted entitlements, consumable
+        /// counts). Missing on an older save, which reads it as empty (version stays 1); never fails a load
+        /// (<see cref="SavePurchases.Parse"/>).
+        /// </summary>
+        [JsonProperty("purchases")] public SavePurchases Purchases = new SavePurchases();
 
         /// <summary>
         /// Stars: records <paramref name="stars"/> for <paramref name="recordId"/> at <paramref name="difficulty"/>, kept only
@@ -564,6 +574,8 @@ namespace OutOfSight.Core
                         }
                     }
                 }
+                // ADSSHOP: the purchases never fail the save either (a malformed object reads as nothing bought).
+                data.Purchases = SavePurchases.Parse(root["purchases"]);
                 // M6 (CONTRACT_M6 2.1): missing, malformed or absent entirely, this never fails the save (SaveOptions.Parse
                 // falls back to defaults field by field instead of rejecting the whole file).
                 data.Options = SaveOptions.Parse(root["options"]);

@@ -204,6 +204,12 @@ namespace OutOfSight
     /// M6 (CONTRACT_M6 2.4): the garden now shows a grass detail (Surface.Grass) instead of staying plain; the window
     /// pane keeps no texture but gets its own smoothness (<see cref="Tuning.WindowPaneSmoothness"/>).
     ///
+    /// WINDOWS3D (2026-11-24, docs/next/progress/WINDOWS3D.md): every window is the art handoff's 3D wood casement window
+    /// (<see cref="WindowModel"/>, <see cref="Window3D"/>) in a real visual opening of its wall (the faces cut around it,
+    /// <see cref="WindowOpenings"/>), the garden backdrop seen through its glass; the wall's colliders stay whole (visual
+    /// only). The flat M3 pane and trim strips on an uncut wall (<see cref="WindowDecor"/>) remain only without the wall
+    /// material (textures off) or without the model.
+    ///
     /// M5 (docs/CONTRACT_M5_v3.md 15.1 to 15.4 and 15.8, CONTRACT_M5.md 16.6):
     /// <list type="bullet">
     /// <item>the split level: platforms (solid walkable occluders), ramps (convex wedge MeshColliders flush at both ends)
@@ -270,6 +276,13 @@ namespace OutOfSight
         private const float BaseboardDepth = Tuning.BaseboardDepth;
         // The pane colour times this (sRGB) is above 1 in linear: only the window feeds the bloom.
         private const float WindowPaneEmission = Tuning.WindowPaneEmission;
+
+        /// <summary>
+        /// The cached unlit pane material (the pane colour times <see cref="Tuning.WindowPaneEmission"/>): the garden backdrop's
+        /// ring and sky draw with it (through their blocks), the cool fixture glows share it (RoomLights), and the flat M3
+        /// window pane (<see cref="WindowDecor"/>, textures off). WINDOWS3D: the 3D windows no longer use it.
+        /// </summary>
+        public static Material PaneMaterial => PrimitiveKit.Emissive(WindowPane, WindowPaneEmission, Tuning.WindowPaneSmoothness, 0f);
 
         public static LevelInstance Build(LevelDef def)
         {
@@ -447,13 +460,18 @@ namespace OutOfSight
             float size = Mathf.Max(GardenSize, Mathf.Max(interior.width, interior.height) + 20f);
             var mid = new Vector3(interior.center.x, 0f, interior.center.y);
             // Garden backdrop (2026-11-19, GardenBackdrop): the grass reaches under the ring around the house, whose foot
-            // stands on it; the ring shares the windows' unlit material (no new material, PRD 7.4).
-            float lawn = Mathf.Max(size, 2f * GardenBackdrop.RingFor(def).Radius + 2f);
+            // stands on it; the ring draws with the cached unlit pane material (PaneMaterial, shared with the cool fixture
+            // glows; WINDOWS3D: the windows no longer draw with it). It is what the 3D windows show through their glass.
+            // GARDENFIT (2026-11-24): the ring hugs the house by default. GARDENZOOM (2026-11-25): it grows with the zoom so
+            // the camera stays inside it (GardenBackdropFit), so the grass reaches under the ring at its largest (the orbit
+            // camera's space and the spectator's flight box, Ring.MaxRadius), plus a spill.
+            GardenBackdrop.Ring garden = GardenBackdrop.RingFor(def);
+            float lawn = Mathf.Max(size, 2f * Mathf.Max(garden.Radius, Mathf.Max(garden.CameraRadius, garden.MaxRadius)) + 20f);
             // M6 (CONTRACT_M6 2.4): the garden shows a grass detail (Grass001) instead of staying plain.
             PrimitiveKit.Part(root, "Garden", PrimitiveKit.QuadMesh, mid + new Vector3(0f, -0.02f, 0f), Quaternion.Euler(90f, 0f, 0f),
                 new Vector3(lawn, lawn, 1f), PrimitiveKit.LitSurface(Outside, Surface.Grass), floor, Surface.Grass)
                 .GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            GardenBackdrop.Build(def, root, PrimitiveKit.Emissive(WindowPane, WindowPaneEmission, Tuning.WindowPaneSmoothness, 0f));
+            GardenBackdrop.Build(def, root, PaneMaterial);
             // One slab under everything, indoors and out, so the chair never falls through a door. It is on
             // the Default layer: no NavMesh source, so no island of NavMesh appears outside the house.
             var ground = new GameObject("GroundCollider") { layer = 0 };
@@ -500,7 +518,12 @@ namespace OutOfSight
         private const string TrimScope = "Trim";
         private const string BaseboardScope = "Baseboards";
         private const string PaneScope = "WindowPane";
+        private const string WindowFrameScope = "WindowFrame";
         private const string StubScope = "Stub";
+        /// <summary>WINDOWS3D: the name of the 3D windows' frame renderers (the frames of one wall line combine into one).</summary>
+        public const string WindowFrameName = "WindowFrame";
+        /// <summary>WINDOWS3D: the name of a 3D window's glass renderer (one per window).</summary>
+        public const string WindowGlassName = "WindowGlass";
         /// <summary>M7 walls pass: the name of the wall stubs' renderers (WallFader.AddStub).</summary>
         public const string StubName = "Stub";
         /// <summary>The name of a wall line's cap renderers (registered with the line's fade rule; RoomLights follows them).</summary>
@@ -852,7 +875,7 @@ namespace OutOfSight
                 public Vector3 Point;
                 public Vector3 Normal;
                 public bool Outer;
-                /// <summary>Window picture (2026-11-19): the property block the combined renderer gets (null: none).</summary>
+                /// <summary>The property block the combined renderer gets (null: none).</summary>
                 public MaterialPropertyBlock Block;
                 public readonly List<PrimitiveKit.CombinePart> Parts = new List<PrimitiveKit.CombinePart>();
             }
@@ -872,8 +895,8 @@ namespace OutOfSight
             /// One part: <paramref name="mesh"/> at a local pose under <paramref name="parent"/>. With a <paramref name="fader"/>
             /// it hides when the plane (<paramref name="point"/>, <paramref name="normal"/>) separates the camera from the player,
             /// or, <paramref name="outer"/> (M7 walls pass: an outer wall, <paramref name="normal"/> its inward normal), whenever
-            /// the camera is on the outer side of that plane. Window picture (2026-11-19): a <paramref name="block"/> is set on the
-            /// part's renderer (parts with a block only combine with parts of the same block).
+            /// the camera is on the outer side of that plane. A <paramref name="block"/> is set on the part's renderer (parts with a
+            /// block only combine with parts of the same block).
             /// </summary>
             public void Add(Transform parent, string name, Mesh mesh, Vector3 localPosition, Quaternion localRotation, Vector3 localScale,
                 Material material, int layer, Surface surface, ShadowCastingMode shadow, string scope, string combinedName,
@@ -1163,6 +1186,11 @@ namespace OutOfSight
             // M7 walls pass (see-through): an outer line also gets its outside faces, with its cap (same material, same
             // rule, no shadow): culled while it stands (the camera inside), they show its body once it fades from outside.
             System.Action<Mesh, Vector3, Quaternion, Vector3> outside = shared ? null : new System.Action<Mesh, Vector3, Quaternion, Vector3>(AddCap);
+            // WINDOWS3D (docs/next/progress/WINDOWS3D.md): with the 3D window, every face of the line (both sides, fills and
+            // outside faces) is cut around its windows, so the garden shows through their glass; null keeps the flat M3
+            // windows on an uncut wall. The segments' colliders never change.
+            WindowModel windowModel = WindowModel.Usable; // MUTATION:WINDOW_MODEL
+            List<Rect> openings = windowModel != null ? WindowOpenings(line, mid, sign) : null;
 
             foreach (Vector2 run in localRuns)
             {
@@ -1175,8 +1203,10 @@ namespace OutOfSight
                     {
                         continue;
                     }
-                    WallSegment(wt, cursor, from, 0f, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside);
-                    WallSegment(wt, from, to, door.Top, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside);
+                    WallSegment(wt, cursor, from, 0f, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside,
+                        openings);
+                    WallSegment(wt, from, to, door.Top, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside,
+                        openings);
                     // The face toward the outside of an outer door decides where its decorative leaf opens; a door with a
                     // real leaf (M5) has none.
                     float leafSide = interior || door.HasLeaf ? 0f : -FaceSideAt(faces, (from + to) * 0.5f);
@@ -1187,7 +1217,8 @@ namespace OutOfSight
                     }
                     cursor = to;
                 }
-                WallSegment(wt, cursor, runTo, 0f, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside);
+                WallSegment(wt, cursor, runTo, 0f, h, t, surfaces, occluder, faceFader, wallRoot.transform, normal, boards, batch, shared, outside,
+                    openings);
 
                 // Top cap: a thin strip that gives the dollhouse walls a readable thickness from above.
                 AddCap(PrimitiveKit.QuadMeshSized(new Vector2(runTo - runFrom, t)), new Vector3((runFrom + runTo) * 0.5f, h, 0f),
@@ -1212,10 +1243,107 @@ namespace OutOfSight
             {
                 (float alongWorld, OpeningDef window, RoomSide _) = line.Windows[w];
                 float local = (alongWorld - mid) * sign;
+                if (windowModel != null)
+                {
+                    // WINDOWS3D: the 3D window goes with its line exactly as the line's door frames do (DOORFADE): the outer
+                    // rule on an outer line, the centre plane on a shared one.
+                    Window3D(wt, windowModel, local, window, t, FaceSideAt(faces, local), batch, fader, ruleNormal, outerRule);
+                    continue;
+                }
                 // M7 walls pass: a window of a shared line (on its outer stretch) fades with the line. On an outer line its
                 // single sided strips face the room, culled from outside exactly when the line fades.
                 WindowDecor(wt, local, window, t, FaceSideAt(faces, local), batch, TrimScope, faceFader, normal);
             }
+        }
+
+        /// <summary>
+        /// WINDOWS3D: the visual openings of a line's windows in its local frame (x along the line, y up): each window's JSON
+        /// rectangle (Width, Bottom, Top) inset by <see cref="Tuning.WindowOpeningOverlap"/> on every edge, so the 3D window's
+        /// outer frame (which fills the JSON rectangle through the whole wall) covers the cut edges.
+        /// </summary>
+        private static List<Rect> WindowOpenings(WallLine line, float mid, float sign)
+        {
+            var openings = new List<Rect>();
+            float inset = Tuning.WindowOpeningOverlap;
+            foreach ((float alongWorld, OpeningDef window, RoomSide _) in line.Windows)
+            {
+                float local = (alongWorld - mid) * sign;
+                float half = window.Width * 0.5f - inset;
+                if (half <= 0f || window.Top - window.Bottom <= 2f * inset)
+                {
+                    continue;
+                }
+                openings.Add(Rect.MinMaxRect(local - half, window.Bottom + inset, local + half, window.Top - inset));
+            }
+            return openings;
+        }
+
+        /// <summary>
+        /// WINDOWS3D: the pieces of the rectangle [x0, x1] by [y0, y1] (a face piece in its wall's local frame) that no opening
+        /// covers: cut into vertical strips at the openings' sides, each strip keeping what lies below and above the openings
+        /// that span it. The rectangle itself, alone, when no opening meets it.
+        /// </summary>
+        private static List<(float x0, float x1, float y0, float y1)> Pieces(float x0, float x1, float y0, float y1, List<Rect> openings)
+        {
+            var pieces = new List<(float, float, float, float)>();
+            const float eps = 1e-4f;
+            var cuts = new List<Rect>();
+            if (openings != null)
+            {
+                foreach (Rect o in openings)
+                {
+                    if (o.xMax > x0 + eps && o.xMin < x1 - eps && o.yMax > y0 + eps && o.yMin < y1 - eps)
+                    {
+                        cuts.Add(o);
+                    }
+                }
+            }
+            if (cuts.Count == 0)
+            {
+                pieces.Add((x0, x1, y0, y1));
+                return pieces;
+            }
+            var xs = new List<float> { x0, x1 };
+            foreach (Rect o in cuts)
+            {
+                xs.Add(Mathf.Clamp(o.xMin, x0, x1));
+                xs.Add(Mathf.Clamp(o.xMax, x0, x1));
+            }
+            xs.Sort();
+            var spans = new List<Vector2>();
+            for (int i = 0; i + 1 < xs.Count; i++)
+            {
+                float a = xs[i];
+                float b = xs[i + 1];
+                if (b - a <= eps)
+                {
+                    continue;
+                }
+                // The openings that span this strip, bottom up: the strip keeps what lies between them.
+                spans.Clear();
+                foreach (Rect o in cuts)
+                {
+                    if (o.xMin <= a + eps && o.xMax >= b - eps)
+                    {
+                        spans.Add(new Vector2(Mathf.Max(o.yMin, y0), Mathf.Min(o.yMax, y1)));
+                    }
+                }
+                spans.Sort((p, q) => p.x.CompareTo(q.x));
+                float cursor = y0;
+                foreach (Vector2 s in spans)
+                {
+                    if (s.x - cursor > eps)
+                    {
+                        pieces.Add((a, b, cursor, s.x));
+                    }
+                    cursor = Mathf.Max(cursor, s.y);
+                }
+                if (y1 - cursor > eps)
+                {
+                    pieces.Add((a, b, cursor, y1));
+                }
+            }
+            return pieces;
         }
 
         /// <summary>
@@ -1516,11 +1644,13 @@ namespace OutOfSight
         /// (see-through walls): a piece standing on the floor also gets the floor under its footprint, the floor of the room on
         /// each side (<paramref name="twoSided"/>) or of its one room, combined with the room floors (no draw call): hidden
         /// while the wall stands, it keeps the floor whole under a faded wall, where the garden used to show. With
-        /// <paramref name="outside"/> (an outer line) the piece's outside face goes there.
+        /// <paramref name="outside"/> (an outer line) the piece's outside face goes there. WINDOWS3D: every face (and the
+        /// outside face) is drawn around <paramref name="openings"/> (<see cref="Pieces"/>), the 3D windows' visual openings;
+        /// the collider stays the whole piece, so the wall still blocks sight, the player and the NavMesh behind a window.
         /// </summary>
         private static void WallSegment(Transform wall, float from, float to, float bottom, float top, float thickness,
             List<Face> faces, int layer, WallFader fader, Transform frame, Vector3 normal, List<Board> boards, Batch batch, bool twoSided,
-            System.Action<Mesh, Vector3, Quaternion, Vector3> outside)
+            System.Action<Mesh, Vector3, Quaternion, Vector3> outside, List<Rect> openings)
         {
             if (to - from < 1e-3f || top - bottom < 1e-3f)
             {
@@ -1541,17 +1671,22 @@ namespace OutOfSight
                     continue;
                 }
                 Quaternion rotation = f.Side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
-                var faceCenter = new Vector3((vFrom + vTo) * 0.5f, (bottom + top) * 0.5f, f.Side * thickness * 0.5f);
-                // A single sided quad casts shadows from both sides only when asked to. A shared line's faces fade with its
-                // centre plane (wave 5B, CONTRACT_M5 17): the faces of one material on both sides of a line combine
-                // (CONTRACT_M5_v3 15.8). The face plane and the centre plane separate the camera from the furniture alike: the
-                // furniture never stands in the wall, and a camera within the wall sees a face's back, which is culled.
-                // Wall finishes (2026-11-19): U along the wall and V up whatever the piece's proportions, continued across the
-                // pieces of the line (beside and over a door), so a wallpaper's stripes stay upright and unbroken.
-                batch.Add(wall, f.Fill ? "Fill" : "Face", WallPart(PrimitiveKit.WallQuadMesh(new Vector2(vTo - vFrom, top - bottom),
-                    WallUvOffset(f.Side, vFrom, vTo, bottom)), f.Material, f.Surface), faceCenter, rotation,
-                    new Vector3(vTo - vFrom, top - bottom, 1f), f.Material, layer, WallPartSurface(f.Material, f.Surface), ShadowCastingMode.TwoSided,
-                    FaceScope, "Face", fader, frame.position, normal); // MUTATION:FACE_PLANE
+                // WINDOWS3D: the face around the windows' openings (the face whole when none meets it), each piece continuing
+                // the pattern (WallUvOffset of its own extent).
+                foreach ((float x0, float x1, float y0, float y1) in Pieces(vFrom, vTo, bottom, top, openings))
+                {
+                    var faceCenter = new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, f.Side * thickness * 0.5f);
+                    // A single sided quad casts shadows from both sides only when asked to. A shared line's faces fade with its
+                    // centre plane (wave 5B, CONTRACT_M5 17): the faces of one material on both sides of a line combine
+                    // (CONTRACT_M5_v3 15.8). The face plane and the centre plane separate the camera from the furniture alike: the
+                    // furniture never stands in the wall, and a camera within the wall sees a face's back, which is culled.
+                    // Wall finishes (2026-11-19): U along the wall and V up whatever the piece's proportions, continued across the
+                    // pieces of the line (beside and over a door), so a wallpaper's stripes stay upright and unbroken.
+                    batch.Add(wall, f.Fill ? "Fill" : "Face", WallPart(PrimitiveKit.WallQuadMesh(new Vector2(x1 - x0, y1 - y0),
+                        WallUvOffset(f.Side, x0, x1, y0)), f.Material, f.Surface), faceCenter, rotation,
+                        new Vector3(x1 - x0, y1 - y0, 1f), f.Material, layer, WallPartSurface(f.Material, f.Surface), ShadowCastingMode.TwoSided,
+                        FaceScope, "Face", fader, frame.position, normal); // MUTATION:FACE_PLANE
+                }
                 if (bottom < 1e-3f && !f.Fill)
                 {
                     boards.Add(new Board
@@ -1578,9 +1713,23 @@ namespace OutOfSight
             }
             if (outside != null)
             {
-                // An outer line's outside face, local +z: with its cap (see BuildWallLine).
-                outside(PrimitiveKit.QuadMeshSized(new Vector2(to - from, top - bottom)), new Vector3((from + to) * 0.5f, (bottom + top) * 0.5f, thickness * 0.5f),
-                    Quaternion.Euler(0f, 180f, 0f), new Vector3(to - from, top - bottom, 1f));
+                List<(float x0, float x1, float y0, float y1)> pieces = Pieces(from, to, bottom, top, openings);
+                if (pieces.Count == 1 && pieces[0] == (from, to, bottom, top))
+                {
+                    // An outer line's outside face, local +z: with its cap (see BuildWallLine).
+                    outside(PrimitiveKit.QuadMeshSized(new Vector2(to - from, top - bottom)), new Vector3((from + to) * 0.5f, (bottom + top) * 0.5f, thickness * 0.5f),
+                        Quaternion.Euler(0f, 180f, 0f), new Vector3(to - from, top - bottom, 1f));
+                }
+                else
+                {
+                    // WINDOWS3D: the outside face around the windows' openings, the crepi continued across its pieces (it faces
+                    // local +z, as a face of the +1 side).
+                    foreach ((float x0, float x1, float y0, float y1) in pieces)
+                    {
+                        outside(PrimitiveKit.WallQuadMesh(new Vector2(x1 - x0, y1 - y0), WallUvOffset(1f, x0, x1, y0)),
+                            new Vector3((x0 + x1) * 0.5f, (y0 + y1) * 0.5f, thickness * 0.5f), Quaternion.Euler(0f, 180f, 0f), new Vector3(x1 - x0, y1 - y0, 1f));
+                    }
+                }
             }
             if (bottom < 1e-3f && faces.Count > 0)
             {
@@ -1705,12 +1854,65 @@ namespace OutOfSight
         }
 
         /// <summary>
-        /// A decorative window on the face side <paramref name="side"/> (-1 is the M1 inner side). The frame is
-        /// made of single sided strips facing the room, like the wall itself: from outside the dollhouse the
-        /// wall disappears and so does its window, instead of leaving a frame floating. M7 walls pass: on a shared line
-        /// (<paramref name="fader"/> set) the window fades with the line's centre plane (<paramref name="normal"/>). Window
-        /// picture (2026-11-19): one single sided sliced quad showing the owner's window (<see cref="WindowImage"/>) instead,
-        /// whenever the picture is there.
+        /// WINDOWS3D (2026-11-24, docs/next/progress/WINDOWS3D.md, ArtHandoff/WoodWindow/INTEGRATION.md): the art handoff's 3D
+        /// wood casement window (<paramref name="model"/>) in the opening of <paramref name="window"/> centred at
+        /// <paramref name="center"/> on the wall's local x, the wall already cut around it (<see cref="WindowOpenings"/>).
+        /// <list type="bullet">
+        /// <item>Placement: the pivot (the model's bottom centre) at the opening's bottom, the scale
+        /// (Width / 1.32, (Top - Bottom) / 1.36) so the outer frame fills the JSON rectangle and overlaps the cut edges, the
+        /// depth fitted to the wall thickness so the outer frame lines the opening through the whole wall while the sill and
+        /// the handle stand proud on the room side (<see cref="WindowModel.Scale"/>, <see cref="WindowModel.Depth"/>), the
+        /// model's +z toward the room: a yaw of 180 on the -1 face side, 0 on the +1 side.</item>
+        /// <item>The frame (wood, gaskets, handle, hinges) is drawn with the wall material, its vertices naming the walnut
+        /// image or a flat colour: no material of its own, and the frames of one wall line combine (<see cref="WindowFrameName"/>).
+        /// It casts its shadow (the sun through the opening draws the sashes on the floor).</item>
+        /// <item>The glass is one renderer per window (<see cref="WindowGlassName"/>, the shared glass material): the shader
+        /// takes its reflection angle from the window's own object space, and each window sorts as its own transparent. No
+        /// shadow; the night preset lowers its reflections (<see cref="WindowModel.NightBlock"/>).</item>
+        /// <item>Both go with their wall line exactly as its door frames do (DOORFADE): registered with the line's rule
+        /// (<paramref name="outer"/>: out of the way whenever the camera is outside the line; else its centre plane,
+        /// <paramref name="normal"/>), the glass with its own see-through treatment (<see cref="WallFader.MarkGlass"/>).</item>
+        /// <item>Visual only: no collider, the Default layer (no occluder, chair blocker or NavMesh source); the wall's
+        /// segments keep their whole colliders behind it, so sight, the player and the NavMesh see the same wall as before.</item>
+        /// </list>
+        /// </summary>
+        private static void Window3D(Transform wall, WindowModel model, float center, OpeningDef window, float t, float side, Batch batch,
+            WallFader fader, Vector3 normal, bool outer)
+        {
+            Quaternion rotation = Quaternion.Euler(0f, side < 0f ? 180f : 0f, 0f);
+            Vector3 scale = WindowModel.Scale(window.Width, window.Top - window.Bottom, t);
+            var position = new Vector3(center, window.Bottom, side * WindowModel.Depth(t));
+            batch.Add(wall, WindowFrameName, model.frame, position, rotation, scale, WallArray.Material, 0, Surface.Plain, ShadowCastingMode.On,
+                WindowFrameScope, WindowFrameName, fader, wall.position, normal, outer);
+            GameObject glass = PrimitiveKit.Part(wall, WindowGlassName, model.glass, position, rotation, scale, model.glassMaterial, 0);
+            MeshRenderer renderer = glass.GetComponent<MeshRenderer>();
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+            MaterialPropertyBlock night = model.NightBlock();
+            if (night != null)
+            {
+                renderer.SetPropertyBlock(night);
+            }
+            if (outer)
+            {
+                fader.AddOuter(renderer, wall.position, normal);
+            }
+            else
+            {
+                fader.Add(renderer, wall.position, normal);
+            }
+            fader.MarkGlass(renderer);
+        }
+
+        /// <summary>
+        /// The flat M3 window, only without the 3D one (<see cref="Window3D"/>: textures off, no wall material or no model), on
+        /// the face side <paramref name="side"/> (-1 is the M1 inner side) of an uncut wall. The frame is made of single sided
+        /// strips facing the room, like the wall itself: from outside the dollhouse the wall disappears and so does its
+        /// window, instead of leaving a frame floating. M7 walls pass: on a shared line (<paramref name="fader"/> set) the
+        /// window fades with the line's centre plane (<paramref name="normal"/>). (The window picture of 2026-11-19 that
+        /// covered it whenever the textures were on is retired: the 3D window replaced it.)
         /// </summary>
         private static void WindowDecor(Transform wall, float center, OpeningDef window, float t, float side, Batch batch, string scope,
             WallFader fader, Vector3 normal)
@@ -1720,24 +1922,10 @@ namespace OutOfSight
             float y = (window.Top + window.Bottom) * 0.5f;
             Quaternion rotation = side < 0f ? Quaternion.identity : Quaternion.Euler(0f, 180f, 0f);
             float z = side * (t * 0.5f + 0.004f);
-            Material paneMaterial = PrimitiveKit.Emissive(WindowPane, WindowPaneEmission, Tuning.WindowPaneSmoothness, 0f);
-            // Window picture (product owner image of 2026-11-19, WindowImage): the owner's wood window with its garden replaces
-            // the plain pane AND the trim strips (the picture has its own frame, mullion, transom and sill: no double frame),
-            // over the strips' own outer extent. Same pane material, every pane still in one combine group, so no level gains
-            // a material or a renderer; the picture comes through a property block. Without the picture (textures off), the M3 look below.
-            MaterialPropertyBlock picture = WindowImage.Block;
-            if (picture != null) // MUTATION:WINDOW_PICTURE
-            {
-                Vector2 outer = WindowImage.OuterSize(w, hgt);
-                batch.Add(wall, "WindowPane", WindowImage.Mesh(outer), new Vector3(center, y + WindowImage.CentreOffset, z), rotation,
-                    new Vector3(outer.x, outer.y, 1f), paneMaterial, 0, Surface.Plain, ShadowCastingMode.Off, PaneScope, "WindowPane", fader,
-                    wall.position, normal, false, picture);
-                return;
-            }
             // Wave 5B (CONTRACT_M5 17): the panes of the outer walls never fade and share one material: combined, they are one
             // renderer. M6 (CONTRACT_M6 2.4): no texture (Surface.Plain), but its own smoothness (0.95).
             batch.Add(wall, "WindowPane", PrimitiveKit.QuadMeshSized(new Vector2(w, hgt)), new Vector3(center, y, z), rotation,
-                new Vector3(w, hgt, 1f), paneMaterial, 0, Surface.Plain,
+                new Vector3(w, hgt, 1f), PaneMaterial, 0, Surface.Plain,
                 ShadowCastingMode.Off, PaneScope, "WindowPane", fader, wall.position, normal);
             Material trim = PrimitiveKit.Lit(Trim, 0.3f);
             const float f = 0.08f;

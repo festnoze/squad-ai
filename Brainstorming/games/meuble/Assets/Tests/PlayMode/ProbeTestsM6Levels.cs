@@ -118,15 +118,17 @@ namespace OutOfSight.Tests
 
         /// <summary>
         /// Level 11's counter-route "drop at the spawn, then full speed" (CONTRACT_M5 19, M5): full speed from the spawn into
-        /// a corner 1.5 m away (the vase falls there), then full speed through the bedroom door, down the corridor and across
-        /// the kitchen to the exit, never careful and never waiting. Rows are x, z.
+        /// a corner 1.5 m away (the vase falls there), then full speed through the bedroom door, down the corridor, along the
+        /// living room lane behind the two bookcases and through the kitchen to the exit, never careful and never waiting.
+        /// Rows are x, z. CARD4 (docs/next/progress/CARD4.md): the corridor now ends at the living room door (5.95, 4.75) and
+        /// the kitchen is entered from the living room (11.25, 3.95); Lea dusts the living room bookshelf at (9.25, 8.15),
+        /// about 5.5 m from the corner where the vase falls (her crash radius is 6 m).
         /// </summary>
         private static readonly float[,] Level11DropAtSpawn =
         {
             { 3.25f, 6.25f }, { 3.75f, 6.25f }, { 3.75f, 7.25f }, { 3.75f, 7.75f }, { 4.75f, 7.75f }, { 5.25f, 7.75f },
-            { 5.25f, 6.75f }, { 5.25f, 5.75f }, { 5.25f, 4.75f }, { 5.25f, 3.75f }, { 5.25f, 2.75f }, { 5.25f, 1.75f },
-            { 5.25f, 1.25f }, { 6.25f, 1.25f }, { 7.25f, 1.25f }, { 8.25f, 1.25f }, { 9.25f, 1.25f }, { 10.25f, 1.25f },
-            { 11.25f, 1.25f }, { 11.25f, 1.75f },
+            { 5.25f, 6.75f }, { 5.25f, 5.75f }, { 5.25f, 4.75f }, { 6.25f, 4.75f }, { 7.25f, 4.75f }, { 8.25f, 4.75f },
+            { 9.25f, 4.75f }, { 10.25f, 4.75f }, { 11.25f, 4.75f }, { 11.25f, 3.75f }, { 11.25f, 2.75f }, { 11.25f, 1.75f },
         };
 
         /// <summary>

@@ -69,8 +69,10 @@ namespace OutOfSight
 
         /// <summary>
         /// Garden backdrop (2026-11-19): the ring of the target's level (GardenBackdrop.RingFor), null without a level. The
-        /// camera always stands inside it (<see cref="Apply"/> shortens the arm at its fence, which the ring's size keeps out
-        /// of reach in play) and the far clip always holds it.
+        /// camera always stands inside its camera space (<see cref="Apply"/> shortens the arm at its fence, which the ring's
+        /// size keeps out of reach in play) and the far clip always holds it. GARDENZOOM (2026-11-25): the ring itself
+        /// follows the camera (GardenBackdropFit grows it past its default size when the zoom takes the camera near or past
+        /// its wall, and shrinks it back once zoomed in); the far clip set here holds its largest size (Ring.FarClip).
         /// </summary>
         public GardenBackdrop.Ring? Fence { get; private set; }
 
@@ -172,7 +174,7 @@ namespace OutOfSight
                 Vector2 stick = InputReader.LookStick();
                 Yaw += stick.x * 140f * sens * Time.unscaledDeltaTime;
                 Pitch = Mathf.Clamp(Pitch - stick.y * 90f * sens * Time.unscaledDeltaTime, Tuning.PitchMin, Tuning.PitchMax);
-                // M7 (CONTRACT_M7 1.5): a drag on the right half of a touchscreen orbits, whatever the cursor lock, with
+                // M7 (CONTRACT_M7 1.5): a drag on the right two thirds of a touchscreen (TOUCHTUTO) orbits, whatever the cursor lock, with
                 // the same sensitivity option (the drag is in pixels of a 1080 pixel high screen, so every screen turns alike).
                 Vector2 drag = InputReader.TouchLookDelta();
                 Yaw += drag.x * Tuning.TouchOrbitDegPerPixel * sens; // MUTATION:TOUCH_ORBIT_SENS
