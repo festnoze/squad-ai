@@ -1,0 +1,12 @@
+{
+  "rev": 5,
+  "previous": ["level1", "level2", "level3", "level11", "level5", "level6", "level7", "level8", "level9", "level12", "level4", "level15", "level13", "level14", "level18", "level17", "level25", "level19", "level22", "level24"],
+  "levels": ["level1", "level2", "level3", "level11", "level5", "level6", "level7", "level8", "level9", "level4", "level12", "level15", "level13", "level14", "level18", "level17", "level25", "level19", "level22", "level24", "level26", "level27", "level28", "level29", "level30", "level31", "level32", "level33", "level34", "level35"],
+  "acts": [
+    { "from": 0, "nameKey": "act1.name" },
+    { "from": 7, "nameKey": "act2.name" },
+    { "from": 16, "nameKey": "act3.name" },
+    { "from": 20, "nameKey": "act4.name" },
+    { "from": 24, "nameKey": "act5.name" }
+  ]
+}

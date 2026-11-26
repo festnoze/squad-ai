@@ -1,0 +1,69 @@
+{
+ "summary": "Harness 5B.1 done. B1: Probe.FurnitureTriangles subtracts the LoadView's triangles from the piece that carries it and budgets the load on its own key 'Load <kind>' (as LevelAudit.CheckBudgets). Built player run with --probe: pass=true, 0 failures, 24 shots, 0 exceptions, 98 MB. Level 11: Chair 340 + Load vase 204; level 13: Player office_chair 312 + Load vase 204; level 17: Chair 340 + Load vase 204 (all within 400). B2: the 9 prose killer fields are now bare test names; rows slot_merge_key and shove_moving are removed; the pre-flight rejects any row without exactly 5 separators, any unknown mode, an empty killer field, or a killer token outside ^[A-Za-z0-9_]+$. It prints the row id and exits 2 before the snapshot or any mutation. Proof: rowcheck.sh parses all 102 rows with the same IFS and finds 0 bad; two injected bad rows (prose token, 6 separators) exit 2. All 9 rewritten rows were re-verified under the Unity queue lock: every listed killer turns red and every marker is restored. M1: 19 missing EditMode killers (plus Robot_and_load_meshes_face_outward) are added to EDIT_TESTS and 21 PlayMode killer full names to PROBE_STEPS. verify.sh now runs killers_listed in the edit and play stages, a drift check that turns the stage red if any killer of mutation.sh is not covered by a required name starting with it; a negative test confirmed it. m11: the audit timeout reads levels.json through cygpath -w and len([levels]) (17), and counts fixtures as the 'new FixtureRule' entries of LevelAudit.cs (19 now with the audit agent's two new ones), so 36 x 312 s. Step37w_ is replaced by Step37w_ConeFollowsThePlatformTop, and the watchers' renamed Step37x_ is added. m12/m13: Level13Hint and Level15Hint are verbatim from contract 19, and Tuning.BalanceWarning = 0.9f.",
+ "blocked": false,
+ "files_changed": [
+  "C:/Dev/squad-ai/Brainstorming/games/out_of_sight/Assets/Scripts/Runtime/Probe.cs",
+  "C:/Dev/squad-ai/Brainstorming/games/out_of_sight/mutation.sh",
+  "C:/Dev/squad-ai/Brainstorming/games/out_of_sight/verify.sh",
+  "C:/Dev/squad-ai/Brainstorming/games/out_of_sight/Assets/Scripts/Core/Strings.cs",
+  "C:/Dev/squad-ai/Brainstorming/games/out_of_sight/Assets/Scripts/Core/Tuning.cs"
+ ],
+ "tests": "Compile clean (SetupAndCompile) at start. EditMode baseline filter CoreM5B|StringsTests|Robot_and_load_meshes_face_outward|Every_name_and_trait_key_is_a_shown_string|Levels_4_to_7_have_one_body|Levels_2_and_3_have_two_rooms|LevelDataM5Tests: 102 tests, 0 red. Kill re-verification of the 9 rewritten rows (hum_none, hum_creak, load_fall, load_window, motion_glide, motion_careful, robot_reverse, put_away, rocks_row): every killer red under its mutant, every marker restored by reverse replacement under the queue lock. PlayMode Step44e_ and Step22c_: both pass with BalanceWarning 0.9. The player was built and run with --probe: report.json pass=true, failures=0, 24 shots, caught and won reached, Player.log 0 exceptions, build 98 MB. Scripts: scratchpad/harness5b1/rowcheck.sh (row parse proof, 102 rows, 0 bad), verify_parts.sh (drift checks green plus a negative case, audit count 17+19), neg/m_tok.sh and neg/m_sep.sh (pre-flight exits 2).",
+ "markers": [],
+ "removed_markers": [
+  "SLOT_MERGE_KEY",
+  "SHOVE_MOVING"
+ ],
+ "probe_steps": [
+  "Step37w_ConeFollowsThePlatformTop (replaces Step37w_)",
+  "Step37x_",
+  "Step03_StillWhileSeen",
+  "Step04_Caught",
+  "Step05_Occluder",
+  "Step06_OutOfCone",
+  "Step22_ModelsReplaceTheProceduralVisuals",
+  "Step24_LoopDrivesClipsHeadAndFootsteps",
+  "Step26_PauseStopsEveryRuleAndHoldsVisuals",
+  "Step27d_HopVariantsNeverRepeat",
+  "Step02_MoveUnseen",
+  "Step41_LockedLevelsUnlockThroughRealWins",
+  "Step41f_CorruptSaveAtBootStartsFresh",
+  "Step37_EachConeUsesItsWatchersRangeAndAngle",
+  "Step38_DogConeColourWalkPatterAndFeet",
+  "Step37_VisualEyeIsTheRoutineEye",
+  "Step36_LeafPosesAndTheColliderAndOcclusionSwap",
+  "Step36c_EOpensTheLeafInExactlyThirtyMovingSteps",
+  "Step36o_OpenLeafBetweenTheCameraAndTheChairIsFaded",
+  "Step38w_DogFanCoversWhatItSees",
+  "Step42w_RobotVisualFollowsSetPoseWithoutCollider",
+  "Step44w_LoadSitsOnTopTiltsAndBreaks",
+  "Step39h_CombinedRenderersKeepCollidersMaterialsAndFades"
+ ],
+ "edit_tests": [
+  "Topple_creak_crash_and_bark_are_never_masked",
+  "Any_full_speed_reversal_drops_the_load",
+  "The_office_chair_full_start_and_full_glide_drop_the_load",
+  "Careful_U_turns_of_the_stool_and_the_office_chair_drop_the_load",
+  "DeltaV_compares_with_the_velocity_exactly_one_window_before",
+  "Stop_distance_and_slide_samples_per_body",
+  "Office_chair_glides_when_braked_against_its_motion_then_drives_back",
+  "Release_is_the_instant_stop_the_glide_or_the_tip",
+  "Straight_start_follows_the_body_table_full_and_careful",
+  "Every_careful_straight_move_holds",
+  "A_clue_within_reach_is_put_away_without_walking",
+  "Only_the_rocking_chair_rocks_and_every_kind_is_a_known_body",
+  "Robot_loop_runs_into_no_wall_and_never_leaves_the_house",
+  "House_robot_fixture_crosses_a_doorway_without_a_leaf",
+  "Robot_loop_stays_on_the_floor_level",
+  "Robot_loop_stays_out_of_leaf_swing_sectors_and_off_the_leaf",
+  "Robot_loop_keeps_one_metre_from_the_spawn_the_seat_homes_and_the_exit",
+  "Lesson_final_needs_three_mechanics_and_mechanics_are_listed_in_order",
+  "Robot_and_load_meshes_face_outward"
+ ],
+ "needs": [
+  "integrate phase: add the B3 replacement row (bodies marker in FurnitureController.EndStep, killers Step42b_ Step42c_ Step42g_) and every other new 5B.1 row. verify.sh now REQUIRES that each EditMode killer of mutation.sh is covered by a name in EDIT_TESTS and each PlayMode killer by a name in PROBE_STEPS that starts with it (use the full test name when a prefix is shared). Otherwise the edit or play stage is red: append the new killers to those lists in the same edit as the rows.",
+  "integrator (docs): CONTRACT_M5 16.10 still quotes the old level15.hint ('Une chute s'entend toujours'), and section 6 line 198 still says the gauge 'turns red above 0.75'. Bring both in line with section 19 (hint text, 0.9). PRD 7.4 should state that the load is budgeted on its own at 400 triangles (contract 19 B1).",
+  "game: Step44e already expects BalanceWarning 0.9 and passes (checked filtered). No action unless you change it again.",
+  "watchers: Step37w_MergedSlots... is gone and Step37x_CharacterSlotsAreTheCatalogSlotsWithinTheBudget is in PROBE_STEPS as Step37x_. Keep that prefix unique."
+ ]
+}

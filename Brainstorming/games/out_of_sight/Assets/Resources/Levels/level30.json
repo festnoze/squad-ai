@@ -1,0 +1,710 @@
+{
+  "id": "level30",
+  "nameKey": "level30.name",
+  "hintKey": "level30.hint",
+  "lesson": "load",
+  "requires": [
+    "rug"
+  ],
+  "pace": {
+    "minShare": 0.1,
+    "maxShare": 0.45,
+    "minPauses": 4,
+    "maxPause": 6.0
+  },
+  "rooms": [
+    {
+      "id": "chambre",
+      "x": 1.95,
+      "z": 9.2,
+      "sizeX": 3.9,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "carpet",
+      "wallFinish": "wallpaper"
+    },
+    {
+      "id": "salle_de_bain",
+      "x": 5.45,
+      "z": 9.2,
+      "sizeX": 2.9,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#F7F4EE",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "ivorytile",
+      "wallFinish": "whitetile"
+    },
+    {
+      "id": "bureau",
+      "x": 8.95,
+      "z": 9.2,
+      "sizeX": 3.9,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "lightoak",
+      "wallFinish": "sageribbed"
+    },
+    {
+      "id": "dressing",
+      "type": "other",
+      "x": 12.45,
+      "z": 9.2,
+      "sizeX": 2.9,
+      "sizeZ": 3.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "lightoak",
+      "wallFinish": "limewash"
+    },
+    {
+      "id": "couloir",
+      "x": 6.95,
+      "z": 6.7,
+      "sizeX": 13.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "travertine"
+    },
+    {
+      "id": "bibliotheque",
+      "x": 1.95,
+      "z": 4.45,
+      "sizeX": 3.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "soft",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "carpet",
+      "wallFinish": "grasscloth"
+    },
+    {
+      "id": "salon",
+      "x": 6.95,
+      "z": 4.45,
+      "sizeX": 5.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "arches"
+    },
+    {
+      "id": "salle_a_manger",
+      "x": 11.95,
+      "z": 4.45,
+      "sizeX": 3.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "lightoak",
+      "wallFinish": "sage"
+    },
+    {
+      "id": "buanderie",
+      "type": "other",
+      "x": 1.7,
+      "z": 1.45,
+      "sizeX": 3.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#F7F4EE",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "tealtile",
+      "wallFinish": "limewash"
+    },
+    {
+      "id": "cuisine",
+      "x": 5.45,
+      "z": 1.45,
+      "sizeX": 3.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#F7F4EE",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "tile",
+      "wallFinish": "subwaytile"
+    },
+    {
+      "id": "office",
+      "x": 8.95,
+      "z": 1.45,
+      "sizeX": 2.9,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#F7F4EE",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "tealtile",
+      "wallFinish": "limewash"
+    },
+    {
+      "id": "veranda",
+      "x": 12.2,
+      "z": 1.45,
+      "sizeX": 3.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#F7F4EE",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "marble",
+      "wallFinish": "pinstripe"
+    }
+  ],
+  "doors": [
+    {
+      "x": 3.95,
+      "z": 9.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 6.95,
+      "z": 10.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 9.25,
+      "z": 7.45,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 12.75,
+      "z": 7.45,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 9.25,
+      "z": 5.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 12.25,
+      "z": 5.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 3.95,
+      "z": 5.25,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 2.75,
+      "z": 2.95,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 3.45,
+      "z": 0.75,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 7.45,
+      "z": 0.75,
+      "width": 1.0,
+      "top": 2.1
+    },
+    {
+      "x": 10.45,
+      "z": 1.75,
+      "width": 1.0,
+      "top": 2.1
+    }
+  ],
+  "windows": [],
+  "rugs": [
+    {
+      "model": "kenney.rug",
+      "x": 5.0,
+      "z": 6.75,
+      "sizeX": 9.9,
+      "sizeZ": 1.2,
+      "yaw": 0.0,
+      "color": "#8C5A36"
+    },
+    {
+      "model": "kenney.rug",
+      "x": 6.95,
+      "z": 5.4,
+      "sizeX": 5.9,
+      "sizeZ": 1.0,
+      "yaw": 0.0,
+      "color": "#8C5A36"
+    },
+    {
+      "model": "kenney.rug",
+      "x": 5.45,
+      "z": 0.75,
+      "sizeX": 3.9,
+      "sizeZ": 1.0,
+      "yaw": 0.0,
+      "color": "#8C5A36"
+    }
+  ],
+  "player": {
+    "kind": "plant_stand",
+    "load": "banana",
+    "x": 2.25,
+    "z": 8.25,
+    "yaw": 90.0,
+    "sizeX": 0.42,
+    "sizeY": 0.65,
+    "sizeZ": 0.42,
+    "color": "#D7263D"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 13.25,
+    "z": 0.75,
+    "sizeX": 0.9,
+    "sizeZ": 0.9,
+    "color": "#3F8F4F"
+  },
+  "props": [
+    {
+      "name": "Lit",
+      "kind": "bed",
+      "x": 1.0,
+      "z": 9.9,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 0.55,
+      "sizeZ": 2.0,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "PlanteChambre",
+      "kind": "plant",
+      "x": 3.6,
+      "z": 10.6,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.3,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "Baignoire",
+      "kind": "bathtub",
+      "x": 4.95,
+      "z": 10.5,
+      "yaw": 0.0,
+      "sizeX": 1.8,
+      "sizeY": 0.6,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Meuble",
+      "kind": "cabinet",
+      "x": 5.75,
+      "z": 9.225,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 1.9,
+      "sizeZ": 0.45,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Etagere",
+      "kind": "bookshelf",
+      "x": 9.2,
+      "z": 8.8,
+      "yaw": 0.0,
+      "sizeX": 1.6,
+      "sizeY": 2.0,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Bureau",
+      "kind": "table",
+      "x": 9.0,
+      "z": 10.45,
+      "yaw": 0.0,
+      "sizeX": 1.4,
+      "sizeY": 0.75,
+      "sizeZ": 0.8,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#6B4226"
+    },
+    {
+      "name": "FauteuilMamie",
+      "kind": "armchair",
+      "x": 6.75,
+      "z": 4.4,
+      "yaw": 180.0,
+      "sizeX": 0.9,
+      "sizeY": 0.95,
+      "sizeZ": 0.85,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "PlanteSalon",
+      "kind": "plant",
+      "x": 4.3,
+      "z": 3.3,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.3,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    },
+    {
+      "name": "Rayonnage",
+      "kind": "bookshelf",
+      "x": 0.2,
+      "z": 4.5,
+      "yaw": 90.0,
+      "sizeX": 1.6,
+      "sizeY": 2.0,
+      "sizeZ": 0.4,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Machine",
+      "kind": "box",
+      "x": 0.4,
+      "z": 0.4,
+      "yaw": 0.0,
+      "sizeX": 0.6,
+      "sizeY": 0.85,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Cuisiniere",
+      "kind": "stove",
+      "x": 5.45,
+      "z": 2.6,
+      "yaw": 0.0,
+      "sizeX": 0.6,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Plan",
+      "kind": "counter",
+      "x": 4.7,
+      "z": 2.6,
+      "yaw": 0.0,
+      "sizeX": 0.9,
+      "sizeY": 0.9,
+      "sizeZ": 0.6,
+      "occluder": true,
+      "color": "#8C5A36",
+      "accentColor": "#F7F4EE"
+    },
+    {
+      "name": "Frigo",
+      "kind": "fridge",
+      "x": 3.85,
+      "z": 2.55,
+      "yaw": 0.0,
+      "sizeX": 0.7,
+      "sizeY": 1.8,
+      "sizeZ": 0.7,
+      "occluder": true,
+      "color": "#F7F4EE",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Vaisselier",
+      "kind": "cabinet",
+      "x": 5.0,
+      "z": 1.325,
+      "yaw": 0.0,
+      "sizeX": 1.0,
+      "sizeY": 1.9,
+      "sizeZ": 0.45,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "Placard",
+      "kind": "cabinet",
+      "x": 9.0,
+      "z": 2.675,
+      "yaw": 0.0,
+      "sizeX": 1.2,
+      "sizeY": 1.9,
+      "sizeZ": 0.45,
+      "occluder": true,
+      "color": "#6B4226",
+      "accentColor": "#8C5A36"
+    },
+    {
+      "name": "PlanteVeranda",
+      "kind": "plant",
+      "x": 13.6,
+      "z": 2.6,
+      "yaw": 0.0,
+      "sizeX": 0.5,
+      "sizeY": 1.3,
+      "sizeZ": 0.5,
+      "occluder": true,
+      "color": "#3F8F4F",
+      "accentColor": "#8C5A36",
+      "style": "banana"
+    }
+  ],
+  "decor": [
+    {
+      "kind": "stock_pot",
+      "host": "Cuisiniere",
+      "x": 0.0,
+      "z": 0.12,
+      "yaw": 0.0
+    },
+    {
+      "kind": "kettle",
+      "host": "Plan",
+      "x": 0.1,
+      "z": 0.0,
+      "yaw": 200.0
+    }
+  ],
+  "decoys": [],
+  "designerRoute": [
+    { "x": 3.25, "z": 8.25, "at": 0.3 },
+    { "x": 3.25, "z": 8.75, "at": 4.5, "careful": true },
+    { "x": 3.25, "z": 9.25, "at": 5.8 },
+    { "x": 4.25, "z": 9.25, "at": 6.5, "careful": true },
+    { "x": 4.75, "z": 9.25, "at": 9.1 },
+    { "x": 4.75, "z": 9.75, "at": 9.8, "careful": true },
+    { "x": 5.25, "z": 9.75, "at": 11.1, "careful": true },
+    { "x": 5.75, "z": 9.75, "at": 12.4 },
+    { "x": 6.25, "z": 9.75, "at": 13.1, "careful": true },
+    { "x": 6.25, "z": 10.25, "at": 14.4, "careful": true },
+    { "x": 6.75, "z": 10.25, "at": 15.7 },
+    { "x": 7.25, "z": 10.25, "at": 16.4, "careful": true },
+    { "x": 7.25, "z": 9.75, "at": 17.7, "careful": true },
+    { "x": 7.25, "z": 9.25, "at": 19.0 },
+    { "x": 7.25, "z": 8.25, "at": 19.7, "careful": true },
+    { "x": 7.25, "z": 7.75, "at": 22.3 },
+    { "x": 7.75, "z": 7.75, "at": 24.6, "careful": true },
+    { "x": 8.25, "z": 7.75, "at": 27.4, "careful": true },
+    { "x": 8.75, "z": 7.75, "at": 28.7 },
+    { "x": 9.25, "z": 7.75, "at": 29.4, "careful": true },
+    { "x": 9.25, "z": 6.75, "at": 30.7 },
+    { "x": 9.25, "z": 5.75, "at": 32.1, "careful": true },
+    { "x": 9.25, "z": 5.25, "at": 34.7 },
+    { "x": 8.75, "z": 5.25, "at": 37.0, "careful": true },
+    { "x": 8.25, "z": 5.25, "at": 39.2, "careful": true },
+    { "x": 7.75, "z": 5.25, "at": 40.5 },
+    { "x": 6.75, "z": 5.25, "at": 41.2, "careful": true },
+    { "x": 6.25, "z": 5.25, "at": 43.8 },
+    { "x": 5.25, "z": 5.25, "at": 44.5, "careful": true },
+    { "x": 4.75, "z": 5.25, "at": 47.1 },
+    { "x": 3.75, "z": 5.25, "at": 47.8, "careful": true },
+    { "x": 3.25, "z": 5.25, "at": 50.4 },
+    { "x": 3.25, "z": 4.25, "at": 51.1, "careful": true },
+    { "x": 2.75, "z": 4.25, "at": 55.3, "careful": true },
+    { "x": 2.75, "z": 3.25, "at": 57.6, "careful": true },
+    { "x": 2.75, "z": 2.75, "at": 60.2 },
+    { "x": 2.75, "z": 1.75, "at": 60.9, "careful": true },
+    { "x": 2.75, "z": 1.25, "at": 63.5 },
+    { "x": 2.75, "z": 0.75, "at": 64.2, "careful": true },
+    { "x": 3.25, "z": 0.75, "at": 65.5, "careful": true },
+    { "x": 3.75, "z": 0.75, "at": 66.8 },
+    { "x": 4.75, "z": 0.75, "at": 67.5, "careful": true },
+    { "x": 5.75, "z": 0.75, "at": 70.1 },
+    { "x": 6.75, "z": 0.75, "at": 71.5 },
+    { "x": 7.75, "z": 0.75, "at": 72.9 },
+    { "x": 8.75, "z": 0.75, "at": 74.3 },
+    { "x": 9.25, "z": 0.75, "at": 75.7 },
+    { "x": 9.25, "z": 1.75, "at": 76.8 },
+    { "x": 10.25, "z": 1.75, "at": 78.6 },
+    { "x": 11.25, "z": 1.75, "at": 80.0 },
+    { "x": 12.25, "z": 1.75, "at": 81.4 },
+    { "x": 13.25, "z": 1.75, "at": 82.8 },
+    { "x": 13.25, "z": 0.75, "at": 84.6 },
+    { "x": 13.25, "z": 0.75, "at": 84.6 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Bernard",
+      "personality": "watchful",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 3.85,
+          "z": 1.75,
+          "facing": 270.0,
+          "dwell": 0.5,
+          "glances": []
+        },
+        {
+          "x": 0.75,
+          "z": 6.75,
+          "facing": 90.0,
+          "dwell": 600.0,
+          "glances": [],
+          "glanceEvery": {
+            "start": 2.0,
+            "period": 9.0,
+            "hold": 4.5,
+            "yaw": 80.0,
+            "alternate": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mamie",
+      "personality": "granny",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 6.5,
+          "z": 0.75,
+          "facing": 270.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 6.75,
+          "z": 3.7,
+          "facing": 195.0,
+          "dwell": 600.0,
+          "glances": [],
+          "glanceEvery": {
+            "start": 2.5,
+            "period": 7.0,
+            "hold": 3.0,
+            "yaw": 60.0,
+            "alternate": true
+          },
+          "sit": "FauteuilMamie"
+        }
+      ]
+    },
+    {
+      "name": "Lea",
+      "personality": "tidy",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 5.45,
+          "z": 2.0,
+          "facing": 0.0,
+          "dwell": 5.0,
+          "glances": []
+        },
+        {
+          "x": 5.45,
+          "z": 2.0,
+          "facing": 175.0,
+          "dwell": 2.0,
+          "glances": []
+        },
+        {
+          "x": 5.45,
+          "z": 2.0,
+          "facing": 0.0,
+          "dwell": 5.0,
+          "glances": []
+        },
+        {
+          "x": 5.45,
+          "z": 2.0,
+          "facing": 185.0,
+          "dwell": 2.0,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Rex",
+      "kind": "dog",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 10.25,
+          "z": 10.25,
+          "facing": 225.0,
+          "dwell": 5.5,
+          "glances": [],
+          "sleep": true
+        },
+        {
+          "x": 10.25,
+          "z": 10.25,
+          "facing": 225.0,
+          "dwell": 2.5,
+          "glances": []
+        }
+      ]
+    }
+  ]
+}

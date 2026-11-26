@@ -1,0 +1,1010 @@
+{
+  "id": "level35",
+  "nameKey": "level35.name",
+  "hintKey": "level35.hint",
+  "lesson": "dark",
+  "requires": [
+    "lit"
+  ],
+  "pace": {
+    "minShare": 0.05,
+    "maxShare": 0.4,
+    "minPauses": 3,
+    "maxPause": 6.0
+  },
+  "lighting": "night",
+  "rooms": [
+    {
+      "id": "m00",
+      "type": "corridor",
+      "x": 8.2,
+      "z": 0.7,
+      "sizeX": 13.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m01",
+      "type": "corridor",
+      "x": 8.2,
+      "z": 11.2,
+      "sizeX": 13.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "wallpaper",
+      "lightWall": "none"
+    },
+    {
+      "id": "m02",
+      "type": "corridor",
+      "x": 6.7,
+      "z": 14.2,
+      "sizeX": 13.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "quatrefoil",
+      "lightWall": "none"
+    },
+    {
+      "id": "m03",
+      "type": "corridor",
+      "x": 14.2,
+      "z": 6.7,
+      "sizeX": 1.4,
+      "sizeZ": 7.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "limewash",
+      "lightWall": "none"
+    },
+    {
+      "id": "m04",
+      "type": "corridor",
+      "x": 14.2,
+      "z": 13.45,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "wallpaper",
+      "lightWall": "none"
+    },
+    {
+      "id": "m05",
+      "type": "corridor",
+      "x": 6.7,
+      "z": 5.2,
+      "sizeX": 10.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "pinstripe",
+      "lightWall": "none"
+    },
+    {
+      "id": "m06",
+      "type": "corridor",
+      "x": 11.2,
+      "z": 2.95,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m07",
+      "type": "corridor",
+      "x": 11.2,
+      "z": 8.2,
+      "sizeX": 1.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "limewash",
+      "lightWall": "none"
+    },
+    {
+      "id": "m08",
+      "type": "corridor",
+      "x": 0.7,
+      "z": 4.45,
+      "sizeX": 1.4,
+      "sizeZ": 8.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "pinstripe",
+      "lightWall": "none"
+    },
+    {
+      "id": "m09",
+      "type": "corridor",
+      "x": 8.95,
+      "z": 9.7,
+      "sizeX": 2.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "limewash",
+      "lightWall": "none"
+    },
+    {
+      "id": "m10",
+      "type": "corridor",
+      "x": 5.2,
+      "z": 8.2,
+      "sizeX": 1.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "sage",
+      "lightWall": "none"
+    },
+    {
+      "id": "m11",
+      "type": "corridor",
+      "x": 3.7,
+      "z": 2.2,
+      "sizeX": 4.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "pinstripe",
+      "lightWall": "none"
+    },
+    {
+      "id": "m12",
+      "type": "corridor",
+      "x": 0.7,
+      "z": 11.2,
+      "sizeX": 1.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "quatrefoil",
+      "lightWall": "none"
+    },
+    {
+      "id": "m13",
+      "type": "corridor",
+      "x": 2.2,
+      "z": 8.2,
+      "sizeX": 1.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "sage",
+      "lightWall": "none"
+    },
+    {
+      "id": "m14",
+      "type": "corridor",
+      "x": 2.95,
+      "z": 3.7,
+      "sizeX": 2.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "pinstripe",
+      "lightWall": "none"
+    },
+    {
+      "id": "m15",
+      "type": "corridor",
+      "x": 6.7,
+      "z": 2.95,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "pinstripe",
+      "lightWall": "none"
+    },
+    {
+      "id": "m16",
+      "type": "corridor",
+      "x": 8.2,
+      "z": 7.45,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "limewash",
+      "lightWall": "none"
+    },
+    {
+      "id": "m17",
+      "type": "corridor",
+      "x": 9.7,
+      "z": 7.45,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "limewash",
+      "lightWall": "none"
+    },
+    {
+      "id": "m18",
+      "type": "corridor",
+      "x": 12.7,
+      "z": 5.2,
+      "sizeX": 1.4,
+      "sizeZ": 4.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m19",
+      "type": "corridor",
+      "x": 13.45,
+      "z": 2.2,
+      "sizeX": 2.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m20",
+      "type": "corridor",
+      "x": 2.95,
+      "z": 12.7,
+      "sizeX": 2.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "quatrefoil",
+      "lightWall": "none"
+    },
+    {
+      "id": "m21",
+      "type": "corridor",
+      "x": 11.95,
+      "z": 12.7,
+      "sizeX": 2.9,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "wallpaper",
+      "lightWall": "none"
+    },
+    {
+      "id": "m22",
+      "type": "corridor",
+      "x": 3.7,
+      "z": 8.95,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "sage",
+      "lightWall": "none"
+    },
+    {
+      "id": "m23",
+      "type": "corridor",
+      "x": 6.7,
+      "z": 7.45,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "sage",
+      "lightWall": "none"
+    },
+    {
+      "id": "m24",
+      "type": "corridor",
+      "x": 12.7,
+      "z": 8.95,
+      "sizeX": 1.4,
+      "sizeZ": 2.9,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "limewash",
+      "lightWall": "none"
+    },
+    {
+      "id": "m25",
+      "type": "corridor",
+      "x": 3.7,
+      "z": 6.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "sage",
+      "lightWall": "none"
+    },
+    {
+      "id": "m26",
+      "type": "corridor",
+      "x": 5.2,
+      "z": 3.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "pinstripe",
+      "lightWall": "none"
+    },
+    {
+      "id": "m27",
+      "type": "corridor",
+      "x": 5.2,
+      "z": 12.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "quatrefoil",
+      "lightWall": "none"
+    },
+    {
+      "id": "m28",
+      "type": "corridor",
+      "x": 6.7,
+      "z": 9.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "sage",
+      "lightWall": "none"
+    },
+    {
+      "id": "m29",
+      "type": "corridor",
+      "x": 6.7,
+      "z": 12.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "quatrefoil",
+      "lightWall": "none"
+    },
+    {
+      "id": "m30",
+      "type": "corridor",
+      "x": 8.2,
+      "z": 2.2,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m31",
+      "type": "corridor",
+      "x": 8.2,
+      "z": 3.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m32",
+      "type": "corridor",
+      "x": 8.2,
+      "z": 12.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "wallpaper",
+      "lightWall": "none"
+    },
+    {
+      "id": "m33",
+      "type": "corridor",
+      "x": 9.7,
+      "z": 2.2,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m34",
+      "type": "corridor",
+      "x": 9.7,
+      "z": 3.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "grasscloth",
+      "lightWall": "none"
+    },
+    {
+      "id": "m35",
+      "type": "corridor",
+      "x": 9.7,
+      "z": 12.7,
+      "sizeX": 1.4,
+      "sizeZ": 1.4,
+      "wallHeight": 2.7,
+      "wallThickness": 0.1,
+      "floor": "hard",
+      "floorColor": "#B07A4E",
+      "wallColor": "#EDE6DA",
+      "floorFinish": "herringbone",
+      "wallFinish": "wallpaper",
+      "lightWall": "none"
+    }
+  ],
+  "doors": [
+    {
+      "x": 1.45,
+      "z": 2.2,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 1.45,
+      "z": 3.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 0.7,
+      "z": 13.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 2.95,
+      "z": 6.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 2.2,
+      "z": 10.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 2.95,
+      "z": 9.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 2.2,
+      "z": 13.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 5.2,
+      "z": 1.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 5.2,
+      "z": 2.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 5.2,
+      "z": 10.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 5.2,
+      "z": 11.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 6.7,
+      "z": 1.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 7.45,
+      "z": 3.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 7.45,
+      "z": 8.2,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 6.7,
+      "z": 10.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 6.7,
+      "z": 11.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 8.2,
+      "z": 1.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 8.2,
+      "z": 5.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 8.2,
+      "z": 11.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 9.7,
+      "z": 1.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 10.45,
+      "z": 3.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 9.7,
+      "z": 8.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 10.45,
+      "z": 9.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 9.7,
+      "z": 11.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 11.2,
+      "z": 1.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 11.2,
+      "z": 4.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 11.2,
+      "z": 5.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 11.95,
+      "z": 9.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 13.45,
+      "z": 5.2,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 13.45,
+      "z": 9.7,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 12.7,
+      "z": 11.95,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 12.7,
+      "z": 13.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 14.2,
+      "z": 1.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 14.2,
+      "z": 10.45,
+      "width": 1.4,
+      "top": 2.7
+    },
+    {
+      "x": 14.2,
+      "z": 11.95,
+      "width": 1.4,
+      "top": 2.7
+    }
+  ],
+  "windows": [],
+  "rugs": [],
+  "player": {
+    "kind": "floor_lamp",
+    "x": 0.75,
+    "z": 9.75,
+    "yaw": 0.0,
+    "sizeX": 0.35,
+    "sizeY": 1.8,
+    "sizeZ": 0.35,
+    "color": "#D7263D",
+    "model": "kenney.floorlamp"
+  },
+  "exit": {
+    "model": "kenney.doormat",
+    "x": 5.2,
+    "z": 3.7,
+    "sizeX": 1.0,
+    "sizeZ": 1.0,
+    "color": "#3F8F4F"
+  },
+  "props": [],
+  "decoys": [],
+  "designerRoute": [
+    { "x": 0.75, "z": 9.75, "at": 5.9, "action": "toggle" },
+    { "x": 0.75, "z": 10.75, "at": 6.2 },
+    { "x": 0.75, "z": 11.25, "at": 8.0 },
+    { "x": 0.75, "z": 12.25, "at": 9.6 },
+    { "x": 0.75, "z": 13.25, "at": 11.4 },
+    { "x": 0.75, "z": 13.75, "at": 13.2 },
+    { "x": 1.75, "z": 13.75, "at": 14.1 },
+    { "x": 2.75, "z": 13.75, "at": 15.9 },
+    { "x": 3.75, "z": 13.75, "at": 17.7 },
+    { "x": 4.75, "z": 13.75, "at": 19.5 },
+    { "x": 5.75, "z": 13.75, "at": 21.3 },
+    { "x": 6.75, "z": 13.75, "at": 23.1 },
+    { "x": 7.75, "z": 13.75, "at": 24.9 },
+    { "x": 8.75, "z": 13.75, "at": 26.7 },
+    { "x": 9.75, "z": 13.75, "at": 28.5 },
+    { "x": 10.75, "z": 13.75, "at": 30.3 },
+    { "x": 11.75, "z": 13.75, "at": 32.1 },
+    { "x": 12.75, "z": 13.75, "at": 33.9 },
+    { "x": 12.75, "z": 12.75, "at": 35.7 },
+    { "x": 12.75, "z": 11.75, "at": 37.5 },
+    { "x": 12.75, "z": 10.75, "at": 39.3 },
+    { "x": 13.75, "z": 10.75, "at": 41.1 },
+    { "x": 13.75, "z": 9.75, "at": 42.9 },
+    { "x": 13.75, "z": 9.25, "at": 44.7 },
+    { "x": 12.75, "z": 9.25, "at": 45.6 },
+    { "x": 11.75, "z": 9.25, "at": 47.4 },
+    { "x": 11.25, "z": 9.25, "at": 49.2 },
+    { "x": 11.25, "z": 8.75, "at": 50.1 },
+    { "x": 11.25, "z": 8.25, "at": 52.8 },
+    { "x": 11.25, "z": 7.25, "at": 54.3 },
+    { "x": 11.25, "z": 6.25, "at": 56.1 },
+    { "x": 11.25, "z": 5.25, "at": 57.9 },
+    { "x": 11.25, "z": 4.25, "at": 59.7 },
+    { "x": 10.75, "z": 4.25, "at": 62.0 },
+    { "x": 10.75, "z": 3.25, "at": 62.9 },
+    { "x": 10.75, "z": 2.25, "at": 64.7 },
+    { "x": 10.75, "z": 1.25, "at": 66.5 },
+    { "x": 10.75, "z": 0.75, "at": 68.3 },
+    { "x": 10.25, "z": 0.75, "at": 69.2 },
+    { "x": 9.25, "z": 0.75, "at": 71.0 },
+    { "x": 8.25, "z": 0.75, "at": 72.8 },
+    { "x": 7.25, "z": 0.75, "at": 74.6 },
+    { "x": 6.25, "z": 0.75, "at": 76.4 },
+    { "x": 5.25, "z": 0.75, "at": 78.2 },
+    { "x": 5.25, "z": 1.75, "at": 80.0 },
+    { "x": 5.25, "z": 2.75, "at": 81.8 },
+    { "x": 5.25, "z": 3.25, "at": 83.6 },
+    { "x": 5.2, "z": 3.7, "at": 83.6 }
+  ],
+  "inhabitants": [
+    {
+      "name": "Hugo",
+      "personality": "watchful",
+      "pattern": "pingpong",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 3.75,
+          "z": 11.25,
+          "facing": 270.0,
+          "dwell": 3.0,
+          "glances": []
+        },
+        {
+          "x": 11.25,
+          "z": 11.25,
+          "facing": 90.0,
+          "dwell": 1.5,
+          "glances": []
+        }
+      ]
+    },
+    {
+      "name": "Paul",
+      "personality": "hurried",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 9.75,
+          "z": 11.25,
+          "facing": 90.0,
+          "dwell": 0.5,
+          "glances": []
+        },
+        {
+          "x": 2.25,
+          "z": 5.25,
+          "facing": 90.0,
+          "dwell": 600.0,
+          "glances": [],
+          "glanceEvery": {
+            "start": 2.0,
+            "period": 7.0,
+            "hold": 4.5,
+            "yaw": 80.0,
+            "alternate": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mamie",
+      "personality": "granny",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 8.25,
+          "z": 11.25,
+          "facing": 90.0,
+          "dwell": 2.0,
+          "glances": []
+        },
+        {
+          "x": 2.25,
+          "z": 0.75,
+          "facing": 90.0,
+          "dwell": 600.0,
+          "glances": [],
+          "glanceEvery": {
+            "start": 3.0,
+            "period": 7.0,
+            "hold": 4.5,
+            "yaw": 80.0,
+            "alternate": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rex",
+      "kind": "dog",
+      "pattern": "loop",
+      "startStation": 0,
+      "stations": [
+        {
+          "x": 12.75,
+          "z": 0.75,
+          "facing": 270.0,
+          "dwell": 5.0,
+          "glances": [],
+          "sleep": true
+        },
+        {
+          "x": 12.75,
+          "z": 0.75,
+          "facing": 270.0,
+          "dwell": 2.5,
+          "glances": []
+        }
+      ]
+    }
+  ],
+  "litZones": [
+    {
+      "name": "Applique angle",
+      "x": 12.7,
+      "z": 11.2,
+      "sizeX": 1.0,
+      "sizeZ": 1.4,
+      "sconce": "-z"
+    },
+    {
+      "name": "Applique carrefour",
+      "x": 11.2,
+      "z": 5.2,
+      "sizeX": 1.4,
+      "sizeZ": 1.0,
+      "sconce": "+x"
+    },
+    {
+      "name": "Applique rangee",
+      "x": 8.2,
+      "z": 0.7,
+      "sizeX": 1.0,
+      "sizeZ": 1.4,
+      "sconce": "-z"
+    }
+  ]
+}

@@ -1,0 +1,430 @@
+{
+  "spec": "docs/levels_v2/LEVELS_V2.md",
+  "generated": "2026-11-20",
+  "rules_for_every_task": [
+    "Project root C:/Dev/squad-ai/Brainstorming/games/out_of_sight (namespace OutOfSight, Unity 6.3 URP). Read LEVELS_V2.md sections 1, 2, 4 and your own section before starting.",
+    "Use the PowerShell tool, never Git Bash. Unity only through the lock wrapper: pwsh -NoProfile -File tools/unity.ps1 -Agent <task id> -UnityArgs \"...\". Never kill another Unity process; the lock may be busy (other agents queue on it).",
+    "Edit only your owner_files (plus new files you create under the paths named in your instructions). If you need a change in a file you do not own, write it in your report for the owner.",
+    "No git write commands. English in code, comments and docs. Never the em-dash character anywhere (code, strings, JSON, docs).",
+    "A parallel visual-polish workflow has uncommitted edits in SaveData.cs, Tuning.cs, Hud.cs, LevelBuilder.cs, Robot.cs, GardenBackdrop.cs, Menu.cs, GhostView.cs, OrbitCamera.cs and others: edit on top of them, never revert them.",
+    "Every new LevelDef field needs C1 first: LevelJson uses MissingMemberHandling.Error, so a level file with an unknown key fails to load.",
+    "Audit messages stay in French (existing convention). Every new rule gets a MUTATION tag comment; list the tag and the mutation.sh line you propose in your report (I1 owns mutation.sh).",
+    "Compile check: pwsh -NoProfile -File tools/unity.ps1 -Agent <id> -UnityArgs \"run . --timeout 1800 -- -executeMethod OutOfSight.Editor.Builder.SetupAndCompile -logFile Build/<id>_compile.log\". EditMode tests: -UnityArgs \"test . --mode EditMode --report-format junit --output TestResults/<id>_edit.xml --timeout 3000\". PlayMode tests: -UnityArgs \"test . --mode PlayMode --filter <names> --report-format junit --output TestResults/<id>_play.xml --timeout 3000\".",
+    "Audit a level: -UnityArgs \"run . --timeout 3000 -- -executeMethod OutOfSight.Editor.LevelAudit.RunBatch -auditLevels <ids or absolute paths without .json> -skipFixtures -difficulty normal,difficile -slack -strictRooms -json Build/levels_v2/<id>.json -logFile Build/<id>.log\" (-strictRooms and -json exist after C5). -writeRoutes only on files under Assets, only once the targets hold (LEVELS_V2 4.5).",
+    "Finish with a report (your final message): what changed, the numbers asked by your acceptance, test premises you broke (file, test, why), proposed mutation lines, open problems."
+  ],
+  "tasks": [
+    {
+      "id": "C1",
+      "title": "Schema v2: new level and manifest fields with validation",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Scripts/Core/LevelDef.cs",
+        "Assets/Scripts/Core/LevelValidator.cs",
+        "Assets/Tests/EditMode/LevelDefV2Tests.cs (new)",
+        "Assets/Resources/Levels/test_v2_schema_*.json (new fixtures, optional)"
+      ],
+      "depends_on": [],
+      "instructions": "Spec: LEVELS_V2.md section 6 (row C1), wave1/code_features.json (features 'Progression v2', 'requires', 'Lit zones', 'Door only an inhabitant opens', 'Night lighting preset', 'Routine authoring: periodic glances', 'Audit: via checks', 'Record revision'). Data model and validation ONLY, no runtime or audit behaviour. Add to LevelDef (all optional, omitted from serialization when default, DefaultValueHandling.Ignore pattern): int Rev ('rev', >= 0) and RecordId => Rev > 0 ? Id + \"~\" + Rev : Id; List<string> RequiredLessons with [JsonProperty(\"requires\")] (the name Requires would clash with the static LevelDef.Lessons naming); PaceDef Pace ('pace': minShare, maxShare, minPauses, maxPause, every key optional); List<ViaCheckDef> ViaChecks ('viaChecks': name, x, z, sizeX, sizeZ, maxRatio default 1.5, avoid bool); List<LitZoneDef> LitZones ('litZones': name, x, z, sizeX, sizeZ, max 4); string Lighting ('lighting': 'day' default or 'night'). OpeningDef: bool PlayerLocked ('playerLocked'). StationDef: GlanceEveryDef GlanceEvery ('glanceEvery': start, period, hold, yaw, alternate, count optional) expanded into Glances in LevelJson.Parse right after deserialization (merged and sorted with explicit glances, like ResolveSeats); ShouldSerializeGlances false when every glance was generated. New lesson ids accepted in 'requires' (and as 'lesson' where meaningful): rug, hum, contact, household, decoy, exitwatch, lit, plus every existing lesson id. Manifest: keep LevelManifest.Parse(json) -> List<string>; add ParseFull(json) -> ManifestDef { int Rev = 1; List<string> Levels; List<string> Previous; List<ActDef> Acts (from, nameKey) }. Validator issues: rev < 0; unknown requires id; requires prerequisites (hum/contact need a robot; household a leaf with openedByInhabitants; decoy a decoy of the player's kind; lit litZones and a floor lamp body; exitwatch an exit; pet a dog; wardrobe a wardrobe the body fits; door a closed leaf the player may open; rug a rug or soft room); at most 5 requires ids; pace ranges (0 <= minShare <= maxShare <= 1, minPauses >= 0, 0 < maxPause <= Tuning.AuditMaxWait); viaChecks inside a room, unique names, at most 2; litZones inside one room, not overlapping the exit, at most 4, issue if the body is not the floor lamp; lighting known; playerLocked needs leaf 'closed' and openedByInhabitants true; glanceEvery: period >= hold + 2 x (0.6 + |yaw|/200), |yaw| <= 80, start + count x period <= dwell, not on a dog. Do not edit any level file other than new test fixtures. Keep it small and land it first: every other task waits on it.",
+      "acceptance": [
+        "Project compiles (SetupAndCompile log without errors).",
+        "EditMode suite green, including new LevelDefV2Tests: parse and round-trip of every new field (compact form kept for glanceEvery); glanceEvery expansion equals a fixture copy of level18 Odile's current hand-written 34 glances (period 9, hold 5, yaw -80); each validator rule has one passing and one failing case; ParseFull reads rev, previous, acts and Parse still returns the list.",
+        "All 24 existing level files and title_house.json still load and validate unchanged."
+      ]
+    },
+    {
+      "id": "C2",
+      "title": "Progression v2: manifest rev 2, unlock rule, save migration, record revision, level select",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Scripts/Core/SaveData.cs",
+        "Assets/Scripts/Runtime/SaveStore.cs",
+        "Assets/Scripts/Runtime/LevelLoader.cs",
+        "Assets/Scripts/Runtime/RecordLine.cs",
+        "Assets/Scripts/Runtime/LevelSelect.cs",
+        "Assets/Resources/Levels/levels.json",
+        "Assets/Tests/EditMode/CoreM5Tests.cs (unlock test only; T1 takes the file over later)",
+        "Assets/Tests/EditMode/SaveM5Tests.cs",
+        "Assets/Tests/EditMode/DifficultyM7Tests.cs",
+        "Assets/Tests/PlayMode/ProbeTestsM5Ui.cs (one new step)"
+      ],
+      "depends_on": ["C1"],
+      "instructions": "Spec: LEVELS_V2.md section 7 and wave1/code_features.json features 'Progression v2', 'Record revision per redesigned level', 'Level select for the v2 line-up'. (1) levels.json: {\"rev\": 2, \"previous\": [level1..level24 in v1 order], \"levels\": [level1, level2, level3, level4, level5, level6, level7, level8, level9, level12, level11, level15, level13, level14, level18, level17, level19, level21, level20, level22, level24], \"acts\": [{from 0, act1.name}, {from 7, act2.name}, {from 16, act3.name}]} (21 entries: LV12 inserts level25 between level22 and level24 later). (2) LevelLoader.LoadManifestDef(). (3) SaveData: [JsonProperty(\"unlocked\")] List<string> Unlocked (missing = empty, wrong type = parse problem like 'won'); [JsonProperty(\"order\")] int Order (missing or < 1 = 1); version stays 1. IsUnlocked(order, i) = valid index && (i == 0 || Won has order[i] || Won has order[i-1] || Unlocked has order[i]). MigrateOrder(rev, previous, current) -> bool: if Order >= rev nothing; else every previous[j] playable under the old rule (j == 0 or previous[j-1] won) and listed in current joins Unlocked, then Order = rev. Never removes anything from Won or Best. (4) SaveStore.Load calls it after a successful parse; when it returns true, save with the existing atomic write and log '[SaveStore] progress migrated to order rev 2: +N unlocked'. (5) Records: RecordWin(levelId, recordId, seconds, difficulty) adds levelId to Won and stores the time under DifficultyDef.RecordKey(recordId, difficulty); RecordLine passes game.Def.RecordId; LevelSelect reads best times with the card's RecordId (LevelMiniature already parses each level). (6) LevelSelect: default selection = the card of SaveStore.FirstUnwonLevel; an act tag ('Acte 2' from the act nameKey via Strings) on the first card of each act. Strings keys act1.name/act2.name/act3.name are written by S1; use Strings lookups only. (7) Tests: rewrite CoreM5Tests.IsUnlocked_opens_a_level_once_the_one_before_it_is_won (line ~1833 asserts a won level is locked, contrary to the new rule); SaveM5Tests: the four worked cases of section 7, fresh save, idempotent second load (no write), wrong-typed 'unlocked' rejected, missing 'order' reads 1, Won and Best never shrink; DifficultyM7Tests: RecordKey with a rev id ('level6~1@difficile'), an old bare 'level6' record not shown for a rev 1 level6 while Won still has 'level6'; ProbeTestsM5Ui: a step where a migrated save opens the expected cards and the act tags show. Mutation tags UNLOCK_WON, UNLOCK_MIGRATED, MIGRATE_PREDECESSOR.",
+      "acceptance": [
+        "Compiles; EditMode suite green except tests T1 owns that fail only because of the new order (list them in the report).",
+        "New and rewritten tests in CoreM5Tests (unlock), SaveM5Tests, DifficultyM7Tests green.",
+        "PlayMode: pwsh ... test . --mode PlayMode --filter Step41 green including the new step."
+      ]
+    },
+    {
+      "id": "C3a",
+      "title": "Held start and player-locked door (runtime)",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Scripts/Runtime/GameState.cs",
+        "Assets/Scripts/Runtime/InputReader.cs",
+        "Assets/Tests/PlayMode/RouteReplayer.cs (ReleaseStart only; C7 edits it after you)",
+        "Assets/Tests/PlayMode/ProbeTestsHeldStart.cs (new)"
+      ],
+      "depends_on": ["C1"],
+      "instructions": "Spec: wave1/code_features.json features 'Start on first input (held start)' and 'Door only an inhabitant opens'. Held start: GameState.Started; BuildLevel sets Started = !HoldStart. While !Started, FixedUpdate only reads input: no furniture motion, inhabitants, robots, vision, creak or Steps; rigs keep their idle pose. The first step with a move input above the dead zone or the action key sets Started and runs in full (step 1 of the schedule). Camera input and the careful key alone do not start. Pause works while held; restart and next level hold again. static HoldStart default true in the player and editor play mode, false when Probe.Requested or SaveStore.IsTestRun (existing tests keep t0 = build). Elapsed counts from the release (records exclude card time). Expose an event or property the HUD (C3b) can read. RouteReplayer: Game.ReleaseStart() called at the first sample when a test turns the hold on. Player-locked leaf: ClaimActionKey skips a closed leaf with PlayerLocked (no action begins); expose a query (e.g. GameState.LockedLeafInReach) so the HUD can show 'Locked'. MUTATION tags HOLD_START, LOCKED_LEAF. Do not touch Hud.cs (C3b).",
+      "acceptance": [
+        "Compiles; EditMode suite green.",
+        "New ProbeTestsHeldStart green: held 3 s with no input gives Steps == 0, every routine at its start pose, creak 0, robot not moved; the first move input starts the level; a designer route replayed with the hold on and ReleaseStart at sample 0 wins on the same exit step as with the hold off (level1 and level8); E next to a playerLocked leaf does nothing while a household walk still opens it (fixture level).",
+        "PlayMode smoke: --filter Step40|Step26 green (existing tests unaffected by the hold)."
+      ]
+    },
+    {
+      "id": "C3b",
+      "title": "HUD v2: held card, names on the card, hint tokens, locked and lit hints, exit marker",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Scripts/Runtime/Hud.cs",
+        "Assets/Tests/PlayMode/ProbeTestsHudV2.cs (new)"
+      ],
+      "depends_on": ["C3a"],
+      "soft_depends_on": ["S1"],
+      "instructions": "Spec: LEVELS_V2.md section 6 row C3b; wave1/code_features.json 'Start on first input', 'Intro card: inhabitant names and the goal line', 'Exit and goal markers over walls'. (1) The intro card stays fully visible until GameState.Started, with the line hud.start (keyboard/pad/touch variants), then the existing 1 s fade. (2) Hud.PeopleLines shows each human as hud.person format '{0}, {1}' (InhabitantDef.Name, personality label) and the dog as 'Rex, the dog' style using its name. (3) Hint text: replace {action} and {careful} by the device's key or button label (keyboard E / Left Shift, pad button / left trigger, touch button names), using the existing controls-line device detection. (4) Door hint shows hud.door.locked for a playerLocked leaf in reach (C3a query). (5) Body hint hud.lit while the floor lamp is off inside a lit zone (read FurnitureController.SightRangeFactor or a LitZone query from C4 if present; guard with null checks so it compiles before C4). (6) Exit marker: screen-space door icon over everything for the exit zone, amber or white (not green), clamped to the screen edge with an arrow when off screen, fading to 0 within 3 m of the furniture, hidden under panels and pause; an open-eye glyph while a human sees the furniture standing in the exit zone. Keep the visual-polish workflow's uncommitted Hud.cs edits.",
+      "acceptance": [
+        "Compiles; EditMode green.",
+        "ProbeTestsHudV2 green: card held until the first input then fades; level22 card lists 'Alfred', 'Mamie' and the Comtesse's data name; level4 hint contains no '{careful}' and contains the keyboard label; marker exists, clamps off screen, fades near the exit; locked hint on a fixture.",
+        "PlayMode --filter Step41|ProbeTestsM5Ui green."
+      ]
+    },
+    {
+      "id": "C4",
+      "title": "Lit zones runtime (level 20 twist)",
+      "priority": "should",
+      "owner_files": [
+        "Assets/Scripts/Runtime/FurnitureController.cs",
+        "Assets/Scripts/Runtime/LampLight.cs",
+        "Assets/Scripts/Runtime/LevelBuilder.cs (one hook call only)",
+        "Assets/Scripts/Runtime/LitZoneView.cs (new)",
+        "Assets/Tests/PlayMode/ProbeTestsLitZone.cs (new)",
+        "Assets/Resources/Levels/test_v2_litzone.json (new fixture)"
+      ],
+      "depends_on": ["C1"],
+      "instructions": "Spec: wave1/code_features.json 'Lit zones'. SightRangeFactor returns 1 when the furniture centre lies in any LitZoneDef (lamp on or off); StepLamp unchanged. LitZoneView builds per zone a ceiling fixture (visual), an unshadowed spot light and a soft floor pool; its lights carry a LitZone marker that LampLight.DimRoomLights skips. One hook call from LevelBuilder after RoomLights.Build; merge on top of the visual-polish workflow's LevelBuilder edits. Budget: about +2 renderers per zone (CheckBudgets counts them). MUTATION tag LIT_FACTOR.",
+      "acceptance": [
+        "Compiles; EditMode green.",
+        "ProbeTestsLitZone green: on the fixture a switched-off lamp inside the zone is seen by a watcher at 8 m and outside it only within 4 m; the pool light is not dimmed when the lamp switches off.",
+        "PlayMode --filter ProbeTestsM8Lights green."
+      ]
+    },
+    {
+      "id": "C5",
+      "title": "Audit A: pace metrics and gate, dead rooms, JSON report, flicker collapse, walk-line and dark checks",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Editor/LevelAudit.cs",
+        "Assets/Resources/Levels/test_v2_audit_*.json (new fixtures)"
+      ],
+      "depends_on": ["C1"],
+      "instructions": "Spec: LEVELS_V2.md 1.3 (definitions) and section 6 row C5; wave1/code_features.json 'Audit: pace metrics, dead rooms and a JSON report' and 'Audit: collapse in-place toggle runs'. (1) Pace from the found path: travel = cell moves x the body's cell cost (+ office chair glide, + rocking chair rock counted as travel); waiting = exit - travel; in-place actions (toggle, door open, hide, hidden time, leave) count as waiting; pinned (sat on) time reported apart and excluded from the share's denominator. Pauses = runs of >= 5 samples at one cell; MidPauses exclude the run starting at t = 0; LongestPause. Print 'rythme : attente X s (Y %), N pauses (M en route), plus longue Z s, assis dessus P s' at every difficulty. The level 'pace' field: outside it at Normal = failure 'rythme hors cible : ...'; at Difficile = note. (2) Dead rooms: used when the path or a via path has a cell in it, a station or robot waypoint lies in it, any inhabitant position sample lies in it, or a wardrobe in it is used; else 'AVERTISSEMENT piece morte : <id>'; -strictRooms makes it a failure. (3) -json <file>: per level and difficulty {id, exit, travel, waitShare, pauses, midPauses, longestPause, pinned, slack, margin, deadRooms[], lessons{id: binds}, requires{}, vias{}, budgets{drawCalls, materials}, habitWarnings[]}. (4) Route post-process: an even run of back-to-back toggles at one cell becomes a wait, an odd run a single toggle at its last time; a hide immediately followed by a leave (hidden < 0.5 s) is removed when the route without it still passes; keep the collapsed route only if FidelityReplay passes, else keep the original with 'clignotement conserve'. (5) Warning 'AVERTISSEMENT pause sur un trajet : ...' when a route pause (>= 0.5 s) lies within 0.6 m of an inhabitant walk segment while that inhabitant walks it. (6) Dark check synchronised: replace or complement DarkFreePass with 'some memory watcher has the lamp within its dark range and inside its cone at the same sample, before the exit'; print the time and distance. Fixtures (validating, small): one pace pass, one pace fail, one empty room, one toggle flicker. Do not implement requires/vias (C6). Do not change the search itself beyond the post-process.",
+      "acceptance": [
+        "Compiles; EditMode green.",
+        "Fixture run: -executeMethod OutOfSight.Editor.LevelAudit.RunBatch -fixtures (or -auditLevels on the new fixtures) reports the expected pass/fail for each new fixture.",
+        "Audit of level6,level20,level22 at normal,difficile with -json: prints the rythme line, writes the JSON, level20's designerRoute toggles collapse to 1, level22's 0.0 s hide/leave pairs disappear or are flagged, level3 prints the walk-line warning (current data), and the exit times of the 24 current levels are unchanged (spot-check 1, 13, 24)."
+      ]
+    },
+    {
+      "id": "C6",
+      "title": "Audit B: requires list, new lesson checks, via checks, locked leaves, lit cells, exitwatch",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Editor/LevelAudit.cs (after C5)",
+        "Assets/Resources/Levels/test_v2_req_*.json (new fixtures)"
+      ],
+      "depends_on": ["C5"],
+      "instructions": "Spec: wave1/code_features.json 'Audit: requires list and new lesson checks', 'Audit: via checks', 'Door only an inhabitant opens' (audit part), 'Lit zones' (audit part), 'Exit in a watched room'. (1) Every id in 'requires' must bind (failure, or note under lessonAdvisory): existing lesson checks by id, plus rug (rugs and soft floors treated as hard: no schedule), hum (Search with Hum = false: no schedule), contact (the Robots = false schedule meets the robot), household (inhabitantDoors false: no schedule), decoy (the existing NeedDecoy necessity check at LevelAudit 1935-1947, as an id), exitwatch (Search with ExitSight = false reaches the exit >= 10 samples earlier; name the watcher), lit (the Lit = false schedule is seen at a lit cell in the real tables). Print one line per id. (2) viaChecks: Search with MustVisit = the zone's cells (one Visit bit in the node key), failure 'aucun horaire par <name>', warning when the via exit > maxRatio x best exit; avoid = true bars the zone instead and the route must not exist or must be slower. Via paths count as used for dead rooms. JSON report gets requires{} and vias{} filled. (3) Player-locked leaves: no Reach cells or ReachBits for the player; failure 'porte verrouillee jamais ouverte' when no household walk opens it. (4) Lit cells: World.Lit[cell]; after ComputeSight and before dilation, copy MoveSeen into MoveDark and Seen into SeenDark for lit cells; FidelityReplay uses the full range when the centre is lit; DarkFreePass ignores lit cells; note 'echantillons en zone eclairee : N'. Keep requires to at most 5 extra searches. MUTATION tags REQUIRES_BIND, VIA_MUSTVISIT.",
+      "acceptance": [
+        "Compiles; EditMode green.",
+        "Fixtures: for each new id one fixture where it binds and one where it does not; one via pass and one via fail; one locked leaf never opened (failure) and one opened by a walk (pass); all report as expected.",
+        "Audit of the current level9 with a temporary variant adding requires [\"hum\"] reports 'hum' binding; current level17 with requires [\"pet\"] reports not binding (known today)."
+      ]
+    },
+    {
+      "id": "C7",
+      "title": "Rush counter-route probe over every listed level",
+      "priority": "should",
+      "owner_files": [
+        "Assets/Tests/PlayMode/ProbeTestsRush.cs (new)",
+        "Assets/Tests/PlayMode/RouteReplayer.cs (after C3a)"
+      ],
+      "depends_on": ["C3a"],
+      "instructions": "Spec: wave1/code_features.json 'Rush counter-route probe over every listed level'. Data-driven PlayMode step over levels.json at Normal, [Category(\"Slow\")]. For each level none of these may win: (a) the designer route with every wait removed (each waypoint departs when the previous is reached); (b) on load levels, a full-speed start that drops the load at the spawn then (a); (c) the NavMesh straight path from spawn to exit at the body's max speed. Exemptions only in the test with a reason (levels 1 and 2 for variant c if the gentle design keeps it winnable; the spec expects level 1's rush to lose). The report lists every surviving rush with its time. Run it at the end against the then-current level files; failures on levels still in progress are reported, not fixed here.",
+      "acceptance": [
+        "Compiles; the probe runs over every listed level and produces a per-level table (win/lose per variant).",
+        "On the current (v1) data it reproduces the known facts: level5 and level8 rushes lose (Step35b, Step45e)."
+      ]
+    },
+    {
+      "id": "C8",
+      "title": "Robot hum disc and matched audio rolloff",
+      "priority": "should",
+      "owner_files": [
+        "Assets/Scripts/Runtime/Robot.cs",
+        "Assets/Scripts/Runtime/Sfx.cs",
+        "Assets/Tests/PlayMode/ProbeTestsHumDisc.cs (new)"
+      ],
+      "depends_on": [],
+      "instructions": "Spec: wave1/code_features.json 'Robot hum disc and matched audio rolloff'. A faint floor ring of radius Tuning.RobotHumRadius following the robot and pulsing with the hum (1 renderer, no collider, budget counted); hum AudioSource max distance about 3.5 m. Merge on top of the visual-polish workflow's Robot.cs edits.",
+      "acceptance": [
+        "Compiles; ProbeTestsHumDisc green: the ring radius equals Tuning.RobotHumRadius and follows the robot on level9.",
+        "Level budgets of 9, 17, 24 still within class (audit budget line)."
+      ]
+    },
+    {
+      "id": "C9",
+      "title": "Loaded-sit probe (gates level 17's sit)",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Tests/PlayMode/ProbeTestsLoadedSit.cs (new)",
+        "Assets/Resources/Levels/test_v2_loaded_sit.json (new fixture)"
+      ],
+      "depends_on": ["C1"],
+      "instructions": "LEVELS_V2.md D17. Build a small fixture: a chair carrying a vase at its spawn, a granny with a sit:'player' station whose seat equals the spawn, sitting within 3 s. Assert: the vase does not fall (no crash noise, no clue) through the snap to the seat home, the pin and the stand-up; the vase stays visually on the chair under the sitter; the level is not lost. If it fails, do NOT fix gameplay code: report the failure precisely (step, |dv|) so LV9 uses the fallback and I1 logs a bug for C3a's owner (GameState.StepLoad ignoring pinned steps is the likely fix).",
+      "acceptance": [
+        "The probe runs and reports pass or a precise failure; the fixture validates (EditMode CoreM4Tests and LevelDataM8Tests iterate every file in Resources/Levels)."
+      ]
+    },
+    {
+      "id": "C10",
+      "title": "Night lighting preset (visual only)",
+      "priority": "should",
+      "owner_files": [
+        "Assets/Scripts/Runtime/Main.cs",
+        "Assets/Scripts/Runtime/RoomLights.cs",
+        "Assets/Scripts/Runtime/GardenBackdrop.cs",
+        "Assets/Scripts/Runtime/WindowImage.cs",
+        "Assets/Tests/PlayMode/ProbeTestsNight.cs (new)"
+      ],
+      "depends_on": ["C1", "external: the visual-polish workflow has merged its changes to these files"],
+      "instructions": "Spec: wave1/code_features.json 'Night lighting preset'. LevelDef.Lighting == 'night': low cool moon key light, ambient about x0.35, every RoomLights fixture on at full, dark blue window emission, night tint on the garden backdrop. No rule reads it (PRD 4.7 unchanged). Keep HUD contrast, cone readability and the luminance checks; add a night shot with a minimum play-area luminance. If the visual-polish workflow is still running, stop and report; this task is not a wave 2 gate.",
+      "acceptance": [
+        "Compiles; ProbeTestsNight green (level20 start luminance clearly below a day level and above the readability floor); ProbeTestsM8Lights and ProbeTestsLightingShots still green."
+      ]
+    },
+    {
+      "id": "S1",
+      "title": "Strings: act names, HUD lines, level names and hints (FR/EN)",
+      "priority": "must",
+      "owner_files": ["Assets/Scripts/Core/Strings.cs"],
+      "depends_on": [],
+      "instructions": "LEVELS_V2.md section 8 is the exact text. Add or replace every listed key in EN and FR (tu register, correct French accents, no em-dash, names exactly as in the level data). Keep the level10, level16 and level23 entries and every unchanged hint. hud.start needs the same device variants the controls line uses. Hints with {action}/{careful} tokens: the tokens are resolved by C3b; that is expected. After the level tasks finish, apply any hint corrections they report (a hint must never contradict its level data), and if LV12 reports the loop fallback, switch level25.hint to the no-'at random' variant.",
+      "acceptance": [
+        "Compiles; EditMode green (string tests, if any, follow).",
+        "grep finds no em-dash in Strings.cs; every key of section 8 exists in both languages; no hint names a key (E, Shift) directly."
+      ]
+    },
+    {
+      "id": "LV1",
+      "title": "Levels 1 and 2 (The Living Room, The Hallway)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level1.json", "Assets/Resources/Levels/level2.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level1' and 'level2'; base wave1/design_act1.json. level1: stations[2].dwell 5.0 -> 3.5 (fallback 4.0), rev 1, pace {0.12, 0.35, 1, 6.0}. level2: exact mirror x -> -x with the full list of the base (yaw f -> 360 - f, glance g -> -g, hinge swaps), couloir floorFinish marble, floorColor #D8D4CC (miniature), rev 1, requires [\"rug\"] (once C6 is in; before, verify the rug by hand with a variant whose rugs are removed: no schedule), pace {0.15, 0.35, 1, 6.0}. Follow the procedure of LEVELS_V2 4.5. If level2's mirrored audit differs from the original beyond the mirror, revert the mirror and keep the marble. Report the test premises broken (LevelDataM2Tests level1 dwell).",
+      "acceptance": [
+        "Audit level1,level2 normal,difficile: 0 defects; level1 exit 9-12 s, >= 1 pause of 1.5 s, slack >= 15 (fallback >= 12); level2 exit 12-15 s, spawn pause >= 2 s, >= 20 rug samples within earshot, slack >= 12, rug binds.",
+        "Pace gate passes (C5 line or numbers.py); designerRoute and designerRouteHard rewritten and replaying.",
+        "The full-speed straight rush on level1 loses (C7 probe or a manual RouteReplayer run)."
+      ]
+    },
+    {
+      "id": "LV2",
+      "title": "Levels 3 and 4 (The Dining Room, The Stool)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level3.json", "Assets/Resources/Levels/level4.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level3' and 'level4'; base wave1/design_act1.json. level3: decoys[4] -> (0.77, 0.25) yaw 0 (NOT the base's (0.75, 0.20)); run docs/levels_v2/tools/decoy_cells.py on the file: decoy4 must explain cell (0.25, 0.25); fallbacks (0.76, 0.25) then (0.75, -0.30); rev 1, requires [\"decoy\"], pace {0.35, 0.52, 2, 6.0}. Report that level3.hint must be the memory hint (S1 has it). level4: exact mirror (full list in the base), salon floorFinish removed (default parquet), rev 1, pace {0.25, 0.45, 2, 6.0}; revert the mirror if not exact.",
+      "acceptance": [
+        "Audit level3,level4 normal,difficile: 0 defects. level3: exit 17-21 s, 2 pauses, decoy rest <= 6 s, >= 15 explained samples, no 'pause sur un trajet' warning, slack 8-12. level4: exit 14-16 s, careful binds, route 100 % careful, slack 8-12.",
+        "Pace gates pass; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV3",
+      "title": "Levels 5 and 6 (The Armchair, The Lamp)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level5.json", "Assets/Resources/Levels/level6.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5"],
+      "instructions": "LEVELS_V2.md section 5 'level5' and 'level6'; base wave1/design_act1.json. level5: sit station dwell 0.5 -> 1.5, TV station dwell 8.0 -> 6.5, rev 1, pace {0.25, 0.50, 2, 6.0}. level6: station 0 -> (2.0, 0.6) facing 270 dwell 10.0, glances [{3.0, 40, 1.0}, {7.0, -40, 1.5}]; chambre wallFinish arches, floorFinish removed; rev 1, pace {0.12, 0.32, 1, 6.0}. Knobs for 6: dwell 9.5, spawn (-3.25, -3.85).",
+      "acceptance": [
+        "Audit level5,level6 normal,difficile: 0 defects. level5: exit 16-20 s, pinned >= 2.0 s, no pratfall, home pause excluding pinned <= 6 s, slack 8-12, Step35b-style rush loses. level6: exit 18-22 s (Difficile within 2 s), one mid-route pause 2-5 s at the dark boundary with the synchronised dark check printing the watcher within range in the lit cone, exactly 1 toggle, slack 8-15.",
+        "Pace gates pass; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV4",
+      "title": "Levels 7 and 18 (The Office rotated, The Wardrobe mirrored)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level7.json", "Assets/Resources/Levels/level18.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5"],
+      "instructions": "LEVELS_V2.md section 5 'level7' and 'level18'. level7 (base design_act1): exact +90 deg rotation with the full list, both dwells 2.0, walls sage, floor marble, rev 1, pace {0.35, 0.55, 2, 6.0}; decoy_cells.py must show one ok cell per decoy. level18 (base design_act2b): every glance hold 5.0 -> 4.8 (fallback 4.7 if slack > 7), then exact mirror x -> -x (all room sizes are multiples of 0.5; yaw f -> 360 - f, glance yaw -80 -> +80, hinge swaps) so the exit turns NW; keep the hand-written glance list; rev 1, pace {0.30, 0.50, 2, 6.0}. Report test premises broken (Step56a coordinates, WaveB rows).",
+      "acceptance": [
+        "Audit level7,level18 normal,difficile: 0 defects. level7: exit 18-22 s, spawn wait <= 6 s, >= 3 glide stops, >= 10 explained samples, slack 6-10. level18: exit 18-24 s, hide 3.5-5.5 s, wardrobe binds, slack 5-7.",
+        "Pace gates pass; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV5",
+      "title": "Levels 8 and 9 (The Doors, The Robot)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level8.json", "Assets/Resources/Levels/level9.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level8' and 'level9'; base wave1/design_act2a.json. level8: apply the base changes with the salon override (wallFinish arches, floorFinish lightoak); rev 1; pace {0.22, 0.45, 3, 6.0}; viaChecks par_la_cuisine (3.75, 1.75) and par_le_couloir (7.25, 7.75), 1 x 1, maxRatio 1.35 (before C6: the base's level8_viaA / level8_viaB variants under Build/levels_v2/variants). level9: apply the base (kitchen and its door, window, two props deleted; Claire startStation 1, glances +-80 hold 2.0; robot lane z 8.25 x 5.25-11.25 speed 0.5; salon rug removed) with chambre floorFinish removed (default parquet); rev 1; requires [\"hum\"]; pace {0.22, 0.45, 4, 6.0}. After level9 passes unmirrored, try the re-snap mirror of LEVELS_V2 4.3 (W = house min x + max x over the room boxes); keep it only if it passes within 3 audit runs. Knobs as in the spec.",
+      "acceptance": [
+        "Audit level8,level9 normal,difficile: 0 defects. level8: exit 15-21 s, both vias pass within 1.35x, door binds, slack 7-10, the corridor-straight rush at 6 s and the waits-removed route lose. level9: exit 15-22 s, hum binds, >= 40 masked samples, no robot contact on the route, 3 rooms used, slack 6-9.",
+        "Pace gates pass; -strictRooms clean; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV6",
+      "title": "Levels 12 and 11 (The Dog at slot 10, The Vase at slot 11)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level12.json", "Assets/Resources/Levels/level11.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5"],
+      "instructions": "LEVELS_V2.md section 5 'level12' and 'level11'. level12 (base design_act2b): sofas resized, PlanteSalon, Rex four facings at (7.25, 3.5), Paul retuned; palette override: chambre wallpaper with no floorFinish, salon keeps sageribbed with floorFinish lightoak, couloir limewash/lightoak, cuisine limewash/tealtile, entree quatrefoil/verde; rev 1; pace {0.22, 0.45, 3, 6.0}. Knobs in order: Rex D0 dwell, D0b dwell, Paul station 2 dwell, Paul Canape dwell; CanapeMilieu x 7.35. level11 (base design_act2a): Lea retuned, unused salon rug removed; rev 1; pace {0.22, 0.45, 3, 6.0}. Report broken premises (Step45b, Step45g, Level11DropAtSpawn, Step45q).",
+      "acceptance": [
+        "Audit level12,level11 normal,difficile: 0 defects. level12: exit 18-26 s (Difficile within +6 s), pet binds, 3+ pauses, slack 6-9. level11: exit 19-27 s, load binds, the last doormat leg careful inside the head turn, slack 5-8; the three rush counter-routes lose.",
+        "Pace gates pass; -strictRooms clean; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV7",
+      "title": "Level 15 rebuild (Let Sleeping Dogs Lie, slot 12)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level15.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5"],
+      "instructions": "LEVELS_V2.md section 5 'level15'; base wave1/design_act2a.json level15 (rooms chambre and couloir deleted, doors moved and added, robot deleted, Claire and Hugo replaced by Mamie granny loop and Rex napping at (11.75, 1.25)). Override: salon wallFinish quatrefoil with no floorFinish. lesson rock, no lessonAdvisory; rev 1; pace {0.22, 0.45, 4, 6.0}. Report the name/hint (S1 has them) and the broken premises (WaveB rows, Step45m, Step64b_Level15Hard, ProbeTestsM9FloorDust).",
+      "acceptance": [
+        "Audit level15 normal,difficile: 0 defects; rock binds with no waiver; >= 3 rocks in Rex's view; exit 19-28 s; spawn wait <= 6 s; Mamie never sees the chair out of place; 4 rooms used; materials <= 24, draw calls <= 120; slack 5-8.",
+        "Pace gate passes; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV8",
+      "title": "Levels 13 and 14 (Wheels and a Vase, The Mezzanine)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level13.json", "Assets/Resources/Levels/level14.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level13' and 'level14'; base wave1/design_act2b.json. level13: base changes (Max front desk, Claire faces south, tile floors), decoys untouched at x 2.84 / 5.84; rev 1; pace {0.22, 0.45, 4, 6.0}; viaChecks cafeteria (12.25, 3.75) and direct (9.25, 1.25), 1 x 1, maxRatio 1.5 (before C6: the base's level13_noDirect / level13_noCafe variants). Max's habit warning is accepted (D24). level14: base changes (mezzanine 2.0 m, new ramps on cell lines, Lea into the kitchen, Mamie dwells) with overrides entree limewash/ivorytile and couloir pinstripe/verde; rev 1; requires [\"sit\"] only if it binds; pace {0.22, 0.45, 4, 6.0}; describe the second sit as a soft deadline.",
+      "acceptance": [
+        "Audit level13,level14 normal,difficile: 0 defects. level13: exit 23-32 s Normal, <= 50 s Difficile, >= 8 explained samples, both vias pass, slack 5-7, the three rush routes lose. level14: exit 36-50 s, second sit 6-10 s after the strict exit, >= 7 top cells, split binds, slack 5-8 and above level17's final slack.",
+        "Pace gates pass; -strictRooms clean; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV9",
+      "title": "Level 17 (The Whole House, act 2 exam)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level17.json"],
+      "depends_on": ["C1", "C9"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level17'; base wave1/design_act2b.json level17. Overrides: BuffetBas cabinet 1.8 x 1.0 x 0.45 at (6.0, 3.05) instead of CanapeBas (colours already in the level; ray check from the dog's eye (7.0, 0.35, 1.0) to the loaded sample points: cross below 1.0 m); Mamie's sit on the loaded chair (s1) only if C9 passed, else drop s1; couloir limewash/verde; entree grasscloth/marble. lesson final; requires [\"door\", \"pet\", \"split\", \"hum\", \"load\"] (C6); rev 1; pace {0.22, 0.45, 5, 6.0}. This is the exam: its slack must be the lowest of act 2 (4-5). Knobs: Lea s2 dwell, Rex nap, Lea s0 dwell, robot start index, Mamie s4 dwell 26.",
+      "acceptance": [
+        "Audit level17 normal,difficile: 0 defects; every requires id binds (pet included); exit 27-37 s; 5+ pauses; slack 4-5; the route passes within 2.5 m of the robot while within 2.25 m of Lea; materials <= 32, draw calls <= 160; Difficile within +8 s.",
+        "Pace gate passes; -strictRooms clean; routes rewritten and replaying; Step57b premise reported."
+      ]
+    },
+    {
+      "id": "LV10",
+      "title": "Levels 19 and 21 (Hide and Seek, The Catwalk)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level19.json", "Assets/Resources/Levels/level21.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level19' and 'level21'; base wave1/design_act3a.json. level19: base changes in full (bathroom, mezzanine, ramps deleted; salon and gallery hard; kitchen door moves; Papa's new loop); optional glanceEvery for Maman if the expansion is identical; rev 1; pace {0.22, 0.45, 5, 6.0}. level21: base changes with override openspace floor stays hard with floorFinish tile (D19); decoys D1 (13.75, 6.34) and D2 (15.75, 6.34) exactly (decoy_cells.py: one ok cell each); rev 1; requires [\"decoy\"]; pace {0.22, 0.45, 6, 6.0}; viaChecks par_le_bureau (1.25, 8.25) and par_le_couloir (5.25, 3.25), 1 x 1, maxRatio 1.6 (before C6: two variant files without door (1.25, 7.45) / without door (6.25, 4.45)). Draw-call cut order if over 160: TableCafet, EtagereDirecteur, shorter Rayonnage.",
+      "acceptance": [
+        "Audit level19,level21 normal,difficile: 0 defects. level19: exit 46-62 s Normal, 55-80 s Difficile, route <= 38 m, >= 2 hides Normal and >= 3 Difficile, wardrobe binds, slack 5-7. level21: exit 27-38 s, >= 8 explained samples, decoy and split bind, both vias pass, no habit warning, slack 5-7, budgets <= 160 / 32.",
+        "Pace gates pass; -strictRooms clean; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV11",
+      "title": "Levels 20 and 22 (Midnight Munchies, Skeletons in the Closet)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level20.json", "Assets/Resources/Levels/level22.json"],
+      "depends_on": ["C1"],
+      "soft_depends_on": ["C5", "C6", "C4", "C3a"],
+      "instructions": "LEVELS_V2.md section 5 'level20' and 'level22'; base wave1/design_act3b.json. level20: base changes in full plus overrides: D18 re-teach beat (Papa's first walk passes the bureau doorway 4.0-7.0 m from the lamp's first waiting cell, inside his lit cone, beyond his 3.2 m dark range); porte_cuisine playerLocked true; litZones lumiere_bureau (11.25, 6.2) 1.5 x 2.4 once C4 and C6 are in (else leave it out and report); lighting night; cuisine whitetile/tile; rev 1; requires [\"household\"] (+ \"lit\" with C4); pace {0.22, 0.45, 4, 6.0}. Keep a secondary light in the bureau (test Lights_d). level22: base changes in full; rev 1; pace {0.22, 0.45, 5, 6.0}; viaChecks aile_sud (14.75, 4.25) and aile_nord (18.25, 10.75), 1 x 1, maxRatio 1.5.",
+      "acceptance": [
+        "Audit level20,level22 normal,difficile: 0 defects. level20: exit 47-63 s Normal, Difficile 3-10 s later, route 18-22 m, exactly 1 toggle, household binds (and lit if present), the locked leaf is opened by Papa, the route never opens porte_salon, slack 4-8. level22: exit 41-56 s, Difficile <= +20 s, >= 2 hides of 3-6 s, no hide/leave pair under 2 s, both vias pass, no habit warning, slack 4-6, budgets <= 145/160 and <= 31/32.",
+        "Pace gates pass; -strictRooms clean; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "LV12",
+      "title": "Level 25 (The Showroom, new) and its manifest entry",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Resources/Levels/level25.json (new)",
+        "Assets/Resources/Levels/levels.json (insert level25 only, after C2)"
+      ],
+      "depends_on": ["C1", "C2"],
+      "soft_depends_on": ["C5", "C6"],
+      "instructions": "LEVELS_V2.md section 5 'level25'; base wave1/design_act3c.json level25 with the geometry overrides of the spec (magasin sizeX 14.9; reserve x 19.2 sizeX 3.4; stockroom door x 17.45 z 6.25; spawn (19.75, 6.25); tables at x 8.25 / 12.25, z 3.0; cartons at x 20.3; the 19 decoy positions listed; NW rug at (8.75, 8.3); Marcel dwells 2.5/2.0/1.5/2.0/1.5/1.5/2.5; Nina glances +-25). decoy_cells.py must report 19 explained walkable cells. Fields: no lesson, requires [\"decoy\"], doorMemory false, pace {0.25, 0.45, 6, 6.0}, viaChecks south lane (10.5, 0.75) and north lane (10.5, 11.25), 1 x 1, maxRatio 1.5. Seed sweep 1-12 on scratch copies by absolute path (never -writeRoutes on them); keep the best seed and record it. Fallbacks: Marcel loop over G0 G1 G5 G2 G3 G6 G4 (tell S1 to switch the hint), drop Nina if share > 45 %. When it passes, insert \"level25\" between level22 and level24 in levels.json.",
+      "acceptance": [
+        "Audit level25 normal,difficile: 0 defects; exit 24-36 s Normal, Difficile within +20 s; >= 40 explained samples; decoy binds (no schedule without decoys); both vias pass; 3 rooms used; budgets <= 110/120 and <= 22/24; audit time < 60 s; no habit warning; slack 4-6.",
+        "Pace gate passes; routes rewritten and replaying; levels.json has 22 entries in the section 3 order."
+      ]
+    },
+    {
+      "id": "LV13",
+      "title": "Level 24 (The Great Escape, finale)",
+      "priority": "must",
+      "owner_files": ["Assets/Resources/Levels/level24.json"],
+      "depends_on": ["C1", "C6"],
+      "soft_depends_on": ["C5", "C8"],
+      "instructions": "LEVELS_V2.md section 5 'level24'; base wave1/design_act3c.json level24 with overrides: decoys (5.25, 4.80, 0), (6.75, 4.80, 0), (5.25, 6.20, 180), (6.75, 6.20, 180) around TableSalle (6.0, 5.5) (decoy_cells.py: 4 ok cells); delete the Mezzanine platform and both ramps (galerie type dining, lightoak / sageribbed); lesson final; requires [\"door\", \"pet\", \"decoy\", \"hum\", \"exitwatch\"] (contact instead of hum if hum does not bind); rev 1; pace {0.25, 0.45, 8, 6.0}; viaChecks aile_nord (14.25, 9.75) and aile_sud (12.75, 1.75), 1 x 1, maxRatio 1.35. Fallback if pet or decoy cannot bind without the platform after 4 runs: restore the mezzanine and ramps exactly as in the base and use requires [\"door\", \"split\", \"decoy\", \"hum\"]. Run it alone (60-90 s per difficulty). Its slack must be the lowest of act 3 (4-5).",
+      "acceptance": [
+        "Audit level24 normal,difficile: 0 defects; every requires id binds; both wing vias pass within 1.35x; exit 32-46 s Normal, Difficile within +20 s; 8+ pauses; >= 10 explained and >= 10 hum samples; arrival on the doormat while Lea is in the hall; all 8 rooms used; slack 4-5; budgets <= 150/160 and <= 31/32.",
+        "Pace gate passes; -strictRooms clean; routes rewritten and replaying."
+      ]
+    },
+    {
+      "id": "T1",
+      "title": "Test suite for the v2 order, cuts and retuned levels",
+      "priority": "must",
+      "owner_files": [
+        "Assets/Tests/EditMode/** and Assets/Tests/PlayMode/** existing files (taking over C2's CoreM5Tests after C2), except the new files created by C1, C3a, C3b, C4, C7, C8, C9, C10"
+      ],
+      "depends_on": ["C2", "C3a", "LV1", "LV2", "LV3", "LV4", "LV5", "LV6", "LV7", "LV8", "LV9", "LV10", "LV11", "LV12", "LV13"],
+      "instructions": "LEVELS_V2.md section 9 lists the files and steps; wave1/code_features.json 'Test suite updates' gives line numbers. Apply every premise change the level tasks reported. Main points: LevelDataM2Tests PlayOrder (v2 list), count 22, WaveB rows rewritten from the final data (level10 row to an 'archived files still validate' test), number-order test replaced by 'manifest is the v2 order and every listed level validates', level1 dwell 3.5; ProbeTestsM5Levels Step40 (manifest count, cap route end + 30 s), Step45a, Step45r, level10/level16 replays deleted, Step45b time-aware, Step45g redrawn, Step45m rock for level15, Step45o level9 lane; ProbeTestsM7Design Step64b_Level10Hard/Level16Hard deleted, Step64b_Level25Hard added; ProbeTestsM7LevelsA/B/C lessons (19 wardrobe hides, 21 decoy stop, 24 chair premise, level25 replay with explained samples > 0, level23 steps kept by id or deleted); ProbeTestsM6Levels Level11DropAtSpawn legs from the audit's counter-route; mirrored coordinates for level2, level4, level7, level18 (and level9 if mirrored) in any hardcoded test; re-shoot lists of ProbeTestsM9*. Keep tests that load cut levels by id. Do not weaken a test to make it pass: when a premise is false because a level misses its spec, report it to I1.",
+      "acceptance": [
+        "EditMode suite green.",
+        "PlayMode suite green, Slow category included (ProbeTestsRush may list documented exemptions only).",
+        "No test references a cut level through the manifest; grep shows no hardcoded 24-level count."
+      ]
+    },
+    {
+      "id": "I1",
+      "title": "Integration: final audit, mutation lines, docs, status",
+      "priority": "must",
+      "owner_files": [
+        "mutation.sh",
+        "docs/PRD.md",
+        "docs/CONTRACT_M2.md",
+        "docs/IDEAS.md",
+        "docs/levels_v2/STATUS.md (new)",
+        "Assets/Scripts/Core/Tuning.cs (stale LevelSelectColumns comment only)"
+      ],
+      "depends_on": ["C1", "C2", "C3a", "C3b", "C5", "C6", "C7", "C9", "S1", "T1"],
+      "soft_depends_on": ["C4", "C8", "C10"],
+      "instructions": "LEVELS_V2.md section 10. (1) levels.json check: 22 ids in the section 3 order, rev 2, previous, acts 0/7/16; cut files unchanged on disk (git diff shows no change to level10/16/23.json). (2) Final full audit of every listed level at normal,difficile with -slack -strictRooms -json Build/levels_v2/final.json; fill STATUS.md with one row per level (exit, share, pauses, longest, slack, lessons, requires, vias, dead rooms, budgets, rush result) and mark each acceptance row met or not with a reason; check the act curves (17 lowest slack of act 2, 24 of act 3). (3) mutation.sh: add the lines proposed by the tasks (UNLOCK_WON, UNLOCK_MIGRATED, MIGRATE_PREDECESSOR, HOLD_START, LIT_FACTOR, LOCKED_LEAF, PACE_PAUSE, REQUIRES_BIND, VIA_MUSTVISIT) and run them. (4) Docs: CONTRACT_M2 11.8 and PRD 6.3 amendment for level1 (window station dwell 3.5, reason: held start, D11); PRD level table and order, act names, cuts; IDEAS: close QW4, QW2, NA2, bug 15, bug 20, bug 27, log any C9 failure as a bug. (5) Run the full EditMode and PlayMode suites once more. Report every unmet criterion with the owning task.",
+      "acceptance": [
+        "Final audit: 0 defects at both difficulties for every listed level; STATUS.md complete.",
+        "EditMode and PlayMode suites green; mutation lines added and killed.",
+        "No em-dash in any file touched by wave 2 (grep for U+2014 over Assets/, docs/levels_v2/, mutation.sh)."
+      ]
+    }
+  ]
+}

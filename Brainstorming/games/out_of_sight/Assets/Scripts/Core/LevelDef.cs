@@ -1,0 +1,1280 @@
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using UnityEngine;
+
+namespace OutOfSight.Core
+{
+    /// <summary>
+    /// A level as data (PRD 6.1, docs/CONTRACT_M2.md 4). Positions are in meters on the floor plane.
+    /// Yaw follows <see cref="YawMath"/>: 0 faces +z, 180 faces -z.
+    ///
+    /// Two forms are accepted. M1: a single <see cref="Room"/> centered on the origin, doors and windows
+    /// named by wall ("+x", "-z", ...). v2: a list of <see cref="Rooms"/>, rectangles of the interior,
+    /// adjacent rooms separated by exactly one wall thickness, and doors given as a point on a wall line.
+    /// </summary>
+    public sealed class LevelDef
+    {
+        public string Id;
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7, D23): the record revision of a redesigned level, 0 (default, not written) for a level
+        /// never redesigned. Best times are keyed by <see cref="RecordId"/>, so a record made on an older version is not read.
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int Rev;
+
+        /// <summary>Levels v2: the id best times are stored under: "level6~1" for rev 1, the bare id for rev 0.</summary>
+        [JsonIgnore] public string RecordId => Rev > 0 ? Id + "~" + Rev : Id;
+
+        public string NameKey;
+        public string HintKey;
+        public RoomDef Room;
+        public List<OpeningDef> Doors = new List<OpeningDef>();
+        public List<OpeningDef> Windows = new List<OpeningDef>();
+        public SpawnDef Player;
+        public ZoneDef Exit;
+        public List<PropDef> Props = new List<PropDef>();
+
+        /// <summary>
+        /// DRESSING (docs/next/progress/DRESSING.md): the decor items on the furniture tops, visual only (no collider, no
+        /// occluder, no noise). Written only when not empty.
+        /// </summary>
+        public List<DecorDef> Decor = new List<DecorDef>();
+        public bool ShouldSerializeDecor() => Decor != null && Decor.Count > 0;
+
+        public List<InhabitantDef> Inhabitants = new List<InhabitantDef>();
+
+        // ----- v2 (docs/CONTRACT_M2.md 4) -----
+        public List<RoomDef> Rooms = new List<RoomDef>();
+        public List<RugDef> Rugs = new List<RugDef>();
+        public List<DecoyDef> Decoys = new List<DecoyDef>();
+        public List<RouteStepDef> DesignerRoute = new List<RouteStepDef>();
+        /// <summary>
+        /// M7 design (docs/CONTRACT_M7.md 4.1): the route the audit wrote at Difficile ("designerRouteHard", LevelAudit
+        /// -writeRoutes); <see cref="DesignerRoute"/> is the Normal one. Written only when not empty.
+        /// </summary>
+        public List<RouteStepDef> DesignerRouteHard = new List<RouteStepDef>();
+        public bool ShouldSerializeDesignerRouteHard() => DesignerRouteHard != null && DesignerRouteHard.Count > 0;
+
+        // ----- M5 (docs/CONTRACT_M5.md 16.12, v3 sections 2 and 15.4) -----
+        public List<PlatformDef> Platforms = new List<PlatformDef>();
+        public List<RampDef> Ramps = new List<RampDef>();
+        public List<RobotDef> Robots = new List<RobotDef>();
+
+        // Newtonsoft's ShouldSerialize hooks: a level without platforms, ramps or robots is written as before M5, so a route
+        // rewritten by the audit leaves an M1 to M4 level file unchanged.
+        public bool ShouldSerializePlatforms() => Platforms != null && Platforms.Count > 0;
+        public bool ShouldSerializeRamps() => Ramps != null && Ramps.Count > 0;
+        public bool ShouldSerializeRobots() => Robots != null && Robots.Count > 0;
+
+        // ----- M6 gameplay (docs/CONTRACT_M6.md 2.6) -----
+        /// <summary>
+        /// M6: the household's door memory is on in this level (opt-in, default false: written only when true, so a level
+        /// rewritten by the audit keeps its file unchanged).
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool DoorMemory;
+
+        /// <summary>
+        /// M6 (CONTRACT_M6 2.7): bit k set when leaf k of <see cref="LeafDoors"/> carries
+        /// <see cref="OpeningDef.OpenedByInhabitants"/>. 0 on a level without such a door.
+        /// </summary>
+        public int HouseholdLeafMask()
+        {
+            int mask = 0;
+            List<OpeningDef> leaves = LeafDoors();
+            for (int k = 0; k < leaves.Count; k++)
+            {
+                if (leaves[k].OpenedByInhabitants)
+                {
+                    mask |= 1 << k;
+                }
+            }
+            return mask;
+        }
+
+        /// <summary>M6 (CONTRACT_M6 2.5): the wardrobe props, in level order.</summary>
+        public List<PropDef> Wardrobes()
+        {
+            var list = new List<PropDef>();
+            if (Props != null)
+            {
+                foreach (PropDef p in Props)
+                {
+                    if (WardrobeRule.IsWardrobe(p))
+                    {
+                        list.Add(p);
+                    }
+                }
+            }
+            return list;
+        }
+
+        private FloorMap floor;
+
+        /// <summary>M5: the level's floor heights (platforms and ramps), built once.</summary>
+        [JsonIgnore] public FloorMap Floor => floor ?? (floor = new FloorMap(this));
+
+        /// <summary>M5: the walkable floor height at a planar point (FloorMap).</summary>
+        public float FloorHeightAt(float x, float z) => Floor.HeightAt(x, z);
+
+        /// <summary>
+        /// M5 (docs/CONTRACT_M5_v3.md 15.1): the doors that carry a leaf, in level order. Leaf i of this list uses the
+        /// NavMesh area <see cref="Tuning.DoorAreaBase"/> + i, and bit i of LevelInstance.OpenMask.
+        /// </summary>
+        public List<OpeningDef> LeafDoors()
+        {
+            var leaves = new List<OpeningDef>();
+            if (Doors != null)
+            {
+                foreach (OpeningDef door in Doors)
+                {
+                    if (door != null && door.HasLeaf)
+                    {
+                        leaves.Add(door);
+                    }
+                }
+            }
+            return leaves;
+        }
+
+        /// <summary>M4: the level's lesson for the audit's lesson-required check ("careful", "sit", "dark", "glide").</summary>
+        public string Lesson;
+
+        /// <summary>M6b (CONTRACT_M6 5): the product owner's waiver, a lesson that does not bind is a note, not a defect.</summary>
+        public bool LessonAdvisory;
+
+        // ----- M4 lessons (docs/CONTRACT_M4.md amendment 9.11) -----
+        /// <summary>The stool: no schedule at full stool speed.</summary>
+        public const string LessonCareful = "careful";
+        /// <summary>A "sit": "player" station constrains the schedule.</summary>
+        public const string LessonSit = "sit";
+        /// <summary>The floor lamp: no schedule without darkness.</summary>
+        public const string LessonDark = "dark";
+        /// <summary>The office chair: the stop samples bind.</summary>
+        public const string LessonGlide = "glide";
+
+        /// <summary>Every accepted <see cref="Lesson"/> value (null is accepted too: no lesson).</summary>
+        // ----- M5 lessons (docs/CONTRACT_M5.md 10 and 16) -----
+        public const string LessonDoor = "door";
+        public const string LessonPet = "pet";
+        public const string LessonSplit = "split";
+        public const string LessonRobot = "robot";
+        public const string LessonRock = "rock";
+        public const string LessonLoad = "load";
+        public const string LessonFinal = "final";
+        // ----- M6 lesson (docs/CONTRACT_M6.md 2.5): a wardrobe the player body fits in. -----
+        public const string LessonWardrobe = "wardrobe";
+
+        // ----- Levels v2 lessons (LEVELS_V2.md 6, C1 and C6): accepted in "requires" and as "lesson". -----
+        /// <summary>A rug or a soft room: the route needs the silent floor.</summary>
+        public const string LessonRug = "rug";
+        /// <summary>The robot's hum: the route needs the hum to cover its hops.</summary>
+        public const string LessonHum = "hum";
+        /// <summary>The robot's bumper: the route must dodge a contact with the robot.</summary>
+        public const string LessonContact = "contact";
+        /// <summary>A leaf an inhabitant opens (openedByInhabitants): the route needs the door someone else opens.</summary>
+        public const string LessonHousehold = "household";
+        /// <summary>A decoy of the player's kind: the route needs a decoy to explain a rest.</summary>
+        public const string LessonDecoy = "decoy";
+        /// <summary>A watched exit: the exit stands in a room a watcher keeps.</summary>
+        public const string LessonExitWatch = "exitwatch";
+        /// <summary>A lit zone (litZones) the floor lamp must cross: darkness does not hide it there.</summary>
+        public const string LessonLit = "lit";
+
+        /// <summary>
+        /// Every accepted <see cref="Lesson"/> value (null is accepted too: no lesson), and every id <see cref="RequiredLessons"/>
+        /// may list. The M4 lessons come first, then M5, M6 and the levels v2 ids, in that order.
+        /// </summary>
+        public static readonly string[] Lessons = { LessonCareful, LessonSit, LessonDark, LessonGlide,
+            LessonDoor, LessonPet, LessonSplit, LessonRobot, LessonRock, LessonLoad, LessonFinal, LessonWardrobe,
+            LessonRug, LessonHum, LessonContact, LessonHousehold, LessonDecoy, LessonExitWatch, LessonLit };
+
+        // ----- Levels v2 schema (LEVELS_V2.md 6, row C1). Every field is optional and written only when set. -----
+
+        /// <summary>
+        /// Levels v2: the lessons the audit must find binding, besides <see cref="Lesson"/> ("requires", ids of
+        /// <see cref="Lessons"/>, at most <see cref="LevelValidator.MaxRequires"/>). Named RequiredLessons because the
+        /// static <see cref="Lessons"/> array already names the accepted ids.
+        /// </summary>
+        [JsonProperty("requires")]
+        public List<string> RequiredLessons = new List<string>();
+        public bool ShouldSerializeRequiredLessons() => RequiredLessons != null && RequiredLessons.Count > 0;
+
+        /// <summary>Levels v2: the pace gate of the audit (waiting share and pauses), or null for the act's default.</summary>
+        public PaceDef Pace;
+
+        /// <summary>Levels v2: zones the audit must find a schedule through (or, with avoid, without). At most 2.</summary>
+        public List<ViaCheckDef> ViaChecks = new List<ViaCheckDef>();
+        public bool ShouldSerializeViaChecks() => ViaChecks != null && ViaChecks.Count > 0;
+
+        /// <summary>Levels v2: ceiling lit zones where a switched-off floor lamp gets no cover from the dark. At most 4.</summary>
+        public List<LitZoneDef> LitZones = new List<LitZoneDef>();
+        public bool ShouldSerializeLitZones() => LitZones != null && LitZones.Count > 0;
+
+        /// <summary>Levels v2 (D25): the lighting preset, "day" (null, default) or "night". Visual only, no rule reads it.</summary>
+        public string Lighting;
+
+        /// <summary><see cref="Lighting"/> values.</summary>
+        public const string LightingDay = "day";
+        public const string LightingNight = "night";
+        public static readonly string[] Lightings = { LightingDay, LightingNight };
+
+        /// <summary>
+        /// Levels v2: expands every station's <see cref="StationDef.GlanceEvery"/> into its <see cref="StationDef.Glances"/>
+        /// (merged and sorted with the explicit glances; generated glances from a previous call are replaced). LevelJson.Parse
+        /// calls it; a level built in code calls it after changing a glanceEvery or a dwell.
+        /// </summary>
+        public void ExpandGlances()
+        {
+            if (Inhabitants == null)
+            {
+                return;
+            }
+            foreach (InhabitantDef h in Inhabitants)
+            {
+                if (h?.Stations == null)
+                {
+                    continue;
+                }
+                foreach (StationDef s in h.Stations)
+                {
+                    s?.ExpandGlances();
+                }
+            }
+        }
+
+        /// <summary>
+        /// M4: resolves <see cref="StationDef.PropSeat"/> for every station whose Sit names a prop of the level (the prop
+        /// center, with the station's Facing), and clears it on every other station. LevelJson.Parse calls it; a level
+        /// built in code calls it after changing its props or stations.
+        /// </summary>
+        public void ResolveSeats()
+        {
+            if (Inhabitants == null)
+            {
+                return;
+            }
+            foreach (InhabitantDef h in Inhabitants)
+            {
+                if (h?.Stations == null)
+                {
+                    continue;
+                }
+                foreach (StationDef s in h.Stations)
+                {
+                    if (s == null)
+                    {
+                        continue;
+                    }
+                    PropDef prop = string.IsNullOrEmpty(s.Sit) || s.SitsOnPlayer || Props == null ? null : Props.Find(p => p.Name == s.Sit);
+                    s.PropSeat = prop != null ? new FurniturePose(prop.Position, s.Facing) : (FurniturePose?)null;
+                }
+            }
+        }
+
+        /// <summary>M4: the player's body, <see cref="BodyDef.For"/> of the player kind (the chair when none is given).</summary>
+        public BodyDef PlayerBody()
+        {
+            return BodyDef.For(Player?.Kind);
+        }
+
+        /// <summary>Every room; an M1 level (single "room") yields that room.</summary>
+        public List<RoomDef> AllRooms()
+        {
+            if (Rooms != null && Rooms.Count > 0)
+            {
+                return Rooms;
+            }
+            return Room != null ? new List<RoomDef> { Room } : new List<RoomDef>();
+        }
+
+        /// <summary>The room whose interior contains the point (edges included), or null.</summary>
+        public RoomDef RoomAt(Vector3 point)
+        {
+            foreach (RoomDef r in AllRooms())
+            {
+                if (r.Contains(point))
+                {
+                    return r;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>True on a rug or in a room whose floor is soft (PRD 4.5).</summary>
+        public bool IsSilentFloor(Vector3 point)
+        {
+            if (Rugs != null)
+            {
+                foreach (RugDef rug in Rugs)
+                {
+                    if (rug.Contains(point))
+                    {
+                        return true;
+                    }
+                }
+            }
+            RoomDef room = RoomAt(point);
+            return room != null && room.IsSoft;
+        }
+
+        /// <summary>How many pieces of furniture of each kind the household owns: the player plus the decoys.</summary>
+        public Dictionary<string, int> Census()
+        {
+            var census = new Dictionary<string, int>();
+            void Count(string kind)
+            {
+                string k = string.IsNullOrEmpty(kind) ? DecoyDef.DefaultKind : kind;
+                census[k] = census.TryGetValue(k, out int n) ? n + 1 : 1;
+            }
+            if (Player != null)
+            {
+                Count(Player.Kind);
+            }
+            if (Decoys != null)
+            {
+                foreach (DecoyDef d in Decoys)
+                {
+                    Count(d.Kind);
+                }
+            }
+            return census;
+        }
+
+        /// <summary>The wall thickness shared by every room (the first room's).</summary>
+        public float WallThickness()
+        {
+            List<RoomDef> rooms = AllRooms();
+            return rooms.Count > 0 ? rooms[0].WallThickness : 0f;
+        }
+
+        /// <summary>The four sides of every room, in room order, then +z, -z, +x, -x.</summary>
+        public List<RoomSide> Sides()
+        {
+            var sides = new List<RoomSide>();
+            List<RoomDef> rooms = AllRooms();
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                RoomDef r = rooms[i];
+                float t = r.WallThickness;
+                sides.Add(new RoomSide(i, "+z", true, r.MaxZ + t * 0.5f, r.MinX, r.MaxX, 1f));
+                sides.Add(new RoomSide(i, "-z", true, r.MinZ - t * 0.5f, r.MinX, r.MaxX, -1f));
+                sides.Add(new RoomSide(i, "+x", false, r.MaxX + t * 0.5f, r.MinZ, r.MaxZ, 1f));
+                sides.Add(new RoomSide(i, "-x", false, r.MinX - t * 0.5f, r.MinZ, r.MaxZ, -1f));
+            }
+            return sides;
+        }
+
+        /// <summary>
+        /// The room sides an opening lies on, and the coordinate of its center along the wall. An opening on
+        /// an outer wall lies on one side, on a shared wall on two (one per room). M1 form: the named wall of
+        /// the single room, <see cref="OpeningDef.Center"/> along it. v2 form: every side whose wall center
+        /// line is within half a wall thickness of the point and whose interior span contains it.
+        /// </summary>
+        public List<RoomSide> SidesOf(OpeningDef opening, out float along)
+        {
+            var found = new List<RoomSide>();
+            along = 0f;
+            if (opening == null)
+            {
+                return found;
+            }
+            List<RoomSide> sides = Sides();
+            if (!opening.IsPointForm)
+            {
+                if (AllRooms().Count != 1)
+                {
+                    return found;
+                }
+                along = opening.Center;
+                foreach (RoomSide s in sides)
+                {
+                    if (s.Side == opening.Wall && along >= s.From - Eps && along <= s.To + Eps)
+                    {
+                        found.Add(s);
+                    }
+                }
+                return found;
+            }
+            foreach (RoomSide s in sides)
+            {
+                float across = s.AlongX ? opening.Z : opening.X;
+                float at = s.AlongX ? opening.X : opening.Z;
+                float half = AllRooms()[s.Room].WallThickness * 0.5f;
+                if (Mathf.Abs(across - s.Line) <= half + Eps && at >= s.From - Eps && at <= s.To + Eps)
+                {
+                    found.Add(s);
+                    along = at;
+                }
+            }
+            return found;
+        }
+
+        /// <summary>
+        /// The axis aligned box of every room interior, plus the walls between them. The runtime NavMesh is
+        /// clipped to it, so no path leaves the house through the exit door (docs/CONTRACT_M2.md 6).
+        /// </summary>
+        public Rect InteriorBounds()
+        {
+            List<RoomDef> rooms = AllRooms();
+            if (rooms.Count == 0)
+            {
+                return new Rect();
+            }
+            float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue;
+            foreach (RoomDef r in rooms)
+            {
+                minX = Mathf.Min(minX, r.MinX);
+                minZ = Mathf.Min(minZ, r.MinZ);
+                maxX = Mathf.Max(maxX, r.MaxX);
+                maxZ = Mathf.Max(maxZ, r.MaxZ);
+            }
+            return Rect.MinMaxRect(minX, minZ, maxX, maxZ);
+        }
+
+        /// <summary>
+        /// The size of a decoy: its own on every axis it gives, else the body size of its kind (M4: "the decoy size
+        /// comes from the decoy kind", docs/CONTRACT_M4.md 2). Until M4 the default was the player's size: every
+        /// level so far has a chair player and chair decoys, so nothing changes for them.
+        /// </summary>
+        public Vector3 DecoySize(DecoyDef decoy)
+        {
+            Vector3 body = BodyDef.For(BodyKinds.Of(decoy.Kind)).Size;
+            return new Vector3(
+                decoy.SizeX > 0f ? decoy.SizeX : body.x,
+                decoy.SizeY > 0f ? decoy.SizeY : body.y,
+                decoy.SizeZ > 0f ? decoy.SizeZ : body.z);
+        }
+
+        internal const float Eps = 1e-4f;
+    }
+
+    /// <summary>One side of one room: the wall band that stands outside the interior on that side.</summary>
+    public readonly struct RoomSide
+    {
+        /// <summary>Index of the room in <see cref="LevelDef.AllRooms"/>.</summary>
+        public readonly int Room;
+        /// <summary>"+z", "-z", "+x" or "-x".</summary>
+        public readonly string Side;
+        /// <summary>True for the z walls (+z, -z), which run along x; false for the x walls.</summary>
+        public readonly bool AlongX;
+        /// <summary>Coordinate of the wall center line: z for a z wall, x for an x wall.</summary>
+        public readonly float Line;
+        /// <summary>Interior span along the wall (x for a z wall, z for an x wall).</summary>
+        public readonly float From;
+        public readonly float To;
+        /// <summary>+1 when the room interior lies toward lower coordinates (the wall faces -axis), else -1.</summary>
+        public readonly float Outward;
+
+        public RoomSide(int room, string side, bool alongX, float line, float from, float to, float outward)
+        {
+            Room = room;
+            Side = side;
+            AlongX = alongX;
+            Line = line;
+            From = from;
+            To = to;
+            Outward = outward;
+        }
+    }
+
+    /// <summary>A silent floor area (PRD 4.5): a flat rug, rotated by its yaw.</summary>
+    public sealed class RugDef
+    {
+        /// <summary>M3: catalog model id for the visual (docs/CONTRACT_M3.md 4); null keeps the procedural visual.</summary>
+        public string Model;
+
+        public float X;
+        public float Z;
+        public float SizeX;
+        public float SizeZ;
+        public float Yaw;
+        public string Color;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+
+        /// <summary>True when the point (planar) is on the rug, edges included.</summary>
+        public bool Contains(Vector3 point)
+        {
+            Vector3 local = YawMath.Rotate(new Vector3(point.x - X, 0f, point.z - Z), -Yaw);
+            return Mathf.Abs(local.x) <= SizeX * 0.5f + LevelDef.Eps && Mathf.Abs(local.z) <= SizeZ * 0.5f + LevelDef.Eps;
+        }
+    }
+
+    /// <summary>A static furniture of the same kind as the player (PRD 11 M2). Size defaults to the player size.</summary>
+    public sealed class DecoyDef
+    {
+        /// <summary>M3: catalog model id for the visual (docs/CONTRACT_M3.md 4); null keeps the procedural visual.</summary>
+        public string Model;
+
+        public const string DefaultKind = "chair";
+
+        public string Kind = DefaultKind;
+        public float X;
+        public float Z;
+        public float Yaw;
+        public float SizeX;
+        public float SizeY;
+        public float SizeZ;
+        public string Color;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+    }
+
+    /// <summary>
+    /// One step of a designer route: at game time At, drive straight to (X, Z). The M4 fields are written only when
+    /// they differ from their default, so a route rewritten by the audit leaves an M1 to M3 level file unchanged.
+    /// </summary>
+    public sealed class RouteStepDef
+    {
+        /// <summary>M4: <see cref="Action"/> that presses E (the floor lamp's light).</summary>
+        public const string ActionToggle = "toggle";
+        /// <summary>M4: <see cref="Action"/> that presses a move key to right a tipped stool.</summary>
+        public const string ActionRightUp = "rightup";
+        /// <summary>M5: <see cref="Action"/> that presses E to open the closed leaf named by <see cref="Door"/>.</summary>
+        public const string ActionOpen = "open";
+        /// <summary>M6: <see cref="Action"/> that presses E to enter the wardrobe in front of the furniture.</summary>
+        public const string ActionHide = "hide";
+        /// <summary>M6: <see cref="Action"/> that presses E to leave the wardrobe.</summary>
+        public const string ActionLeave = "leave";
+
+        public float X;
+        public float Z;
+        public float At;
+        // M4 (docs/CONTRACT_M4.md amendment 9.3).
+        /// <summary>Holds the careful key (Left Shift) for the leg: half the body's max speed.</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Careful;
+        /// <summary>"toggle" (E), "rightup" (a move key to right a tipped stool), or null.</summary>
+        public string Action;
+        // CONTRACT_M4 10.7: WaitFor is removed (never read); a route step has x, z, at, careful and action only.
+        /// <summary>M5: the leaf id an "open" action opens.</summary>
+        public string Door;
+    }
+
+    /// <summary>M4: the authored home of the player's seat for a "sit": "player" station.</summary>
+    public sealed class SeatDef
+    {
+        public float X;
+        public float Z;
+        public float Yaw;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+    }
+
+    /// <summary>
+    /// M4: the furniture body kinds of <see cref="BodyDef"/> (docs/CONTRACT_M4.md 2). <see cref="BodyDef.For"/> turns an
+    /// unknown kind into the chair at run time; the level validator rejects an unknown kind instead, so a typo never
+    /// becomes a chair silently.
+    /// </summary>
+    public static class BodyKinds
+    {
+        public const string Chair = "chair";
+        public const string Stool = "stool";
+        public const string Armchair = "armchair";
+        public const string FloorLamp = "floor_lamp";
+        public const string OfficeChair = "office_chair";
+        /// <summary>M5 (docs/CONTRACT_M5.md 5): the rocking chair.</summary>
+        public const string RockingChair = "rocking_chair";
+        /// <summary>NEWFURN (docs/next/progress/NEWFURN.md): the plant stand, carrying its banana pot (LoadKinds.Banana).</summary>
+        public const string PlantStand = "plant_stand";
+
+        /// <summary>Every body kind, in the order of the contract tables (M4, then M5's rocking chair, then NEWFURN's plant stand).</summary>
+        public static readonly string[] All = { Chair, Stool, Armchair, FloorLamp, OfficeChair, RockingChair, PlantStand };
+
+        /// <summary>The kind a furniture of <paramref name="kind"/> stands for: null or empty is the chair (M1 data).</summary>
+        public static string Of(string kind)
+        {
+            return string.IsNullOrEmpty(kind) ? Chair : kind;
+        }
+
+        /// <summary>True for a kind <see cref="BodyDef.For"/> knows (null or empty counts as the chair).</summary>
+        public static bool IsKnown(string kind)
+        {
+            string k = Of(kind);
+            return BodyDef.For(k).Kind == k;
+        }
+
+        /// <summary>
+        /// The catalog model a furniture of <paramref name="kind"/> shows when its data names none: the body's model,
+        /// except for the chair, whose M1 to M3 data without a model keeps the procedural chair (docs/CONTRACT_M3.md 4),
+        /// and for an unknown kind. Null means the procedural visual.
+        /// </summary>
+        public static string DefaultModel(string kind)
+        {
+            string k = Of(kind);
+            return k != Chair && IsKnown(k) ? BodyDef.For(k).Model : null;
+        }
+    }
+
+    /// <summary>levels.json: the play order (docs/CONTRACT_M2.md 4). It is not a level.</summary>
+    public static class LevelManifest
+    {
+        public const string FileName = "levels";
+
+        private sealed class Manifest
+        {
+            public List<string> Levels = new List<string>();
+        }
+
+        public static List<string> Parse(string json)
+        {
+            Manifest m = JsonConvert.DeserializeObject<Manifest>(json);
+            return m?.Levels ?? new List<string>();
+        }
+
+        /// <summary>
+        /// Levels v2 (LEVELS_V2.md 7): the whole manifest, rev, previous order and acts included. Unknown keys are ignored
+        /// (as in <see cref="Parse"/>); a missing list reads as empty, a missing rev as 1.
+        /// </summary>
+        public static ManifestDef ParseFull(string json)
+        {
+            ManifestDef m = JsonConvert.DeserializeObject<ManifestDef>(json) ?? new ManifestDef();
+            m.Levels = m.Levels ?? new List<string>();
+            m.Previous = m.Previous ?? new List<string>();
+            m.Acts = m.Acts ?? new List<ActDef>();
+            return m;
+        }
+    }
+
+    /// <summary>Levels v2 (LEVELS_V2.md 7): levels.json as a whole.</summary>
+    public sealed class ManifestDef
+    {
+        /// <summary>The order revision: 1 for the v1 flat list (missing), 2 for the levels v2 order.</summary>
+        public int Rev = 1;
+        /// <summary>The play order.</summary>
+        public List<string> Levels = new List<string>();
+        /// <summary>The play order of the previous revision, for the one-shot save migration (empty when none).</summary>
+        public List<string> Previous = new List<string>();
+        /// <summary>The acts, in play order.</summary>
+        public List<ActDef> Acts = new List<ActDef>();
+    }
+
+    /// <summary>Levels v2: an act of the play order, from its first level index.</summary>
+    public sealed class ActDef
+    {
+        /// <summary>Index in <see cref="ManifestDef.Levels"/> of the act's first level.</summary>
+        public int From;
+        /// <summary>Strings key of the act's name ("act1.name").</summary>
+        public string NameKey;
+    }
+
+    /// <summary>
+    /// Levels v2 (LEVELS_V2.md 1.3, C5): the audit's pace gate. Every key is optional (null: the act's default). Shares are
+    /// fractions of the schedule (0 to 1), pauses are runs of at least 0.5 s at one cell, seconds for the longest pause.
+    /// </summary>
+    public sealed class PaceDef
+    {
+        public float? MinShare;
+        public float? MaxShare;
+        public int? MinPauses;
+        public float? MaxPause;
+    }
+
+    /// <summary>
+    /// Levels v2 (C6): an axis aligned zone the audit must find a schedule through, no slower than <see cref="MaxRatio"/> x
+    /// the best exit; with <see cref="Avoid"/> the zone is barred instead (the route that skips it must not exist or be slower).
+    /// </summary>
+    public sealed class ViaCheckDef
+    {
+        public const float DefaultMaxRatio = 1.5f;
+
+        public string Name;
+        public float X;
+        public float Z;
+        public float SizeX;
+        public float SizeZ;
+
+        [System.ComponentModel.DefaultValue(DefaultMaxRatio)]
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public float MaxRatio = DefaultMaxRatio;
+
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Avoid;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+
+        /// <summary>True when the planar point lies in the zone, edges included.</summary>
+        public bool Contains(Vector3 point)
+        {
+            return Mathf.Abs(point.x - X) <= SizeX * 0.5f + LevelDef.Eps && Mathf.Abs(point.z - Z) <= SizeZ * 0.5f + LevelDef.Eps;
+        }
+    }
+
+    /// <summary>
+    /// Levels v2 (C4): an axis aligned lit zone under a ceiling light. A floor lamp whose centre stands in it is seen at the
+    /// full sight range, switched on or off. MAZES: or in front of a wall sconce (<see cref="Sconce"/>), with the same rule.
+    /// </summary>
+    public sealed class LitZoneDef
+    {
+        public string Name;
+        public float X;
+        public float Z;
+        public float SizeX;
+        public float SizeZ;
+
+        /// <summary>
+        /// MAZES (docs/next/progress/MAZES.md): the wall of the zone's room ("+x", "-x", "+z" or "-z") that carries the wall
+        /// sconce lighting the zone, or null (default, not written) for a ceiling light. The sconce hangs on that wall at the
+        /// zone's centre along it (RoomLights draws it, LitZoneView lights the zone from it). Visual only: the rule is the
+        /// same for both kinds.
+        /// </summary>
+        public string Sconce;
+
+        /// <summary>Every <see cref="Sconce"/> value (null or empty: a ceiling light).</summary>
+        public static readonly string[] SconceWalls = { "+x", "-x", "+z", "-z" };
+
+        /// <summary>MAZES: true when a wall sconce lights the zone (<see cref="Sconce"/> set).</summary>
+        [JsonIgnore] public bool HasSconce => !string.IsNullOrEmpty(Sconce);
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+
+        /// <summary>True when the planar point lies in the zone, edges included.</summary>
+        public bool Contains(Vector3 point)
+        {
+            return Mathf.Abs(point.x - X) <= SizeX * 0.5f + LevelDef.Eps && Mathf.Abs(point.z - Z) <= SizeZ * 0.5f + LevelDef.Eps;
+        }
+    }
+
+    /// <summary>
+    /// A rectangle of the interior. X, Z is its center (an M1 single room sits at the origin). Walls stand
+    /// outside the interior, <see cref="WallThickness"/> thick.
+    /// </summary>
+    public sealed class RoomDef
+    {
+        public const string HardFloor = "hard";
+        public const string SoftFloor = "soft";
+
+        /// <summary>M7 (docs/CONTRACT_M7.md 1.2): the <see cref="FloorFinish"/> value of the kitchen and bathroom tile.</summary>
+        public const string TileFinish = "tile";
+
+        // Floor finishes (M8 ROOMS_PLAN.md 4, product owner request, 2026-11-19): the other <see cref="FloorFinish"/>
+        // values, own creation (tools/assets/make_floor_finishes.py). "marble" and "herringbone" join "tile" as
+        // hard-floor-only looks; "carpet" is the opposite, a soft-floor-only look (a wall-to-wall carpet, distinct
+        // from the plain soft floor's own border-and-field Carpet look above it): a carpet always means quiet.
+        /// <summary>White-grey marble slabs with fine veins and a thin joint: hard floor only.</summary>
+        public const string MarbleFinish = "marble";
+        /// <summary>Darker oak herringbone parquet, a woven chevron: hard floor only.</summary>
+        public const string HerringboneFinish = "herringbone";
+        /// <summary>Wall-to-wall carpet, a warm grey-beige loop pile: soft floor only.</summary>
+        public const string CarpetFinish = "carpet";
+
+        // M9 floors (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md): a third parquet, a second marble
+        // (own creation, tools/assets/make_floor_finishes.py) and the product owner's two bathroom tiles. All hard
+        // floor only.
+        /// <summary>Wide light oak planks, the third parquet: hard floor only.</summary>
+        public const string LightOakFinish = "lightoak";
+        /// <summary>Dark green verde marble with pale veins, the second marble: hard floor only.</summary>
+        public const string VerdeFinish = "verde";
+        /// <summary>Small ivory bathroom tiles (tile_bathroom_small_ivory.png): hard floor only.</summary>
+        public const string IvoryTileFinish = "ivorytile";
+        /// <summary>Large teal bathroom tiles (tile_bathroom_large_teal.png): hard floor only.</summary>
+        public const string TealTileFinish = "tealtile";
+
+        /// <summary>Every <see cref="FloorFinish"/> value a level may give (null or empty: the default parquet, or on
+        /// a soft floor the plain Carpet look). Every value of <see cref="HardFloorFinishes"/> needs a hard floor;
+        /// "carpet" a soft one (LevelValidator).</summary>
+        public static readonly string[] FloorFinishes =
+        {
+            TileFinish, MarbleFinish, HerringboneFinish, CarpetFinish, LightOakFinish, VerdeFinish, IvoryTileFinish, TealTileFinish,
+        };
+
+        /// <summary>The hard-floor-only <see cref="FloorFinish"/> values: every one but "carpet" (a soft room already
+        /// has its own distinct carpet looks, so a hard look never hides a quiet floor).</summary>
+        public static readonly string[] HardFloorFinishes =
+        {
+            TileFinish, MarbleFinish, HerringboneFinish, LightOakFinish, VerdeFinish, IvoryTileFinish, TealTileFinish,
+        };
+
+        // Wall finishes (product owner request, 2026-11-19): the <see cref="WallFinish"/> values.
+        /// <summary>Soft painted plaster in a muted sage.</summary>
+        public const string SageFinish = "sage";
+        /// <summary>Warm clay limewash.</summary>
+        public const string LimewashFinish = "limewash";
+        /// <summary>Woven grasscloth wallpaper in dusty blue.</summary>
+        public const string GrassclothFinish = "grasscloth";
+        /// <summary>A printed wallpaper: pale sage stripes and small botanical sprigs.</summary>
+        public const string WallpaperFinish = "wallpaper";
+
+        // Tiled walls (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md): the product owner's two wall images,
+        // each a whole wall from the floor to the top (tiles above a trim, paint below), mapped once up the wall.
+        /// <summary>White square tiles with black grout above a pastel blue paint (wall_bathroom_white_pastel_blue.png), for bathrooms.</summary>
+        public const string WhiteTileFinish = "whitetile";
+        /// <summary>Ivory subway tiles above a sage paint (wall_kitchen_ivory_sage.png), for kitchens.</summary>
+        public const string SubwayTileFinish = "subwaytile";
+
+        // Printed and stone walls (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md section 6): the product
+        // owner's three all-over wall images, each repeating both ways at its metric size (no band, so any wall height).
+        /// <summary>A honed greige travertine (wall_travertine_greige.png), for entrances, halls, living rooms and bathrooms.</summary>
+        public const string TravertineFinish = "travertine";
+        /// <summary>Slate blue triple arches printed on a cream linen (wall_deco_arches_blue.png), for living and dining rooms and bedrooms.</summary>
+        public const string ArchesFinish = "arches";
+        /// <summary>Olive and taupe pinstripes on a beige linen (wall_linen_pinstripe_olive.png), for bedrooms and offices.</summary>
+        public const string PinstripeFinish = "pinstripe";
+
+        // Walls 4 (product owner request, 2026-11-19, docs/m9/FLOORS_WALLS.md section 7): two more all-over images.
+        /// <summary>Sage quatrefoils and terracotta stars printed on a cream paper (wall_quatrefoil.png), for bedrooms, entrances and corridors.</summary>
+        public const string QuatrefoilFinish = "quatrefoil";
+        /// <summary>A sage painted fluted panel, vertical ribs (wall_sage_ribbed.png), for living and dining rooms and offices.</summary>
+        public const string SageRibbedFinish = "sageribbed";
+
+        /// <summary>Every <see cref="WallFinish"/> value a level may give (null or empty: the cream crepi).</summary>
+        public static readonly string[] WallFinishes =
+        {
+            SageFinish, LimewashFinish, GrassclothFinish, WallpaperFinish, WhiteTileFinish, SubwayTileFinish,
+            TravertineFinish, ArchesFinish, PinstripeFinish, QuatrefoilFinish, SageRibbedFinish,
+        };
+
+        /// <summary>
+        /// The <see cref="WallFinishes"/> whose image spans the wall once, floor to top (Tuning.TiledWallHeight): their trim
+        /// sits at one height on every wall, so a room showing one may not have taller walls (LevelValidator).
+        /// </summary>
+        public static readonly string[] TiledWallFinishes = { WhiteTileFinish, SubwayTileFinish };
+
+        public string Id;
+        public float X;
+        public float Z;
+        /// <summary>"hard" (default) or "soft" (silent, PRD 4.5).</summary>
+        public string Floor;
+        public float SizeX;
+        public float SizeZ;
+        public float WallHeight;
+        public float WallThickness;
+        public string FloorColor;
+        public string WallColor;
+        /// <summary>
+        /// M7 (docs/CONTRACT_M7.md 1.2) and M8 floor finishes (docs/m8/ROOMS_PLAN.md 4): null (default) or one of
+        /// <see cref="FloorFinishes"/>: visual only, the room's "floor" (<see cref="IsSoft"/>) alone still drives
+        /// PRD 4.5 silence, whatever the finish.
+        /// </summary>
+        public string FloorFinish;
+        /// <summary>
+        /// Wall finishes (product owner request, 2026-11-19): null (default, the cream crepi) or one of
+        /// <see cref="WallFinishes"/>: visual only, shown on the room-facing side of the room's walls (the other side of
+        /// a shared wall belongs to the next room); caps and outside faces keep the crepi.
+        /// </summary>
+        public string WallFinish;
+
+        /// <summary>
+        /// M8 room types (docs/m8/ROOMS_PLAN.md 2): the type as the level gives it ("type", one of <see cref="RoomTypes.All"/>),
+        /// or null, written only when set. Read <see cref="Type"/>, which falls back to the type inferred from the id.
+        /// </summary>
+        [JsonProperty("type")]
+        public string DeclaredType;
+
+        /// <summary>
+        /// M8: the room type, presentation only (no rule reads it): <see cref="DeclaredType"/> when the level gives one, else
+        /// <see cref="RoomTypes.Infer"/> of the id ("cuisine" is a kitchen, "couloir_est" a corridor, an unknown id "other").
+        /// Setting it sets <see cref="DeclaredType"/>.
+        /// </summary>
+        [JsonIgnore]
+        public string Type
+        {
+            get => string.IsNullOrEmpty(DeclaredType) ? RoomTypes.Infer(Id) : DeclaredType;
+            set => DeclaredType = value;
+        }
+
+        /// <summary>M8 (docs/m8/ROOMS_PLAN.md 5): <see cref="LightWall"/> value that gives the room no secondary light.</summary>
+        public const string LightWallNone = "none";
+
+        /// <summary>Every <see cref="LightWall"/> value a level may give (null or empty: the automatic placement).</summary>
+        public static readonly string[] LightWalls = { "+x", "-x", "+z", "-z", LightWallNone };
+
+        /// <summary>
+        /// M8 (docs/m8/ROOMS_PLAN.md 5), visual only: null (default) places the room's secondary light fixtures automatically;
+        /// a side ("+x", "-x", "+z", "-z") puts its wall fixtures on that wall; "none" gives the room no fixture and no light.
+        /// </summary>
+        public string LightWall;
+
+        [JsonIgnore] public float MinX => X - SizeX * 0.5f;
+        [JsonIgnore] public float MaxX => X + SizeX * 0.5f;
+        [JsonIgnore] public float MinZ => Z - SizeZ * 0.5f;
+        [JsonIgnore] public float MaxZ => Z + SizeZ * 0.5f;
+        [JsonIgnore] public bool IsSoft => Floor == SoftFloor;
+        [JsonIgnore] public bool IsTile => FloorFinish == TileFinish;
+
+        public bool Contains(Vector3 point)
+        {
+            return Mathf.Abs(point.x - X) <= SizeX * 0.5f + LevelDef.Eps && Mathf.Abs(point.z - Z) <= SizeZ * 0.5f + LevelDef.Eps;
+        }
+    }
+
+    /// <summary>
+    /// A door (a gap in the wall) or a window (decorative, no gap). M1 form: <see cref="Wall"/> names one of
+    /// the four walls of the single room and <see cref="Center"/> places it along that wall. v2 form
+    /// (<see cref="Wall"/> null): <see cref="X"/>, <see cref="Z"/> is a point on a wall line.
+    /// </summary>
+    public sealed class OpeningDef
+    {
+        private const float TopDefault = Tuning.DoorTopDefault;
+
+        /// <summary>"+x", "-x", "+z" or "-z" (M1 form). Null in the v2 form, which uses X and Z.</summary>
+        public string Wall;
+        /// <summary>v2 form: a point on a wall line.</summary>
+        public float X;
+        public float Z;
+        /// <summary>M1 form: coordinate of the opening center along the wall (z for the x walls, x for the z walls).</summary>
+        public float Center;
+        public float Width;
+        public float Bottom;
+        public float Top = TopDefault;
+
+        // ----- M5 (docs/CONTRACT_M5_v3.md 3 and 15.2), doors only -----
+        /// <summary>null (a doorway), "open" or "closed".</summary>
+        public string Leaf;
+        /// <summary>"start" (default, the lower world coordinate along the wall) or "end".</summary>
+        public string Hinge;
+        /// <summary>The leaf id, unique in the level.</summary>
+        public string Id;
+        /// <summary>The id of the room the leaf swings into.</summary>
+        public string Swing;
+
+        /// <summary>
+        /// M6 (docs/CONTRACT_M6.md 2.7): an inhabitant whose walk crosses this closed leaf stops, opens it and leaves it open;
+        /// plans use its doorway. Opt-in, default false (written only when true).
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool OpenedByInhabitants;
+
+        /// <summary>
+        /// Levels v2 (D27): a closed leaf the player may not open (E does nothing there); only an inhabitant's walk opens it,
+        /// so it needs <see cref="OpenedByInhabitants"/>. Opt-in, default false (written only when true).
+        /// </summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool PlayerLocked;
+
+        /// <summary>M5: <see cref="Leaf"/> of a leaf standing open, and of a closed one.</summary>
+        public const string LeafOpen = "open";
+        public const string LeafClosed = "closed";
+        /// <summary>M5: <see cref="Hinge"/> values.</summary>
+        public const string HingeStart = "start";
+        public const string HingeEnd = "end";
+
+        [JsonIgnore] public bool IsPointForm => Wall == null;
+
+        /// <summary>M5: the door carries a leaf (open or closed).</summary>
+        [JsonIgnore] public bool HasLeaf => !string.IsNullOrEmpty(Leaf);
+
+        /// <summary>M5: the door carries a closed leaf (as authored).</summary>
+        [JsonIgnore] public bool LeafClosedAtStart => Leaf == LeafClosed;
+
+        /// <summary>
+        /// MAZES (docs/next/progress/MAZES.md): a passage is a leafless doorway whose top reaches the height of the wall it
+        /// opens (<paramref name="wallHeight"/>): an open gap from the floor to the top of the wall, as the maze corridors
+        /// meet. The builder draws it without a door frame, a lintel or a cap across it, so the camera reads the way through
+        /// from above; every rule treats it as any doorway (no new data: "top" equal to the wall height says it).
+        /// </summary>
+        public bool IsPassage(float wallHeight) => !HasLeaf && Top >= wallHeight - 1e-3f;
+    }
+
+    /// <summary>The player furniture: kind, floor position, yaw and bounding box size.</summary>
+    public sealed class SpawnDef
+    {
+        /// <summary>M3: catalog model id for the visual (docs/CONTRACT_M3.md 4); null keeps the procedural visual.</summary>
+        public string Model;
+
+        public string Kind;
+        public float X;
+        public float Z;
+        public float Yaw;
+        public float SizeX;
+        public float SizeY;
+        public float SizeZ;
+        public string Color;
+        /// <summary>
+        /// M5: a load on top ("vase", "books", "plant") or null (CONTRACT_M5 6, 16.5). NEWFURN: "banana", the plant stand's own
+        /// banana pot (only on the plant stand, LoadKinds).
+        /// </summary>
+        public string Load;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+        [JsonIgnore] public Vector3 Size => new Vector3(SizeX, SizeY, SizeZ);
+    }
+
+    /// <summary>Axis aligned rectangle on the floor (the exit doormat).</summary>
+    public sealed class ZoneDef
+    {
+        /// <summary>M3: catalog model id for the visual (docs/CONTRACT_M3.md 4); null keeps the procedural visual.</summary>
+        public string Model;
+
+        public float X;
+        public float Z;
+        public float SizeX;
+        public float SizeZ;
+        public string Color;
+
+        public bool Contains(Vector3 point)
+        {
+            return Mathf.Abs(point.x - X) <= SizeX * 0.5f && Mathf.Abs(point.z - Z) <= SizeZ * 0.5f;
+        }
+    }
+
+    /// <summary>A static prop, built from primitives by kind, filling the box of the given size.</summary>
+    public sealed class PropDef
+    {
+        /// <summary>M3: catalog model id for the visual (docs/CONTRACT_M3.md 4); null keeps the procedural visual.</summary>
+        public string Model;
+
+        public string Name;
+        /// <summary>"sofa", "bookshelf", "table", "cabinet", "counter", "plant", "armchair" (M4), "wardrobe" (M6, <see cref="WardrobeRule"/>), "box",
+        /// or an M8 room object (<see cref="PropKinds.RoomObjects"/>).</summary>
+        public string Kind;
+        public float X;
+        public float Z;
+        public float Yaw;
+        public float SizeX;
+        public float SizeY;
+        public float SizeZ;
+        public bool Occluder = true;
+        public string Color;
+        public string AccentColor;
+
+        /// <summary>
+        /// PLANT (2026-11-24): the look of a "plant" prop, <see cref="PlantStyleFicus"/> or <see cref="PlantStyleBanana"/>;
+        /// null picks one from the prop's position (a deterministic mix). Visual only: both share the same two colliders.
+        /// </summary>
+        public string Style;
+
+        /// <summary>
+        /// DRESSING (docs/next/progress/DRESSING.md): a furniture look (<see cref="DecorKinds.Looks"/>) drawn instead of the
+        /// procedural visual, fitted to the prop's box; the prop keeps exactly its colliders, occluder flag and position. Null
+        /// keeps the procedural visual. Never together with <see cref="Model"/>.
+        /// </summary>
+        public string Dress;
+
+        public const string PlantStyleFicus = "ficus";
+        public const string PlantStyleBanana = "banana";
+        public static readonly string[] PlantStyles = { PlantStyleFicus, PlantStyleBanana };
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+        [JsonIgnore] public Vector3 Size => new Vector3(SizeX, SizeY, SizeZ);
+    }
+
+    public sealed class InhabitantDef
+    {
+        /// <summary>M3: catalog model id for the visual (docs/CONTRACT_M3.md 4); null keeps the procedural visual.</summary>
+        public string Model;
+
+        public string Name;
+        public int StartStation;
+        public string BodyColor;
+        public string HeadColor;
+        public List<StationDef> Stations = new List<StationDef>();
+
+        // ----- M5 (docs/CONTRACT_M5.md 3, 16.7) -----
+        /// <summary>"human" (null) or "dog".</summary>
+        public string Kind;
+        /// <summary>A PersonalityDef id, or null for default.</summary>
+        public string Personality;
+        /// <summary>"loop" (null), "pingpong" or "wander".</summary>
+        public string Pattern;
+        /// <summary>The wander seed, in [0, 2^31 - 1].</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public int Seed;
+    }
+
+    /// <summary>PRD 5.1: a position, a facing yaw, a dwell time and head glances.</summary>
+    public sealed class StationDef
+    {
+        /// <summary>M4: the <see cref="Sit"/> value that sits on the player's seat at <see cref="Seat"/>.</summary>
+        public const string SitOnPlayer = "player";
+
+        public float X;
+        public float Z;
+        public float Facing;
+        public float Dwell;
+        public List<GlanceDef> Glances = new List<GlanceDef>();
+
+        /// <summary>
+        /// Levels v2: periodic head glances, expanded into <see cref="Glances"/> by <see cref="ExpandGlances"/> (LevelJson.Parse
+        /// calls it). Null when the station has none.
+        /// </summary>
+        public GlanceEveryDef GlanceEvery;
+
+        /// <summary>
+        /// Levels v2: "glances" is not written when every glance was generated by <see cref="GlanceEvery"/>, so a file keeps
+        /// its compact form (LevelJson.Serialize writes only the explicit glances next to a glanceEvery).
+        /// </summary>
+        public bool ShouldSerializeGlances() => GlanceEvery == null || Glances == null || Glances.Exists(g => g != null && !g.Generated);
+
+        /// <summary>
+        /// Levels v2: replaces the glances generated by a previous call with those of <see cref="GlanceEvery"/> (glance k at
+        /// start + k x period, yaw flipped on every odd k when alternate), merged with the explicit glances and sorted by
+        /// offset (stable: an explicit glance stays before a generated one at the same offset).
+        /// </summary>
+        public void ExpandGlances()
+        {
+            if (Glances == null)
+            {
+                Glances = new List<GlanceDef>();
+            }
+            int generated = Glances.RemoveAll(g => g != null && g.Generated);
+            if (GlanceEvery == null)
+            {
+                return;
+            }
+            int n = GlanceEvery.ResolvedCount(Dwell);
+            if (n == 0 && generated == 0)
+            {
+                return;
+            }
+            for (int k = 0; k < n; k++)
+            {
+                float yaw = GlanceEvery.Alternate && k % 2 == 1 ? -GlanceEvery.Yaw : GlanceEvery.Yaw;
+                Glances.Add(new GlanceDef { Offset = GlanceEvery.Start + k * GlanceEvery.Period, Yaw = yaw, Hold = GlanceEvery.Hold, Generated = true });
+            }
+            // Stable insertion sort by offset (List.Sort is not stable).
+            for (int i = 1; i < Glances.Count; i++)
+            {
+                GlanceDef g = Glances[i];
+                int j = i - 1;
+                while (j >= 0 && Offset(Glances[j]) > Offset(g))
+                {
+                    Glances[j + 1] = Glances[j];
+                    j--;
+                }
+                Glances[j + 1] = g;
+            }
+        }
+
+        private static float Offset(GlanceDef g) => g != null ? g.Offset : float.MinValue;
+
+        /// <summary>M4: a prop name, "player", or null (no sitting).</summary>
+        public string Sit;
+        /// <summary>M4: the seat home when Sit is "player".</summary>
+        public SeatDef Seat;
+
+        [JsonIgnore] public Vector3 Position => new Vector3(X, 0f, Z);
+
+        /// <summary>M4: true for a "sit": "player" station.</summary>
+        [JsonIgnore] public bool SitsOnPlayer => Sit == SitOnPlayer;
+
+        /// <summary>
+        /// M4: the seat home of a station that sits on a prop: the prop center, facing the station's Facing (the seated
+        /// facing). Not data: <see cref="LevelDef.ResolveSeats"/> sets it from the props (LevelJson.Parse calls it), so the
+        /// sitter sits on the sofa instead of hovering at the seat front. Null for any other station.
+        /// </summary>
+        [JsonIgnore] public FurniturePose? PropSeat;
+
+        /// <summary>M5: a dog station where the dog sleeps (eye closed) for the whole dwell (v3 4).</summary>
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Sleep;
+    }
+
+    /// <summary>A head glance: time offset into the dwell, head yaw relative to the body, hold duration.</summary>
+    public sealed class GlanceDef
+    {
+        public float Offset;
+        public float Yaw;
+        public float Hold;
+
+        /// <summary>Levels v2: generated by <see cref="StationDef.GlanceEvery"/>, not data (never written).</summary>
+        [JsonIgnore] public bool Generated;
+    }
+
+    /// <summary>
+    /// Levels v2: periodic head glances of a station ("glanceEvery"). Glance k starts at <see cref="Start"/> + k x
+    /// <see cref="Period"/> into the dwell, turns the head by <see cref="Yaw"/> (sign flipped on every odd k when
+    /// <see cref="Alternate"/>) and holds <see cref="Hold"/> seconds. <see cref="Count"/> glances, or when it is not given as
+    /// many as fit: the largest n with start + n x period within the dwell.
+    /// </summary>
+    public sealed class GlanceEveryDef
+    {
+        /// <summary>A guard against a runaway count; the validator rejects such a station anyway.</summary>
+        public const int MaxGenerated = 1000;
+
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public float Start;
+        public float Period;
+        public float Hold;
+        public float Yaw;
+        [JsonProperty(DefaultValueHandling = DefaultValueHandling.Ignore)]
+        public bool Alternate;
+        /// <summary>The number of glances, or null to fill the dwell.</summary>
+        public int? Count;
+
+        /// <summary>The number of glances generated in a dwell of <paramref name="dwell"/> seconds.</summary>
+        public int ResolvedCount(float dwell)
+        {
+            if (Count.HasValue)
+            {
+                return Mathf.Clamp(Count.Value, 0, MaxGenerated);
+            }
+            if (Period <= 0f)
+            {
+                return 0;
+            }
+            return Mathf.Clamp(Mathf.FloorToInt((dwell - Start) / Period + 1e-4f), 0, MaxGenerated);
+        }
+    }
+
+    /// <summary>JSON reading and writing of levels (Newtonsoft, camelCase, unknown members rejected).</summary>
+    public static class LevelJson
+    {
+        private static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
+        {
+            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+            MissingMemberHandling = MissingMemberHandling.Error,
+            NullValueHandling = NullValueHandling.Ignore,
+            Formatting = Formatting.Indented,
+        };
+
+        /// <summary>
+        /// Reads a level and resolves its derived data (levels v2: <see cref="LevelDef.ExpandGlances"/>, then M4:
+        /// <see cref="LevelDef.ResolveSeats"/>).
+        /// </summary>
+        public static LevelDef Parse(string json)
+        {
+            LevelDef level = JsonConvert.DeserializeObject<LevelDef>(json, Settings);
+            level?.ExpandGlances();
+            level?.ResolveSeats();
+            return level;
+        }
+
+        /// <summary>
+        /// Writes a level. Levels v2: a station with a glanceEvery writes only its explicit glances (the generated ones are
+        /// taken out for the call and put back), so Parse(Serialize(level)) expands them once.
+        /// </summary>
+        public static string Serialize(LevelDef level)
+        {
+            var saved = new List<(StationDef station, List<GlanceDef> glances)>();
+            if (level?.Inhabitants != null)
+            {
+                foreach (InhabitantDef h in level.Inhabitants)
+                {
+                    if (h?.Stations == null)
+                    {
+                        continue;
+                    }
+                    foreach (StationDef s in h.Stations)
+                    {
+                        if (s?.GlanceEvery != null && s.Glances != null && s.Glances.Exists(g => g != null && g.Generated))
+                        {
+                            saved.Add((s, s.Glances));
+                            s.Glances = s.Glances.FindAll(g => g == null || !g.Generated);
+                        }
+                    }
+                }
+            }
+            try
+            {
+                return JsonConvert.SerializeObject(level, Settings);
+            }
+            finally
+            {
+                foreach ((StationDef station, List<GlanceDef> glances) in saved)
+                {
+                    station.Glances = glances;
+                }
+            }
+        }
+
+        /// <summary>Parses "#RRGGBB" or "#RRGGBBAA"; anything else returns <paramref name="fallback"/>.</summary>
+        public static Color ParseColor(string hex, Color fallback)
+        {
+            return !string.IsNullOrEmpty(hex) && ColorUtility.TryParseHtmlString(hex, out Color c) ? c : fallback;
+        }
+    }
+}
