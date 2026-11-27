@@ -1,8 +1,0 @@
-mode=minimize exe=C:/Dev/squad-ai/Brainstorming/games/painter_io/Build/infra-perf/PainterIO.exe suspendAt=12 suspendMs=1500 noSuspend=False
-hwnd=4329636
-foreground=True
-visible ms/s: 542
-iconic=True
-minimized ms/s: 2 (0,2 % of one core)
-watchdog lines: 0 
-[PainterIO] render scale 1.000 (tier High, height 960)

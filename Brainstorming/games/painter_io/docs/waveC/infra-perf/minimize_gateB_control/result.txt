@@ -1,7 +1,0 @@
-mode=minimize exe=C:/Dev/squad-ai/Brainstorming/games/painter_io/Build/Windows/PainterIO.exe suspendAt=12 suspendMs=1500 noSuspend=False
-hwnd=80941328
-foreground=True
-visible ms/s: 1215
-iconic=True
-minimized ms/s: 1315 (131,5 % of one core)
-watchdog lines: 1 [PainterIO] quality watchdog: 37,8 fps < 49,8, tier High -> Medium

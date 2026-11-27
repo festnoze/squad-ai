@@ -1,3 +1,0 @@
-hwnd=55380480
-visible ms/s: 1419
-minimized ms/s: 932

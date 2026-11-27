@@ -1,5 +1,0 @@
-mode=menu exe=C:/Dev/squad-ai/Brainstorming/games/painter_io/Build/infra-perf/PainterIO.exe suspendAt=12 suspendMs=1500 noSuspend=False
-foreground=True
-suspended 1500 ms at t=12,1 s after launch
-watchdog lines: 0 
-[PainterIO] render scale 1.000 (tier High, height 960)

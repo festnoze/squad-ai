@@ -1,1 +1,0 @@
-frames 114 span 4.00-7.98 s mean interval 35.2 ms (28.4 fps)

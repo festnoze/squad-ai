@@ -1,6 +1,0 @@
-1 fire medium exit=0 secs=54 [ProbePerf] avgMs=6.72 p95Ms=7.52 tier=Medium
-2 liquid medium exit=0 secs=50 [ProbePerf] avgMs=3.96 p95Ms=5.02 tier=Medium
-3 fire low exit=0 secs=46 [ProbePerf] avgMs=5.45 p95Ms=6.20 tier=Low
-4 fire medium exit=0 secs=46 [ProbePerf] avgMs=6.61 p95Ms=7.43 tier=Medium
-5 liquid medium exit=0 secs=45 [ProbePerf] avgMs=3.86 p95Ms=4.70 tier=Medium
-6 fire low exit=0 secs=45 [ProbePerf] avgMs=5.36 p95Ms=6.12 tier=Low
