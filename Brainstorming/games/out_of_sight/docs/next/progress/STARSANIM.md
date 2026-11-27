@@ -130,3 +130,112 @@ A fail (no stars) waits that one frame only.
   press Enter right away to check Next level is never blocked; win the last level for the end screen. Then
   `Build/Play/OutOfSight.exe -touch` for the touch layout (bottom bar under the column). With the Simulated ad provider
   (`simulatedEveryLevelEnd`), the ad shows about 1.2 s after the stars settled.
+
+## 9. Confetti (2026-11-27)
+
+User request: "add confetti at the end of a level when the player gets 3 stars".
+
+### When
+
+- Only for a three star result, on the win panel and on the end screen. Never on 0 to 2 stars, never on the fail panel.
+- Fired by the third star's fill (`Hud.OnStarFilled(2)` with `WinStars.Count == 3`), so it bursts on the same frame as the
+  third star's big finish (t = 1.22 s), with the chord chime. A skip or `Hud.CompleteStarsAnimation()` on a three star
+  result fires it at once, with the one chime the skip owes (the next frame). A press that also leaves the panel (Enter
+  on Next level) drops that chime, so no confetti either.
+- Once per win: a refresh (language change, layout switch, resize, RecordLine asking again with the same count) never
+  fires it again, since nothing fills again. A new count (`ShowWinStars` restarting the reveal) stops the old shower.
+- Stops at once (`WinConfettiView.Stop`: every piece hidden, its canvas off) when the panel goes: Next level, Replay,
+  Menu (ShowWin and HidePanels hide the row), a fail panel, the HUD hidden by a menu over the panel, or an ad opening
+  (`AdService.Showing`, checked every frame). It never starts under an ad, a menu or `Hud.ReducedMotion` (no flying
+  paper and no pop for the accessibility hook).
+- The ad is untouched: `AdDirector` still waits on `Hud.StarsAnimating` only (the stars' reveal, 1.87 s), then its 1.2 s;
+  the shower (about 3.3 s from 1.22 s) is simply cut if the ad opens before it ends.
+
+### What it looks like (`Assets/Scripts/Runtime/WinConfettiView.cs`)
+
+- 96 pieces (`Tuning.ConfettiPieces`): 72 from two cannons just below the bottom corners (40 units in, plus the safe area's
+  side insets), fired in turn within 0.16 s, up and inward at 56 to 84 degrees; 24 rained from just above the top edge
+  between 0.2 and 0.7 s (`Tuning.ConfettiCannonShare` 0.75).
+- Shapes (`ProceduralArt.ConfettiShapes`, one 128 x 32 atlas of four 32 x 32 cells): paper rectangles 11-16 x 15-22
+  (34 %), streamer strips 5.5-7.5 x 28-44 (22 %), dots 10-15 (20 %), curled ribbons 18-26 (14 %, an open ring), wavy
+  streamers 10-13 x 26-36 (10 %). Colours: the stars' gold, the player furniture's red (`LevelMiniature.ChairRed`), teal,
+  white and soft blue.
+- Motion (reference units for a 1080 high canvas, scaled by the canvas's height, so every aspect ratio looks the same):
+  shots at 2300 to 3400 units/s, linear (1.2 to 1.9 /s) plus quadratic air drag, gravity 600; the shots reach 60 to 95 %
+  of the screen's height in about a second, then the paper flutters down at about 330 units/s, swaying sideways (50 to
+  120 units/s, more as it slows), spinning 120 to 620 degrees/s and flipping in 3D (scale X = cos, 5 to 13 rad/s, a
+  negative scale shows the back, the colour 40 % darker edge-on). Each piece lives 2.4 to 3 s (top rain 2.1 to 2.6 s)
+  and fades out over its last 0.6 s: the shower ends after about 3.3 s (`Duration`).
+- Draw order: its nested Canvas sits right after the stars and "New stars!" in the win panel, before the Next level /
+  Replay / Menu groups and the end screen's group: over the dim, the texts and the stars, under every button. Raycast
+  off on every piece and no raycaster on its canvas: nothing is ever blocked.
+- Sound: `Sfx.PlayConfettiPop()`, a party popper synthesized at startup (0.75 s: a low-passed noise pop with a thump
+  falling from 170 Hz, the streamers' high-passed whoosh, a thinning crackle of tiny 2.8 to 7.2 kHz ticks; its own hashed
+  noise, so every clip drawn after it is unchanged), once per shower, a one shot on `Sfx.UiSource` like the chimes
+  (options' volume, silent under AudioMute). `Tuning.SfxConfettiPopVolume` 0.42 times the mix scale. Counter
+  `ConfettiPopsPlayed`.
+
+### Cost on Android
+
+- One extra nested Canvas (only it rebuilds while the paper falls, enabled only then), 96 images built once, one atlas
+  and the default UI material: one draw call. Unscaled time (the end screen may be paused). No allocation per frame
+  (struct maths, arrays, one `System.Random`). Atlas 16 KB, popper about 66 KB of audio.
+
+### Probes for tests
+
+- `Hud.WinConfetti` (`Playing`, `Bursts`, `LivePieces`, `PieceCount`, `Duration`, `Images`, `Canvas`, `Root`),
+  `Hud.ConfettiPlaying`, `Hud.CompleteConfetti()` (ends it at once), `Sfx.ConfettiPop`, `Sfx.ConfettiPopsPlayed`.
+- `ProbeTestsStars` (edited, not run): Step76a checks no confetti before the third star, one burst and one pop at the
+  third star, 60 to 120 pieces, about 3 s, raycast off and one atlas for every piece, the shower under the three buttons,
+  no new burst on a refresh, stopped by Replay, fired at once by a skip on the second three star win, and ending by
+  itself (canvas off, no piece left). Step76c checks the three star shower stops when the count becomes one, and that the
+  one star result (its reveal, then a completion) never fires one nor pops.
+- `ProbeTestsEndPanel` unchanged: its shots now catch the confetti fired by `CompleteStarsAnimation` (no assertion looks
+  at it; call `Hud.CompleteConfetti()` there for clean shots if wanted).
+
+## 10. STAR3D: bevelled 3D hero stars (2026-11-27)
+
+User request: "make the 3 stars look strongly 3D with shading; right now they are very flat".
+
+- `Stars.StarLarge` (the filled hero star) is now drawn in its own colours, 256 x 256 (no mipmaps, bilinear): ten facets
+  (the distance field's gradient is constant on each arm half, so each arm splits down its ridge into a lit and a shaded
+  half), a thick rounded bevel along the edges (slope 2.4 at the edge easing to 0.42 over 0.15 of the half box), Lambert
+  light from the top-left plus a Blinn sheen, a gold gradient from bright yellow at the top tip to deep amber at the
+  bottom tips, a glossy streak across the upper-left, a dark amber rim and outline, and a soft drop shadow 0.05 right and
+  0.065 down baked in. The shape is a little chunkier (inner ratio 0.5) and smaller (outer radius 0.84 of the half box
+  instead of 0.88 plus a 0.09 outline) so the outline and the shadow fit inside the same box: sizes and layout unchanged.
+- `Stars.StarSlot` (an empty slot): the same shape recessed in a dark grey-blue: the surface leans inward (a lip sloping
+  into the hole, steep walls, the floor's facets upside down), so the top walls are in shadow and the bottom ones catch
+  the light; the top-left wall casts its shadow on the floor. The filled star covers it exactly and pops out of it.
+- `Stars.StarFlash` (new, 128 x 128): the star's white silhouette. The fills are no longer tinted gold (a tint can only
+  darken the baked colours): they show white (`WinStarsView.FilledTint`), and the punch's white-hot flash is this
+  silhouette laid over the star (`WinStarsView` builds one per star between the stars and the rings), fading from 0.95
+  over the first 0.55 of the punch. The punch, glow, ring, sparkles and shake are unchanged.
+- Small uses keep the old flat sprite: `Stars.Star` (96 texels, tinted gold or faint cream) on the level select cards
+  (56 units) and the level select's total icon; at that size the bevel and the facets would turn to mush. Only the end
+  screen's hero row uses the 3D sprites.
+- Cost: drawn once at the HUD's start (two 258 x 258 distance fields, about 135 000 star distance evaluations, a few
+  milliseconds), 256 + 256 + 64 KB of texture instead of 2 x 147 KB. At rest one more texture in the row's canvas only
+  while a star flashes.
+- Tests: the settled fill colour assertions in `ProbeTestsStars` now compare with `WinStarsView.FilledTint` (they compared
+  with `Stars.Gold`, which the 3D sprite no longer uses as a tint). The cards' `Stars.Gold` / `Stars.Empty` checks are
+  unchanged.
+
+## 11. Files and checks (Confetti and STAR3D)
+
+- New: `Assets/Scripts/Runtime/WinConfettiView.cs`.
+- Edited: `HudWinStars.cs` (the shower: built in BuildWinStars, fired from OnStarFilled, stopped in ShowWinStars,
+  HideWinStars and UpdateWinStars, the probes), `Hud.cs` (its canvas in ApplyCanvases), `ProceduralArt.cs`
+  (`ConfettiShapes`, `DrawCells`), `Sfx.cs` (`ConfettiPop`, `PlayConfettiPop`, `SynthesizePopper`), `Core/Tuning.cs`
+  (`ConfettiPieces`, `ConfettiCannonShare`, `SfxConfettiPopVolume`), `Stars.cs` (the 3D `StarLarge`, `StarSlot`, the new
+  `StarFlash`), `WinStarsView.cs` (`FilledTint`, the flash images), `Assets/Tests/PlayMode/ProbeTestsStars.cs`.
+- Compile: `SetupAndCompile` (Build/confetti.log), no `error CS`.
+- Tests to run: PlayMode `ProbeTestsStars|ProbeTestsEndPanel|ProbeTestsM5Ui|ProbeTestsM3Audio|ProbeTestsAudioOverhaul`,
+  EditMode `StarsTests|MonetizationTests`.
+- By hand, after a rebuild of the player: `Build/Play/OutOfSight.exe`, win a level quickly (three stars): the 3D slots
+  pop in, each gold star flashes white and fills its socket, and as the third lands with the chord the confetti bursts
+  from both bottom corners with a pop, rains from the top, flutters down and fades in about 3 s, under the buttons
+  (click Next level or Replay during the shower: it works and the shower stops). Click during the reveal: the stars
+  settle and the confetti bursts at once. Win slowly (one or two stars): no confetti. Then
+  `Build/Play/OutOfSight.exe -touch` for the touch layout (the bottom bar over the paper). With the Simulated ad provider
+  (`simulatedEveryLevelEnd`), the ad still shows about 1.2 s after the stars settled and cuts the shower.

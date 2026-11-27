@@ -19,15 +19,27 @@ public sealed class EuropeMenuTests
         }
         EuropeProgress.StorageKey = TestKey;
         EuropeProgress.ResetProgress();
+        SaveData.MemoryOnly = true;   // the results below record stats: never into the player's PlayerPrefs
+        SaveData.ResetTestSettings();
         var root = new GameObject("Europe menu test");
         try
         {
             var director = root.AddComponent<GameDirector>();
             Assert.That(director.State, Is.EqualTo(GameState.Menu));
             var ui = UiRoot.Instance;
-            ui.OpenEurope();
+
+            // Rule v1.7 (countries first): no "Pays" button; JOUER opens the country screen.
+            var menuButtons = ui.Menu.Canvas.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            Assert.That(System.Array.Exists(menuButtons, b => b.name == "Countries"), Is.False, "the Pays button is gone");
+            var play = System.Array.Find(menuButtons, b => b.name == "Face" && b.transform.parent.name == "Play");
+            Assert.That(play, Is.Not.Null);
+            play.onClick.Invoke();
             yield return null;
             yield return null;
+            Assert.That(director.State, Is.EqualTo(GameState.Menu), "JOUER does not start a square round");
+            Assert.That(EuropeScreen.Active, Is.Not.Null);
+            Assert.That(EuropeScreen.Active.Visible, Is.True, "JOUER shows the country screen");
+            Assert.That(ui.Menu.Visible, Is.False);
 
             var map = root.GetComponentInChildren<EuropeMapView>();
             Assert.That(map, Is.Not.Null);
@@ -89,10 +101,41 @@ public sealed class EuropeMenuTests
             Assert.That(screen.PlaySelected(), Is.True);
             Assert.That(director.State, Is.EqualTo(GameState.Playing));
             Assert.That(director.Session.Sim.Arena.Polygon, Is.Not.Null);
+            Assert.That(director.Session.Sim.Config.RoundDuration, Is.EqualTo(900.0), "rule v1.7: 15 min country rounds");
+            Assert.That(director.Session.Sim.Config.ConquestShare, Is.EqualTo(1.0), "the goal is 100 %");
+            Assert.That(director.Session.Sim.ConquestCellCount, Is.GreaterThan(0));
             Assert.That(map.gameObject.activeSelf, Is.False);
 
-            director.StartRound();
-            Assert.That(director.Session.Sim.Arena.Polygon, Is.Not.Null);
+            // Results: REJOUER replays the same country, PAYS SUIVANT goes on to the country screen.
+            director.ShowResults();
+            Assert.That(director.State, Is.EqualTo(GameState.Results));
+            yield return new WaitForSecondsRealtime(ResultsScreen.InputGuardSeconds + 0.15f);
+            var resultButtons = ui.Results.Canvas.GetComponentsInChildren<UnityEngine.UI.Button>(true);
+            var replay = System.Array.Find(resultButtons, b => b.name == "Replay");
+            var next = System.Array.Find(resultButtons, b => b.name == "Face" && b.transform.parent.name == "NextCountry");
+            Assert.That(replay, Is.Not.Null);
+            Assert.That(next, Is.Not.Null);
+            replay.onClick.Invoke();
+            Assert.That(director.State, Is.EqualTo(GameState.Playing));
+            Assert.That(director.Session.Sim.Arena.Polygon, Is.Not.Null, "REJOUER keeps the country");
+            Assert.That(director.SelectedCountry.code, Is.EqualTo("FR"));
+
+            director.ShowResults();
+            yield return new WaitForSecondsRealtime(ResultsScreen.InputGuardSeconds + 0.15f);
+            next.onClick.Invoke();
+            yield return null;
+            Assert.That(director.State, Is.EqualTo(GameState.Menu));
+            Assert.That(EuropeScreen.Active.Visible, Is.True, "PAYS SUIVANT shows the country screen");
+            Assert.That(ui.Menu.Visible, Is.False);
+            Assert.That(map.gameObject.activeSelf, Is.True);
+            Assert.That(director.Session.IsAttract, Is.True, "the attract match runs behind the country screen");
+
+            // Back from the country screen: the menu (whose JOUER brings the countries again).
+            ui.CloseEurope();
+            yield return null;
+            Assert.That(ui.Menu.Visible, Is.True);
+            director.StartRound();   // launch flags, probe and tests may still play; the menu never does it with no country
+            Assert.That(director.Session.Sim.Arena.Polygon, Is.Not.Null, "the last country is kept");
             director.ToMenu();
             Assert.That(director.Session.Sim.Arena.Polygon, Is.Null);
         }
@@ -102,6 +145,7 @@ public sealed class EuropeMenuTests
             EuropeProgress.ResetProgress();
             PlayerPrefs.DeleteKey(TestKey);
             EuropeProgress.StorageKey = null;
+            SaveData.MemoryOnly = false;
         }
         yield return null;
     }

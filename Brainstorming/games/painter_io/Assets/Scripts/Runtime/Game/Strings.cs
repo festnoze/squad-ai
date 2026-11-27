@@ -1,6 +1,9 @@
 // Owned by BI since wave B-2 (written by B4). Contract 15.6: every visible text goes through Strings.Get (French default, English table), and every number
 // shown to the player goes through the formatters below (decimal comma in French, point in English, culture independent).
 // Player names: "name.you" (Toi / You) and "name.color0".."name.color3" (Corail, Lagon, Safran, Lilas), see Palette.
+// Wave D-2 (traits-ui, docs/BIOME_TRAITS.md sections 5 and 7): trait.<Id>.name / trait.<Id>.desc for every TraitId (the
+// descriptions take the trait's parameters, see TraitText), the biome rules option and trait matrix, the rules line of
+// the menu, the kill reward toasts and chips, and the reward items of the results stats line.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -71,8 +74,53 @@ namespace PainterIO.Runtime
             { "options.ring", "Délai anneau" },
             { "options.factor_value", "× {0}" },
             { "options.seconds_value", "{0} s" },
+            { "options.minutes_value", "{0} min" },
             { "options.reset", "Réinitialiser" },
             { "options.close", "Fermer" },
+
+            // Wave D-2 (docs/BIOME_TRAITS.md sections 5 and 7): the biome rules toggle and the hidden trait matrix.
+            { "options.biome_rules", "Règles des biomes" },
+            { "options.biome_rules_on", "Chaque biome a ses règles" },
+            { "options.classic_rules", "Règles classiques" },
+            { "options.trait_matrix", "Traits des biomes" },
+            { "options.matrix_note", "S’applique à la prochaine manche et au menu" },
+            { "options.matrix_classic", "Règles classiques actives : la matrice attend" },
+            { "options.back", "Retour" },
+            { "options.col_liquid", "L" },
+            { "options.col_fire", "F" },
+            { "options.col_electric", "E" },
+
+            // Wave D-2: the rules of the selected biome under the menu cards.
+            { "menu.rules_classic", "Règles classiques : les mêmes règles partout" },
+            { "menu.rules_none", "Aucune règle spéciale dans ce biome" },
+            { "menu.rules_more", "+{0}" },
+
+            // Wave D-2 (BIOME_TRAITS 2 and 7): one name and one short description per trait (Strings key trait.<Id>.name /
+            // trait.<Id>.desc, Id = the TraitId name). The descriptions take the trait's parameters (TraitText.Describe).
+            { "trait.Inertia.name", "Inertie" },
+            { "trait.Inertia.desc", "Virages plus amples" },
+            { "trait.Coalescence.name", "Coalescence" },
+            { "trait.Coalescence.desc", "Les petits trous de ton terrain se comblent" },
+            { "trait.SparkSpeed.name", "Vitesse étincelle" },
+            { "trait.SparkSpeed.desc", "Étincelle plus rapide : × {0}" },
+            { "trait.SparkSpeed.desc_slow", "Étincelle plus lente : × {0}" },
+            { "trait.Propagation.name", "Propagation" },
+            { "trait.Propagation.desc", "Ton terrain s’étend toutes les {0} s" },
+            { "trait.ScorchedEarth.name", "Terre brûlée" },
+            { "trait.ScorchedEarth.desc", "Le terrain libéré reste brûlé {0} s" },
+            { "trait.Conduction.name", "Conduction" },
+            { "trait.Conduction.desc", "+{0} % de vitesse sur ton terrain" },
+            { "trait.ArcReach.name", "Arc électrique" },
+            { "trait.ArcReach.desc", "Tu coupes de plus loin : +{0} %" },
+            { "trait.RingInterval.name", "Anneaux fréquents" },
+            { "trait.RingInterval.desc", "Un anneau lasso toutes les {0} s" },
+            { "trait.KillInheritance.name", "Héritage" },
+            { "trait.KillInheritance.desc", "Élimine un rival : son terrain est à toi" },
+            { "trait.KillInheritance.desc_share", "Élimine un rival : {0} % de son terrain" },
+            { "trait.KillSpeedBoost.name", "Élan" },
+            { "trait.KillSpeedBoost.desc", "+{0} % de vitesse par élimination (max +{1} %)" },
+            { "trait.KillShield.name", "Bouclier" },
+            { "trait.KillShield.desc", "Invincible {0} s après une élimination" },
 
             // HUD (15.3).
             { "hud.out", "éliminé" },
@@ -80,6 +128,17 @@ namespace PainterIO.Runtime
             { "toast.cut", "Tu as coupé {0} !" },
             { "toast.spark_kill", "Ton étincelle a eu {0} !" },
             { "toast.lasso_ready", "Lasso prêt !" },
+            // Wave D-2 (BIOME_TRAITS 7.2): the human's kill rewards and the compact reward chips.
+            { "toast.inherit", "Tu as pris le terrain de {0} !" },
+            { "toast.speed", "Vitesse +{0} %" },
+            { "toast.speed_max", "Vitesse max : +{0} %" },
+            { "toast.shield", "Invincible {0} s" },
+            { "toast.shield_quench", "Invincible {0} s : étincelle éteinte !" },
+            { "toast.quenched_return", "Étincelle éteinte : boucle perdue." },
+            { "hud.speed", "+{0} %" },
+            { "hud.seconds", "{0} s" },
+            // Rule v1.7 (contract 31): the conquest goal under the timer.
+            { "hud.goal", "Objectif {0}" },
 
             // Tutorial (15.4; brief section 1 verbatim, the first-cut line as changed by the user in contract 24, v1.4).
             { "hint.steer", "Glisse ton doigt pour diriger" },
@@ -96,7 +155,7 @@ namespace PainterIO.Runtime
             { "results.rank.4", "4e" },
             { "results.rank.n", "{0}e" },
             { "results.tied", "Ex æquo {0}" },
-            { "results.area_caption", "surface finale" },
+            { "results.area_caption", "territoire conquis" },
             { "results.saved", "Rentré {0} s avant l’étincelle : boucle perdue." },
             { "results.saved_close", "Sauvé de justesse : boucle perdue." },
             { "results.caught", "{0} t’a coupé : rattrapé à {1} m de chez toi." },
@@ -105,6 +164,10 @@ namespace PainterIO.Runtime
             { "results.territory_lost", "Ton dernier morceau de terrain a été pris." },
             { "results.time_up", "Temps écoulé." },
             { "results.last_survivor", "Dernier survivant !" },
+            // Rule v1.7 (contract 31): the conquest goal.
+            { "results.conquest", "Territoire conquis à 100 % !" },
+            { "results.conquest_rival", "{0} a conquis tout le territoire." },
+            { "results.time_up_winner", "Le plus grand territoire l’emporte." },
             { "results.all_eliminated", "Éliminés au même instant" },
             { "results.stats", "{0} · {1} · {2} · {3} · {4}" },
             { "results.stat.captures.one", "{0} capture" },
@@ -116,8 +179,15 @@ namespace PainterIO.Runtime
             { "results.stat.pockets.one", "{0} poche" },
             { "results.stat.pockets.other", "{0} poches" },
             { "results.tuning_modified", "réglages modifiés" },
+            // Wave D-2: kill rewards appended to the stats line when the human earned some.
+            { "results.stat.inherit.one", "{0} terrain pris" },
+            { "results.stat.inherit.other", "{0} terrains pris" },
+            { "results.stat.speed", "vitesse +{0} %" },
+            { "results.stat.shields.one", "{0} bouclier" },
+            { "results.stat.shields.other", "{0} boucliers" },
             { "results.replay", "REJOUER" },
             { "results.menu", "MENU" },
+            { "results.next_country", "PAYS SUIVANT" },
 
             // Pause and quit (15.7).
             { "pause.title", "Pause" },
@@ -173,14 +243,64 @@ namespace PainterIO.Runtime
             { "options.ring", "Ring delay" },
             { "options.factor_value", "× {0}" },
             { "options.seconds_value", "{0} s" },
+            { "options.minutes_value", "{0} min" },
             { "options.reset", "Reset" },
             { "options.close", "Close" },
+
+            { "options.biome_rules", "Biome rules" },
+            { "options.biome_rules_on", "Each biome has its own rules" },
+            { "options.classic_rules", "Classic rules" },
+            { "options.trait_matrix", "Biome traits" },
+            { "options.matrix_note", "Applies to the next round and to the menu" },
+            { "options.matrix_classic", "Classic rules are on: the matrix waits" },
+            { "options.back", "Back" },
+            { "options.col_liquid", "L" },
+            { "options.col_fire", "F" },
+            { "options.col_electric", "E" },
+
+            { "menu.rules_classic", "Classic rules: the same rules everywhere" },
+            { "menu.rules_none", "No special rule in this biome" },
+            { "menu.rules_more", "+{0}" },
+
+            { "trait.Inertia.name", "Inertia" },
+            { "trait.Inertia.desc", "Wider turns" },
+            { "trait.Coalescence.name", "Coalescence" },
+            { "trait.Coalescence.desc", "Small holes in your land fill in" },
+            { "trait.SparkSpeed.name", "Spark speed" },
+            { "trait.SparkSpeed.desc", "Faster spark: × {0}" },
+            { "trait.SparkSpeed.desc_slow", "Slower spark: × {0}" },
+            { "trait.Propagation.name", "Spread" },
+            { "trait.Propagation.desc", "Your land grows every {0} s" },
+            { "trait.ScorchedEarth.name", "Scorched earth" },
+            { "trait.ScorchedEarth.desc", "Freed land stays burnt for {0} s" },
+            { "trait.Conduction.name", "Conduction" },
+            { "trait.Conduction.desc", "+{0}% speed on your land" },
+            { "trait.ArcReach.name", "Arc reach" },
+            { "trait.ArcReach.desc", "You cut from further away: +{0}%" },
+            { "trait.RingInterval.name", "Frequent rings" },
+            { "trait.RingInterval.desc", "A lasso ring every {0} s" },
+            { "trait.KillInheritance.name", "Inheritance" },
+            { "trait.KillInheritance.desc", "Eliminate a rival: its land is yours" },
+            { "trait.KillInheritance.desc_share", "Eliminate a rival: {0}% of its land" },
+            { "trait.KillSpeedBoost.name", "Momentum" },
+            { "trait.KillSpeedBoost.desc", "+{0}% speed per elimination (max +{1}%)" },
+            { "trait.KillShield.name", "Shield" },
+            { "trait.KillShield.desc", "Invincible for {0} s after an elimination" },
 
             { "hud.out", "out" },
             { "toast.eliminated", "{0} was eliminated" },
             { "toast.cut", "You cut {0}!" },
             { "toast.spark_kill", "Your spark got {0}!" },
             { "toast.lasso_ready", "Lasso ready!" },
+            { "toast.inherit", "You took {0}'s land!" },
+            { "toast.speed", "Speed +{0}%" },
+            { "toast.speed_max", "Top speed: +{0}%" },
+            { "toast.shield", "Invincible for {0} s" },
+            { "toast.shield_quench", "Invincible for {0} s: spark out!" },
+            { "toast.quenched_return", "Spark put out: loop lost." },
+            { "hud.speed", "+{0}%" },
+            { "hud.seconds", "{0} s" },
+            { "hud.goal", "Goal {0}" },
 
             { "hint.steer", "Swipe to steer" },
             { "tut.exit", "Leave your color and come back to grow your land." },
@@ -194,7 +314,7 @@ namespace PainterIO.Runtime
             { "results.rank.4", "4th" },
             { "results.rank.n", "{0}th" },
             { "results.tied", "Tied {0}" },
-            { "results.area_caption", "final area" },
+            { "results.area_caption", "land conquered" },
             { "results.saved", "Home {0} s ahead of the spark: loop lost." },
             { "results.saved_close", "Saved by a hair: loop lost." },
             { "results.caught", "{0} cut you: caught {1} m from home." },
@@ -203,6 +323,9 @@ namespace PainterIO.Runtime
             { "results.territory_lost", "Your last piece of land was taken." },
             { "results.time_up", "Time's up." },
             { "results.last_survivor", "Last survivor!" },
+            { "results.conquest", "100% of the land conquered!" },
+            { "results.conquest_rival", "{0} conquered the whole land." },
+            { "results.time_up_winner", "The largest land wins." },
             { "results.all_eliminated", "Eliminated at the same instant" },
             { "results.stats", "{0} · {1} · {2} · {3} · {4}" },
             { "results.stat.captures.one", "{0} capture" },
@@ -214,8 +337,14 @@ namespace PainterIO.Runtime
             { "results.stat.pockets.one", "{0} pocket" },
             { "results.stat.pockets.other", "{0} pockets" },
             { "results.tuning_modified", "modified settings" },
+            { "results.stat.inherit.one", "{0} land taken" },
+            { "results.stat.inherit.other", "{0} lands taken" },
+            { "results.stat.speed", "speed +{0}%" },
+            { "results.stat.shields.one", "{0} shield" },
+            { "results.stat.shields.other", "{0} shields" },
             { "results.replay", "PLAY AGAIN" },
             { "results.menu", "MENU" },
+            { "results.next_country", "NEXT COUNTRY" },
 
             { "pause.title", "Paused" },
             { "pause.resume", "RESUME" },
@@ -360,13 +489,16 @@ namespace PainterIO.Runtime
             return FormatIn(language, "fmt.gain", Area(percent, language));
         }
 
-        /// <summary>The countdown "01:30": minutes and seconds of the remaining time, seconds rounded up.</summary>
+        /// <summary>
+        /// The countdown "15:00", "1:30", "0:07" (rule v1.7: m:ss for the 15 min rounds): minutes without padding and
+        /// seconds of the remaining time, seconds rounded up.
+        /// </summary>
         public static string Clock(double seconds)
         {
             if (double.IsNaN(seconds) || seconds < 0.0) seconds = 0.0;
             long s = (long)Math.Ceiling(seconds - 1e-6);
             if (s < 0) s = 0;
-            return (s / 60).ToString("00", CultureInfo.InvariantCulture) + ":" + (s % 60).ToString("00", CultureInfo.InvariantCulture);
+            return (s / 60).ToString(CultureInfo.InvariantCulture) + ":" + (s % 60).ToString("00", CultureInfo.InvariantCulture);
         }
 
         /// <summary>A survived duration "1:12" (minutes without padding, seconds rounded down).</summary>

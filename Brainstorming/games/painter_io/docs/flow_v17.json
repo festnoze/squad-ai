@@ -1,0 +1,69 @@
+{
+  "task": "Rule change v1.7 (designer, 2026-11-27): countries are the core of the game (no Pays button, JOUER opens the country screen) and the goal becomes conquering 100 % of the land within a 15 min cap",
+  "agent": "flow",
+  "date": "2026-11-27",
+  "contract": "docs/CONTRACT.md section 31 (header bumped to v2.0); docs/europe/PROGRESSION.md updated",
+  "files_changed": {
+    "core": [
+      "Assets/Scripts/Core/Sim/Conquest.cs (new): ConquerableMask, TargetCells, Percent, DefaultShare / DisplaySlack / LazyFloor",
+      "Assets/Scripts/Core/Sim/RoundResult.cs: RoundEndReason.Conquest = 4",
+      "Assets/Scripts/Core/Sim/Simulation.cs: ConquestCellCount, IsConquerable, ConquestTargetCells, ConquestPercent, ConquestPercentOf, internal ConquestReached (lazy cached mask); conquest check after the end-of-tick trait hook (only when a behaviour trait is attached)",
+      "Assets/Scripts/Core/Sim/EventResolver.cs: step g only (one line: Conquest after LastSurvivor / AllEliminated, before TimeUp)",
+      "Assets/Scripts/Core/World/SimConfig.cs: ConquestShare field (default Conquest.DefaultShare = 1.0)",
+      "Assets/Scripts/Core/World/Tuning.cs: comments only (RoundDuration stays 90; no new constant, the Tuning mirror test expects 27)",
+      "Assets/Scripts/Core/World/ArenaPolygon.cs: StopBeforeBorder minimum step 1e-4 -> MinBorderStep 0.01 (see decisions); another agent later added a border ride (Follow, contract 33) in the same file and kept this constant"
+    ],
+    "runtime": [
+      "Assets/Scripts/Runtime/UI/MenuScreen.cs: Pays button removed, Options centered, JOUER -> UiRoot.OpenEurope",
+      "Assets/Scripts/Runtime/UI/ResultsScreen.cs: PAYS SUIVANT (main, GameDirector.ToCountryScreen) + REJOUER (same country), conquest cause lines, time-up WHY line",
+      "Assets/Scripts/Runtime/UI/Hud.cs: every percentage = ConquestPercent (labels, leaderboard, capture gains), goal bar under the human label, 'Objectif 100 %' under the timer",
+      "Assets/Scripts/Runtime/UI/SettingsPanel.cs: round time shown in minutes (RoundValueText)",
+      "Assets/Scripts/Runtime/Game/GameDirector.cs: ToCountryScreen, SelectedCountry, HumanOutcome.AreaPercent = conquest percentage, HumanOutcome.Winner",
+      "Assets/Scripts/Runtime/Game/SaveData.cs: RoundSecondsChoices 300/600/900, DefaultRoundSeconds 900, MigrateRoundSeconds, TuningModified and ResetTestSettings against 900",
+      "Assets/Scripts/Runtime/Game/GameSession.cs: -roundDuration clamp [5, 900]",
+      "Assets/Scripts/Runtime/Game/Strings.cs: options.minutes_value, hud.goal, results.conquest, results.conquest_rival, results.time_up_winner, results.next_country (FR + EN), results.area_caption 'territoire conquis' / 'land conquered', Clock m:ss",
+      "Assets/Scripts/Runtime/Game/EuropeProgress.cs: doc comment of IsCountedWin (logic unchanged)",
+      "Assets/Scripts/Runtime/Input/SteeringInput.cs: Escape / back on the results -> ToCountryScreen"
+    ],
+    "tests": [
+      "Assets/Tests/EditMode/Core/ConquestTests.cs (new, 8 tests, also in the dotnet loop)",
+      "Assets/Tests/EditMode/Runtime/FlowV17Tests.cs (new, 6 tests)",
+      "Assets/Tests/EditMode/Runtime/EuropeLevelsTests.cs: EveryCountryHasAReachableConquestGoal",
+      "Assets/Tests/EditMode/Runtime/UiStringsTests.cs: clock expectations m:ss",
+      "Assets/Tests/PlayMode/EuropeMenuTests.cs: no Pays button, JOUER opens the countries, 900 s country round, REJOUER keeps the country, PAYS SUIVANT shows the country screen over the attract match"
+    ],
+    "docs": ["docs/CONTRACT.md (section 31, header v2.0)", "docs/europe/PROGRESSION.md", "docs/flow_v17.json"]
+  },
+  "decisions": [
+    "Reachability: strict 100 % of ArenaCellCount is NOT reachable. A head center never leaves {SignedDistance <= -ArenaMargin} and CaptureSolver seeds every Void cell and the box border, so the cells between the inset line and the rim are outside for every capture: 7 412 of 256 652 cells (2.89 %) on the square arena. Pieces of a country beyond a neck narrower than 2 x ArenaMargin are unreachable too.",
+    "Goal definition: denominator = conquerable cells (Conquest.ConquerableMask: head cells = arena cells whose center is in the inset shape and in a 4-connected piece holding a player position; non-head cells joined to the Void / grid border through non-head cells are out). Threshold = ceil(C x (min(ConquestShare,1) - 0.005)): met exactly when the HUD (whole percents from 10 %) reads the goal, i.e. '100 %' from 99.5 %. The slack absorbs cut corners, stair notches and v1.5/v1.6 specks, and lets a rival alive on a speck under 0.5 % not block the win.",
+    "Percentage shown everywhere = Simulation.ConquestPercent = 100 x min(owned, C) / C (HUD labels, leaderboard, '+x %' gains, results, best score, Europe-independent). The numerator counts every owned cell, including rim cells a trail crossed just outside the mask (about 0.6 % of C after a full rim tour), clamped at 100 %: a per-player masked count would need a full grid scan per frame. AreaPercent (R20, over ArenaCellCount) is unchanged for the Core and the bots.",
+    "Proof: ConquestTests ends rounds by Conquest with scripted rim tours on the square arena (t = 49.6 s, 99.60 %), with a rival alive on a 0.23 % speck (ends by Conquest, rival rank 2), and on a non-convex polygon with a 0.6 u neck (t = 42.3 s, 99.91 %; the 4 320-cell piece beyond the neck is excluded). With the goal off, a full tour leaves 72 of 249 240 (square) and 132 of 108 237 (polygon) conquerable cells unowned. All 46 Europe levels keep at least 70.8 % of their arena cells conquerable (smallest: NO).",
+    "ArenaPolygon fix found by the proof: a head sliding along a country border advanced 48 x 1e-4 u per tick (about 0.3 u/s instead of 6 u/s), so the rim of a country could hardly be painted by a human pushing on it. MinBorderStep = 0.01 u (still far below the 0.9 u a step would need to skip an inlet; a step leaving the inset shape is still refused). Not touched: the square arena (classic and probe hashes unchanged). This changes country-round motion for humans and bots (better).",
+    "Mask cost: built lazily and cached; the round end check builds it only once a living player owns 0.5 x 0.995 of the arena cells (sound because every level keeps > 0.5 conquerable, tested); the HUD reads a percentage at round start, so country rounds build it during the ready gate: up to 110 ms (IE) in the editor.",
+    "Round end order kept: last survivor (n >= 2) wins at once, then all eliminated, then Conquest, then TimeUp (largest land, ties shared). In 4-player rounds a full conquest usually eliminates everyone first, so most conquest wins still read 'Dernier survivant !'; Conquest fires when rivals survive on specks, in single-player rounds, or with a lower ConquestShare.",
+    "Round time: Tuning.RoundDuration stays 90 (Core tests and bot rounds); the runtime sets 900 through SaveData (choices 5/10/15 min, default 15). The round time is still a hidden test setting: 5 or 10 min marks the round as 'réglages modifiés' (no stats, no Europe win), 15 min does not. A saved value below 300 s (60/90/120) reads as 900. -roundDuration now clamps to [5, 900].",
+    "Results: main button 'PAYS SUIVANT' always goes to the country screen (also for a loss, per 'dans tous les cas'); 'REJOUER' replays the same country; Escape on the results does the same as PAYS SUIVANT. The pause panel MENU button still goes to the main menu (abandon).",
+    "First launch: the current flow never starts a tutorial round by itself (boot -> menu over the attract match), so nothing changed: JOUER opens the country screen with France (the only playable country) selected, and the tutorial bubbles run in that first France round.",
+    "Square arena: still reachable through GameDirector.StartRound() with no country, StartCountry(null), the probe, DevShot, TraitFxLab / RenderLab and tests. The attract match is unchanged (square, 90 s).",
+    "Europe win counting: unchanged rule (rank 1, shared included), which covers Conquest, LastSurvivor and first at TimeUp; now asserted per reason (FlowV17Tests).",
+    "The HUD timer reads m:ss ('15:00', '9:59', '0:07') instead of mm:ss."
+  ],
+  "tests": {
+    "core_dotnet_full": "NOT VERIFIED for the final state: the last full run was stopped on the coordinator's instruction. Last complete full run (before the constant move): 626 tests, 614 passed, 5 failed (see attribution). Final state: dotnet build of tools/CoreTests compiles with 0 errors, 0 warnings.",
+    "core_dotnet_conquest": "ConquestTests 8/8 passed",
+    "core_dotnet_attribution": "An intermediate full run (626 tests) had 5 failures: SimConfig_DefaultsMirrorEveryTuningConstant was mine (Tuning conquest constants, moved to Conquest) and is fixed; R18_PocketCellsClaimedByASimultaneousReturnKeepTheirPreviousOwner, Determinism_RoamingFuzz..., V14_Fuzz_BotRounds..., KillAudit_1_Classic... came from the other agent's work in progress: rerun right after, all 5 pass with the conquest goal on (and with it off).",
+    "unity_setup": "tools/verify.ps1 -Steps setup -Agent flow: PASS, no compile error, ShaderCheck 13 shaders 0 failure (this run rewrote docs/verify_last.txt)",
+    "unity_editmode": "Relevant filter (FlowV17Tests|EuropeLevelsTests|EuropeProgressTests|EuropeProgressionTests|UiStringsTests|WaveC_UiTests|WaveC_GameFlowTests|WaveD_TraitsInfraTests|WaveD_TraitsUiTests|RuntimeSkeletonTests|ConquestTests): 103 tests, 0 failures (TestResults/flow-edit2.xml, after the constant move)",
+    "unity_playmode": "EuropeMenuTests|BootTests: 5 tests, 0 failures, 0 errors (TestResults/flow-play.xml)"
+  },
+  "not_verified": [
+    "Per the coordinator's late instruction, treat everything as not verified: the full Core suite was not rerun on the final code (only compiled), and the WaveC_Composites_KeepTheirFetchCount known failure was not rechecked.",
+    "No player build was made (none into Build/Windows, Build/Play, Build/Android or Build/flow): the flow was checked in PlayMode tests only, not by eye in a player; the HUD goal bar and caption layout were not looked at on screen (portrait 9:16 and tall phones).",
+    "A real human conquest win end to end in a player (covered by Core scripted rounds and by the outcome / win-hook tests).",
+    "Probe, probe-fire/electric and traits steps of verify.ps1 were not run (they need a Build/Windows player); the probe hash comes from DemoScenario (square arena, 90 s, unchanged code path) so it should be unchanged.",
+    "Full Unity EditMode and PlayMode suites were not run, only the relevant filters listed above.",
+    "Android (touch flow, hitch of up to about 110 ms when the conquest mask is built at country round start on a slower device).",
+    "Bots in 900 s country rounds were not watched for a full 15 minutes (their logic only reads RoundDuration near the end, unchanged code)."
+  ]
+}

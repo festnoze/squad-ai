@@ -10,6 +10,10 @@
 // voices (AddDrivenVoice: asymmetric tanh, drive 2.5) and the splat gets a mid splash; the lose jingle is doubled an octave
 // up with richer partials and a little more drive, as loud as the win jingle on a phone. Every clip loses at most 4 dB
 // through a 400 Hz 24 dB/oct high-pass (WaveC_AudioTests).
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md sections 5 and 7): GrowCreep is the liquid set's optional Grow clip (the
+// human's own Propagation growth, played softly at -18 dB); KillInherit (inherit swell), SpeedUp (speed-up zip) and
+// ShieldShimmer (shield shimmer) are the shared cues of the human's kill rewards. Same rules: no bass-only body, every
+// one-shot ends on an exact zero.
 using System;
 using UnityEngine;
 
@@ -32,6 +36,10 @@ namespace PainterIO.Runtime
         WinJingle = 11,
         LoseJingle = 12,
         LoopLost = 13,
+        GrowCreep = 14,       // wave D-2: liquid ISfxClipSet.Grow (a biome slot)
+        KillInherit = 15,     // wave D-2: KillInheritance reward of the human (shared)
+        SpeedUp = 16,         // wave D-2: KillSpeedBoost reward of the human (shared)
+        ShieldShimmer = 17,   // wave D-2: KillShield reward of the human (shared; also its soft end, pitched down)
     }
 
     public static class SfxSynth
@@ -40,7 +48,7 @@ namespace PainterIO.Runtime
         public const int SampleRate = 44100;
 
         /// <summary>Number of SfxId values.</summary>
-        public const int ClipCount = 14;
+        public const int ClipCount = 18;
 
         /// <summary>Every clip is normalized to this absolute peak.</summary>
         public const float PeakTarget = 0.89f;
@@ -80,6 +88,10 @@ namespace PainterIO.Runtime
             1.50,               // WinJingle
             1.40,               // LoseJingle
             0.62,               // LoopLost
+            0.60,               // GrowCreep
+            0.72,               // KillInherit
+            0.36,               // SpeedUp
+            0.80,               // ShieldShimmer
         };
 
         /// <summary>Duration of a clip in seconds.</summary>
@@ -120,6 +132,10 @@ namespace PainterIO.Runtime
                 case SfxId.WinJingle: return WinJingle(b);
                 case SfxId.LoseJingle: return LoseJingle(b);
                 case SfxId.LoopLost: return LoopLost(b);
+                case SfxId.GrowCreep: return GrowCreep(b);
+                case SfxId.KillInherit: return KillInherit(b);
+                case SfxId.SpeedUp: return SpeedUp(b);
+                case SfxId.ShieldShimmer: return ShieldShimmer(b);
                 default: throw new ArgumentOutOfRangeException(nameof(id), id, "unknown clip");
             }
         }
@@ -439,6 +455,127 @@ namespace PainterIO.Runtime
             }
             LowPass(b, 6000, false);
             return Finish(b, 0.12, 0.6, false);
+        }
+
+        // Grow (wave D-2, the liquid set's optional Grow clip): the puddle creeps outward. A slow, soft swell of
+        // band-passed noise drifting up (a wet surface spreading) with a few tiny bubbles rising through it. Played at
+        // -18 dB, so it stays a texture under the game.
+        private static float[] GrowCreep(double[] b)
+        {
+            int n = b.Length;
+            double dur = (double)n / SampleRate;
+            var noise = new NoiseSource(0x6A0C3UL);
+            var band = new Svf();
+            var band2 = new Svf();
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / SampleRate;
+                double env = SwellEnvelope(t, 0.22, dur);
+                double x = noise.Next();
+                band.Process(x, 1100.0 * Math.Pow(2.0, t / dur), 2.2, out _, out double bp, out _);
+                band2.Process(x, 2600.0 + 600.0 * t / dur, 3.0, out _, out double bp2, out _);
+                b[i] += env * (0.9 * bp + 0.35 * bp2);
+            }
+            var rnd = new NoiseSource(0x6A0C4UL);
+            for (int d = 0; d < 9; d++)
+            {
+                double at = 0.04 + 0.42 * Unit(rnd);
+                double f0 = 800.0 + 700.0 * Unit(rnd);
+                AddVoice(b, at, f0, f0 * 1.6, 0.02, 0.0015, 0.018 + 0.012 * Unit(rnd), 0.18 * SwellEnvelope(at, 0.22, dur));
+            }
+            LowPass(b, 5200, false);
+            return Finish(b, 0.08, 0.4, false);
+        }
+
+        // Inherit swell (wave D-2, KillInheritance): the rival's land pours into yours. A broad noise whoosh sweeping up
+        // under a bright major chord that glides up a fourth while it swells, crowned by a glossy two-note sparkle.
+        private static float[] KillInherit(double[] b)
+        {
+            int n = b.Length;
+            double dur = (double)n / SampleRate;
+            var noise = new NoiseSource(0x14E21UL);
+            var band = new Svf();
+            double[] freqs = { 523.25, 659.25, 783.99, 1046.5 };
+            double[] amps = { 0.20, 0.18, 0.16, 0.10 };
+            var phases = new double[freqs.Length];
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / SampleRate;
+                double env = SwellEnvelope(t, 0.30, dur);
+                double fc = 600.0 * Math.Pow(3400.0 / 600.0, Math.Min(1.0, t / 0.5));
+                band.Process(noise.Next(), fc, 1.1, out _, out double bp, out _);
+                double glide = 1.0 + 0.335 * (1.0 - Math.Exp(-t / 0.18));
+                double pad = 0.0;
+                for (int k = 0; k < freqs.Length; k++)
+                {
+                    phases[k] += TwoPi * freqs[k] * glide / SampleRate;
+                    pad += amps[k] * Math.Sin(phases[k]);
+                }
+                b[i] = env * (0.5 * bp + pad);
+            }
+            AddBell(b, 0.30, 2093.0, 0.22, 0.18);
+            AddBell(b, 0.38, 2793.8, 0.18, 0.16);
+            LowPass(b, 8000, false);
+            return Finish(b, 0.10, 0.5, false);
+        }
+
+        // Speed-up zip (wave D-2, KillSpeedBoost): a quick upward zip (a gliding tone with its octave, over band noise
+        // sweeping up) ending in a short bright tick.
+        private static float[] SpeedUp(double[] b)
+        {
+            int n = b.Length;
+            const double sweep = 0.22;
+            var noise = new NoiseSource(0x5BEEDUL);
+            var band = new Svf();
+            double phase = 0.0;
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / SampleRate;
+                double u = Math.Min(1.0, t / sweep);
+                double f = 560.0 * Math.Pow(2600.0 / 560.0, u * u);
+                phase += TwoPi * f / SampleRate;
+                double env;
+                if (t < 0.015) env = 0.5 - 0.5 * Math.Cos(Math.PI * t / 0.015);
+                else if (t < sweep) env = 0.7 + 0.3 * u;
+                else env = Math.Exp(-(t - sweep) / 0.035);
+                band.Process(noise.Next(), 1800.0 + 4200.0 * u, 1.6, out _, out double bp, out _);
+                b[i] += env * (0.42 * Math.Sin(phase) + 0.16 * Math.Sin(2.0 * phase) + 0.35 * bp);
+            }
+            AddVoice(b, sweep - 0.005, 2400, 3100, 0.01, 0.0008, 0.02, 0.5, 2.0, 0.15, 0.5);
+            LowPass(b, 9000, false);
+            return Finish(b, 0.04, 0.8, false);
+        }
+
+        // Shield shimmer (wave D-2, KillShield): a glossy glass film closing around the pearl. Three detuned high partials
+        // (G6, C7, E7) with a slow vibrato and a 14 Hz amplitude shimmer, a soft breathy band of noise, a gentle swell
+        // in and a long fade. Sfx plays it pitched down and softer when the shield ends.
+        private static float[] ShieldShimmer(double[] b)
+        {
+            int n = b.Length;
+            double dur = (double)n / SampleRate;
+            double[] freqs = { 1567.98, 2093.0, 2637.0, 1571.5 };
+            double[] amps = { 0.30, 0.24, 0.16, 0.20 };
+            double[] rates = { 5.1, 6.3, 7.4, 5.7 };
+            var phases = new double[freqs.Length];
+            var noise = new NoiseSource(0x541E1DUL);
+            var band = new Svf();
+            for (int i = 0; i < n; i++)
+            {
+                double t = (double)i / SampleRate;
+                double env = t < 0.07 ? Math.Pow(Math.Sin(0.5 * Math.PI * t / 0.07), 2.0) : Math.Exp(-(t - 0.07) / 0.28);
+                double shimmer = 0.72 + 0.28 * Math.Sin(TwoPi * 14.0 * t);
+                double tone = 0.0;
+                for (int k = 0; k < freqs.Length; k++)
+                {
+                    phases[k] += TwoPi * freqs[k] * (1.0 + 0.004 * Math.Sin(TwoPi * rates[k] * t)) / SampleRate;
+                    tone += amps[k] * Math.Sin(phases[k]);
+                }
+                band.Process(noise.Next(), 5200.0 - 1400.0 * t / dur, 2.4, out _, out double bp, out _);
+                b[i] += env * (shimmer * tone + 0.22 * bp);
+            }
+            AddVoice(b, 0.0, 900, 1800, 0.05, 0.002, 0.04, 0.35, 2.0, 0.12, 0.5);
+            LowPass(b, 9000, false);
+            return Finish(b, 0.15, 0.3, false);
         }
         // ------------------------------------------------------------------------------------------------------------
         // DSP helpers.

@@ -1504,5 +1504,13 @@ namespace OutOfSight.Core
         public const float SfxStarChimeVolume = 0.5f;
         public const float SfxStarChimeFinalVolume = 0.6f;
         public const float SfxStarDullVolume = 0.35f;
+
+        // ----- CONFETTI (2026-11-27, docs/next/progress/STARSANIM.md "Confetti"): the three star shower (WinConfettiView). -----
+        /// <summary>The confetti pieces of the shower (pooled, built once): three quarters from the two bottom cannons, the rest from the top edge.</summary>
+        public const int ConfettiPieces = 96;
+        /// <summary>The share of <see cref="ConfettiPieces"/> fired by the two bottom corner cannons (the rest rains from the top edge).</summary>
+        public const float ConfettiCannonShare = 0.75f;
+        /// <summary>The party popper's synthesized volume (times Sfx's mix scale): under the third star's chord it rings with.</summary>
+        public const float SfxConfettiPopVolume = 0.42f;
     }
 }

@@ -1,0 +1,73 @@
+{
+  "task": "Rule v1.9 border ride: after 1 s of continuous contact with the arena boundary the head rides it at x3 and follows it around every corner without new input",
+  "date": "2026-11-27",
+  "agent": "ride",
+  "contract": "docs/CONTRACT.md section 33",
+  "files": {
+    "added": [
+      "Assets/Scripts/Core/Sim/BorderRide.cs (motion of one player with the rule on: contact, trigger, ride, end rules)",
+      "Assets/Tests/EditMode/Core/BorderRideTests.cs"
+    ],
+    "changed": [
+      "Assets/Scripts/Core/World/SimConfig.cs (BorderRideRule enum, BorderRide = Off, BorderRideFactor = 3.0, BorderRideDelay = 1.0)",
+      "Assets/Scripts/Core/Sim/PlayerState.cs (BorderContactStart, BorderRiding, BorderRideSign, BorderRideInput, BorderRideStart)",
+      "Assets/Scripts/Core/World/Arena.cs (FollowBorder, RideSubStep, RideMaxSubSteps)",
+      "Assets/Scripts/Core/World/ArenaPolygon.cs (Follow, active-edge riding tangent, projection onto the inset line)",
+      "Assets/Scripts/Core/Sim/EventResolver.cs (BeginTick: BorderRide.Move instead of Arena.Step when On; EndTick: ride end on spark or elimination)",
+      "Assets/Scripts/Core/Sim/Simulation.cs (HeadGrace check includes BorderRideFactor when On; StateHash hashes the ride state only when On)",
+      "Assets/Scripts/Core/Sim/SimView.cs (IsBorderRiding, BorderRideStartTime, EffectiveSpeed includes the ride factor)",
+      "Assets/Scripts/Runtime/Game/GameSession.cs (one line in RoundConfig: BorderRide = On for real rounds)",
+      "Assets/Scripts/Runtime/Actors/TraitFxView.cs (riding cue: the Conduction streak, 80 % longer, tinted toward neon yellow)",
+      "Assets/Scripts/Runtime/Probe/EuropeShot.cs (new plan 'ride': France round, fixed slanted push into the nearest border, two shots and '[EuropeShot] ride' log lines)",
+      "Assets/Tests/EditMode/Core/BotTests.cs (optional borderRide parameter of RunRound / RunSeeds, default false)",
+      "docs/CONTRACT.md (section 33)"
+    ]
+  },
+  "decisions": [
+    "Core default Off (every pinned hash and the probe hash keep their values); the game turns it On in GameSession.RoundConfig. The attract round and the probe DemoScenario stay Off.",
+    "BorderRideFactor and BorderRideDelay are SimConfig fields with literal defaults, not Tuning constants (SimConfig_DefaultsMirrorEveryTuningConstant counts Tuning constants).",
+    "Contact = the R4 step was constrained (slide or hold) or the step ends within 0.02 u of the inset line. Contact start = exact instant the straight path reaches that tolerance (bisection), so it does not depend on the tick rate.",
+    "The ride starts at contact start + delay inside the tick (normal motion before, ride after). A held head (pushing within the hold angle) rides too; direction = side the desired heading leans to, +OutwardNormal.Perp() when straight in (|component| < 1e-9).",
+    "New input = desired heading more than 20 degrees from the one the ride last accepted (joystick wobble tolerance). A new input pointing inward by more than BorderHoldAngle from the tangent ends the ride; a new input along the border the other way reverses it.",
+    "Auto-follow: sub-steps of at most 0.05 u. Classic square: tangent step projected back onto the convex inset rounded box. Polygon: tangent of the active edge that pushes least into the other active edges (turns at convex vertices instead of being held), arc of radius margin around reflex vertices; result always inside the inset shape. Less than 20 % progress in a tick (dead end) ends the ride.",
+    "La Revanche: no ride and no contact time while chased. A spark that appears mid-tick ends the ride from the next tick (the rest of the cut tick, at most 1/TickRate s, was already planned at ride speed: changing a tick's target mid event loop would break the precomputed visit lists). Spark speed unchanged. SparkCatchEta and the bot escape math stay exact for chased players because they never ride.",
+    "Within a tick the motion stays the straight segment from start to target: a corner rounded in one tick is drawn as its chord.",
+    "Feedback: TraitFxView streak only; no sound (a new SimEventType would break the event count test and touch more shared files)."
+  ],
+  "tests": {
+    "written": [
+      "BorderRide_StartsAfterExactlyOneSecondOfContactAndNotBefore",
+      "BorderRide_RidesAtThreeTimesTheSpeedAlongTheBorder",
+      "BorderRide_CrossRate_SameOutcomesAndSameRideInstantAt30_60_144Hz (outcomes and ride instant across rates, StateHash determinism within one rate as per contract 10.0 item 3)",
+      "BorderRide_EndsWhenThePlayerSteersInward",
+      "BorderRide_SmallJoystickWobbleIsNotANewInput",
+      "BorderRide_NoBoostWhileChased",
+      "BorderRide_ASparkEndsTheRideAtOnce",
+      "BorderRide_FollowsTheRoundedCornerOfTheSquareWithoutInput",
+      "BorderRide_TurnsAtConvexPolygonVerticesWithoutInput",
+      "BorderRide_WrapsAroundAReflexPolygonVertexWithoutInput",
+      "BorderRide_OffIgnoresEveryRideParameter",
+      "BorderRide_SeededBotOnlyRoundsStillMeetSection9Targets (dotnet only, lasso on and off)",
+      "BorderRide_BotRoundsReport (dotnet only, information)"
+    ],
+    "runs_before_the_stop_order": {
+      "note": "These runs happened before the coordinator asked to stop running tests; nothing was re-run after the last edits (EuropeShot ride plan, TraitFxView cue, the contract text).",
+      "dotnet_border_ride_tests": "11 / 11 passed (the 11 non-bot tests)",
+      "dotnet_bot_section9_with_ride": "2 / 2 passed, identical metrics to the ride-off rounds; 10 bot rounds: 0 contact ticks, 0 rides (bots never come within 0.02 u of the border)",
+      "dotnet_baseline_before_changes": "619 run, 616 passed, 3 failed (KillAudit_1, SimConfig_DefaultsMirrorEveryTuningConstant, V14_Fuzz): pre-existing, other agents' work in progress",
+      "full_core_suite_with_ride": "started, stopped on the coordinator's order: no result",
+      "unity_setup_and_editmode": "setup PASS (ShaderCheck 13 shaders, 0 failures); EditMode 822 tests, 0 failures, 7 skipped (run before the TraitFxView and EuropeShot edits)",
+      "player_build": "Build/ride built, then deleted without shots (coordinator order)"
+    }
+  },
+  "not_verified": [
+    "EVERYTHING below is marked not verified per the coordinator's instruction",
+    "the last edits (TraitFxView riding cue, EuropeShot 'ride' plan) were not compiled after the last change by Unity (the Core part compiled in dotnet and Unity before)",
+    "the full Core suite and the PlayMode suite with the final code",
+    "the ride in a built player: no shot, no log (run tools/europe_shots.ps1 -Plan ride to get '<biome>_ride_fr_start/follow.png' and '[EuropeShot] ride' lines)",
+    "the riding cue on screen (streak tint and length) and its luma under the 235 cap",
+    "feel on a phone: 20 degree input tolerance, x3 speed on country outlines with many small edges, chords on sharp corners",
+    "performance of ArenaPolygon.Follow on the largest country outlines (one pass over the edges plus up to 7 distance queries per 0.05 u sub-step)",
+    "the probe hash 246577239DE179C4 with the final build (expected unchanged: DemoScenario keeps the rule Off)"
+  ]
+}

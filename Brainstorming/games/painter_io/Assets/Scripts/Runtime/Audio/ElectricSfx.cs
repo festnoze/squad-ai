@@ -8,6 +8,7 @@
 // Wave C (audio package): Synthesize / BuildSlot of ISplitSfxClipSet (worker-thread synthesis, robust-03), and feel-04: the
 // return thunk is driven harder with a 2 kHz contact click, and the ambience is a 120 Hz buzz with 240 to 960 Hz partials,
 // so a phone speaker plays them (at most 4 dB lost for a one-shot, 6 dB for a loop).
+// Wave D-2 (traits-infra): the optional Grow slot (Clip.Creep): a soft crawl of small crackles over a faint buzz.
 using System;
 using UnityEngine;
 
@@ -16,7 +17,7 @@ namespace PainterIO.Runtime
     public class ElectricSfx : LiquidSfx
     {
         /// <summary>The clips of the electric set (ElectricSfx.Synthesize).</summary>
-        public enum Clip { Exit = 0, Return = 1, Fill = 2, Cut = 3, TensionLoop = 4, Caught = 5, LoopLost = 6, Ambient = 7 }
+        public enum Clip { Exit = 0, Return = 1, Fill = 2, Cut = 3, TensionLoop = 4, Caught = 5, LoopLost = 6, Ambient = 7, Creep = 8 }
 
         /// <summary>Length of the seamless tension loop (every tonal component is a multiple of 2 Hz).</summary>
         public const double TensionLoopSeconds = 0.5;
@@ -27,22 +28,22 @@ namespace PainterIO.Runtime
         /// <summary>Peak of the ambience loop (softer than the one-shots; Sfx also plays it at Sfx.AmbientVolume).</summary>
         public const float AmbientPeak = 0.6f;
 
-        private static readonly double[] Durations = { 0.14, 0.30, 0.48, 0.22, TensionLoopSeconds, 0.65, 0.62, AmbientLoopSeconds };
+        private static readonly double[] Durations = { 0.14, 0.30, 0.48, 0.22, TensionLoopSeconds, 0.65, 0.62, AmbientLoopSeconds, 0.56 };
 
         private const double TwoPi = 2.0 * Math.PI;
 
         public override BiomeId Biome => BiomeId.Electric;
 
         /// <summary>
-        /// The samples of the eight electric clips (pure C#, thread-safe; slot k is Clip k). LiquidSfx.Build makes the
-        /// clips from them (a clip that fails stays null and is logged; the others still play).
+        /// The samples of the nine electric clips (the eight base slots and Grow; pure C#, thread-safe; slot k is Clip
+        /// k). LiquidSfx.Build makes the clips from them (a clip that fails stays null and is logged; the others still play).
         /// </summary>
         public override SfxClipSamples Synthesize(int sampleRate)
         {
             int rate = sampleRate > 8000 ? sampleRate : SfxSynth.SampleRate;
             var samples = new SfxClipSamples(BiomeId.Electric, rate);
             System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
-            for (int k = 0; k < SfxClipSamples.SlotCount; k++)
+            for (int k = 0; k < SfxClipSamples.AllSlotCount; k++)
             {
                 try
                 {
@@ -92,6 +93,7 @@ namespace PainterIO.Runtime
                 case Clip.Caught: return s.CaughtDischarge(b);
                 case Clip.LoopLost: return s.LoopLostFizzle(b);
                 case Clip.Ambient: return s.AmbientHum(b);
+                case Clip.Creep: return s.GrowCreep(b);
                 default: throw new ArgumentOutOfRangeException(nameof(clip), clip, "unknown clip");
             }
         }
@@ -278,6 +280,29 @@ namespace PainterIO.Runtime
                 }
                 LowPass(b, 4000, true);
                 return Finish(b, 0.0, 0.0, true, AmbientPeak);
+            }
+
+            // Grow (wave D-2, the optional Grow slot): the charge crawls outward over new ground. A swelling crawl of small
+            // crackles (dense in the middle) over a faint 240 Hz buzz whose partials a phone plays, and a thin rising whine.
+            // Played at -18 dB under the game.
+            public float[] GrowCreep(double[] b)
+            {
+                int n = b.Length;
+                double dur = (double)n / rate;
+                var crackle = new double[n];
+                AddCrackle(crackle, 0.02, 0.46, 46, 0x6C3E9UL, 0.8, 3600, 1.5);
+                double phase = 0.0, whine = 0.0;
+                for (int i = 0; i < n; i++)
+                {
+                    double t = (double)i / rate;
+                    double env = Swell(t, 0.22, dur);
+                    phase += TwoPi * 240.0 / rate;
+                    whine += TwoPi * (1400.0 + 500.0 * t / dur) / rate;
+                    double buzz = Harmonics(phase, 9) * 0.22;
+                    b[i] += env * (buzz + 0.07 * Math.Sin(whine)) + crackle[i] * (0.35 + 0.65 * env);
+                }
+                LowPass(b, 7000, false);
+                return Finish(b, 0.08, 1.2, false, SfxSynth.PeakTarget);
             }
 
             // ---------------------------------------------------------------------------------------------------------

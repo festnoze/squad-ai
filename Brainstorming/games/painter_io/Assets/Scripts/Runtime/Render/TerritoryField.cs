@@ -27,6 +27,18 @@
 // crackle). Both share a rolling epoch (rebased every RevealRebaseSeconds) so half precision stays finer than 1/60 s:
 // only the difference _PIO_Now - reveal is meaningful. The fill of a capture lasts BiomeTheme.Current.FillDuration
 // (taken when the wave starts).
+//
+// Biome traits (wave D-2 traits-fx, docs/BIOME_TRAITS.md sections 5 and 7.2; generic, never tests the biome):
+// - TerritoryGrew (Propagation): the grown ring is revealed like a slow fill from the territory edge, in GrowSteps
+//   angular steps over GrowSeconds (the edge creeps around each territory, a few re-blurs instead of one per frame), with
+//   reveal times, and the per-player envelope _PIO_GrowPulse drives each composite's soft edge accent. A one-cell ring
+//   never triggers a composite's capture front (its gates read cells deeper inside), so growth never looks like a capture.
+// - TerritoryInherited (KillInheritance): the victim's land first starts its own evaporation (the Eliminated event), then
+//   after InheritDelaySeconds a fill wave in the killer's color sweeps over it from the kill point at InheritSweepSpeed,
+//   so every biome's own capture front (fire flames, electric discharge, liquid ripple) crosses the land it takes.
+// - ScorchedEarth: the scorch level of each freed cell (SimView.ScorchEndTime) is the G channel of _PIO_RevealTime (an RG
+//   texture): it fades in with the evaporation of the eliminated land, holds, fades out over the last ScorchFadeSeconds and
+//   leaves a cell when a capture wave reveals it. _PIO_ScorchOn is 1 while any cell is scorched.
 using System;
 using System.Collections.Generic;
 using PainterIO.Core;
@@ -67,6 +79,28 @@ namespace PainterIO.Runtime
         /// </summary>
         public const int DomeGrowCells = 32;
 
+        /// <summary>Wave D-2: seconds a Propagation ring takes to creep around a territory (well below the 4 s interval).</summary>
+        public const float GrowSeconds = 1.2f;
+        /// <summary>Wave D-2: angular steps of that creep (one territory re-blur per step).</summary>
+        public const int GrowSteps = 6;
+        /// <summary>Wave D-2: rise and total length of the _PIO_GrowPulse envelope (seconds).</summary>
+        public const float GrowPulseRise = 0.15f;
+        public const float GrowPulseSeconds = 1.4f;
+        /// <summary>Wave D-2: grown cells for a full-strength _PIO_GrowPulse (fewer cells give a weaker accent).</summary>
+        public const int GrowPulseFullCells = 48;
+        /// <summary>Wave D-2: seconds between the kill and the start of the killer's sweep over the inherited land.</summary>
+        public const float InheritDelaySeconds = 0.25f;
+        /// <summary>Wave D-2: speed (u/s) of the inherited sweep, and the bounds of its duration (seconds).</summary>
+        public const float InheritSweepSpeed = 15f;
+        public const float InheritMinSeconds = 0.45f;
+        public const float InheritMaxSeconds = 1.5f;
+        /// <summary>Wave D-2: a scorched cell fades out over the last ScorchFadeSeconds of its scorch (BIOME_TRAITS 5).</summary>
+        public const float ScorchFadeSeconds = 2f;
+        /// <summary>Wave D-2: the scorch fades in over this time after the elimination (with the evaporation of the land).</summary>
+        public const float ScorchFadeInSeconds = 0.6f;
+        /// <summary>Wave D-2: the scorch levels are refreshed at most this often (seconds of visual time).</summary>
+        public const float ScorchRefreshSeconds = 1f / 30f;
+
         /// <summary>FillDuration of the current biome (Liquid 0.35, Fire 0.60, Electric 0.25 s).</summary>
         public static float CurrentFillDuration
         {
@@ -102,6 +136,8 @@ namespace PainterIO.Runtime
         private static readonly int IdNow = Shader.PropertyToID("_PIO_Now");
         private static readonly int IdDome = Shader.PropertyToID("_PIO_TerritoryDome");
         private static readonly int IdDomeTexel = Shader.PropertyToID("_PIO_TerritoryDomeTexel");
+        private static readonly int IdScorchOn = Shader.PropertyToID("_PIO_ScorchOn");
+        private static readonly int IdGrowPulse = Shader.PropertyToID("_PIO_GrowPulse");
 
         private sealed class Wave
         {
@@ -127,10 +163,20 @@ namespace PainterIO.Runtime
         private Texture2D visualMask;
         private Texture2D pocketMask;
         private Texture2D revealTex;
-        private bool revealHalf;             // R16_SFloat (else R32_SFloat)
+        private bool revealHalf;             // R16G16_SFloat (else R32G32_SFloat); R = reveal time, G = scorch level
         private float[] reveal;              // CPU copy of the reveal times (relative to revealEpoch)
-        private NativeArray<ushort> revealPxHalf;
-        private NativeArray<float> revealPxFloat;
+        private NativeArray<ushort> revealPxHalf;   // two halves per texel
+        private NativeArray<float> revealPxFloat;   // two floats per texel
+
+        // Wave D-2 traits (allocated on first use: classic rounds never touch them).
+        private float[] scorchLevel;         // CPU copy of the G channel
+        private double[] scorchEnd;          // sim time the cell's scorch ends (SimView.ScorchEndTime)
+        private double[] scorchStart;        // sim time of the elimination that scorched it (fade in)
+        private readonly List<int> scorchCells = new List<int>();
+        private double scorchRefreshedAt = double.NegativeInfinity;
+        private bool scorchActive;
+        private readonly double[] growStart = { double.NaN, double.NaN, double.NaN, double.NaN };
+        private readonly float[] growAmp = new float[4];
         private double revealEpoch;
         private float revealStamp;           // the current reveal time (relative), used by SetVisual outside the waves
         private bool revealDirty;
@@ -142,6 +188,12 @@ namespace PainterIO.Runtime
         private byte[] visual;               // displayed owner per cell (0 neutral, 1..4 players)
         private int[] cellWave;              // id of the latest wave that will reveal the cell, 0 when none
         private int nextWaveId = 1;
+
+        // Rule v1.6 (contract 30): the last inherited sweep, so the bridge band of the same kill joins it (one sweep).
+        private Wave inheritWave;
+        private int[] inheritCells;
+        private Vec2d inheritOrigin;
+        private double inheritTime;
 
         private GameSession session;
         private Simulation sim;
@@ -204,8 +256,33 @@ namespace PainterIO.Runtime
         /// <summary>Times the GPU passes ran (full or scissored), for tests and the probe.</summary>
         public int PassRuns { get; private set; }
 
-        /// <summary>The _PIO_RevealTime texture (grid-sized, R16_SFloat or R32_SFloat).</summary>
+        /// <summary>
+        /// The _PIO_RevealTime texture (grid-sized, R16G16_SFloat or R32G32_SFloat): R = reveal time, G = scorch level
+        /// (wave D-2).
+        /// </summary>
         public Texture2D RevealTexture => revealTex;
+
+        /// <summary>Wave D-2: the scorch level of a cell as uploaded (0 = none, 1 = fully scorched).</summary>
+        public float ScorchOf(int cellIndex)
+        {
+            return scorchLevel != null && cellIndex >= 0 && cellIndex < scorchLevel.Length ? scorchLevel[cellIndex] : 0f;
+        }
+
+        /// <summary>Wave D-2: true while at least one cell shows a scorch (_PIO_ScorchOn).</summary>
+        public bool ScorchActive => scorchActive;
+
+        /// <summary>Wave D-2: cells whose scorch is still tracked (showing or about to show).</summary>
+        public int ScorchTracked => scorchCells.Count;
+
+        /// <summary>Wave D-2: the _PIO_GrowPulse envelopes (per player channel) at the current visual time.</summary>
+        public Vector4 GrowPulse
+        {
+            get
+            {
+                double now = VisualTime();
+                return new Vector4(GrowEnvelope(0, now), GrowEnvelope(1, now), GrowEnvelope(2, now), GrowEnvelope(3, now));
+            }
+        }
 
         /// <summary>
         /// The reveal time of a cell relative to the current epoch (RevealNever for cells present at bind time); compare it
@@ -244,13 +321,18 @@ namespace PainterIO.Runtime
             sim = s != null ? s.Sim : null;
             endedExtra = 0.0;
             waves.Clear();
+            inheritWave = null;
+            inheritCells = null;
             for (int p = 0; p < 4; p++)
             {
                 fade[p] = 1f;
                 fadeStart[p] = double.NaN;
+                growStart[p] = double.NaN;
+                growAmp[p] = 0f;
             }
             mismatchLogged = false;
             LastReconcileFixes = 0;
+            ClearTraitState();
             if (sim == null)
             {
                 ClearAll();
@@ -285,12 +367,68 @@ namespace PainterIO.Runtime
             switch (e.Type)
             {
                 case SimEventType.Return:
-                    if (e.Cells != null && e.Cells.Length > 0) AddWave(e.Player, e.Point, e.Cells, e.Time);
+                    if (e.Cells != null && e.Cells.Length > 0) AddWave(e.Player, e.Point, e.Cells, e.Time, CurrentFillDuration, false);
                     break;
                 case SimEventType.Eliminated:
                     StartEvaporation(e.Player, e.Time);
+                    if (e.Cells != null && e.Cells.Length > 0) TrackScorch(e.Cells, e.Time);
+                    break;
+                case SimEventType.TerritoryGrew:
+                    if (e.Cells != null && e.Cells.Length > 0) AddGrowth(e.Player, e.Cells, e.Time);
+                    break;
+                case SimEventType.TerritoryInherited:
+                    if (e.Cells != null && e.Cells.Length > 0)
+                    {
+                        inheritWave = AddWave(e.Player, e.Point, e.Cells, e.Time + InheritDelaySeconds, -1.0, true);
+                        inheritCells = e.Cells;
+                        inheritOrigin = e.Point;
+                        inheritTime = e.Time;
+                    }
+                    break;
+                case SimEventType.InheritanceBridged:
+                    if (e.Cells != null && e.Cells.Length > 0) AddBridge(e);
+                    break;
+                case SimEventType.TerritorySevered:
+                    if (e.Cells != null) DropFromWaves(e.Player, e.Cells);
                     break;
             }
+        }
+
+        // Rule v1.6 (contract 30): the band that joins the inherited land to the killer's domain sweeps with that land, as one
+        // wave from the kill point (the band starts near it, so the sweep runs along the kill line into the inherited land).
+        // Without a pending inherited sweep of the same kill, the band sweeps alone from the kill point.
+        private void AddBridge(SimEvent e)
+        {
+            Wave pending = inheritWave;
+            if (pending != null && inheritCells != null && inheritTime == e.Time && pending.Owner == e.Player + 1
+                && pending.Next == 0 && waves.Remove(pending))
+            {
+                var union = new int[inheritCells.Length + e.Cells.Length];
+                Array.Copy(inheritCells, union, inheritCells.Length);
+                Array.Copy(e.Cells, 0, union, inheritCells.Length, e.Cells.Length);
+                inheritWave = AddWave(e.Player, inheritOrigin, union, e.Time + InheritDelaySeconds, -1.0, true);
+                return;
+            }
+            AddWave(e.Player, e.Point, e.Cells, e.Time + InheritDelaySeconds, -1.0, true);
+        }
+
+        // Rule v1.5 / v1.6 (TerritorySevered): severed cells left their player; a pending wave of that player must not paint
+        // them (they evaporate with the land they came from, or snap at the next reconciliation).
+        private void DropFromWaves(int player, int[] cells)
+        {
+            if (player < 0 || player >= 4 || waves.Count == 0) return;
+            byte owner = (byte)(player + 1);
+            for (int w = 0; w < waves.Count; w++)
+            {
+                Wave wave = waves[w];
+                if (wave.Owner != owner) continue;
+                for (int k = 0; k < cells.Length; k++)
+                {
+                    int c = cells[k];
+                    if (c >= 0 && c < cellWave.Length && cellWave[c] == wave.Id) cellWave[c] = 0;
+                }
+            }
+            reconcileRequested = true;
         }
 
         /// <summary>Per frame (LiquidRenderer.LateUpdate): waves, evaporation, reconciliation, pockets, uploads, passes.</summary>
@@ -315,6 +453,7 @@ namespace PainterIO.Runtime
                 AdvanceEvaporation(now);
                 if (sim.Grid.Version != reconciledVersion || reconcileRequested) Reconcile();
                 UpdatePockets();
+                if (scorchCells.Count > 0 || scorchActive) UpdateScorch(now);
             }
             if (maskDirty)
             {
@@ -356,15 +495,19 @@ namespace PainterIO.Runtime
         // ------------------------------------------------------------------------------------------------------------
         // Fill waves and evaporation.
 
-        private void AddWave(int player, Vec2d origin, int[] cells, double startTime)
+        // A fill wave: cells appear in order of distance from the origin. A capture (sweep false) lasts `fill` seconds, the
+        // farthest cell last (contract 12.3). The inherited sweep of wave D-2 (sweep true) starts at the cell nearest to
+        // the origin (the kill point is usually outside the victim's land) and moves at InheritSweepSpeed, its duration
+        // clamped to [InheritMinSeconds, InheritMaxSeconds].
+        private Wave AddWave(int player, Vec2d origin, int[] cells, double startTime, double fill, bool sweep)
         {
-            if (player < 0 || player >= 4) return;
+            if (player < 0 || player >= 4) return null;
             OwnerGrid g = sim.Grid;
             int n = cells.Length;
             var keys = new double[n];
             var items = new int[n];
             double cs = g.CellSize, org = g.Origin;
-            double dMax = 0.0;
+            double dMax = 0.0, dMin = double.MaxValue;
             for (int k = 0; k < n; k++)
             {
                 int c = cells[k];
@@ -375,18 +518,77 @@ namespace PainterIO.Runtime
                 keys[k] = d;
                 items[k] = c;
                 if (d > dMax) dMax = d;
+                if (d < dMin) dMin = d;
             }
             Array.Sort(keys, items);
-            double fill = CurrentFillDuration;
+            double d0 = 0.0;
+            if (sweep)
+            {
+                d0 = dMin;
+                fill = Math.Min(InheritMaxSeconds, Math.Max(InheritMinSeconds, (dMax - dMin) / InheritSweepSpeed));
+            }
+            double span = dMax - d0;
             var wave = new Wave { Id = nextWaveId++, Owner = (byte)(player + 1), Cells = items, Times = keys };
             if (nextWaveId == int.MaxValue) nextWaveId = 1;
             for (int k = 0; k < n; k++)
             {
-                keys[k] = startTime + (dMax > 1e-9 ? fill * keys[k] / dMax : 0.0);
+                keys[k] = startTime + (span > 1e-9 ? fill * (keys[k] - d0) / span : 0.0);
                 int c = items[k];
                 if (c >= 0 && c < cellWave.Length) cellWave[c] = wave.Id;
             }
             waves.Add(wave);
+            return wave;
+        }
+
+        // Wave D-2 (TerritoryGrew): the grown cells creep around the territory in GrowSteps angular steps over GrowSeconds,
+        // starting at an angle that differs per player, around the centroid of the grown cells. Rings > 1 creep together.
+        private void AddGrowth(int player, int[] cells, double startTime)
+        {
+            if (player < 0 || player >= 4) return;
+            int n = cells.Length;
+            double cx = 0.0, cy = 0.0;
+            for (int k = 0; k < n; k++)
+            {
+                cx += cells[k] % size;
+                cy += cells[k] / size;
+            }
+            cx /= n;
+            cy /= n;
+            double start = 1.9 + 2.4 * player;
+            var keys = new double[n];
+            var items = new int[n];
+            for (int k = 0; k < n; k++)
+            {
+                int c = cells[k];
+                double a = Math.Atan2(c / size - cy, c % size - cx) - start;
+                a -= 2.0 * Math.PI * Math.Floor(a / (2.0 * Math.PI));
+                int step = Math.Min(GrowSteps - 1, (int)(a / (2.0 * Math.PI) * GrowSteps));
+                keys[k] = startTime + step * (GrowSeconds / GrowSteps);
+                items[k] = c;
+            }
+            Array.Sort(keys, items);
+            var wave = new Wave { Id = nextWaveId++, Owner = (byte)(player + 1), Cells = items, Times = keys };
+            if (nextWaveId == int.MaxValue) nextWaveId = 1;
+            for (int k = 0; k < n; k++)
+            {
+                int c = items[k];
+                if (c >= 0 && c < cellWave.Length) cellWave[c] = wave.Id;
+            }
+            waves.Add(wave);
+            growStart[player] = startTime;
+            growAmp[player] = Mathf.Clamp01(n / (float)GrowPulseFullCells);
+        }
+
+        // _PIO_GrowPulse of one player: rises over GrowPulseRise, then a smooth decay to 0 at GrowPulseSeconds.
+        private float GrowEnvelope(int p, double now)
+        {
+            double t0 = growStart[p];
+            if (double.IsNaN(t0) || sim == null || p >= sim.Players.Count || !sim.Players[p].Alive) return 0f;
+            float t = (float)(now - t0);
+            if (t <= 0f || t >= GrowPulseSeconds) return 0f;
+            float rise = Mathf.SmoothStep(0f, 1f, t / GrowPulseRise);
+            float fall = 1f - Mathf.SmoothStep(0f, 1f, (t - GrowPulseRise) / (GrowPulseSeconds - GrowPulseRise));
+            return growAmp[p] * rise * fall;
         }
 
         private void AdvanceWaves(double now)
@@ -499,8 +701,17 @@ namespace PainterIO.Runtime
         {
             if (reveal == null || c < 0 || c >= reveal.Length) return;
             reveal[c] = value;
-            if (revealHalf) revealPxHalf[c] = Mathf.FloatToHalf(value);
-            else revealPxFloat[c] = value;
+            if (revealHalf) revealPxHalf[2 * c] = Mathf.FloatToHalf(value);
+            else revealPxFloat[2 * c] = value;
+            revealDirty = true;
+        }
+
+        // Wave D-2: the G channel of the reveal texture (scorch level).
+        private void WriteScorch(int c, float level)
+        {
+            scorchLevel[c] = level;
+            if (revealHalf) revealPxHalf[2 * c + 1] = Mathf.FloatToHalf(level);
+            else revealPxFloat[2 * c + 1] = level;
             revealDirty = true;
         }
 
@@ -510,13 +721,107 @@ namespace PainterIO.Runtime
             revealStamp = 0f;
             if (reveal == null) return;
             ushort never = Mathf.FloatToHalf(RevealNever);
+            ushort zero = Mathf.FloatToHalf(0f);
             for (int c = 0; c < reveal.Length; c++)
             {
                 reveal[c] = RevealNever;
-                if (revealHalf) revealPxHalf[c] = never;
-                else revealPxFloat[c] = RevealNever;
+                if (revealHalf)
+                {
+                    revealPxHalf[2 * c] = never;
+                    revealPxHalf[2 * c + 1] = zero;
+                }
+                else
+                {
+                    revealPxFloat[2 * c] = RevealNever;
+                    revealPxFloat[2 * c + 1] = 0f;
+                }
             }
+            if (scorchLevel != null) Array.Clear(scorchLevel, 0, scorchLevel.Length);
             revealDirty = true;
+        }
+
+        // ------------------------------------------------------------------------------------------------------------
+        // Wave D-2 traits: scorched ground (the G channel of the reveal texture).
+
+        // Bind calls ResetReveal afterwards, which clears the G channel of every cell.
+        private void ClearTraitState()
+        {
+            if (scorchEnd != null)
+            {
+                for (int k = 0; k < scorchCells.Count; k++) scorchEnd[scorchCells[k]] = 0.0;
+            }
+            scorchCells.Clear();
+            scorchActive = false;
+            scorchRefreshedAt = double.NegativeInfinity;
+        }
+
+        // Freed cells of an elimination: the ones ScorchedEarth marked (end time after the elimination) are tracked.
+        private void TrackScorch(int[] freed, double time)
+        {
+            if (sim == null || reveal == null || !sim.Config.Traits.Has(TraitId.ScorchedEarth)) return;
+            SimView view = sim.View;
+            int count = reveal.Length;
+            if (scorchLevel == null || scorchLevel.Length != count)
+            {
+                scorchLevel = new float[count];
+                scorchEnd = new double[count];
+                scorchStart = new double[count];
+                scorchCells.Clear();
+            }
+            for (int k = 0; k < freed.Length; k++)
+            {
+                int c = freed[k];
+                if (c < 0 || c >= count) continue;
+                double end = view.ScorchEndTime(c);
+                if (!(end > time)) continue;
+                bool tracked = scorchEnd[c] > 0.0 || scorchLevel[c] > 0f;
+                if (!tracked || end > scorchEnd[c])
+                {
+                    if (!tracked) scorchCells.Add(c);
+                    scorchEnd[c] = Math.Max(end, 1e-9);
+                    scorchStart[c] = time;
+                }
+            }
+            scorchRefreshedAt = double.NegativeInfinity;
+        }
+
+        // Levels of the tracked cells at the visual clock: fade in with the evaporation, hold, fade out over the last
+        // ScorchFadeSeconds; a cell leaves when its scorch ended, or when it was captured and its fill revealed it.
+        private void UpdateScorch(double now)
+        {
+            if (scorchLevel == null)
+            {
+                scorchActive = false;
+                return;
+            }
+            if (now - scorchRefreshedAt < ScorchRefreshSeconds && now >= scorchRefreshedAt) return;
+            scorchRefreshedAt = now;
+            byte[] cells = sim.Grid.Cells;
+            bool any = false;
+            for (int k = scorchCells.Count - 1; k >= 0; k--)
+            {
+                int c = scorchCells[k];
+                byte o = cells[c];
+                bool captured = o != 0 && o != OwnerGrid.Void && cellWave[c] == 0;
+                double end = scorchEnd[c];
+                float level = 0f;
+                if (!captured && now < end)
+                {
+                    float fadeIn = Mathf.Clamp01((float)(now - scorchStart[c]) / ScorchFadeInSeconds);
+                    float fadeOut = Mathf.Clamp01((float)(end - now) / ScorchFadeSeconds);
+                    level = fadeIn * fadeIn * (3f - 2f * fadeIn) * fadeOut;
+                }
+                if (Mathf.Abs(level - scorchLevel[c]) > 0.5f / 255f || (level == 0f && scorchLevel[c] != 0f)) WriteScorch(c, level);
+                if (level > 0f) any = true;
+                if (captured || now >= end)
+                {
+                    if (scorchLevel[c] != 0f) WriteScorch(c, 0f);
+                    scorchEnd[c] = 0.0;
+                    scorchCells[k] = scorchCells[scorchCells.Count - 1];
+                    scorchCells.RemoveAt(scorchCells.Count - 1);
+                }
+            }
+            scorchActive = any;
         }
 
         // Moves the epoch to now; every stored time shifts by the same amount (reveals older than RevealForgetSeconds are
@@ -533,8 +838,8 @@ namespace PainterIO.Runtime
                 v -= shift;
                 if (v < -RevealForgetSeconds) v = RevealNever;
                 reveal[c] = v;
-                if (revealHalf) revealPxHalf[c] = Mathf.FloatToHalf(v);
-                else revealPxFloat[c] = v;
+                if (revealHalf) revealPxHalf[2 * c] = Mathf.FloatToHalf(v);
+                else revealPxFloat[2 * c] = v;
             }
             revealDirty = true;
         }
@@ -654,8 +959,9 @@ namespace PainterIO.Runtime
             visualMask = NewMask("PIO VisualMask");
             pocketMask = NewMask("PIO PocketMask");
             DestroyObject(revealTex);
-            revealHalf = SystemInfo.IsFormatSupported(GraphicsFormat.R16_SFloat, GraphicsFormatUsage.Sample);
-            revealTex = new Texture2D(size, size, revealHalf ? GraphicsFormat.R16_SFloat : GraphicsFormat.R32_SFloat, TextureCreationFlags.None)
+            // Wave D-2: RG (R = reveal time, G = scorch level), so the composites read the scorch with their reveal fetch.
+            revealHalf = SystemInfo.IsFormatSupported(GraphicsFormat.R16G16_SFloat, GraphicsFormatUsage.Sample);
+            revealTex = new Texture2D(size, size, revealHalf ? GraphicsFormat.R16G16_SFloat : GraphicsFormat.R32G32_SFloat, TextureCreationFlags.None)
             {
                 name = "PIO RevealTime",
                 filterMode = revealHalf ? FilterMode.Bilinear : FilterMode.Point,
@@ -664,6 +970,11 @@ namespace PainterIO.Runtime
                 hideFlags = HideFlags.HideAndDontSave,
             };
             reveal = new float[cellCount];
+            scorchLevel = null;
+            scorchEnd = null;
+            scorchStart = null;
+            scorchCells.Clear();
+            scorchActive = false;
             AcquirePixels();
             ResetReveal();
             AllocateTargets();
@@ -880,6 +1191,8 @@ namespace PainterIO.Runtime
                 Shader.SetGlobalVector(IdRevealTexel, new Vector4(1f / size, 1f / size, size, size));
             }
             Shader.SetGlobalFloat(IdNow, (float)(VisualTime() - revealEpoch));
+            Shader.SetGlobalFloat(IdScorchOn, scorchActive ? 1f : 0f);
+            Shader.SetGlobalVector(IdGrowPulse, sim != null ? GrowPulse : Vector4.zero);
             if (dome != null)
             {
                 Shader.SetGlobalTexture(IdDome, dome);

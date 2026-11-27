@@ -166,11 +166,25 @@ namespace PainterIO.Tests
                     for (int c = 0; c < e.Cells.Length; c++)
                     {
                         int cell = e.Cells[c];
+                        // Rule v1.6 (contract 30): inherited land the killer could not join to its domain is severed in the
+                        // same step and becomes PLAIN neutral (never scorched), like every severed cell (rule v1.5).
+                        if (SeveredInStep(events, cell)) continue;
                         if (sim.Grid.Cells[cell] == OwnerGrid.Neutral && !sim.View.IsScorched(cell) && sim.Time < e.Time + sim.View.Traits.Get(TraitId.ScorchedEarth).P1 - 1e-9)
                             Assert.Fail("tick " + sim.Tick + ": a freed neutral cell is not scorched right after the elimination");
                     }
                 }
             }
+        }
+
+        /// <summary>True when a TerritorySevered event of these events lists the cell (its Cells are ascending).</summary>
+        private static bool SeveredInStep(IReadOnlyList<SimEvent> events, int cell)
+        {
+            for (int k = 0; k < events.Count; k++)
+            {
+                if (events[k].Type == SimEventType.TerritorySevered && events[k].Cells != null && Array.BinarySearch(events[k].Cells, cell) >= 0)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>

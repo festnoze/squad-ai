@@ -15,6 +15,13 @@
 // exceptions captured from the log since the first scene load), "[ProbeHash] <hex>" (after the demo), "[ProbePerf] avgMs=<x>
 // p95Ms=<y> tier=<t>" (after the 20 s bot round), and last "[ProbeResult] PASS" or "[ProbeResult] FAIL <reasons>"; then
 // Application.Quit(0 or 1). [ProbeResult] is printed after the bot round so exceptions raised there also fail the run.
+//
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md sections 5 and 6): the demo runs CLASSIC by default (the hash
+// 246577239DE179C4 is unchanged) and accepts the trait flags (-classic, -traits "<key>" or -traits default for the biome's
+// line of the table, -trait <Id>=0|1): "[ProbeTraits] <key>" names the set ("classic" when none). A traited demo is judged
+// by DemoScenario.Monitor.EvaluateTraited (the classic story is logged as information, not asserted), takes the extra
+// screenshots planned by DemoScenario.TraitShots (trait_grow, trait_reward, trait_scorch, trait_reach), and the bot round
+// of step 5 runs with the same traits.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -91,6 +98,10 @@ namespace PainterIO.Runtime
         // Demo round.
         private GameSession demo;
         private DemoScenario.Monitor monitor;
+        private DemoScenario.TraitShots traitShots;
+        private RuleTraits demoTraits = RuleTraits.Classic;
+        private readonly List<string> traitShotsTaken = new List<string>();
+        private bool captureNeedsPaint;
         private int humanCellsBeforeStep;
         private bool hashRecorded;
         private ulong stateHash;
@@ -260,6 +271,11 @@ namespace PainterIO.Runtime
                     Fail("the demo session was replaced before checkpoint " + names[next]);
                     break;
                 }
+                if (traitShots != null && traitShots.TryTake(demo.Sim.Tick, out string traitShot))
+                {
+                    yield return CaptureTraitShot(traitShot);
+                    continue;
+                }
                 if (demo.Sim.Tick >= ticks[next] || demo.Sim.Ended)
                 {
                     string checkpoint = names[next];
@@ -279,11 +295,27 @@ namespace PainterIO.Runtime
 
             // The hash at exactly DemoScenario.EndTick (BeforeTick handler).
             float hashStart = Time.realtimeSinceStartup;
-            while (!hashRecorded && director.Session == demo && Time.realtimeSinceStartup - hashStart < HashWaitSeconds) yield return null;
+            while (!hashRecorded && director.Session == demo && Time.realtimeSinceStartup - hashStart < HashWaitSeconds)
+            {
+                if (traitShots != null && director.State != GameState.Results && traitShots.TryTake(demo.Sim.Tick, out string traitShot))
+                {
+                    yield return CaptureTraitShot(traitShot);
+                    continue;
+                }
+                yield return null;
+            }
 
             // Results screen (after the death beat), when it appears.
             float resultsStart = Time.realtimeSinceStartup;
-            while (director.State != GameState.Results && Time.realtimeSinceStartup - resultsStart < ResultsWaitSeconds) yield return null;
+            while (director.State != GameState.Results && Time.realtimeSinceStartup - resultsStart < ResultsWaitSeconds)
+            {
+                if (traitShots != null && director.Session == demo && traitShots.TryTake(demo.Sim.Tick, out string traitShot))
+                {
+                    yield return CaptureTraitShot(traitShot);
+                    continue;
+                }
+                yield return null;
+            }
             if (director.State == GameState.Results)
             {
                 yield return new WaitForSecondsRealtime(0.6f);
@@ -292,6 +324,12 @@ namespace PainterIO.Runtime
             else Fail("results never showed (state " + director.State + ")");
 
             Check("scenario", EvaluateDemo);
+            if (traitShots != null)
+            {
+                Debug.Log("[Probe] trait shots taken: " + (traitShotsTaken.Count > 0 ? string.Join(", ", traitShotsTaken) : "none")
+                          + (traitShots.PendingCount > 0 ? " (" + traitShots.PendingCount + " planned too late, after the results)" : ""));
+                traitShots.Detach();
+            }
             if (hashRecorded) Debug.Log("[ProbeHash] " + stateHash.ToString("X16", CultureInfo.InvariantCulture));
             else Debug.Log("[Probe] no state hash: DemoScenario.EndTick " + DemoScenario.EndTick + " was not reached");
 
@@ -305,15 +343,20 @@ namespace PainterIO.Runtime
             try
             {
                 // -biome is applied by GameDirector at each session start; the forced overload makes the demo explicit.
+                // Traits: classic unless the command line gives trait flags (BiomeTraitTable.ResolveScripted).
                 demo = requestedBiome.HasValue
                     ? DemoScenario.CreateSession(out monitor, requestedBiome.Value)
                     : DemoScenario.CreateSession(out monitor);
+                demoTraits = demo.Traits;
                 demo.Sim.BeforeTick += OnDemoBeforeTick;
                 demo.EventRaised += OnDemoEvent;
+                if (!demoTraits.IsClassic) traitShots = new DemoScenario.TraitShots(demo.Sim);
                 humanCellsBeforeStep = HumanCells(demo.Sim);
                 director.StartRound(demo);
-                shotsExpected = 2 + DemoScenario.CheckpointTicks.Length;   // menu + checkpoints + results
-                Debug.Log("[Probe] demo started: " + DemoScenario.CheckpointTicks.Length + " checkpoints, EndTick " + DemoScenario.EndTick);
+                shotsExpected = 2 + DemoScenario.CheckpointTicks.Length;   // menu + checkpoints + results (+ trait shots taken)
+                Debug.Log("[ProbeTraits] " + demoTraits);
+                Debug.Log("[Probe] demo started: " + DemoScenario.CheckpointTicks.Length + " checkpoints, EndTick " + DemoScenario.EndTick
+                          + ", traits " + demoTraits + (LaunchArgs.HasTraitArgs ? " (from the command line)" : " (default: classic)"));
                 return true;
             }
             catch (Exception e)
@@ -388,10 +431,20 @@ namespace PainterIO.Runtime
 
         private void EvaluateDemo(List<string> problems)
         {
+            bool traited = !demoTraits.IsClassic;
             if (monitor != null)
             {
                 monitor.Finish();
-                if (!monitor.Evaluate(out List<string> monitorFailures))
+                if (traited)
+                {
+                    // Wave D-2: the classic story does not hold under every trait set; only EvaluateTraited is asserted.
+                    if (!monitor.EvaluateTraited(out List<string> traitedFailures))
+                        problems.Add("DemoScenario.Monitor (traits " + demoTraits + "): " + string.Join("; ", traitedFailures));
+                    bool story = monitor.Evaluate(out List<string> storyFailures);
+                    Debug.Log("[Probe] classic story under traits (information, not asserted): "
+                              + (story ? "holds" : "differs: " + string.Join("; ", storyFailures)));
+                }
+                else if (!monitor.Evaluate(out List<string> monitorFailures))
                 {
                     problems.Add("DemoScenario.Monitor: " + string.Join("; ", monitorFailures));
                 }
@@ -400,6 +453,14 @@ namespace PainterIO.Runtime
             Debug.Log("[Probe] demo facts firstReturn{" + firstReturn + "} firstCapture{" + firstCapture + "} savedChase{" + savedChase
                       + "} flickerReturns=" + flickerReturns + " cutsReceived=" + humanCuts + " pocket tick=" + pocketTick + " cells="
                       + pocketCells + " eliminated tick=" + caughtTick + " cause=" + caughtCause + " hashTick=" + hashTick);
+            if (traited)
+            {
+                if (demo != null && demo.Sim.EventCapHits != 0) problems.Add("EventCapHits = " + demo.Sim.EventCapHits);
+                if (!hashRecorded) problems.Add("no state hash at DemoScenario.EndTick " + DemoScenario.EndTick);
+                if (!firstReturn.Seen || firstReturn.Chased || firstReturn.Cells <= 0 || firstReturn.After <= firstReturn.Before)
+                    problems.Add("the first return is not an unchased capture that increased the area (" + firstReturn + ")");
+                return;
+            }
 
             // The first return captured cells: under v1.4 it is the unchased clean capture.
             if (!firstReturn.Seen) problems.Add("the human never returned home");
@@ -433,7 +494,8 @@ namespace PainterIO.Runtime
             {
                 round = CreateBotRound();
                 director.StartRound(round);
-                Debug.Log("[Probe] bot round started seed=" + BotRoundSeed + " lasso=true tickRate=" + round.Sim.Config.TickRate);
+                Debug.Log("[Probe] bot round started seed=" + BotRoundSeed + " lasso=true tickRate=" + round.Sim.Config.TickRate
+                          + " traits=" + round.Traits);
             }
             catch (Exception e)
             {
@@ -479,10 +541,13 @@ namespace PainterIO.Runtime
             if (frames.Count == 0) Fail("no frame measured during the bot round");
         }
 
-        /// <summary>A normal round (TickRate 60, lasso on) whose human (index 0) is a Balanced BotController.</summary>
-        private static GameSession CreateBotRound()
+        /// <summary>
+        /// A normal round (TickRate 60, lasso on) whose human (index 0) is a Balanced BotController. Wave D-2: with the
+        /// demo's trait set (classic by default), never the saved options.
+        /// </summary>
+        private GameSession CreateBotRound()
         {
-            SimConfig config = GameSession.RoundConfig(BotRoundSeed, true);
+            SimConfig config = GameSession.RoundConfig(BotRoundSeed, true, demoTraits);
             config.TickRate = Tuning.TickRate;
             var controllers = new IController[Tuning.PlayerCount];
             BotStyle[] lineup = { BotStyle.Balanced, BotStyle.Balanced, BotStyle.Greedy, BotStyle.Aggressive };
@@ -501,6 +566,14 @@ namespace PainterIO.Runtime
 
         // ------------------------------------------------------------------------------------------------------------
         // Screenshots.
+
+        /// <summary>Wave D-2: one DemoScenario.TraitShots screenshot ("trait_&lt;name&gt;.png"), counted with the others.</summary>
+        private IEnumerator CaptureTraitShot(string name)
+        {
+            shotsExpected++;
+            traitShotsTaken.Add(name + "@" + demo.Sim.Tick);
+            yield return Capture("trait_" + name, demo, false);
+        }
 
         private IEnumerator Capture(string name, GameSession session, bool requireTexts)
         {
@@ -521,6 +594,9 @@ namespace PainterIO.Runtime
                 Debug.LogWarning("[Probe] could not delete the old " + path + ": " + e.Message);
             }
             long tick = session != null ? session.Sim.Tick : -1;
+            // Wave D-2: under traits the human may already be dead at a checkpoint (Feu's 2.1x spark catches it in phase 2),
+            // so the paint guard then applies only while the human is alive.
+            captureNeedsPaint = NeedsHumanPaint(name) && (demoTraits.IsClassic || (session != null && !session.IsClosed && session.HumanAlive));
             // Frame checks on the frame that is being captured.
             Check("renderers@" + name, CheckRenderers);
             Check("texts@" + name, problems => CheckTexts(problems, requireTexts));
@@ -569,7 +645,7 @@ namespace PainterIO.Runtime
                 // B6 guard beyond 18.2: plain ground + HUD passes both rules above, so the shots that frame the human's
                 // puddle must show enough of its (biome) color.
                 string paintNote = "";
-                if (NeedsHumanPaint(name))
+                if (captureNeedsPaint)
                 {
                     double paint = PaintFraction(pixels, Palette.ColorOf(DemoScenario.Human));
                     paintNote = " humanPaint=" + Pct(paint);

@@ -21,6 +21,10 @@
 // from BiomeTheme.Current's clip set and switch live on BiomeTheme.Changed; the set's Ambient loop (if any) plays softly.
 // Muted by SaveData.SoundOn = false, in batchmode and with -mute (no clip is synthesized then, but every decision still
 // runs and raises CuePlayed). "-sfxlog" logs every cue and the listener output peak once per second (verification).
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md sections 5 and 7): the human's own TerritoryGrew plays the biome set's
+// optional Grow clip at -18 dB, at most once every GrowRepeatSeconds; the human's kill rewards play short shared cues:
+// TerritoryInherited the inherit swell (with the 20 ms capture pulse), SpeedBoosted the speed-up zip (pitched up a little
+// per level), ShieldStarted the shield shimmer and ShieldEnded a softer, lower shimmer. Bots' trait events stay silent.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -168,7 +172,7 @@ namespace PainterIO.Runtime
                     if (!TakeResult(k)) continue;
                 }
                 BuildNextSlot(k);
-                if (nextSlot[k] < SfxClipSamples.SlotCount) return null;
+                if (nextSlot[k] < SfxClipSamples.AllSlotCount) return null;
                 index = k;
                 return Complete(k);
             }
@@ -194,7 +198,7 @@ namespace PainterIO.Runtime
                 }
                 if (!TakeResult(index)) return null;
             }
-            while (nextSlot[index] < SfxClipSamples.SlotCount) BuildNextSlot(index);
+            while (nextSlot[index] < SfxClipSamples.AllSlotCount) BuildNextSlot(index);
             return Complete(index);
         }
 
@@ -206,7 +210,7 @@ namespace PainterIO.Runtime
             {
                 ISplitSfxClipSet set = sets[k];
                 if (set == null) continue;
-                AudioClip[] owned = { set.Exit, set.Return, set.Fill, set.Cut, set.TensionLoop, set.Caught, set.LoopLost, set.Ambient };
+                AudioClip[] owned = { set.Exit, set.Return, set.Fill, set.Cut, set.TensionLoop, set.Caught, set.LoopLost, set.Ambient, set.Grow };
                 foreach (AudioClip c in owned)
                 {
                     if (c != null) made.Add(c);
@@ -279,6 +283,18 @@ namespace PainterIO.Runtime
         /// <summary>Captured cells at which the fill swell reaches full volume.</summary>
         public const int SwellFullCells = 1500;
 
+        /// <summary>Wave D-2 (BIOME_TRAITS 5): gain of the Grow clip (the human's own growth only).</summary>
+        public const float GrowGainDb = -18f;
+
+        /// <summary>Wave D-2: the Grow clip plays at most once per this many real seconds.</summary>
+        public const float GrowRepeatSeconds = 2.0f;
+
+        /// <summary>Wave D-2: gain of the softer, lower shimmer when the human's shield ends.</summary>
+        public const float ShieldEndGainDb = -9f;
+
+        /// <summary>Wave D-2: pitch of the shimmer when the human's shield ends.</summary>
+        public const float ShieldEndPitch = 0.7f;
+
         private const int HumanPriority = 32;
         private const int UiPriority = 16;
         private const int SpectatorPriority = 160;
@@ -300,6 +316,10 @@ namespace PainterIO.Runtime
             0.62f,  // WinJingle
             0.58f,  // LoseJingle
             0.50f,  // LoopLost
+            0.45f,  // GrowCreep (times GrowGainDb)
+            0.55f,  // KillInherit
+            0.50f,  // SpeedUp
+            0.48f,  // ShieldShimmer
         };
 
         /// <summary>Volume of the biome ambience loop (ISfxClipSet.Ambient), when the biome has one.</summary>
@@ -410,7 +430,7 @@ namespace PainterIO.Runtime
         public static bool IsBiomeSlot(SfxId id)
         {
             return id == SfxId.ExitPlop || id == SfxId.ReturnGloop || id == SfxId.FillSwell || id == SfxId.CutSnap
-                   || id == SfxId.SparkLoop || id == SfxId.CaughtSplat || id == SfxId.LoopLost;
+                   || id == SfxId.SparkLoop || id == SfxId.CaughtSplat || id == SfxId.LoopLost || id == SfxId.GrowCreep;
         }
 
         /// <summary>The clip of a biome slot in a set (null for a shared clip or a missing one).</summary>
@@ -426,6 +446,7 @@ namespace PainterIO.Runtime
                 case SfxId.SparkLoop: return set.TensionLoop;
                 case SfxId.CaughtSplat: return set.Caught;
                 case SfxId.LoopLost: return set.LoopLost;
+                case SfxId.GrowCreep: return set.Grow;
                 default: return null;
             }
         }
@@ -512,7 +533,7 @@ namespace PainterIO.Runtime
                 ISfxClipSet set = clipSets[k];
                 clipSets[k] = null;
                 if (set == null) continue;
-                AudioClip[] owned = { set.Exit, set.Return, set.Fill, set.Cut, set.TensionLoop, set.Caught, set.LoopLost, set.Ambient };
+                AudioClip[] owned = { set.Exit, set.Return, set.Fill, set.Cut, set.TensionLoop, set.Caught, set.LoopLost, set.Ambient, set.Grow };
                 foreach (AudioClip c in owned)
                 {
                     if (c == null || !destroyed.Add(c)) continue;
@@ -831,6 +852,12 @@ namespace PainterIO.Runtime
         // ------------------------------------------------------------------------------------------------------------
         // Session events (forwarded after each Step, in resolution order).
 
+        /// <summary>Wave D-2, tests only: handles one event as if the bound session had forwarded it.</summary>
+        internal void HandleEventForTests(SimEvent e)
+        {
+            OnSessionEvent(e);
+        }
+
         private void OnSessionEvent(SimEvent e)
         {
             try
@@ -921,6 +948,41 @@ namespace PainterIO.Runtime
                 case SimEventType.RingSpawned:
                     // A world event (not bot-only): a soft, lower chime announces the ring to the human.
                     if (live) PlayCue(SfxId.RingChime, SfxScope.BotGainDb, 0.84f, -1, SpectatorPriority);
+                    break;
+
+                // Wave D-2 (BIOME_TRAITS 5 and 7): trait events, for the live human only.
+                case SimEventType.TerritoryGrew:
+                    if (live && h >= 0 && e.Player == h && e.Cells != null && e.Cells.Length > 0)
+                    {
+                        int k = (int)SfxId.GrowCreep;
+                        if (clock - lastSpectatorCue[k] < GrowRepeatSeconds) break;
+                        lastSpectatorCue[k] = clock;
+                        PlayCue(SfxId.GrowCreep, GrowGainDb, Jitter(1f, 0.03f), h, SpectatorPriority);
+                    }
+                    break;
+
+                case SimEventType.TerritoryInherited:
+                    if (live && h >= 0 && e.Player == h)
+                    {
+                        PlayCue(SfxId.KillInherit, SfxScope.HumanGainDb, 1f, h, HumanPriority);
+                        Pulse(Haptics.CaptureMs);
+                    }
+                    break;
+
+                case SimEventType.SpeedBoosted:
+                    if (live && h >= 0 && e.Player == h)
+                    {
+                        float level = Mathf.Clamp((float)e.Value - 1f, 0f, 1f);
+                        PlayCue(SfxId.SpeedUp, -1f, 1f + 0.5f * level, h, HumanPriority);
+                    }
+                    break;
+
+                case SimEventType.ShieldStarted:
+                    if (live && h >= 0 && e.Player == h) PlayCue(SfxId.ShieldShimmer, -1f, 1f, h, HumanPriority);
+                    break;
+
+                case SimEventType.ShieldEnded:
+                    if (live && h >= 0 && e.Player == h) PlayCue(SfxId.ShieldShimmer, ShieldEndGainDb, ShieldEndPitch, h, HumanPriority);
                     break;
             }
         }

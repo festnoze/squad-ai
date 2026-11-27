@@ -1469,6 +1469,8 @@ namespace OutOfSight
             SetEnabled(winCanvas, Visible && winOn);
             // STARSANIM: the hero stars' own Canvas, with the win panel once RecordLine set them for the win.
             SetEnabled(winStars != null ? winStars.Canvas : null, winStars != null && Visible && winOn && winStars.Shown);
+            // CONFETTI: the three star shower's own Canvas, only while it falls on the visible win panel.
+            SetEnabled(winConfetti != null ? winConfetti.Canvas : null, winConfetti != null && Visible && winOn && winConfetti.Playing);
             // One row of buttons at a time on the win panel: Next level/Replay/Menu on a plain win, the EndGroup's own
             // Replay/Menu principal on the end screen (never both: they share the row's place).
             SetEnabled(winNextCanvas, Visible && winOn && winNextOn && !endOn);

@@ -38,6 +38,7 @@ namespace OutOfSight
     ///
     /// STARSANIM (docs/next/progress/STARSANIM.md): the end screen's star chimes (<see cref="PlayStarChime"/>, rising, the
     /// third a chord) and the empty star's tick (<see cref="PlayStarDull"/>), synthesized at startup like the M2 to M5 cues.
+    /// CONFETTI (2026-11-27): the three star confetti's party popper (<see cref="PlayConfettiPop"/>), synthesized too.
     /// </summary>
     public sealed class Sfx : MonoBehaviour
     {
@@ -113,6 +114,15 @@ namespace OutOfSight
         public int StarDullsPlayed { get; private set; }
         public int LastStarChime { get; private set; } = -1;
         public float LastStarChimeVolume { get; private set; }
+
+        /// <summary>
+        /// CONFETTI (docs/next/progress/STARSANIM.md "Confetti"): the party popper of the three star confetti, synthesized (a
+        /// paper pop with a low thump, the streamers' whoosh and a sparse crackle of paper bits).
+        /// </summary>
+        public AudioClip ConfettiPop { get; private set; }
+
+        /// <summary>CONFETTI: party poppers played (tests).</summary>
+        public int ConfettiPopsPlayed { get; private set; }
 
         /// <summary>Index in the library's softHops of the last muffled hop, -1 before the first one.</summary>
         public int LastSoftHopVariant { get; private set; } = -1;
@@ -291,6 +301,9 @@ namespace OutOfSight
         private const float StarDullVolume = Tuning.SfxStarDullVolume * MixScale;
         private const float StarChimeSeconds = 0.9f;
         private const float StarFinalSeconds = 1.4f;
+        // CONFETTI: the party popper, under the third star's chord it rings with.
+        private const float ConfettiPopVolume = Tuning.SfxConfettiPopVolume * MixScale;
+        private const float ConfettiPopSeconds = 0.75f;
         // Each chime's notes as (frequency Hz, delay s, gain) triples: G5, then C6, then a rolled C major chord led by E6
         // (E6, C6, G6, C7), so the three stars climb G, C, E and the last one lands on the full chord.
         private static readonly float[] StarNote1 = { 783.99f, 0f, 1f };
@@ -403,6 +416,8 @@ namespace OutOfSight
                 SynthesizeChime("star chime 3", StarFinalSeconds, StarChord),
             };
             StarDull = Synthesize("star dull", 0.14f, StarDullSample);
+            // CONFETTI: the party popper (its own hashed noise: the shared generator and every draw after it are unchanged).
+            ConfettiPop = SynthesizePopper("confetti pop", ConfettiPopSeconds);
             // Two hop sources in turn: a hop's pitch is set on a source whose previous hop has ended, so a
             // recorded tail (up to 0.3 s, hops every 0.22 s) is never re-pitched mid sound.
             hopSources = new[] { NewSource(1f), NewSource(1f) };
@@ -737,6 +752,21 @@ namespace OutOfSight
             }
             UiSource.PlayOneShot(StarDull, Mathf.Clamp01(StarDullVolume));
             StarDullsPlayed++;
+        }
+
+        /// <summary>
+        /// CONFETTI (docs/next/progress/STARSANIM.md "Confetti"): the party popper, once as the three star confetti bursts. Same
+        /// source and rules as <see cref="PlayStarChime"/>: a one shot on <see cref="UiSource"/>, at the options' volume, silent
+        /// under <see cref="AudioMute"/>, never <see cref="LastClip"/>.
+        /// </summary>
+        public void PlayConfettiPop()
+        {
+            if (UiSource == null || ConfettiPop == null)
+            {
+                return;
+            }
+            UiSource.PlayOneShot(ConfettiPop, Mathf.Clamp01(ConfettiPopVolume));
+            ConfettiPopsPlayed++;
         }
 
         /// <summary>
@@ -1361,6 +1391,64 @@ namespace OutOfSight
             float attack = Mathf.Clamp01(t / 0.002f);
             float release = Mathf.Clamp01((d - t) / 0.02f);
             return (body + knock + n) * 0.7f * attack * release;
+        }
+
+        /// <summary>
+        /// CONFETTI: a party popper. A burst of low-passed noise with a falling low thump (the pop and the paper leaving the
+        /// tube), the streamers' whoosh (high-passed noise swelling and fading over about half a second) and a sparse crackle
+        /// of tiny bright ticks thinning out (the paper bits), normalised to a 0.85 peak. Filter state, so no
+        /// <see cref="Generator"/>; its own hashed noise (<see cref="HashNoise"/>), never the shared generator.
+        /// </summary>
+        private AudioClip SynthesizePopper(string name, float duration)
+        {
+            int count = Mathf.CeilToInt(duration * Rate);
+            var data = new float[count];
+            float lowA = 1f - Mathf.Exp(-2f * Mathf.PI * 2200f / Rate);
+            float low = 0f;
+            float highIn = 0f;
+            float highOut = 0f;
+            float thumpPhase = 0f;
+            const float tickSlot = 0.009f;
+            float peak = 1e-6f;
+            for (int i = 0; i < count; i++)
+            {
+                float t = i / (float)Rate;
+                float n = HashNoise(i + 104729);
+                // The pop: a short burst of low-passed noise.
+                low += (n - low) * lowA;
+                float pop = low * Mathf.Exp(-t * 55f) * 1.8f;
+                // Its thump: a low tone falling from 170 to about 95 Hz.
+                float f = 170f * (1f - 0.45f * Mathf.Clamp01(t / 0.05f));
+                thumpPhase += 2f * Mathf.PI * f / Rate;
+                float thump = Mathf.Sin(thumpPhase) * Mathf.Exp(-t * 36f) * 0.8f;
+                // The whoosh: high-passed noise swelling and fading between 0.02 and 0.5 s.
+                highOut = 0.97f * (highOut + n - highIn);
+                highIn = n;
+                float swell = Mathf.Sin(Mathf.PI * Mathf.Clamp01((t - 0.02f) / 0.48f));
+                float whoosh = highOut * swell * swell * 0.2f;
+                // The crackle: in each 9 ms slot, maybe one tiny bright tick, rarer and rarer after the pop.
+                int slot = Mathf.FloorToInt(t / tickSlot);
+                float local = t - slot * tickSlot;
+                float chance = t > 0.03f ? 0.6f * Mathf.Exp(-(t - 0.03f) * 5f) : 0f;
+                float crackle = 0f;
+                if ((HashNoise(slot * 31 + 101) + 1f) * 0.5f < chance)
+                {
+                    float pitch = 2800f + 2200f * (HashNoise(slot * 17 + 3) + 1f);
+                    float gain = 0.12f + 0.1f * (HashNoise(slot * 13 + 7) + 1f);
+                    crackle = Mathf.Sin(2f * Mathf.PI * pitch * local) * Mathf.Exp(-local * 900f) * gain;
+                }
+                float attack = Mathf.Clamp01(t / 0.002f);
+                float release = Mathf.Clamp01((duration - t) / 0.06f);
+                data[i] = (pop + thump + whoosh + crackle) * attack * release;
+                peak = Mathf.Max(peak, Mathf.Abs(data[i]));
+            }
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = Mathf.Clamp(data[i] / peak * 0.85f, -1f, 1f);
+            }
+            AudioClip clip = AudioClip.Create(name, count, 1, Rate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
         /// <summary>A repeatable white noise sample in [-1, 1] for sample index <paramref name="i"/> (a PCG style integer hash).</summary>

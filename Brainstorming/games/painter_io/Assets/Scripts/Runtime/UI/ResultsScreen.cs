@@ -6,6 +6,13 @@
 // appears. The background match keeps playing behind a navy dim.
 // Wave C (feel-11): a darker dim (0.86) behind the key numbers, cause and WHY paragraphs 880 units wide, and the lines below
 // the area stacked from their measured heights, so an empty WHY line leaves no empty band (StackLines).
+// Wave D-2 (traits-ui, docs/BIOME_TRAITS.md 7.2): when the human earned kill rewards this round, the stats block gains a
+// second line ("1 terrain pris · vitesse +20 % · 2 boucliers", from Hud.Rewards); a saved return whose spark a shield put out
+// reads "Étincelle éteinte : boucle perdue." instead of "Sauvé de justesse" (its margin is 0). Nothing changes otherwise.
+// Rule v1.7 (contract 31): the area is the conquest percentage ("territoire conquis"), a conquest win reads "Territoire
+// conquis à 100 % !" (a rival's: "Safran a conquis tout le territoire."), a time-up end adds "Le plus grand territoire
+// l'emporte.", and the buttons are PAYS SUIVANT (the country screen, GameDirector.ToCountryScreen) and REJOUER (the same
+// country again).
 using PainterIO.Core;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,11 +32,11 @@ namespace PainterIO.Runtime
         public const float LineGap = 40f;
         public const float TagGap = 30f;
         public const float TagHeight = 64f;
-        /// <summary>REJOUER: center above the safe bottom and size (its light rim adds 6 units around it).</summary>
+        /// <summary>The main button (PAYS SUIVANT since rule v1.7): center above the safe bottom and size (its light rim adds 6 units around it).</summary>
         public const float ReplayY = 440f;
         public static readonly Vector2 ReplaySize = new Vector2(640f, 170f);
 
-        private static readonly Color Saffron = new Color32(0xF5, 0xB7, 0x31, 0xFF);
+        private static readonly Color Saffron = UiKit.Saffron;
 
         private readonly Text rankShadow, rankHighlight, rankText, areaText, areaCaption, causeLine, whyLine, statsLine, tagText;
         private readonly Image tagBg;
@@ -73,11 +80,13 @@ namespace PainterIO.Runtime
             tagText = UiKit.Label(tagBg.transform, "Text", 32, Saffron, TextAnchor.MiddleCenter, false);
             UiKit.Stretch(tagText.rectTransform);
 
-            RectTransform replay = UiKit.PrimaryButton(Safe, "Replay", ReplaySize, Palette.ColorOf(0), 72, OnReplay,
-                                                       out replayBg, out replayLabel);
-            UiKit.Place(replay, UiKit.BottomCenter, new Vector2(0f, ReplayY), ReplaySize);
-            Button menu = UiKit.Btn(Safe, "Menu", new Vector2(440f, 124f), UiKit.WithAlpha(UiKit.NavyLight, 0.95f), 62f, 52, UiKit.Light, OnMenu, out menuLabel);
-            UiKit.Place((RectTransform)menu.transform, UiKit.BottomCenter, new Vector2(0f, 250f), new Vector2(440f, 124f));
+            // Rule v1.7: the main button goes on to the country screen ("PAYS SUIVANT", where a win plays the reveal of the
+            // newly unlocked flags); the second one replays the same country ("REJOUER").
+            RectTransform next = UiKit.PrimaryButton(Safe, "NextCountry", ReplaySize, Palette.ColorOf(0), 72, OnNextCountry,
+                                                     out replayBg, out replayLabel);
+            UiKit.Place(next, UiKit.BottomCenter, new Vector2(0f, ReplayY), ReplaySize);
+            Button replay = UiKit.Btn(Safe, "Replay", new Vector2(440f, 124f), UiKit.WithAlpha(UiKit.NavyLight, 0.95f), 62f, 52, UiKit.Light, OnReplay, out menuLabel);
+            UiKit.Place((RectTransform)replay.transform, UiKit.BottomCenter, new Vector2(0f, 250f), new Vector2(440f, 124f));
         }
 
         /// <summary>Buttons ignore input for 0.5 s after the panel appears.</summary>
@@ -124,8 +133,8 @@ namespace PainterIO.Runtime
         private void Fill()
         {
             HumanOutcome o = outcome;
-            replayLabel.text = Strings.Get("results.replay");
-            menuLabel.text = Strings.Get("results.menu");
+            replayLabel.text = Strings.Get("results.next_country");
+            menuLabel.text = Strings.Get("results.replay");
             int human = Session != null && Session.HumanIndex >= 0 ? Session.HumanIndex : 0;
             Color hc = Palette.ColorOf(human);
             replayBg.color = hc;
@@ -153,15 +162,31 @@ namespace PainterIO.Runtime
             SetRank(Strings.Rank(o.Rank, o.SharedRank));
             areaText.text = Strings.Area(o.AreaPercent);
             BuildLines(o, out string cause, out string why);
+            RewardTally rewards = Root != null && Root.Hud != null ? Root.Hud.Rewards : null;
+            // Wave D-2: the saved line of a return whose spark a shield put out (margin 0) says so.
+            if (rewards != null && rewards.LastChasedReturnQuenched && o.Cause == EliminationCause.None && o.HadSavedReturn)
+                why = Strings.Get("toast.quenched_return");
             causeLine.text = cause;
             SetWhy(why);
-            statsLine.text = Strings.Format("results.stats",
-                Strings.Count("results.stat.captures", o.Captures),
-                Strings.Count("results.stat.cuts", o.CutsMade),
-                Strings.Count("results.stat.kills", o.Kills),
-                Strings.Count("results.stat.pockets", o.PocketsMade),
-                Strings.Duration(o.SurvivedSeconds));
+            statsLine.text = StatsLine(o, rewards, Strings.Language);
             Layout();
+        }
+
+        /// <summary>
+        /// The stats line of 15.5, plus (wave D-2) the human's kill rewards on a second line when it earned some:
+        /// "7 captures · 2 coupes · 1 élimination · 1 poche · 1:12" then "1 terrain pris · vitesse +20 %" (a line of its own,
+        /// so no reward item is split by the wrap). Public static for tests.
+        /// </summary>
+        public static string StatsLine(HumanOutcome o, RewardTally rewards, int language)
+        {
+            string line = Strings.FormatIn(language, "results.stats",
+                Strings.Count("results.stat.captures", o.Captures, language),
+                Strings.Count("results.stat.cuts", o.CutsMade, language),
+                Strings.Count("results.stat.kills", o.Kills, language),
+                Strings.Count("results.stat.pockets", o.PocketsMade, language),
+                Strings.Duration(o.SurvivedSeconds));
+            string extra = rewards != null ? rewards.StatsItems(language) : null;
+            return string.IsNullOrEmpty(extra) ? line : line + "\n" + extra;
         }
 
         /// <summary>Vertical centers (TopCenter, y up) of the lines below the area, from StackLines.</summary>
@@ -261,11 +286,17 @@ namespace PainterIO.Runtime
                 case RoundEndReason.AllEliminated:
                     cause = Strings.Get("results.all_eliminated");
                     break;
+                case RoundEndReason.Conquest:
+                    // Rule v1.7: the human conquered the goal, or a rival did while the human was still alive.
+                    bool mine = o.Rank == 1 || o.Winner < 0;
+                    cause = mine ? Strings.Get("results.conquest") : Strings.Format("results.conquest_rival", Strings.PlayerName(o.Winner, -1));
+                    break;
                 default:
                     cause = Strings.Get("results.time_up");
                     break;
             }
             if (o.HadSavedReturn) why = Hud.SavedLine(o.LastSavedMargin);
+            else if (o.Reason == RoundEndReason.TimeUp) why = Strings.Get("results.time_up_winner");
         }
 
         private void SetRank(string rank)
@@ -290,11 +321,12 @@ namespace PainterIO.Runtime
             if (d != null) d.StartRound();
         }
 
-        private void OnMenu()
+        /// <summary>Rule v1.7: "PAYS SUIVANT" goes on to the country screen, whatever the outcome.</summary>
+        private void OnNextCountry()
         {
             if (!AcceptsInput) return;
             GameDirector d = Director;
-            if (d != null) d.ToMenu();
+            if (d != null) d.ToCountryScreen();
         }
     }
 }

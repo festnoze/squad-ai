@@ -7,7 +7,7 @@
 // - Territory layer: t_i from _PIO_TerritoryField times _PIO_PlayerFade (sampled at w plus a slow wobble of at most
 //   0.04 u), j = argmax t_i, cT = saturate((t_j - 0.5) / fwidth(t_j) + 0.5) (the contour). The relief HT and its
 //   gradient come from _PIO_TerritoryHeight (H of the wider relief field, scaled by the fade of j). Ground (navy, faint
-//   woven grain, a soft vignette, darker outside the arena with a soft rim shadow) under it, with a contact darkening
+//   woven grain, a soft vignette, a soft rim shadow, light grey outside the arena past a yellow neon line) under it, with a contact darkening
 //   right around the liquid (every tier, no extra fetch) and a soft lower-right drop shadow of everything (Medium and
 //   High); rival actors shadow the puddles. Two colors that touch both fall to H = 0, which draws the crease: within
 //   one relief texel of the contact the lit surface goes flat and darkens into an antialiased groove (wave C), and no
@@ -45,10 +45,19 @@
 //   toward the light (stored in the same texel). An actor on its own puddle takes the same terms (weighted by own), so
 //   necks and a pearl at home stay seamless; threads on bare ground or on a rival puddle are unchanged (b = 0 or
 //   own = 0). _PIO_BiomeParams.x (LiquidTheme.DropStrength) scales it all: 0 gives back the wave C puddles.
+// - Biome traits (wave D-2 traits-fx, docs/BIOME_TRAITS.md 5 and 7, generic: any trait may run in this biome):
+//   - Rim: with Propagation a puddle may reach the border of the grid (the arena's straight sides), where the clamped
+//     fields would smear it outside the arena. The narrow field, the relief (height and gradient), the wide field and the
+//     dome are limited by the analytic profiles of a straight edge lying on the border (PIO_LiquidWall), so the puddle
+//     ends on the rim with its usual meniscus, bevel, drop and shadow.
+//   - Scorched ground (ScorchedEarth): the G channel of the reveal fetch (no extra fetch) turns the table into a dried
+//     paint stain: lighter, desaturated and matte, a faint crackle, and a darker coffee ring along its ragged edge.
+//   - Growth (Propagation, _PIO_GrowPulse): a liquid creep, a soft wet crest riding just behind the advancing edge and a
+//     faint film of the color spreading past it; much weaker than the fill ripple, never a capture.
 // Fetch budget (Medium): territory field 1, height 1, dome 1 (wave D), pocket 1, actor 1, reveal 1, shadow taps 2 (8
 // without actors; the territory shadow tap is skipped inside puddles, cT = 1); the actor path adds 2 x 2
 // forward-difference fetches (actor field and relief at +x and +y: 12). Low has no shadow taps (6 and 10). High uses
-// B-spline fetches and central differences (contract 12.2 item 4 allows it).
+// B-spline fetches and central differences (contract 12.2 item 4 allows it). Wave D-2 adds no fetch.
 #ifndef PIO_LIQUID_COMPOSITE_INCLUDED
 #define PIO_LIQUID_COMPOSITE_INCLUDED
 
@@ -91,6 +100,68 @@
 #define PIO_DROP_SHADOW 0.35           // soft contact shadow of the dome on the ground (lower right)
 #define PIO_DROP_SHADOW_LO 0.2         // ... from t_dome sampled toward the light
 #define PIO_DROP_SHADOW_HI 0.8
+// Biome traits (wave D-2, header).
+#define PIO_GROW_CREST 0.66            // wide-field value of the growth crest (just behind the advancing edge)
+#define PIO_GROW_LIFT 0.6              // its strength relative to the fill ripple's crest
+#define PIO_GROW_FILM 0.16             // the film of color spreading just past the edge (fraction of the color)
+#define PIO_STAIN_LIFT 1.55            // a dried stain is lighter than the table ...
+#define PIO_STAIN_GREY 0.75            // ... desaturated toward its grey by this much
+#define PIO_STAIN_RING 0.42            // the coffee ring darkens the stain's edge by up to this much
+
+// Logistic approximation of the standard normal CDF (|error| < 0.01): the profile of a blurred straight edge.
+float PIO_EdgeProfile(float x)
+{
+    return 1.0 / (1.0 + exp(-1.702 * x));
+}
+
+// Wave D-2 rim (header): signed distance (world units, > 0 outside) of w to the border of the grid rectangle
+// _PIO_ArenaRect and its outward normal. No derivative: usable in a branch.
+float PIO_GridBorder(float2 w, out float2 nOut)
+{
+    float2 halfR = _PIO_ArenaRect.zw * 0.5;
+    float2 rel = w - (_PIO_ArenaRect.xy + halfR);
+    float2 q = abs(rel) - halfR;
+    bool alongX = q.x > q.y;
+    nOut = alongX ? float2(rel.x >= 0.0 ? 1.0 : -1.0, 0.0) : float2(0.0, rel.y >= 0.0 ? 1.0 : -1.0);
+    return alongX ? q.x : q.y;
+}
+
+// Wave D-2 rim: limits a relief sample (H_T, dH/dx, dH/dy, max t_wide; world units) by a straight puddle edge lying on
+// the grid border (signed distance dB, outward normal n): the height of that edge, PIO_Height of its wide profile, wins
+// where it is lower, with its own gradient. Off the border (the usual case) the sample is returned unchanged.
+float4 PIO_LiquidWallRelief(float4 h, float dB, float2 n)
+{
+    float tw = PIO_EdgeProfile(-dB / PIO_WALL_SIGMA_WIDE);
+    float hw = PIO_Height(tw);
+    float4 r = h;
+    r.w = min(h.w, tw);
+    [flatten] if (hw < h.x)
+    {
+        // dH/dt of PIO_Height times dt/d(dB) of the profile; the slope at the contour is unbounded (the caller caps it).
+        float st = sqrt(max(tw, 1e-6));
+        float u = max((st - 0.70711) / 0.29289, 1e-4);
+        float dHdt = PIO_H0 * 0.5 / sqrt(u) * (1.0 / 0.29289) * 0.5 / st;
+        float dtdB = -(1.702 / PIO_WALL_SIGMA_WIDE) * tw * (1.0 - tw);
+        r.xyz = float3(hw, n * (dHdt * dtdB));
+    }
+    return r;
+}
+
+// Wave D-2 rim: the same for a dome sample (t_dome, dt/dx, dt/dy, t_dome toward the light) at the wobbled point w.
+float4 PIO_LiquidWallDome(float4 dm, float dB, float2 n, float2 w)
+{
+    float td = PIO_EdgeProfile(-dB / PIO_WALL_SIGMA_DOME);
+    float4 r = dm;
+    [flatten] if (td < dm.x)
+    {
+        r.xyz = float3(td, n * (-(1.702 / PIO_WALL_SIGMA_DOME) * td * (1.0 - td)));
+    }
+    float2 nS;
+    float dBs = PIO_GridBorder(w + float2(-0.6, 0.8) * PIO_DOME_SHADOW_REACH, nS);
+    r.w = min(dm.w, PIO_EdgeProfile(-dBs / PIO_WALL_SIGMA_DOME));
+    return r;
+}
+
 
 float PIO_Max4(float4 v)
 {
@@ -241,6 +312,25 @@ float PIO_ValueNoise(float2 p)
     return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
 }
 
+// Wave D-2 scorched ground (header): a dried paint stain on the table color g. level = scorch level (0..1, already
+// faded by TerritoryField), w = world position, pix = world units per pixel. No derivative: called inside the ground
+// branch. The stain's ragged edge comes from a noise threshold on the level, so the 0.125 u cells never show.
+float3 PIO_DriedStain(float3 g, float level, float2 w, float pix)
+{
+    float rag = PIO_ValueNoise(w * 2.3 + 7.0) * 0.6 + PIO_ValueNoise(w * 6.1 - 3.0) * 0.4;
+    float edge = level - 0.5 + 0.42 * (rag - 0.5);
+    float cover = saturate(edge / max(0.08, 2.0 * pix) + 0.5);
+    float ring = exp(-edge * edge * 110.0) * saturate(level * 3.0);
+    // Faint crackle of dried paint: thin dark lines where a stretched noise crosses its middle.
+    float crack = PIO_ValueNoise(w * float2(4.2, 3.6) + 21.0);
+    float lines = 1.0 - smoothstep(0.0, 0.035 + pix, abs(crack - 0.5));
+    float grey = dot(g, float3(0.2126, 0.7152, 0.0722));
+    float3 stain = lerp(g, float3(grey, grey, grey) * float3(1.08, 1.0, 0.92), PIO_STAIN_GREY) * PIO_STAIN_LIFT;
+    stain *= 1.0 - 0.18 * lines * cover;
+    float3 c = lerp(g, stain, cover);
+    return c * (1.0 - PIO_STAIN_RING * ring);
+}
+
 // Exact signed distance of the rounded-square arena (< 0 inside).
 float PIO_ArenaSdf(float2 p)
 {
@@ -251,19 +341,17 @@ float PIO_ArenaSdf(float2 p)
 
 // The table: navy with a faint woven grain (two value noises stretched across each other, about 2 px per lattice cell
 // at 30 px/u so the grain does not crawl when the camera pans; multiplicative in linear space, about +/- 1 sRGB level
-// like the reference) and a slow mottle, a soft inner shadow along the arena rim, and the darker outside.
-float3 PIO_Ground(float2 w, float pix)
+// like the reference) and a slow mottle, a soft inner shadow along the arena rim, then the shared arena frame (flat
+// light grey outside, yellow neon line on the edge: CountryDistance.hlsl).
+float3 PIO_Ground(float2 w, float pix, float time)
 {
     float sd = PIO_ArenaSdf(w);
-    float inArena = saturate(0.5 - sd / pix);
     float fibers = PIO_ValueNoise(w * float2(15.0, 5.5)) + PIO_ValueNoise(w * float2(5.5, 15.0) + 31.0) - 1.0;
     float mottle = PIO_ValueNoise(w * 1.7 + 17.0) - 0.5;
     float grain = 1.0 + fibers * 0.13 + mottle * 0.09;
     float rim = 1.0 - 0.32 * (1.0 - smoothstep(0.0, 1.4, -sd));
     float3 inside = _PIO_GroundColor.rgb * grain * rim;
-    float outsideShade = 1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.8, sd));
-    float3 outside = _PIO_OutsideColor.rgb * (1.0 + fibers * 0.05) * outsideShade;
-    return lerp(outside, inside, inArena);
+    return PIO_ArenaFrame(inside, sd, pix, time);
 }
 
 // Soft darkening of the table toward the corners of the view (the actor field rectangle is the view grown by 0.6 u).
@@ -367,9 +455,18 @@ void PIO_CompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseColor,
     // ---- Territory layer ------------------------------------------------------------------------------------------
     float2 wt = w + PIO_Wobble(w, time);
     float2 uvT = (wt - _PIO_ArenaRect.xy) / _PIO_ArenaRect.zw;
-    float4 t = PIO_FetchTerritory(uvT, bicubic) * _PIO_PlayerFade;
+    // Wave D-2 rim (header): a puddle that reaches the grid border ends there with a normal edge profile.
+    float2 nB;
+    float dB = PIO_GridBorder(wt, nB);
+    float wallN = PIO_EdgeProfile(-dB / PIO_WALL_SIGMA_NARROW);
+    float4 t = min(PIO_FetchTerritory(uvT, bicubic), wallN) * _PIO_PlayerFade;
     float4 ht = PIO_FetchHeight(uvT, bicubic);
     float4 dm = PIO_FetchDome(uvT, bicubic);                             // wave D: the wide dome field
+    [branch] if (dB > -2.5)
+    {
+        ht = PIO_LiquidWallRelief(ht, dB, nB);
+        dm = PIO_LiquidWallDome(dm, dB, nB, wt);
+    }
     float4 mj = PIO_ArgmaxMask(t);
     float tj = dot(t, mj);
     float fadeJ = dot(_PIO_PlayerFade, mj);
@@ -414,13 +511,20 @@ void PIO_CompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseColor,
     // depths behind the contour, read from the smooth wide relief field (tw = 0.5 on the contour), and the reveal age only
     // gates them on while the liquid there is fresh: they ride the advancing edge during the fill and fade when it stops.
     // One tap, every tier.
-    float reveal = SAMPLE_TEXTURE2D_LOD(_PIO_RevealTime, sampler_PIO_RevealTime, uvT, 0).r;
+    // Wave D-2: the same fetch carries the scorch level in G (ScorchedEarth, header); none outside the grid.
+    float2 revealRG = SAMPLE_TEXTURE2D_LOD(_PIO_RevealTime, sampler_PIO_RevealTime, uvT, 0).rg;
+    float reveal = revealRG.x;
+    float scorch = revealRG.y * saturate(0.5 - dB / pix);
     float age = clamp(_PIO_Now - reveal, 0.0, PIO_RIPPLE_LIFE);
     float fresh = 1.0 - smoothstep(0.06, PIO_RIPPLE_LIFE, age);
     float twj = ht.w * fadeJ;
     float c1 = (twj - PIO_RIPPLE_CREST1) * (1.0 / 0.085);
     float c2 = (twj - PIO_RIPPLE_CREST2) * (1.0 / 0.02);
     float wave = (exp(-c1 * c1) + 0.45 * exp(-c2 * c2)) * fresh;
+    // Wave D-2 growth (Propagation, header): a weaker crest just behind the creeping edge, kept off the creases.
+    float grow = dot(_PIO_GrowPulse, mj) * (1.0 - crease);
+    float cg = (twj - PIO_GROW_CREST) * (1.0 / 0.1);
+    wave += PIO_GROW_LIFT * grow * exp(-cg * cg);
     float rippleLift = 1.0 + PIO_RIPPLE_LIFT * wave;
     float rippleSheen = PIO_RIPPLE_SHEEN * wave * wave;
 
@@ -447,6 +551,9 @@ void PIO_CompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseColor,
         [branch] if (cT < 1.0)
         {
             float tw = SAMPLE_TEXTURE2D_LOD(_PIO_TerritoryHeight, sampler_PIO_TerritoryHeight, uvT + off / _PIO_ArenaRect.zw, 0).w * fadeJ;
+            float2 nOff;
+            float dBoff = PIO_GridBorder(wt + off, nOff);                // wave D-2 rim: no shadow smeared past it
+            tw = min(tw, PIO_EdgeProfile(-dBoff / PIO_WALL_SIGMA_WIDE));
             groundShadow = PIO_GROUND_SHADOW * smoothstep(0.0, 0.72, saturate(tw + PIO_Max4(aS)));
         }
     }
@@ -457,7 +564,18 @@ void PIO_CompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseColor,
     float3 ground = float3(0.0, 0.0, 0.0);
     [branch] if (cT < 1.0)
     {
-        ground = PIO_Ground(w, pix) * ((1.0 - groundShadow) * (1.0 - domeShadow) * (1.0 - contact) * PIO_Vignette(w));
+        float3 table = PIO_Ground(w, pix, time);
+        // Wave D-2: scorched ground is a dried paint stain (its own branch: no cost without ScorchedEarth).
+        [branch] if (scorch > 0.002)
+        {
+            table = PIO_DriedStain(table, scorch, w, pix);
+        }
+        ground = table * ((1.0 - groundShadow) * (1.0 - domeShadow) * (1.0 - contact) * PIO_Vignette(w));
+        // Wave D-2 growth: a faint film of the color creeping out past the edge: at the pulse's peak it hugs the edge,
+        // then it slides outward (lower narrow-field values, up to about 0.2 u out) while it fades.
+        float filmAt = lerp(0.14, 0.42, grow);
+        float filmX = (tj - filmAt) * (1.0 / 0.13);
+        ground += PIO_ChannelColor(mj) * (PIO_GROW_FILM * grow * exp(-filmX * filmX) * step(0.03, tj));
     }
     float3 puddle = float3(0.0, 0.0, 0.0);
     [branch] if (cT > 0.0)

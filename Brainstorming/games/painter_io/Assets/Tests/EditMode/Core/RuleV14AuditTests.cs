@@ -688,7 +688,7 @@ namespace PainterIO.Tests
 #else
             const int seeds = 6;
 #endif
-            int chasedSeen = 0, exactChecked = 0;
+            int chasedSeen = 0, exactChecked = 0, linkedChecked = 0;
             for (ulong seed = 1; seed <= (ulong)seeds; seed++)
             {
                 BotStyle[] styles = { BotStyle.Balanced, BotStyle.Balanced, BotStyle.Greedy, BotStyle.Aggressive };
@@ -710,6 +710,7 @@ namespace PainterIO.Tests
                 var returnsWithCells = new int[n];
                 var kills = new int[n];
                 var cuts = new int[n];
+                var linksBefore = new int[n];   // rule v1.8 (contract 32): PlayerState.DomainLinks at the start of the tick
                 sim.BeforeTick += s =>
                 {
                     snap.Cells = Snapshot(s);
@@ -717,6 +718,7 @@ namespace PainterIO.Tests
                     for (int i = 0; i < n; i++)
                     {
                         PlayerState p = s.Players[i];
+                        linksBefore[i] = p.DomainLinks;
                         snap.Trails[i].Clear();
                         for (int k = 0; k < p.Trail.Count; k++) snap.Trails[i].Add(p.Trail.Points[k]);
                         snap.Pockets[i].Clear();
@@ -789,6 +791,14 @@ namespace PainterIO.Tests
                         else
                         {
                             int[] expected = SolverCapture(before, sim.Players[pi].Id, snap.Trails[pi], e.Point, snap.Pockets[pi]);
+                            if (sim.Players[pi].DomainLinks > linksBefore[pi])
+                            {
+                                // Rule v1.8 (contract 32): this closure would have left the domain in pieces, so it also took
+                                // the band of its trail: the solver's capture is a part of it.
+                                Assert.IsTrue(IsSubset(expected, e.Cells), at + "a linked capture contains the CaptureSolver capture");
+                                linkedChecked++;
+                                continue;
+                            }
                             Assert.IsTrue(SameCells(expected, e.Cells), at + "unchased capture == CaptureSolver ("
                                           + e.Cells.Length + " vs " + expected.Length + ")");
                             exactChecked++;
@@ -806,7 +816,7 @@ namespace PainterIO.Tests
                 Assert.AreEqual(0, sim.EventCapHits, "EventCapHits");
             }
             TestContext.WriteLine("V14 fuzz: " + seeds + " rounds, " + chasedSeen + " chased returns, " + exactChecked
-                                  + " unchased captures recomputed exactly");
+                                  + " unchased captures recomputed exactly, " + linkedChecked + " linked captures (rule v1.8) containing the solver's");
             Assert.That(exactChecked, Is.GreaterThan(20 * seeds), "the fuzz must actually check captures");
         }
     }

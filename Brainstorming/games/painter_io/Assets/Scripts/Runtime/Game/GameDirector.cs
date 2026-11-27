@@ -4,6 +4,11 @@
 // else the -biome command line, else SaveData.Biome) and when a biome card is picked in the menu (SelectBiome).
 // Wave C (game-flow, robust-04): the screen may sleep and Android renders at 30 fps while the pause panel is up (also after
 // an automatic pause); NeverSleep and 60 fps come back when the pause ends (SleepTimeoutFor, AndroidTargetFrameRate).
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md section 5): rounds and the attract match get the traits of the biome being
+// played (GameSession); a biome pick and any change of the trait options (SaveData.Changed: BiomeRulesOn, TraitMatrix)
+// apply to the attract match immediately (GameSession.RefreshAttractTraits restarts it when its traits differ).
+// Rule v1.7 (contract 31, countries first): JOUER opens the country screen, the results go on to it (ToCountryScreen) or
+// replay the same country (StartRound keeps selectedCountry); HumanOutcome carries the conquest percentage and the winner.
 using System;
 using System.Collections.Generic;
 using PainterIO.Core;
@@ -21,8 +26,11 @@ namespace PainterIO.Runtime
     {
         public int Rank;
         public bool SharedRank;
+        /// <summary>Rule v1.7: the conquest percentage (owned cells over the conquerable cells), as the HUD shows it.</summary>
         public double AreaPercent;
         public RoundEndReason Reason;
+        /// <summary>Rule v1.7: a winner of the ended round (the conqueror for RoundEndReason.Conquest); -1 before the end.</summary>
+        public int Winner = -1;
         public EliminationCause Cause;
         public int Attacker = -1;
         public double CaughtDistance = -1;
@@ -128,11 +136,13 @@ namespace PainterIO.Runtime
             Build("DevShot", () => DevShot.TryCreate(this));
             Build("EuropeShot", () => EuropeShot.TryCreate(this));
             Guard("Menu", ToMenu);
+            SaveData.Changed += OnSaveDataChanged;
         }
 
         private void OnDestroy()
         {
             if (Instance != this) return;
+            SaveData.Changed -= OnSaveDataChanged;
             if (Session != null)
             {
                 Session.EventRaised -= OnSessionEvent;
@@ -199,7 +209,10 @@ namespace PainterIO.Runtime
             {
                 ulong seed = (ulong)DateTime.UtcNow.Ticks;
                 bool lasso = LaunchArgs.Lasso ?? SaveData.LassoOn;
-                SetSession(GameSession.CreateRound(seed, lasso, selectedCountry), GameState.Playing);
+                GameSession round = GameSession.CreateRound(seed, lasso, selectedCountry);
+                Debug.Log("[PainterIO] round biome=" + BiomeTheme.CommandNameOf(GameSession.ActiveBiome()) + " traits=" + round.Traits
+                          + (SaveData.BiomeRulesOn ? "" : " (Regles classiques)"));
+                SetSession(round, GameState.Playing);
             }
             catch (Exception e)
             {
@@ -207,10 +220,29 @@ namespace PainterIO.Runtime
             }
         }
 
+        /// <summary>
+        /// Starts a round on the country (its polygon arena and starts), State = Playing; "Rejouer" (StartRound) replays
+        /// the same country. Null plays the classic square arena: since rule v1.7 the menu never does that (JOUER opens
+        /// the country screen); only launch flags, the probe, DevShot and tests still play the square.
+        /// </summary>
         public void StartCountry(EuropeCatalog.Country country)
         {
             selectedCountry = country;
             StartRound();
+        }
+
+        /// <summary>The country of the last StartCountry (null for the square arena).</summary>
+        public EuropeCatalog.Country SelectedCountry => selectedCountry;
+
+        /// <summary>
+        /// Rule v1.7 (countries first): back to the menu state with the country screen open, where a won round plays the
+        /// reveal of the newly unlocked flags ("Pays suivant" on the results). The attract match runs behind it as usual.
+        /// </summary>
+        public void ToCountryScreen()
+        {
+            ToMenu();
+            UiRoot ui = UiRoot.Instance;
+            if (ui != null && State == GameState.Menu) Guard("CountryScreen", ui.OpenEurope);
         }
 
         /// <summary>Starts a prepared real session (DevShot, probe), State = Playing. The session keeps its own AwaitingStart.</summary>
@@ -245,6 +277,24 @@ namespace PainterIO.Runtime
             SaveData.Biome = (int)id;
             if (Session != null) Session.Biome = null;
             BiomeTheme.SetCurrent(id);
+            RefreshAttractTraits();
+        }
+
+        /// <summary>
+        /// Wave D-2: the attract match behind the menu takes the traits of the selected biome at once (a biome pick, the
+        /// "Regles des biomes" option or the trait matrix changed). Real rounds keep their traits until they end.
+        /// </summary>
+        private void RefreshAttractTraits()
+        {
+            GameSession s = Session;
+            if (s == null || !s.IsAttract || s.IsClosed || State != GameState.Menu) return;
+            Guard("AttractTraits", () => s.RefreshAttractTraits());
+        }
+
+        private void OnSaveDataChanged()
+        {
+            if (this == null) return;
+            RefreshAttractTraits();
         }
 
         /// <summary>The biome a session plays in: its own Biome, else -biome (until a menu pick), else SaveData.Biome.</summary>
@@ -527,6 +577,7 @@ namespace PainterIO.Runtime
                     else if (LastOutcome != null && s.Sim.Result != null && !resultsShown)
                     {
                         LastOutcome.Reason = s.Sim.Result.Reason;
+                        LastOutcome.Winner = WinnerOf(s.Sim, h);
                     }
                     break;
             }
@@ -542,13 +593,13 @@ namespace PainterIO.Runtime
             {
                 if (j != h && sim.RankOf(j) == o.Rank) o.SharedRank = true;
             }
-            int arena = sim.Grid.ArenaCellCount;
             int cells;
             if (eliminated) cells = p.FinalCells;
             else if (sim.Result != null) cells = sim.Result.FinalCells[h];
             else cells = sim.Grid.CountOf(p.Id);
-            o.AreaPercent = arena > 0 ? 100.0 * cells / arena : 0.0;
+            o.AreaPercent = sim.ConquestPercentOf(cells);   // rule v1.7: the percentage the HUD showed
             o.Reason = sim.Ended && sim.Result != null ? sim.Result.Reason : RoundEndReason.None;
+            o.Winner = WinnerOf(sim, h);
             o.Cause = eliminated ? p.Cause : EliminationCause.None;
             if (eliminated)
             {
@@ -564,6 +615,13 @@ namespace PainterIO.Runtime
             o.HadSavedReturn = hadSavedReturn;
             o.LastSavedMargin = lastSavedMargin;
             return o;
+        }
+
+        /// <summary>A winner of the ended round, the human first when it shares the first place; -1 before the end.</summary>
+        private static int WinnerOf(Simulation sim, int human)
+        {
+            if (!sim.Ended || sim.Result == null || sim.Result.Winners == null || sim.Result.Winners.Count == 0) return -1;
+            return sim.Result.Winners.Contains(human) ? human : sim.Result.Winners[0];
         }
 
         private static void RecordStats(GameSession s, HumanOutcome o)

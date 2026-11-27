@@ -64,7 +64,7 @@ namespace PainterIO.Runtime
                     new Color32(0xE6, 0xD8, 0xFF, 0xFF),
                 },
                 Ground = new Color32(0x0B, 0x0F, 0x1E, 0xFF),          // very dark blue-black circuit board
-                OutsideArena = new Color32(0x07, 0x09, 0x12, 0xFF),
+                OutsideArena = Palette.OutsideArena,                   // #B4B9C1, shared light grey (border_neon)
                 UiAccent = new Color32(0xB8, 0xF6, 0xFF, 0xFF),        // cool neon white
                 FillDuration = 0.25f,
                 // Emissive look: cores, rims, arcs and the current packet go above 1 and bloom on the High tier.

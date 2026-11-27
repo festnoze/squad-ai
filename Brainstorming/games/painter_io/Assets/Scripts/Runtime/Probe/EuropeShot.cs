@@ -7,6 +7,8 @@
 //   -europeshot <dir> [-europeshot-plan map,round,progress,flags] [-europeshot-size WxH] [-biome liquid|fire|electric]
 //   map      : the Pays map opened (France), Monaco reached with the arrow navigation, Norway, Turkey, the UK
 //   round    : a round on France with the human looping out of its home and back (two shots)
+//   ride     : rule v1.9 border ride on France: the human heads to the nearest border and pushes into it at a slant with
+//              one fixed heading; a shot when the ride starts and one 0.6 s later (two shots, "[EuropeShot] ride" lines)
 //   progress : the map as the progression left it (combine with -europe-reset / -europe-wins / -europe-unlockall)
 //   flags    : three close-up frames of the floating flags, 0.25 s apart, to judge the waving
 // -europeshot-size makes the run wait (8 s max) until the window has that client size, for tall windows resized by the
@@ -43,6 +45,10 @@ namespace PainterIO.Runtime
         private GameSession steered;
         private int steerPhase;
         private double phaseStart, slideHeading, startHeading;
+        private double rideHeading;   // ride plan: the fixed slanted push into the border (phase 6)
+        private bool rideMode;
+        /// <summary>Ride plan: angle (radians, 35 degrees) between the push and the outward normal (above the hold angle: slides).</summary>
+        public const double RideSlant = 35.0 * Math.PI / 180.0;
         private Vec2d homePos;
 
         /// <summary>The EuropeShot component when "-europeshot &lt;dir&gt;" is on the command line, else null.</summary>
@@ -118,6 +124,7 @@ namespace PainterIO.Runtime
                 {
                     case "map": yield return MapPlan(); break;
                     case "round": yield return RoundPlan(); break;
+                    case "ride": yield return RidePlan(); break;
                     case "progress": yield return ProgressPlan(); break;
                     case "flags": yield return FlagsPlan(); break;
                     default: problems.Add("unknown plan step " + step); break;
@@ -190,6 +197,52 @@ namespace PainterIO.Runtime
             steered = null;
             director.ToMenu();
             yield return new WaitForSecondsRealtime(0.5f);
+        }
+
+        /// <summary>
+        /// Rule v1.9 border ride: phase 4 to the nearest border, then phase 6 pushes into it at RideSlant from the outward
+        /// normal with that heading fixed (no new input), so the head slides, rides after BorderRideDelay and follows the
+        /// outline on its own. Logs the ride state, the speed and the position at both shots.
+        /// </summary>
+        private IEnumerator RidePlan()
+        {
+            EuropeCatalog.Country france = Array.Find(EuropeCatalog.Load().countries, c => c.code == "FR");
+            director.StartCountry(france);
+            GameSession s = director.Session;
+            if (s == null || director.State != GameState.Playing) { problems.Add("the France round did not start"); yield break; }
+            int h = s.HumanIndex;
+            rideMode = true;
+            steered = s;
+            homePos = s.Sim.Players[h].Pos;
+            SetPhase(4, s, default);
+            string prefix = BiomeTheme.Current.CommandName + "_ride_fr_";
+            float t0 = Time.realtimeSinceStartup;
+            while (!s.IsClosed && !s.Sim.Ended && s.HumanAlive && Time.realtimeSinceStartup - t0 < 25f && !s.Sim.View.IsBorderRiding(h))
+                yield return null;
+            LogRide(s, "start");
+            if (!s.Sim.View.IsBorderRiding(h)) problems.Add("the human never rode the border (BorderRide " + s.Sim.Config.BorderRide + ")");
+            yield return Capture(prefix + "start", s);
+            double mark = s.Sim.Time;
+            t0 = Time.realtimeSinceStartup;
+            while (!s.IsClosed && !s.Sim.Ended && s.HumanAlive && Time.realtimeSinceStartup - t0 < 10f && s.Sim.Time - mark < 0.6)
+                yield return null;
+            LogRide(s, "follow");
+            yield return Capture(prefix + "follow", s);
+            steered = null;
+            rideMode = false;
+            director.ToMenu();
+            yield return new WaitForSecondsRealtime(0.5f);
+        }
+
+        private static void LogRide(GameSession s, string label)
+        {
+            int h = s.HumanIndex;
+            PlayerState me = s.Sim.Players[h];
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            Debug.Log("[EuropeShot] ride " + label + " riding=" + s.Sim.View.IsBorderRiding(h) + " rideStart=" + me.BorderRideStart.ToString("0.000", ci)
+                      + " contactStart=" + me.BorderContactStart.ToString("0.000", ci) + " speed=" + s.Sim.View.EffectiveSpeed(h).ToString("0.00", ci)
+                      + " pos=" + me.Pos + " headingDeg=" + (me.Heading * 180.0 / Math.PI).ToString("0.0", ci)
+                      + " alive=" + me.Alive + " simTime=" + s.Sim.Time.ToString("0.00", ci));
         }
 
         private IEnumerator ProgressPlan()
@@ -290,7 +343,10 @@ namespace PainterIO.Runtime
                     break;
                 case 4:
                     s.HumanController.Desired = outward.Angle();
-                    if (distance > -BorderApproach) SetPhase(5, s, outward);
+                    if (distance > -BorderApproach) SetPhase(rideMode ? 6 : 5, s, outward);
+                    break;
+                case 6:
+                    s.HumanController.Desired = rideHeading;   // fixed: the ride follows the outline without new input
                     break;
                 default:
                     s.HumanController.Desired = slideHeading;
@@ -303,6 +359,7 @@ namespace PainterIO.Runtime
             steerPhase = phase;
             phaseStart = s.Sim.Time;
             if (phase == 5) slideHeading = outward.Perp().Angle();
+            if (phase == 6) rideHeading = Geo.WrapAngle(outward.Angle() + RideSlant);
         }
 
         private IEnumerator Capture(string name, GameSession session = null)

@@ -72,6 +72,18 @@ namespace PainterIO.Core
 
         /// <summary>The cells the elimination freed (Eliminated.Cells, ascending). Still neutral when OnKill runs.</summary>
         public int[] FreedCells;
+
+        /// <summary>
+        /// Rule v1.6 (contract 30): the victim's spark at the kill (SCut and the cut geometry). Set only in single-domain
+        /// rounds (KillInheritance with SimConfig.InheritanceBridge on), else null.
+        /// </summary>
+        internal Spark Spark;
+
+        /// <summary>
+        /// Rule v1.6: the victim's trail from its exit to the cut point P = PointAt(SCut) (the part that tied it to its
+        /// land), copied before the elimination cleared the trail. Set only in single-domain rounds, else null.
+        /// </summary>
+        internal List<Vec2d> VictimPrefix;
     }
 
     /// <summary>

@@ -39,6 +39,12 @@ namespace PainterIO.Core
         private int stamp;
         private int version;
 
+        // Rule v1.6 (KillInheritance bridge, contract 30): the identity of the current exit and the arc length dropped from
+        // its front since it started (DropPrefix).
+        private int epoch;
+        private double dropped;
+        private readonly List<Vec2d> tailScratch = new List<Vec2d>();
+
         private static readonly Comparison<SelfCrossing> CrossingOrder = CompareCrossings;
 
         public Trail()
@@ -66,12 +72,58 @@ namespace PainterIO.Core
         /// <summary>Increments on every mutation: each Clear, Start and accepted Append (an ignored Append changes nothing).</summary>
         public int Version => version;
 
+        /// <summary>
+        /// Rule v1.6 (contract 30, api addition): identity of the current exit, incremented by every Clear and Start (not by
+        /// Append nor DropPrefix). Two reads with the same Epoch see the same exit.
+        /// </summary>
+        internal int Epoch => epoch;
+
+        /// <summary>
+        /// Rule v1.6: arc length removed from the front of the current exit by DropPrefix since its Start (0 otherwise). An
+        /// arc length s recorded on this exit when Dropped was d0 is now s - (Dropped - d0).
+        /// </summary>
+        internal double Dropped => dropped;
+
         public void Clear()
+        {
+            Reset();
+            epoch++;
+            dropped = 0.0;
+        }
+
+        private void Reset()
         {
             points.Clear();
             arc.Clear();
             buckets.Clear();
             version++;
+        }
+
+        /// <summary>
+        /// Rule v1.6 (KillInheritance bridge, contract 30): the part [0, s] of the trail became territory. The trail now
+        /// starts at PointAt(s) and keeps every later stored point (same last point, so the head bookkeeping of section 6 is
+        /// unchanged); Epoch stays (same exit) and Dropped grows by s. Version changes (cut and lasso candidates computed on
+        /// the old trail are dropped by their re-validation). No-op when s &lt;= 0 or the trail is empty; s beyond Length
+        /// leaves the last point only.
+        /// </summary>
+        internal void DropPrefix(double s)
+        {
+            int n = points.Count;
+            if (n == 0 || !(s > 0.0)) return;
+            double length = Length;
+            if (s > length) s = length;
+            Vec2d first = PointAt(s);
+            tailScratch.Clear();
+            for (int k = 1; k < n; k++)
+            {
+                if (arc[k] > s) tailScratch.Add(points[k]);
+            }
+            if (tailScratch.Count == 0) first = points[n - 1];
+            Reset();
+            AddPoint(first, 0.0);
+            for (int k = 0; k < tailScratch.Count; k++) Append(tailScratch[k]);
+            tailScratch.Clear();
+            dropped += s;
         }
 
         /// <summary>Clear then add the first point.</summary>

@@ -1,0 +1,56 @@
+{
+  "task": "Country border: light grey outside the arena and a yellow neon edge line, same look in the three biomes",
+  "date": "2026-11-27",
+  "agent": "border",
+  "design": {
+    "shared_code": "PIO_ArenaFrame(inside, sd, pix, time) in Assets/Resources/Shaders/CountryDistance.hlsl (already included by the three composites); called from the ground shading of LiquidComposite (PIO_Ground), FireComposite (ground branch) and ElectricComposite (PIOE_Ground). Same function for country polygons and the classic rounded square (it takes the arena signed distance).",
+    "fetch_cost": "none added: the glow is derived from the arena signed distance already computed for the ground (analytic square or the existing _PIO_CountryDistance fetch). No derivative inside, usable in the existing dynamic branches.",
+    "layering": "drawn in the ground layer only, so territories, trails, heads and pockets are composited on top of it; the line is centred 0.04 u outside the edge so a territory hugging the rim does not cover its core."
+  },
+  "parameters": {
+    "outside_grey_srgb": "#B4B9C1 (Palette.OutsideArena, used by all three themes; also the camera clear color)",
+    "outside_grey_linear": [0.456, 0.485, 0.533],
+    "outside_shading": "flat (no noise, no darkening)",
+    "neon_core_linear": [1.0, 0.94, 0.50],
+    "neon_glow_linear": [1.0, 0.80, 0.03],
+    "core_offset_u": 0.04,
+    "core_half_width_u": "max(0.045, 0.75 px)",
+    "glow": "lerp toward the glow color by saturate((0.60 * exp(-x / 0.09) + 0.32 * exp(-x / 0.30)) * pulse), x = |sd - 0.04| in world units",
+    "pulse": "1 + 0.07 * sin(1.4 t) on the halo only (period about 4.5 s), the core is steady",
+    "max_value": "all components <= 1.0, so nothing feeds the High-tier bloom (threshold 1.1)",
+    "inner_rim_shadow": "kept as before in each biome (darkens the ground inside the edge, so the neon reads)"
+  },
+  "files_changed": [
+    "Assets/Resources/Shaders/CountryDistance.hlsl (PIO_ArenaFrame + PIO_NEON_* constants)",
+    "Assets/Resources/Shaders/LiquidComposite.hlsl (PIO_Ground uses the frame, takes time; header comment)",
+    "Assets/Resources/Shaders/FireComposite.hlsl (ground uses the frame; header comment)",
+    "Assets/Resources/Shaders/ElectricComposite.hlsl (PIOE_Ground uses the frame instead of the cool blue rim line and dark outside; header comment)",
+    "Assets/Scripts/Runtime/View/Palette.cs (OutsideArena #151D38 -> #B4B9C1)",
+    "Assets/Scripts/Runtime/Biomes/LiquidTheme.cs, FireTheme.cs, ElectricTheme.cs (OutsideArena = Palette.OutsideArena)",
+    "Assets/Tests/EditMode/Runtime/BiomeTests.cs (expected outside colors)",
+    "docs/CONTRACT.md (11.3 palette, 12 ground, 14 camera clear color, 25 fire and electric grounds)"
+  ],
+  "shots": {
+    "dir": "docs/border/shots",
+    "europe_round_france": [
+      "540x960/{liquid,fire,electric}_round_fr_{capture,border}.png",
+      "1080x2400/{liquid,fire,electric}_round_fr_{capture,border}.png"
+    ],
+    "classic_square_probe_fire_540x960": "classic_probe/*.png (menu.png shows the rounded-square corner with the neon and the grey)",
+    "built_player": "Build/border (Windows, deleted after the shots)"
+  },
+  "verification": {
+    "setup_compile_shadercheck": "PASS, ShaderCheck 13 shaders, 0 failures (every _PIO_ShaderId marker kept, no new shader file)",
+    "europe_shots": "6 runs, 12 PNGs, 0 log errors",
+    "probe_classic_fire": "[ProbeResult] PASS",
+    "editmode": "790 tests, 23 failures, 7 skipped. The 122 rendering/biome/palette tests (BiomeTests, LiquidRenderTests, FireBiomeTests, WaveC_* incl. WaveC_Composites_KeepTheirFetchCount, WaveD_LiqDropTests, Europe*) all pass. The 23 failures are Core rule hashes (InheritanceBridge, KillTraitsAudit, TraitsClassic, AuditTests, RuleV14Audit, SimConfig defaults) and UiStringsTests.Format_*: files owned by the parallel agents, untouched here.",
+    "playmode": "not run (BootTests compare the camera clear color with theme.OutsideArena, which still holds)"
+  },
+  "not_verified": [
+    "the look on a real phone (only the Windows player at 540x960 and 1080x2400 client sizes)",
+    "the pulse (stills only)",
+    "a territory lying right against the rim (no shot puts one there; by construction the core sits 0.04 u outside the edge and territories draw over the inner halo)",
+    "menu/attract readability: when the attract camera shows the outside, light HUD/menu text (e.g. the best score line) now sits over light grey; it has a shadow but the UI agent may want to check it",
+    "Electric player color 2 (#FFE84D) and Liquid Saffron (#F5B731) are yellow too; they read as filled hex/liquid areas, distinct from the thin line, but the hue is close"
+  ]
+}

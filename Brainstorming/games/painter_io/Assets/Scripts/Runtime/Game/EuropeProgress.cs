@@ -133,7 +133,9 @@ namespace PainterIO.Runtime
         /// <summary>
         /// The game's round victory, as counted in SaveData.Wins by GameDirector.RecordStats: a real round (not attract,
         /// probe, DevShot or test sessions), with stats-valid settings (no modified test tuning, no command line override),
-        /// that the human finished first (rank 1, shared first place included).
+        /// that the human finished first (rank 1, shared first place included). Rule v1.7: rank 1 covers every winning end,
+        /// whatever RoundEndReason says: Conquest (the conqueror owns the most cells), LastSurvivor, and the largest land
+        /// (or a share of it) at TimeUp.
         /// </summary>
         public static bool IsCountedWin(bool countsForStats, bool tuned, HumanOutcome outcome) =>
             countsForStats && !tuned && outcome != null && outcome.Rank == 1;

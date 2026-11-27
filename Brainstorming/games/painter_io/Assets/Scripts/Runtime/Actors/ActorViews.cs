@@ -6,6 +6,8 @@
 // Contract 25.2: beads (pearls, droplets, splash drops, evaporating beads) use BiomeTheme.Current's BeadShader and the
 // overlays (cut flash, ring, charge ring, home arrow, indicators, glints) its OverlayShader, with the same vertex data;
 // on BiomeTheme.Changed every batch re-binds its shader live. Colors come from Palette (the biome's PlayerColors).
+// Wave D-2 (traits-fx, docs/BIOME_TRAITS.md 5 and 7.2): TraitFxView draws the generic trait visuals (conduction streak,
+// reach arcs, speed aura, shield film, timer ring and shimmering trail) after the pearls and the charge ring.
 using System;
 using System.Collections.Generic;
 using PainterIO.Core;
@@ -138,7 +140,11 @@ namespace PainterIO.Runtime
         private SparkEdgeIndicator sparkEdge;
         private RingIndicator ringIndicator;
         private SplashView splash;
+        private TraitFxView traitFx;
         private bool hidden = true;
+
+        /// <summary>Wave D-2: the trait visuals (null if they failed to build).</summary>
+        public TraitFxView TraitFx => traitFx;
 
         /// <summary>The spark edge indicator (screen position for the tutorial pointer, contract 12.3 / 15.4).</summary>
         public SparkEdgeIndicator SparkEdge => sparkEdge;
@@ -152,6 +158,7 @@ namespace PainterIO.Runtime
             var v = go.AddComponent<ActorViews>();
             v.director = d;
             v.Build();
+            TraitFxLab.TryCreate(d);   // dev aid, only with -traitfxlab <dir>
             if (d != null)
             {
                 d.SessionStarted += v.OnSessionStarted;
@@ -225,6 +232,7 @@ namespace PainterIO.Runtime
             Guard("SparkEdgeIndicator", () => sparkEdge = new SparkEdgeIndicator());
             Guard("RingIndicator", () => ringIndicator = new RingIndicator());
             Guard("SplashView", () => splash = new SplashView(transform, ctx.BeadShader));
+            Guard("TraitFxView", () => traitFx = new TraitFxView(transform, ctx.OverlayShader));
             EnsurePlayers(Tuning.PlayerCount);
             BiomeTheme.Changed += OnBiomeChanged;
         }
@@ -262,6 +270,7 @@ namespace PainterIO.Runtime
             foreach (PearlView p in pearls) p?.Destroy();
             foreach (RetractionView r in retractions) r?.Destroy();
             splash?.Destroy();
+            traitFx?.Destroy();
             ctx.Pearls?.Destroy();
             ctx.Overlays?.Destroy();
             ctx.Indicators?.Destroy();
@@ -302,6 +311,7 @@ namespace PainterIO.Runtime
                 s.EventRaised += OnSimEvent;
                 EnsurePlayers(s.Sim.Players.Count);
             }
+            TraitFxShots.Reset();
             ResetViews();
         }
 
@@ -320,11 +330,13 @@ namespace PainterIO.Runtime
             Guard("SparkEdgeIndicator", () => sparkEdge?.Reset());
             Guard("RingIndicator", () => ringIndicator?.Reset());
             Guard("SplashView", () => splash?.Reset());
+            Guard("TraitFxView", () => traitFx?.Reset());
         }
 
         private void OnSimEvent(SimEvent e)
         {
             if (e == null || session == null) return;
+            if (TraitFxShots.Enabled) TraitFxShots.OnEvent(e, ctx.Time, session.HumanIndex, session.Sim);   // dev aid (-traitfxshots)
             int p = e.Player;
             bool valid = p >= 0 && p < threads.Length;
             switch (e.Type)
@@ -362,6 +374,18 @@ namespace PainterIO.Runtime
                     break;
                 case SimEventType.RingPicked:
                     ringView?.OnPicked(p, ctx.Time);
+                    break;
+                case SimEventType.SpeedBoosted:
+                case SimEventType.ShieldStarted:
+                case SimEventType.ShieldEnded:
+                    if (!valid || traitFx == null) break;
+                    try
+                    {
+                        PearlView pv = pearls[p];
+                        traitFx.OnEvent(e, ctx.Time, pv != null ? pv.LastPosition : session.RenderPos(p),
+                                        pv != null ? pv.LastRadius : (float)Tuning.HeadRadius);
+                    }
+                    catch (Exception ex) { Report("TraitFxView", ex); }
                     break;
             }
         }
@@ -422,6 +446,8 @@ namespace PainterIO.Runtime
             catch (Exception e) { Report("RingView", e); }
             try { chargeRing?.Tick(ctx, pearls); }
             catch (Exception e) { Report("ChargeRing", e); }
+            try { traitFx?.Tick(ctx, pearls); }
+            catch (Exception e) { Report("TraitFxView", e); }
             for (int i = 0; i < n; i++)
             {
                 try { retractions[i]?.DrawGlint(ctx); }
@@ -450,6 +476,7 @@ namespace PainterIO.Runtime
                 ctx.Indicators?.End();
             }
             catch (Exception e) { Report("batches", e); }
+            if (TraitFxShots.Enabled) TraitFxShots.Tick(ctx.Time);
         }
 
         private void PrepareContext(GameSession s)
@@ -506,6 +533,7 @@ namespace PainterIO.Runtime
             foreach (PearlView p in pearls) p?.Hide();
             foreach (RetractionView r in retractions) r?.Hide();
             splash?.Hide();
+            traitFx?.Hide();
             ctx.Pearls?.Hide();
             ctx.Overlays?.Hide();
             ctx.Indicators?.Hide();

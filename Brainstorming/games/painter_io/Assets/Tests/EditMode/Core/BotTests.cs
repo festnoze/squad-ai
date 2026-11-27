@@ -167,10 +167,11 @@ namespace PainterIO.Tests
         /// of section 9.
         /// </summary>
         internal static RoundStats RunRound(ulong seed, BotPersonality[] lineup, int humanIndex, bool lasso, int tickRate = 60,
-                                            List<double> decisionSamples = null)
+                                            List<double> decisionSamples = null, bool borderRide = false)
         {
             int n = lineup.Length;
             var config = new SimConfig { Seed = seed, TickRate = tickRate, LassoEnabled = lasso };
+            if (borderRide) config.BorderRide = BorderRideRule.On;   // rule v1.9 (BorderRideTests)
             var probes = new ProbeController[n];
             var controllers = new IController[n];
             for (int i = 0; i < n; i++)
@@ -418,12 +419,13 @@ namespace PainterIO.Tests
             return s;
         }
 
-        internal static Summary RunSeeds(int seeds, BotPersonality[] lineup, int humanIndex, bool lasso, out List<RoundStats> rounds)
+        internal static Summary RunSeeds(int seeds, BotPersonality[] lineup, int humanIndex, bool lasso, out List<RoundStats> rounds,
+                                         bool borderRide = false)
         {
             rounds = new List<RoundStats>();
             var samples = new List<double>();
             var watch = Stopwatch.StartNew();
-            for (int k = 1; k <= seeds; k++) rounds.Add(RunRound((ulong)k, lineup, humanIndex, lasso, 60, samples));
+            for (int k = 1; k <= seeds; k++) rounds.Add(RunRound((ulong)k, lineup, humanIndex, lasso, 60, samples, borderRide));
             watch.Stop();
             return Summarize(rounds, samples, watch.Elapsed.TotalSeconds);
         }

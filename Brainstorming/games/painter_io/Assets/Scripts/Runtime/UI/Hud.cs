@@ -11,6 +11,15 @@
 // Wave C: toasts never shrink below 0.85; with the leaderboard open a toast that would overlap it moves below it (and
 // below a visible tutorial bubble), and a line too long for the screen wraps to two lines (rules-02, ToastLayout). The
 // rival chevron is more opaque, a bit bigger and outlined in navy so it reads over bright beds (layout unchanged).
+// Wave D-2 (traits-ui, docs/BIOME_TRAITS.md 7.2): toasts for the human's kill rewards ("Tu as pris le terrain de Safran !",
+// "Vitesse +10 %", "Invincible 3 s"). A reward raised in the same frame as the kill toast of its victim merges into it:
+// the land reward replaces "Ton étincelle a eu Safran !" (it says more), the speed and shield rewards go on a second,
+// smaller line of the same pill, so one kill never floods the 2-entry queue and the shield toast is never 1.6 s late. A
+// chased return whose spark a shield put out shows "Étincelle éteinte : boucle perdue." (its Margin is 0). Right of the
+// pause button, RewardChips shows the human's speed level and shield time; RewardTally feeds the results stats line.
+// Rule v1.7 (contract 31, docs/CONTRACT.md 31): every percentage is the conquest percentage (Simulation.ConquestPercent,
+// owned cells over the conquerable cells), a slim bar under the human label fills toward the goal and "Objectif 100 %"
+// sits under the timer; the timer reads m:ss (15:00 rounds).
 using System;
 using System.Collections.Generic;
 using PainterIO.Core;
@@ -59,6 +68,19 @@ namespace PainterIO.Runtime
         /// <summary>Rival chevron: opacity and size (visuals-hud-contrast-over-bright-beds).</summary>
         public const float ChevronAlpha = 0.9f;
         public static readonly Vector2 ChevronSize = new Vector2(28f, 18f);
+        /// <summary>Wave D-2: height added to a toast pill by its reward line, and that line's font size.</summary>
+        public const float ToastSubHeight = 50f;
+        public const int ToastSubFont = 36;
+        /// <summary>Wave D-2: the reward chips start this far right of the pause button's right edge.</summary>
+        public const float RewardChipsGap = 22f;
+        /// <summary>
+        /// Rule v1.7: the goal bar (under the human label, above the pause button) and the goal caption (under the timer):
+        /// center below the safe top, bar size, caption font size.
+        /// </summary>
+        public const float GoalBarY = 152f;
+        public const float GoalBarWidth = 300f;
+        public const float GoalBarHeight = 12f;
+        public const int GoalFontSize = 32;
 
         /// <summary>Height of the expanded leaderboard.</summary>
         public static float BoardHeight => Tuning.PlayerCount * BoardRowHeight + BoardPadding;
@@ -68,15 +90,27 @@ namespace PainterIO.Runtime
 
         private readonly Text humanLabel, timerLabel, rivalLabel;
         private readonly RectTransform humanRect, timerRect;
+        // Rule v1.7: progress toward the conquest goal (bar under the human label, caption under the timer).
+        private readonly Image goalTrack, goalFill;
+        private readonly Text goalLabel;
+        private long goalKey = long.MinValue;
         private readonly Image rivalChevron;
         private readonly CanvasGroup pauseGroup;
         private readonly CanvasGroup boardGroup;
         private readonly Row[] rows = new Row[Tuning.PlayerCount];
         private readonly CanvasGroup toastGroup;
         private readonly RectTransform toastRect;
-        private readonly Text toastText;
+        private readonly Text toastText, toastSub;
         private float toastNaturalWidth = 300f;
         private bool toastWrapped;
+        private float toastExtra = -1f;
+
+        // Wave D-2: kill rewards.
+        private readonly RewardChips rewardChips;
+        private readonly RewardTally tally = new RewardTally();
+        private Toast killToast;
+        private int killToastVictim = -1, killToastFrame = -1;
+        private bool humanSparkQuenched;
         private readonly Gain[] gains = new Gain[4];
         private readonly Image vignette;
 
@@ -116,6 +150,8 @@ namespace PainterIO.Runtime
         private sealed class Toast
         {
             public string Text;
+            /// <summary>Wave D-2: the reward line under the text (null when none).</summary>
+            public string Sub;
             public bool AboutHuman;
             public float Time;
         }
@@ -144,6 +180,24 @@ namespace PainterIO.Runtime
             timerLabel = UiKit.Label(Safe, "Countdown", AreaFontSize, UiKit.Light, TextAnchor.MiddleCenter);
             timerRect = timerLabel.rectTransform;
             UiKit.Place(timerRect, UiKit.TopCenter, new Vector2(0f, -TopBarY), new Vector2(360f, TopBarHeight));
+
+            // Rule v1.7 (contract 31): the goal. A slim bar under the human percentage fills toward the goal (100 %), and
+            // "Objectif 100 %" sits under the timer.
+            goalTrack = UiKit.Rounded(Safe, "GoalTrack", UiKit.WithAlpha(UiKit.Navy, 0.6f), GoalBarHeight * 0.5f);
+            RectTransform gt = goalTrack.rectTransform;
+            gt.anchorMin = gt.anchorMax = UiKit.TopLeft;
+            gt.pivot = new Vector2(0f, 0.5f);
+            gt.sizeDelta = new Vector2(GoalBarWidth, GoalBarHeight);
+            gt.anchoredPosition = new Vector2(52f, -GoalBarY);
+            goalFill = UiKit.Rounded(gt, "Fill", Palette.ColorOf(0), GoalBarHeight * 0.5f);
+            RectTransform gf = goalFill.rectTransform;
+            gf.anchorMin = new Vector2(0f, 0f);
+            gf.anchorMax = new Vector2(0f, 1f);
+            gf.pivot = new Vector2(0f, 0.5f);
+            gf.offsetMin = Vector2.zero;
+            gf.offsetMax = new Vector2(0f, 0f);
+            goalLabel = UiKit.Label(Safe, "Goal", GoalFontSize, UiKit.WithAlpha(UiKit.Light, 0.8f), TextAnchor.MiddleCenter);
+            UiKit.Place(goalLabel.rectTransform, UiKit.TopCenter, new Vector2(0f, -GoalBarY), new Vector2(360f, 46f));
 
             Button rivalButton = UiKit.Btn(Safe, "RivalArea", new Vector2(340f, 130f), new Color(1f, 1f, 1f, 0f), 30f, 0,
                                            UiKit.Light, ToggleBoard, out _);
@@ -223,6 +277,18 @@ namespace PainterIO.Runtime
             UiKit.Stretch(toastBg.rectTransform);
             toastText = UiKit.Label(toastRect, "Text", 44, UiKit.Light, TextAnchor.MiddleCenter, false);
             UiKit.Stretch(toastText.rectTransform);
+            // Wave D-2: the reward line of a kill toast (bottom band of the pill, hidden otherwise).
+            toastSub = UiKit.Label(toastRect, "Sub", ToastSubFont, UiKit.Saffron, TextAnchor.MiddleCenter, false);
+            RectTransform sr = toastSub.rectTransform;
+            sr.anchorMin = new Vector2(0f, 0f);
+            sr.anchorMax = new Vector2(1f, 0f);
+            sr.pivot = new Vector2(0.5f, 0f);
+            sr.offsetMin = new Vector2(0f, 10f);
+            sr.offsetMax = new Vector2(0f, 10f + ToastSubHeight);
+            toastSub.enabled = false;
+
+            // Wave D-2: the human's speed level and shield time, right of the pause button.
+            rewardChips = new RewardChips(Safe, new Vector2(52f + PauseButtonSize + RewardChipsGap, -84f - 55f - 26f - PauseButtonSize * 0.5f));
 
             // "+x %" capture gains, pooled; their Text is disabled while idle.
             for (int i = 0; i < gains.Length; i++)
@@ -241,11 +307,28 @@ namespace PainterIO.Runtime
         /// <summary>The text of the toast on screen, or null.</summary>
         public string CurrentToast => current != null ? current.Text : null;
 
+        /// <summary>Wave D-2: the reward line of the toast on screen, or null.</summary>
+        public string CurrentToastSub => current != null ? current.Sub : null;
+
+        /// <summary>Wave D-2: toasts waiting behind the current one (tests).</summary>
+        public int QueuedToasts => queue.Count;
+
+        /// <summary>Wave D-2: what the human earned from kills this round (ResultsScreen reads it).</summary>
+        public RewardTally Rewards => tally;
+
+        /// <summary>Wave D-2: the speed level and shield chips (tests).</summary>
+        public RewardChips Chips => rewardChips;
+
         public void Bind(GameSession s)
         {
             session = s;
             queue.Clear();
             current = null;
+            killToast = null;
+            killToastVictim = killToastFrame = -1;
+            humanSparkQuenched = false;
+            tally.Reset();
+            rewardChips.Hide();
             toastGroup.alpha = 0f;
             for (int i = 0; i < gains.Length; i++)
             {
@@ -258,13 +341,13 @@ namespace PainterIO.Runtime
             areaT = 1f;
             areaShown = areaFrom = areaTo = HumanArea(s);
             lastRenderTime = double.NaN;
-            humanKey = rivalKey = timerKey = long.MinValue;
+            humanKey = rivalKey = timerKey = goalKey = long.MinValue;
             for (int i = 0; i < rowKeys.Length; i++) rowKeys[i] = long.MinValue;
         }
 
         public override void Relabel()
         {
-            humanKey = rivalKey = timerKey = long.MinValue;
+            humanKey = rivalKey = timerKey = goalKey = long.MinValue;
             for (int i = 0; i < rowKeys.Length; i++) rowKeys[i] = long.MinValue;
         }
 
@@ -279,16 +362,25 @@ namespace PainterIO.Runtime
             Simulation sim = s.Sim;
             switch (e.Type)
             {
+                case SimEventType.Exit:
+                    if (e.Player == h) humanSparkQuenched = false;
+                    break;
                 case SimEventType.Return:
                     if (e.Player != h) break;
                     if (e.Cells != null && e.Cells.Length > 0)
                     {
                         popT = 0f;
-                        int arena = sim.Grid.ArenaCellCount;
+                        int arena = sim.ConquestCellCount;   // rule v1.7: the conquest denominator, as the label
                         double gain = arena > 0 ? 100.0 * e.Cells.Length / arena : 0.0;
                         if (gain >= GainMinPercent) SpawnGain(gain, e.Point);
                     }
-                    if (e.Chased && !s.IsFlickerReturn(e)) Enqueue(SavedLine(e.Margin), true);
+                    if (e.Chased && !s.IsFlickerReturn(e))
+                    {
+                        // Wave D-2: a shield put the spark out during this exit; the loop stays lost and Margin is 0.
+                        tally.LastChasedReturnQuenched = humanSparkQuenched;
+                        Enqueue(humanSparkQuenched ? Strings.Get("toast.quenched_return") : SavedLine(e.Margin), true);
+                    }
+                    humanSparkQuenched = false;
                     break;
                 case SimEventType.Cut:
                     if (e.Other == h && e.Player != h) Enqueue(Strings.Format("toast.cut", Strings.PlayerName(e.Player, h)), true);
@@ -296,13 +388,84 @@ namespace PainterIO.Runtime
                 case SimEventType.Eliminated:
                     if (e.Player == h) break;
                     if (e.Cause == EliminationCause.Spark && e.Other == h)
-                        Enqueue(Strings.Format("toast.spark_kill", Strings.PlayerName(e.Player, h)), true);
+                    {
+                        Toast t = EnqueueToast(Strings.Format("toast.spark_kill", Strings.PlayerName(e.Player, h)), true);
+                        if (t != null)
+                        {
+                            killToast = t;
+                            killToastVictim = e.Player;
+                            killToastFrame = Time.frameCount;
+                        }
+                    }
                     else Enqueue(Strings.Format("toast.eliminated", Strings.PlayerName(e.Player, h)), e.Other == h);
                     break;
                 case SimEventType.RingPicked:
                     if (e.Player == h && !lassoBubbleShown) Enqueue(Strings.Get("toast.lasso_ready"), true);
                     break;
+                case SimEventType.TerritoryInherited:
+                    if (e.Player != h) break;
+                    tally.Inherited++;
+                    tally.InheritedCells += e.Cells != null ? e.Cells.Length : 0;
+                    RewardToast(e.Other, Strings.Format("toast.inherit", Strings.PlayerName(e.Other, h)), true);
+                    break;
+                case SimEventType.SpeedBoosted:
+                    if (e.Player != h) break;
+                    double speedGain = e.Value - tally.SpeedMultiplier;
+                    tally.SpeedMultiplier = Math.Max(tally.SpeedMultiplier, e.Value);
+                    RewardToast(e.Other, SpeedToast(speedGain, e.Value, SpeedCap(sim)), false);
+                    break;
+                case SimEventType.ShieldStarted:
+                    if (e.Player != h) break;
+                    tally.Shields++;
+                    if (e.Chased) humanSparkQuenched = true;
+                    string seconds = TraitText.Seconds(Math.Max(0.0, e.Value - e.Time), Strings.Language);
+                    RewardToast(e.Other, Strings.Format(e.Chased ? "toast.shield_quench" : "toast.shield", seconds), false);
+                    break;
             }
+        }
+
+        /// <summary>
+        /// Wave D-2 (BIOME_TRAITS 7.2): "Vitesse +10 %" with the gain of this kill, or "Vitesse max : +30 %" (the total)
+        /// once the multiplier reached 1 + cap (cap NaN when the round has no KillSpeedBoost). The chip shows the total.
+        /// Public static for tests.
+        /// </summary>
+        public static string SpeedToast(double gain, double multiplier, double cap)
+        {
+            bool atCap = !double.IsNaN(cap) && multiplier >= 1.0 + cap - 1e-6;
+            if (atCap) return Strings.Format("toast.speed_max", TraitText.Percent(multiplier - 1.0, Strings.Language));
+            return Strings.Format("toast.speed", TraitText.Percent(gain, Strings.Language));
+        }
+
+        private static double SpeedCap(Simulation sim)
+        {
+            TraitSpec spec = sim != null && sim.Config != null && sim.Config.Traits != null ? sim.Config.Traits.Get(TraitId.KillSpeedBoost) : null;
+            return spec != null ? spec.P2 : double.NaN;
+        }
+
+        /// <summary>
+        /// Wave D-2: shows a kill reward. When the kill toast of the same victim was queued in this frame (the reward events
+        /// follow the victim's Eliminated in the same Step), the reward merges into it: replaceText swaps its text (the land
+        /// reward), otherwise the reward joins its second line. Else the reward gets its own toast.
+        /// </summary>
+        private void RewardToast(int victim, string text, bool replaceText)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            bool merge = killToast != null && killToastVictim == victim && killToastFrame == Time.frameCount
+                         && (killToast == current || queue.Contains(killToast));
+            if (!merge)
+            {
+                Toast t = EnqueueToast(text, true);
+                if (t != null)
+                {
+                    killToast = t;   // a second reward of the same kill (no kill toast) joins this one
+                    killToastVictim = victim;
+                    killToastFrame = Time.frameCount;
+                }
+                return;
+            }
+            if (replaceText) killToast.Text = text;
+            else killToast.Sub = string.IsNullOrEmpty(killToast.Sub) ? text : killToast.Sub + " · " + text;
+            if (killToast == current) ApplyToastText(current);
         }
 
         /// <summary>
@@ -318,16 +481,23 @@ namespace PainterIO.Runtime
         /// <summary>Queues a toast (15.3 rules). Public for tests and for other packages that need a toast.</summary>
         public void Enqueue(string text, bool aboutHuman)
         {
-            if (string.IsNullOrEmpty(text)) return;
-            if (HumanChased() && !aboutHuman) return;
+            EnqueueToast(text, aboutHuman);
+        }
+
+        /// <summary>Enqueue returning the queued (or shown) toast, null when it was refused.</summary>
+        private Toast EnqueueToast(string text, bool aboutHuman)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+            if (HumanChased() && !aboutHuman) return null;
             var t = new Toast { Text = text, AboutHuman = aboutHuman, Time = Time.unscaledTime };
             if (current == null)
             {
                 ShowToast(t);
-                return;
+                return t;
             }
             queue.Add(t);
             while (queue.Count > ToastQueueSize) queue.RemoveAt(0);
+            return t;
         }
 
         // ------------------------------------------------------------------------------------------------------------
@@ -354,7 +524,7 @@ namespace PainterIO.Runtime
                 PlayerState hp = sim.Players[h];
                 if (hp.Alive)
                 {
-                    double target = sim.AreaPercent(h);
+                    double target = sim.ConquestPercent(h);
                     if (Math.Abs(target - areaTo) > 1e-9)
                     {
                         areaFrom = areaShown;
@@ -377,6 +547,7 @@ namespace PainterIO.Runtime
             popT = Mathf.Min(1f, popT + simDt / PopSeconds);
             float pop = 1f + (PopScale - 1f) * Mathf.Sin(Mathf.PI * popT);
             humanRect.localScale = new Vector3(pop, pop, 1f);
+            TickGoal(sim, h, hasHuman);
 
             // Countdown (full round time while the round waits for the human).
             double remaining = Math.Max(0.0, sim.Config.RoundDuration - sim.Time);
@@ -407,7 +578,7 @@ namespace PainterIO.Runtime
             if (bestRival >= 0 && bestRival < sim.Players.Count)
             {
                 rivalLabel.color = Palette.ColorOf(bestRival);
-                double ra = sim.Players[bestRival].Alive ? sim.AreaPercent(bestRival) : 0.0;
+                double ra = sim.Players[bestRival].Alive ? sim.ConquestPercent(bestRival) : 0.0;
                 long rkey = ((long)Math.Round(ra * 10.0) * 8 + bestRival) * 4 + Strings.Language;
                 if (rkey != rivalKey)
                 {
@@ -429,9 +600,60 @@ namespace PainterIO.Runtime
             pauseGroup.blocksRaycasts = canPause;
             pauseGroup.interactable = canPause;
 
+            TickRewards(dt, sim, h, hasHuman, renderTime, canPause || (d != null && d.IsPaused));
             TickToasts(dt);
             TickGains(dt);
             TickVignette(dt, s, sim, h);
+        }
+
+        /// <summary>
+        /// Wave D-2: the speed level and shield chips, polled from SimView on the render clock. Shown while the human is
+        /// alive in a running round (also under the pause panel); "-uidemo rewards" forces demo values and a demo toast.
+        /// </summary>
+        private void TickRewards(float dt, Simulation sim, int h, bool hasHuman, double renderTime, bool inPlay)
+        {
+            double multiplier = 1.0, shieldLeft = 0.0, shieldDuration = TraitDefaults.KillShieldDuration;
+            double perKill = 0.0, cap = 0.0;
+            RuleTraits traits = sim.Config != null ? sim.Config.Traits : null;
+            TraitSpec boost = traits != null ? traits.Get(TraitId.KillSpeedBoost) : null;
+            if (boost != null)
+            {
+                perKill = boost.P1;
+                cap = boost.P2;
+            }
+            TraitSpec shield = traits != null ? traits.Get(TraitId.KillShield) : null;
+            if (shield != null) shieldDuration = shield.P1;
+            if (hasHuman && inPlay && sim.Players[h].Alive)
+            {
+                multiplier = sim.View.SpeedMultiplier(h);
+                if (sim.View.IsShielded(h)) shieldLeft = Math.Max(0.0, sim.View.ShieldEndTime(h) - renderTime);
+            }
+            if (UiRoot.DemoShows("rewards"))
+            {
+                perKill = TraitDefaults.KillSpeedBoostPerKill;
+                cap = TraitDefaults.KillSpeedBoostCap;
+                multiplier = 1.0 + 2.0 * perKill;
+                shieldDuration = TraitDefaults.KillShieldDuration;
+                shieldLeft = 2.1;
+                if (!tally.Any)
+                {
+                    tally.Inherited = 1;
+                    tally.SpeedMultiplier = multiplier;
+                    tally.Shields = 1;
+                }
+                if (current == null && queue.Count == 0)
+                {
+                    string victim = Strings.PlayerName(2, h);
+                    Toast t = EnqueueToast(Strings.Format("toast.inherit", victim), true);
+                    if (t != null)
+                    {
+                        t.Sub = SpeedToast(perKill, multiplier, double.NaN) + " · " + Strings.Format("toast.shield", TraitText.Seconds(shieldDuration, Strings.Language));
+                        ApplyToastText(t);
+                    }
+                }
+            }
+            Color human = Palette.ColorOf(h >= 0 ? h : 0);
+            rewardChips.Tick(dt, multiplier, perKill, cap, shieldLeft, shieldDuration, human);
         }
 
         private void UpdateBoard(Simulation sim, int h)
@@ -464,7 +686,7 @@ namespace PainterIO.Runtime
                 int i = order[r];
                 PlayerState p = sim.Players[i];
                 int rank = sim.RankOf(i);
-                double area = p.Alive ? sim.AreaPercent(i) : 0.0;
+                double area = p.Alive ? sim.ConquestPercent(i) : 0.0;
                 long key = (((long)Math.Round(area * 10.0) * 8 + i) * 8 + rank) * 8 + (p.Alive ? 1 : 0) * 4 + Strings.Language;
                 row.Dot.color = Palette.ColorOf(i);
                 row.Highlight.enabled = i == h;
@@ -506,8 +728,9 @@ namespace PainterIO.Runtime
                 a = Mathf.Min(1f, toastT / 0.15f) * Mathf.Clamp01((ToastSeconds - toastT) / 0.2f);
                 float avoidTop = float.NaN, avoidBottom = float.NaN;
                 TutorialBubbleBand(ref avoidTop, ref avoidBottom);
-                ToastPlacement p = ToastLayout(Safe.rect.width, toastNaturalWidth, boardOpen, avoidTop, avoidBottom);
-                SetToastWrap(p.Wrap);
+                float extra = string.IsNullOrEmpty(current.Sub) ? 0f : ToastSubHeight;
+                ToastPlacement p = ToastLayout(Safe.rect.width, toastNaturalWidth, boardOpen, avoidTop, avoidBottom, extra);
+                SetToastWrap(p.Wrap, extra);
                 if (toastRect.sizeDelta != p.Size) toastRect.sizeDelta = p.Size;
                 toastRect.localScale = new Vector3(p.Scale, p.Scale, 1f);
                 toastRect.anchoredPosition = p.Position + new Vector2(0f, 14f * (1f - Mathf.Min(1f, toastT / 0.15f)));
@@ -519,19 +742,32 @@ namespace PainterIO.Runtime
         {
             current = t;
             toastT = 0f;
-            SetToastWrap(false);   // single-line sizing first: the natural width decides the layout
-            toastText.text = t.Text;
-            toastNaturalWidth = Mathf.Max(toastText.preferredWidth + 84f, 300f);
-            toastRect.sizeDelta = new Vector2(toastNaturalWidth, ToastHeight);
+            ApplyToastText(t);
             UiRoot.RaiseToastShown(t.Text);
         }
 
-        private void SetToastWrap(bool wrap)
+        /// <summary>Puts the toast's text (and wave D-2 reward line) in the pill and measures its natural width.</summary>
+        private void ApplyToastText(Toast t)
         {
-            if (wrap == toastWrapped) return;
+            bool sub = !string.IsNullOrEmpty(t.Sub);
+            float extra = sub ? ToastSubHeight : 0f;
+            SetToastWrap(false, extra);   // single-line sizing first: the natural width decides the layout
+            toastText.text = t.Text;
+            toastSub.enabled = sub;
+            if (sub) toastSub.text = t.Sub;
+            float width = toastText.preferredWidth;
+            if (sub) width = Mathf.Max(width, toastSub.preferredWidth);
+            toastNaturalWidth = Mathf.Max(width + 84f, 300f);
+            toastRect.sizeDelta = new Vector2(toastNaturalWidth, ToastHeight + extra);
+        }
+
+        private void SetToastWrap(bool wrap, float extra)
+        {
+            if (wrap == toastWrapped && Mathf.Abs(extra - toastExtra) < 0.01f) return;
             toastWrapped = wrap;
+            toastExtra = extra;
             toastText.horizontalOverflow = wrap ? HorizontalWrapMode.Wrap : HorizontalWrapMode.Overflow;
-            toastText.rectTransform.offsetMin = wrap ? new Vector2(36f, 10f) : Vector2.zero;
+            toastText.rectTransform.offsetMin = wrap ? new Vector2(36f, 10f + extra) : new Vector2(0f, extra);
             toastText.rectTransform.offsetMax = wrap ? new Vector2(-36f, -10f) : Vector2.zero;
         }
 
@@ -592,20 +828,31 @@ namespace PainterIO.Runtime
         /// </summary>
         internal static ToastPlacement ToastLayout(float safeWidth, float toastWidth, bool boardOpen, float avoidTop, float avoidBottom)
         {
+            return ToastLayout(safeWidth, toastWidth, boardOpen, avoidTop, avoidBottom, 0f);
+        }
+
+        /// <summary>
+        /// ToastLayout for a pill extraHeight taller (wave D-2: the reward line of a kill toast, ToastSubHeight). The width,
+        /// scale and wrap rules are unchanged; the board and bubble avoidance use the taller pill.
+        /// </summary>
+        internal static ToastPlacement ToastLayout(float safeWidth, float toastWidth, bool boardOpen, float avoidTop, float avoidBottom,
+                                                   float extraHeight)
+        {
             float width = safeWidth > 1f ? safeWidth : UiKit.RefWidth;
             float avail = width - ToastSideMargin;
             float w = Mathf.Max(1f, toastWidth);
+            float extra = Mathf.Max(0f, extraHeight);
             var p = new ToastPlacement();
             if (w * MinToastScale > avail)
             {
                 p.Wrap = true;
                 p.Scale = 1f;
-                p.Size = new Vector2(Mathf.Max(100f, width - ToastWrapMargin), ToastWrapHeight);
+                p.Size = new Vector2(Mathf.Max(100f, width - ToastWrapMargin), ToastWrapHeight + extra);
             }
             else
             {
                 p.Scale = Mathf.Clamp(avail / w, MinToastScale, 1f);
-                p.Size = new Vector2(w, ToastHeight);
+                p.Size = new Vector2(w, ToastHeight + extra);
             }
             float halfH = p.Size.y * p.Scale * 0.5f;
             float y = ToastY;
@@ -719,6 +966,38 @@ namespace PainterIO.Runtime
             return p.Alive && p.Spark != null;
         }
 
+        /// <summary>
+        /// Rule v1.7: the goal bar fills with the shown conquest percentage over the goal (GoalPercent), in the human's
+        /// color; the caption reads "Objectif 100 %". Both hide when the goal is off (ConquestShare 0).
+        /// </summary>
+        private void TickGoal(Simulation sim, int h, bool hasHuman)
+        {
+            double goal = GoalPercent(sim.Config.ConquestShare);
+            bool on = hasHuman && goal > 0.0;
+            goalTrack.enabled = goalFill.enabled = goalLabel.enabled = on;
+            if (!on) return;
+            float fill = Mathf.Clamp01((float)(areaShown / goal));
+            goalFill.rectTransform.offsetMax = new Vector2(GoalBarWidth * fill, 0f);
+            goalFill.enabled = fill > 0.001f;
+            goalFill.color = Palette.ColorOf(h);
+            long key = (long)Math.Round(goal * 10.0) * 4 + Strings.Language;
+            if (key == goalKey) return;
+            goalKey = key;
+            goalLabel.text = GoalText(sim.Config.ConquestShare, Strings.Language);
+        }
+
+        /// <summary>Rule v1.7: the goal as the HUD shows it, in percent (100 for ConquestShare 1); 0 when the goal is off.</summary>
+        public static double GoalPercent(double conquestShare)
+        {
+            return conquestShare > 0.0 ? 100.0 * Math.Min(1.0, conquestShare) : 0.0;
+        }
+
+        /// <summary>Rule v1.7: "Objectif 100 %" (EN "Goal 100%"). Public static for tests.</summary>
+        public static string GoalText(double conquestShare, int language)
+        {
+            return Strings.FormatIn(language, "hud.goal", Strings.Area(GoalPercent(conquestShare), language));
+        }
+
         private static int BestRival(Simulation sim, int h)
         {
             int best = -1, bestCells = -1;
@@ -740,7 +1019,7 @@ namespace PainterIO.Runtime
         private static double HumanArea(GameSession s)
         {
             if (s == null || s.IsAttract || s.HumanIndex < 0) return 0.0;
-            return s.Sim.AreaPercent(s.HumanIndex);
+            return s.Sim.ConquestPercent(s.HumanIndex);
         }
     }
 }

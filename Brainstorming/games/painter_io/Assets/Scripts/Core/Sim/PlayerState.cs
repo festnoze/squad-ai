@@ -26,6 +26,24 @@ namespace PainterIO.Core
         /// Always false in classic rounds, where the cancellation clears the flag exactly as before.
         /// </summary>
         internal bool ExitWasCutBefore;
+
+        // Rule v1.6 (KillInheritance bridge, contract 30): the geometry of the cut, recorded by section 6 step c so that a
+        // kill by this spark can turn "the line the killer made" into territory. Never read without KillInheritance.
+
+        /// <summary>True for a real cut (step c: the attacker's head touched the trail); false for DebugForceCut.</summary>
+        internal bool Linked;
+
+        /// <summary>The attacker's head at the cut instant (Q, within ContactRadius of PointAt(SCut)).</summary>
+        internal Vec2d AttackerHead;
+
+        /// <summary>The attacker's Trail.Epoch at the cut when it was trailing then, else -1 (home at the cut).</summary>
+        internal int AttackerEpoch = -1;
+
+        /// <summary>The attacker's trail length at the cut instant (its head Q lies at that arc), when trailing.</summary>
+        internal double AttackerArc;
+
+        /// <summary>The attacker's Trail.Dropped at the cut (maps AttackerArc after a later DropPrefix of that exit).</summary>
+        internal double AttackerDropped;
     }
 
     public sealed class PlayerState
@@ -81,6 +99,36 @@ namespace PainterIO.Core
 
         /// <summary>True while shielded (ShieldEnd set). Alive players only carry a shield.</summary>
         public bool Shielded => ShieldEnd > double.NegativeInfinity;
+
+        /// <summary>
+        /// Rule v1.6 (contract 30, api addition): number of kill inheritance bridges this player made (InheritanceBridged
+        /// events). Bots read it to re-pick their closure target after their territory was joined; 0 in classic rounds.
+        /// </summary>
+        public int InheritanceBridges;
+
+        /// <summary>
+        /// Rule v1.8 (contract 32, api addition): number of returns whose trail became a band of territory because the
+        /// capture alone would have left this player's domain in several pieces (a detached gain, or a trail joining two
+        /// separate pieces). Counted per Return; not hashed. 0 with SimConfig.SingleDomain = Off.
+        /// </summary>
+        public int DomainLinks;
+
+        // Rule v1.9 (contract 33, border ride, BorderRide.cs). Neutral values unless SimConfig.BorderRide is On.
+
+        /// <summary>Sim time at which the current continuous contact with the boundary began; NaN when not in contact.</summary>
+        public double BorderContactStart = double.NaN;
+
+        /// <summary>True while the head rides the boundary (speed x BorderRideFactor, heading = the boundary tangent).</summary>
+        public bool BorderRiding;
+
+        /// <summary>Riding direction: +1 along OutwardNormal.Perp(), -1 against it (0 when not riding).</summary>
+        public int BorderRideSign;
+
+        /// <summary>The DesiredHeading the ride last accepted; a desired heading farther than BorderRide.InputTolerance from it is a new input.</summary>
+        public double BorderRideInput;
+
+        /// <summary>Sim time at which the current (or last) ride started; NaN before the first ride.</summary>
+        public double BorderRideStart = double.NaN;
 
         public int OwnedCells(OwnerGrid g) => g.CountOf(Id);
     }

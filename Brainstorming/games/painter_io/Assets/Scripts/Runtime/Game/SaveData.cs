@@ -1,5 +1,8 @@
 // Owned by BI since wave B-2 (written by B0a). Contract 11.5 (+ 25.1 Biome): persistent settings, stats and tutorial flags (PlayerPrefs keys "pio.<Name>").
 // Wave C (game-flow): TutSelfCrossDone (the self-crossing lesson of rules-01) and the MemoryOnly test scope.
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md section 5): BiomeRulesOn (the Options toggle "Regles des biomes", OFF =
+// "Regles classiques") and TraitMatrix (the hidden trait matrix, canonical text of BiomeTraitTable, "" = the table) with
+// ResetTraitMatrix; TuningModified also covers a matrix that differs from the table (BiomeRulesOn does not).
 // Every PlayerPrefs access is wrapped in try/catch and falls back to the default. Values are cached in memory after the
 // first read (only this class writes these keys), so per-frame readers (Palette, Sfx) cost nothing.
 using System;
@@ -15,7 +18,13 @@ namespace PainterIO.Runtime
         // Test-setting ranges (contract 15.2).
         public const float SparkFactorMin = 1.4f, SparkFactorMax = 2.4f, SparkFactorStep = 0.1f;
         public const float RingDelayMin = 10f, RingDelayMax = 30f, RingDelayStep = 5f;
-        public static readonly float[] RoundSecondsChoices = { 60f, 90f, 120f };
+        /// <summary>
+        /// Rule v1.7 (contract 31): the round time is only the ultimate limit of a country round (the goal is to conquer
+        /// 100 %): 5, 10 or 15 minutes, 15 by default. A value saved by an older version (60 / 90 / 120 s, below the first
+        /// choice) reads as the default.
+        /// </summary>
+        public static readonly float[] RoundSecondsChoices = { 300f, 600f, 900f };
+        public const float DefaultRoundSeconds = 900f;
 
         /// <summary>Raised after every setter (also when the value did not change).</summary>
         public static event Action Changed;
@@ -35,8 +44,11 @@ namespace PainterIO.Runtime
         private static readonly BoolPref tutLassoDone = new BoolPref("TutLassoDone", false);
         private static readonly BoolPref tutSelfCrossDone = new BoolPref("TutSelfCrossDone", false);
         private static readonly FloatPref sparkFactor = new FloatPref("SparkFactor", (float)Tuning.SparkSpeedFactor, SparkFactorMin, SparkFactorMax);
-        private static readonly FloatPref roundSeconds = new FloatPref("RoundSeconds", (float)Tuning.RoundDuration, 60f, 120f);
+        // The stored range is wider than the choices so an old saved value survives the clamp and is migrated by the getter.
+        private static readonly FloatPref roundSeconds = new FloatPref("RoundSeconds", DefaultRoundSeconds, 0f, 3600f);
         private static readonly FloatPref ringDelay = new FloatPref("RingDelay", (float)Tuning.LassoFirstSpawn, RingDelayMin, RingDelayMax);
+        private static readonly BoolPref biomeRulesOn = new BoolPref("BiomeRulesOn", true);
+        private static readonly StringPref traitMatrix = new StringPref("TraitMatrix", "", BiomeTraitTable.CanonicalMatrix);
 
         /// <summary>Default true.</summary>
         public static bool SoundOn { get => soundOn.Get(); set => Set(soundOn, value); }
@@ -104,11 +116,21 @@ namespace PainterIO.Runtime
             set => Set(sparkFactor, Snap(value, SparkFactorMin, SparkFactorMax, SparkFactorStep));
         }
 
-        /// <summary>Test setting, default 90 (60 / 90 / 120: snapped to the nearest choice).</summary>
+        /// <summary>
+        /// Test setting, default 900 (300 / 600 / 900 s: snapped to the nearest choice). Rule v1.7: a stored value below the
+        /// first choice is a pre-v1.7 save (60 / 90 / 120 s) and reads as DefaultRoundSeconds.
+        /// </summary>
         public static float RoundSeconds
         {
-            get => SnapChoice(roundSeconds.Get());
+            get => MigrateRoundSeconds(roundSeconds.Get());
             set => Set(roundSeconds, SnapChoice(value));
+        }
+
+        /// <summary>The round time a stored value stands for: DefaultRoundSeconds for a pre-v1.7 value, else the nearest choice.</summary>
+        public static float MigrateRoundSeconds(float stored)
+        {
+            if (float.IsNaN(stored) || float.IsInfinity(stored) || stored < RoundSecondsChoices[0] - 0.5f) return DefaultRoundSeconds;
+            return SnapChoice(stored);
         }
 
         /// <summary>Test setting, default 15 (10..30 step 5).</summary>
@@ -118,17 +140,44 @@ namespace PainterIO.Runtime
             set => Set(ringDelay, Snap(value, RingDelayMin, RingDelayMax, RingDelayStep));
         }
 
-        /// <summary>Any test setting differs from Tuning.</summary>
+        /// <summary>
+        /// Wave D-2 (BIOME_TRAITS 5): the Options toggle "Regles des biomes" (default true). False = "Regles classiques":
+        /// every round and the attract match run the classic rules (no trait). A normal option: it does not mark the
+        /// tuning as modified.
+        /// </summary>
+        public static bool BiomeRulesOn { get => biomeRulesOn.Get(); set => Set(biomeRulesOn, value); }
+
+        /// <summary>
+        /// Wave D-2 (BIOME_TRAITS 5): the hidden trait matrix (trait -> set of biomes) as canonical text of
+        /// BiomeTraitTable ("Id=letters;...", only the rows that differ from the table); "" = the default table. The
+        /// setter canonicalizes (unknown rows dropped). Edit it through BiomeTraitTable.SetAssigned.
+        /// </summary>
+        public static string TraitMatrix { get => traitMatrix.Get(); set => Set(traitMatrix, value ?? ""); }
+
+        /// <summary>The trait matrix differs from the default table (a test setting: stats are not saved then).</summary>
+        public static bool TraitMatrixModified => !string.IsNullOrEmpty(TraitMatrix);
+
+        /// <summary>Restores the default trait table (the matrix "Reinitialiser" button).</summary>
+        public static void ResetTraitMatrix()
+        {
+            Set(traitMatrix, "");
+        }
+
+        /// <summary>
+        /// Any test setting differs from its default (Tuning; the round time from DefaultRoundSeconds since rule v1.7), or
+        /// the trait matrix differs from the table (BiomeRulesOn excluded).
+        /// </summary>
         public static bool TuningModified =>
             Mathf.Abs(SparkFactor - (float)Tuning.SparkSpeedFactor) > 1e-3f
-            || Mathf.Abs(RoundSeconds - (float)Tuning.RoundDuration) > 1e-3f
-            || Mathf.Abs(RingDelay - (float)Tuning.LassoFirstSpawn) > 1e-3f;
+            || Mathf.Abs(RoundSeconds - DefaultRoundSeconds) > 1e-3f
+            || Mathf.Abs(RingDelay - (float)Tuning.LassoFirstSpawn) > 1e-3f
+            || TraitMatrixModified;
 
         /// <summary>Restores the three test settings to their Tuning defaults (the Options "Reinitialiser" button).</summary>
         public static void ResetTestSettings()
         {
             sparkFactor.Set((float)Tuning.SparkSpeedFactor);
-            roundSeconds.Set((float)Tuning.RoundDuration);
+            roundSeconds.Set(DefaultRoundSeconds);
             ringDelay.Set((float)Tuning.LassoFirstSpawn);
             RaiseChanged();
         }
@@ -157,6 +206,7 @@ namespace PainterIO.Runtime
             quality.Invalidate(); colorIndex.Invalidate(); biome.Invalidate(); bestArea.Invalidate(); wins.Invalidate();
             roundsPlayed.Invalidate(); tutExitDone.Invalidate(); tutCutDone.Invalidate(); tutLassoDone.Invalidate();
             tutSelfCrossDone.Invalidate(); sparkFactor.Invalidate(); roundSeconds.Invalidate(); ringDelay.Invalidate();
+            biomeRulesOn.Invalidate(); traitMatrix.Invalidate();
         }
 
         private static void Set<T>(Pref<T> pref, T value)
@@ -191,7 +241,7 @@ namespace PainterIO.Runtime
 
         private static float SnapChoice(float value)
         {
-            float best = RoundSecondsChoices[1];
+            float best = DefaultRoundSeconds;
             float bestDistance = float.MaxValue;
             foreach (float c in RoundSecondsChoices)
             {
@@ -283,6 +333,32 @@ namespace PainterIO.Runtime
             protected override int Read() => PlayerPrefs.GetInt(Key, Default);
             protected override void Write(int v) => PlayerPrefs.SetInt(Key, v);
             protected override int Sanitize(int v) => v < min ? min : (v > max ? max : v);
+        }
+
+        private sealed class StringPref : Pref<string>
+        {
+            private readonly Func<string, string> canonical;
+
+            public StringPref(string name, string defaultValue, Func<string, string> canonical) : base(name, defaultValue)
+            {
+                this.canonical = canonical;
+            }
+
+            protected override string Read() => PlayerPrefs.GetString(Key, Default);
+            protected override void Write(string v) => PlayerPrefs.SetString(Key, v);
+
+            protected override string Sanitize(string v)
+            {
+                if (v == null) return Default;
+                try
+                {
+                    return canonical != null ? canonical(v) ?? Default : v;
+                }
+                catch (Exception)
+                {
+                    return Default;
+                }
+            }
         }
 
         private sealed class FloatPref : Pref<float>

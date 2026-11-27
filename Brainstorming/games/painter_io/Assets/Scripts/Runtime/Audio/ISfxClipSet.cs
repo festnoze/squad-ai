@@ -6,6 +6,10 @@
 // Sfx can synthesize the sets of the other biomes on a worker thread at startup (Synthesize: pure C#, thread-safe) and make
 // their AudioClips on the main thread later (BuildSlot, one clip at a time). Build(rate) is exactly every BuildSlot of
 // Synthesize(rate), so both paths give the same samples.
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md section 5), additive: the optional Grow clip (the human's own territory
+// growth from Propagation, played at -18 dB). It is the extra slot SfxSlot.Grow, after the eight base slots: SlotCount
+// (and SfxClipSamples.Hash) still cover the eight base slots only; AllSlotCount counts the extra slot too, and Build /
+// the background loader make it last.
 using System;
 using UnityEngine;
 
@@ -39,6 +43,12 @@ namespace PainterIO.Runtime
         /// <summary>Background ambience loop (null for Liquid).</summary>
         AudioClip Ambient { get; }
 
+        /// <summary>
+        /// Wave D-2 (optional, BIOME_TRAITS 5): the human's own territory growth (Propagation): a soft creep / crackle that
+        /// Sfx plays at -18 dB, rate limited. Null when the set has none.
+        /// </summary>
+        AudioClip Grow { get; }
+
         /// <summary>Synthesizes the clips (called once by Sfx; sampleRate is SfxSynth.SampleRate).</summary>
         void Build(int sampleRate);
     }
@@ -54,6 +64,9 @@ namespace PainterIO.Runtime
         Caught = 5,
         LoopLost = 6,
         Ambient = 7,
+
+        /// <summary>Wave D-2: the optional Grow clip, an extra slot after the eight base slots (outside SlotCount and Hash).</summary>
+        Grow = 8,
     }
 
     /// <summary>
@@ -76,14 +89,17 @@ namespace PainterIO.Runtime
     /// </summary>
     public sealed class SfxClipSamples
     {
-        /// <summary>Number of SfxSlot values.</summary>
+        /// <summary>Number of base SfxSlot values (Exit .. Ambient): the slots of contract 25.2 and of Hash().</summary>
         public const int SlotCount = 8;
+
+        /// <summary>Wave D-2: base slots plus the extra slots (SfxSlot.Grow); Build and the loader make all of them.</summary>
+        public const int AllSlotCount = 9;
 
         private const ulong FnvOffset = 14695981039346656037UL;
         private const ulong FnvPrime = 1099511628211UL;
 
-        private readonly float[][] data = new float[SlotCount][];
-        private readonly string[] errors = new string[SlotCount];
+        private readonly float[][] data = new float[AllSlotCount][];
+        private readonly string[] errors = new string[AllSlotCount];
 
         public SfxClipSamples(BiomeId biome, int sampleRate)
         {
@@ -121,7 +137,10 @@ namespace PainterIO.Runtime
             errors[(int)slot] = error;
         }
 
-        /// <summary>FNV-1a 64 over every slot's sample bit patterns (slot order, empty slots included): a determinism check.</summary>
+        /// <summary>
+        /// FNV-1a 64 over every base slot's sample bit patterns (slot order, empty slots included): a determinism check.
+        /// The extra slots (Grow) are not included, so the wave C hashes stay valid.
+        /// </summary>
         public ulong Hash()
         {
             ulong h = FnvOffset;

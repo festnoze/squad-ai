@@ -21,10 +21,13 @@ namespace PainterIO.Tests
         /// (it touches the victim's land along x = 0). Players 2 and 3 idle far away, so the round goes on.
         /// </summary>
         private static Simulation Build(int rate, RuleTraits traits, IController killer, Vec2d killerStart, double killerHeading,
-                                        double catchTime)
+                                        double catchTime, InheritanceBridgeRule bridge = InheritanceBridgeRule.Bridge)
         {
             var sb = new SimBuilder(rate);
             sb.Config.Traits = traits;
+            sb.Config.InheritanceBridge = bridge;
+            // Rule v1.8 (contract 32): the pre-v1.6 island (InheritanceBridge = Off) needs SingleDomain = Off.
+            if (bridge == InheritanceBridgeRule.Off) sb.Config.SingleDomain = SingleDomainRule.Off;
             sb.AddRect(0, -4, 8, 4, V(4 + H, H), East, new ConstantHeadingController(East));
             sb.AddRect(-10, -4, 0, 4, killerStart, killerHeading, killer);
             sb.AddIdle(IdleCorners[2]);
@@ -35,9 +38,9 @@ namespace PainterIO.Tests
         }
 
         /// <summary>The killer stays home (orbit inside its land).</summary>
-        private static Simulation HomeKiller(int rate, RuleTraits traits)
+        private static Simulation HomeKiller(int rate, RuleTraits traits, InheritanceBridgeRule bridge = InheritanceBridgeRule.Bridge)
         {
-            return Build(rate, traits, new HomeCirclerController(V(-5, 0)), V(-5 + H, H), North, CatchTime);
+            return Build(rate, traits, new HomeCirclerController(V(-5, 0)), V(-5 + H, H), North, CatchTime, bridge);
         }
 
         /// <summary>
@@ -243,7 +246,9 @@ namespace PainterIO.Tests
         [Test]
         public void KillInheritance_ShareKeepsTheCoreOfTheLandNearItsCentroid()
         {
-            Simulation sim = HomeKiller(60, TraitTestKit.One(TraitId.KillInheritance, 0.5));
+            // The Share selection itself, with the pre-v1.6 island behaviour (InheritanceBridge = Off): the core of the land,
+            // which does not touch the killer's land, is kept as an island.
+            Simulation sim = HomeKiller(60, TraitTestKit.One(TraitId.KillInheritance, 0.5), InheritanceBridgeRule.Off);
             var log = new EventLog(sim);
             RunUntilTime(sim, 1.2);
             int[] land = TraitTestKit.RectCells(sim.Grid, 0, -4, 8, 4);
@@ -254,6 +259,15 @@ namespace PainterIO.Tests
             Assert.AreEqual(2, sim.Grid.Cells[CellIndex(sim.Grid, 4 + H, H)], "the center goes to the killer");
             Assert.AreEqual(OwnerGrid.Neutral, sim.Grid.Cells[CellIndex(sim.Grid, H, -4 + H)], "a corner stays neutral");
             for (int k = 1; k < inherited.Cells.Length; k++) Assert.That(inherited.Cells[k], Is.GreaterThan(inherited.Cells[k - 1]));
+
+            // Rule v1.6 (contract 30, default): the same core is apart from the killer's domain and a forced cut makes no
+            // bridge, so the single-domain rule severs it right away (plain neutral).
+            Simulation v16 = HomeKiller(60, TraitTestKit.One(TraitId.KillInheritance, 0.5));
+            var log16 = new EventLog(v16);
+            RunUntilTime(v16, 1.2);
+            SimEvent inherited16 = log16.Single(SimEventType.TerritoryInherited, 1);
+            Assert.IsTrue(SameCells(inherited16.Cells, log16.Single(SimEventType.TerritorySevered, 1).Cells), "v1.6: the core is severed");
+            Assert.AreEqual(land.Length, TraitTestKit.CountOwned(v16.Grid, land, OwnerGrid.Neutral), "v1.6: the whole land is neutral");
         }
 
         [Test]

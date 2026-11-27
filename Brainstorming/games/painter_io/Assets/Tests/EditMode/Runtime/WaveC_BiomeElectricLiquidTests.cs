@@ -216,12 +216,13 @@ namespace PainterIO.Tests
         public void WaveC_Composites_KeepTheirFetchCount()
         {
             // Wave C adds no texture fetch (contract 12.2 item 4): the counts of the B-2 sources (each B-spline helper
-            // holds 4 bilinear taps used only on High).
+            // holds 4 bilinear taps used only on High). Wave D: LiquidComposite gains the one dome fetch that
+            // docs/WAVE_D_FEEDBACK.md F2 allows (13 -> 14); the wave D-2 traits add none (the scorch rides the reveal fetch).
             string elec = StripComments(ShaderSource("ElectricComposite.hlsl"));
             Assert.AreEqual(10, Count(elec, @"SAMPLE_TEXTURE2D_LOD\s*\("), "ElectricComposite fetch sites");
             Assert.AreEqual(1, Count(elec, @"SAMPLE_TEXTURE2D_LOD\s*\(\s*_PIO_RevealTime"), "one reveal fetch");
             string liquid = StripComments(ShaderSource("LiquidComposite.hlsl"));
-            Assert.AreEqual(13, Count(liquid, @"SAMPLE_TEXTURE2D_LOD\s*\("), "LiquidComposite fetch sites");
+            Assert.AreEqual(14, Count(liquid, @"SAMPLE_TEXTURE2D_LOD\s*\("), "LiquidComposite fetch sites (13 + the F2 dome)");
         }
 
         [Test]

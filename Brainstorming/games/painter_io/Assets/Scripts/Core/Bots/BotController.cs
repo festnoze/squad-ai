@@ -133,6 +133,12 @@ namespace PainterIO.Core
         private bool lassoDrawn, lassoWanted, curlDone;
         private double threatSince = double.NaN;
 
+        // Rule v1.6 (contract 30): PlayerState.InheritanceBridges seen at the last decision; when it grows while the bot is
+        // trailing, the closure target R of its plan is re-picked as the nearest own cell (the domain now includes the band
+        // and the inherited land). Never changes in rounds without the single-domain rule.
+        private int seenBridges;
+        private bool retargetReturn;
+
         // Attack.
         private int victim = -1;
         private double victimS, attackStart;
@@ -257,6 +263,8 @@ namespace PainterIO.Core
             wasTrailing = false;
             lassoDrawn = lassoWanted = curlDone = false;
             threatSince = double.NaN;
+            seenBridges = me.InheritanceBridges;
+            retargetReturn = false;
             victim = -1;
             returnHasTarget = false;
         }
@@ -269,11 +277,20 @@ namespace PainterIO.Core
             bool trailing = !me.Home;
             TrackOwnExit(me, trailing);
             TrackEnemies();
+            if (me.InheritanceBridges != seenBridges)
+            {
+                // Rule v1.6: an inheritance bridge joined the land of a victim to this bot's domain. Every own cell is home:
+                // the leg to R will aim at the nearest one (and Return mode already does, NearestOwned).
+                seenBridges = me.InheritanceBridges;
+                retargetReturn = trailing;
+                returnHasTarget = false;
+            }
             detourActive = false;   // recomputed below by UpdateOut / UpdateReturnTarget
 
             // Follow the simulation's Home flag (the only truth about safety, R5).
             if (!trailing)
             {
+                retargetReturn = false;
                 if (Mode == BotMode.Out || Mode == BotMode.Return)
                 {
                     // Back home: dwell a moment, heading into the land, before the next plan.
@@ -669,6 +686,13 @@ namespace PainterIO.Core
                 Vec2d from = planIndex == returnIndex ? me.Pos : plan[returnIndex - 1];
                 plan[returnIndex] = DeeperOwned(g, me.Pos, from, plan[returnIndex]);
             }
+            else if (retargetReturn && planIndex == returnIndex)
+            {
+                // Rule v1.6: after a bridge, close into the nearest own cell (band or inherited land included).
+                plan[returnIndex] = DeeperOwned(g, me.Pos, me.Pos, plan[returnIndex]);
+                retargetReturn = false;
+            }
+            if (planIndex == returnIndex) retargetReturn = false;
             // On the leg to R, avoid crossing the own trail when uncharged (section 9).
             detourActive = planIndex == returnIndex && !me.Charged && FindDetour(me, plan[returnIndex], out detour);
             target = detourActive ? detour : plan[planIndex];

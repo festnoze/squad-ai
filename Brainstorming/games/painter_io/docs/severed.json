@@ -1,0 +1,127 @@
+{
+  "package": "severed",
+  "status": "done",
+  "summary": "Rule v1.5 (contract section 29, test id R21), designer request 'la partie dans laquelle l'ennemi n'est pas ne lui appartient plus': when the captures of one section 6 step a group take cells from a living player and split its territory, the player keeps one piece per split territory (the piece of its anchor: the pawn's cell when it stands on its land, else the cell it left home from while trailing; the largest piece when the anchor is in no piece of that split) and the other pieces become neutral (default) or the cutter's. Option SimConfig.SeveredTerritory (SeveredTerritoryRule Off / Neutral / Capturer). New event TerritorySevered. Off reproduces every pinned hash of the previous Core exactly. The probe hash 246577239DE179C4 is unchanged with the default (the scripted demo contains no split, reproduced headless). No Runtime change was needed.",
+  "rule": {
+    "who": "every living player that loses at least one cell to another player's capture in a step a group (human and bots alike); the ordinary capture, the lasso pocket validated at the return, cells added by AugmentCapture traits and the ReturnsBeforeRoundEnd path all go through step a",
+    "trait_paths": "no trait takes cells from a living rival outside step a: Propagation grows only into neutral cells, Coalescence fills only neutral holes (inside the capture, so it is judged), KillInheritance moves the cells of a dead victim, ScorchedEarth only marks cells; eliminations never sever",
+    "connectivity": "8-adjacency (dual of the 4-connected outside flood of section 7 and the adjacency of the D1 rim; cells touching at a corner are one piece)",
+    "judged_pieces": "only pieces produced by this split: pieces = 8-components of the victim's cells after the captures; two pieces are in one split group when one pre-transfer 8-component (remaining old cells + lost cells) spans both; pieces that touch no lost cell (older islands, inherited land) are never visited",
+    "anchor": "read on the grid before the captures: the pawn's current cell at uG if the victim owns it (home, or returning at this instant); a home victim crossing out at this instant: the last own cell of its visit list; a trailing victim: TerritorySplit.ExitCell(Trail.Points[0]) = the owned cell among those whose closed square contains the exit point (lowest index), else the cell containing it",
+    "fallback": "anchor cell in no piece of the group: the largest piece (most cells, ties: lowest cell index)",
+    "fresh_capture": "a piece holding cells the victim gained in the same group (its own simultaneous return, R18) is never severed",
+    "recipient": "SeveredTerritoryRule.Neutral (default): plain neutral, never scorched (a running ScorchedEarth scorch on such a cell is forgotten); Capturer: the cutter = the lowest-index returner of the group that took a lost cell of that territory; Off: pre-v1.5 behaviour, bit-identical",
+    "order_in_step_a": "captures written (after the R18 conflict rule), Return events, severance (all victims analysed first, then all changes written), TerritorySevered events, R9 stolen-home exits, TerritoryLost eliminations",
+    "event": "SimEventType.TerritorySevered (appended at the end, value 16): Time = group time, Player = victim, Other = cutter, Recipient (new SimEvent field, -1 otherwise) = receiving player or -1 when neutral, Cells = severed cells ascending; one event per victim and cutter",
+    "never_eliminates": "the kept piece never loses a cell, so a split never eliminates anyone"
+  },
+  "files": [
+    "Assets/Scripts/Core/Grid/TerritorySplit.cs (new: pure split analysis, pooled stamped buffers, early exit, ExitCell)",
+    "Assets/Scripts/Core/Sim/EventResolver.cs (step a: CollectSevered before the captures are written, ApplySevered after the Return events, AnchorCell)",
+    "Assets/Scripts/Core/Sim/SimEvents.cs (SimEventType.TerritorySevered, SimEvent.Recipient)",
+    "Assets/Scripts/Core/World/SimConfig.cs (enum SeveredTerritoryRule, field SeveredTerritory = Neutral)",
+    "Assets/Scripts/Core/Traits/ScorchedEarthTrait.cs (internal Forget(cell): severed cells are never scorched)",
+    "Assets/Tests/EditMode/Core/SeveredTerritoryTests.cs (new, 24 R21 test cases)",
+    "Assets/Tests/EditMode/Core/Traits/TraitsClassicTests.cs (baseline table: pre-v1.5 Off column + default column)",
+    "Assets/Tests/EditMode/Core/Traits/KillRulesTests.cs (event enum count 17, classic seed 1 hash)",
+    "Assets/Tests/EditMode/Core/TraitsAuditTests.cs (classic seed 1 hash, Coalescence oracle exempts holes made of severed cells)",
+    "Assets/Tests/EditMode/Core/KillTraitsAuditTests.cs (classic seed 1 hash, TerritorySevered is not a trait event)",
+    "docs/CONTRACT.md (header v1.8, section 29)",
+    "docs/severed.json"
+  ],
+  "api_additions": [
+    "public enum SeveredTerritoryRule { Off = 0, Neutral = 1, Capturer = 2 } (Core/World/SimConfig.cs)",
+    "public SeveredTerritoryRule SimConfig.SeveredTerritory = SeveredTerritoryRule.Neutral",
+    "SimEventType.TerritorySevered (appended, value 16)",
+    "public int SimEvent.Recipient = -1",
+    "internal static class TerritorySplit { Find(...), ExitCell(...) } (Core/Grid/TerritorySplit.cs)",
+    "internal void ScorchedEarthTrait.Forget(int cell)"
+  ],
+  "tests": {
+    "command": "dotnet test tools/CoreTests/PainterIO.CoreTests.csproj --artifacts-path tools/CoreTests/.art/severed",
+    "baseline_before_change": "554 passed, 0 failed (10 min 28 s)",
+    "added": 24,
+    "final_run": "578 passed, 0 failed, 0 skipped (7 min 59 s) on the final tree = 554 previous + 24 new R21 cases. Intermediate run before the pin updates: 14 failures, all explained in pinned_values_updated (11 pins, 2 Coalescence oracle cases, 1 Capture_Perf_FullSizeBox timing at 15 ms vs 10 ms caused by my concurrent builds; it passes alone and in the final run).",
+    "unity_editmode": "not run: no Runtime file was edited (Unity lock avoided). The other agents' Unity compiles after my files existed show no CS error (their logs in Logs/).",
+    "r21_cases": [
+      "R21_CorridorCaptureKeepsThePawnPieceAndNeutralizesTheOther (also AreaPercent, RankOf, event order and exact cells)",
+      "R21_TrailingVictimKeepsThePieceItLeftHomeFrom",
+      "R21_AnchorCellCapturedKeepsTheLargestPiece (home victim in the band: R9 stolen exit + largest piece)",
+      "R21_UntouchedPreExistingIslandIsKept",
+      "R21_SplitOfAnIslandWithoutThePawnKeepsItsLargestPiece",
+      "R21_CapturerOptionGivesTheSeveredPieceToTheCutter",
+      "R21_OffOptionKeepsBothPiecesAsBefore",
+      "R21_HumanAndBotsAreJudgedTheSame x4 (human cuts bot, bot cuts human, both index orders)",
+      "R21_VictimReturningAtTheSameInstantKeepsItsCaptureAndThePieceItReturnedOnto (R18 simultaneous returns, gained cells)",
+      "R21_LassoPocketThatSplitsARivalSeversThePieceWithoutItsPawn (the rival loses cells only through the pocket)",
+      "R21_SeveredCellsArePlainNeutralUnderTheFireTraits (never scorched, Propagation grows into them)",
+      "R21_CaptureAugmentedByCoalescenceIsJudgedTheSame",
+      "R21_SameOutcomeAndGridAt30_60_144Hz x4 (Neutral and Capturer, home / trailing / anchor captured: same events, times, severed cells and identical grid bytes)",
+      "R21_SameSeedSameStateHashWithTheRule (twin runs at 30, 60, 144 Hz)",
+      "R21_BotRoundsSeverTerritoryAndKeepTheInvariants x4 (8 bot rounds each at 60/30/144 Hz Neutral and 60 Hz Capturer: invariants every tick, severances happen)"
+    ]
+  },
+  "pinned_values_updated": [
+    {
+      "where": "TraitsClassicTests.Baselines",
+      "change": "each row now pins two hashes: the pre-trait value, asserted with SeveredTerritory = Off (unchanged, proves isolation), and the default-rules value",
+      "rows": [
+        { "seed": 1, "rate": 60, "lasso": true, "human": -1, "off": "8CB763231AC73608", "default": "C042710F17995DCB", "why": "3 severances (17355 cells) in the round" },
+        { "seed": 2, "rate": 60, "lasso": true, "human": -1, "off": "2D4E3923E8FC07DC", "default": "2D4E3923E8FC07DC", "why": "no split in this round: unchanged" },
+        { "seed": 3, "rate": 60, "lasso": false, "human": -1, "off": "20109E29FF4E9FEC", "default": "48ED63A5F94CC15C", "why": "1 severance (56 cells)" },
+        { "seed": 4, "rate": 60, "lasso": true, "human": 0, "off": "99AEBACD711C7E8F", "default": "972BDEB73EEDCAAF", "why": "1 severance (220 cells)" },
+        { "seed": 5, "rate": 30, "lasso": true, "human": -1, "off": "B7018354A8617813", "default": "150EEF5F7D86D93E", "why": "2 severances (2141 cells)" },
+        { "seed": 6, "rate": 144, "lasso": true, "human": -1, "off": "22707E7EDD9ED472", "default": "EF0A76462F9F1006", "why": "1 severance (21 cells)" },
+        { "seed": 7, "rate": 60, "lasso": false, "human": 0, "off": "E109EA10426D1F29", "default": "3299BD126EBC01AC", "why": "6 severances (29787 cells)" }
+      ]
+    },
+    { "where": "TraitsClassicTests.TraitsClassic_EveryTraitDisabledIsClassic", "from": "8CB763231AC73608", "to": "C042710F17995DCB (default) + an added Off assertion = 8CB763231AC73608", "why": "same seed 1 round under the default rules" },
+    { "where": "TraitsAuditTests.TraitsAudit_1_NullParsedAndDisabledInvalidSetsAreBitIdenticalToClassic", "from": "8CB763231AC73608", "to": "C042710F17995DCB", "why": "the test builds a default SimConfig (rule on); Off value pinned in TraitsClassicTests" },
+    { "where": "KillTraitsAuditTests.KillAudit_1_ClassicRoundsNeverTouchTheKillStateAndKeepThePreTraitHash", "from": "8CB763231AC73608", "to": "C042710F17995DCB", "why": "same; also TerritorySevered is excluded from the 'trait event in a classic round' check (it is a core rule event)" },
+    { "where": "KillRulesTests.KillRules_ClassicRoundsReproduceThePreTraitHashWhateverSparkFollowsVictimSpeed", "from": "8CB763231AC73608 (x2)", "to": "C042710F17995DCB (x2)", "why": "same round, default rules" },
+    { "where": "KillRulesTests.KillRules_NewEventTypesAreAppendedAtTheEnd", "from": "16 event types", "to": "17, TerritorySevered = 16", "why": "the new event is appended at the end" },
+    { "where": "TraitsAuditTests Auditor.CheckCoalescence (oracle)", "change": "a hole that contains cells severed in the same Step is exempt (other holes still checked)", "why": "Coalescence fills holes inside the capture, before the split; a 1-cell rival fragment enclosed by the cutter becomes a neutral hole after it (seen in 'Liquide' 60 Hz at t = 70.633); it is filled at the cutter's next unchased return" }
+  ],
+  "pinned_values_unchanged": [
+    "Player probe hash 246577239DE179C4 (tools/verify.ps1 -ExpectedClassicHash): reproduced headless by replaying DemoScenario (Core + DemoScenario.cs outside its Unity block, BeforeTick at DemoScenario.EndTick, as PlayerProbe does) with Off, Neutral and Capturer: 246577239DE179C4 in all three, zero severance. verify.ps1 untouched.",
+    "Traited demo hashes (headless, not pinned anywhere): Liquide v1.1 05AC27EE4F056FD0, Feu v1.1 3DF3952B7C1BC26E, Electricite v1.1 6C31B923BF6E308E, identical under Off / Neutral / Capturer (no split in the demo).",
+    "No S1 - S6 hash is pinned: the scenario tests compare outcomes across rates; they pass unchanged.",
+    "Rng sequence pins (MathWorldTests) untouched."
+  ],
+  "values_to_recompute_in_player": [],
+  "runtime": {
+    "changed": "nothing",
+    "territory_field": "TerritoryField.Update reconciles every cell whenever sim.Grid.Version changes (Reconcile, dirty rectangles): severed cells leave the victim's color on the next frame. They snap off (no fill wave, no 0.6 s evaporation fade like an eliminated player's puddle) and with Capturer they appear in the cutter's color at once. The first reconcile logs '[PainterIO] TerritoryField reconciled N cell(s) with the grid' once per bind (informational, no test or verify step checks it). Re-checked after another agent modified TerritoryField.cs during this task: the Grid.Version reconcile is still there (line 398).",
+    "hud_leaderboard_results": "Hud polls AreaPercent / RankOf / CountOf every frame (area count-up animates down too), the leaderboard and rival label too, GameDirector.HumanOutcome and Simulation.EndRound read OwnerGrid counts: all see the new owners immediately",
+    "win_detection": "a split never eliminates, so LastSurvivor / AllEliminated are unaffected; TimeUp ranks read CountOf"
+  },
+  "determinism": "result depends only on the grid, the captured cells and the anchor (fixed scan and neighbour order, union-find with lowest-index roots, cells sorted); identical events, severed cells and grid bytes at 30, 60 and 144 Hz; twin runs give identical StateHash; the option is not hashed (equal states, equal hashes; Off is bit-identical). Hot path: CollectSevered runs only for groups with returns and stops at once when no returner took a rival cell; TerritorySplit uses per-thread pooled stamped arrays (no grid-sized allocation per call), and stops as soon as all frontier seeds joined one piece.",
+  "edge_cases": [
+    "home victim whose pawn cell is captured: R9 stolen exit (TerritoryStolen + Exit, after TerritorySevered) and the largest piece is kept",
+    "trailing victim: the piece of its exit cell is kept even if it is the smaller one and the pawn is far away; if the exit cell was taken since, the largest piece",
+    "victim returning at the same instant (R18): its fresh capture is never severed; its anchor is its return cell",
+    "an island split while the pawn is on another island: that island keeps its largest piece, the rest of the land is not judged",
+    "older islands that touch no lost cell are never judged (inherited land, pieces left by Off)",
+    "two cutters of one territory in one group: the lowest index is the cutter (and the recipient with Capturer); one event per victim and cutter",
+    "a victim that loses all its cells is eliminated by R9 as before (nothing to sever)",
+    "R18 contested cells keep their owner, so they are not lost and cannot split anyone",
+    "severed cells that were scorched before the victim captured them are plain neutral (scorch forgotten)",
+    "large severances happen: in the TraitsClassicTests bot round seed 7 (default rules) 6 severances removed 29787 cells in total, because the kept piece is the anchor's piece even when it is the smaller one"
+  ],
+  "open_questions": [
+    "Presentation: TerritorySevered has no dedicated visual, sound or toast yet (cells snap off through the reconcile). Suggested for the Runtime owners: an evaporation-style fade of the event's Cells (TerritoryField), toasts 'Ton domaine a été coupé !' / 'Tu as coupé le domaine de X !', a soft sound.",
+    "Trailing anchor: the designer said 'la partie dans laquelle l'ennemi n'est pas'; for a trailing victim the piece of its exit cell is kept (decision given). Alternatives: the piece nearest the pawn, or the largest piece.",
+    "Coalescence: should severed fragments enclosed by the cutter's land be filled at once (they are filled at its next unchased return)?",
+    "Bots do not value splits in their excursion or attack planning (BotController unchanged); they can now lose big pieces. The section 9 bot targets still pass.",
+    "No hidden test setting / SaveData / command line switch for SeveredTerritory (Runtime files owned by the wave D agents); the default Neutral applies to rounds, attract and probe through SimConfig defaults.",
+    "docs/BIOME_TRAITS.md section 1 still says classic mode is bit-identical to 'the current' simulation: true for the probe hash, but the Core classic rolling hashes changed with rule v1.5 (contract 29 records it); BIOME_TRAITS.md was not edited."
+  ],
+  "contract_issues": [
+    "Contract numbering: 'rule v1.5' (section 29) is the second rule change after rule v1.4, while 'contract v1.5' is the biome addition (section 25); the header records both.",
+    "Section 10.0 compares StateHash only within one tick rate (it includes Tick), so 'identical StateHash at 30, 60 and 144 Hz' is verified as identical outcomes, severed cells and grid bytes across rates plus identical twin hashes per rate."
+  ],
+  "needs": [
+    "Parent: run the Unity EditMode suite and the probe after the wave D rebuild (the Core changed; expected: probe hash still 246577239DE179C4).",
+    "Unity runs by other agents during this task (traits-infra, kill-verify EditMode) may have compiled a partial state of the R21 test updates; rerun them on the final tree."
+  ]
+}

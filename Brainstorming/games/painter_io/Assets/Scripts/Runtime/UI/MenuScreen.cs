@@ -16,6 +16,17 @@
 // over the old one, so the logo never turns see-through); idle, the logo breathes very slightly and a soft shine sweeps
 // across the letters every few seconds (a band masked by Resources/UI/logo_mask.png). The text title stays as the
 // fallback, shown only when no logo texture loads.
+//
+// Wave D-2 (traits-ui, docs/BIOME_TRAITS.md sections 5 and 7.2): each biome card shows the icons of its active traits
+// (TraitChipRow, over the bottom of its preview), and the rules of the selected biome are listed under the cards
+// (BiomeRulesView: icon, name and a one-line description per trait; "Regles classiques" when the biome rules are off).
+// The sets come from BiomeTraitTable.Resolve (defaults, saved matrix, command line, master switch) and are refreshed on
+// Relabel (SaveData.Changed) and when the selection changes. To make room, the color picker, JOUER, Options and the
+// best line moved down (the gaps between them are tighter; the cards and the title are unchanged).
+//
+// Rule v1.7 (contract 31, countries first): the "Pays" button is gone; JOUER opens the country screen (EuropeScreen: the
+// map and the progression), where "Jouer ce pays" starts the round. The classic square arena is not reachable from here.
+using System.Collections.Generic;
 using PainterIO.Core;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,7 +46,24 @@ namespace PainterIO.Runtime
         public const float TallTitleShare = 0.5f;
         public const float SwatchSize = 120f;
         public const float SwatchSpacing = 176f;
-        public const float SwatchY = 790f;
+        /// <summary>Wave D-2: swatch row center above the safe bottom (was 790, moved down for the rules list).</summary>
+        public const float SwatchY = 655f;
+        /// <summary>Wave D-2: 'Ta couleur' label, JOUER, Options and best line centers above the safe bottom.</summary>
+        public const float ColorLabelY = 765f;
+        public const float PlayY = 455f;
+        public const float OptionsY = 270f;
+        public const float BestY = 145f;
+        /// <summary>
+        /// Wave D-2: the rules list of the selected biome, center above the safe bottom and size (5 rows of 36 plus the
+        /// padding of its backing panel), between the cards (selected bottom at about 1010) and the color label (top 795).
+        /// </summary>
+        public const float RulesY = 900f;
+        public const float RulesWidth = 1000f;
+        public const float RulesHeight = 200f;
+        /// <summary>Wave D-2: trait chips of a card, center below the card face's top (over the preview's bottom edge).</summary>
+        public const float CardChipsY = -142f;
+        /// <summary>Opacity of the trait chips of an unselected card.</summary>
+        public const float UnselectedChipAlpha = 0.72f;
         public const float CardWidth = 290f;
         public const float CardHeight = 250f;
         public const float CardSpacing = 320f;
@@ -94,9 +122,18 @@ namespace PainterIO.Runtime
             public Text Name;
             public BiomePreview Painter;
             public bool WasSelected;
+            public TraitChipRow Chips;
+            public float ChipAlpha = -1f;
         }
 
         private readonly Card[] cards = new Card[BiomeTheme.Count];
+        // Wave D-2: the resolved trait set of each biome (BiomeTraitTable.Resolve), refreshed by RefreshTraits.
+        private readonly List<TraitSpec>[] biomeTraits = new List<TraitSpec>[BiomeTheme.Count];
+        private bool classicRules;
+        private BiomeRulesView rules;
+        private BiomeId rulesBiome;
+        private bool rulesShown;
+        private float rulesWidthSeen = -1f;
         private readonly Text biomeLabel;
         private readonly RectTransform cardRow;
         private float cardRowWidthSeen = -1f;
@@ -128,7 +165,7 @@ namespace PainterIO.Runtime
         private bool logoBiomeKnown;
         private float logoFade = 1f;
         private float logoClock;
-        private readonly Text colorLabel, bestLine, playLabel, optionsLabel, countriesLabel;
+        private readonly Text colorLabel, bestLine, playLabel, optionsLabel;
         private readonly Image playBg;
         private readonly RectTransform playRect;
         private readonly Image[] swatches = new Image[4];
@@ -239,11 +276,15 @@ namespace PainterIO.Runtime
                 UiKit.Place(card.Preview.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -22f - 73f), new Vector2(240f, 146f));
                 card.Name = UiKit.Label(b.transform, "Name", 42, UiKit.Light, TextAnchor.MiddleCenter);
                 UiKit.Place(card.Name.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 42f), new Vector2(CardWidth, 60f));
+                // Wave D-2: the biome's active traits as small icons over the bottom edge of the preview.
+                card.Chips = new TraitChipRow(b.transform, "Traits", UiKit.TopCenter, new Vector2(0f, CardChipsY));
                 cards[i] = card;
             }
+            // Wave D-2: the rules of the selected biome, between the cards and the color picker.
+            rules = new BiomeRulesView(Safe, UiKit.BottomCenter, new Vector2(0f, RulesY), new Vector2(RulesWidth, RulesHeight));
             // Color picker.
             colorLabel = UiKit.Label(Safe, "ColorLabel", 40, UiKit.WithAlpha(UiKit.Light, 0.85f), TextAnchor.MiddleCenter);
-            UiKit.Place(colorLabel.rectTransform, UiKit.BottomCenter, new Vector2(0f, 900f), new Vector2(800f, 60f));
+            UiKit.Place(colorLabel.rectTransform, UiKit.BottomCenter, new Vector2(0f, ColorLabelY), new Vector2(800f, 60f));
             for (int i = 0; i < 4; i++)
             {
                 int colorIndex = i;
@@ -265,19 +306,17 @@ namespace PainterIO.Runtime
 
             // JOUER (rimmed so it stays readable over an attract puddle of the same color).
             playRect = UiKit.PrimaryButton(Safe, "Play", new Vector2(600f, 176f), Palette.ColorOf(0), 84, OnPlay, out playBg, out playLabel);
-            UiKit.Place(playRect, UiKit.BottomCenter, new Vector2(0f, 520f), new Vector2(600f, 176f));
+            UiKit.Place(playRect, UiKit.BottomCenter, new Vector2(0f, PlayY), new Vector2(600f, 176f));
 
-            // Options (small) and the best score line.
+            // Options (small, centered: rule v1.7 removed the "Pays" button, JOUER opens the countries) and the best line.
             Image optionsShadow = UiKit.Rounded(Safe, "OptionsShadow", UiKit.WithAlpha(UiKit.Navy, 0.55f), 54f);
-            UiKit.Place(optionsShadow.rectTransform, UiKit.BottomCenter, new Vector2(-185f, 322f), new Vector2(344f, 108f));
+            UiKit.Place(optionsShadow.rectTransform, UiKit.BottomCenter, new Vector2(0f, OptionsY - 8f), new Vector2(344f, 108f));
             Button options = UiKit.Btn(Safe, "Options", new Vector2(340f, 104f), UiKit.NavyLight, 52f, 44,
                                        UiKit.Light, OnOptions, out optionsLabel);
-            UiKit.Place((RectTransform)options.transform, UiKit.BottomCenter, new Vector2(-185f, 330f), new Vector2(340f, 104f));
-            var countries = UiKit.Btn(Safe, "Countries", new Vector2(340f, 104f), UiKit.NavyLight, 52f, 44,
-                                        UiKit.Light, root.OpenEurope, out countriesLabel);
-            UiKit.Place((RectTransform)countries.transform, UiKit.BottomCenter, new Vector2(185f, 330f), new Vector2(340f, 104f));
+            UiKit.Place((RectTransform)options.transform, UiKit.BottomCenter, new Vector2(0f, OptionsY), new Vector2(340f, 104f));
             bestLine = UiKit.Label(Safe, "Best", 40, UiKit.WithAlpha(UiKit.Light, 0.9f), TextAnchor.MiddleCenter);
-            UiKit.Place(bestLine.rectTransform, UiKit.BottomCenter, new Vector2(0f, 190f), new Vector2(1000f, 60f));
+            UiKit.Place(bestLine.rectTransform, UiKit.BottomCenter, new Vector2(0f, BestY), new Vector2(1000f, 60f));
+            RefreshTraits();
         }
 
         public void SetInteractable(bool value)
@@ -300,9 +339,77 @@ namespace PainterIO.Runtime
             }
             playLabel.text = Strings.Get("menu.play");
             optionsLabel.text = Strings.Get("menu.options");
-            countriesLabel.text = Strings.Language == 0 ? "Pays" : "Countries";
             int wins = SaveData.Wins;
             bestLine.text = Strings.Format("menu.best", Strings.Area(SaveData.BestArea), Strings.Count("menu.wins", wins));
+            RefreshTraits();   // SaveData.Changed (biome rules toggle, trait matrix, language) triggers a relabel
+        }
+
+        // ------------------------------------------------------------------------------------------------------------
+        // Biome traits (wave D-2).
+
+        /// <summary>The enabled traits of a biome as the menu shows them (BiomeTraitTable.Resolve at the last refresh).</summary>
+        internal List<TraitSpec> TraitsShown(BiomeId biome)
+        {
+            List<TraitSpec> l = biomeTraits[(int)BiomeTheme.Clamp((int)biome)];
+            return l ?? new List<TraitSpec>();
+        }
+
+        /// <summary>True when the menu shows "Regles classiques" (biome rules off or -classic).</summary>
+        internal bool ClassicRulesShown => classicRules;
+
+        /// <summary>The rules list under the cards (tests).</summary>
+        internal BiomeRulesView Rules => rules;
+
+        /// <summary>The trait chips of a biome card (tests).</summary>
+        internal TraitChipRow ChipsOf(BiomeId biome)
+        {
+            Card c = cards[(int)BiomeTheme.Clamp((int)biome)];
+            return c != null ? c.Chips : null;
+        }
+
+        /// <summary>
+        /// Re-reads every biome's trait set (BiomeTraitTable.Resolve: table, saved matrix, command line, master switch) and
+        /// redraws the card chips and the rules list. Called at construction and on every Relabel.
+        /// </summary>
+        public void RefreshTraits()
+        {
+            classicRules = !SaveData.BiomeRulesOn || LaunchArgs.Classic;
+            for (int i = 0; i < biomeTraits.Length; i++)
+            {
+                List<TraitSpec> specs;
+                try
+                {
+                    specs = classicRules ? new List<TraitSpec>() : TraitText.Enabled(BiomeTraitTable.Resolve((BiomeId)i));
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning("[PainterIO] menu traits of " + (BiomeId)i + " failed: " + e.Message);
+                    specs = new List<TraitSpec>();
+                }
+                biomeTraits[i] = specs;
+                if (cards[i] != null) cards[i].ChipAlpha = -1f;   // redraw
+            }
+            rulesShown = false;
+            TickTraits();
+        }
+
+        /// <summary>Card chips (dimmed on unselected cards) and the rules list of the selected biome.</summary>
+        private void TickTraits()
+        {
+            BiomeId selected = BiomeTheme.Current.Id;
+            for (int i = 0; i < cards.Length; i++)
+            {
+                Card c = cards[i];
+                if (c == null || c.Chips == null) continue;
+                float alpha = c.Biome == selected ? 1f : UnselectedChipAlpha;
+                if (Mathf.Abs(alpha - c.ChipAlpha) < 1e-4f) continue;
+                c.ChipAlpha = alpha;
+                c.Chips.Show(biomeTraits[i], alpha);
+            }
+            if (rules == null || (rulesShown && rulesBiome == selected)) return;
+            rulesBiome = selected;
+            rulesShown = true;
+            rules.Show(biomeTraits[(int)selected], classicRules);
         }
 
         public override void Tick(float dt)
@@ -322,6 +429,7 @@ namespace PainterIO.Runtime
             playBg.color = Palette.ColorAt(h);
             FitCardRow();
             TickCards(dt);
+            TickTraits();
             TickLogo(dt);
             TickAttractCover(dt);
             playPulse += dt;
@@ -376,6 +484,13 @@ namespace PainterIO.Runtime
                 if (logoRoot != null) logoRoot.anchoredPosition = new Vector2(0f, -y);
             }
             float w = Safe.rect.width;
+            if (rules != null && w > 1f && Mathf.Abs(w - rulesWidthSeen) >= 0.01f)
+            {
+                // Wave D-2: the rules list keeps a margin inside a narrow safe area (it scales its rows to fit).
+                rulesWidthSeen = w;
+                rules.Rect.sizeDelta = new Vector2(Mathf.Min(RulesWidth, w - CardRowMargin), RulesHeight);
+                rulesShown = false;
+            }
             if (Mathf.Abs(w - cardRowWidthSeen) < 0.01f) return;
             cardRowWidthSeen = w;
             float s = CardRowScale(w);
@@ -639,10 +754,10 @@ namespace PainterIO.Runtime
             Palette.HumanColor = colorIndex;
         }
 
+        /// <summary>Rule v1.7 (countries first): JOUER opens the country screen (map and progression), never the square arena.</summary>
         private void OnPlay()
         {
-            GameDirector d = Director;
-            if (d != null) d.StartCountry(null);
+            if (Root != null) Root.OpenEurope();
         }
 
         private void OnOptions()

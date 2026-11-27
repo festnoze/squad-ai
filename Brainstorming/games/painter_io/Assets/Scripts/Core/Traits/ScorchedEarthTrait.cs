@@ -64,6 +64,16 @@ namespace PainterIO.Core
             }
         }
 
+        /// <summary>
+        /// Rule v1.5 (contract 29, api addition): forgets the cell's scorch, so a cell that changed owner after its scorch
+        /// started and is made neutral again by a split (TerritorySevered) is plain neutral, not scorched again. The state
+        /// hash (batches) is unchanged.
+        /// </summary>
+        internal void Forget(int cell)
+        {
+            if (until != null) until[cell] = 0.0;
+        }
+
         /// <summary>True when the cell is neutral and its scorch has not ended at 'now' (now &lt; EliminatedAt + Duration).</summary>
         public bool IsScorched(int cell, double now)
         {

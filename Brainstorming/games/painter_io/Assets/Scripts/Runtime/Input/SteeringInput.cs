@@ -438,7 +438,7 @@ namespace PainterIO.Runtime
                     director.SetPaused(!director.IsPaused);
                     break;
                 case GameState.Results:
-                    director.ToMenu();
+                    director.ToCountryScreen();   // rule v1.7: the results always go on to the country screen
                     break;
                 case GameState.Menu:
                     // B4's UiRoot.HandleBack closes Options, else toggles the "Quitter ?" panel; it is deduplicated per frame

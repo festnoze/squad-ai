@@ -1,7 +1,12 @@
 // Owned by B4. Contract 15.2: the Options panel (opened from the menu). Son, Vibrations, Bonus lasso (default OFF, saved),
 // Langue FR/EN, Qualité Auto/Haute/Moyenne/Basse and a version label. Five taps on the version label reveal the hidden
-// "Réglages de test" section: Vitesse étincelle 1,4 to 2,4 step 0,1, Durée de manche 60 / 90 / 120 s, Délai anneau 10 to 30 s
-// step 5, Réinitialiser (SaveData test settings, 11.5). Closing the panel flushes SaveData.
+// "Réglages de test" section: Vitesse étincelle 1,4 to 2,4 step 0,1, Durée de manche 5 / 10 / 15 min (rule v1.7: the time
+// limit of a round, 15 min by default), Délai anneau 10 to 30 s step 5, Réinitialiser (SaveData test settings, 11.5).
+// Closing the panel flushes SaveData.
+// Wave D-2 (traits-ui, docs/BIOME_TRAITS.md section 5): a "Règles des biomes" switch (SaveData.BiomeRulesOn; its caption
+// reads "Règles classiques" when off) and, in the hidden test settings, a "Traits des biomes" button next to
+// Réinitialiser that opens the trait matrix (TraitMatrixPanel) in place of the Options panel. "-uidemo options,matrix"
+// opens it for screenshots.
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -18,15 +23,20 @@ namespace PainterIO.Runtime
         /// <summary>Stays true for the rest of the app session once revealed.</summary>
         private static bool testsRevealed;
 
+        /// <summary>Wave D-2: height of the "Règles des biomes" row (its label plus the caption under it).</summary>
+        public const float BiomeRulesRowHeight = 130f;
+
         private readonly RectTransform panel;
         private readonly Image panelBg;
         private readonly Text title, versionText, testsTitle, closeLabel;
         private readonly List<KeyValuePair<Text, string>> rowLabels = new List<KeyValuePair<Text, string>>();
-        private readonly UiSwitch sound, haptics, lasso;
+        private readonly UiSwitch sound, haptics, lasso, biomeRules;
+        private readonly Text biomeRulesCaption;
         private readonly UiSegments language, quality;
-        private readonly Text sparkValue, roundValue, ringValue, resetLabel;
+        private readonly Text sparkValue, roundValue, ringValue, resetLabel, matrixLabel;
         private readonly RectTransform tests, closeRect, versionRect;
-        private readonly CanvasGroup testsGroup;
+        private readonly CanvasGroup testsGroup, panelGroup;
+        private readonly TraitMatrixPanel matrix;
         private int versionTaps;
         private float lastTap = -10f;
 
@@ -37,6 +47,7 @@ namespace PainterIO.Runtime
 
             panel = UiKit.Rect("Panel", Safe);
             UiKit.Place(panel, UiKit.Center, Vector2.zero, new Vector2(PanelWidth, 1000f));
+            panelGroup = panel.gameObject.AddComponent<CanvasGroup>();
             Image shadow = UiKit.Rounded(panel, "Shadow", UiKit.WithAlpha(UiKit.Navy, 0.7f), 60f);
             UiKit.Stretch(shadow.rectTransform);
             shadow.rectTransform.offsetMin = new Vector2(-4f, -18f);
@@ -56,6 +67,17 @@ namespace PainterIO.Runtime
             sound = Switch(panel, "options.sound", ref y, v => SaveData.SoundOn = v);
             haptics = Switch(panel, "options.haptics", ref y, v => SaveData.HapticsOn = v);
             lasso = Switch(panel, "options.lasso", ref y, v => SaveData.LassoOn = v);
+            // Wave D-2: the biome rules master switch, its label a little higher and a caption under it.
+            Text rulesLabel = RowLabel(panel, "options.biome_rules", y + 14f);
+            biomeRules = new UiSwitch(panel, new Vector2(PanelWidth * 0.5f - 64f - 80f, y), OnBiomeRules);
+            biomeRulesCaption = UiKit.Label(panel, "BiomeRulesCaption", 30, UiKit.WithAlpha(UiKit.Light, 0.62f), TextAnchor.MiddleLeft);
+            RectTransform cr = biomeRulesCaption.rectTransform;
+            cr.anchorMin = cr.anchorMax = new Vector2(0f, 1f);
+            cr.pivot = new Vector2(0f, 0.5f);
+            cr.sizeDelta = new Vector2(600f, 44f);
+            cr.anchoredPosition = new Vector2(66f, y - 34f);
+            rulesLabel.rectTransform.sizeDelta = new Vector2(560f, 64f);
+            y -= BiomeRulesRowHeight;
             language = Segments(panel, "options.language", ref y, new[] { "options.lang_fr", "options.lang_en" }, 110f,
                                 i => Strings.Language = i);
             Text qLabel = RowLabel(panel, "options.quality", y);
@@ -89,9 +111,13 @@ namespace PainterIO.Runtime
             ringValue = Stepper(tests, "options.ring", ty, () => SaveData.RingDelay -= SaveData.RingDelayStep,
                                 () => SaveData.RingDelay += SaveData.RingDelayStep);
             ty -= RowHeight + 10f;
-            Button reset = UiKit.Btn(tests, "Reset", new Vector2(420f, 96f), UiKit.NavyLight, 48f, 40, UiKit.Light,
+            Button reset = UiKit.Btn(tests, "Reset", new Vector2(400f, 96f), UiKit.NavyLight, 48f, 40, UiKit.Light,
                                      SaveData.ResetTestSettings, out resetLabel);
-            UiKit.Place((RectTransform)reset.transform, UiKit.TopCenter, new Vector2(0f, ty), new Vector2(420f, 96f));
+            UiKit.Place((RectTransform)reset.transform, UiKit.TopCenter, new Vector2(-215f, ty), new Vector2(400f, 96f));
+            // Wave D-2: the trait matrix (BIOME_TRAITS 5), opened in place of this panel.
+            Button traits = UiKit.Btn(tests, "TraitMatrix", new Vector2(400f, 96f), UiKit.NavyLight, 48f, 40, UiKit.Saffron,
+                                      () => SetMatrixOpen(true), out matrixLabel);
+            UiKit.Place((RectTransform)traits.transform, UiKit.TopCenter, new Vector2(215f, ty), new Vector2(400f, 96f));
 
             // Close.
             Button close = UiKit.Btn(panel, "Close", new Vector2(460f, 130f), Palette.ColorOf(0), 65f, 56, UiKit.Light, OnClose, out closeLabel);
@@ -100,7 +126,23 @@ namespace PainterIO.Runtime
             closeRect.pivot = new Vector2(0.5f, 0f);
             closeRect.anchoredPosition = new Vector2(0f, 50f);
 
+            // Wave D-2: the trait matrix sub-panel (hidden until the test settings button opens it).
+            matrix = new TraitMatrixPanel(Safe, () => SetMatrixOpen(false));
+
             Layout();
+        }
+
+        /// <summary>The hidden trait matrix (tests, DevShot).</summary>
+        public TraitMatrixPanel Matrix => matrix;
+
+        /// <summary>Shows the trait matrix in place of the Options panel, or the Options panel again.</summary>
+        public void SetMatrixOpen(bool open)
+        {
+            if (matrix == null) return;
+            matrix.SetOpen(open);
+            panelGroup.alpha = open ? 0f : 1f;
+            panelGroup.interactable = !open;
+            panelGroup.blocksRaycasts = !open;
         }
 
         /// <summary>True when the hidden test settings are revealed.</summary>
@@ -116,6 +158,7 @@ namespace PainterIO.Runtime
         public void OnOpened()
         {
             versionTaps = 0;
+            SetMatrixOpen(false);
             Refresh();
             Layout();
         }
@@ -127,9 +170,11 @@ namespace PainterIO.Runtime
             versionText.text = Strings.Format("options.version", Application.version);
             testsTitle.text = Strings.Get("options.test_settings");
             resetLabel.text = Strings.Get("options.reset");
+            matrixLabel.text = Strings.Get("options.trait_matrix");
             closeLabel.text = Strings.Get("options.close");
             language.Relabel();
             quality.Relabel();
+            if (matrix != null) matrix.Relabel();
             Refresh();
         }
 
@@ -146,19 +191,40 @@ namespace PainterIO.Runtime
             sound.Tick(dt);
             haptics.Tick(dt);
             lasso.Tick(dt);
+            biomeRules.Tick(dt);
+            if (matrix != null)
+            {
+                if (Visible && !matrix.IsOpen && testsRevealed && UiRoot.DemoShows("matrix")) SetMatrixOpen(true);
+                matrix.Fit(availW, availH);
+            }
+        }
+
+        protected override void OnHide()
+        {
+            SetMatrixOpen(false);
         }
 
         // ------------------------------------------------------------------------------------------------------------
+
+        private void OnBiomeRules(bool on)
+        {
+            SaveData.BiomeRulesOn = on;
+            biomeRulesCaption.text = Strings.Get(on ? "options.biome_rules_on" : "options.classic_rules");
+            if (matrix != null) matrix.Refresh();
+        }
 
         private void Refresh()
         {
             sound.Set(SaveData.SoundOn);
             haptics.Set(SaveData.HapticsOn);
             lasso.Set(SaveData.LassoOn);
+            bool rulesOn = SaveData.BiomeRulesOn;
+            biomeRules.Set(rulesOn);
+            biomeRulesCaption.text = Strings.Get(rulesOn ? "options.biome_rules_on" : "options.classic_rules");
             language.Select(Strings.Language);
             quality.Select(SaveData.Quality);
             sparkValue.text = Strings.Format("options.factor_value", Strings.Decimal(SaveData.SparkFactor, 1));
-            roundValue.text = Strings.Format("options.seconds_value", Strings.Decimal(SaveData.RoundSeconds, 0));
+            roundValue.text = RoundValueText(SaveData.RoundSeconds, Strings.Language);
             ringValue.text = Strings.Format("options.seconds_value", Strings.Decimal(SaveData.RingDelay, 0));
         }
 
@@ -190,6 +256,12 @@ namespace PainterIO.Runtime
         private void OnClose()
         {
             if (Root != null) Root.CloseOptions();
+        }
+
+        /// <summary>Rule v1.7: the round time limit in minutes ("15 min"). Public static for tests.</summary>
+        public static string RoundValueText(float seconds, int language)
+        {
+            return Strings.FormatIn(language, "options.minutes_value", Strings.Decimal(seconds / 60.0, 0, language));
         }
 
         private static void StepRound(int direction)

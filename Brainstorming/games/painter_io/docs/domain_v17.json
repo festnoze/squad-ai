@@ -1,0 +1,136 @@
+{
+  "package": "domain",
+  "status": "done",
+  "rule_numbering": "The brief called this rule v1.7. While this package ran, the parallel round-flow agent wrote contract section 31 as 'Rule change v1.7: countries first, 15 min cap, conquest goal' (contract v2.0). To avoid two different 'rule v1.7', this rule is 'rule v1.8', contract section 32 (contract v2.1), test id R23. The report keeps the file name the brief asked for (docs/domain_v17.json).",
+  "summary": "Rule v1.8 (contract section 32, test id R23): one single domain in every round type. A stress invariant over 240 bot rounds (5 arenas: square, Croatia, Greece, Italy, Norway; classic and the three v1.1 biome sets; lasso on and off; bot-only and with a human proxy) found 183 new splits under the pre-v1.8 rules, all caused by the player's own closures: a capture whose region touches only the trail (near loops joined by the wall raster), a detached lasso pocket, or contested cells of simultaneous returns; once split, a trail from one piece to the other captured nothing ('it does not close the loop'). Fix: SimConfig.SingleDomain (On by default, Off = pre-v1.8 bit-identical) generalizes the rule v1.6 single domain to every round type; a closure that would leave the domain in pieces (8-connected, then 4-connected so corner-only joints count too) takes the band of its whole trail (InheritanceBandHalfWidth 0.45 u plus the supercover raster, the v1.6 band), so the pieces become one domain; the v1.6 safety net severs what an own or simultaneous action still leaves apart (piece of the return cell kept). Enemy-caused splits keep rule v1.5. After the fix: 0 violations in the same 240 rounds and in the 24-round dotnet matrix.",
+  "diagnosis": {
+    "harness": "Assets/Tests/EditMode/Core/SingleDomainStressTests.cs: independent 8- and 4-connectivity oracle (no Core helper) after every tick whose grid changed (only the owners whose cells changed are relabelled); each new split is classified from the tick's events and the grid diff (cells gained apart and their source event, or cells lost and their new owner).",
+    "big_matrix_pre_v18": {
+      "test": "R23_Diagnosis_PreV18Rules (Explicit, Category Stress): SimConfig.SingleDomain = Off",
+      "rounds": 240,
+      "ticks": 760460,
+      "grid_checks": 12920,
+      "new_splits": 183,
+      "by_cause": {
+        "own return: detached capture (region touching only the trail)": 143,
+        "own return: detached lasso pocket": 37,
+        "simultaneous returns (R18 contested cells left a detached gain)": 3,
+        "enemy capture (rule v1.5 not applied)": 0,
+        "kill inheritance island": 0,
+        "trait effect (Propagation, Coalescence, ScorchedEarth)": 0,
+        "start territory in pieces": 0
+      },
+      "returns_of_a_split_player_that_captured_nothing": 1834,
+      "diagonal_only_connections": { "new_occurrences": 105, "visible_corner_joined_part_of_16_cells_or_more": 58, "visible_by_cause": { "own capture": 46, "cells taken by a rival or severed": 11, "kill inheritance": 1 }, "player_checks_with_a_corner_neck": 815 },
+      "single_domain_severances_v16": 12,
+      "inheritance_bridges_v16": 58
+    },
+    "fast_matrix_pre_v18": { "test": "R23_Diagnosis_PreV18RulesFastMatrix (Explicit)", "rounds": 24, "new_splits": 15, "by_cause": { "own return: detached capture": 13, "own return: detached lasso pocket": 2 } },
+    "first_full_matrix_pre_v18": "48 rounds (square, Croatia, Greece, 4 sets x 4 combos): 43 new splits (38 detached capture, 3 detached pocket, 2 simultaneous returns).",
+    "notes": "Every violation was caused by the player's own return. Rule v1.5 already handles every enemy capture, KillInheritance islands were already handled by rule v1.6 in Feu, and no trait creates a split. The designer's second complaint is a consequence: once the domain is in two pieces, a trail between them encloses nothing."
+  },
+  "root_causes": [
+    {
+      "where": "Assets/Scripts/Core/Grid/CaptureSolver.cs:141-183 (Interior from the seeds next to ReachAfter, Rim = trail cells 8-adjacent to the Interior) with docs/CONTRACT.md section 8 last item (two passes closer than about one cell are joined by the wall raster)",
+      "what": "A near loop of the trail far from home closes a region bounded only by trail cells: the capture (Interior + Rim) touches the domain nowhere (or only at a corner). 143 of the 183 splits."
+    },
+    {
+      "where": "Assets/Scripts/Core/Grid/CaptureSolver.cs:178-183 (pocket cells added as they are) and docs/CONTRACT.md R17 / section 8 (the loop interior is captured only through the pocket, the trail is never taken except as Rim)",
+      "what": "A lasso pocket made away from the ordinary closure (the loop is loop-erased from the outline) is captured as an island. 37 splits."
+    },
+    {
+      "where": "Assets/Scripts/Core/Sim/EventResolver.cs StepReturns, R18 conflict rule (the 'contested' loop right after the capture computation)",
+      "what": "Cells claimed by two simultaneous returns keep their previous owner, which can cut a returner's gain from its domain. 3 splits."
+    },
+    {
+      "where": "Assets/Scripts/Core/Grid/CaptureSolver.cs:158-162 (interiorCount == 0: pocket only)",
+      "what": "Once the domain is in two pieces, a trail from one to the other encloses nothing (the gap between the pieces stays open to the outside): no Interior, no Rim, the trail is dropped. The designer's 'it does not close the loop'."
+    },
+    {
+      "where": "Assets/Scripts/Core/Sim/Simulation.cs:148-152 (pre-change: SingleDomain = KillInheritance with Share > 0 and InheritanceBridge not Off) and EventResolver.cs StepReturns (pre-change: the v1.6 closure footprint and KeepReturnersWhole only when singleDomain)",
+      "what": "The rule v1.6 machinery that already cured these cases (closure footprint, safety net) ran only in Feu rounds: classic, Liquide and Electricite had no single-domain guarantee."
+    }
+  ],
+  "fix": {
+    "rule": "docs/CONTRACT.md section 32 (rule v1.8, R23); docs/BIOME_TRAITS.md v1.3 (7.3 no longer Fire-only)",
+    "switch": "SimConfig.SingleDomain (enum SingleDomainRule { Off = 0, On = 1 }, default On). Simulation.SingleDomain = On || the v1.6 KillInheritance condition. EventResolver: linkBands = singleDomain && On (v1.8 closures and rim filter), inheritanceJoin = singleDomain && KillInheritance attached with Share > 0 (the v1.6 kill path, RecordCutGeometry, victim prefix). With Off every flag equals its pre-v1.8 value.",
+    "closures": "EventResolver.LinkCapture (step a, unchased returns, before AugmentCapture): KeepOnePiece(own + capture, anchor = return cell, 4-connected); one piece: unchanged (one flood). Else the band of the whole trail up to the crossing point (InheritanceBridge.BandCells: cells within InheritanceBandHalfWidth plus the supercover raster), minus own, Void and the R1 rim band, is added when it leaves fewer cells apart (8-connected first, then 4-connected). The band is part of the capture (Return.Cells, R18, rule v1.5 for rivals under it, R9, TerritoryLost); PlayerState.DomainLinks++.",
+    "safety_net": "KeepReturnersWhole (rule v1.6) now runs in every round type: a returner whose gain is still apart (contested cells, its own land severed in the same group) keeps the piece of its return cell; the rest becomes neutral (TerritorySevered, Other = -1). Documented fallback when no own line joins the parts.",
+    "enemy_splits": "Rule v1.5 unchanged (designer decision).",
+    "kill_inheritance": "Rule v1.6 unchanged; with SingleDomain On, InheritanceBridge = Off behaves as AnchorOnly; the bridge band also leaves out the R1 rim band (only with SingleDomain On, so Off stays bit-identical).",
+    "rim": "EventResolver.RimSafe: band cells whose center lies closer to the rim than ArenaMargin minus half a cell diagonal are left out (no trail raster reaches them; R1 keeps them neutral forever). Found by AuditTests.Determinism_RoamingFuzz (R1 assertion) on the first full run.",
+    "grid_helper": "TerritorySplit.KeepOnePiece gains an optional neighbours parameter (8 default, 4 for the corner-joint test); FloodPiece follows it.",
+    "runtime": "No change. Band cells are Return cells, so TerritoryField.OnSimEvent starts the return fill wave over them in every biome (AddWave from the return point), and TerritoryField reconciles every Grid.Version change. The Fire inheritance sweep is unchanged.",
+    "bots": "No change needed: a link happens at a return (the bot is home, no stale plan); the safety net touches only returners; bots read home from the grid (NearestOwned, OwnerAt). R23_ABotKeepsFindingItsWayHomeAfterALink and the section 9 targets (BotTests) pass."
+  },
+  "decisions_on_ambiguous_points": [
+    "Band over a living rival's land: the band is taken over its full width, as a capture (the trail is the only line the player drew; a thinner line through rival land would look broken, which the designer wants to avoid). The rival's pieces are then judged by rule v1.5 (it keeps the piece of its pawn). 'Prefer a line that does not take land from a living rival' is honoured in the sense that a band is added only when the capture alone would leave the domain in pieces.",
+    "Which line: the whole trail as driven (not the loop-erased outline), so a lasso pocket, which lies on the trail, is always joined.",
+    "Corner-only joints: own closures are linked when the domain plus the capture is not one 4-connected piece, so a closure never leaves a diagonal-only connection. Enemy captures can still leave a corner joint (rule v1.5 judges 8-connectivity): kept, measured, open question.",
+    "Fallback: when the band cannot join (contested cells), the v1.6 safety net keeps the piece of the return cell and neutralizes the rest (no Capturer option for these).",
+    "Pre-existing pieces (custom SimSetup territories only) are kept until a trail joins them or the safety net judges that player as a returner; R2 discs and the Europe start discs are one piece (checked: 0 start violations).",
+    "SingleDomain = Off restores the pre-v1.8 rules exactly (classic: no guarantee; Feu: rule v1.6 with the one-cell footprint closures).",
+    "Rule numbered v1.8 / section 32 because section 31 already used 'rule change v1.7'."
+  ],
+  "tests_added": [
+    "Assets/Tests/EditMode/Core/SingleDomainStressTests.cs: R23_EveryLivingTerritoryIsOneEightConnectedPieceAfterEveryTick (24 rounds in dotnet, about 36 s: square + Croatia + Greece x 4 sets x 2 of the 4 lasso / lineup combos; Unity: square only, 8 rounds), R23_Stress_FiveArenasThreeSeedsPerCell (Explicit, Stress, 240 rounds), R23_Diagnosis_PreV18Rules and R23_Diagnosis_PreV18RulesFastMatrix (Explicit, report only).",
+    "Assets/Tests/EditMode/Core/SingleDomainTests.cs: R23_ReproductionOffAJoinBetweenTwoPiecesCapturesNothing, R23_AJoinBetweenTwoPiecesBecomesABandOfTerritory (30/60/144 Hz, 7 cells across), R23_ABandOverARivalsLandIsACaptureAndTheRivalKeepsThePieceOfItsPawn (30/60/144 Hz), R23_ReproductionOffADetachedPocketLeavesTwoPieces, R23_ADetachedPocketIsLinkedByTheBandOfItsTrail (30/60/144 Hz), R23_ABotKeepsFindingItsWayHomeAfterALink, R23_SameSeedSameHashWithLinks, R23_TheRuleHoldsInEveryRoundTypeAndOffRestoresThePreV18Switch, R23_BiomeRoundHashesOffAndDefault x6 (Liquide, Electricite and four Feu rows, Off and default columns)."
+  ],
+  "tests_changed": [
+    { "where": "TraitsClassicTests.Baselines / TraitsClassic_BotRoundHashesEqualThePreTraitBaseline", "change": "a third column: the pre-trait column is now read with SeveredTerritory = Off and SingleDomain = Off, the rule v1.5 column with SingleDomain = Off (both unchanged values), the new default column pins rule v1.8 (all seven rows changed: every round has at least one link)", "rows_v18": { "1": "474509F44E0715B8", "2": "11D28CDBDE3CA24B", "3": "55B09630D101DAF4", "4": "691C5A62A5A5EE35", "5": "0728918E2CA26105", "6": "FF7592A9D3BA6EA5", "7": "23FEE35F8C2E5E0D" } },
+    { "where": "TraitsClassicTests.TraitsClassic_EveryTraitDisabledIsClassic, KillRulesTests.KillRules_ClassicRoundsReproduceThePreTraitHash..., KillTraitsAuditTests.KillAudit_1 (hash part), TraitsAuditTests.TraitsAudit_1", "change": "the classic reference is TraitsClassicTests.ClassicSeed1V18 (474509F44E0715B8); C042710F17995DCB is the value with SingleDomain = Off", "why": "the seed 1 classic round contains a closure that is now linked" },
+    { "where": "KillTraitsAuditTests.KillAudit_1_ClassicRoundsNeverTouchTheKillStateAndKeepThePreTraitHash (part a)", "change": "runs seeds 5, 6 and 7 instead of 5", "why": "rule v1.8 changed the seed 5 round, which no longer had a spark in its first 45 s (non-vacuity floor)" },
+    { "where": "InheritanceBridgeTests.Repro / Closed (InheritanceBridge = Off), KillTraitsAuditTests builders (three scenarios pinned to Off), KillInheritanceTraitTests.Build", "change": "InheritanceBridge = Off also sets SingleDomain = Off", "why": "with SingleDomain On, Off behaves as AnchorOnly; these tests keep their regression value for the pre-v1.6 island" },
+    { "where": "InheritanceBridgeTests.R22_OffReproducesThePreV16FireHashesAndTheDefaultIsPinned, OffRound", "change": "both columns are read with SingleDomain = Off (values unchanged); the v1.8 default values of these rounds are pinned in SingleDomainTests.BiomeRows (seed 1 unchanged, seeds 3, 4, 5 changed)", "why": "the default now includes rule v1.8" },
+    { "where": "InheritanceBridgeTests.R22_TheRuleBelongsToTheKillInheritancePath", "change": "the 'false outside KillInheritance' assertions are made with SingleDomain = Off; one assertion that the default is true in classic", "why": "the single domain is a core rule since v1.8" },
+    { "where": "AuditTests.R18_PocketCellsClaimedByASimultaneousReturnKeepTheirPreviousOwner", "change": "runs with SingleDomain = Off", "why": "its synthetic pocket lies far from the returner's land and trail (a real pocket always lies on the trail), so rule v1.8 severs it as an island; the test is about R18" },
+    { "where": "RuleV14AuditTests.V14_Fuzz_BotRoundsChasedReturnsAreEmptyAndUnchasedReturnsMatchTheSolver", "change": "a linked return (DomainLinks grew in the tick) must contain the CaptureSolver capture instead of equalling it (17 such returns in its 6 rounds, 704 still compared exactly)", "why": "the link adds the band to the capture" }
+  ],
+  "pinned_values": {
+    "unchanged_with_off": "Classic 8CB763231AC73608 (SeveredTerritory Off + SingleDomain Off), C042710F17995DCB and the other rule v1.5 rows (SingleDomain Off), Feu v1.6 rows of InheritanceBridgeTests.FireRows in both columns (SingleDomain Off): all reproduce, which shows the Off switch is bit-identical.",
+    "default_v18": {
+      "classic": "TraitsClassicTests column 3 (above); ClassicSeed1V18 = 474509F44E0715B8",
+      "biome_rows": [
+        { "set": "Liquide v1.1", "seed": 1, "rate": 60, "lasso": true, "off": "919D60BB084C34C4", "default": "A5DA3E9225B83D0D" },
+        { "set": "Electricite v1.1", "seed": 2, "rate": 60, "lasso": false, "off": "06CEAB293AB96B3C", "default": "490D14DA9896513C" },
+        { "set": "Feu v1.1", "seed": 1, "rate": 60, "lasso": true, "off": "6A081F4785E9DCEB", "default": "6A081F4785E9DCEB" },
+        { "set": "Feu v1.1", "seed": 3, "rate": 60, "lasso": false, "off": "3B68A996FF6CCED3", "default": "C33B24C3C6D51695" },
+        { "set": "Feu v1.1", "seed": 4, "rate": 30, "lasso": true, "off": "444396D4DF17FBAA", "default": "8BD70059B541DD05" },
+        { "set": "Feu v1.1", "seed": 5, "rate": 144, "lasso": true, "off": "FABA4ABCAD0A5181", "default": "9EB4402BCB65ACAB" }
+      ],
+      "note": "The Liquide and Electricite 'off' values were computed with the new code and SingleDomain = Off; their bit-identity with the pre-v1.8 code rests on the code paths (with Off every switch equals its old value) and on the classic and Feu rows, which were pinned before this package and still reproduce."
+    },
+    "probe": "Classic probe hash 246577239DE179C4 unchanged: WaveD_TheDemoIsClassicByDefaultAndRunsTraitedWithTheFlags (asserts it on the headless DemoScenario) passed in the Unity EditMode run. The traited demo hashes (Liquide, Feu, Electricite) are not pinned anywhere and were not recomputed; they may differ from older reports (verify.ps1 only checks their equality across rates)."
+  },
+  "test_results": "dotnet (first full run with the fix, before the last fixes): 619 tests, 614 passed, 5 failed: SimConfig_DefaultsMirrorEveryTuningConstant (the parallel conquest agent: SimConfig lacks Tuning.ConquestDisplaySlack, not this package) and four failures caused by this rule, all fixed after: Determinism_RoamingFuzz (R1 rim band reached by a band, fixed by RimSafe), R18_PocketCells (now SingleDomain Off), KillAudit_1 (seeds 6 and 7 added), V14_Fuzz (linked captures checked as supersets). The 37 affected or new tests then passed in a targeted dotnet run (Determinism_RoamingFuzz, R18_PocketCells, KillAudit_1, V14_Fuzz, TraitsClassic x10, SingleDomainTests x14, KillRules_Classic, TraitsAudit_1). A final full dotnet run was started and stopped on the coordinator request (no failure printed before it was stopped). Stress: R23 fast matrix 24 rounds, 0 violations (36 s); big matrix 240 rounds, 0 violations, 329 links, 11 single-domain severances, 52 bridges, diagonal-only visible necks 13 (all from rival captures), run before the RimSafe filter. Unity EditMode (tools/unity.ps1 -Agent domain, full suite, final tree): JUnit tests=822, failures=0, errors=0, skipped=7 (Explicit report fixtures and the three Explicit R23 stress variants), 122 s; includes WaveC_Composites_KeepTheirFetchCount (passed), Bots_SeededBotOnlyRoundsMeetSection9Targets x2 (Unity variant: invariants only), R23_* and TraitsClassic rows 1-2.",
+  "determinism": "The band depends only on the trail geometry (union of capsules and the supercover raster are independent of how a straight path was subdivided into trail points); the labellings use a fixed scan and neighbour order on pooled stamped buffers. R23 cross-rate tests compare events, times, Return cells (band included), TerritorySevered cells and ranks at 30, 60 and 144 Hz; twin bot rounds give identical StateHash every 15 ticks. SingleDomain is not hashed.",
+  "performance": "One 4-connected flood of the returner's territory per unchased return (O(territory), pooled buffers, no allocation of grid size); three more floods and one band raster only when a link is considered (329 links in 240 rounds, about 1.4 per round). The 24-round stress test takes about 36 s in the dotnet loop (30 s of it is the rounds themselves).",
+  "remaining_and_open_questions": [
+    "Corner-only joints left by a rival's capture (rule v1.5 judges 8-connectivity): 13 visible occurrences (a corner-joined part of at least 16 cells) in 240 rounds after the fix, against 58 before. If the designer considers a corner joint as 'cut in two', rule v1.5 could judge 4-connectivity (more severances) or fill the corner cell; not done (enemy-caused splits keep v1.5 as decided).",
+    "A link through a rival's land takes the band over its full width and can sever the rival's far piece (rule v1.5). The designer may prefer a thinner line there.",
+    "Pre-existing pieces in custom setups are not judged until a trail joins them or a return runs the safety net.",
+    "The band is long for a long trail (the whole trail becomes land): it rewards a detached closure with more land than the region itself. Intended by the brief ('the trail becomes a band of territory')."
+  ],
+  "not_verified": "A complete dotnet run of the final tree (stopped on request): Bots_SeededBotOnlyRoundsMeetSection9Targets with the 50-seed dotnet targets was green in the first full run (before RimSafe, which only removes rim-band cells) but not re-run after. The big 240-round stress was not re-run after RimSafe (the fast matrix and the Unity matrix were). Traited probe hashes not recomputed. No player build (parent).",
+  "files": [
+    "Assets/Scripts/Core/World/SimConfig.cs (enum SingleDomainRule, field SingleDomain)",
+    "Assets/Scripts/Core/Sim/Simulation.cs (SingleDomain condition, doc)",
+    "Assets/Scripts/Core/Sim/EventResolver.cs (linkBands, inheritanceJoin, LinkCapture, RimSafe, StepReturns link flag and DomainLinks, StepKillRewards / StepCuts / Eliminate gated on inheritanceJoin, BuildBand rim filter, JoinInheritance doc)",
+    "Assets/Scripts/Core/Grid/TerritorySplit.cs (KeepOnePiece neighbours parameter)",
+    "Assets/Scripts/Core/Sim/PlayerState.cs (DomainLinks)",
+    "Assets/Scripts/Core/Sim/SimView.cs (SingleDomain doc)",
+    "Assets/Tests/EditMode/Core/SingleDomainStressTests.cs (new)",
+    "Assets/Tests/EditMode/Core/SingleDomainTests.cs (new)",
+    "Assets/Tests/EditMode/Core/Traits/TraitsClassicTests.cs, Traits/InheritanceBridgeTests.cs, Traits/KillRulesTests.cs, Traits/KillInheritanceTraitTests.cs, KillTraitsAuditTests.cs, TraitsAuditTests.cs, AuditTests.cs, RuleV14AuditTests.cs (see tests_changed)",
+    "docs/CONTRACT.md (v2.1, section 32), docs/BIOME_TRAITS.md (v1.3, 7.3), docs/domain_v17.json"
+  ],
+  "api_additions": [
+    "public enum SingleDomainRule { Off = 0, On = 1 } (Core/World/SimConfig.cs)",
+    "public SingleDomainRule SimConfig.SingleDomain = On",
+    "public int PlayerState.DomainLinks",
+    "internal: TerritorySplit.KeepOnePiece(..., int neighbours = 8)"
+  ],
+  "needs": [
+    "Parent: rebuild the players and run the probe (classic probe hash 246577239DE179C4 and the traited probe hashes): see 'probe' above for what the Unity EditMode run showed."
+  ]
+}

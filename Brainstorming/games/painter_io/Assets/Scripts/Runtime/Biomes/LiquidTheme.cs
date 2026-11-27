@@ -23,7 +23,7 @@ namespace PainterIO.Runtime
                 OverlayShader = BiomeTheme.LiquidOverlayShader,
                 PlayerColors = (Color[])Palette.Colors.Clone(),       // Coral, Teal, Saffron, Lilac (11.3)
                 Ground = Palette.Background,                           // #1E2A4D
-                OutsideArena = Palette.OutsideArena,                   // #151D38
+                OutsideArena = Palette.OutsideArena,                   // #B4B9C1, shared light grey (border_neon)
                 UiAccent = new Color32(0xF3, 0xEE, 0xE8, 0xFF),       // the UI light: the HUD looks exactly as in wave B-1
                 FillDuration = 0.35f,
                 BloomOnHigh = false,

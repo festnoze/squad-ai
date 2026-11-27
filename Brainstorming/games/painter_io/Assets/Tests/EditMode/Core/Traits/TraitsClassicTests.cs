@@ -10,21 +10,36 @@ namespace PainterIO.Tests
     public class TraitsClassicTests
     {
         /// <summary>
-        /// Rolling StateHash (every 30 ticks and at the end) of full bot rounds, recorded with the Core of Gate C (before
-        /// any trait code existed). Columns: seed, tick rate, lasso spawns, human index, hash.
+        /// Rolling StateHash (every 30 ticks and at the end) of full bot rounds. Columns: seed, tick rate, lasso spawns, human
+        /// index, the hash recorded with the Core of Gate C (before any trait code existed), which every later Core must still
+        /// give with SimConfig.SeveredTerritory = Off, and the hash with the default rules (rule v1.5, contract 29: severed
+        /// territory Neutral). Rule v1.5 changed every row whose round contains a split (all but seed 2). Rule v1.8 (contract
+        /// 31): both older columns are read with SimConfig.SingleDomain = Off (bit-identical), and the last column is the
+        /// default (single domain in every round type); it changed every row whose round contains a closure that would have
+        /// left a domain in pieces.
         /// </summary>
         private static readonly object[] Baselines =
         {
-            new object[] { 1UL, 60, true, -1, 0x8CB763231AC73608UL },
-            new object[] { 2UL, 60, true, -1, 0x2D4E3923E8FC07DCUL },
-            new object[] { 3UL, 60, false, -1, 0x20109E29FF4E9FECUL },
-            new object[] { 4UL, 60, true, 0, 0x99AEBACD711C7E8FUL },
-            new object[] { 5UL, 30, true, -1, 0xB7018354A8617813UL },
-            new object[] { 6UL, 144, true, -1, 0x22707E7EDD9ED472UL },
-            new object[] { 7UL, 60, false, 0, 0xE109EA10426D1F29UL },
+            new object[] { 1UL, 60, true, -1, 0x8CB763231AC73608UL, 0xC042710F17995DCBUL, 0x474509F44E0715B8UL },
+            new object[] { 2UL, 60, true, -1, 0x2D4E3923E8FC07DCUL, 0x2D4E3923E8FC07DCUL, 0x11D28CDBDE3CA24BUL },
+            new object[] { 3UL, 60, false, -1, 0x20109E29FF4E9FECUL, 0x48ED63A5F94CC15CUL, 0x55B09630D101DAF4UL },
+            new object[] { 4UL, 60, true, 0, 0x99AEBACD711C7E8FUL, 0x972BDEB73EEDCAAFUL, 0x691C5A62A5A5EE35UL },
+            new object[] { 5UL, 30, true, -1, 0xB7018354A8617813UL, 0x150EEF5F7D86D93EUL, 0x0728918E2CA26105UL },
+            new object[] { 6UL, 144, true, -1, 0x22707E7EDD9ED472UL, 0xEF0A76462F9F1006UL, 0xFF7592A9D3BA6EA5UL },
+            new object[] { 7UL, 60, false, 0, 0xE109EA10426D1F29UL, 0x3299BD126EBC01ACUL, 0x23FEE35F8C2E5E0DUL },
         };
 
-        private static ulong Rolling(ulong seed, int rate, bool lasso, int human, RuleTraits traits)
+        /// <summary>
+        /// The seed 1 row with the rule v1.5 rules (SingleDomain = Off): the classic reference of the other trait suites,
+        /// which compare trait-off rounds with SingleDomain = Off.
+        /// </summary>
+        internal const ulong ClassicSeed1 = 0xC042710F17995DCBUL;
+
+        /// <summary>The seed 1 row with the default rules (rule v1.8).</summary>
+        internal const ulong ClassicSeed1V18 = 0x474509F44E0715B8UL;
+
+        private static ulong Rolling(ulong seed, int rate, bool lasso, int human, RuleTraits traits,
+                                     SeveredTerritoryRule? severed = null, SingleDomainRule? domain = null)
         {
             BotStyle[] styles = TraitTestKit.Lineup;
             var controllers = new IController[4];
@@ -32,19 +47,27 @@ namespace PainterIO.Tests
                 controllers[i] = new BotController(BotPersonality.Preset(styles[i]), seed * 7919UL + (ulong)i * 104729UL + 17UL);
             var config = new SimConfig { Seed = seed, TickRate = rate, LassoEnabled = lasso };
             if (traits != null) config.Traits = traits;
+            if (severed.HasValue) config.SeveredTerritory = severed.Value;
+            if (domain.HasValue) config.SingleDomain = domain.Value;
             var sim = new Simulation(config, controllers, new SimSetup { HumanIndex = human });
             return TraitTestKit.RollingRoundHash(sim, 30, false);
         }
 
         [TestCaseSource(nameof(Baselines))]
-        public void TraitsClassic_BotRoundHashesEqualThePreTraitBaseline(ulong seed, int rate, bool lasso, int human, ulong expected)
+        public void TraitsClassic_BotRoundHashesEqualThePreTraitBaseline(ulong seed, int rate, bool lasso, int human, ulong preV15,
+                                                                         ulong v15, ulong expected)
         {
 #if UNITY_5_3_OR_NEWER
             // Unity (Editor Mono): the two first rows only, to keep the EditMode run short; dotnet checks all seven.
             if (seed > 2UL) return;
 #endif
+            Assert.AreEqual(preV15.ToString("X16"),
+                            Rolling(seed, rate, lasso, human, null, SeveredTerritoryRule.Off, SingleDomainRule.Off).ToString("X16"),
+                            "SeveredTerritory = Off and SingleDomain = Off must reproduce the pre-trait (pre-v1.5) hash exactly");
+            Assert.AreEqual(v15.ToString("X16"), Rolling(seed, rate, lasso, human, null, null, SingleDomainRule.Off).ToString("X16"),
+                            "SingleDomain = Off must reproduce the rule v1.5 hash exactly");
             Assert.AreEqual(expected.ToString("X16"), Rolling(seed, rate, lasso, human, null).ToString("X16"),
-                            "default SimConfig (Traits = Classic) must reproduce the pre-trait hash");
+                            "default SimConfig (Traits = Classic, SeveredTerritory = Neutral, SingleDomain = On)");
             Assert.AreEqual(expected.ToString("X16"), Rolling(seed, rate, lasso, human, RuleTraits.Parse("classic")).ToString("X16"),
                             "RuleTraits.Parse(\"classic\")");
         }
@@ -58,8 +81,13 @@ namespace PainterIO.Tests
             Assert.AreEqual(TraitDefaults.All.Count, allOff.Specs.Count, "disabled specs are kept (11 traits since wave D-2)");
             Assert.IsTrue(allOff.IsClassic);
             Assert.AreEqual("", allOff.ToKey());
-            Assert.AreEqual(0x8CB763231AC73608UL.ToString("X16"), Rolling(1UL, 60, true, -1, allOff).ToString("X16"),
+            Assert.AreEqual(ClassicSeed1V18.ToString("X16"), Rolling(1UL, 60, true, -1, allOff).ToString("X16"),
                             "a set whose traits are all disabled is bit-identical to classic");
+            Assert.AreEqual(ClassicSeed1.ToString("X16"), Rolling(1UL, 60, true, -1, allOff, null, SingleDomainRule.Off).ToString("X16"),
+                            "and to the rule v1.5 round with SingleDomain = Off");
+            Assert.AreEqual(0x8CB763231AC73608UL.ToString("X16"),
+                            Rolling(1UL, 60, true, -1, allOff, SeveredTerritoryRule.Off, SingleDomainRule.Off).ToString("X16"),
+                            "and to the pre-trait round with SeveredTerritory = Off and SingleDomain = Off");
         }
 
         [Test]

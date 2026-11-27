@@ -26,6 +26,14 @@
 //   9 Spark   a = intensity. A spark streaking toward local +x (head at x = 0.55).
 //  10 Packet  a = intensity. The current packet: a white-blue hot head at local x = 0.3 in an elongated glow that
 //             falls off faster ahead of the head (local x > 0.3) than behind it.
+// Trait shapes (wave D-2 traits-fx, same ids and parameters as Overlay.hlsl, drawn by Actors/TraitFxView.cs), as neon:
+//  16 Streak  a plasma streak with a jagged filament behind an orb running on its own territory (Conduction).
+//  17 Arc     a small lightning arc between a head and the exposed wire it could cut (ArcReach).
+//  18 Aura    a crackling neon ring around the orb, wider and brighter per speed level (KillSpeedBoost).
+//  19 Film    a force field: a neon rim with faint hexagons inside (KillShield).
+//  20 Timer   a small neon ring draining clockwise.
+//  21 Shimmer current pulses running along a shielded wire (strip mesh).
+// Every trait shape stays below sRGB luma 235 without bloom (the current packet stays the brightest moving thing).
 #ifndef PIO_ELECTRIC_OVERLAY_INCLUDED
 #define PIO_ELECTRIC_OVERLAY_INCLUDED
 
@@ -77,6 +85,123 @@ float PIOE_BoltPath(float xw, float lx, float seed, float tq, float amplitude)
     return n * amplitude * pin;
 }
 
+float PIOE_OvSq(float x)
+{
+    return x * x;
+}
+
+// Wave D-2 trait shapes as neon: the cool white-blue of their cores, capped below sRGB luma 235.
+#define PIOE_TRAIT_CORE float3(0.56, 0.72, 0.80)
+
+// Wave D-2 trait shapes (16 - 21) of the electric biome (header). Returns (rgb, alpha before opacity). wppX = world
+// units per pixel along local x (taken by the caller outside any branch).
+float4 PIOE_OverlayTrait(float shape, float2 q, float4 uv0, float4 p, float2 cs, float3 albedo, float aa, float wppX)
+{
+    float time = _PIO_Time.x;
+    float unitsPerLocal = max(uv0.z, 1e-4);
+    float rho = length(q);
+    float3 neon = min(albedo * 1.1, float3(1.0, 1.0, 1.0));
+    float3 color = neon;
+    float alpha = 0.0;
+    if (shape < 16.5)
+    {
+        // Streak: a neon plasma streak with a jagged white-blue filament down its middle (17 Hz).
+        float k = saturate(p.y);
+        float u = q.x * 0.5 + 0.5;
+        float wv = 0.16 + 0.84 * pow(saturate(u), 0.7);
+        float body = exp(-(q.y * q.y) / (wv * wv * 0.28)) * smoothstep(0.0, 0.4, u) * (1.0 - smoothstep(0.88, 1.0, u));
+        float tq = floor(time * 17.0 + p.w * 5.0);
+        float jag = (PIOE_OvNoise(float2(q.x * 6.0 + tq * 3.1, tq)) - 0.5) * 0.5 * wv;
+        float fil = exp(-PIOE_OvSq((q.y - jag) / max(0.08 * wv, 0.025))) * smoothstep(0.1, 0.65, u) * (1.0 - smoothstep(0.88, 1.0, u));
+        color = lerp(lerp(neon, PIOE_TRAIT_CORE, 0.2), PIOE_TRAIT_CORE, saturate(fil));
+        alpha = k * saturate(0.5 * body + 0.85 * fil);
+    }
+    else if (shape < 17.5)
+    {
+        // Arc: a small lightning arc, pinned at both ends, re-rolled at 20 Hz, with a short fading branch.
+        float seed = p.y;
+        float lx = q.x * (1.0 / 0.88);
+        float halfX = unitsPerLocal * 0.88;
+        float halfY = unitsPerLocal * max(p.z, 1e-3);
+        float yw = q.y * halfY;
+        float tq = floor(time * 20.0 + seed * 10.0);
+        float lc = clamp(lx, -1.0, 1.0);
+        float path = ((PIOE_OvNoise(float2(lc * 2.6 + seed * 17.0, tq * 1.37 + seed)) - 0.5)
+                    + 0.6 * (PIOE_OvNoise(float2(lc * 6.5 - seed * 5.0, tq * 2.11 - seed)) - 0.5)
+                    + 0.3 * (PIOE_OvNoise(float2(lc * 15.0 + seed * 3.0, tq * 3.3)) - 0.5)) * halfY * sqrt(saturate(1.0 - lc * lc));
+        float cw = max(p.w, wppX * 0.7);
+        float dist = abs(yw - path);
+        float core = exp(-dist * dist / (cw * cw));
+        float glow = exp(-dist / (cw * 4.5));
+        float ends = 1.0 - smoothstep(0.96, 1.04, abs(lx));
+        float2 wq = float2(q.x * unitsPerLocal, yw);
+        float contact = exp(-dot(wq - float2(halfX, 0.0), wq - float2(halfX, 0.0)) / 0.0036)
+                      + exp(-dot(wq + float2(halfX, 0.0), wq + float2(halfX, 0.0)) / 0.0036);
+        color = lerp(neon, PIOE_TRAIT_CORE, saturate(core * 1.3 + contact));
+        alpha = saturate(saturate(core + 0.55 * glow) * ends + 0.8 * contact) * (1.0 - smoothstep(0.8, 1.0, abs(q.y)));
+    }
+    else if (shape < 18.5)
+    {
+        // Aura: a crackling neon ring around the orb, jag re-rolled at 15 Hz, wider and brighter per level.
+        float level = max(p.y, 0.0);
+        float rim = max(p.z, 0.05);
+        float ang = atan2(q.y, q.x);
+        float tq = floor(time * 15.0);
+        float r1 = rim + 0.08 + 0.04 * min(level, 3.0);
+        float jag = (PIOE_OvNoise(float2(ang * 6.0 + tq * 2.3, tq * 0.7)) - 0.5) * 0.09;
+        float crackle = exp(-PIOE_OvSq((rho - r1 + jag) / 0.022));
+        float seg = smoothstep(0.35 - 0.08 * min(level, 3.0), 0.6, PIOE_OvNoise(float2(ang * 2.0 - time * 2.0, level)));
+        float glowR = exp(-PIOE_OvSq((rho - r1) / (0.07 + 0.03 * min(level, 3.0)))) * step(rim * 0.85, rho);
+        float burst = saturate(p.w) * exp(-PIOE_OvSq((rho - rim - 0.35 * (1.0 - p.w)) / 0.08));
+        color = lerp(neon, PIOE_TRAIT_CORE, saturate(crackle * seg + burst));
+        alpha = saturate((0.14 + 0.08 * min(level, 3.0)) * glowR + 0.85 * crackle * seg + 0.7 * burst);
+    }
+    else if (shape < 19.5)
+    {
+        // Film: a force field, a neon rim with faint hexagons inside that flicker.
+        float r0 = max(p.y, 0.1);
+        float rr = rho / r0;
+        float inside = saturate((1.0 - rr) * r0 / aa + 0.5);
+        float rimG = pow(saturate(rr), 6.0);
+        float2 hq = q * (4.5 / r0);
+        float2 hp = abs(frac(float2(hq.x, hq.y * 0.57735 + hq.x * 0.5)) - 0.5);
+        float hexL = 1.0 - smoothstep(0.0, 0.08, min(hp.x, hp.y));
+        float flick = 0.7 + 0.3 * step(0.4, PIOE_OvNoise(float2(floor(time * 12.0), 3.0)));
+        float pop = saturate(p.w);
+        color = lerp(neon, PIOE_TRAIT_CORE, saturate(0.3 * rimG + 0.4 * pop));
+        alpha = inside * saturate(0.05 + 0.6 * rimG * flick + 0.18 * hexL * smoothstep(0.3, 0.9, rr) * saturate(p.z + 0.5) + 0.5 * pop * rimG);
+    }
+    else if (shape < 20.5)
+    {
+        // Timer: a small neon ring draining clockwise from 12 o'clock over a dim track.
+        float r0 = p.y;
+        float hw = max(p.z, 1e-3);
+        float frac01 = saturate(p.w);
+        float band = saturate((hw - abs(rho - r0)) / aa + 0.5);
+        float a01 = frac(0.25 - atan2(q.y, q.x) / 6.2831853 + 1.0);
+        float onArc = saturate((frac01 - a01) * 6.2831853 * r0 / aa + 0.5);
+        float core = exp(-PIOE_OvSq((rho - r0) / (hw * 0.5)));
+        color = lerp(neon * 0.25, lerp(neon, PIOE_TRAIT_CORE, core * 0.6), onArc);
+        alpha = band * lerp(0.4, 1.0, onArc);
+    }
+    else
+    {
+        // Shimmer (strip): pulses of current running along the shielded wire over a faint cool sheen.
+        float k = saturate(p.y);
+        float y = uv0.y;
+        float s = uv0.w;
+        float body = exp(-y * y * 2.5);
+        float g = frac(s * (1.0 / 0.8) - time * 3.0);
+        float pulse = exp(-PIOE_OvSq((g - 0.5) / 0.14)) * exp(-y * y * 9.0);
+        float tq = floor(time * 15.0);
+        float jag = (PIOE_OvNoise(float2(s * 6.0 + tq * 3.1, tq)) - 0.5) * 0.9;
+        float filament = exp(-PIOE_OvSq((y - jag) / 0.12)) * (0.6 + 0.4 * PIOE_OvNoise(float2(s * 5.0, tq + 7.0)));
+        color = lerp(neon, PIOE_TRAIT_CORE, saturate(0.3 + pulse + 0.5 * filament));
+        alpha = k * saturate(0.15 * body + 0.45 * filament + 0.9 * pulse) * (1.0 - smoothstep(0.75, 1.0, abs(y)));
+    }
+    return float4(color, alpha);
+}
+
 void PIO_ElectricOverlaySG_float(float4 VertexColor, float4 UV0, float4 UV1, float4 UV2, out float3 BaseColor, out float Alpha)
 {
     float2 q = UV0.xy;
@@ -100,7 +225,14 @@ void PIO_ElectricOverlaySG_float(float4 VertexColor, float4 UV0, float4 UV1, flo
     float3 color = albedo;
     float alpha = 0.0;
 
-    if (shape < 0.5)
+    if (shape > 15.5)
+    {
+        // Wave D-2 trait shapes (header).
+        float4 trait = PIOE_OverlayTrait(shape, q, UV0, UV1, cs, albedo, aa, wppX);
+        color = trait.rgb;
+        alpha = trait.a * border;
+    }
+    else if (shape < 0.5)
     {
         // Ring: neon tube with crawling arcs and a soft dark contact ring.
         float r0 = UV1.y;

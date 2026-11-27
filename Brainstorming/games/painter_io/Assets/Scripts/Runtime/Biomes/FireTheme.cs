@@ -33,7 +33,7 @@ namespace PainterIO.Runtime
                     new Color32(0xE8, 0xD2, 0xFF, 0xFF),
                 },
                 Ground = new Color32(0x1A, 0x14, 0x12, 0xFF),          // charred stone (#1A1412 to #241A16)
-                OutsideArena = new Color32(0x10, 0x0C, 0x0B, 0xFF),
+                OutsideArena = Palette.OutsideArena,                   // #B4B9C1, shared light grey (border_neon)
                 UiAccent = new Color32(0xFF, 0xD2, 0x9A, 0xFF),        // warm ember white
                 FillDuration = 0.60f,
                 BloomOnHigh = true,

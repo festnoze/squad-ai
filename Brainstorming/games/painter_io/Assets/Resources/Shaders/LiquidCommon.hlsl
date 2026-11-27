@@ -79,6 +79,18 @@ TEXTURE2D(_PIO_TerritoryDome);     SAMPLER(sampler_PIO_TerritoryDome);     // x 
                                    // PIO_DOME_SHADOW_REACH toward the key light (the soft contact shadow source)
 float4 _PIO_TerritoryDomeTexel;    // (1/w, 1/h, w, h) of _PIO_TerritoryDome
 
+// Biome traits (wave D-2 traits-fx, docs/BIOME_TRAITS.md sections 5 and 7; set by TerritoryField, read by the three
+// composites). An unset global reads as 0, which turns every trait effect off.
+// - Scorched ground (ScorchedEarth): the scorch level of each cell (1 = scorched, fading to 0 over the last
+//   PIO_SCORCH_FADE seconds) is the G channel of _PIO_RevealTime (an RG texture since wave D-2), so LiquidComposite and
+//   ElectricComposite read it from the reveal fetch they already make and the 12.2 item 4 fetch budgets are unchanged.
+//   This stands for the "_PIO_ScorchMask" of BIOME_TRAITS 5 (same grid, same meaning, same fade).
+float _PIO_ScorchOn;               // 1 while at least one cell is scorched (gates FireComposite's scorch fetch), else 0
+// - Propagation (TerritoryGrew): a slow, subtle edge front. Per sim player channel, an envelope in [0, 1] that rises in
+//   about 0.15 s when that player's territory grows and decays over about 1.2 s; each composite draws its own soft edge
+//   accent with it (liquid creep, flames licking a little higher, rim crackle). Never as bright as a capture front.
+float4 _PIO_GrowPulse;
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------------------------------------------------
@@ -93,6 +105,14 @@ float4 _PIO_TerritoryDomeTexel;    // (1/w, 1/h, w, h) of _PIO_TerritoryDome
 // Gaussian edge of sigma 0.8 u peaks at 0.5 per u) and the distance toward the light (-0.6, 0.8) of its shadow sample.
 #define PIO_DOME_GRAD_RANGE 1.0
 #define PIO_DOME_SHADOW_REACH 0.32
+// Biome traits (wave D-2): seconds over which a scorched cell fades out before its scorch ends (TerritoryField writes
+// the faded level, this is for reference), and the Gaussian sigmas, in world units, of the edge profiles the composites
+// rebuild where a territory reaches the border of the grid (_PIO_ArenaRect): with Propagation a puddle may reach the
+// arena rim, and the clamped fields would otherwise smear it past the rim. Narrow field, relief field, dome field.
+#define PIO_SCORCH_FADE 2.0
+#define PIO_WALL_SIGMA_NARROW 0.16
+#define PIO_WALL_SIGMA_WIDE 0.26
+#define PIO_WALL_SIGMA_DOME 0.8
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Functions

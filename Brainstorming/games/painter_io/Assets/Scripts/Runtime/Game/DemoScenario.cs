@@ -2,6 +2,12 @@
 // SimSetup, scripted controllers and BeforeTick hooks keyed on the integer Tick (TickRate 60), with named checkpoint ticks
 // and an assertion helper. Everything outside the UNITY_5_3_OR_NEWER block uses PainterIO.Core only, so the scenario also
 // runs in a plain dotnet process (handy to tune the geometry without the Unity lock).
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md section 5): the demo runs CLASSIC by default (the probe hash
+// 246577239DE179C4 is unchanged); CreateSession takes BiomeTraitTable.ResolveScripted(biome), so the command line can give
+// it traits (-traits default = the biome's line of the table, -traits "<key>", -trait <Id>=0|1, -classic). The story
+// below is the classic one: Monitor.Evaluate asserts it only for a classic round; a traited round is judged by
+// Monitor.EvaluateTraited (no story, only what every trait set must keep). TraitShots lists the extra screenshots of a
+// traited round (growth, kill reward, scorched ground, reach arc), keyed on sim ticks.
 //
 // The story under rule v1.4 (contract 24: a chased return survives but captures nothing). Player 0 is the human (coral),
 // 1 the rival (teal), 2 and 3 the cutters (saffron and lilac):
@@ -103,10 +109,18 @@ namespace PainterIO.Runtime
             new Vec2d(7.3, 2.6), new Vec2d(7.1, -1.6), new Vec2d(8.6, -1.0), new Vec2d(9.4, 2.6), new Vec2d(10.0, 5.5),
         };
 
-        /// <summary>Default sim config of the demo: TickRate 60, default turn rate, no random ring spawns.</summary>
+        /// <summary>Default sim config of the demo: TickRate 60, default turn rate, no random ring spawns, classic rules.</summary>
         public static SimConfig CreateConfig()
         {
             return new SimConfig { TickRate = TickRate, LassoEnabled = false, Seed = 1 };
+        }
+
+        /// <summary>Wave D-2: the demo config with a trait set (null = classic, identical to CreateConfig()).</summary>
+        public static SimConfig CreateConfig(RuleTraits traits)
+        {
+            SimConfig config = CreateConfig();
+            config.Traits = traits ?? RuleTraits.Classic;
+            return config;
         }
 
         /// <summary>Start positions, headings and territories (the human is player 0). names may be null.</summary>
@@ -147,7 +161,13 @@ namespace PainterIO.Runtime
         /// <summary>A headless demo round with its hooks and a monitor (Core only).</summary>
         public static Simulation CreateSimulation(out Monitor monitor)
         {
-            var sim = new Simulation(CreateConfig(), CreateControllers(), CreateSetup());
+            return CreateSimulation(out monitor, null);
+        }
+
+        /// <summary>Wave D-2: a headless demo round under a trait set (null = classic) with its hooks and a monitor.</summary>
+        public static Simulation CreateSimulation(out Monitor monitor, RuleTraits traits)
+        {
+            var sim = new Simulation(CreateConfig(traits), CreateControllers(), CreateSetup());
             AttachHooks(sim);
             monitor = new Monitor(sim);
             return sim;
@@ -163,22 +183,31 @@ namespace PainterIO.Runtime
         /// <summary>
         /// The demo round as a real (non-attract) GameSession: AwaitingStart = false, CountsForStats = false, names as in
         /// GameSession.CreateRound, hooks attached and a monitor watching it. Its biome follows the command line (-biome)
-        /// or SaveData.Biome (GameDirector applies it when the session starts).
+        /// or SaveData.Biome (GameDirector applies it when the session starts). Wave D-2: its traits are
+        /// BiomeTraitTable.ResolveScripted(that biome): classic unless the command line gives trait flags.
         /// </summary>
         public static GameSession CreateSession(out Monitor monitor)
         {
-            var session = new GameSession(CreateConfig(), CreateSetup(GameSession.DefaultNames(PlayerCount, Human)),
-                                          CreateControllers(), false);
-            AttachHooks(session.Sim);
-            monitor = new Monitor(session.Sim);
-            return session;
+            return CreateSession(out monitor, null, BiomeTraitTable.ResolveScripted(GameSession.ActiveBiome()));
         }
 
-        /// <summary>The demo round in a forced biome (GameSession.Biome; the probe and the tests use it).</summary>
+        /// <summary>The demo round in a forced biome (GameSession.Biome; the probe and the tests use it), traits as above.</summary>
         public static GameSession CreateSession(out Monitor monitor, BiomeId biome)
         {
-            GameSession session = CreateSession(out monitor);
-            session.Biome = biome;
+            return CreateSession(out monitor, biome, BiomeTraitTable.ResolveScripted(biome));
+        }
+
+        /// <summary>
+        /// Wave D-2: the demo round with an explicit trait set (null = classic) and an optional forced biome (null follows
+        /// -biome / SaveData.Biome). Tests and per-biome trait runs use it.
+        /// </summary>
+        public static GameSession CreateSession(out Monitor monitor, BiomeId? biome, RuleTraits traits)
+        {
+            var session = new GameSession(CreateConfig(traits), CreateSetup(GameSession.DefaultNames(PlayerCount, Human)),
+                                          CreateControllers(), false);
+            if (biome.HasValue) session.Biome = biome.Value;
+            AttachHooks(session.Sim);
+            monitor = new Monitor(session.Sim);
             return session;
         }
 #endif
@@ -530,6 +559,31 @@ namespace PainterIO.Runtime
                 return failures.Count == 0;
             }
 
+            /// <summary>Wave D-2: the watched round runs with at least one trait (the classic story is then not asserted).</summary>
+            public bool Traited => !sim.Config.Traits.IsClassic;
+
+            /// <summary>
+            /// Wave D-2: what a demo round must keep under ANY trait set (the classic story of Evaluate does not hold: for
+            /// example Feu's 2.1x spark catches the human in phase 2). Phase 1 is a clean unchased capture before any cut,
+            /// EventCapHits stays 0 and every checkpoint tick is reached. Returns true when every check holds.
+            /// </summary>
+            public bool EvaluateTraited(out List<string> failures)
+            {
+                failures = new List<string>();
+                if (FirstReturnTick < 0) failures.Add("no capturing return (phase 1)");
+                else
+                {
+                    if (FirstReturnChased) failures.Add("the capturing return was chased");
+                    if (FirstCutTick >= 0 && FirstCutTick <= FirstReturnTick) failures.Add("the human was cut before the clean capture");
+                }
+                if (sim.EventCapHits != 0) failures.Add("EventCapHits = " + sim.EventCapHits);
+                for (int k = 0; k < Checkpoints.Length; k++)
+                {
+                    if (!Checkpoints[k].Recorded) failures.Add(CheckpointNames[k] + " not reached");
+                }
+                return failures.Count == 0;
+            }
+
             /// <summary>One line per fact, for logs.</summary>
             public string Report()
             {
@@ -561,6 +615,145 @@ namespace PainterIO.Runtime
             private static string F(double v)
             {
                 return v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+
+        /// <summary>
+        /// Wave D-2 (BIOME_TRAITS 6, player screenshots): the extra screenshots of a traited demo round, planned from the
+        /// sim only (events and BeforeTick reads; it never steers the sim). A shot is due at a tick; the caller captures
+        /// it in the first rendered frame with Sim.Tick &gt;= that tick, like the checkpoints. Each kind is planned once:
+        ///   grow    first TerritoryGrew of the human + GrowDelay ticks (Propagation front over its own puddle);
+        ///   reward  first kill reward (TerritoryInherited, SpeedBoosted, ShieldStarted) + RewardDelay ticks (about the
+        ///           middle of a fill wave, before the death beat of a dead human ends);
+        ///   scorch  first elimination whose freed cells are scorched (ScorchedEarth without a surviving inheritor)
+        ///           + ScorchDelay ticks;
+        ///   reach   first tick where an enemy head comes within ContactRadius x 1.25 (plus ReachLeadTicks of base pawn
+        ///           travel, so the captured frame, a tick or two later, still precedes the cut) of an exposed point of a
+        ///           trail of the human, or the human's head near another trail, when ArcReach widened the contact.
+        /// Nothing is planned in a classic round.
+        /// </summary>
+        public sealed class TraitShots
+        {
+            public const long GrowDelay = 10;
+            public const long RewardDelay = 18;
+            public const long ScorchDelay = 30;
+
+            /// <summary>Lead of the reach shot in ticks of base pawn travel (frames land up to two ticks after the plan).</summary>
+            public const double ReachLeadTicks = 2.0;
+
+            /// <summary>The reach arc shows within this multiple of the contact radius (BIOME_TRAITS 5).</summary>
+            public const double ReachScale = 1.25;
+
+            private readonly Simulation sim;
+            private readonly List<KeyValuePair<long, string>> due = new List<KeyValuePair<long, string>>();
+            private readonly HashSet<string> planned = new HashSet<string>();
+            private int[] pendingFreed;
+            private readonly bool active;
+            private readonly bool watchReach;
+
+            public TraitShots(Simulation sim)
+            {
+                this.sim = sim ?? throw new ArgumentNullException(nameof(sim));
+                RuleTraits traits = sim.Config.Traits;
+                active = traits != null && !traits.IsClassic;
+                watchReach = active && sim.Config.ContactScale > 1.0 + 1e-9;
+                if (!active) return;
+                sim.EventRaised += OnEvent;
+                sim.BeforeTick += OnBeforeTick;
+            }
+
+            /// <summary>Shot names planned so far (in planning order), for logs.</summary>
+            public IEnumerable<string> Planned => planned;
+
+            /// <summary>Pending shots (due tick, name).</summary>
+            public int PendingCount => due.Count;
+
+            /// <summary>The next shot whose tick has come (removed from the queue), or false.</summary>
+            public bool TryTake(long tick, out string name)
+            {
+                name = null;
+                int best = -1;
+                for (int k = 0; k < due.Count; k++)
+                {
+                    if (due[k].Key > tick) continue;
+                    if (best < 0 || due[k].Key < due[best].Key) best = k;
+                }
+                if (best < 0) return false;
+                name = due[best].Value;
+                due.RemoveAt(best);
+                return true;
+            }
+
+            /// <summary>Unsubscribes from the sim.</summary>
+            public void Detach()
+            {
+                if (!active) return;
+                sim.EventRaised -= OnEvent;
+                sim.BeforeTick -= OnBeforeTick;
+            }
+
+            private void Plan(string name, long tick)
+            {
+                if (!planned.Add(name)) return;
+                due.Add(new KeyValuePair<long, string>(tick, name));
+            }
+
+            // Raised during Step: the tick that raises it ends with Tick + 1.
+            private void OnEvent(SimEvent e)
+            {
+                long tick = sim.Tick + 1;
+                switch (e.Type)
+                {
+                    case SimEventType.TerritoryGrew:
+                        if (e.Player == Human && e.Cells != null && e.Cells.Length > 0) Plan("grow", tick + GrowDelay);
+                        break;
+                    case SimEventType.TerritoryInherited:
+                    case SimEventType.SpeedBoosted:
+                    case SimEventType.ShieldStarted:
+                        Plan("reward", tick + RewardDelay);
+                        break;
+                    case SimEventType.Eliminated:
+                        if (e.Cells != null && e.Cells.Length > 0 && sim.Config.Traits.Has(TraitId.ScorchedEarth) && !planned.Contains("scorch"))
+                            pendingFreed = e.Cells;
+                        break;
+                }
+            }
+
+            // Runs before each Step, on the state left by the previous one.
+            private void OnBeforeTick(Simulation s)
+            {
+                if (pendingFreed != null)
+                {
+                    int[] cells = pendingFreed;
+                    pendingFreed = null;
+                    for (int k = 0; k < cells.Length; k += Math.Max(1, cells.Length / 16))
+                    {
+                        if (!s.View.IsScorched(cells[k])) continue;
+                        Plan("scorch", s.Tick + ScorchDelay);
+                        break;
+                    }
+                }
+                if (watchReach && !planned.Contains("reach") && ReachVisible(s)) Plan("reach", s.Tick);
+            }
+
+            private static bool ReachVisible(Simulation s)
+            {
+                double radius = s.Config.ContactRadius * ReachScale + ReachLeadTicks * s.Config.PawnSpeed * s.Config.Dt;
+                double grace = s.Config.HeadGrace;
+                int n = s.Players.Count;
+                for (int v = 0; v < n; v++)
+                {
+                    PlayerState victim = s.Players[v];
+                    if (!victim.Alive || victim.Home || victim.Trail.Length <= grace) continue;
+                    for (int a = 0; a < n; a++)
+                    {
+                        if (a == v || (a != Human && v != Human)) continue;
+                        PlayerState attacker = s.Players[a];
+                        if (!attacker.Alive) continue;
+                        if (victim.Trail.ClosestPointWithin(attacker.Pos, radius, victim.Trail.Length - grace, out _, out _)) return true;
+                    }
+                }
+                return false;
             }
         }
     }

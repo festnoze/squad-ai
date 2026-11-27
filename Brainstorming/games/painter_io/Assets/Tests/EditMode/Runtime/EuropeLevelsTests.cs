@@ -29,6 +29,49 @@ public sealed class EuropeLevelsTests
         }
     }
 
+    /// <summary>
+    /// Rule v1.7 (contract 31): every country has a conquest goal. The conquerable cells (Simulation.ConquestCellCount)
+    /// leave out only the rim band and the pieces beyond thin necks, and stay above Conquest.LazyFloor of the arena
+    /// cells (the lazy mask of Simulation.ConquestReached relies on it). Reports the smallest share and the slowest mask.
+    /// </summary>
+    [Test]
+    public void EveryCountryHasAReachableConquestGoal()
+    {
+        double minShare = 1.0, maxMs = 0.0;
+        string minCode = "", slowCode = "";
+        foreach (var country in EuropeCatalog.Load().countries)
+        {
+            var config = new SimConfig();
+            var setup = new SimSetup();
+            country.Configure(config, setup);
+            var sim = new Simulation(config, new IController[4], setup);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            int conquerable = sim.ConquestCellCount;
+            watch.Stop();
+            double share = conquerable / (double)sim.Grid.ArenaCellCount;
+            Assert.That(share, Is.GreaterThan(PainterIO.Core.Conquest.LazyFloor), country.code + " conquerable share " + share);
+            Assert.That(sim.ConquestTargetCells, Is.LessThanOrEqualTo(conquerable), country.code);
+            for (int i = 0; i < 4; i++)
+            {
+                Assert.That(sim.ConquestPercent(i), Is.GreaterThan(0.0), country.code + " start disc " + i + " counts");
+            }
+            if (share < minShare)
+            {
+                minShare = share;
+                minCode = country.code;
+            }
+            if (watch.Elapsed.TotalMilliseconds > maxMs)
+            {
+                maxMs = watch.Elapsed.TotalMilliseconds;
+                slowCode = country.code;
+            }
+        }
+        Debug.Log("[EuropeLevels] smallest conquerable share " + minShare.ToString("F3") + " (" + minCode + "), slowest mask "
+                  + maxMs.ToString("F1") + " ms (" + slowCode + ")");
+        TestContext.WriteLine("smallest conquerable share " + minShare.ToString("F3") + " (" + minCode + "), slowest mask "
+                              + maxMs.ToString("F1") + " ms (" + slowCode + ")");
+    }
+
     [Test]
     public void CrossingANarrowInletCannotSkipTheBorder()
     {

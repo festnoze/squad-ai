@@ -137,6 +137,23 @@ namespace OutOfSight
         /// <summary>STARSANIM: a four point twinkle with a round core, the sparkles flying out of a filling star.</summary>
         public static Sprite Sparkle => sparkle != null ? sparkle : sparkle = Draw(64, 64, SparkleAlpha, "Sparkle");
 
+        // ----- CONFETTI (2026-11-27, docs/next/progress/STARSANIM.md "Confetti"): the shower's pieces, white to tint. -----
+        private static Sprite[] confettiShapes;
+
+        /// <summary>CONFETTI: the index of each piece shape in <see cref="ConfettiShapes"/>.</summary>
+        public const int ConfettiSquare = 0;
+        public const int ConfettiDisc = 1;
+        public const int ConfettiCurl = 2;
+        public const int ConfettiWave = 3;
+
+        /// <summary>
+        /// CONFETTI: the confetti pieces' shapes, four 32 x 32 cells of one 128 x 32 texture (so the whole shower batches into
+        /// one draw call): a paper square (stretched into rectangles and streamer strips), a disc, a curled ribbon (an open
+        /// ring) and a wavy streamer. Each keeps a clear texel all round, so the bilinear filter never bleeds a neighbour in.
+        /// </summary>
+        public static Sprite[] ConfettiShapes => confettiShapes ?? (confettiShapes = DrawCells(32, "Confetti",
+            ConfettiSquareAlpha, ConfettiDiscAlpha, ConfettiCurlAlpha, ConfettiWaveAlpha));
+
         /// <summary>
         /// Tests (the sprite textures are not readable once drawn): the alpha of an eye state's drawing on a
         /// <paramref name="width"/> x <paramref name="height"/> grid, row by row, with the same function and the same
@@ -212,6 +229,91 @@ namespace OutOfSight
             sprite.name = name;
             sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
             return sprite;
+        }
+
+        /// <summary>
+        /// CONFETTI: one texture holding a row of <paramref name="cell"/> square cells, one per shader, and a sprite per cell
+        /// (no mipmaps, bilinear, not readable). Each shader sees u and v in [-1, 1] over its own cell.
+        /// </summary>
+        private static Sprite[] DrawCells(int cell, string name, params PixelFn[] shaders)
+        {
+            int count = shaders.Length;
+            int width = cell * count;
+            var texture = new Texture2D(width, cell, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+            };
+            var pixels = new Color[width * cell];
+            float pixel = 2f / cell;
+            for (int k = 0; k < count; k++)
+            {
+                for (int y = 0; y < cell; y++)
+                {
+                    for (int x = 0; x < cell; x++)
+                    {
+                        float u = (x + 0.5f) / cell * 2f - 1f;
+                        float v = (y + 0.5f) / cell * 2f - 1f;
+                        pixels[y * width + k * cell + x] = shaders[k](u, v, pixel);
+                    }
+                }
+            }
+            texture.SetPixels(pixels);
+            texture.Apply(false, true);
+            var sprites = new Sprite[count];
+            for (int k = 0; k < count; k++)
+            {
+                Sprite sprite = Sprite.Create(texture, new Rect(k * cell, 0, cell, cell), new Vector2(0.5f, 0.5f), 100f, 0,
+                    SpriteMeshType.FullRect);
+                sprite.name = name + k;
+                sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
+                sprites[k] = sprite;
+            }
+            return sprites;
+        }
+
+        /// <summary>CONFETTI: a paper square to the cell's edge (less one texel), a faint sheen brighter at the top.</summary>
+        private static Color ConfettiSquareAlpha(float u, float v, float pixel)
+        {
+            float a = Cover(Mathf.Max(Mathf.Abs(u), Mathf.Abs(v)) - 0.88f, pixel);
+            float l = 0.88f + 0.12f * (v + 1f) * 0.5f;
+            return new Color(l, l, l, a);
+        }
+
+        /// <summary>CONFETTI: a round paper dot.</summary>
+        private static Color ConfettiDiscAlpha(float u, float v, float pixel)
+        {
+            return new Color(1f, 1f, 1f, Cover(Mathf.Sqrt(u * u + v * v) - 0.86f, pixel));
+        }
+
+        /// <summary>CONFETTI: a curled ribbon, three quarters of a thick ring with rounded ends (open at the right).</summary>
+        private static Color ConfettiCurlAlpha(float u, float v, float pixel)
+        {
+            const float radius = 0.6f;
+            const float half = 0.17f;
+            float r = Mathf.Sqrt(u * u + v * v);
+            float band = Mathf.Abs(r - radius) - half;
+            // The open quarter (angles -45 to 45 degrees): the band ends there in two round caps.
+            float angle = Mathf.Atan2(v, u) * Mathf.Rad2Deg;
+            if (angle > -45f && angle < 45f)
+            {
+                float c = 0.70710678f * radius;
+                float end1 = Mathf.Sqrt((u - c) * (u - c) + (v - c) * (v - c)) - half;
+                float end2 = Mathf.Sqrt((u - c) * (u - c) + (v + c) * (v + c)) - half;
+                band = Mathf.Min(end1, end2);
+            }
+            return new Color(1f, 1f, 1f, Cover(band, pixel));
+        }
+
+        /// <summary>CONFETTI: a wavy streamer, a band snaking up the cell (one and a half waves), its ends cut square.</summary>
+        private static Color ConfettiWaveAlpha(float u, float v, float pixel)
+        {
+            float centre = 0.42f * Mathf.Sin(v * Mathf.PI * 1.5f);
+            float band = Mathf.Abs(u - centre) - 0.24f;
+            float ends = Mathf.Abs(v) - 0.88f;
+            return new Color(1f, 1f, 1f, Cover(Mathf.Max(band, ends), pixel));
         }
 
         private static float Cover(float signedDistance, float pixel)

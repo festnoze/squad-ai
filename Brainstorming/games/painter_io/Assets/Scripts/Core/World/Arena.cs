@@ -193,6 +193,49 @@ namespace PainterIO.Core
             return best;
         }
 
+        /// <summary>Rule v1.9 border ride: longest sub-step (u) of FollowBorder (the requested length is split evenly).</summary>
+        public const double RideSubStep = 0.05;
+
+        /// <summary>Rule v1.9 border ride: most sub-steps of one FollowBorder call (longer moves use longer sub-steps).</summary>
+        public const int RideMaxSubSteps = 64;
+
+        /// <summary>
+        /// Rule v1.9 (contract 33) border ride motion: moves a head that lies on (or within the contact tolerance of) the
+        /// inset line {SignedDistance = -Margin} along that line for 'length' (u), in the direction sign x OutwardNormal.Perp()
+        /// (sign +1 or -1), around every corner: the rounded corners of the classic square, and on a country polygon both the
+        /// convex vertices (where the head would be held) and the reflex ones (ArenaPolygon.Follow). The result is in the
+        /// inset shape. direction = the unit tangent of the last sub-step (the riding heading). Deterministic, doubles only.
+        /// </summary>
+        public Vec2d FollowBorder(Vec2d p, double length, int sign, out Vec2d direction)
+        {
+            if (polygon != null) return polygon.Follow(p, length, sign, Margin, out direction);
+            double s = sign < 0 ? -1.0 : 1.0;
+            Vec2d q = OntoInsetLine(p);
+            direction = OutwardNormal(q).Perp() * s;
+            if (!(length > 0.0)) return q;
+            int steps = (int)Math.Ceiling(length / RideSubStep);
+            if (steps < 1) steps = 1;
+            if (steps > RideMaxSubSteps) steps = RideMaxSubSteps;
+            double h = length / steps;
+            for (int k = 0; k < steps; k++)
+            {
+                // The inset rounded box is convex: a tangent step leaves it (or stays on a straight side) and the
+                // projection brings it back onto the line, so the head follows the sides and the corner arcs.
+                Vec2d t = OutwardNormal(q).Perp() * s;
+                direction = t;
+                q = OntoInsetLine(q + t * h);
+            }
+            return q;
+        }
+
+        /// <summary>Nearest point of the inset line for a point near it (pushed out from inside, clamped from outside).</summary>
+        private Vec2d OntoInsetLine(Vec2d p)
+        {
+            double f = SignedDistance(p) + Margin;
+            if (f < 0.0) p = p - OutwardNormal(p) * f;
+            return ClampInside(p);
+        }
+
         private static double Clamp(double v, double lo, double hi)
         {
             if (v < lo) return lo;

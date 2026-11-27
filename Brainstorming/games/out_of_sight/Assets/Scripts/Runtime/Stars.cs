@@ -13,9 +13,9 @@ namespace OutOfSight
     /// route has nothing to beat and gives three stars. Three stars at or under the reference times
     /// <see cref="Tuning.StarsThreeFactor"/>, two under <see cref="Tuning.StarsTwoFactor"/>, one for any other win. The best
     /// count is kept in the save under the record key (<see cref="SaveData.RecordStars"/>), so a redesigned level (a new
-    /// RecordId) starts again, as its records do. The star sprite is drawn once in code (no texture asset), like GaugeArt;
-    /// <see cref="StarRow"/> lays three of them out on every level select card, and <see cref="WinStarsView"/> (STARSANIM,
-    /// docs/next/progress/STARSANIM.md) is the end screen's animated hero row.
+    /// RecordId) starts again, as its records do. The star sprites are drawn once in code (no texture asset), like GaugeArt;
+    /// <see cref="StarRow"/> lays three flat ones out on every level select card, and <see cref="WinStarsView"/> (STARSANIM,
+    /// docs/next/progress/STARSANIM.md) is the end screen's animated hero row, with bevelled 3D stars since STAR3D.
     /// </summary>
     public static class Stars
     {
@@ -116,36 +116,40 @@ namespace OutOfSight
         private static Sprite star;
         private static Sprite starLarge;
         private static Sprite starSlot;
+        private static Sprite starFlash;
         private const int StarTexels = 96;
-        // STARSANIM: the end screen's hero stars are up to 184 units wide (1.8x during their punch), so they get a finer
-        // texture than the cards' 56 unit stars (192 texels: about 147 KB each, two textures).
-        private const int LargeStarTexels = 192;
         private static readonly Color Outline = new Color(0.1f, 0.07f, 0.05f, 1f);
-        // STARSANIM: an empty slot's inside (a dark, see-through socket) and its rim (the title's cream).
-        private static readonly Color SlotInside = new Color(0.06f, 0.05f, 0.045f, 0.62f);
-        private static readonly Color SlotRim = new Color(1f, 0.94f, 0.82f, 0.62f);
-
-        /// <summary>The star sprite (drawn once): a white fill, a little brighter at the top, ringed in dark ink.</summary>
-        public static Sprite Star => star != null ? star : star = DrawStar(StarTexels, "Star", false);
-
-        /// <summary>STARSANIM: the same star on a finer texture, for the end screen's hero row (tinted gold when earned).</summary>
-        public static Sprite StarLarge => starLarge != null ? starLarge : starLarge = DrawStar(LargeStarTexels, "StarLarge", false);
 
         /// <summary>
-        /// STARSANIM: an empty star slot of the hero row, in its own colours (draw it white): a dark see-through inside ringed
-        /// in cream, the same outline as <see cref="StarLarge"/>, so a filled star covers it exactly.
+        /// The flat star sprite (drawn once): a white fill, a little brighter at the top, ringed in dark ink. Kept for the small
+        /// uses (the level select cards' 56 unit stars, the level select's total icon), where it is tinted gold or faint cream.
         /// </summary>
-        public static Sprite StarSlot => starSlot != null ? starSlot : starSlot = DrawStar(LargeStarTexels, "StarSlot", true);
+        public static Sprite Star => star != null ? star : star = DrawStar(StarTexels, "Star");
 
-        private static Sprite DrawStar(int size, string name, bool slot)
+        /// <summary>
+        /// STAR3D (2026-11-27, docs/next/progress/STARSANIM.md): the end screen's hero star, a chunky bevelled 3D gold star
+        /// drawn in its own colours (show it white, <see cref="WinStarsView.FilledTint"/>): ten facets split down each arm's
+        /// ridge, lit from the top-left over a gradient from bright yellow at the top to deep amber at the bottom, a thick
+        /// rounded bevel along the edges, a dark amber rim and outline, a glossy streak and a specular sheen at the top-left,
+        /// and a soft drop shadow down-right baked in (the sprite's padding holds it).
+        /// </summary>
+        public static Sprite StarLarge => starLarge != null ? starLarge : starLarge = DrawHeroStar(HeroTexels, "StarLarge");
+
+        /// <summary>
+        /// STAR3D: an empty slot of the hero row, in its own colours (draw it white): the same star shape recessed into the panel
+        /// in a dark desaturated grey-blue (the walls in shadow at the top, a light lip at the bottom, the top-left wall's shadow
+        /// cast on the floor), so <see cref="StarLarge"/> covers it exactly and pops out of it.
+        /// </summary>
+        public static Sprite StarSlot => starSlot != null ? starSlot : starSlot = DrawHeroSlot(HeroTexels, "StarSlot");
+
+        /// <summary>
+        /// STAR3D: the hero star's silhouette in plain white with a soft edge, laid over a filling star and faded out: the
+        /// white-hot flash of its punch (a tint can only darken the baked colours of <see cref="StarLarge"/>).
+        /// </summary>
+        public static Sprite StarFlash => starFlash != null ? starFlash : starFlash = DrawHeroFlash(FlashTexels, "StarFlash");
+
+        private static Sprite DrawStar(int size, string name)
         {
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
-            {
-                name = name,
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Bilinear,
-                hideFlags = HideFlags.DontUnloadUnusedAsset,
-            };
             var pixels = new Color[size * size];
             float pixel = 2f / size;
             const float outline = 0.09f;
@@ -157,22 +161,26 @@ namespace OutOfSight
                     float d = StarDistance(p, 0.88f, 0.47f);
                     float outer = Mathf.Clamp01(0.5f - (d - outline) / pixel);
                     float inner = Mathf.Clamp01(0.5f - d / pixel);
-                    Color c;
-                    if (slot)
-                    {
-                        c = Color.Lerp(SlotRim, SlotInside, inner);
-                        c.a *= outer;
-                    }
-                    else
-                    {
-                        float v = (y + 0.5f) / size;
-                        float l = 0.86f + 0.14f * v;
-                        c = Color.Lerp(Outline, new Color(l, l, l, 1f), inner);
-                        c.a = outer;
-                    }
+                    float v = (y + 0.5f) / size;
+                    float l = 0.86f + 0.14f * v;
+                    Color c = Color.Lerp(Outline, new Color(l, l, l, 1f), inner);
+                    c.a = outer;
                     pixels[y * size + x] = c;
                 }
             }
+            return ToSprite(pixels, size, name);
+        }
+
+        /// <summary>One sprite from <paramref name="pixels"/> (square, row by row from the bottom): no mipmaps, bilinear, not readable.</summary>
+        private static Sprite ToSprite(Color[] pixels, int size, string name)
+        {
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+            {
+                name = name,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+            };
             texture.SetPixels(pixels);
             texture.Apply(false, true);
             Sprite sprite = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect);
@@ -180,6 +188,241 @@ namespace OutOfSight
             sprite.hideFlags = HideFlags.DontUnloadUnusedAsset;
             return sprite;
         }
+
+        // ----- STAR3D (2026-11-27): the hero row's bevelled 3D stars, drawn once (no texture asset, nothing per frame). -----
+        // The hero stars show up to 184 units wide (about 206 px on a 20:9 phone, 245 px on a 1440p monitor; 1.8x for an
+        // instant during the punch): 256 texels keep them crisp at rest (256 KB each, two textures), the flash 128 (64 KB).
+        // Shape: the cards' star, a little chunkier (inner ratio 0.5) and smaller (outer radius 0.84 of the half box) to leave
+        // the outline and the drop shadow room inside the box, so the boxes and the layout stay as they were.
+        private const int HeroTexels = 256;
+        private const int FlashTexels = 128;
+        private const float HeroRadius = 0.84f;
+        private const float HeroInner = 0.5f;
+        // The bevel (sprite units, the half box is 1): its width, the slope at the very edge and the facets' slope beyond it.
+        private const float HeroBevel = 0.15f;
+        private const float HeroEdgeSlope = 2.4f;
+        private const float HeroRoofSlope = 0.42f;
+        private const float HeroRim = 0.03f;
+        private const float HeroOutlineWidth = 0.028f;
+        private const float HeroShadowAlpha = 0.5f;
+        private static readonly Vector2 HeroShadowOffset = new Vector2(0.05f, -0.065f);
+        // The slot: its outer lip, the walls' width and slopes, and the reach of the top-left wall's shadow on the floor.
+        private const float SlotLip = 0.045f;
+        private const float SlotWall = 0.1f;
+        private const float SlotEdgeSlope = 2f;
+        private const float SlotFloorSlope = 0.25f;
+        private const float SlotLipSlope = 1.4f;
+        private static readonly Vector2 SlotCastOffset = new Vector2(-0.07f, 0.08f);
+        // The light comes from the top-left, toward the viewer; the half vector gives the specular sheen.
+        private static readonly Vector3 HeroLight = new Vector3(-0.52f, 0.62f, 0.59f).normalized;
+        private static readonly Vector3 HeroHalf = (new Vector3(-0.52f, 0.62f, 0.59f).normalized + Vector3.forward).normalized;
+        private static readonly Color HeroTop = new Color(1f, 0.93f, 0.36f, 1f);
+        private static readonly Color HeroMid = new Color(1f, 0.74f, 0.12f, 1f);
+        private static readonly Color HeroBottom = new Color(0.86f, 0.38f, 0.03f, 1f);
+        private static readonly Color HeroRimColor = new Color(0.55f, 0.22f, 0.02f, 1f);
+        private static readonly Color HeroOutlineColor = new Color(0.32f, 0.12f, 0.02f, 1f);
+        private static readonly Color HeroShadowColor = new Color(0.05f, 0.03f, 0.02f, 1f);
+        private static readonly Color SlotBase = new Color(0.27f, 0.31f, 0.4f, 1f);
+
+        /// <summary>
+        /// The filled hero star (see <see cref="StarLarge"/>). Per texel: the distance to the star's edge, its inward direction
+        /// (the distance's gradient: constant over each facet, so each arm splits down its ridge into a lit and a shaded half),
+        /// a height slope steep at the edge (the rounded bevel) easing to the facets' gentle slope, lit by Lambert plus a
+        /// Blinn sheen, over the vertical gold gradient; then the gloss streak, the dark rim, the outline and the drop shadow.
+        /// </summary>
+        private static Sprite DrawHeroStar(int size, string name)
+        {
+            float[] field = HeroField(size);
+            float pixel = 2f / size;
+            int sx = Mathf.RoundToInt(HeroShadowOffset.x / pixel);
+            int sy = Mathf.RoundToInt(HeroShadowOffset.y / pixel);
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    var p = new Vector2((x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f);
+                    float d = FieldAt(field, size, x, y);
+                    // The drop shadow: the outlined star's shape moved down-right, soft edged.
+                    float ds = FieldAt(field, size, x - sx, y - sy);
+                    float shadow = HeroShadowAlpha * (1f - Smooth(-0.02f, 0.07f, ds - HeroOutlineWidth));
+                    float outer = Mathf.Clamp01(0.5f - (d - HeroOutlineWidth) / pixel);
+                    Color star = HeroOutlineColor;
+                    float body = Mathf.Clamp01(0.5f - d / pixel);
+                    if (body > 0f)
+                    {
+                        float inside = -d;
+                        float t = Mathf.Clamp01(inside / HeroBevel);
+                        float slope = HeroRoofSlope + (HeroEdgeSlope - HeroRoofSlope) * (1f - t) * (1f - t);
+                        // Raised: the surface leans outward, away from the inward direction.
+                        float diffuse = Lit(-Inward(field, size, x, y), slope, out float sheen);
+                        Color col = GoldGradient(p.y) * (0.36f + 0.9f * diffuse);
+                        float gloss = Gloss(p) * Smooth(0.02f, 0.07f, inside);
+                        col = Color.Lerp(col, Color.white, Mathf.Clamp01(sheen * 0.55f + gloss));
+                        float rim = 1f - Smooth(HeroRim * 0.4f, HeroRim, inside);
+                        col = Color.Lerp(col, HeroRimColor, rim * 0.85f);
+                        star = Color.Lerp(HeroOutlineColor, col, body);
+                    }
+                    pixels[y * size + x] = OverShadow(star, outer, shadow);
+                }
+            }
+            return ToSprite(pixels, size, name);
+        }
+
+        /// <summary>
+        /// The empty slot (see <see cref="StarSlot"/>): the same field, the surface leaning inward (a hole): the outer lip slopes
+        /// into it, the walls are steep, the floor's facets are the star's turned upside down; lit by the same light, so the top
+        /// walls are in shadow and the bottom ones catch the light; the top-left wall casts its shadow on the floor.
+        /// </summary>
+        private static Sprite DrawHeroSlot(int size, string name)
+        {
+            float[] field = HeroField(size);
+            float pixel = 2f / size;
+            int lx = Mathf.RoundToInt(SlotCastOffset.x / pixel);
+            int ly = Mathf.RoundToInt(SlotCastOffset.y / pixel);
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float d = FieldAt(field, size, x, y);
+                    float alpha = Mathf.Clamp01(0.5f - (d - SlotLip) / pixel);
+                    if (alpha <= 0f)
+                    {
+                        pixels[y * size + x] = Color.clear;
+                        continue;
+                    }
+                    float inside = -d;
+                    float slope = d > 0f
+                        ? SlotLipSlope * (1f - Mathf.Clamp01(d / SlotLip))
+                        : SlotFloorSlope + (SlotEdgeSlope - SlotFloorSlope) * Sq(1f - Mathf.Clamp01(inside / SlotWall));
+                    float diffuse = Lit(Inward(field, size, x, y), slope, out _);
+                    Color col = SlotBase * (0.3f + 0.95f * diffuse);
+                    if (inside > 0f)
+                    {
+                        // The floor lies in the top-left wall's shadow where the point toward the light is out of the hole.
+                        float cast = Smooth(-0.04f, 0.03f, FieldAt(field, size, x + lx, y + ly));
+                        col *= 1f - 0.45f * cast;
+                    }
+                    if (d > 0f)
+                    {
+                        alpha *= 1f - 0.55f * Smooth(0f, SlotLip, d);
+                    }
+                    col.a = alpha * 0.95f;
+                    pixels[y * size + x] = col;
+                }
+            }
+            return ToSprite(pixels, size, name);
+        }
+
+        /// <summary>The flash (see <see cref="StarFlash"/>): white, opaque over the star and its outline, fading just outside it.</summary>
+        private static Sprite DrawHeroFlash(int size, string name)
+        {
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    var p = new Vector2((x + 0.5f) / size * 2f - 1f, (y + 0.5f) / size * 2f - 1f);
+                    float d = StarDistance(p, HeroRadius, HeroInner);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, 1f - Smooth(-0.02f, 0.05f, d));
+                }
+            }
+            return ToSprite(pixels, size, name);
+        }
+
+        /// <summary>
+        /// The hero star's signed distances on a (<paramref name="size"/> + 2) square grid, row by row from the bottom: the
+        /// texels plus one of padding all round, so every texel has the four neighbours of its gradient.
+        /// </summary>
+        private static float[] HeroField(int size)
+        {
+            int w = size + 2;
+            var field = new float[w * w];
+            for (int y = 0; y < w; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    var p = new Vector2((x - 0.5f) / size * 2f - 1f, (y - 0.5f) / size * 2f - 1f);
+                    field[y * w + x] = StarDistance(p, HeroRadius, HeroInner);
+                }
+            }
+            return field;
+        }
+
+        /// <summary>The distance at texel (<paramref name="x"/>, <paramref name="y"/>), -1 to size; far outside the star beyond the grid.</summary>
+        private static float FieldAt(float[] field, int size, int x, int y)
+        {
+            int w = size + 2;
+            x++;
+            y++;
+            if (x < 0 || y < 0 || x >= w || y >= w)
+            {
+                return 1f;
+            }
+            return field[y * w + x];
+        }
+
+        /// <summary>The unit direction toward the star's inside at a texel (minus the distance's gradient), zero on a flat spot.</summary>
+        private static Vector2 Inward(float[] field, int size, int x, int y)
+        {
+            var g = new Vector2(FieldAt(field, size, x - 1, y) - FieldAt(field, size, x + 1, y),
+                FieldAt(field, size, x, y - 1) - FieldAt(field, size, x, y + 1));
+            float m = g.magnitude;
+            return m > 1e-6f ? g / m : Vector2.zero;
+        }
+
+        /// <summary>
+        /// The diffuse light (0 to 1) of a surface rising <paramref name="slope"/> per unit toward <paramref name="lean"/>'s
+        /// opposite (its normal leans toward <paramref name="lean"/>), and its Blinn sheen in <paramref name="sheen"/>.
+        /// </summary>
+        private static float Lit(Vector2 lean, float slope, out float sheen)
+        {
+            Vector3 n = new Vector3(lean.x * slope, lean.y * slope, 1f).normalized;
+            sheen = Mathf.Pow(Mathf.Max(0f, Vector3.Dot(n, HeroHalf)), 36f);
+            return Mathf.Max(0f, Vector3.Dot(n, HeroLight));
+        }
+
+        /// <summary>The gold from deep amber at the bottom tips (y -0.66) through orange gold to bright yellow at the top tip (0.84).</summary>
+        private static Color GoldGradient(float y)
+        {
+            float k = Mathf.Clamp01((y + 0.66f) / 1.5f);
+            return k < 0.5f ? Color.Lerp(HeroBottom, HeroMid, Smooth(0f, 0.5f, k)) : Color.Lerp(HeroMid, HeroTop, Smooth(0.5f, 1f, k));
+        }
+
+        /// <summary>The glossy streak: a soft ellipse across the upper-left of the star (0 to 0.55).</summary>
+        private static float Gloss(Vector2 p)
+        {
+            const float cos = 0.6156615f;
+            const float sin = 0.7880108f;
+            float dx = p.x + 0.2f;
+            float dy = p.y - 0.3f;
+            float u = (dx * cos + dy * sin) / 0.3f;
+            float v = (-dx * sin + dy * cos) / 0.075f;
+            return (1f - Smooth(0.35f, 1f, u * u + v * v)) * 0.55f;
+        }
+
+        /// <summary>The star (<paramref name="star"/>, coverage <paramref name="cover"/>) over the drop shadow's alpha.</summary>
+        private static Color OverShadow(Color star, float cover, float shadow)
+        {
+            float under = shadow * (1f - cover);
+            float a = cover + under;
+            if (a <= 1e-5f)
+            {
+                return Color.clear;
+            }
+            Color c = (star * cover + HeroShadowColor * under) / a;
+            c.a = a;
+            return c;
+        }
+
+        private static float Smooth(float from, float to, float x)
+        {
+            float t = Mathf.Clamp01((x - from) / (to - from));
+            return t * t * (3f - 2f * t);
+        }
+
+        private static float Sq(float x) => x * x;
 
         /// <summary>Signed distance (negative inside) to a five point star of outer radius <paramref name="r"/> and inner ratio <paramref name="rf"/>.</summary>
         private static float StarDistance(Vector2 p, float r, float rf)

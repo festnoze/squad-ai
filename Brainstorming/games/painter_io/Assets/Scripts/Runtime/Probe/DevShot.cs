@@ -8,6 +8,11 @@
 // hooks); frame code only reads. A shot is taken in the first rendered frame with Sim.Tick >= its checkpoint, with
 // ScreenCapture.CaptureScreenshot, then the runner stays paused during a realtime wait for the file (5 s max) + 0.2 s.
 // Every log line starts with "[DevShot]".
+//
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md section 5): the demo runs CLASSIC by default and accepts the trait flags
+// (-classic, -traits "<key>", -traits default = the biome's line of the table, -trait <Id>=0|1). A traited demo also saves
+// the DemoScenario.TraitShots screenshots ("<biome>_trait_grow.png", _reward, _scorch, _reach) when they come up, for
+// example: -devshot <dir> -biome fire -traits default -trait KillInheritance=0 (Propagation front, then scorched ground).
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -29,6 +34,7 @@ namespace PainterIO.Runtime
         private string dir;
         private GameSession demo;
         private DemoScenario.Monitor monitor;
+        private DemoScenario.TraitShots traitShots;
         private int nextCheckpoint;
         private bool capturing;
         private bool done;
@@ -106,8 +112,9 @@ namespace PainterIO.Runtime
             try
             {
                 demo = DemoScenario.CreateSession(out monitor);
+                if (!demo.Traits.IsClassic) traitShots = new DemoScenario.TraitShots(demo.Sim);
                 director.StartRound(demo);
-                Debug.Log("[DevShot] demo started");
+                Debug.Log("[DevShot] demo started, traits " + demo.Traits + (LaunchArgs.HasTraitArgs ? " (from the command line)" : " (default: classic)"));
             }
             catch (Exception e)
             {
@@ -125,6 +132,11 @@ namespace PainterIO.Runtime
                     problems.Add("the demo session was replaced");
                     break;
                 }
+                if (traitShots != null && traitShots.TryTake(demo.Sim.Tick, out string traitShot))
+                {
+                    yield return Capture("trait_" + traitShot, demo);
+                    continue;
+                }
                 long target = DemoScenario.CheckpointTicks[nextCheckpoint];
                 if (demo.Sim.Tick >= target || demo.Sim.Ended)
                 {
@@ -136,9 +148,17 @@ namespace PainterIO.Runtime
                 yield return null;
             }
 
-            // 4. Results screen (after the death beat), when it appears.
+            // 4. Results screen (after the death beat), when it appears (trait shots due meanwhile are still taken).
             float resultsStart = Time.realtimeSinceStartup;
-            while (director.State != GameState.Results && Time.realtimeSinceStartup - resultsStart < ResultsWaitSeconds) yield return null;
+            while (director.State != GameState.Results && Time.realtimeSinceStartup - resultsStart < ResultsWaitSeconds)
+            {
+                if (traitShots != null && director.Session == demo && traitShots.TryTake(demo.Sim.Tick, out string traitShot))
+                {
+                    yield return Capture("trait_" + traitShot, demo);
+                    continue;
+                }
+                yield return null;
+            }
             if (director.State == GameState.Results)
             {
                 yield return new WaitForSecondsRealtime(0.6f);
@@ -203,9 +223,24 @@ namespace PainterIO.Runtime
             if (monitor != null)
             {
                 monitor.Finish();
-                bool pass = monitor.Evaluate(out List<string> failures);
-                Debug.Log("[DevShot] scenario " + (pass ? "PASS" : "FAIL " + string.Join("; ", failures)));
+                if (monitor.Traited)
+                {
+                    bool common = monitor.EvaluateTraited(out List<string> traitedFailures);
+                    bool story = monitor.Evaluate(out List<string> storyFailures);
+                    Debug.Log("[DevShot] scenario (traits " + demo.Traits + ") " + (common ? "PASS" : "FAIL " + string.Join("; ", traitedFailures))
+                              + "; classic story " + (story ? "holds" : "differs: " + string.Join("; ", storyFailures)));
+                }
+                else
+                {
+                    bool pass = monitor.Evaluate(out List<string> failures);
+                    Debug.Log("[DevShot] scenario " + (pass ? "PASS" : "FAIL " + string.Join("; ", failures)));
+                }
                 Debug.Log("[DevShot] facts " + monitor.Report());
+            }
+            if (traitShots != null)
+            {
+                Debug.Log("[DevShot] trait shots planned: " + string.Join(", ", traitShots.Planned) + (traitShots.PendingCount > 0 ? " (" + traitShots.PendingCount + " not taken)" : ""));
+                traitShots.Detach();
             }
             if (capturing) problems.Add("finished during a capture");
             Debug.Log("[DevShot] done" + (problems.Count > 0 ? " with problems: " + string.Join("; ", problems) : "") + " -> quit 0");

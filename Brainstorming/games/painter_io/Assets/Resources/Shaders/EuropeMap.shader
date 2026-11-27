@@ -11,6 +11,7 @@ Shader "PainterIO/EuropeMap"
         _Wave ("Cloth wave", Float) = 0
         _Phase ("Cloth phase", Float) = 0
         _Cutout ("Alpha cutout", Float) = 0
+        [HideInInspector] _PIO_ShaderId ("id", Float) = 1
     }
     SubShader
     {
@@ -30,6 +31,7 @@ Shader "PainterIO/EuropeMap"
             float _Wave;
             float _Phase;
             float _Cutout;
+            float _PIO_ShaderId;
             CBUFFER_END
 
             struct Attributes

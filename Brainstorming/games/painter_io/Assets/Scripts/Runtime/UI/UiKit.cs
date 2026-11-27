@@ -3,7 +3,8 @@
 // canvas and landscape windows a wider one) and a GraphicRaycaster on every Canvas; uGUI Text with the OFL font from
 // Resources/Fonts (fallback LegacyRuntime.ttf); raycastTarget off on every non-interactive Graphic; navy text shadows
 // (#151D38, alpha 0.7, 3 px at the reference resolution). Sprites (round, ring, triangle, vignette, gradient, soft band, and
-// the logo's shine band since wave D) are generated in code once.
+// the logo's shine band since wave D) are generated in code once. Wave D-2: MakeSprite is internal (TraitIcons draws the
+// trait icons with it) and Saffron is shared by the results tag, the trait matrix and the reward chips.
 using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -33,6 +34,8 @@ namespace PainterIO.Runtime
         public static readonly Color NavyLight = new Color32(0x33, 0x42, 0x73, 0xFF);
         /// <summary>Light UI text #F3EEE8.</summary>
         public static readonly Color Light = new Color32(0xF3, 0xEE, 0xE8, 0xFF);
+        /// <summary>Saffron accent (#F5B731): the results tag, the test settings titles, the kill reward chips.</summary>
+        public static readonly Color Saffron = new Color32(0xF5, 0xB7, 0x31, 0xFF);
         public static readonly Color ShadowColor = new Color(0x15 / 255f, 0x1D / 255f, 0x38 / 255f, 0.7f);
         public static readonly Vector2 ShadowDistance = new Vector2(3f, -3f);
 
@@ -553,7 +556,11 @@ namespace PainterIO.Runtime
             return Vector2.Dot(p - a, n);
         }
 
-        private static Sprite MakeSprite(string name, int w, int h, Func<float, float, float> alpha, Vector4 border, bool mips)
+        /// <summary>
+        /// A white sprite whose alpha is alpha(x, y) at each pixel center (pixels, y up), with a 9-slice border and optional
+        /// mipmaps (trilinear). Created with DontSave. Wave D-2: internal so TraitIcons draws its icons the same way.
+        /// </summary>
+        internal static Sprite MakeSprite(string name, int w, int h, Func<float, float, float> alpha, Vector4 border, bool mips)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, mips, false)
             {

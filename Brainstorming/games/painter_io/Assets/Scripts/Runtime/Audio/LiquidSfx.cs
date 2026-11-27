@@ -1,6 +1,7 @@
 // Owned by BI (wave B-2), by the audio package since wave C: B5's liquid clips moved behind ISfxClipSet (contract 25.2).
 // The synthesis itself stays in SfxSynth (deterministic, pure C#); this set only builds and holds the AudioClips of the
 // biome slots. Wave C: ISplitSfxClipSet, so Sfx can synthesize the set on a worker thread and make the clips later.
+// Wave D-2 (traits-infra): the optional Grow slot (SfxSynth GrowCreep), built after the eight base slots.
 using System;
 using System.Diagnostics;
 using UnityEngine;
@@ -19,6 +20,7 @@ namespace PainterIO.Runtime
         public AudioClip Caught { get; protected set; }
         public AudioClip LoopLost { get; protected set; }
         public AudioClip Ambient { get; protected set; }
+        public AudioClip Grow { get; protected set; }
 
         /// <summary>
         /// Builds every slot now: BuildSlot of each slot of Synthesize(sampleRate). A clip that fails stays null and is
@@ -27,7 +29,7 @@ namespace PainterIO.Runtime
         public virtual void Build(int sampleRate)
         {
             SfxClipSamples samples = Synthesize(sampleRate);
-            for (int k = 0; k < SfxClipSamples.SlotCount; k++) BuildSlot(samples, (SfxSlot)k);
+            for (int k = 0; k < SfxClipSamples.AllSlotCount; k++) BuildSlot(samples, (SfxSlot)k);
         }
 
         /// <summary>
@@ -38,7 +40,7 @@ namespace PainterIO.Runtime
         {
             var samples = new SfxClipSamples(BiomeId.Liquid, SfxSynth.SampleRate);
             Stopwatch watch = Stopwatch.StartNew();
-            for (int k = 0; k < SfxClipSamples.SlotCount; k++)
+            for (int k = 0; k < SfxClipSamples.AllSlotCount; k++)
             {
                 var slot = (SfxSlot)k;
                 SfxId? id = LiquidId(slot);
@@ -76,6 +78,7 @@ namespace PainterIO.Runtime
                 case SfxSlot.TensionLoop: return SfxId.SparkLoop;
                 case SfxSlot.Caught: return SfxId.CaughtSplat;
                 case SfxSlot.LoopLost: return SfxId.LoopLost;
+                case SfxSlot.Grow: return SfxId.GrowCreep;
                 default: return null;
             }
         }
@@ -92,6 +95,7 @@ namespace PainterIO.Runtime
                 case SfxSlot.TensionLoop: TensionLoop = clip; break;
                 case SfxSlot.Caught: Caught = clip; break;
                 case SfxSlot.LoopLost: LoopLost = clip; break;
+                case SfxSlot.Grow: Grow = clip; break;
                 default: Ambient = clip; break;
             }
         }

@@ -3,7 +3,11 @@ using System.Collections.Generic;
 
 namespace PainterIO.Core
 {
-    public enum RoundEndReason { None = 0, LastSurvivor = 1, AllEliminated = 2, TimeUp = 3 }
+    /// <summary>
+    /// Why a round ended (R19). Conquest (rule v1.7, contract 31): a player owns the conquest goal (Simulation.ConquestTargetCells,
+    /// SimConfig.ConquestShare of the conquerable cells) and wins at once.
+    /// </summary>
+    public enum RoundEndReason { None = 0, LastSurvivor = 1, AllEliminated = 2, TimeUp = 3, Conquest = 4 }
 
     /// <summary>Final standings of a round (R19).</summary>
     public sealed class RoundResult

@@ -1,6 +1,6 @@
-# Painter IO - Build Contract v1.7
+# Painter IO - Build Contract v2.1
 
-Status: v1.7, 2026-11-26 (v1.0 amended after the contract review into v1.1, v1.2 restores Shader Graph (section 22), v1.3 records the wave A as-built amendments (section 23), v1.4 is the user's La Revanche rule change (section 24), v1.5 adds the three biomes (section 25), v1.6 records the wave C as-built amendments and folds the accepted wave B readings (section 26)). This file is
+Status: v2.1, 2026-11-27 (v2.1 adds the designer's rule v1.8: one single domain in every round type (section 32); v2.0 adds the designer's rule change v1.7: countries first, 15 min cap, conquest goal (section 31); v1.0 amended after the contract review into v1.1, v1.2 restores Shader Graph (section 22), v1.3 records the wave A as-built amendments (section 23), v1.4 is the user's La Revanche rule change (section 24), v1.5 adds the three biomes (section 25), v1.6 records the wave C as-built amendments and folds the accepted wave B readings (section 26), v1.7 adds the biome traits and the wave D feedback (sections 27, 28), v1.8 adds the designer's severed territory rule, rule v1.5 (section 29), v1.9 adds the designer's single domain rule and the kill inheritance bridge, rule v1.6 (section 30)). This file is
 the single source of truth for every agent that builds Painter IO.
 The game design brief is `docs/REGLES_DU_JEU.txt` (French, v0.1). The visual reference is `docs/reference_gouttes.png`.
 
@@ -959,7 +959,8 @@ tests pass fixed seeds).
 
 ### 11.3 Palette (View/Palette.cs)
 Player colors (sRGB): 0 Coral #F2674F, 1 Teal #22C4B6, 2 Saffron #F5B731, 3 Lilac #8E6CEF.
-Background navy #1E2A4D, outside arena #151D38, UI text light #F3EEE8, danger flash white #FFFFFF.
+Background navy #1E2A4D, outside arena #B4B9C1 (flat light grey shared by every biome since border_neon, was #151D38),
+UI text light #F3EEE8, danger flash white #FFFFFF.
 The human picks its color in the menu (index swap: the human always is sim player 0):
 ```csharp
 public static class Palette {
@@ -1123,8 +1124,10 @@ Two field sources feed one composite:
      where the liquid is thin), lobes = 1 or 2 (QualityTier). Model: Lambert wrap + strong Blinn-Phong highlight (gloss
      80-120) + a second broad soft lobe when lobes = 2 + Fresnel rim. Returns linear RGB. Overlay.hlsl and Bead.hlsl (used by their graphs)
      include this file and call only these two functions.
-   - Ground: navy with subtle procedural grain (+/- 0.02 luminance), darker outside the arena with a soft rim shadow along
-     the arena edge.
+   - Ground: navy with subtle procedural grain (+/- 0.02 luminance) with a soft rim shadow along the arena edge. Arena
+     frame (border_neon, every biome, shared PIO_ArenaFrame in CountryDistance.hlsl, no fetch): flat light grey outside
+     (_PIO_OutsideColor = Palette.OutsideArena) and a thin yellow neon line just outside the edge with a soft glow on both
+     sides and a slow low-amplitude pulse (docs/border_neon.json).
    - Shadows: `_PIO_ShadowOffset` = 0.12 * normalize(L.xy) = (-0.072, +0.096) u (sampling toward the light puts the shadow
      on the lower right). Ground pixel: shadow = 0.45 * smoothstep(0.35, 0.8, max_i(t_i + a_i) at w + _PIO_ShadowOffset).
      Territory surface pixel: shadow = 0.35 * smoothstep(0.35, 0.8, max_i a_i at w + _PIO_ShadowOffset). color *= 1 - shadow.
@@ -1237,7 +1240,7 @@ V8 With a pending pocket next to the player's own puddle and over a rival puddle
 
 ## 14. Camera (View/CameraRig.cs, B3)
 - Main camera created at runtime: orthographic at z = -50 looking +Z, depth 0, cullingMask = ~(1 << LiquidLayers.Field),
-  clear SolidColor #151D38. UniversalAdditionalCameraData: renderPostProcessing = false (LiquidRenderer sets it true only on
+  clear SolidColor = the biome's OutsideArena (#B4B9C1). UniversalAdditionalCameraData: renderPostProcessing = false (LiquidRenderer sets it true only on
   High when bloom is enabled), renderShadows = false, requiresDepthOption = Off, requiresColorOption = Off,
   antialiasing = None. CameraRig updates in LateUpdate with `[DefaultExecutionOrder(100)]`.
 - Visible width 18 u in portrait (orthographicSize = 9 / aspect); in landscape visible height 20 u.
@@ -1702,7 +1705,7 @@ fusion at necks, pending pocket stripes readable and distinct from home, antiali
 contact shadow or glow that separates layers.
 
 ### 25.3 Feu (fire)
-- Ground: charred dark stone and ash (#1A1412 to #241A16), faint cooled cracks; outside the arena darker (#100C0B).
+- Ground: charred dark stone and ash (#1A1412 to #241A16), faint cooled cracks; outside the arena the shared light grey #B4B9C1 past the yellow neon line (border_neon, was #100C0B).
 - Player flame colors (chemical flames, readable): 0 orange-red (#FF5A2A, hot core #FFD08A), 1 copper green-teal (#22E0B8), 2 gold
   (#FFC21F), 3 potassium violet (#B472FF).
 - Territory: a bed of glowing embers in the player's flame color: interior = coals (animated cellular noise, slow breathing pulse, dark
@@ -1719,7 +1722,7 @@ contact shadow or glow that separates layers.
   stripes without flames. Sounds: soft crackle ambience, whoosh on fill, fuse hiss tension loop rising in pitch, pop on exit, burst on catch.
 
 ### 25.4 Électricité (electricity)
-- Ground: very dark blue-black (#0B0F1E) with a faint hexagonal circuit grid that lights up softly near territories; outside #070912.
+- Ground: very dark blue-black (#0B0F1E) with a faint hexagonal circuit grid that lights up softly near territories; outside the shared light grey #B4B9C1 past the yellow neon line (border_neon, was #070912).
 - Player neon colors: 0 neon red-pink (#FF4D6D), 1 cyan (#2EF2FF), 2 electric yellow (#FFE84D), 3 violet (#A974FF).
 - Territory: an electrified plasma field: interior = neon surface with a slowly flowing hex or circuit pattern; edge = a bright neon rim
   with crawling micro arcs (jagged animated noise) and occasional small lightning arcs hopping along the border.
@@ -1955,3 +1958,338 @@ all traits off with "Règles classiques" / -classic (bit-identical to the classi
 docs/WAVE_D_FEEDBACK.md is normative and part of this contract: F1 a real logo (variants per biome, app icons), F2 the liquid looks like a
 DROP (domed thick body), F3 electric bases crossed by small arcs like the live wire. The logo wordmark waits for the user's choice of the
 game name (Painter IO or a new name from docs/naming brainstorm); until then the logo work is not started.
+
+## 29. Rule v1.5: severed territory (v1.8, designer decision, overrides older sections where they disagree)
+
+The designer, 2026-11-27: "lorsque on coupe le domaine d'un ennemi, la partie dans laquelle l'ennemi n'est pas ne lui appartient plus
+(pour le moment, il se retrouve avec deux parties de domaines non contigues)". A core rule (id R21), not a biome trait: "Règles
+classiques" keep it. Code: Core/Grid/TerritorySplit.cs (pure analysis) and EventResolver.StepReturns (section 6 step a); tests:
+Tests/EditMode/Core/SeveredTerritoryTests.cs (R21_*).
+
+R21 Severed territory. When the captures of one section 6 step a group take cells from a living player (the victim) and leave its
+territory in separate pieces, the victim keeps only one piece of each territory that was split; the other pieces of that split are
+severed: they become neutral (default) or the cutter's, see the option below.
+- Who: every living player that loses at least one cell to another player's capture in the group (human and bots alike, any player
+  index). Every path that takes cells from a living rival goes through step a: the ordinary capture, the lasso pocket validated at the
+  return, cells added by a trait's AugmentCapture (Coalescence fills only neutral holes), and the ReturnsBeforeRoundEnd path. No trait
+  takes cells from a living rival elsewhere: Propagation grows into neutral cells only, KillInheritance moves the cells of a dead victim,
+  ScorchedEarth only marks cells. Eliminations are not transfers and never sever.
+- Connectivity: 8-adjacency (the territory connectivity dual to the 4-connected outside flood of section 7, where own cells touching at
+  a corner already close a capture, and the adjacency of the D1 rim). Cells touching only at a corner are one piece.
+- Which pieces are judged: only the pieces produced by this split. With Lost = cells the victim lost to other players in the group,
+  Gained = cells it gained in the same group (only when it also returned), pieces = 8-connected components of its cells after the
+  captures, and pre-transfer territories = 8-connected components of (its remaining old cells + Lost): two pieces are in the same split
+  group when one pre-transfer territory spans both. A group of one piece is untouched. Islands that were already separate before
+  (inherited land, the far side of an older split under Off) touch no Lost cell and are never judged.
+- The anchor (the piece kept in a group), read on the grid BEFORE the captures of the group: the pawn's current cell at uG when the
+  victim owns it (a home victim, or a victim returning at this instant); a home victim crossing out at this very instant: the last own
+  cell of its visit list (the cell it is leaving); a trailing victim: the cell it left home from, i.e. the cell it owns among the cells
+  whose closed square contains Trail.Points[0] (the exit point lies on that cell's edge, R5; lowest index if several). When the anchor
+  cell is in a piece of the group, that piece is kept; otherwise (the anchor cell was captured, or the anchor is on another island, or
+  the exit cell was lost earlier) the LARGEST piece of the group is kept (most cells, ties: the piece holding the lowest cell index).
+- A piece holding Gained cells (the victim's own simultaneous capture, R18) is never severed. The kept piece never loses a cell, so a
+  split never eliminates anyone (R9 eliminations come only from captures).
+- Option `SimConfig.SeveredTerritory` (`SeveredTerritoryRule`, api addition): `Neutral` (default) severed cells become plain neutral:
+  never scorched (a ScorchedEarth scorch still running on such a cell is forgotten), capturable, open to Propagation and Coalescence;
+  `Capturer` they go to the cutter; `Off` the pre-v1.5 behaviour, bit-identical (every pinned hash of the v1.7 Core reproduces).
+- The cutter of a group: the lowest-index returner of the group that took a Lost cell of that pre-transfer territory.
+- Order inside step a: captures written (R18 conflict rule first), Return events, then the severance (every victim analysed on the
+  grid left by the captures, then every change written, so with Capturer a cutter that is itself a victim is judged on its own land),
+  TerritorySevered events, then the R9 stolen-home exits, then the TerritoryLost eliminations. The anchor rule guarantees that no home
+  player's current cell is severed, so the R9 check is unchanged.
+- Event (api addition, appended at the END of SimEventType, value 16): `TerritorySevered`: Time = the group time, Player = the victim,
+  Other = the cutter, `SimEvent.Recipient` (new field, -1 for every other event) = the player that received the cells (= Other with
+  Capturer) or -1 when they became neutral, Cells = the severed cells (ascending). One event per victim and cutter, victims ascending,
+  then cutters ascending.
+- Score, percentage, leaderboard, ranks and the round end read OwnerGrid counts (CountOf, AreaPercent, RankOf, EndRound), so they see
+  the new owners at once. The Runtime needs no handler: TerritoryField reconciles every cell whenever Grid.Version changes (dirty
+  rectangle uploads), so severed cells leave the victim's color on the next frame (no fill wave, no evaporation fade; a presentation
+  for TerritorySevered, for example a fade or a toast, is optional future work). The HUD and the camera read the counts every frame.
+- Determinism: the result depends only on the grid, the captured cells and the anchor (fixed scan order, union-find with lowest-index
+  roots); the flood stops as soon as every frontier seed joined one piece (a bite that splits nothing explores only around the bite);
+  buffers are pooled per thread and grid size (stamped, never cleared per call). Outcomes, severed cells and grids are identical at 30,
+  60 and 144 Hz (R21_SameOutcomeAndGridAt30_60_144Hz); StateHash is unchanged in structure (the option is not hashed: equal states give
+  equal hashes).
+- Edge cases: a victim whose home cell is captured gets its R9 stolen exit AND keeps the largest piece; a trailing victim keeps the
+  piece of its exit cell even when its pawn is far away; a victim that loses everything is eliminated by R9 exactly as before (no
+  piece, no severance); two simultaneous cutters of the same territory: the lowest index is the cutter (and the recipient with
+  Capturer); a victim split in two places in one group gets one event per cutter.
+- Coalescence: its hole filling runs inside the capture (AugmentCapture), before the split; a hole made of severed cells inside the
+  returner's land is filled at its next unchased return (Coalescence counts pre-existing holes).
+- Pinned values: the classic rolling hash 8CB763231AC73608 and the seven pre-trait bot round hashes of TraitsClassicTests hold
+  exactly with `SeveredTerritory = Off`; with the default, six of the seven changed (every round that contains a split; seed 1 is now
+  C042710F17995DCB) and both columns are pinned in TraitsClassicTests (docs/severed.json lists them). The probe hash
+  246577239DE179C4 is unchanged: the scripted demo contains no split (checked headless with DemoScenario under Off, Neutral and
+  Capturer, classic and the three biome sets).
+
+## 30. Rule v1.6: single domain and kill inheritance bridge (v1.9, designer decision, overrides older sections where they disagree)
+
+The designer, 2026-11-27, about the Feu kill reward (KillInheritance): the conquered land "should be considered yours and part of
+your domain, but if you go from your previous domain to the conquered one, it don't close the loop, worse, the line you make to
+kill the enemy should be turned into a line of your domain (not only as a line), so that your domain stay connected, otherwise you
+have 2 parts of your domain, which is against the rules (your domain must be one single domain)". Id R22. It belongs to the
+KillInheritance trait path (docs/BIOME_TRAITS.md 7.3): classic rounds, Liquide and Électricité are untouched. Code:
+EventResolver (StepKillRewards, JoinInheritance, BuildBand, ApplyBand, KeepReturnersWhole, WithTrailFootprint),
+Core/Traits/InheritanceBridge.cs (the kill line and its band), TerritorySplit.KeepOnePiece / GainAttached (Core/Grid), Trail
+Epoch / Dropped / DropPrefix; tests: Tests/EditMode/Core/Traits/InheritanceBridgeTests.cs (R22_*). Report: docs/inherit_fix.json.
+
+Why the loop did not close (pre-v1.6): KillInheritance wrote the victim's cells for the killer without looking at where they lie,
+so the inherited land B was an island next to the killer's land A (contract 29 even listed inherited land among the islands rule
+v1.5 never judges). A trail from A into B IS a return (R5: B's cells are own), but section 7 takes walls = A + B + trail, and a
+trail that only joins two pieces encloses nothing: no Interior, hence no Rim (CaptureSolver returns the pocket only), so the trail
+was dropped (R8 / C2: a bare line captures nothing) and the domain stayed in two pieces. Nothing turned the kill line into land.
+
+R22 Single domain. In a round where KillInheritance is enabled with Share > 0 and `SimConfig.InheritanceBridge` is not Off
+(Simulation.SingleDomain, SimView.SingleDomain), at the end of every section 6 resolution step the territory of every living
+player is ONE 8-connected region (the adjacency of R21). Inherited land is plain domain for every purpose (returns and closures,
+the capture flood, the rim, the lasso, Propagation, Coalescence, score, bots).
+- Bridge at the inheritance (step b, right after the kill traits of each kill; the killer's anchor is the v1.5 anchor read on the
+  grid BEFORE that inheritance: its pawn's cell when home, its exit cell when out, else the largest piece). If the killer's
+  territory is now several pieces and the rule is Bridge, the kill line is built:
+  (a) the killer's trail from its exit point to Q (its head at the cut, at arc s_Q recorded at the cut), when the killer is still
+      out on the exit that made the cut (same Trail.Epoch; s_Q is mapped by Trail.Dropped); refused when that exit was cut since
+      (ExitWasCut: v1.4, a cut exit never becomes territory; it covers a running chase and a spark KillShield extinguished);
+  (b) when the killer was home at the cut, or has closed that exit since, the line starts at Q itself, which must still lie on a
+      cell of the killer (its former trail became territory at the closure); refused otherwise (the line was taken since);
+  (c) the link Q to P = the cut point on the victim's trail (|QP| <= ContactRadius), then the victim's trail from P back to its
+      exit point (the part that tied it to its land, copied before the elimination cleared it).
+  A cut forced by DebugForceCut has no contact geometry: it never makes a bridge. Band cells = every non-Void cell whose center
+  lies within `SimConfig.InheritanceBandHalfWidth` (default 0.45 u = HeadRadius: a band about 0.9 u, 7 cells wide) of the line,
+  plus the supercover raster of the line (the footprint a closure gives a trail), so the band is never thinner than one cell. The
+  band is applied only when it joins pieces to the kept piece (no band cell would be cut off and fewer cells would be severed than
+  without it; the killer had one domain before, so what it joins is inherited land). Applying it is a capture by the killer: cells of third players are lost by them and judged by
+  rule v1.5 (anchors read before the write, the cutter is the killer, SeveredTerritory option as configured), then the R9 stolen
+  home exits (TerritoryStolen + Exit, Other = the killer) and the TerritoryLost eliminations. Event (api addition, appended at the
+  END of SimEventType, value 17) `InheritanceBridged`: Time = group time, Player = killer, Other = victim, Point = the victim's head
+  at the kill (as TerritoryInherited), Cells = the band cells that became the killer's (ascending). PlayerState.InheritanceBridges++.
+- The killer's trail when part (a) was used: the prefix [exit, Q] is territory now, so Trail.DropPrefix(s_Q) cuts it: the active
+  trail starts at Q (inside the band) and keeps every later point, so the stored end, uTrailEnd, L(u), the head and its current
+  cell are unchanged; Trail.Version changes (cut and lasso candidates of that trail are re-validated and dropped), Epoch stays,
+  Dropped grows by s_Q; the pending pocket stays pending (validated at the next unchased return); the exit is not cut (no spark).
+  A later cut of the remaining trail spawns its spark on the new arcs; a later return captures with the remaining trail, whose
+  exit point Q lies on the domain (TerritorySplit.ExitCell finds the band cell). When the killer's head lies on its domain after
+  the bridge, the next candidate pass returns it at that instant (section 6 state check), as for an inherited cell (BIOME_TRAITS
+  7.2); ReturnsBeforeRoundEnd covers a round that ends in that group.
+- Single domain of the killer: after the bridge (or when no bridge could be made, or with AnchorOnly) the killer keeps the piece
+  of its anchor (else the largest) and every other piece becomes plain neutral (never scorched: a running ScorchedEarth scorch is
+  forgotten), with TerritorySevered (Player = the killer, Other = -1: no cutter, Recipient = -1), raised right after the kill
+  rewards (after InheritanceBridged when there is one). The kept piece holds the killer's pawn when it is home, so R9 is
+  unaffected. A killer whose last cell an earlier bridge band of the same group took is eliminated by TerritoryLost and gets
+  nothing more; a killer eliminated in the same group gets nothing, as before (cells neutral, ScorchedEarth scorches them).
+- Closures (step a, unchased returns): when the capture (Interior + Rim + pocket) would leave a part apart from the returner's
+  domain (TerritorySplit.GainAttached false: a lasso pocket or a region that touches only the trail, or a trail that leaves one
+  piece and enters another), the capture also takes the trail footprint (supercover raster of the whole trail up to the crossing
+  point, minus own and Void cells). It is added before the traits' AugmentCapture, so Coalescence also fills the holes it closes,
+  and it is part of the capture (R18 and rule v1.5 apply to it). A closure that already joins the domain is unchanged (C2 holds:
+  a bare back-and-forth line still captures nothing).
+- Safety net (end of step a, after the v1.5 severance, before R9): a returner that gained cells keeps one domain. The cheap check
+  (GainAttached on the written grid) is exact while its territory was one domain and lost nothing; with simultaneous returns
+  (R18 contested cells), a severance of its own land or the Capturer option, TerritorySplit.KeepOnePiece decides (anchor = its
+  return cell). A part apart is severed as above.
+- Losses of a living player to captures are judged by rule v1.5 (contract 29): with the default SeveredTerritory = Neutral it
+  keeps one piece; SeveredTerritory = Off disables that half of the invariant (Off means the designer wants the pre-v1.5 splits).
+- Option (api addition) `SimConfig.InheritanceBridge` (`InheritanceBridgeRule`): `Bridge` (default), `AnchorOnly` (single domain
+  without the band: inherited land apart from the killer's domain is severed), `Off` (the pre-v1.6 behaviour, bit-identical:
+  every pinned Feu value of the v1.8 Core reproduces). `SimConfig.InheritanceBandHalfWidth` (default
+  TraitDefaults.KillInheritanceBandHalfWidth = 0.45). Neither option is hashed (equal states, equal hashes). Without
+  KillInheritance, or with Share 0, none of this runs. The KillInheritance key stays "KillInheritance(1,0)".
+- Bots: they read only the grid for home (GridQueries.NearestOwned, OwnerAt), so every own cell already counts for the return
+  target, the round-time trigger and an enemy's escape estimate. Added: after PlayerState.InheritanceBridges grows while a bot is
+  trailing, its Return mode re-targets at once and the leg to R of its plan aims at the nearest own cell (pushed 1 u deeper). The
+  round-time bound D_home <= L + one cell still holds after DropPrefix (the exit point Q is own). Never active without the rule.
+- Presentation: TerritoryField reconciles from the grid, so the band and the severed cells appear without a handler. The Fire
+  inheritance sweep (wave D-2) is event driven: InheritanceBridged now joins the pending TerritoryInherited sweep of the same kill
+  (one sweep from the kill point, along the band into the inherited land), and TerritorySevered removes its cells from the pending
+  waves of the player that lost them (they evaporate with the land they came from instead of being painted, then reconcile).
+- Determinism: the band depends only on the line geometry (distances to segments and the supercover raster do not depend on how
+  a straight path was subdivided into trail points), Q and P are exact roots, the labelling uses a fixed scan and neighbour order
+  with pooled stamped buffers (no grid-sized allocation per call). Outcomes, band cells and grids are identical at 30, 60 and 144
+  Hz (R22 cross-rate tests); twin rounds give identical StateHash. Cost: two labellings and one band raster per inheritance that
+  leaves pieces (a few per round); O(gain) per unchased return in single-domain rounds (GainAttached).
+- Pinned values: classic (8CB763231AC73608 Off / C042710F17995DCB default and the seven TraitsClassicTests rows), the Liquide and
+  Électricité values and the probe hash 246577239DE179C4 are unchanged; with InheritanceBridge = Off the Feu demo hash
+  3DF3952B7C1BC26E and every Feu bot round reproduce exactly. With the default the Feu demo hash is 1F733FBFBED2D3A9 (not pinned,
+  verify checks equality across rates); R22_OffReproducesThePreV16FireHashesAndTheDefaultIsPinned pins four Feu rounds in both
+  columns. SimEventType gains one value (18 values).
+- Edge cases and limits: KillInheritance Share < 1 keeps the core of the land near its centroid; the band ends on the victim's
+  exit point at the rim, which stays neutral, so the core is joined only when it touches the domain: under v1.6 a Share < 1 core
+  is usually severed (open question in docs/inherit_fix.json). The invariant assumes one domain at the start (R2 discs); a start
+  territory that is already in pieces (a custom SimSetup, a start disc clipped by a Europe outline) keeps its pieces until that
+  player's first inheritance, which keeps its anchor piece only.
+
+## 31. Rule change v1.7: countries first, 15 min cap, conquest goal (v2.0, designer decision, overrides older sections where they disagree)
+
+The designer, 2026-11-27: "Les pays ont l'air d'être une option. Je veux que ça soit le cœur du jeu. Enlève le bouton Pays, et
+quand tu cliques sur JOUER tu tombes sur la liste des pays à sélectionner." and "Enlève la notion de timer, ou plutôt : il sert de
+limite ultime, par exemple 15 minutes. Le but du jeu devient de conquérir 100 % du territoire pendant cette durée. Si à l'issue de
+ce très long temps on n'a pas réussi, le vainqueur est celui qui a conquis la plus grande partie du territoire. Dans tous les cas
+on continue sur la sélection du pays suivant." Report: docs/flow_v17.json. Code: Core/Sim/Conquest.cs, Simulation (Conquest*),
+SimConfig.ConquestShare, RoundEndReason.Conquest, EventResolver step g; runtime: MenuScreen, ResultsScreen, Hud, SaveData,
+SettingsPanel, GameDirector.ToCountryScreen, Strings. Tests: Tests/EditMode/Core/ConquestTests.cs, Tests/EditMode/Runtime/
+FlowV17Tests.cs, EuropeLevelsTests.EveryCountryHasAReachableConquestGoal, PlayMode EuropeMenuTests.
+
+31.1 Flow (supersedes 15.2 and the "Pays" button of docs/europe/PROGRESSION.md). The menu has no "Pays" button; JOUER opens the
+country screen (EuropeScreen: the 3D map and the progression); "Jouer ce pays" starts the country round. The results offer PAYS
+SUIVANT (main button, also Escape / back: GameDirector.ToCountryScreen, the menu state with the country screen open, where a win
+plays the reveal of the newly unlocked flags) and REJOUER (the same country again). The square arena is no longer reachable from
+the menu; StartRound with no country, the probe, DevShot, the launch flags and the tests still play it. First launch is unchanged
+(menu over the attract match; the tutorial bubbles run in the first round, which is France, the only playable country).
+
+31.2 R19 amended: round end. Checked at step g of every event group, in this order: last survivor (n >= 2, one alive: wins at
+once, unchanged), all eliminated, Conquest (new: a living player owns `Simulation.ConquestTargetCells`; it wins at once, ranks by
+cells as usual, EndTime = the group time), TimeUp (largest territory wins, ties shared, unchanged). Behaviour traits that grow a
+territory at the end of a tick (Propagation) are checked there too (Simulation.Step, only when a trait is attached).
+
+31.3 The goal (api additions). Strict 100 % of ArenaCellCount is NOT reachable: a head center stays in the inset shape
+{SignedDistance <= -ArenaMargin} and the capture flood seeds every Void cell, so the cells between the inset line and the rim
+(about 3 cells deep, 2.9 % of the square arena) are outside for every capture. The goal is therefore defined on what can be owned:
+- `Conquest.ConquerableMask` / `Simulation.ConquestCellCount`: head cells = arena cells whose center lies in the inset shape and
+  in a 4-connected piece of such cells holding a player position; every non-head arena cell 4-connected through non-head cells
+  to the Void or the grid border is out; everything else (head cells and what they enclose) is conquerable. Pieces beyond a neck
+  narrower than 2 ArenaMargin are out too. Built lazily and cached (once a player owns Conquest.LazyFloor x the goal share of the
+  arena cells, or when the runtime first reads a percentage).
+- `SimConfig.ConquestShare` (default `Conquest.DefaultShare` = 1.0, the goal shown as 100 %; above 1 counts as 1; <= 0 turns the
+  goal off). `Conquest.TargetCells(C, share)` = ceil(C x (min(share, 1) - `Conquest.DisplaySlack`)) with slack 0.005: the
+  HUD shows whole percents from 10 %, so the goal is met exactly when the displayed percentage reads the goal ("100 %" from
+  99.5 %). The slack absorbs the cells a real path misses (stair notches, cut corners, specks left by rules v1.5 / v1.6) and lets a
+  rival survive on a speck below 0.5 % without blocking the win.
+- `Simulation.ConquestPercent(i)` = 100 x min(owned, C) / C: the one percentage shown everywhere (HUD labels, leaderboard, capture
+  gains, results, best score). The numerator counts every owned cell (rim cells a trail crossed just outside the mask included),
+  clamped to 100 %. `AreaPercent` (R20, over ArenaCellCount) is unchanged for the Core and the bots.
+- Reachability proof (ConquestTests): scripted rim tours end rounds by Conquest on the square arena (with and without a rival
+  alive on a speck) and on a non-convex polygon with a 0.6 u neck; with the goal off a full tour leaves 72 of 249 240 (square)
+  and 132 of 108 237 (polygon) conquerable cells unowned, far below the slack. Every Europe level keeps more than half of its
+  arena cells conquerable (EuropeLevelsTests).
+- ArenaPolygon fix found by this proof: StopBeforeBorder's smallest step was 1e-4 u, so a head sliding along a country border
+  moved about 0.3 u/s instead of PawnSpeed; it is `ArenaPolygon.MinBorderStep` = 0.01 u now (still far below the 2 x margin a step
+  would need to skip an inlet). Square-arena rounds, the classic hashes and the probe hash are not affected.
+
+31.4 Round time. `Tuning.RoundDuration` stays 90 s (Core default for the tests and bot rounds). The runtime sets 900 s: SaveData
+round choices are 5 / 10 / 15 min (300 / 600 / 900 s), 15 by default (`SaveData.DefaultRoundSeconds`, the reference of
+TuningModified); a value saved by an older version (60 / 90 / 120 s, below the first choice) reads as the default; the settings
+show minutes; -roundDuration is clamped to [5, 900]. The HUD timer reads m:ss ("15:00"). The bots read RoundDuration as before.
+
+31.5 Presentation. HUD: the labels show ConquestPercent, a slim bar under the human label fills toward the goal (human color) and
+"Objectif 100 %" / "Goal 100%" sits under the timer. Results: "territoire conquis" under the area; cause line "Territoire conquis
+à 100 % !" (a rival's conquest: "Safran a conquis tout le territoire."); a time-up end adds "Le plus grand territoire l'emporte."
+when no saved line is shown. The Europe campaign counts a win in every winning end (rank 1: Conquest, LastSurvivor, first or
+shared first at TimeUp), unchanged rule (EuropeProgress.IsCountedWin).
+## 32. Rule v1.8: one single domain in every round type (v2.1, designer decision, overrides older sections where they disagree)
+
+The designer, 2026-11-27 (translated): "I still sometimes end up with my domain cut in two. There must be a reinforced check that
+the domain always stays contiguous. If the domain would end up in two parts, keep a line between the two parts. Especially since,
+right now, when I join one part to the other, the game tends to consider it is not the same domain, so it does not close the loop
+and does not make the link between the two." Id R23. A core rule, not a biome trait: it generalizes the single domain of rule v1.6
+(section 30) from the KillInheritance path to classic rounds, Liquide and Electricite. (Numbering: the task brief called it rule
+v1.7; section 31 already uses "rule change v1.7" for the conquest goal, so this one is rule v1.8.) Code: EventResolver.LinkCapture,
+RimSafe, the singleDomain / linkBands / inheritanceJoin switches, TerritorySplit.KeepOnePiece(neighbours), SimConfig.SingleDomain,
+PlayerState.DomainLinks. Tests: Tests/EditMode/Core/SingleDomainTests.cs and SingleDomainStressTests.cs (R23_*). Report:
+docs/domain_v17.json.
+
+32.1 Why domains were cut in two (stress diagnosis, 240 bot rounds, pre-v1.8 rules). A capture is Interior + Rim + pocket (section
+7). Two passes of a trail closer than about one cell are joined by the wall raster (section 8, accepted limitation), so a near loop
+far from home encloses a region whose rim touches only the trail: the capture is an island ("own return: detached capture", the
+dominant cause). A lasso pocket made away from the ordinary closure is an island too (the pocket lies on the trail, but trail cells
+are taken only as Rim). Contested cells of simultaneous returns (R18) can cut a gain from its domain. Once in two pieces, a trail
+from one piece to the other encloses nothing (no Interior, hence no Rim, CaptureSolver returns the pocket only): "it does not close
+the loop". Rule v1.6 fixed this for Feu only; classic, Liquide and Electricite had no guarantee. Enemy captures never caused a
+split (rule v1.5 works), and no trait causes one (Propagation grows 4-adjacent neutral cells, Coalescence fills enclosed holes).
+
+R23 Single domain. With `SimConfig.SingleDomain = On` (the default, `SingleDomainRule`, api addition), at the end of every section 6
+resolution step the territory of every living player is ONE 8-connected region, in every round type.
+- Closures (step a, unchased returns, before the traits' AugmentCapture): the capture is checked with the returner's cells, the
+  capture counted as its own and the piece of its return cell kept (TerritorySplit.KeepOnePiece). When own + capture is one
+  4-connected piece nothing changes (one flood, O(territory)); C2 holds (a bare back-and-forth line still captures nothing). Else
+  the band of the whole trail up to the crossing point is added when it leaves fewer cells apart (8-connected pieces first, then
+  4-connected pieces, so a region joined only at a corner is linked too): band = every non-Void cell whose center lies within
+  `SimConfig.InheritanceBandHalfWidth` (0.45 u, about 7 cells wide) of the trail plus its supercover raster (the rule v1.6 band,
+  InheritanceBridge.BandCells), minus own cells, minus the R1 rim band (EventResolver.RimSafe: cells whose center lies closer to
+  the rim than ArenaMargin minus half a cell diagonal, which no trail raster reaches, stay neutral forever). It joins a detached
+  lasso pocket or region, a corner-joined region, and two separate pieces the trail goes between ("the line between the two
+  parts"). The band is part of the capture: Return.Cells lists it, R18 applies to it, cells of a living rival under it are taken
+  (the trail is the only line the player drew; the rival's pieces are then judged by rule v1.5, then R9 and TerritoryLost), and
+  Coalescence runs after it. PlayerState.DomainLinks++ (api addition, not hashed) for each such return that applied cells.
+- Safety net (end of step a, after rule v1.5, before R9, as in section 30, now in every round): a returner that gained cells keeps
+  one domain; when a part still lies apart (contested cells of a simultaneous return, its own land severed in the same group), it
+  keeps the piece of its return cell and the rest becomes plain neutral (TerritorySevered, Other = -1, Recipient = -1, scorch
+  forgotten). This is the documented fallback when no own line can join the parts.
+- Enemy-caused splits keep rule v1.5 (section 29, designer decision): the victim keeps the piece of its anchor, the rest is
+  neutral (SeveredTerritory option unchanged; SeveredTerritory = Off still disables that half of the invariant).
+- KillInheritance (section 30) is unchanged: bridge, AnchorOnly. With SingleDomain = On, `InheritanceBridge = Off` behaves as
+  AnchorOnly (an inherited island is never kept); the bridge band also leaves out the R1 rim band. The closures of Feu rounds take
+  the band (no longer the one-cell trail footprint of section 30).
+- Off (`SingleDomain = Off`): the pre-v1.8 behaviour, bit-identical (section 30 runs only on the KillInheritance path, with its
+  footprint closures). Every pinned value of the v2.0 Core reproduces with Off: the classic pre-trait and rule v1.5 columns of
+  TraitsClassicTests, the rule v1.6 Feu rows (InheritanceBridgeTests.FireRows, both columns), the Liquide / Electricite / Feu rows
+  of SingleDomainTests.BiomeRows. The option is not hashed (equal states, equal hashes).
+- Pre-existing pieces (a custom SimSetup territory) are kept until a trail joins them or the safety net judges that player as a
+  returner; R2 discs and the Europe start discs (radius within the outline) are one piece.
+- Diagonal necks: own closures never leave a corner-only joint (the 4-connected check above). A rival capture can still leave a
+  victim joined only at a corner (rule v1.5 judges 8-connectivity, the designer's adjacency); measured: 13 visible occurrences
+  (corner-joined part of at least 16 cells) in 240 rounds after the fix, against 58 before (open question in the report).
+- Determinism: the band depends only on the trail geometry (capsule distances and the supercover raster do not depend on how a
+  straight path was subdivided), the labellings use a fixed scan and neighbour order on pooled stamped buffers; outcomes, Return
+  cells and grids are identical at 30, 60 and 144 Hz (R23 cross-rate tests), twin rounds give identical StateHash.
+- Cost: one 4-connected flood of the returner's territory per unchased return; three more floods and one band raster only when a
+  link is considered (about 1.4 per round in bot rounds).
+- Bots: a link happens at a return, when the bot is home, so no plan is stale; bots read home from the grid (NearestOwned,
+  OwnerAt) and the safety net only touches returners. Section 9 targets still hold (BotTests). Presentation: the band cells are
+  Return cells, so the fill wave of the return paints them in every biome (TerritoryField.AddWave from the return point), and
+  TerritoryField reconciles every grid change; no Runtime change was needed.
+- Pinned values: with the default, every TraitsClassicTests row changed (their rounds contain links); the new column and
+  TraitsClassicTests.ClassicSeed1V18 are the classic reference; SingleDomainTests.BiomeRows pins Liquide, Electricite and Feu rows
+  in two columns. The player probe hash 246577239DE179C4 must be checked in the Unity EditMode run (WaveD_TraitsInfraTests); see
+  docs/domain_v17.json for the result.
+
+## 33. Rule v1.9: border ride (v2.2, designer decision, overrides older sections where they disagree)
+Designer request (translated): "when the pawn runs along the border for more than one second, its speed is multiplied by 3,
+and without any change of direction from the user it keeps following the border even where the border makes obtuse angles".
+Code: Core/Sim/BorderRide.cs (called from EventResolver.BeginTick, section 6 step 1), Arena.FollowBorder and
+ArenaPolygon.Follow (boundary following), PlayerState ride fields, SimView.IsBorderRiding / BorderRideStartTime.
+- Switch: `SimConfig.BorderRide` (BorderRideRule Off / On), `BorderRideFactor` = 3.0, `BorderRideDelay` = 1.0 s. The Core
+  default is Off and Off is bit-identical to the pre-v1.9 simulation (the R4 call is unchanged, no ride field is read or
+  hashed). The game turns it On for real rounds (GameSession.RoundConfig); the menu attract round and the probe's
+  DemoScenario keep Off (the probe hash 246577239DE179C4 is unchanged).
+- Contact: a head is in contact with the boundary when its R4 step was constrained (slide or hold, Arena.Step) or when the
+  step ends within BorderRide.ContactTolerance (0.02 u) of the inset line. Contact starts at the exact instant the straight
+  path of the tick reaches that tolerance (bisection on the tick fraction), so a head approaching at a constant heading gets
+  the same instant at every tick rate; any tick without contact clears it (PlayerState.BorderContactStart = NaN).
+- Trigger: the ride starts at contact start + BorderRideDelay (sim time). When that instant falls inside a tick, the head
+  moves normally up to it and rides for the rest of the tick. A held head (pushing within BorderHoldAngle of the normal)
+  rides too.
+- Effect: tick speed = PawnSpeed x SpeedMultiplier x the behaviours' factor (Conduction) x BorderRideFactor while riding.
+  The HeadGrace check of the Simulation constructor includes BorderRideFactor when the rule is On (60 Hz: 6 x 3 / 60 =
+  0.3 u per tick; with the Electricite traits 0.51 u).
+- Direction: at the start, the side the desired heading leans to along the boundary (sign of its component along
+  OutwardNormal.Perp(); a push straight in, |component| below 1e-9, takes +Perp). While riding the heading IS the boundary
+  tangent in that direction (PlayerState.Heading is set to it every tick).
+- Auto-follow: Arena.FollowBorder moves the head along the inset line in sub-steps of at most 0.05 u: on the classic square
+  the tangent step is projected back onto the convex inset rounded box (sides and corner arcs); on a country polygon each
+  sub-step takes the tangent of the active edge (within margin + 0.02 u) that pushes least into the other active edges, so
+  at a convex vertex (where a plain R4 slide is held) the head turns onto the next edge, and at a reflex vertex it follows
+  the arc of radius ArenaMargin around the vertex. The result is always inside the inset shape. A ride tick that advances
+  less than 20 % of its step (a dead end narrower than the head) ends the ride.
+- New input: a desired heading within BorderRide.InputTolerance (20 degrees) of the one the ride last accepted is not a new
+  input (a held joystick wobbles). A new input that points into the interior by more than BorderHoldAngle from the tangent
+  ends the ride; any other new input is accepted (a push along the boundary the other way reverses the ride).
+- End: steering inward (above), the head leaving the boundary, a dead end, elimination, or a spark on the trail. After an
+  end the head moves at its normal speed for that whole tick and the delay starts over at the next contact.
+- La Revanche: no ride while a spark chases the player, and a chased player accumulates no contact time. A spark that
+  appears during a ride ends it: from the next tick on (BorderRide.Move at tick start, and EndOfTick at step 3 clears the
+  flag at the end of the cut tick); the rest of the cut tick (at most 1 / TickRate s) was planned at the ride speed. Spark
+  speeds are unchanged (SparkSpeedOf at the cut). Closed forms: SimView.SparkCatchEta (R12/R13) assumes the trailing speed
+  PawnSpeed x SpeedMultiplier, which holds because a chased player never rides; the event engine's catch candidates use the
+  actual trail growth of each tick; the bot intercept and escape math (BotController) uses SpeedMultiplier only, which is
+  conservative for a riding bot (it is faster than planned) and exact for a chased victim (never riding).
+- Event engine: a tick's motion stays the straight segment from the start to the full-step target (PosAt is linear), so a
+  ride tick that rounds a corner is drawn as its chord, and in the tick where a ride starts the cell entry times are those of
+  the uniform segment (no event in the tests falls there).
+- StateHash: only when the rule is On, per player the ride flags (riding, sign) and BorderContactStart (rounded to 1e-9).
+- Bots: they do not seek the ride. In seeded bot-only rounds they never come within the contact tolerance of the border
+  (0 contact ticks in 10 rounds), so section 9 targets are unchanged with the rule On (BorderRideTests).
+- Presentation: TraitFxView draws the Conduction speed streak, 80 % longer and tinted toward the border's neon yellow, behind
+  a riding pearl (no new shader, no extra fetch). No sound (no new event type).
+- Tests: BorderRideTests (trigger after exactly 1 s and not before, x3 closed-form position, cross-rate outcomes and ride
+  instant at 30/60/144 Hz, rounded corner, convex and reflex polygon vertices without input, end on steering inward, joystick
+  wobble, no boost while chased, a spark ends the ride, Off ignores every ride parameter, section 9 bot targets with the rule
+  On). See docs/border_ride.json.

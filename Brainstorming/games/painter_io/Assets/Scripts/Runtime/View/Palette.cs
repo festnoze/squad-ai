@@ -19,8 +19,9 @@ namespace PainterIO.Runtime
         /// <summary>Table (arena ground) navy #1E2A4D.</summary>
         public static readonly Color Background = new Color32(0x1E, 0x2A, 0x4D, 0xFF);
 
-        /// <summary>Outside the arena (and the camera clear color) #151D38.</summary>
-        public static readonly Color OutsideArena = new Color32(0x15, 0x1D, 0x38, 0xFF);
+        /// <summary>Outside the arena (and the camera clear color) #B4B9C1: a flat, slightly cool light grey shared by every
+        /// biome so the outside reads as "not playable" (the composites draw a yellow neon line on the edge).</summary>
+        public static readonly Color OutsideArena = new Color32(0xB4, 0xB9, 0xC1, 0xFF);
 
         /// <summary>Light UI text #F3EEE8.</summary>
         public static readonly Color UiText = new Color32(0xF3, 0xEE, 0xE8, 0xFF);

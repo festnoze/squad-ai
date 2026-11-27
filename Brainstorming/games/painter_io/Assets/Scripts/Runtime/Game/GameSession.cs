@@ -1,5 +1,8 @@
 // Owned by BI since wave B-2 (written by B0a). Contract 11.2 (GameSession, round and attract factories) and 23.3 (bot seeds, lineups, Exit/Return
 // debounce helpers). Also holds LaunchArgs, the command-line reader shared by GameDirector, DevShot and the probe.
+// Wave D-2 (traits-infra, docs/BIOME_TRAITS.md section 5): CreateRound / CreateAttract set SimConfig.Traits to
+// BiomeTraitTable.Resolve(the biome being played); the attract match restarts itself when its traits change
+// (RefreshAttractTraits); LaunchArgs reads -classic, -traits "<key>" and -trait <Id>=0|1.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -97,6 +100,23 @@ namespace PainterIO.Runtime
         }
 
         public bool HumanAlive => HumanIndex >= 0 && Sim.Players[HumanIndex].Alive;
+
+        /// <summary>Wave D-2: the trait set of the running simulation (Sim.Config.Traits; classic = no trait).</summary>
+        public RuleTraits Traits => Sim.Config.Traits ?? RuleTraits.Classic;
+
+        /// <summary>
+        /// Wave D-2 (BIOME_TRAITS 5: matrix and option changes apply to the attract match immediately): an attract session
+        /// whose traits differ from BiomeTraitTable.Resolve(the current biome) replaces its simulation now (like the
+        /// restart after a round end: Restarted is raised). Returns true when it restarted. No-op for other sessions.
+        /// </summary>
+        public bool RefreshAttractTraits()
+        {
+            if (!IsAttract || closed) return false;
+            RuleTraits wanted = BiomeTraitTable.Resolve(ActiveBiome());
+            if (wanted.Equals(Traits)) return false;
+            RestartAttract();
+            return true;
+        }
 
         /// <summary>True while the round waits for the human (Runner.Paused).</summary>
         public bool AwaitingStart { get; private set; }
@@ -199,7 +219,8 @@ namespace PainterIO.Runtime
 
         /// <summary>
         /// A real round: human index 0 (ExternalController, Desired = null) + bots 1..3 (Balanced, Greedy, Aggressive).
-        /// Config from Tuning, then the SaveData test settings, then the command-line overrides; AwaitingStart = true.
+        /// Config from Tuning, then the SaveData test settings, then the command-line overrides, then the traits of the
+        /// biome being played (BiomeTraitTable.Resolve(ActiveBiome())); AwaitingStart = true.
         /// </summary>
         public static GameSession CreateRound(ulong seed, bool lassoEnabled, EuropeCatalog.Country country = null)
         {
@@ -226,7 +247,10 @@ namespace PainterIO.Runtime
             return session;
         }
 
-        /// <summary>4 bots (Balanced, Balanced, Greedy, Aggressive), endless: restarts itself on round end.</summary>
+        /// <summary>
+        /// 4 bots (Balanced, Balanced, Greedy, Aggressive), endless: restarts itself on round end. Wave D-2: with the
+        /// traits of the selected biome (BiomeTraitTable.Resolve(ActiveBiome())), re-resolved at every restart.
+        /// </summary>
         public static GameSession CreateAttract(ulong seed)
         {
             return new GameSession(AttractConfig(seed), AttractSetup(), AttractControllers(seed), true);
@@ -241,10 +265,30 @@ namespace PainterIO.Runtime
             }
         }
 
-        /// <summary>The config of a real round (also used by tests): see CreateRound.</summary>
+        /// <summary>
+        /// The biome a new round or attract match plays in: GameDirector.ResolveBiome(null) (the -biome command line until
+        /// a menu pick, else SaveData.Biome); without a director, -biome else SaveData.Biome.
+        /// </summary>
+        public static BiomeId ActiveBiome()
+        {
+            GameDirector d = GameDirector.Instance;
+            if (d != null) return d.ResolveBiome(null);
+            return LaunchArgs.Biome ?? BiomeTheme.Clamp(SaveData.Biome);
+        }
+
+        /// <summary>
+        /// The config of a real round (also used by tests): see CreateRound. Traits = BiomeTraitTable.Resolve(ActiveBiome()).
+        /// Always built from scratch (never from a previous Simulation.Config, which carries applied config traits).
+        /// </summary>
         public static SimConfig RoundConfig(ulong seed, bool lassoEnabled)
         {
-            var config = new SimConfig { Seed = seed };
+            return RoundConfig(seed, lassoEnabled, BiomeTraitTable.Resolve(ActiveBiome()));
+        }
+
+        /// <summary>The config of a real round with an explicit trait set (null = classic): the probe's bot round, tests.</summary>
+        public static SimConfig RoundConfig(ulong seed, bool lassoEnabled, RuleTraits traits)
+        {
+            var config = new SimConfig { Seed = seed, Traits = traits ?? RuleTraits.Classic };
             // SaveData stores floats: round back to the setting's step so the default 1.8f gives exactly Tuning's 1.8.
             config.SparkSpeedFactor = FromSetting(SaveData.SparkFactor);
             config.RoundDuration = FromSetting(SaveData.RoundSeconds);
@@ -258,6 +302,7 @@ namespace PainterIO.Runtime
                 config.LassoRespawn = LaunchArgs.RingInterval.Value;
             }
             config.LassoEnabled = lassoEnabled;
+            config.BorderRide = BorderRideRule.On;   // rule v1.9 (contract 33): the border ride is on in the game
             return config;
         }
 
@@ -282,7 +327,7 @@ namespace PainterIO.Runtime
 
         private static SimConfig AttractConfig(ulong seed)
         {
-            return new SimConfig { Seed = seed, LassoEnabled = SaveData.LassoOn };
+            return new SimConfig { Seed = seed, LassoEnabled = SaveData.LassoOn, Traits = BiomeTraitTable.Resolve(ActiveBiome()) };
         }
 
         private static SimSetup AttractSetup()
@@ -406,8 +451,9 @@ namespace PainterIO.Runtime
 
     /// <summary>
     /// Command-line options of the player (Windows; harmless elsewhere): -fps n, -lasso 0|1, -sparkFactor x,
-    /// -roundDuration s, -ringInterval s, -biome liquid|fire|electric, -devshot dir, -probe, -mute. Parsed once; tests may
-    /// call Reload.
+    /// -roundDuration s, -ringInterval s, -biome liquid|fire|electric, -devshot dir, -probe, -mute. Wave D-2
+    /// (BIOME_TRAITS 5): -classic, -traits "&lt;RuleTraits key&gt;" (or "default": the biome's line of the table) and
+    /// -trait &lt;Id&gt;=0|1 (repeatable). Parsed once; tests may call Reload.
     /// </summary>
     public static class LaunchArgs
     {
@@ -417,6 +463,10 @@ namespace PainterIO.Runtime
         private static bool? lasso;
         private static double? sparkFactor, roundDuration, ringInterval;
         private static BiomeId? biome;
+        private static bool classic;
+        private static string traitsKey;
+        private static List<KeyValuePair<TraitId, bool>> traitToggles = new List<KeyValuePair<TraitId, bool>>();
+        private static string traitArgsError;
 
         /// <summary>-fps n (0 when absent).</summary>
         public static int Fps { get { Parse(); return fps; } }
@@ -427,7 +477,7 @@ namespace PainterIO.Runtime
         /// <summary>-sparkFactor x, clamped to [1.05, 5].</summary>
         public static double? SparkFactor { get { Parse(); return sparkFactor; } }
 
-        /// <summary>-roundDuration s, clamped to [5, 600].</summary>
+        /// <summary>-roundDuration s, clamped to [5, 900] (rule v1.7: 900 s is the default round time limit).</summary>
         public static double? RoundDuration { get { Parse(); return roundDuration; } }
 
         /// <summary>-ringInterval s, clamped to [1, 300].</summary>
@@ -436,8 +486,31 @@ namespace PainterIO.Runtime
         /// <summary>-biome liquid|fire|electric (or 0|1|2), null when absent or not a biome (contract 25.1).</summary>
         public static BiomeId? Biome { get { Parse(); return biome; } }
 
-        /// <summary>A command-line tuning override is active (stats are then not recorded).</summary>
-        public static bool HasTuningOverride => SparkFactor.HasValue || RoundDuration.HasValue || RingInterval.HasValue;
+        /// <summary>Wave D-2: -classic (every trait off for every round, the attract match and scripted sessions).</summary>
+        public static bool Classic { get { Parse(); return classic; } }
+
+        /// <summary>
+        /// Wave D-2: the value of -traits (trimmed), null when absent or unparsable (see TraitArgsError). Either a valid
+        /// RuleTraits key or BiomeTraitTable's "default" keyword.
+        /// </summary>
+        public static string TraitsKey { get { Parse(); return traitsKey; } }
+
+        /// <summary>Wave D-2: every valid -trait &lt;Id&gt;=0|1, in command-line order (true = on).</summary>
+        public static IReadOnlyList<KeyValuePair<TraitId, bool>> TraitToggles { get { Parse(); return traitToggles; } }
+
+        /// <summary>Wave D-2: the first invalid trait argument (null when every one parsed); BiomeTraitTable logs it once.</summary>
+        public static string TraitArgsError { get { Parse(); return traitArgsError; } }
+
+        /// <summary>Any trait flag is on the command line (-classic, -traits or -trait).</summary>
+        public static bool HasTraitArgs => Classic || TraitsKey != null || TraitToggles.Count > 0;
+
+        /// <summary>
+        /// A command-line tuning override is active (stats are then not recorded). Wave D-2: an explicit -traits set
+        /// (other than "default") or a -trait toggle counts, like a modified trait matrix; -classic is a normal option.
+        /// </summary>
+        public static bool HasTuningOverride => SparkFactor.HasValue || RoundDuration.HasValue || RingInterval.HasValue
+                                                || (TraitsKey != null && !BiomeTraitTable.IsDefaultKeyword(TraitsKey))
+                                                || TraitToggles.Count > 0;
 
         /// <summary>True when the flag (for example "-probe") is on the command line (case-insensitive).</summary>
         public static bool Has(string flag)
@@ -485,8 +558,59 @@ namespace PainterIO.Runtime
             string l = ValueRaw("-lasso");
             if (l != null) lasso = l.Trim() != "0" && !l.Trim().Equals("false", StringComparison.OrdinalIgnoreCase);
             if (TryDouble("-sparkFactor", out double s)) sparkFactor = Clamp(s, 1.05, 5.0);
-            if (TryDouble("-roundDuration", out double r)) roundDuration = Clamp(r, 5.0, 600.0);
+            if (TryDouble("-roundDuration", out double r)) roundDuration = Clamp(r, 5.0, 900.0);
             if (TryDouble("-ringInterval", out double i)) ringInterval = Clamp(i, 1.0, 300.0);
+            ParseTraits();
+        }
+
+        /// <summary>-classic, -traits and every -trait (BIOME_TRAITS 5). Errors are kept in traitArgsError.</summary>
+        private static void ParseTraits()
+        {
+            classic = IndexOf("-classic") >= 0;
+            traitsKey = null;
+            traitToggles = new List<KeyValuePair<TraitId, bool>>();
+            traitArgsError = null;
+            if (IndexOf("-traits") >= 0)
+            {
+                string key = ValueRaw("-traits");
+                if (key == null || key.StartsWith("-", StringComparison.Ordinal)) traitArgsError = "-traits needs a value (a RuleTraits key or 'default')";
+                else if (BiomeTraitTable.IsDefaultKeyword(key)) traitsKey = key.Trim();
+                else
+                {
+                    try
+                    {
+                        RuleTraits.Parse(key);
+                        traitsKey = key.Trim();
+                    }
+                    catch (FormatException e)
+                    {
+                        traitArgsError = "-traits '" + key + "' ignored: " + e.Message;
+                    }
+                }
+            }
+            for (int k = 0; args != null && k < args.Length; k++)
+            {
+                if (!string.Equals(args[k], "-trait", StringComparison.OrdinalIgnoreCase)) continue;
+                string v = k + 1 < args.Length ? args[k + 1] : null;
+                if (TryParseToggle(v, out TraitId id, out bool on)) traitToggles.Add(new KeyValuePair<TraitId, bool>(id, on));
+                else if (traitArgsError == null) traitArgsError = "-trait '" + v + "' ignored (expected <Id>=0|1, Id one of " + string.Join(", ", TraitDefaults.All) + ")";
+            }
+        }
+
+        /// <summary>"Id=1", "Id=0" (also on / off, true / false; Id by name or number).</summary>
+        private static bool TryParseToggle(string text, out TraitId id, out bool on)
+        {
+            id = 0;
+            on = false;
+            if (string.IsNullOrEmpty(text)) return false;
+            int eq = text.IndexOf('=');
+            if (eq <= 0) return false;
+            if (!BiomeTraitTable.TryParseTraitId(text.Substring(0, eq), out id)) return false;
+            string v = text.Substring(eq + 1).Trim().ToLowerInvariant();
+            if (v == "1" || v == "on" || v == "true") on = true;
+            else if (v == "0" || v == "off" || v == "false") on = false;
+            else return false;
+            return true;
         }
 
         private static int IndexOf(string flag)

@@ -1,0 +1,157 @@
+{
+  "package": "inherit",
+  "status": "done",
+  "summary": "Rule v1.6 (contract section 30, test id R22, docs/BIOME_TRAITS.md 7.3), designer request 'your domain must be one single domain': in rounds with KillInheritance (Share > 0, the Feu set) every living player's territory stays ONE 8-connected domain. When KillInheritance gives a victim's land that does not touch the killer's domain, the kill line (the killer's trail from its exit to its head at the cut Q, the link Q-P to the cut point, the victim's trail from P back to its land) becomes a band of territory 0.9 u wide (InheritanceBridged); the killer's trail is cut at Q and keeps working from there. When no bridge can be made (the killer's exit was cut, a forced cut, the killer's line taken since, a band that reaches nothing), the killer keeps the piece of its v1.5 anchor and the rest becomes plain neutral (TerritorySevered, Other = -1). Closures that would leave a detached part take their trail footprint, and a safety check keeps returners whole. Option SimConfig.InheritanceBridge (Bridge default, AnchorOnly, Off = pre-v1.6, bit-identical) and SimConfig.InheritanceBandHalfWidth (0.45 u). Classic, Liquide, Electricite and the probe hash 246577239DE179C4 are unchanged; with Off every Feu value reproduces. Bots re-pick their closure target after a bridge; the Fire inheritance sweep now includes the band.",
+  "root_causes": [
+    {
+      "where": "Assets/Scripts/Core/Traits/KillInheritanceTrait.cs:51-77 (pre-change OnKill, the write at line 71)",
+      "what": "The trait writes every freed cell of the victim for the killer without looking at where they lie: the inherited land B is an island whenever it does not touch the killer's land A. Nothing turns the line of the kill into territory, so the killer owns two separate pieces (the designer's 'two parts of your domain')."
+    },
+    {
+      "where": "Assets/Scripts/Core/Grid/CaptureSolver.cs:158-162 (interiorCount == 0 returns the pocket only) and 164-177 (Rim = trail cells 8-adjacent to the Interior); Assets/Scripts/Core/Sim/EventResolver.cs:631-638 and 911-923 (pre-change: the capture of a return is CaptureSolver over the loop-erased trail only)",
+      "what": "Driving the trail from A into B IS a return (EventResolver.AddHomeTransition, pre-change lines 289-313: B's cells are own, so return detection, the exit point and the loop-erased outline all work), but section 7 takes walls = A + B + trail, and a trail that only joins two pieces encloses nothing (the gap between A and B stays open to the outside): no Interior, hence no Rim (R8 / C2: a bare line captures nothing). The trail is dropped and the domain stays in two pieces: 'it don't close the loop'. Reproduced by R22_ReproductionOffKeepsTwoPiecesAndTheClosureIntoTheInheritedLandCapturesNothing (InheritanceBridge = Off: Return.Cells empty, two pieces, the trail cells neutral)."
+    },
+    {
+      "where": "Assets/Scripts/Core/Sim/EventResolver.cs:944-960 (pre-change StepKillRewards -> Simulation.NotifyKills); Assets/Scripts/Core/Grid/TerritorySplit.cs:20-22 (doc) and docs/CONTRACT.md section 29 ('Islands that were already separate before (inherited land ...) are never judged'); docs/BIOME_TRAITS.md 7.2 (an inherited cell under the head was the only case considered)",
+      "what": "No step after the kill rewards looked at the killer's connectivity, and rule v1.5 explicitly tolerated inherited islands: the 'one home blob' assumption of the rules was never enforced for KillInheritance."
+    },
+    {
+      "where": "Assets/Scripts/Core/Bots/BotController.cs:666-671 (pre-change UpdateOut)",
+      "what": "Minor: bots already read home from the grid (GridQueries.NearestOwned, OwnerAt) for the return target, the round-time trigger and an enemy's escape estimate, so every own cell counts; but the plan's closure point R stayed in the old land after an inheritance (it was re-picked only when R was no longer owned)."
+    },
+    {
+      "where": "Assets/Scripts/Runtime/Render/TerritoryField.cs:371-374 (pre-change TerritoryInherited sweep)",
+      "what": "Presentation: the Fire inheritance sweep only covered the inherited cells; there was no band to sweep."
+    }
+  ],
+  "single_home_assumptions_checked": [
+    "Return detection (AddHomeTransition), exit/entry bookkeeping, loop-erased outline: owner-based, already accept any own cell (not a cause).",
+    "One-flood capture (CaptureSolver): correct for one domain; a trail joining two pieces captures nothing (cause, fixed by the bridge and the closure footprint).",
+    "Anchor (EventResolver.AnchorCell, TerritorySplit.ExitCell): exit cell or pawn cell, reused as the v1.6 anchor; ExitCell finds the band cell after the trail restarts at Q.",
+    "Bots: NearestOwned / OwnerAt everywhere except the plan point R (fixed); the round-time bound D_home <= L + one cell still holds after DropPrefix (Q is own).",
+    "Runtime: HomeArrow, CameraRig chase view and ElectricFx use NearestOwned; HUD and results read CountOf; ThreadView rebuilds from Trail.Points every frame (a trail restarting at Q is drawn from Q); no Exit event is raised for the restart (GameSession exit age unchanged).",
+    "Start territories: R2 discs are one piece; a custom SimSetup or a start disc clipped by a Europe outline may start in pieces (kept until that player's first inheritance, documented)."
+  ],
+  "fix": {
+    "rule": "contract section 30 (R22), BIOME_TRAITS 7.3",
+    "bridge": "EventResolver.StepKillRewards (per kill: v1.5 anchor read before the inheritance, kill traits, then JoinInheritance). JoinInheritance: TerritorySplit.KeepOnePiece; if several pieces and Bridge: BuildBand (kill line from Spark cut geometry recorded in step c + the victim's trail prefix copied in Eliminate), InheritanceBridge.BandCells (cells within InheritanceBandHalfWidth of the line + supercover raster), accepted when it joins pieces to the kept one (KeepOnePiece with the band as virtual cells: no band cell cut off, fewer cells severed than without it; the killer had one domain before, so the joined pieces are inherited land); ApplyBand: v1.5 bookkeeping for third players (CollectSevered / ApplySevered, cutter = killer), write, Trail.DropPrefix(s_Q), InheritanceBridges++, InheritanceBridged event, R9 stolen exits, TerritoryLost; then KeepOnePiece and SeverPieces (plain neutral, scorch forgotten, TerritorySevered Other = -1).",
+    "killer_trail": "Trail.DropPrefix keeps the last point (uTrailEnd, L(u), head and cell unchanged), changes Version (stale cut / lasso candidates dropped), keeps Epoch (exit identity) and adds to Dropped (maps arcs recorded on the same exit, for a second kill by the same cut exit). Pending pocket kept; the exit is never cut (bridge refused when ExitWasCut).",
+    "closures": "StepReturns: when an unchased capture is not attached to the domain (TerritorySplit.GainAttached), WithTrailFootprint adds the supercover raster of the whole trail, before the traits' AugmentCapture (found by TraitsAudit_3: the footprint can close small holes that Coalescence must fill).",
+    "safety_net": "KeepReturnersWhole at the end of step a (after rule v1.5, before R9): GainAttached on the written grid, full KeepOnePiece with simultaneous returns, a severance of the returner's land or the Capturer option.",
+    "switch": "Simulation.SingleDomain = KillInheritance attached with Share > 0 and InheritanceBridge != Off; nothing of the above runs otherwise (classic, Liquide, Electricite, KillInheritance(0), Off).",
+    "bots": "BotController: PlayerState.InheritanceBridges watched at each decision; after a bridge while trailing, Return mode re-targets at once and the leg to R aims at NearestOwned pushed 1 u deeper.",
+    "runtime": "TerritoryField (minimal): InheritanceBridged joins the pending TerritoryInherited sweep of the same kill (one wave from the kill point over band + inherited land); TerritorySevered removes its cells from the pending waves of the player that lost them (they evaporate with their land instead of being painted, then reconcile). AddWave returns its wave."
+  },
+  "files": [
+    "Assets/Scripts/Core/Sim/EventResolver.cs (StepKillRewards per kill, JoinInheritance, BandJoins, BuildBand, OwnsPoint, ApplyBand, KeepReturnersWhole, SeverPieces, WithTrailFootprint, RecordCutGeometry, Eliminate keeps spark + victim prefix)",
+    "Assets/Scripts/Core/Traits/InheritanceBridge.cs (new: kill line helpers and band raster)",
+    "Assets/Scripts/Core/Grid/TerritorySplit.cs (KeepOnePiece, GainAttached, FloodPiece on the pooled buffers)",
+    "Assets/Scripts/Core/Trail/Trail.cs (Epoch, Dropped, DropPrefix, private Reset)",
+    "Assets/Scripts/Core/Sim/PlayerState.cs (Spark cut geometry fields, PlayerState.InheritanceBridges)",
+    "Assets/Scripts/Core/Sim/SimEvents.cs (SimEventType.InheritanceBridged = 17)",
+    "Assets/Scripts/Core/Sim/Simulation.cs (Inheritance, SingleDomain, NotifyKill; DebugForceCut doc)",
+    "Assets/Scripts/Core/Sim/SimView.cs (SingleDomain)",
+    "Assets/Scripts/Core/Traits/KillInheritanceTrait.cs (LastInherited, doc)",
+    "Assets/Scripts/Core/Traits/ISimTrait.cs (KillInfo.Spark, KillInfo.VictimPrefix, internal)",
+    "Assets/Scripts/Core/Traits/TraitDefaults.cs (KillInheritanceBandHalfWidth = 0.45)",
+    "Assets/Scripts/Core/World/SimConfig.cs (enum InheritanceBridgeRule, InheritanceBridge, InheritanceBandHalfWidth)",
+    "Assets/Scripts/Core/Bots/BotController.cs (closure target after a bridge)",
+    "Assets/Scripts/Runtime/Render/TerritoryField.cs (bridge band in the inherited sweep, severed cells leave pending waves)",
+    "Assets/Tests/EditMode/Core/Traits/InheritanceBridgeTests.cs (new, 18 R22 test cases)",
+    "Assets/Tests/EditMode/Core/Traits/TraitTestKit.cs (scorch invariant exempts cells severed in the same step)",
+    "Assets/Tests/EditMode/Core/Traits/KillRulesTests.cs (enum count 18)",
+    "Assets/Tests/EditMode/Core/Traits/KillInheritanceTraitTests.cs (Share test: Off for the selection, v1.6 block added)",
+    "Assets/Tests/EditMode/Core/KillTraitsAuditTests.cs (v1.6 outcomes, three scenarios pinned to Off, see pinned_values_changed)",
+    "docs/CONTRACT.md (v1.9, section 30)",
+    "docs/BIOME_TRAITS.md (v1.2, section 7 row and 7.2, new 7.3)",
+    "docs/inherit_fix.json"
+  ],
+  "api_additions": [
+    "public enum InheritanceBridgeRule { Off = 0, Bridge = 1, AnchorOnly = 2 } (Core/World/SimConfig.cs)",
+    "public InheritanceBridgeRule SimConfig.InheritanceBridge = Bridge; public double SimConfig.InheritanceBandHalfWidth = 0.45",
+    "public const double TraitDefaults.KillInheritanceBandHalfWidth = 0.45",
+    "SimEventType.InheritanceBridged (appended, value 17)",
+    "public int PlayerState.InheritanceBridges",
+    "public bool SimView.SingleDomain",
+    "internal: Spark.Linked / AttackerHead / AttackerEpoch / AttackerArc / AttackerDropped; KillInfo.Spark / VictimPrefix; Trail.Epoch / Dropped / DropPrefix; Simulation.Inheritance / SingleDomain / NotifyKill; KillInheritanceTrait.LastInherited; TerritorySplit.KeepOnePiece / GainAttached; static class InheritanceBridge"
+  ],
+  "tests": {
+    "command": "dotnet test tools/CoreTests/PainterIO.CoreTests.csproj --artifacts-path tools/CoreTests/.art/inherit",
+    "baseline_before_change": "578 tests in the tree before this package (the severed report's final count; my first full run after the change listed 596 = 578 + 18 new, 584 passed, 12 failed: the 11 expected v1.6 outcome changes listed below and one Coalescence oracle failure that found a real ordering bug, fixed)",
+    "added": 18,
+    "final_run": "596 passed, 0 failed, 0 skipped (6 min 44 s) on the final tree",
+    "unity_setup": "pwsh -NoProfile -File tools/verify.ps1 -Steps setup -Agent inherit: PASS setup (exit 0, no compile error, ShaderCheck PASS 13 shaders), OVERALL PASS (run on the final tree)",
+    "unity_editmode": "pwsh -NoProfile -File tools/unity.ps1 -Agent inherit -UnityArgs \"test . --mode EditMode --report-format junit --output TestResults/inherit_edit2.xml --timeout 2400\": JUnit tests=778, failures=0, errors=0, skipped=4 (BotsReport_HumanProxyFixture x2 and TraitsBalance_Diagnostics x2, report-only fixtures skipped by design), 110 s, final tree. Includes the 18 R22 cases (Editor sizes), WaveD2_TerritoryInherited_SweepsTheKillersColorFromTheKillPoint and WaveD_TheDemoIsClassicByDefaultAndRunsTraitedWithTheFlags. No build into Build/Windows, Build/Android or Build/Play.",
+    "r22_cases": [
+      "R22_ReproductionOffKeepsTwoPiecesAndTheClosureIntoTheInheritedLandCapturesNothing (the root cause, Off)",
+      "R22_BridgeWithTheKillerStillOutSplitsItsTrailAndTheClosureIntoTheInheritedLandCaptures (30/60/144 Hz, single domain every tick, the later closure into B captures > 1000 cells and the trail becomes domain)",
+      "R22_TheBandIsTheKillLineWithThicknessAndTheKillersTrailRestartsAtTheCutPoint (parts a, b, c of the line, burnt part excluded, 7 cells across, trail starts at Q, L and trail end consistent)",
+      "R22_TheRestOfTheTrailKeepsWorking_ASparkRunsOnTheSplitTrail (spark closed form on the split trail, 30/60/144 Hz)",
+      "R22_BridgeWhenTheKillerAlreadyClosedStartsAtItsFormerTrail (30/60/144 Hz)",
+      "R22_TheBandOverAThirdPlayersLandIsACaptureAndSplitsItByTheV15Rule (third player keeps its pawn piece, TerritorySevered Other = killer, 30/60/144 Hz)",
+      "R22_AChasedKillerMakesNoBridgeAndKeepsItsAnchorPieceOnly (ExitWasCut, inherited land severed exactly, never scorched, trail untouched, 30/60/144 Hz)",
+      "R22_ABrokenBridgeSeversTheInheritedLand (killer closed, its cells around Q taken, 30/60/144 Hz)",
+      "R22_AnchorOnlyKeepsOneDomainWithoutTheBand",
+      "R22_AKillerDyingInTheSameGroupLeavesTheLandNeutralAndScorched (existing rule unchanged, 30/60/144 Hz)",
+      "R22_ABotGoesHomeIntoTheJoinedLandAfterAnInheritance (the bot closes into the band / inherited land instead of its old land)",
+      "R22_NoLivingPlayerEverOwnsTwoPiecesInFireBotRounds (12 full Feu v1.1 rounds, balanced + aggressive lineups, seeds 1-6, 30/60/144 Hz, independent 8-connectivity oracle after every grid change: 20 kills, 3 bridges, 2 single-domain severances, 1411 checks, 0 violations)",
+      "R22_SameSeedSameHashWithTheBridge",
+      "R22_OffReproducesThePreV16FireHashesAndTheDefaultIsPinned x4",
+      "R22_TheRuleBelongsToTheKillInheritancePath (SingleDomain false for classic, Feu without KillInheritance, Liquide v1.1, Electricite v1.1, Share 0, Off)"
+    ],
+    "bot_round_breakdown": "Scratch analysis over 60 full Feu v1.1 rounds (seeds 1-30, two lineups): 97 inheritances, 74 already touching the killer's domain, 20 bridged, 3 severed (all three because the killer's own exit had been cut: v1.4 forbids that trail to become land)."
+  },
+  "pinned_values_changed": [
+    { "where": "KillRulesTests.KillRules_NewEventTypesAreAppendedAtTheEnd", "from": "17 event types", "to": "18, InheritanceBridged = 17", "why": "the new event is appended at the end" },
+    { "where": "TraitTestKit.AssertTraitInvariants (scorch invariant)", "change": "a freed cell severed in the same step (TerritorySevered) is exempt from 'freed neutral cells are scorched'", "why": "v1.6 makes inherited land the killer cannot join plain neutral (never scorched), like rule v1.5 severances" },
+    { "where": "KillTraitsAuditTests.KillAudit_3_OnlyTheCutterRetainedByR11IsRewarded (both cases)", "from": "the winner owns the 1024 inherited cells", "to": "the inherited land is severed (TerritorySevered, Other = -1) and neutral, no InheritanceBridged", "why": "the victim's trail was teleported away from its land (DebugSetTrail), so the kill line cannot reach it: no bridge, single domain" },
+    { "where": "KillTraitsAuditTests.KillAudit_3_TwoVictimsAtOnceArePaidInKillOrderAndTheShieldStartsOnce", "from": "event order ending 'TerritoryInherited(0,2) SpeedBoosted(0,2)', land of 2 owned by the killer", "to": "order ends with 'TerritorySevered(0,-1)', land of 2 severed and neutral", "why": "victim 2's land is far from the killer's and the kill was forced (no contact geometry): no bridge" },
+    { "where": "KillTraitsAuditTests.KillAudit_3_AChasedKillerKeepsItsInheritanceUntilItsOwnKillerTakesItAll", "from": "X ends with K's and V's former land", "to": "X's inheritance is severed (neutral, not scorched); K's own inheritance (adjacent land) is unchanged", "why": "X's land is far from it and X's spark was forced" },
+    { "where": "KillTraitsAuditTests.KillAudit_6_AShieldSavesACutKillerButItsPendingPocketIsStillErased", "from": "the inherited pocket cells stay A's", "to": "the inherited land is severed at the kill, no pocket cell is A's, no InheritanceBridged", "why": "a cut exit (KillShield keeps ExitWasCut) can never become a bridge (v1.4); this now also tests the chased-killer fallback with KillShield" },
+    { "where": "KillTraitsAuditTests.KillAudit_3_AKillerCapturedToDeathBeforeOrInTheSameGroupIsNotRewarded part (iii), KillAudit_4_AShareKeepsTheRimScorchedAndPropagationNeverFillsIt, KillAudit_4_APendingPocketOverInheritedLandCapturesOnlyWhatWasNotOwned (both cases)", "change": "run with SimConfig.InheritanceBridge = Off (assertions unchanged)", "why": "their subject (kill ordering, Share + ScorchedEarth + Propagation, a pocket over inherited land) needs an inherited island; under v1.6 the far land of a forced kill is severed at once, which R22 tests cover. They keep their regression value for the legacy option." },
+    { "where": "KillInheritanceTraitTests.KillInheritance_ShareKeepsTheCoreOfTheLandNearItsCentroid", "change": "the selection assertions run with Off; a v1.6 block asserts that the same core is severed under the default", "why": "the Share 0.5 core does not touch the killer's land and the forced cut makes no bridge" },
+    { "where": "Feu v1.1 values (not pinned before)", "change": "R22 pins four rolling hashes in two columns (Off = pre-v1.6, default = v1.6)", "rows": [
+      { "seed": 1, "rate": 60, "lasso": true, "off": "982984A543ECCFE4", "default": "6A081F4785E9DCEB" },
+      { "seed": 3, "rate": 60, "lasso": false, "off": "D9E2762A577C962C", "default": "3B68A996FF6CCED3" },
+      { "seed": 4, "rate": 30, "lasso": true, "off": "1D2C63CC32B1A93B", "default": "444396D4DF17FBAA" },
+      { "seed": 5, "rate": 144, "lasso": true, "off": "3B965B4C4764194F", "default": "FABA4ABCAD0A5181" }
+    ], "why": "every Feu round with a kill changes (bridges, severances, different later play); Off proves the switch" }
+  ],
+  "pinned_values_unchanged": [
+    "Player probe hash 246577239DE179C4 (classic demo, headless replay of DemoScenario): unchanged.",
+    "Classic rolling hashes: 8CB763231AC73608 (SeveredTerritory Off), C042710F17995DCB (default) and the seven TraitsClassicTests rows: unchanged (tests green).",
+    "Liquide v1.1 demo 05AC27EE4F056FD0 and Electricite v1.1 demo 6C31B923BF6E308E: unchanged; Liquide / Electricite bot rounds unchanged (headless comparison).",
+    "Feu v1.1 demo: 3DF3952B7C1BC26E with InheritanceBridge = Off (unchanged), 1F733FBFBED2D3A9 with the default (the first cutter kills the human at t = 8.20 and bridges 101 band cells). Not pinned anywhere: verify checks the traited probe hashes for equality across rates only."
+  ],
+  "values_to_recompute_in_player": [
+    "Feu traited probe hash (tools/verify.ps1 probe-fire, -traits default): expected 1F733FBFBED2D3A9 at -fps 30 and 144 (headless value), not pinned."
+  ],
+  "determinism": "The band depends only on the line geometry (distance to segments and the supercover raster do not depend on how a straight path was subdivided into trail points); Q and P come from exact contact roots; KeepOnePiece / GainAttached use a fixed scan and neighbour order on pooled stamped buffers. Cross-rate tests (30/60/144 Hz) compare events, times, every Cells array (InheritanceBridged and TerritorySevered included) and ranks; twin rounds give identical StateHash. The options are not hashed (equal states, equal hashes).",
+  "edge_cases": [
+    "Killer still out on the cut exit: band from its exit point; trail cut at Q (DropPrefix), its head may then lie on own land: it returns at that instant through the section 6 state check, also in the round-end group (ReturnsBeforeRoundEnd).",
+    "Killer home at the cut, or closed since: the line starts at Q, which must still be the killer's cell (its closure made that trail territory); a closure that captured nothing, or a capture of those cells by someone else, means no bridge.",
+    "Killer out on the cut exit but that exit was cut (spark or a spark KillShield extinguished): no bridge (v1.4), the anchor is its exit cell, so it keeps its old land.",
+    "Forced cuts (DebugForceCut) carry no contact geometry: never a bridge (most kill tests use them; their far inherited land is now severed).",
+    "Two kills by the same cut exit: the second maps its arc through Trail.Dropped; a cut point already turned into territory links from Q.",
+    "Band over a third player's land: capture for that player (rule v1.5 split, R9 stolen exit, TerritoryLost elimination if it had nothing else; a killer of a later kill of the same group eliminated that way gets nothing).",
+    "Band over Void: skipped; over the killer's own cells: no change (not listed in InheritanceBridged).",
+    "Share < 1: the inherited core rarely touches the band end (the rim stays neutral), so it is usually severed.",
+    "SeveredTerritory = Off: losses to captures are not judged (that half of the invariant is the designer's v1.5 switch); Capturer: a returner that receives severed pieces gets the full single-domain check.",
+    "A home killer's pawn cell is its anchor, so the kept piece always holds it (R9 unaffected); severed cells under a third player's head cannot occur (only the killer's own pieces are severed by v1.6)."
+  ],
+  "performance": "Per inheritance that leaves pieces (a few per round): two labellings (KeepOnePiece: a flood from the anchor that stops when it reached every cell; a grid scan only when there are several pieces) and one band raster. Per unchased return in single-domain rounds: GainAttached, O(captured cells). No grid-sized allocation per call; classic rounds run none of it.",
+  "open_questions": [
+    "Share < 1 (tuning only, default 1): the core near the centroid is usually severed under v1.6. Suggestion: pick the Share cells by distance from the band end (or from the killer's domain) instead of the centroid.",
+    "Band width: 0.45 u half width (0.9 u, the pearl's diameter, about 7 cells). The designer may want it wider or thinner (SimConfig.InheritanceBandHalfWidth); no SaveData / command line switch was added (Runtime work was out of scope), the default applies to rounds, attract and probe.",
+    "Forced cuts never bridge: fine for tests; if a future game mode spawns sparks without contact (power-ups), it should record a cut geometry.",
+    "Severed inherited land snaps out through the victim's evaporation (no dedicated visual, sound or toast for TerritorySevered or InheritanceBridged beyond the sweep): a toast such as 'Ton domaine s'étend jusqu'à ...' could be added by the UI owners.",
+    "The killer's thread restarts at Q without an Exit event: ThreadView draws its neck at Q, inside the band (cosmetic)."
+  ],
+  "contract_issues": [
+    "Contract 29 called inherited land an island that rule v1.5 never judges; section 30 overrides it in KillInheritance rounds.",
+    "Numbering: 'rule v1.6' (section 30) is the third rule change after v1.4 and v1.5, while 'contract v1.6' is the wave C amendment (section 26); the header records both."
+  ],
+  "needs": [
+    "Parent: rebuild the players (Build/Windows, Android, Play) and run the probe: expected classic 246577239DE179C4 unchanged; Feu traited probe 1F733FBFBED2D3A9 (equal at -fps 30 and 144)."
+  ]
+}

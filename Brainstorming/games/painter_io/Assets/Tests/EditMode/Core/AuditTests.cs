@@ -675,6 +675,10 @@ namespace PainterIO.Tests
         public void R18_PocketCellsClaimedByASimultaneousReturnKeepTheirPreviousOwner()
         {
             var b = new SimBuilder(60);
+            // Rule v1.8 (contract 32): the synthetic pocket lies far from A's land and trail (a real pocket always lies on
+            // the trail), so the single-domain rule would sever it as an island; this test is about R18, so it runs with
+            // the pre-v1.8 rules.
+            b.Config.SingleDomain = SingleDomainRule.Off;
             b.AddRect(-8, -8, 0, 8, V(-4, H), West, new ConstantHeadingController(West));
             int pc = b.AddRect(14, -6, 20, 6, V(17, H), East, new ConstantHeadingController(East));
             Simulation sim = b.Build();

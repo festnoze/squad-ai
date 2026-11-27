@@ -5,7 +5,8 @@
 // reading the same globals as LiquidComposite (territory field, wide relief field, actor field, pocket mask, palette,
 // fade) plus the biome globals (_PIO_RevealTime, _PIO_Now, _PIO_SecondaryColors). Emissive look, no relief shading:
 // - Ground: very dark blue-black with a faint hexagonal circuit grid (traces and vias) that lights up softly, tinted by
-//   the nearby player, close to territories; a cool neon line marks the arena edge, the outside is darker.
+//   the nearby player, close to territories; a yellow neon line marks the arena edge, the outside is a flat light grey (shared
+//   PIO_ArenaFrame, CountryDistance.hlsl).
 // - Territory: an electrified plasma field. Interior = dimmed neon surface with a slowly flowing hex pattern; edge = a
 //   bright neon rim with crawling micro arcs (jagged noise re-rolled at 12 Hz) and occasional small lightning arcs that
 //   hop along the border (a random spot per 3.2 u cell, re-drawn every 0.38 s). A colored glow halo outside the edge
@@ -26,9 +27,16 @@
 // - Pending pockets: dashed neon diagonal lines (marching), no rim, no flow, so home stays identifiable.
 // - Elimination (_PIO_PlayerFade): short circuit. The territory keeps its shape, surges, flickers (9 Hz, half contrast,
 //   local only: no strobing) while its micro arcs intensify, blacks out, then disappears when the fade ends.
+// - Biome traits (wave D-2 traits-fx, docs/BIOME_TRAITS.md 5 and 7, generic: any trait may run in this biome):
+//   - Rim: with Propagation a territory may reach the border of the grid (the arena's straight sides): the narrow and
+//     wide fields are limited by a straight edge lying on the border, so the plasma ends there with its neon rim.
+//   - Scorched ground (ScorchedEarth): a dead, burnt circuit (traces dark and broken, charred blotches, a rare dying
+//     spark). The scorch level is the G channel of the reveal fetch: no extra fetch.
+//   - Growth (Propagation, _PIO_GrowPulse): the rim of a growing territory crackles more (denser, brighter micro arcs)
+//     and its halo swells a little while its ring creeps out; no discharge (that stays the capture's).
 // Fetch budget (Medium): territory field 1, wide relief 1, pocket 1, reveal 1, actor 1 (5 without actors); the actor
 // path adds the jittered core fetch (6). High uses B-spline fetches of the territory field and the pocket mask. The
-// interior arcs (wave D) are pure arithmetic: no fetch added.
+// interior arcs (wave D) are pure arithmetic: no fetch added. Wave D-2 adds no fetch.
 // Cost (wave C): the ground runs only where cT < 1, the plasma surface only where cT > 0 and the micro arcs only near
 // the borders (dynamic branches, derivatives all taken before them); the fill discharge and the hopping arcs were
 // already branched. Wave D: the interior arcs run inside the plasma branch, in their own branch, and visit the 2 x 2
@@ -68,6 +76,23 @@
 #define PIOE_ARC_HZ_LOW 3.0           // Low: slow re-roll (static-ish arcs)
 #define PIOE_ARC_MEDIUM 0.5           // density scale on Medium (F3: Medium halves the density)
 #define PIOE_ARC_LOW 0.25             // density scale on Low (a few arcs)
+#define PIOE_GROW_ARCS 0.6            // wave D-2: a growing rim's micro arcs are this much brighter (fraction) ...
+#define PIOE_GROW_SEG 0.18            // ... and this much denser (segment threshold shift)
+#define PIOE_BURNT float3(0.022, 0.016, 0.014)   // wave D-2: linear color of a charred blotch on a dead circuit
+
+// Wave D-2 rim (header): signed distance (world units, > 0 outside) to the border of the grid rectangle. No derivative.
+float PIOE_GridBorder(float2 w)
+{
+    float2 halfR = _PIO_ArenaRect.zw * 0.5;
+    float2 q = abs(w - (_PIO_ArenaRect.xy + halfR)) - halfR;
+    return max(q.x, q.y);
+}
+
+// Logistic approximation of the standard normal CDF: the profile of a blurred straight edge.
+float PIOE_EdgeProfile(float x)
+{
+    return 1.0 / (1.0 + exp(-1.702 * x));
+}
 
 float PIOE_Max4(float4 v)
 {
@@ -192,10 +217,10 @@ float4 PIOE_SampleBSpline(TEXTURE2D_PARAM(tex, smp), float2 uv, float4 texel)
 
 // The circuit board: dark blue-black, a faint hex grid of traces with vias, lit and tinted near territories. pix = world
 // units per pixel, taken by the caller outside the dynamic branch this runs in (no derivative in here, wave C).
-float3 PIOE_Ground(float2 w, float time, float near, float3 tint, float pix)
+// Wave D-2: scorch = the scorch level (ScorchedEarth): there the circuit is dead and burnt (PIOE_DeadCircuit).
+float3 PIOE_Ground(float2 w, float time, float near, float3 tint, float pix, float scorch)
 {
     float sd = PIOE_ArenaSdf(w);
-    float inArena = saturate(0.5 - sd / pix);
 
     float mottle = PIOE_Noise(w * 0.9 + 31.0) - 0.5;
     float3 base = _PIO_GroundColor.rgb * (1.0 + 0.35 * mottle);
@@ -216,13 +241,29 @@ float3 PIOE_Ground(float2 w, float time, float near, float3 tint, float pix)
     float lit = 0.18 + 3.5 * near;
     float3 circuit = float3(0.010, 0.022, 0.055) * lit * shimmer;
     float3 inside = base + (trace * 0.85 + via + pad * 0.7) * circuit + (trace + via) * tint * near * 0.16;
+    // Wave D-2 dead circuit (ScorchedEarth), in its own branch: no cost without a scorch.
+    [branch] if (scorch > 0.002)
+    {
+        float rag = PIOE_Noise(w * 2.2 + 11.0) * 0.6 + PIOE_Noise(w * 5.9 - 4.0) * 0.4;
+        float edge = scorch - 0.5 + 0.45 * (rag - 0.5);
+        float cover = saturate(edge / max(0.08, 2.0 * pix) + 0.5);
+        // Dead traces: dark, broken where a noise says the copper burnt through; vias charred.
+        float broken = step(0.42, PIOE_Noise(w * 3.1 + float2(cellHash * 7.0, 2.0)));
+        float3 deadTrace = float3(0.030, 0.026, 0.024) * trace * broken + float3(0.010, 0.008, 0.007) * (via + pad);
+        float blotch = smoothstep(0.45, 0.8, PIOE_Noise(w * 0.95 + 23.0));
+        float3 dead = lerp(base * float3(0.75, 0.68, 0.62), PIOE_BURNT, blotch * 0.8) + deadTrace;
+        // A rare dying spark: a tiny orange-blue point that blinks on one cell for a moment.
+        float slot = floor(time * 2.3 + cellHash * 5.0);
+        float pick = PIOE_Hash(h.zw * 3.7 + slot * 1.31);
+        float sparkOn = step(0.93, pick) * smoothstep(0.6, 1.0, scorch);
+        float sr = saturate(1.0 - r / 0.12);
+        dead += lerp(float3(0.9, 0.42, 0.12), float3(0.35, 0.6, 1.0), frac(pick * 13.0)) * (sparkOn * sr * sr * 0.8);
+        inside = lerp(inside, dead, cover);
+    }
 
-    // Arena edge: a soft cool neon line, the darker outside beyond it.
-    float rimLine = exp(-abs(sd) / 0.045) * 0.10 + exp(-max(sd, 0.0) / 0.5) * 0.015 * inArena;
+    // Arena edge: the shared frame (flat light grey outside, yellow neon line: CountryDistance.hlsl).
     float innerShade = 1.0 - 0.35 * (1.0 - smoothstep(0.0, 1.2, -sd));
-    float3 outside = _PIO_OutsideColor.rgb * (1.0 + 0.2 * mottle);
-    float3 g = lerp(outside, inside * innerShade, inArena);
-    return g + float3(0.05, 0.16, 0.42) * rimLine;
+    return PIO_ArenaFrame(inside * innerShade, sd, pix, time);
 }
 
 // 32-bit integer mixer (lowbias32).
@@ -370,12 +411,19 @@ void PIO_ElectricCompositeSG_float(float4 VertexColor, float2 UV1, out float3 Ba
         tRaw = SAMPLE_TEXTURE2D_LOD(_PIO_TerritoryField, sampler_PIO_TerritoryField, uvT, 0);
         pocket = SAMPLE_TEXTURE2D_LOD(_PIO_PocketMask, sampler_PIO_PocketMask, uvT, 0);
     }
+    // Wave D-2 rim (header): a territory that reaches the grid border ends there (narrow and wide profiles).
+    float dB = PIOE_GridBorder(w);
+    tRaw = min(tRaw, PIOE_EdgeProfile(-dB / PIO_WALL_SIGMA_NARROW));
     // Short circuit: a fading player keeps its full shape until the very end of the fade (the color blacks out instead).
     float4 fade = _PIO_PlayerFade;
     float4 shapeFade = saturate(fade * 25.0);
     float4 t = tRaw * shapeFade;
-    float wide = SAMPLE_TEXTURE2D_LOD(_PIO_TerritoryHeight, sampler_PIO_TerritoryHeight, uvT, 0).w;
-    float rev = SAMPLE_TEXTURE2D_LOD(_PIO_RevealTime, sampler_PIO_RevealTime, uvT, 0).r;
+    float wide = min(SAMPLE_TEXTURE2D_LOD(_PIO_TerritoryHeight, sampler_PIO_TerritoryHeight, uvT, 0).w,
+                     PIOE_EdgeProfile(-dB / PIO_WALL_SIGMA_WIDE));
+    // Wave D-2: the reveal fetch also carries the scorch level in G (ScorchedEarth); none past the grid border.
+    float2 revRG = SAMPLE_TEXTURE2D_LOD(_PIO_RevealTime, sampler_PIO_RevealTime, uvT, 0).rg;
+    float rev = revRG.x;
+    float scorch = revRG.y * saturate(0.5 - dB / pix);
 
     float4 mj = PIOE_ArgmaxMask(t);
     float tj = dot(t, mj);
@@ -443,13 +491,15 @@ void PIO_ElectricCompositeSG_float(float4 VertexColor, float2 UV1, out float3 Ba
     float arcMask = smoothstep(0.80, 0.93, tj) * (1.0 - pocketCover);
 
     // ---- Ground, only where the territory does not fully cover the pixel (cT is exactly 1 inside it) -------------------
+    // Wave D-2 growth (Propagation): the envelope of the territory under or nearest to the pixel.
+    float growJ = dot(_PIO_GrowPulse, mj);
     float3 ground = float3(0.0, 0.0, 0.0);
     [branch] if (cT < 1.0)
     {
-        ground = PIOE_Ground(w, time, near, tint, pix);
-        // Colored glow halo just outside the edges (separates the layers).
+        ground = PIOE_Ground(w, time, near * (1.0 - 0.85 * saturate(scorch)), tint, pix, scorch);
+        // Colored glow halo just outside the edges (separates the layers); it swells a little while the rim grows.
         float halo = pow(saturate(wide * 1.6), 1.6) * (1.0 - cT);
-        ground += tint * halo * 0.30 * lerp(1.0, level, dying);
+        ground += tint * halo * (0.30 + 0.22 * growJ) * lerp(1.0, level, dying);
     }
 
     // ---- Plasma surface, only where the territory shows (cT is exactly 0 off it): the lerp result is unchanged ---------
@@ -537,8 +587,9 @@ void PIO_ElectricCompositeSG_float(float4 VertexColor, float2 UV1, out float3 Ba
         float n2 = low ? 0.0 : PIOE_Noise(w * 15.0 - tq * 9.7) - 0.5;
         float arcT = tj + n1 * 0.22 + n2 * 0.08;
         float arcLine = saturate((0.022 - abs(arcT - 0.43)) / arcAA + 0.5);
-        float seg = smoothstep(0.52, 0.74, PIOE_Noise(w * 1.1 + float2(time * 0.9, -time * 0.55)));
-        float micro = arcLine * seg * smoothstep(0.2, 0.32, tj) * (1.0 + 2.5 * dying * level);
+        float segShift = PIOE_GROW_SEG * growJ;                       // wave D-2: a growing rim crackles more
+        float seg = smoothstep(0.52 - segShift, 0.74 - segShift, PIOE_Noise(w * 1.1 + float2(time * 0.9, -time * 0.55)));
+        float micro = arcLine * seg * smoothstep(0.2, 0.32, tj) * (1.0 + 2.5 * dying * level + PIOE_GROW_ARCS * growJ);
         color += (secJ * 1.5 + colJ * 0.5) * micro * lerp(1.0, level, dying);
     }
 

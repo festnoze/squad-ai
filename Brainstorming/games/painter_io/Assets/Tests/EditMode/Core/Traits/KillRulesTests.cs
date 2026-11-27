@@ -70,7 +70,9 @@ namespace PainterIO.Tests
             Assert.AreEqual(13, (int)SimEventType.SpeedBoosted);
             Assert.AreEqual(14, (int)SimEventType.ShieldStarted);
             Assert.AreEqual(15, (int)SimEventType.ShieldEnded);
-            Assert.AreEqual(16, Enum.GetValues(typeof(SimEventType)).Length);
+            Assert.AreEqual(16, (int)SimEventType.TerritorySevered, "rule v1.5 (contract 29), appended after the kill events");
+            Assert.AreEqual(17, (int)SimEventType.InheritanceBridged, "rule v1.6 (contract 30), appended after TerritorySevered");
+            Assert.AreEqual(18, Enum.GetValues(typeof(SimEventType)).Length);
         }
 
         // ------------------------------------------------------------------------------------------------------------
@@ -90,10 +92,14 @@ namespace PainterIO.Tests
         public void KillRules_ClassicRoundsReproduceThePreTraitHashWhateverSparkFollowsVictimSpeed()
         {
             // TraitsClassicTests pins seven rows with the default config; here the 7.1 switch must not matter either.
-            Assert.AreEqual(0x8CB763231AC73608UL.ToString("X16"),
+            // Rule v1.5 (contract 29): with the default SeveredTerritory (Neutral) the seed 1 round is C042710F17995DCB (it
+            // was the pre-trait 8CB763231AC73608, still the value with SeveredTerritory = Off, pinned in TraitsClassicTests).
+            // Rule v1.8 (contract 32): C042710F17995DCB is now the value with SingleDomain = Off; the default is
+            // TraitsClassicTests.ClassicSeed1V18.
+            Assert.AreEqual(TraitsClassicTests.ClassicSeed1V18.ToString("X16"),
                             TraitTestKit.RollingRoundHash(ClassicRound(1UL, 60, true, null, false), 30, false).ToString("X16"),
                             "SparkFollowsVictimSpeed = false, classic");
-            Assert.AreEqual(0x8CB763231AC73608UL.ToString("X16"),
+            Assert.AreEqual(TraitsClassicTests.ClassicSeed1V18.ToString("X16"),
                             TraitTestKit.RollingRoundHash(ClassicRound(1UL, 60, true, null, true), 30, false).ToString("X16"),
                             "SparkFollowsVictimSpeed = true (default), classic");
         }

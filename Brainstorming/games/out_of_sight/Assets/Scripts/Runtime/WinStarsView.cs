@@ -14,16 +14,19 @@ namespace OutOfSight
     /// apart);</item>
     /// <item>from <see cref="Tuning.StarsAnimFirstFill"/>, each earned star fills one after the other
     /// (<see cref="Tuning.StarsAnimFillGap"/> apart): it punches in from <see cref="Tuning.StarsAnimPunchScale"/> down to 1 with an
-    /// overshoot, flashing white to gold, over a glow, inside an expanding ring, with sparkles flying out and a short shake
-    /// of the row; the owner plays the rising chime (<see cref="Sfx.PlayStarChime"/>). The third star's finish is bigger:
-    /// more and faster sparkles, a wider ring, a stronger shake, a pulse of the whole row and the chord chime;</item>
+    /// overshoot, white-hot at first (a white silhouette over it fading out, <see cref="Stars.StarFlash"/>), over a glow,
+    /// inside an expanding ring, with sparkles flying out and a short shake of the row; the owner plays the rising chime
+    /// (<see cref="Sfx.PlayStarChime"/>). The third star's finish is bigger: more and faster sparkles, a wider ring, a
+    /// stronger shake, a pulse of the whole row and the chord chime (and the HUD's confetti, <see cref="WinConfettiView"/>);</item>
     /// <item>an unearned star stays empty: a small squash of its slot and a soft tick (<see cref="Sfx.PlayStarDull"/>).</item>
     /// </list>
+    /// STAR3D (2026-11-27): the stars and the slots are bevelled 3D sprites in their own colours (<see cref="Stars.StarLarge"/>,
+    /// <see cref="Stars.StarSlot"/>), shown untinted (<see cref="FilledTint"/>).
     /// <see cref="Complete"/> settles everything at once (a tap, a click, Enter: the HUD calls it), with at most one chime.
     /// Not a component: <see cref="Hud"/> owns one and drives it from its Update with unscaled time, like the gauges.
-    /// Cheap on a phone: 12 star, ring and glow images and a pool of <see cref="SparklePool"/> sparkles, built once under a
-    /// nested Canvas of their own (only it rebuilds while the reveal plays); nothing is allocated per frame (scales, colours,
-    /// positions and rotations are structs, the random draws come from one System.Random built here).
+    /// Cheap on a phone: 15 star, flash, ring and glow images and a pool of <see cref="SparklePool"/> sparkles, built once
+    /// under a nested Canvas of their own (only it rebuilds while the reveal plays); nothing is allocated per frame (scales,
+    /// colours, positions and rotations are structs, the random draws come from one System.Random built here).
     /// </summary>
     public sealed class WinStarsView
     {
@@ -52,6 +55,12 @@ namespace OutOfSight
         private const float PulseSeconds = 0.32f;
         private const float SparkleDrag = 3.2f;
         private const float SparkleGravity = 520f;
+
+        /// <summary>
+        /// STAR3D: an earned star's settled tint. White: the 3D sprite carries its own gold shading (a gold tint would
+        /// darken it and kill its white gloss).
+        /// </summary>
+        public static readonly Color FilledTint = Color.white;
 
         private static readonly Color FlashWhite = new Color(1f, 0.98f, 0.9f, 1f);
         private static readonly Color GlowTint = new Color(1f, 0.86f, 0.45f, 1f);
@@ -118,6 +127,7 @@ namespace OutOfSight
 
         private readonly Image[] slots;
         private readonly Image[] fills;
+        private readonly Image[] flashes;
         private readonly Image[] glows;
         private readonly Image[] rings;
         private readonly Image[] sparkles = new Image[SparklePool];
@@ -156,6 +166,7 @@ namespace OutOfSight
             int n = Mathf.Max(1, Tuning.StarsPerLevel);
             slots = new Image[n];
             fills = new Image[n];
+            flashes = new Image[n];
             glows = new Image[n];
             rings = new Image[n];
             centres = new Vector2[n];
@@ -185,7 +196,8 @@ namespace OutOfSight
                     ? new Vector2((i - 1) * side, middle ? 0f : -MiddleRaise)
                     : new Vector2((i - (n - 1) * 0.5f) * (SideSize + StarGap), 0f);
             }
-            // Drawing order: glows behind everything, then the slots, the gold stars, the rings, the sparkles in front.
+            // Drawing order: glows behind everything, then the slots, the gold stars, their flashes, the rings, the sparkles in
+            // front.
             for (int i = 0; i < n; i++)
             {
                 glows[i] = NewImage(name + "Glow" + i, ProceduralArt.SoftGlow, centres[i], sizes[i] * 1.6f);
@@ -199,6 +211,11 @@ namespace OutOfSight
             {
                 fills[i] = NewImage(name + i, Stars.StarLarge, centres[i], sizes[i]);
                 fills[i].preserveAspect = true;
+            }
+            for (int i = 0; i < n; i++)
+            {
+                flashes[i] = NewImage(name + "Flash" + i, Stars.StarFlash, centres[i], sizes[i]);
+                flashes[i].preserveAspect = true;
             }
             for (int i = 0; i < n; i++)
             {
@@ -383,6 +400,7 @@ namespace OutOfSight
             FillsFired++;
             bool final = k == slots.Length - 1 && slots.Length == 3;
             fills[k].enabled = true;
+            flashes[k].enabled = true;
             glows[k].enabled = true;
             rings[k].enabled = true;
             SpawnSparkles(k, final ? SparklesFinal : SparklesPerStar, final);
@@ -426,9 +444,22 @@ namespace OutOfSight
             float u = Mathf.Clamp01(age / Mathf.Max(0.01f, Tuning.StarsAnimPunchSeconds));
             float s = Mathf.LerpUnclamped(Tuning.StarsAnimPunchScale, 1f, EaseOutBack(u));
             fills[i].rectTransform.localScale = new Vector3(s, s, 1f);
-            Color c = Color.Lerp(FlashWhite, Stars.Gold, Mathf.Clamp01(u * 1.5f));
+            Color c = FilledTint;
             c.a = Mathf.Clamp01(u * 5f);
             fills[i].color = c;
+            // STAR3D: the white-hot flash, the star's white silhouette over it, fading out over the first 0.55 of the punch.
+            float f = 1f - Mathf.Clamp01(u * 1.8f);
+            if (f > 0f)
+            {
+                flashes[i].rectTransform.localScale = new Vector3(s, s, 1f);
+                Color fc = FlashWhite;
+                fc.a = 0.95f * f * Mathf.Sqrt(f);
+                flashes[i].color = fc;
+            }
+            else if (flashes[i].enabled)
+            {
+                flashes[i].enabled = false;
+            }
 
             float g = age / GlowSeconds;
             if (g < 1f)
@@ -568,17 +599,18 @@ namespace OutOfSight
                 bool lit = i < Count;
                 fills[i].enabled = lit;
                 fills[i].rectTransform.localScale = Vector3.one;
-                fills[i].color = lit ? Stars.Gold : Color.clear;
+                fills[i].color = lit ? FilledTint : Color.clear;
             }
             Root.anchoredPosition = basePosition;
             Root.localScale = Vector3.one;
         }
 
-        /// <summary>Every glow, ring and sparkle gone, the shake and the pulse stopped.</summary>
+        /// <summary>Every flash, glow, ring and sparkle gone, the shake and the pulse stopped.</summary>
         private void KillEffects()
         {
             for (int i = 0; i < glows.Length; i++)
             {
+                flashes[i].enabled = false;
                 glows[i].enabled = false;
                 rings[i].enabled = false;
             }

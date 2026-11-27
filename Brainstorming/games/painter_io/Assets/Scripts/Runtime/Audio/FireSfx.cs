@@ -9,6 +9,7 @@
 //   Caught      burst      an explosive burst: noise closing down, a low boom, falling debris crackles
 //   LoopLost    fizzle     contract 24: the saved fuse fizzles out (falling hiss, sputters, a soft sagging tone)
 //   Ambient     crackle    seamless 4 s loop: a quiet low roar of embers with random crackles and snaps
+//   Grow        spread     wave D-2 (optional Grow slot): flames licking outward, a soft rising roar with thin crackles
 // Pure C# DSP in doubles with deterministic noise (the same samples on every call and platform). Every one-shot ends on
 // an exact zero; every clip is normalized to SfxSynth.PeakTarget; the loops join seamlessly (wrapped events, filters
 // primed over one full pass).
@@ -33,10 +34,11 @@ namespace PainterIO.Runtime
             Burst = 5,
             Fizzle = 6,
             Crackle = 7,
+            Spread = 8,   // wave D-2: the optional Grow slot (SfxSlot.Grow)
         }
 
-        /// <summary>Number of Clip values.</summary>
-        public const int ClipCount = 8;
+        /// <summary>Number of Clip values (slot k is Clip k, the extra Grow slot included).</summary>
+        public const int ClipCount = 9;
 
         /// <summary>Length of the seamless fuse hiss loop (two surges per loop, like the liquid spark loop's pulses).</summary>
         public const double FuseLoopSeconds = 0.5;
@@ -56,6 +58,7 @@ namespace PainterIO.Runtime
             0.62,                 // Burst
             0.62,                 // Fizzle
             AmbientLoopSeconds,   // Crackle
+            0.62,                 // Spread
         };
 
         public BiomeId Biome => BiomeId.Fire;
@@ -68,24 +71,25 @@ namespace PainterIO.Runtime
         public AudioClip Caught { get; private set; }
         public AudioClip LoopLost { get; private set; }
         public AudioClip Ambient { get; private set; }
+        public AudioClip Grow { get; private set; }
 
         /// <summary>
-        /// Builds the eight clips now: BuildSlot of each slot of Synthesize(sampleRate) (a clip that fails stays null and
-        /// is logged; the others still play).
+        /// Builds the nine clips now (the eight base slots and Grow): BuildSlot of each slot of Synthesize(sampleRate) (a
+        /// clip that fails stays null and is logged; the others still play).
         /// </summary>
         public void Build(int sampleRate)
         {
             SfxClipSamples samples = Synthesize(sampleRate);
-            for (int k = 0; k < SfxClipSamples.SlotCount; k++) BuildSlot(samples, (SfxSlot)k);
+            for (int k = 0; k < SfxClipSamples.AllSlotCount; k++) BuildSlot(samples, (SfxSlot)k);
         }
 
-        /// <summary>The samples of the eight clips (pure C#, thread-safe; slot k is Clip k).</summary>
+        /// <summary>The samples of the nine clips (pure C#, thread-safe; slot k is Clip k).</summary>
         public SfxClipSamples Synthesize(int sampleRate)
         {
             int rate = sampleRate >= 8000 ? sampleRate : SfxSynth.SampleRate;
             var samples = new SfxClipSamples(BiomeId.Fire, rate);
             System.Diagnostics.Stopwatch watch = System.Diagnostics.Stopwatch.StartNew();
-            for (int k = 0; k < ClipCount; k++)
+            for (int k = 0; k < SfxClipSamples.AllSlotCount; k++)
             {
                 try
                 {
@@ -114,6 +118,7 @@ namespace PainterIO.Runtime
                 case SfxSlot.TensionLoop: TensionLoop = clip; break;
                 case SfxSlot.Caught: Caught = clip; break;
                 case SfxSlot.LoopLost: LoopLost = clip; break;
+                case SfxSlot.Grow: Grow = clip; break;
                 default: Ambient = clip; break;
             }
         }
@@ -151,6 +156,7 @@ namespace PainterIO.Runtime
                 case Clip.Burst: return s.Burst();
                 case Clip.Fizzle: return s.Fizzle();
                 case Clip.Crackle: return s.Crackle();
+                case Clip.Spread: return s.Spread();
                 default: throw new ArgumentOutOfRangeException(nameof(c), c, "unknown fire clip");
             }
         }
@@ -412,6 +418,34 @@ namespace PainterIO.Runtime
                     b[i] = roar[i] * scale * breath + popsF[i];
                 }
                 return Finish(0.0, 0.8, true);
+            }
+
+            // Spread (wave D-2, the optional Grow slot): the fire licks outward over new ground. A soft roar of
+            // band-passed noise rising and opening, thin crackles thickening then thinning out, no low thump (it plays at
+            // -18 dB under the game, so it must not mask anything).
+            public float[] Spread()
+            {
+                double dur = (double)N / rate;
+                var noise = new Noise(0x5E2EADUL);
+                var band = new Svf();
+                var high = new Svf();
+                for (int i = 0; i < N; i++)
+                {
+                    double t = T(i);
+                    double env = Swell(t, 0.24, dur);
+                    double x = noise.Next();
+                    band.Process(x, 700.0 * Math.Pow(2400.0 / 700.0, Math.Min(1.0, t / 0.45)), 0.9, rate, out _, out double bp, out _);
+                    high.Process(x, 3800.0, 1.6, rate, out _, out double bp2, out _);
+                    b[i] += env * (0.9 * bp + 0.25 * bp2);
+                }
+                var rnd = new Noise(0x5E2EAEUL);
+                for (int k = 0; k < 18; k++)
+                {
+                    double at = 0.03 + 0.5 * Unit(rnd);
+                    Click(at, (0.12 + 0.25 * Unit(rnd)) * Swell(at, 0.24, dur), 0.001 + 0.0015 * Unit(rnd), 0xB100UL + (ulong)k);
+                }
+                LowPass(7000, false);
+                return Finish(0.08, 0.9, false);
             }
 
             // ---- DSP helpers ---------------------------------------------------------------------------------------

@@ -73,6 +73,34 @@ namespace PainterIO.Core
         private readonly double[] pickupIn, pickupOut;
         private readonly List<double> pickupTimes = new List<double>();
 
+        // Rule v1.5 (contract 29), per player index: the victims of one step a, the cells each lost to other players, the
+        // anchor cell (taken on the grid before the captures), the index of its own return in the step (-1 when none),
+        // and the split analysis (severed cells with the cutter of their group).
+        private readonly bool[] severVictim;
+        private readonly List<int>[] severLost;
+        private readonly int[] severAnchor, severOwnReturn;
+        private readonly List<int>[] severCells, severCutter;
+        private readonly List<int> severScratch = new List<int>();
+
+        // Rule v1.6 (single domain and kill inheritance bridge, contract 30). singleDomain is fixed for the round
+        // (Simulation.SingleDomain: KillInheritance with Share > 0 and SimConfig.InheritanceBridge not Off, or rule v1.8);
+        // none of the code below runs otherwise. Rule v1.8 (contract 32): linkBands = SimConfig.SingleDomain On, the
+        // guarantee in every round type (closures take the band of their trail, LinkCapture); inheritanceJoin = the v1.6
+        // kill inheritance path (KillInheritance attached with Share > 0). With SingleDomain Off both keep the v1.6 meaning,
+        // so classic rounds and the other trait sets keep their exact pre-v1.8 behaviour.
+        private readonly bool singleDomain;
+        private readonly bool linkBands;
+        private readonly bool inheritanceJoin;
+        private readonly List<int> linkExtra = new List<int>();
+        private readonly List<int> domainSevered = new List<int>();
+        private readonly List<int> domainSeveredWithBand = new List<int>();
+        private readonly List<int> bandCells = new List<int>();
+        private readonly List<int> bandExtra = new List<int>();
+        private readonly List<Vec2d> bandLine = new List<Vec2d>();
+        private readonly List<int> bandWho = new List<int>(1);
+        private readonly List<int> footprint = new List<int>();
+        private CellMask bandMask;
+
         public EventResolver(Simulation sim)
         {
             this.sim = sim;
@@ -80,6 +108,9 @@ namespace PainterIO.Core
             grid = sim.Grid;
             players = sim.PlayerArray;
             n = players.Length;
+            singleDomain = sim.SingleDomain;
+            linkBands = singleDomain && cfg.SingleDomain == SingleDomainRule.On;
+            inheritanceJoin = singleDomain && sim.Inheritance != null && sim.Inheritance.Share > 0.0;
             p0 = new Vec2d[n];
             p1 = new Vec2d[n];
             growth = new double[n];
@@ -92,6 +123,18 @@ namespace PainterIO.Core
             pickupIn = new double[n];
             pickupOut = new double[n];
             pocketScratch = new CellMask(grid.Size);
+            severVictim = new bool[n];
+            severAnchor = new int[n];
+            severOwnReturn = new int[n];
+            severLost = new List<int>[n];
+            severCells = new List<int>[n];
+            severCutter = new List<int>[n];
+            for (int i = 0; i < n; i++)
+            {
+                severLost[i] = new List<int>();
+                severCells[i] = new List<int>();
+                severCutter[i] = new List<int>();
+            }
         }
 
         // ------------------------------------------------------------------------------------------------------------
@@ -118,6 +161,7 @@ namespace PainterIO.Core
             double stepLength = cfg.PawnSpeed * dt;
             double hold = cfg.BorderHoldAngleRad;
             bool speedTraits = sim.Behaviours.Length > 0;
+            bool rideOn = cfg.BorderRide == BorderRideRule.On;
             for (int i = 0; i < n; i++)
             {
                 PlayerState p = players[i];
@@ -143,7 +187,11 @@ namespace PainterIO.Core
                 double factor = p.SpeedMultiplier;
                 if (speedTraits) factor *= sim.SpeedFactorOf(p);
                 if (factor != 1.0) step = stepLength * factor;
-                Vec2d b = sim.Arena.Step(a, Vec2d.FromAngle(p.Heading) * step, hold);
+                // Rule v1.9 (contract 33): with the border ride on, BorderRide.Move replaces the R4 step (x BorderRideFactor
+                // and boundary following while riding). Off keeps the exact R4 call.
+                Vec2d b = rideOn
+                    ? BorderRide.Move(sim, p, a, step, hold, t0, dt)
+                    : sim.Arena.Step(a, Vec2d.FromAngle(p.Heading) * step, hold);
                 p0[i] = a;
                 p1[i] = b;
                 p.PrevPos = a;
@@ -222,6 +270,11 @@ namespace PainterIO.Core
                 p.Pos = pos;
                 p.Cell = CellAt(i, uStop);
                 if (p.Spark != null) p.Spark.S = SparkS(p.Spark, uStop);
+            }
+            // Rule v1.9 (contract 33): a spark or an elimination of this tick ends a ride.
+            if (cfg.BorderRide == BorderRideRule.On)
+            {
+                for (int i = 0; i < n; i++) BorderRide.EndOfTick(players[i]);
             }
         }
 
@@ -528,7 +581,7 @@ namespace PainterIO.Core
 
             StepReturns(t, uG);      // a
             StepSparkCatches(t);     // b
-            StepKillRewards();       // b, end: kill traits (docs/BIOME_TRAITS.md section 7)
+            StepKillRewards(t, uG);  // b, end: kill traits (docs/BIOME_TRAITS.md section 7), v1.6 bridge (contract 30)
             StepShieldEnds(t);       // b, end: shield ends (7.1), after a kill of this group may have extended the shield
             StepCuts(t);             // c
             StepLassos(t);           // d
@@ -558,9 +611,11 @@ namespace PainterIO.Core
             // R19: an eliminated player's rank is final now: 1 + players alive after its event group.
             for (int k = 0; k < eliminatedInGroup.Count; k++) sim.EliminatedRank[eliminatedInGroup[k]] = 1 + alive;
 
-            // g. Round end check, TimeUp last.
+            // g. Round end check, TimeUp last. Rule v1.7 (contract 31): the conquest goal ends the round after the
+            // last-survivor and all-eliminated checks and before TimeUp.
             if (n >= 2 && alive == 1) sim.EndRound(RoundEndReason.LastSurvivor, t);
             else if (alive == 0) sim.EndRound(RoundEndReason.AllEliminated, t);
+            else if (sim.ConquestReached()) sim.EndRound(RoundEndReason.Conquest, t);
             else if (timeUp) sim.EndRound(RoundEndReason.TimeUp, t);
         }
 
@@ -574,7 +629,9 @@ namespace PainterIO.Core
             return x.Attacker.CompareTo(y.Attacker);
         }
 
-        // a. Returns (R7, R18), then stolen home cells (R9), then players left with no cell (R9). A chased returner
+        // a. Returns (R7, R18), then severed territory (rule v1.5, contract 29), then the single domain of the returners
+        // (rule v1.6, contract 30, KillInheritance rounds only), then stolen home cells (R9), then players left with no cell
+        // (R9). A chased returner
         // (R13 v1.4, contract 24) is saved with an empty capture: its trail, spark and pocket are cleared, nothing is won.
         // A spark spawned less than eps before the return is a cut at closure (R14) and is cancelled first (unchased).
         private void StepReturns(double t, double uG)
@@ -590,6 +647,7 @@ namespace PainterIO.Core
             var points = new List<Vec2d>(returners);
             var us = new List<double>(returners);
             var captured = new List<int[]>(returners);
+            var linked = new List<bool>(returners);   // rule v1.8: the capture took the band of the trail (DomainLinks)
             for (int c = 0; c < group.Count; c++)
             {
                 Candidate cand = group[c];
@@ -601,6 +659,7 @@ namespace PainterIO.Core
                 who.Add(cand.Player);
                 points.Add(cand.Point);
                 us.Add(cand.U);
+                bool link = false;
                 // R13 / contract 24 (v1.4): a chased return survives but captures nothing. CaptureSolver is not called,
                 // the pending pocket is not validated (it is cleared below) and the empty set claims no cell in the R18
                 // conflict rule. Unchased returns: against the grid as it is now (R18). docs/BIOME_TRAITS.md 7.1: "chased"
@@ -610,10 +669,19 @@ namespace PainterIO.Core
                 else
                 {
                     int[] cells = ComputeCapture(cand.Player, cand.Point);
+                    // Rule v1.8 (contract 32): a closure whose capture would leave the domain in pieces (a lasso pocket or
+                    // a region that touches only the trail, a part joined only at a corner, a trail that leaves one piece
+                    // and enters another) also takes the band of its trail, which joins them. Rule v1.6 (contract 30,
+                    // SingleDomain Off): the trail footprint when the capture is not attached. Before the traits, so
+                    // Coalescence also fills the holes the band closes.
+                    if (linkBands) cells = LinkCapture(cand.Player, cand.Point, cand.U, cells, out link);
+                    else if (singleDomain && cells.Length > 0 && !TerritorySplit.GainAttached(grid, p.Id, cells))
+                        cells = WithTrailFootprint(cand.Player, cand.Point, cells);
                     // Traits (BIOME_TRAITS section 6, step a): unchased returns only, before the R18 conflict rule.
                     if (sim.Behaviours.Length > 0) cells = sim.AugmentCapture(p, cells);
                     captured.Add(cells);
                 }
+                linked.Add(link);
             }
             int m = who.Count;
             if (m == 0) return;
@@ -638,6 +706,8 @@ namespace PainterIO.Core
                 }
                 applied[r] = keep.ToArray();
             }
+            // Rule v1.5 (contract 29): the victims of these captures and their anchors, on the grid before it is written.
+            bool severing = cfg.SeveredTerritory != SeveredTerritoryRule.Off && CollectSevered(who, applied, m, uG);
             for (int r = 0; r < m; r++)
             {
                 byte id = players[who[r]].Id;
@@ -669,12 +739,21 @@ namespace PainterIO.Core
                 // Contract 23.2 D2: Captures counts only the returns that applied cells (after the R18 conflict rule);
                 // the Return event is still emitted for every return (a chased one with an empty Cells array).
                 if (applied[r].Length > 0) p.Captures++;
+                if (linked[r] && applied[r].Length > 0) p.DomainLinks++;
                 sim.Emit(new SimEvent
                 {
                     Type = SimEventType.Return, Time = t, Player = who[r], Point = points[r], Cells = applied[r],
                     Chased = chased, Margin = margin,
                 });
             }
+
+            // Rule v1.5 (contract 29): split territories keep one piece; the others are severed (TerritorySevered). The kept
+            // piece holds the victim's pawn when it stands on its land, so no home player's current cell is severed.
+            if (severing) ApplySevered(applied, t);
+
+            // Rule v1.6 (contract 30): every returner keeps one domain (a contested cell or a simultaneous capture can
+            // still leave a gained part apart).
+            if (singleDomain) KeepReturnersWhole(who, applied, m, severing, t, uG);
 
             // R9 / R18b: every alive home player (returners included) whose current cell at uG was just taken by one of
             // these returns starts an exit at its head. (A home player whose cell at uG is not its own for any other
@@ -712,6 +791,132 @@ namespace PainterIO.Core
                     if (bit < 64 && (victims[r] & (1UL << bit)) != 0 && (other < 0 || who[r] < other)) other = who[r];
                 }
                 Eliminate(i, EliminationCause.TerritoryLost, other, t, uG);
+            }
+        }
+
+        /// <summary>
+        /// Rule v1.5 (contract 29), before the captures of step a are written: every living player that loses cells to
+        /// another player's capture is a victim; its lost cells (ascending) and its anchor cell are recorded on the grid as
+        /// it is before the captures. False when nobody loses a cell to another player (the common case: nothing else runs).
+        /// </summary>
+        private bool CollectSevered(List<int> who, int[][] applied, int m, double uG)
+        {
+            bool any = false;
+            for (int i = 0; i < n; i++)
+            {
+                severVictim[i] = false;
+                severLost[i].Clear();
+                severOwnReturn[i] = -1;
+            }
+            for (int r = 0; r < m; r++)
+            {
+                severOwnReturn[who[r]] = r;
+                byte id = players[who[r]].Id;
+                int[] cells = applied[r];
+                for (int k = 0; k < cells.Length; k++)
+                {
+                    byte prev = grid.Cells[cells[k]];
+                    if (prev == OwnerGrid.Neutral || prev == OwnerGrid.Void || prev == id || prev > n) continue;
+                    int v = prev - 1;
+                    if (!players[v].Alive) continue;   // never true (a dead player owns no cell), kept as a guard
+                    severLost[v].Add(cells[k]);
+                    severVictim[v] = true;
+                    any = true;
+                }
+            }
+            if (!any) return false;
+            for (int v = 0; v < n; v++)
+            {
+                if (!severVictim[v]) continue;
+                severLost[v].Sort();
+                severAnchor[v] = AnchorCell(v, uG);
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Rule v1.5 anchor, on the grid before the captures: the pawn's current cell at uG when the player owns it (a home
+        /// player, or a returner on its return cell); a home player crossing out at this very instant: the last own cell of
+        /// its visit list (the cell it is leaving); a trailing player: the cell it left home from
+        /// (TerritorySplit.ExitCell of Trail.Points[0]). -1 when there is none.
+        /// </summary>
+        private int AnchorCell(int i, double uG)
+        {
+            PlayerState p = players[i];
+            int c = CellAt(i, uG);
+            if (grid.Cells[c] == p.Id) return c;
+            if (p.Home)
+            {
+                List<CellEntry> v = visits[i];
+                if (v.Count > 0)
+                {
+                    for (int k = IndexAt(v, uG) - 1; k >= 0; k--)
+                    {
+                        if (grid.Cells[v[k].Index] == p.Id) return v[k].Index;
+                    }
+                }
+                return grid.Cells[p.Cell] == p.Id ? p.Cell : -1;
+            }
+            return p.Trail.Count > 0 ? TerritorySplit.ExitCell(grid, p.Id, p.Trail.Points[0]) : -1;
+        }
+
+        /// <summary>
+        /// Rule v1.5, after the captures of step a and their Return events: every victim recorded by CollectSevered keeps
+        /// one piece of each territory the captures split (TerritorySplit.Find) and loses the others, which become neutral
+        /// (SeveredTerritoryRule.Neutral, scorch forgotten) or the cutter's (Capturer). Every victim is analysed first on the
+        /// grid left by the captures, then the changes are written, so with Capturer a cutter that is itself a victim of the
+        /// same group is judged on its own land only. One TerritorySevered event per victim and cutter (victims ascending,
+        /// then cutters ascending), cells ascending. A victim always keeps a piece, so nobody is eliminated here.
+        /// </summary>
+        private void ApplySevered(int[][] applied, double t)
+        {
+            bool anything = false;
+            for (int v = 0; v < n; v++)
+            {
+                severCells[v].Clear();
+                severCutter[v].Clear();
+                if (!severVictim[v] || !players[v].Alive) continue;
+                int r = severOwnReturn[v];
+                int[] gained = r >= 0 ? applied[r] : null;
+                if (TerritorySplit.Find(grid, players[v].Id, severLost[v], gained, severAnchor[v], severCells[v], severCutter[v]) > 0)
+                    anything = true;
+            }
+            if (!anything) return;
+
+            bool toCutter = cfg.SeveredTerritory == SeveredTerritoryRule.Capturer;
+            for (int v = 0; v < n; v++)
+            {
+                List<int> cells = severCells[v], cutters = severCutter[v];
+                int done = 0, previous = int.MinValue;
+                while (done < cells.Count)
+                {
+                    int cutter = int.MaxValue;
+                    for (int k = 0; k < cutters.Count; k++)
+                    {
+                        if (cutters[k] > previous && cutters[k] < cutter) cutter = cutters[k];
+                    }
+                    previous = cutter;
+                    severScratch.Clear();
+                    for (int k = 0; k < cells.Count; k++)
+                    {
+                        if (cutters[k] == cutter) severScratch.Add(cells[k]);
+                    }
+                    done += severScratch.Count;
+                    severScratch.Sort();
+                    int recipient = toCutter && cutter >= 0 && cutter < n && players[cutter].Alive ? cutter : -1;
+                    byte owner = recipient >= 0 ? players[recipient].Id : OwnerGrid.Neutral;
+                    ScorchedEarthTrait scorch = recipient < 0 ? sim.Scorch : null;
+                    for (int k = 0; k < severScratch.Count; k++)
+                    {
+                        grid.Set(severScratch[k], owner);
+                        scorch?.Forget(severScratch[k]);
+                    }
+                    sim.Emit(new SimEvent
+                    {
+                        Type = SimEventType.TerritorySevered, Time = t, Player = v, Other = cutter, Recipient = recipient,
+                        Cells = severScratch.ToArray(),
+                    });
+                }
             }
         }
 
@@ -768,6 +973,319 @@ namespace PainterIO.Core
             return cells ?? Array.Empty<int>();
         }
 
+        // ------------------------------------------------------------------------------------------------------------
+        // Rule v1.6: single domain and kill inheritance bridge (contract 30). Runs only when singleDomain is true.
+
+        /// <summary>
+        /// Rule v1.6, step a: the capture plus the trail footprint (the supercover raster of the whole trail up to the
+        /// crossing point, the footprint a closure gives a trail), minus own and Void cells, ascending. Used when the
+        /// capture alone would leave a part apart from the domain (TerritorySplit.GainAttached false): the trail joins the
+        /// exit, the entry and every captured part (a lasso pocket lies on the trail), as a trail that leaves one piece of the
+        /// domain and enters another closes the loop.
+        /// </summary>
+        private int[] WithTrailFootprint(int i, Vec2d crossing, int[] cells)
+        {
+            PlayerState p = players[i];
+            outlineInput.Clear();
+            IReadOnlyList<Vec2d> pts = p.Trail.Points;
+            for (int k = 0; k < p.Trail.Count; k++) outlineInput.Add(pts[k]);
+            if (outlineInput.Count == 0 || Vec2d.Distance(outlineInput[outlineInput.Count - 1], crossing) >= 1e-9) outlineInput.Add(crossing);
+            CellMask mask = BandMask();
+            mask.Clear();
+            GridRaster.RasterPolyline(grid, outlineInput, mask);
+            for (int k = 0; k < cells.Length; k++) mask.Set(cells[k]);
+            mask.CopyIndices(footprint);
+            byte[] owners = grid.Cells;
+            int w = 0;
+            for (int k = 0; k < footprint.Count; k++)
+            {
+                byte o = owners[footprint[k]];
+                if (o != p.Id && o != OwnerGrid.Void) footprint[w++] = footprint[k];
+            }
+            footprint.RemoveRange(w, footprint.Count - w);
+            return footprint.ToArray();
+        }
+
+        /// <summary>
+        /// Rule v1.8 (contract 32), step a, every round type: the capture of an unchased return, plus the band of its trail
+        /// when the capture alone would leave the returner's domain in pieces. Pieces are read with the capture counted as
+        /// the returner's (the grid is not written yet) and the piece of the return cell kept. When the domain plus the
+        /// capture is one 4-connected piece nothing changes (the common case: one flood, O(territory)). Otherwise the band
+        /// of the whole trail up to the crossing point (cells within InheritanceBandHalfWidth of it plus its supercover
+        /// raster, the v1.6 band, InheritanceBridge.BandCells) is added when it leaves fewer cells apart (8-connected
+        /// pieces first, then 4-connected ones, so a part joined only at a corner is linked too): it joins a detached
+        /// lasso pocket or region, a corner-joined region, and two separate pieces the trail goes between. The band is part
+        /// of the capture: R18 and rule v1.5 apply to it, cells of a living rival under it are taken (the trail is the only
+        /// line the player drew). Own and Void cells are left out; the result is ascending.
+        /// </summary>
+        private int[] LinkCapture(int i, Vec2d crossing, double u, int[] cells, out bool link)
+        {
+            link = false;
+            PlayerState p = players[i];
+            byte id = p.Id;
+            int anchor = CellAt(i, u);
+            if (grid.Cells[anchor] != id) anchor = -1;
+            linkExtra.Clear();
+            linkExtra.AddRange(cells);
+            domainSevered.Clear();
+            if (TerritorySplit.KeepOnePiece(grid, id, linkExtra, anchor, domainSevered, 4) <= 1) return cells;
+            int apart4 = domainSevered.Count;
+            domainSevered.Clear();
+            TerritorySplit.KeepOnePiece(grid, id, linkExtra, anchor, domainSevered);
+            int apart8 = domainSevered.Count;
+
+            outlineInput.Clear();
+            IReadOnlyList<Vec2d> pts = p.Trail.Points;
+            for (int k = 0; k < p.Trail.Count; k++) outlineInput.Add(pts[k]);
+            if (outlineInput.Count == 0 || Vec2d.Distance(outlineInput[outlineInput.Count - 1], crossing) >= 1e-9) outlineInput.Add(crossing);
+            CellMask mask = BandMask();
+            InheritanceBridge.BandCells(grid, outlineInput, cfg.InheritanceBandHalfWidth, mask, bandCells);   // leaves the band in mask
+            for (int k = 0; k < cells.Length; k++) mask.Set(cells[k]);
+            mask.CopyIndices(footprint);
+            byte[] owners = grid.Cells;
+            int w = 0;
+            for (int k = 0; k < footprint.Count; k++)
+            {
+                int c = footprint[k];
+                byte o = owners[c];
+                if (o != id && o != OwnerGrid.Void && RimSafe(c)) footprint[w++] = c;
+            }
+            footprint.RemoveRange(w, footprint.Count - w);
+
+            domainSevered.Clear();
+            TerritorySplit.KeepOnePiece(grid, id, footprint, anchor, domainSevered);
+            int band8 = domainSevered.Count;
+            bool better = band8 < apart8;
+            if (!better && band8 == apart8)
+            {
+                domainSevered.Clear();
+                TerritorySplit.KeepOnePiece(grid, id, footprint, anchor, domainSevered, 4);
+                better = domainSevered.Count < apart4;
+            }
+            if (!better) return cells;
+            link = true;
+            return footprint.ToArray();
+        }
+
+        private CellMask BandMask()
+        {
+            if (bandMask == null) bandMask = new CellMask(grid.Size);
+            return bandMask;
+        }
+
+        /// <summary>
+        /// Rule v1.6, end of step a: every returner that gained cells keeps one 8-connected domain. The cheap check
+        /// (TerritorySplit.GainAttached: every gained cell joins the cells it had) is exact while its territory was one
+        /// domain and lost nothing; with simultaneous returns, a severance of its own land or the Capturer option the full
+        /// labelling decides. A part apart from the piece of its return cell (else the largest piece) is severed (neutral).
+        /// </summary>
+        private void KeepReturnersWhole(List<int> who, int[][] applied, int m, bool severing, double t, double uG)
+        {
+            for (int r = 0; r < m; r++)
+            {
+                int i = who[r];
+                PlayerState p = players[i];
+                if (!p.Alive || applied[r].Length == 0) continue;
+                bool full = m >= 2 || (severing && (severVictim[i] || cfg.SeveredTerritory == SeveredTerritoryRule.Capturer));
+                if (!full && TerritorySplit.GainAttached(grid, p.Id, applied[r])) continue;
+                int cell = CellAt(i, uG);
+                int anchor = grid.Cells[cell] == p.Id ? cell : -1;
+                domainSevered.Clear();
+                if (TerritorySplit.KeepOnePiece(grid, p.Id, null, anchor, domainSevered) > 1) SeverPieces(i, domainSevered, t);
+            }
+        }
+
+        /// <summary>
+        /// Rule v1.6: the cells (ascending) become plain neutral (a running ScorchedEarth scorch is forgotten) and one
+        /// TerritorySevered event is raised (Player = the owner, Other = -1: no cutter, the single-domain rule severed them,
+        /// Recipient = -1).
+        /// </summary>
+        private void SeverPieces(int player, List<int> cells, double t)
+        {
+            if (cells.Count == 0) return;
+            ScorchedEarthTrait scorch = sim.Scorch;
+            for (int k = 0; k < cells.Count; k++)
+            {
+                grid.Set(cells[k], OwnerGrid.Neutral);
+                scorch?.Forget(cells[k]);
+            }
+            sim.Emit(new SimEvent
+            {
+                Type = SimEventType.TerritorySevered, Time = t, Player = player, Other = -1, Recipient = -1, Cells = cells.ToArray(),
+            });
+        }
+
+        /// <summary>
+        /// Rule v1.6, right after the kill traits of one kill gave the victim's land to the killer (KillInheritanceTrait
+        /// .LastInherited not empty). If the killer's territory is now several pieces: with InheritanceBridge = Bridge, the
+        /// band of the kill line is built (BuildBand) and applied when it joins the anchor's piece to inherited land
+        /// (ApplyBand: InheritanceBridged, the v1.5 split rule for third players, R9, the killer's trail cut at the cut
+        /// point); then the killer keeps the piece of its anchor (read on the grid before the inheritance: the v1.5 anchor,
+        /// else the largest piece) and every other piece is severed. Rule v1.8 (contract 32): with SingleDomain On this also
+        /// runs when InheritanceBridge is Off, which then behaves as AnchorOnly (no band, the island is severed).
+        /// </summary>
+        private void JoinInheritance(KillInfo kill, int anchor, double t, double uG)
+        {
+            int killer = kill.Killer;
+            byte id = players[killer].Id;
+            domainSevered.Clear();
+            if (TerritorySplit.KeepOnePiece(grid, id, null, anchor, domainSevered) <= 1) return;   // one domain already
+            if (cfg.InheritanceBridge == InheritanceBridgeRule.Bridge && BuildBand(kill, out double split))
+            {
+                bandExtra.Clear();
+                for (int k = 0; k < bandCells.Count; k++)
+                {
+                    if (grid.Cells[bandCells[k]] != id) bandExtra.Add(bandCells[k]);
+                }
+                if (bandExtra.Count > 0)
+                {
+                    domainSeveredWithBand.Clear();
+                    TerritorySplit.KeepOnePiece(grid, id, bandExtra, anchor, domainSeveredWithBand);
+                    if (BandJoins())
+                    {
+                        ApplyBand(kill, split, t, uG);
+                        domainSevered.Clear();
+                        if (players[killer].Alive) TerritorySplit.KeepOnePiece(grid, id, null, anchor, domainSevered);
+                    }
+                }
+            }
+            if (players[killer].Alive) SeverPieces(killer, domainSevered, t);
+        }
+
+        /// <summary>
+        /// The band is applied only when it joins pieces to the kept one (the anchor's piece, else the largest): no band cell
+        /// would be cut off (the band touches the kept piece) and fewer cells would be severed than without it. Before the
+        /// inheritance the killer had one domain, so the pieces it joins are inherited land.
+        /// </summary>
+        private bool BandJoins()
+        {
+            for (int k = 0; k < domainSeveredWithBand.Count; k++)
+            {
+                if (bandExtra.BinarySearch(domainSeveredWithBand[k]) >= 0) return false;
+            }
+            return domainSeveredWithBand.Count < domainSevered.Count;
+        }
+
+        /// <summary>
+        /// Builds the kill line and its band cells (bandCells). False when no bridge can be made: a forced cut (no contact
+        /// geometry); the killer still out on the exit that made the cut but that exit was cut since (v1.4: a cut exit never
+        /// becomes territory, ExitWasCut covers a running chase too); the killer home at the cut or back home since, and its
+        /// head point at the cut (Q) is no longer its cell (the line it made was taken since). split = the arc of Q on the
+        /// killer's current trail when the trail prefix [exit, Q] is part of the line (the trail is cut there), else 0.
+        /// </summary>
+        private bool BuildBand(KillInfo kill, out double split)
+        {
+            split = 0.0;
+            Spark spark = kill.Spark;
+            List<Vec2d> victimPrefix = kill.VictimPrefix;
+            if (spark == null || !spark.Linked || victimPrefix == null || victimPrefix.Count == 0) return false;
+            PlayerState k = players[kill.Killer];
+            byte id = k.Id;
+            bandLine.Clear();
+            if (spark.AttackerEpoch >= 0 && !k.Home && k.Trail.Count > 0 && k.Trail.Epoch == spark.AttackerEpoch)
+            {
+                if (k.ExitWasCut) return false;
+                double s = spark.AttackerArc - (k.Trail.Dropped - spark.AttackerDropped);
+                if (s > Trail.MinPointSpacing)
+                {
+                    InheritanceBridge.AppendPrefix(k.Trail, s, bandLine);
+                    split = Math.Min(s, k.Trail.Length);
+                }
+                else
+                {
+                    // The cut point lies on a part of this exit that already became territory (an earlier bridge).
+                    if (!OwnsPoint(id, spark.AttackerHead)) return false;
+                    bandLine.Add(spark.AttackerHead);
+                }
+            }
+            else
+            {
+                if (!OwnsPoint(id, spark.AttackerHead)) return false;
+                bandLine.Add(spark.AttackerHead);
+            }
+            // The link Q -> P (P = the last point of the victim's prefix), then the victim's trail back to its exit.
+            for (int j = victimPrefix.Count - 1; j >= 0; j--) InheritanceBridge.AddPoint(bandLine, victimPrefix[j]);
+            InheritanceBridge.BandCells(grid, bandLine, cfg.InheritanceBandHalfWidth, BandMask(), bandCells);
+            if (linkBands)
+            {
+                // Rule v1.8 (contract 32): the band never reaches the outer rim band of R1 (kept neutral forever).
+                int w = 0;
+                for (int c = 0; c < bandCells.Count; c++)
+                {
+                    if (RimSafe(bandCells[c])) bandCells[w++] = bandCells[c];
+                }
+                bandCells.RemoveRange(w, bandCells.Count - w);
+            }
+            return bandCells.Count > 0;
+        }
+
+        /// <summary>
+        /// Rule v1.8 (contract 32), R1: a band cell must be a cell a trail raster can reach. A head center stays at least
+        /// ArenaMargin inside the rim, so every cell of a trail's supercover raster has its center at most ArenaMargin minus
+        /// half a cell diagonal inside it; band cells closer to the rim are left out, so the outer rim band stays neutral
+        /// forever (R1) whatever the band half width.
+        /// </summary>
+        private bool RimSafe(int cell)
+        {
+            int size = grid.Size;
+            Vec2d center = grid.CellCenter(cell % size, cell / size);
+            return sim.Arena.SignedDistance(center) <= -(cfg.ArenaMargin - 0.5 * Math.Sqrt(2.0) * grid.CellSize) + 1e-9;
+        }
+
+        /// <summary>True when one of the cells whose closed square contains p is the player's.</summary>
+        private bool OwnsPoint(byte id, Vec2d p)
+        {
+            int c = TerritorySplit.ExitCell(grid, id, p);
+            return c >= 0 && grid.Cells[c] == id;
+        }
+
+        /// <summary>
+        /// Writes the band cells that were not the killer's (bandExtra) as a capture of the killer: third players that lose
+        /// cells are judged by the v1.5 split rule (anchors read before the write), then a home player whose cell was taken
+        /// exits (R9, TerritoryStolen + Exit, Other = the killer) and a player left with no cell is eliminated
+        /// (TerritoryLost). The killer's trail prefix [exit, Q] is territory now: the trail is cut at split (the rest stays
+        /// its active trail, whose exit point is Q). Emits InheritanceBridged right after the write.
+        /// </summary>
+        private void ApplyBand(KillInfo kill, double split, double t, double uG)
+        {
+            int killer = kill.Killer;
+            PlayerState k = players[killer];
+            byte id = k.Id;
+            int[] band = bandExtra.ToArray();
+            var applied = new[] { band };
+            bandWho.Clear();
+            bandWho.Add(killer);
+            bool severing = cfg.SeveredTerritory != SeveredTerritoryRule.Off && CollectSevered(bandWho, applied, 1, uG);
+            for (int c = 0; c < band.Length; c++) grid.Set(band[c], id);
+            if (split > 0.0) k.Trail.DropPrefix(split);
+            k.InheritanceBridges++;
+            sim.Emit(new SimEvent
+            {
+                Type = SimEventType.InheritanceBridged, Time = t, Player = killer, Other = kill.Victim, Point = kill.Point, Cells = band,
+            });
+            if (severing) ApplySevered(applied, t);
+            for (int i = 0; i < n; i++)
+            {
+                PlayerState p = players[i];
+                if (i == killer || !p.Alive || !p.Home) continue;
+                int cell = CellAt(i, uG);
+                if (grid.Cells[cell] == p.Id || Array.BinarySearch(band, cell) < 0) continue;
+                Vec2d head = PosAt(i, uG);
+                p.Home = false;
+                p.ExitWasCut = false;
+                p.Trail.Start(head);
+                uTrailEnd[i] = uG;
+                sim.Emit(new SimEvent { Type = SimEventType.TerritoryStolen, Time = t, Player = i, Other = killer, Point = head });
+                sim.Emit(new SimEvent { Type = SimEventType.Exit, Time = t, Player = i, Point = head });
+            }
+            for (int i = 0; i < n; i++)
+            {
+                PlayerState p = players[i];
+                if (i == killer || !p.Alive || grid.CountOf(p.Id) != 0) continue;
+                Eliminate(i, EliminationCause.TerritoryLost, killer, t, uG);
+            }
+        }
+
         // b. Spark catches: only a player still alive that still has its spark (a returner of step a has none).
         private void StepSparkCatches(double t)
         {
@@ -786,8 +1304,12 @@ namespace PainterIO.Core
         /// killer alive now is alive after the group): the kill traits run for every Spark elimination of this group whose
         /// killer is alive, in elimination order. A kill whose killer is dead or was eliminated in this group gets nothing
         /// (the victim's cells stay neutral, as without the traits). Nothing runs without kill traits (classic rounds).
+        /// Rule v1.6 (contract 30, single-domain rounds only): after the kill traits of each kill, the inherited land is
+        /// joined to the killer's domain by the bridge band, or severed (JoinInheritance). The killer's anchor is read on the
+        /// grid before that kill's inheritance. A killer whose last cell an earlier bridge band of this group took is
+        /// eliminated (TerritoryLost) and gets nothing more.
         /// </summary>
-        private void StepKillRewards()
+        private void StepKillRewards(double t, double uG)
         {
             if (killsInGroup.Count == 0) return;
             rewarded.Clear();
@@ -798,7 +1320,18 @@ namespace PainterIO.Core
             }
             if (rewarded.Count > 0)
             {
-                sim.NotifyKills(rewarded);
+                if (!inheritanceJoin) sim.NotifyKills(rewarded);
+                else
+                {
+                    for (int k = 0; k < rewarded.Count; k++)
+                    {
+                        KillInfo kill = rewarded[k];
+                        if (!players[kill.Killer].Alive) continue;
+                        int anchor = AnchorCell(kill.Killer, uG);
+                        sim.NotifyKill(kill);
+                        if (sim.Inheritance.LastInherited.Length > 0 && players[kill.Killer].Alive) JoinInheritance(kill, anchor, t, uG);
+                    }
+                }
                 rewardedInGroup = true;
             }
             rewarded.Clear();
@@ -880,6 +1413,7 @@ namespace PainterIO.Core
                     SCut = win.S, TimeCut = t, Attacker = win.Attacker, S = win.S, PrevS = win.S, Speed = cfg.SparkSpeedOf(victim.SpeedMultiplier),
                     ExitWasCutBefore = victim.ExitWasCut,
                 };
+                if (inheritanceJoin) RecordCutGeometry(victim.Spark, win.Attacker, win.U);
                 victim.ExitWasCut = true;
                 players[win.Attacker].CutsMade++;
                 sim.Emit(new SimEvent
@@ -887,6 +1421,24 @@ namespace PainterIO.Core
                     Type = SimEventType.Cut, Time = t, Player = v, Other = win.Attacker, Point = victim.Trail.PointAt(win.S),
                     S = win.S,
                 });
+            }
+        }
+
+        /// <summary>
+        /// Rule v1.6: the geometry of a real cut, for a later inheritance bridge: the attacker's head at the cut's own u (Q)
+        /// and, when the attacker is trailing then, its exit identity, its trail length at that u (Q's arc) and its
+        /// Trail.Dropped.
+        /// </summary>
+        private void RecordCutGeometry(Spark spark, int attacker, double u)
+        {
+            PlayerState a = players[attacker];
+            spark.Linked = true;
+            spark.AttackerHead = PosAt(attacker, u);
+            if (!a.Home && a.Trail.Count > 0)
+            {
+                spark.AttackerEpoch = a.Trail.Epoch;
+                spark.AttackerArc = TrailLength(attacker, u);
+                spark.AttackerDropped = a.Trail.Dropped;
             }
         }
 
@@ -987,6 +1539,15 @@ namespace PainterIO.Core
                     Cause = EliminationCause.Spark,
                 });
             }
+            // Rule v1.6 (contract 30): the spark and the victim's trail from its exit to the cut point, kept for the bridge.
+            Spark sparkAtKill = null;
+            List<Vec2d> victimPrefix = null;
+            if (inheritanceJoin && cause == EliminationCause.Spark && p.Spark != null && other >= 0 && other < n)
+            {
+                sparkAtKill = p.Spark;
+                victimPrefix = new List<Vec2d>();
+                InheritanceBridge.AppendPrefix(p.Trail, p.Spark.SCut, victimPrefix);
+            }
             freed.Clear();
             grid.Neutralize(p.Id, freed);
             freed.Sort();
@@ -1013,7 +1574,13 @@ namespace PainterIO.Core
                 players[other].Kills++;
                 // docs/BIOME_TRAITS.md section 7: a kill, rewarded at the end of step b if its killer is still alive.
                 if (sim.KillTraits.Length > 0)
-                    killsInGroup.Add(new KillInfo { Killer = other, Victim = i, Time = t, Point = head, FreedCells = freedCells });
+                {
+                    killsInGroup.Add(new KillInfo
+                    {
+                        Killer = other, Victim = i, Time = t, Point = head, FreedCells = freedCells, Spark = sparkAtKill,
+                        VictimPrefix = victimPrefix,
+                    });
+                }
             }
             eliminatedInGroup.Add(i);
         }

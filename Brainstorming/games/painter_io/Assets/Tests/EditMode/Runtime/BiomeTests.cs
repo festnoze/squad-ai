@@ -78,11 +78,12 @@ namespace PainterIO.Tests
             }
             AssertColor("#FFD08A", fire.SecondaryColors[0], "fire hot core");
             AssertColor("#1E2A4D", liquid.Ground, "liquid ground");
-            AssertColor("#151D38", liquid.OutsideArena, "liquid outside");
+            // Border neon (docs/border_neon.json): one flat light grey outside the arena in every biome.
+            AssertColor("#B4B9C1", liquid.OutsideArena, "liquid outside");
             AssertColor("#1A1412", fire.Ground, "fire ground");
-            AssertColor("#100C0B", fire.OutsideArena, "fire outside");
+            AssertColor("#B4B9C1", fire.OutsideArena, "fire outside");
             AssertColor("#0B0F1E", elec.Ground, "electric ground");
-            AssertColor("#070912", elec.OutsideArena, "electric outside");
+            AssertColor("#B4B9C1", elec.OutsideArena, "electric outside");
             AssertColor("#F3EEE8", liquid.UiAccent, "liquid HUD accent = the UI light (HUD unchanged)");
 
             // Readability (25.5): the four player colors of every biome stay clearly distinct.

@@ -141,9 +141,17 @@ namespace PainterIO.Core
                 Behaviours[b].Attach(this, Config.Traits.Get(Behaviours[b].Id));
                 if (Behaviours[b] is ISpeedTrait speed && speed.MaxSpeedFactor > 1.0) maxFactor *= speed.MaxSpeedFactor;
                 if (Behaviours[b] is IKillTrait kill) kills.Add(kill);
+                if (Behaviours[b] is KillInheritanceTrait inheritance) Inheritance = inheritance;
             }
             MaxSpeedFactor = maxFactor;
             KillTraits = kills.ToArray();
+            // Rule v1.8 (contract 32): the single-domain rule holds in every round type (SimConfig.SingleDomain = On, the
+            // default). With SingleDomain = Off it belongs to the KillInheritance path only (rule v1.6, contract 30): Off,
+            // Share 0 (nothing is ever inherited) and every round without the trait then keep the pre-v1.6 behaviour.
+            SingleDomain = Config.SingleDomain == SingleDomainRule.On
+                           || (Inheritance != null && Inheritance.Share > 0.0 && Config.InheritanceBridge != InheritanceBridgeRule.Off);
+            // Rule v1.9 (contract 33): a riding head moves BorderRideFactor times faster, so the check covers that factor too.
+            if (Config.BorderRide == BorderRideRule.On && Config.BorderRideFactor > 1.0) maxFactor *= Config.BorderRideFactor;
             if (maxFactor > 1.0 && !(Config.HeadGrace > Config.PawnSpeed * maxFactor * Config.Dt))
                 throw new ArgumentException("HeadGrace (" + Config.HeadGrace + ") must exceed PawnSpeed x max trait speed factor x Dt ("
                                             + Config.PawnSpeed * maxFactor * Config.Dt + ", traits " + traitKey
@@ -199,20 +207,35 @@ namespace PainterIO.Core
         /// <summary>The attached kill traits (IKillTrait) in TraitId order (empty in classic rounds and without kill traits).</summary>
         internal IKillTrait[] KillTraits { get; }
 
+        /// <summary>The attached KillInheritance trait, else null.</summary>
+        internal KillInheritanceTrait Inheritance { get; }
+
+        /// <summary>
+        /// Rule v1.6 (single domain, contract 30): KillInheritance is attached with Share &gt; 0 and
+        /// Config.InheritanceBridge is not Off. Only then does the event engine keep every living player's territory one
+        /// 8-connected domain (inheritance bridge and severance, closures that take their trail footprint, safety check).
+        /// Rule v1.8 (contract 32): also true in every round when Config.SingleDomain is On (the default); the closures
+        /// then take the band of their trail (EventResolver.LinkCapture).
+        /// </summary>
+        internal bool SingleDomain { get; }
+
         /// <summary>
         /// docs/BIOME_TRAITS.md section 7, after step b of a group: every kill trait for every kill (killer alive), in kill
         /// order then TraitId order; the events each call raises are emitted right after it.
         /// </summary>
         internal void NotifyKills(List<KillInfo> kills)
         {
-            for (int k = 0; k < kills.Count; k++)
+            for (int k = 0; k < kills.Count; k++) NotifyKill(kills[k]);
+        }
+
+        /// <summary>Every kill trait for one kill, in TraitId order; the events each call raises are emitted right after it.</summary>
+        internal void NotifyKill(KillInfo kill)
+        {
+            for (int t = 0; t < KillTraits.Length; t++)
             {
-                for (int t = 0; t < KillTraits.Length; t++)
-                {
-                    traitEvents.Clear();
-                    KillTraits[t].OnKill(this, kills[k], traitEvents);
-                    for (int e = 0; e < traitEvents.Count; e++) Emit(traitEvents[e]);
-                }
+                traitEvents.Clear();
+                KillTraits[t].OnKill(this, kill, traitEvents);
+                for (int e = 0; e < traitEvents.Count; e++) Emit(traitEvents[e]);
             }
             traitEvents.Clear();
         }
@@ -310,7 +333,13 @@ namespace PainterIO.Core
             if (!Ended)
             {
                 // Trait hook of step 3: after the trail appends, positions and sparks, before the ring spawner.
-                if (Behaviours.Length > 0) RunEndOfTickTraits();
+                if (Behaviours.Length > 0)
+                {
+                    RunEndOfTickTraits();
+                    // Rule v1.7: a trait that grew a territory outside an event group (Propagation) can meet the goal too.
+                    if (!Ended && ConquestReached()) EndRound(RoundEndReason.Conquest, Time);
+                }
+                if (Ended) return;
                 ringSpawner.Run(this);
                 if (Tick >= EndTick && !Ended)
                 {
@@ -326,6 +355,76 @@ namespace PainterIO.Core
             CheckPlayer(playerIndex);
             int arena = Grid.ArenaCellCount;
             return arena > 0 ? 100.0 * Grid.CountOf(players[playerIndex].Id) / arena : 0.0;
+        }
+
+        // ------------------------------------------------------------------------------------------------------------
+        // Conquest goal (rule v1.7, contract 31; geometry and threshold in Conquest.cs).
+
+        private bool[] conquestMask;
+        private int conquestCells = -1;
+
+        /// <summary>
+        /// Arena cells some player can own by capture (Conquest.ConquerableMask, seeded with the players' positions): the
+        /// denominator of the conquest percentage. Built on first use and cached (the reachable pieces never change).
+        /// </summary>
+        public int ConquestCellCount
+        {
+            get
+            {
+                EnsureConquestMask();
+                return conquestCells;
+            }
+        }
+
+        /// <summary>True when the cell (index j * Size + i) is conquerable.</summary>
+        public bool IsConquerable(int cell)
+        {
+            EnsureConquestMask();
+            return (uint)cell < (uint)conquestMask.Length && conquestMask[cell];
+        }
+
+        /// <summary>Owned cells that meet the goal: Conquest.TargetCells(ConquestCellCount, Config.ConquestShare).</summary>
+        public int ConquestTargetCells => Conquest.TargetCells(ConquestCellCount, Config.ConquestShare);
+
+        /// <summary>The conquest percentage of a player (current ownership, 0 for an eliminated player): what the HUD shows.</summary>
+        public double ConquestPercent(int playerIndex)
+        {
+            CheckPlayer(playerIndex);
+            return Conquest.Percent(Grid.CountOf(players[playerIndex].Id), ConquestCellCount);
+        }
+
+        /// <summary>The conquest percentage of a cell count (FinalCells of a result, an eliminated player's last land).</summary>
+        public double ConquestPercentOf(int cells) => Conquest.Percent(cells, ConquestCellCount);
+
+        /// <summary>
+        /// Rule v1.7: true when a living player owns ConquestTargetCells. The mask is built only once a player owns
+        /// ConquestLazyFloor x the goal share of the arena cells (every shipped level has at least that share of conquerable
+        /// cells), so rounds far from the goal never pay for it.
+        /// </summary>
+        internal bool ConquestReached()
+        {
+            double share = Config.ConquestShare;
+            if (!(share > 0.0)) return false;
+            int best = 0;
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (players[i].Alive) best = Math.Max(best, Grid.CountOf(players[i].Id));
+            }
+            if (best <= 0) return false;
+            if (conquestMask == null)
+            {
+                double floor = Conquest.LazyFloor * (Math.Min(1.0, share) - Conquest.DisplaySlack) * Grid.ArenaCellCount;
+                if (best < floor) return false;
+            }
+            return best >= ConquestTargetCells;
+        }
+
+        private void EnsureConquestMask()
+        {
+            if (conquestMask != null) return;
+            var seeds = new Vec2d[players.Length];
+            for (int i = 0; i < players.Length; i++) seeds[i] = players[i].Pos;
+            conquestMask = Conquest.ConquerableMask(Arena, Grid, seeds, out conquestCells);
         }
 
         /// <summary>
@@ -376,6 +475,16 @@ namespace PainterIO.Core
                 h = HashLong(h, p.Pocket.Count);
             }
             if (Ring != null) h = HashVec(h, Ring.Pos);
+            if (Config.BorderRide == BorderRideRule.On)
+            {
+                // Rule v1.9 (contract 33): the ride state, only when the rule is on (Off keeps every hash).
+                for (int i = 0; i < players.Length; i++)
+                {
+                    PlayerState p = players[i];
+                    h = HashByte(h, (byte)((p.BorderRiding ? 1 : 0) | (p.BorderRideSign > 0 ? 2 : 0) | (p.BorderRideSign < 0 ? 4 : 0)));
+                    h = HashLong(h, Round9(p.BorderContactStart));
+                }
+            }
             if (traitsActive)
             {
                 h = HashLong(h, traitKey.Length);
@@ -445,7 +554,9 @@ namespace PainterIO.Core
         /// Spawns a spark now on the victim's trail as if cut: Spark { SCut = sCut, TimeCut = Time, Attacker, S = PrevS =
         /// sCut, Speed = Config.SparkSpeedOf(victim.SpeedMultiplier) }, ExitWasCut = true, attacker CutsMade++ (attacker may
         /// be -1: nobody is credited). No-op if the victim already has a spark, is home, is eliminated or is shielded
-        /// (KillShield). sCut &gt;= L gives a catch at the next tick start.
+        /// (KillShield). sCut &gt;= L gives a catch at the next tick start. A forced cut has no contact geometry (no head
+        /// touched the trail): under rule v1.6 (contract 30) a kill by such a spark never makes an inheritance bridge, so
+        /// inherited land that does not touch the killer's domain is severed.
         /// </summary>
         public void DebugForceCut(int victim, double sCut, int attacker)
         {

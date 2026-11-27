@@ -18,6 +18,10 @@ namespace PainterIO.Core
     /// the normal section 6 state check (an unchased return captures with its trail, a chased one captures nothing);
     /// Propagation grows the inherited land too; ScorchedEarth marks only cells that stay neutral (IsScorched needs a
     /// neutral cell).
+    /// Rule v1.6 (single domain, contract 30, SimConfig.InheritanceBridge): right after this trait (and the other kill
+    /// traits of the same kill), the event engine joins the inherited land to the killer's domain with the bridge band of
+    /// the kill line (InheritanceBridged) and severs whatever stays apart (TerritorySevered); see InheritanceBridge and
+    /// EventResolver.StepKillRewards. This class only moves the freed cells and reports them in LastInherited.
     /// </summary>
     public sealed class KillInheritanceTrait : ISimTrait, IKillTrait
     {
@@ -28,6 +32,12 @@ namespace PainterIO.Core
 
         /// <summary>Share of the victim's freed cells the killer inherits (P1, in [0, 1]).</summary>
         public double Share { get; private set; } = TraitDefaults.KillInheritanceShare;
+
+        /// <summary>
+        /// Rule v1.6: the cells the last OnKill gave to the killer (ascending, the TerritoryInherited cells), empty when it
+        /// gave nothing. Read by the event engine right after the kill traits of that kill.
+        /// </summary>
+        internal int[] LastInherited { get; private set; } = Array.Empty<int>();
 
         public void Attach(Simulation sim, TraitSpec spec)
         {
@@ -50,6 +60,7 @@ namespace PainterIO.Core
 
         public void OnKill(Simulation sim, KillInfo kill, List<SimEvent> raised)
         {
+            LastInherited = Array.Empty<int>();
             int[] freed = kill.FreedCells;
             if (!(Share > 0.0) || freed == null || freed.Length == 0) return;
             OwnerGrid g = sim.Grid;
@@ -69,10 +80,12 @@ namespace PainterIO.Core
 
             byte id = killer.Id;
             for (int k = 0; k < cells.Count; k++) g.Set(cells[k], id);
+            int[] given = cells.ToArray();
+            LastInherited = given;
             raised.Add(new SimEvent
             {
                 Type = SimEventType.TerritoryInherited, Time = kill.Time, Player = kill.Killer, Other = kill.Victim, Point = kill.Point,
-                Cells = cells.ToArray(),
+                Cells = given,
             });
         }
 

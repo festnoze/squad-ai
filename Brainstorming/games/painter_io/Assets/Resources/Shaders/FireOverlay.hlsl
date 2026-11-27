@@ -20,6 +20,14 @@
 //  11 Smoke   a = seed, b = density, c = unused. A soft, noisy smoke puff in the vertex color.
 //  12 Ash     a = heat 0..1, b = seed, c = unused. The burnt fuse droplet cooling to ash: transparent at heat 1 (the hot
 //             ember bead under it shows), glowing cracks on grey ash in between, opaque grey ash at 0.
+// Trait shapes (wave D-2 traits-fx, same ids and parameters as Overlay.hlsl, drawn by Actors/TraitFxView.cs), as fire:
+//  16 Streak  a flame jet licking back from a fireball running on its own bed (Conduction).
+//  17 Arc     a thin crackling spark line between a head and the exposed fuse it could cut (ArcReach).
+//  18 Aura    a corona of flame tongues around the fireball, taller per speed level (KillSpeedBoost).
+//  19 Film    a heat shield: a shimmering golden shell with a hot rim (KillShield).
+//  20 Timer   a small ember ring draining clockwise.
+//  21 Shimmer gold sparks running along a shielded fuse (strip mesh).
+// Every trait shape stays below sRGB luma 235 without bloom (the spark stays the brightest moving thing).
 #ifndef PIO_FIRE_OVERLAY_INCLUDED
 #define PIO_FIRE_OVERLAY_INCLUDED
 
@@ -71,6 +79,121 @@ float3 PIO_FireOverlayRamp(float heat, float3 flame)
     return lerp(c, float3(2.4, 2.0, 1.4), smoothstep(0.55, 1.0, heat));
 }
 
+float PIO_FireOvSq(float x)
+{
+    return x * x;
+}
+
+// Wave D-2 trait shapes as fire: the flame color, warmed toward a pale gold that stays below sRGB luma 235.
+#define PIO_FIRE_TRAIT_GOLD float3(0.86, 0.62, 0.30)
+
+// Wave D-2 trait shapes (16 - 21) of the fire biome (header). Returns (rgb, alpha before opacity).
+float4 PIO_FireOverlayTrait(float shape, float2 q, float4 uv0, float4 p, float2 cs, float3 albedo, float aa)
+{
+    float time = _PIO_Time.x;
+    float unitsPerLocal = max(uv0.z, 1e-4);
+    float rho = length(q);
+    float3 flame = min(albedo * 1.15, float3(1.2, 1.2, 1.2));
+    float3 color = flame;
+    float alpha = 0.0;
+    if (shape < 16.5)
+    {
+        // Streak: a flame jet thrown back from the fireball, flickering tongues, hotter near the pearl.
+        float k = saturate(p.y);
+        float u = q.x * 0.5 + 0.5;
+        float n = PIO_FireOverlayNoise(float2(q.x * 3.0 + time * 9.0 + p.w * 13.0, q.y * 2.2));
+        float wv = (0.2 + 0.8 * pow(saturate(u), 0.8)) * (0.75 + 0.5 * n);
+        float body = saturate(1.0 - abs(q.y) / max(wv * 0.62, 1e-3)) * smoothstep(0.0, 0.4, u) * (1.0 - smoothstep(0.88, 1.0, u));
+        float heat = saturate(body * (0.45 + 0.5 * u) + 0.15 * n);
+        color = lerp(flame * 0.9, PIO_FIRE_TRAIT_GOLD, smoothstep(0.25, 0.75, heat));
+        alpha = k * saturate(body * (0.7 + 0.5 * n));
+    }
+    else if (shape < 17.5)
+    {
+        // Arc: a thin crackling spark line, pinned at the head and at the fuse, re-rolled at 18 Hz.
+        float seed = p.y;
+        float lx = q.x * (1.0 / 0.88);
+        float halfX = unitsPerLocal * 0.88;
+        float halfY = unitsPerLocal * max(p.z, 1e-3);
+        float yw = q.y * halfY;
+        float tq = floor(time * 18.0 + seed * 7.0);
+        float lc = clamp(lx, -1.0, 1.0);
+        float pin = sqrt(saturate(1.0 - lc * lc));
+        float path = ((PIO_FireOverlayNoise(float2(lc * 2.6 + seed * 17.0, tq * 1.37)) - 0.5)
+                    + 0.6 * (PIO_FireOverlayNoise(float2(lc * 6.5 - seed * 5.0, tq * 2.11)) - 0.5)) * halfY * pin;
+        float cw = max(p.w, 0.012);
+        float dist = abs(yw - path);
+        float core = exp(-dist * dist / (cw * cw));
+        float glow = exp(-dist / (cw * 4.0));
+        float ends = 1.0 - smoothstep(0.96, 1.04, abs(lx));
+        float2 wq = float2(q.x * unitsPerLocal, yw);
+        float contact = exp(-dot(wq - float2(halfX, 0.0), wq - float2(halfX, 0.0)) / 0.0036)
+                      + exp(-dot(wq + float2(halfX, 0.0), wq + float2(halfX, 0.0)) / 0.0036);
+        color = lerp(flame, PIO_FIRE_TRAIT_GOLD, saturate(core * 1.3 + contact));
+        alpha = saturate(saturate(core + 0.5 * glow) * ends + 0.8 * contact) * (1.0 - smoothstep(0.8, 1.0, abs(q.y)));
+    }
+    else if (shape < 18.5)
+    {
+        // Aura: flame tongues around the fireball, rising toward screen up, taller and brighter per level.
+        float level = max(p.y, 0.0);
+        float rim = max(p.z, 0.05);
+        float2 world = float2(q.x * cs.x - q.y * cs.y, q.x * cs.y + q.y * cs.x);
+        float ang = atan2(world.y, world.x);
+        float reach = (0.1 + 0.07 * min(level, 3.0)) * (1.0 + 0.6 * saturate(world.y / max(rho, 1e-4)));
+        float n = PIO_FireOverlayNoise(float2(ang * 3.2, time * 4.0 - rho * 6.0)) * 0.65
+                + PIO_FireOverlayNoise(float2(ang * 7.0 + 3.0, time * 6.5 - rho * 11.0)) * 0.35;
+        float hgt = (rho - rim) / max(reach, 1e-3);
+        float tongue = saturate((n * 1.3 - hgt) * 3.0) * step(rim * 0.85, rho) * (1.0 - smoothstep(0.85, 1.0, rho));
+        float burst = saturate(p.w) * exp(-PIO_FireOvSq((rho - rim - 0.35 * (1.0 - p.w)) / 0.08));
+        color = lerp(flame * 0.85, PIO_FIRE_TRAIT_GOLD, saturate(tongue * 0.6 + burst));
+        alpha = saturate(tongue * (0.45 + 0.12 * min(level, 3.0)) + 0.7 * burst);
+    }
+    else if (shape < 19.5)
+    {
+        // Film: a heat shield, a shimmering golden shell with a hot rim and a faint warm veil inside.
+        float r0 = max(p.y, 0.1);
+        float2 world = float2(q.x * cs.x - q.y * cs.y, q.x * cs.y + q.y * cs.x);
+        float n = PIO_FireOverlayNoise(world * 5.0 + float2(0.0, -time * 2.2));
+        float rr = rho / (r0 * (1.0 + 0.03 * (n - 0.5)));
+        float inside = saturate((1.0 - rr) * r0 / aa + 0.5);
+        float rimG = pow(saturate(rr), 6.0);
+        float lightAz = saturate(dot(world / max(rho, 1e-4), float2(-0.6, 0.8)));
+        float window = exp(-PIO_FireOvSq((rr - 0.74) / 0.1)) * smoothstep(0.7, 0.98, lightAz);
+        float shimmer = 0.8 + 0.2 * saturate(p.z) * sin(time * 11.0 + n * 6.0);
+        float pop = saturate(p.w);
+        color = lerp(flame, PIO_FIRE_TRAIT_GOLD, saturate(0.45 + 0.4 * rimG + window + pop));
+        alpha = inside * saturate((0.08 + 0.06 * n) + 0.55 * rimG * shimmer + 0.6 * window + 0.5 * pop * rimG);
+    }
+    else if (shape < 20.5)
+    {
+        // Timer: a small ember ring draining clockwise from 12 o'clock over a dark track.
+        float r0 = p.y;
+        float hw = max(p.z, 1e-3);
+        float frac01 = saturate(p.w);
+        float band = saturate((hw - abs(rho - r0)) / aa + 0.5);
+        float a01 = frac(0.25 - atan2(q.y, q.x) / 6.2831853 + 1.0);
+        float onArc = saturate((frac01 - a01) * 6.2831853 * r0 / aa + 0.5);
+        float core = 1.0 - saturate(abs(rho - r0) / hw);
+        color = lerp(float3(0.05, 0.035, 0.03), lerp(flame, PIO_FIRE_TRAIT_GOLD, 0.35 + core * 0.55), onArc);
+        alpha = band * lerp(0.6, 1.0, onArc);
+    }
+    else
+    {
+        // Shimmer (strip): a golden heat haze over the shielded fuse: a wavering bright line and long gold sparks
+        // running along its middle toward the head.
+        float k = saturate(p.y);
+        float y = uv0.y;
+        float s = uv0.w;
+        float body = exp(-y * y * 2.5);
+        float hl = exp(-PIO_FireOvSq((y - 0.3 * sin(s * 4.0 - time * 6.0)) / 0.16)) * (0.55 + 0.45 * PIO_FireOverlayNoise(float2(s * 3.0, time * 9.0)));
+        float g = frac(s * (1.0 / 0.8) - time * 2.4);
+        float spark = exp(-PIO_FireOvSq((g - 0.5) / 0.14)) * exp(-y * y * 9.0);
+        color = lerp(flame, PIO_FIRE_TRAIT_GOLD, saturate(0.35 + spark + 0.4 * hl));
+        alpha = k * saturate(0.18 * body + 0.45 * hl + 0.9 * spark) * (1.0 - smoothstep(0.75, 1.0, abs(y)));
+    }
+    return float4(color, alpha);
+}
+
 void PIO_FireOverlaySG_float(float4 VertexColor, float4 UV0, float4 UV1, float4 UV2, out float3 BaseColor, out float Alpha)
 {
     float2 q = UV0.xy;
@@ -91,7 +214,14 @@ void PIO_FireOverlaySG_float(float4 VertexColor, float4 UV0, float4 UV1, float4 
     float3 color = albedo;
     float alpha = 0.0;
 
-    if (shape < 0.5)
+    if (shape > 15.5)
+    {
+        // Wave D-2 trait shapes (header).
+        float4 trait = PIO_FireOverlayTrait(shape, q, UV0, UV1, cs, albedo, aa);
+        color = trait.rgb;
+        alpha = trait.a;
+    }
+    else if (shape < 0.5)
     {
         // Ring of fire: a white-hot tube with small tongues licking outward and a warm glow.
         float r0 = UV1.y;

@@ -3,7 +3,7 @@
 //
 // The Feu biome composite. Same inputs, globals and layering as LiquidComposite (one full-resolution pass over the
 // static LiquidSurface quad, UV1 = world position w of the pixel), with an emissive fire look instead of glossy paint:
-// - Ground: charred stone and ash (#1A1412 to #241A16, faint cooled cracks), darker outside the arena, lit by a warm
+// - Ground: charred stone and ash (#1A1412 to #241A16, faint cooled cracks), light grey outside the arena past a yellow neon line (shared PIO_ArenaFrame), lit by a warm
 //   glow around every fire (soft, a little stronger above each fire: light rises).
 // - Territory: j = argmax t_i (the contour uses the unfaded field, so a burning-out bed keeps its shape). The interior is
 //   a bed of glowing coals in the player's flame color (animated cellular noise, slow breathing pulse per coal, dark
@@ -39,9 +39,20 @@
 // High = B-spline territory, 3 x 3 animated coals, 3 flame octaves; Medium = bilinear, 2 x 2 animated coals, 2 octaves;
 // Low = 2 x 2 static coals, 2 octaves on a single warp, no owner and glow taps (tongues capped where the pixel's own
 // field still names the owner), no cracks.
+// - Biome traits (wave D-2 traits-fx, docs/BIOME_TRAITS.md 5 and 7, generic: any trait may run in this biome):
+//   - Rim: with Propagation a bed may reach the border of the grid (the arena's straight sides): the narrow field and
+//     the contour distance are limited by a straight edge lying on the border, so the bed ends there with its flames.
+//   - Scorched ground (ScorchedEarth): ash with dying embers. The scorch level is the G channel of _PIO_RevealTime,
+//     fetched only while a scorch exists (_PIO_ScorchOn) and only on the ground; the actor glow on the ground now comes
+//     from the actor fetch at the pixel, so that fetch slot is the one the scorch uses.
+//   - Growth (Propagation, _PIO_GrowPulse): the flames of a growing bed lick a little higher and its rim glows a little
+//     hotter while its ring creeps out; no white-hot band (that stays the capture's).
+//   - Inherited land (KillInheritance): TerritoryField sweeps a fill wave in the killer's color over it, so the
+//     spreading-fire front above crosses the land the killer takes.
 // Fetch budget (Medium): territory field 1, wide relief 1 (Gather), reveal 1 (Gather), pocket 1, actor 1, owner tap 1,
-// actor glow tap 1 = 7, with or without actors (the actor path needs no forward differences: no relief to shade, and
-// fwidth(fA) is taken outside the dynamic branch). High uses B-spline territory fetches (4). Low: 5.
+// scorch 1 (wave D-2: only while a scorch exists; it replaced the actor glow tap) = 7, with or without actors (the actor
+// path needs no forward differences: no relief to shade, and fwidth(fA) is taken outside the dynamic branch). High uses
+// B-spline territory fetches (4). Low: 5 (6 while a scorch exists).
 #ifndef PIO_FIRE_COMPOSITE_INCLUDED
 #define PIO_FIRE_COMPOSITE_INCLUDED
 
@@ -68,6 +79,28 @@
 #define PIO_FIRE_JITTER 0.05           // u: ragged reveal sampling
 #define PIO_FIRE_COAL_FREQ 1.75        // coals per unit (cellular noise frequency)
 #define PIO_FIRE_WHITE float3(1.75, 1.6, 1.35)
+#define PIO_FIRE_GROW_REACH 0.4        // wave D-2: a growing bed's flames reach this much farther (fraction)
+#define PIO_FIRE_GROW_HEAT 0.24        // ... and its rim burns this much hotter
+#define PIO_FIRE_ASH float3(0.085, 0.078, 0.072)   // wave D-2: linear grey of scorched ash
+#define PIO_FIRE_EMBER float3(1.0, 0.30, 0.06)     // ... and of its dying embers
+
+// Wave D-2 rim (header): signed distance (world units, > 0 outside) to the border of the grid rectangle and its outward
+// normal. No derivative.
+float PIO_FireGridBorder(float2 w, out float2 nOut)
+{
+    float2 halfR = _PIO_ArenaRect.zw * 0.5;
+    float2 rel = w - (_PIO_ArenaRect.xy + halfR);
+    float2 q = abs(rel) - halfR;
+    bool alongX = q.x > q.y;
+    nOut = alongX ? float2(rel.x >= 0.0 ? 1.0 : -1.0, 0.0) : float2(0.0, rel.y >= 0.0 ? 1.0 : -1.0);
+    return alongX ? q.x : q.y;
+}
+
+// Logistic approximation of the standard normal CDF: the profile of a blurred straight edge.
+float PIO_FireEdgeProfile(float x)
+{
+    return 1.0 / (1.0 + exp(-1.702 * x));
+}
 
 float PIO_FireMax4(float4 v)
 {
@@ -371,6 +404,30 @@ float4 PIO_FireTongue(float nS, float h, float reach, float3 flame, float3 hot, 
     return float4(col, body);
 }
 
+// Wave D-2 scorched ground (header): grey ash with dying embers over the charred ground g. level = the scorch level
+// (TerritoryField fades it: in with the burn out of the bed, out over the last 2 s), pix = world units per pixel. The
+// embers die before the ash: they need a level near 1. No derivative: called inside the ground branch.
+float3 PIO_FireAsh(float3 g, float level, float2 w, float time, float pix)
+{
+    float rag = PIO_FireNoise(w * 2.1 + float2(5.0, 1.0)) * 0.6 + PIO_FireNoise(w * 5.7 + float2(-2.0, 9.0)) * 0.4;
+    float edge = level - 0.5 + 0.45 * (rag - 0.5);
+    float cover = saturate(edge / max(0.08, 2.0 * pix) + 0.5);
+    float mottle = PIO_FireNoise(w * 1.3 + float2(41.0, 3.0));
+    float fine = PIO_FireNoise(w * 17.0 + float2(3.0, 7.0));
+    float3 ash = PIO_FIRE_ASH * (0.72 + 0.45 * mottle) * (0.9 + 0.2 * fine);
+    // Embers: one candidate per cell of a 0.4 u lattice, a small soft speck that breathes and sometimes flares.
+    float2 cellP = w * 2.5;
+    float2 cid = floor(cellP);
+    float hsh = PIO_FireHash(cid + float2(17.0, 3.0));
+    float2 ctr = cid + 0.25 + 0.5 * float2(hsh, frac(hsh * 47.13));
+    float dist = length(cellP - ctr);
+    float live = step(0.72, hsh) * smoothstep(0.55, 0.95, level) * cover;
+    float breath = 0.55 + 0.45 * sin(time * (1.3 + 2.1 * hsh) + hsh * 40.0);
+    float speck = saturate(1.0 - dist / (0.16 + 0.1 * hsh)) * live * breath;
+    float3 c = lerp(g, ash, cover);
+    return c + PIO_FIRE_EMBER * (speck * speck * 0.9) + PIO_FIRE_EMBER * (0.04 * live * breath * saturate(1.0 - dist));
+}
+
 void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseColor, out float Alpha)
 {
     float2 w = UV1;
@@ -395,6 +452,10 @@ void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseCo
     {
         tRaw = SAMPLE_TEXTURE2D_LOD(_PIO_TerritoryField, sampler_PIO_TerritoryField, uvT, 0);
     }
+    // Wave D-2 rim (header): a bed that reaches the grid border ends there.
+    float2 nB;
+    float dB = PIO_FireGridBorder(w, nB);
+    tRaw = min(tRaw, PIO_FireEdgeProfile(-dB / PIO_WALL_SIGMA_NARROW));
     float4 mj = PIO_FireArgmax(tRaw);
     float tj = dot(tRaw, mj);
     float fadeJ = saturate(dot(_PIO_PlayerFade, mj));
@@ -420,6 +481,12 @@ void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseCo
     float hLen = length(gD);
     gD = lerp(gS, gD * (length(gS) / max(hLen, 1e-5)), smoothstep(0.03, 0.2, hLen));
 #endif
+    // Wave D-2 rim: the contour distance of an intersection is the larger one (the border is the edge there).
+    [flatten] if (dB > d)
+    {
+        d = dB;
+        gD = nB;
+    }
     float gLen = length(gD);
     float2 nOut = gLen > 1e-4 ? gD / gLen : float2(0.0, 1.0);
     float normalOk = smoothstep(0.45, 0.8, gLen);                // about 1 along edges, 0 where edges meet
@@ -489,12 +556,15 @@ void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseCo
     float fadeO = saturate(dot(_PIO_PlayerFade, mo));
     float aliveO = fadeO * fadeO;
     float aliveJ = fadeJ * fadeJ;
+    // Wave D-2 growth (Propagation): the envelope of the flames' owner and of the bed's.
+    float growO = dot(_PIO_GrowPulse, mo);
+    float growJ = dot(_PIO_GrowPulse, mj);
 
     // ---- The flame band: tongues outward over the ground and inward over the rim -----------------------------------
-    // Outward reach: about 0.85 u on edges facing up, 0.3 u facing down; the fill front adds up to 75 %. Capped where
-    // the owner is still known (the owner tap adds its offset on Medium and High).
+    // Outward reach: about 0.85 u on edges facing up, 0.3 u facing down; the fill front adds up to 75 %, a growing bed
+    // up to PIO_FIRE_GROW_REACH. Capped where the owner is still known (the owner tap adds its offset on Medium and High).
     float reachCap = PIO_FIRE_OWNER_REACH + (rich ? PIO_FIRE_OWNER_OFFSET : 0.0);
-    float reachOut = min(lerp(0.3, 0.85, up01) * (1.0 + 0.75 * gate), reachCap);
+    float reachOut = min(lerp(0.3, 0.85, up01) * (1.0 + 0.75 * gate + PIO_FIRE_GROW_REACH * growO), reachCap);
     float reachIn = min((0.42 + 0.08 * up01) * (1.0 + 0.6 * gate), 0.7);
     float3 flameAdd = float3(0.0, 0.0, 0.0);
     float4 flameIn = float4(0.0, 0.0, 0.0, 0.0);
@@ -538,7 +608,7 @@ void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseCo
         float twinkle = smoothstep(0.86, 0.95, pick) * sin(frac(time * 3.0) * 3.14159265) * (1.0 - smoothstep(0.04, 0.3, cells.x));
         float heat = lerp(0.04 + 0.05 * slow, coal + 0.45 * twinkle, crust);
         float rim = saturate(1.0 + d / 0.3);                            // 1 on the contour, 0 at 0.3 u inside
-        heat += 0.14 * rim * rim;                                        // a little hotter by the edge (the tongues do the rest)
+        heat += (0.14 + PIO_FIRE_GROW_HEAT * growJ) * rim * rim;         // a little hotter by the edge (more while growing)
         float band = (d + 0.14) * (1.0 / 0.2);
         heat += 1.05 * gate * exp(-band * band) + 0.14 * warm * crust;   // the white-hot front band, fresh embers
         heat *= 1.0 - burn;
@@ -565,7 +635,6 @@ void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseCo
     [branch] if (bedCover < 1.0)
     {
         float sd = PIO_FireArenaSdf(w);
-        float inArena = saturate(0.5 - sd / pix);
         float mottle = PIO_FireNoise(w * 0.9 + float2(31.0, 4.0));
         float fine = PIO_FireNoise(w * 21.0) - 0.5;
         float3 g0 = _PIO_GroundColor.rgb;                    // #1A1412
@@ -583,17 +652,24 @@ void PIO_FireCompositeSG_float(float4 VertexColor, float2 UV1, out float3 BaseCo
             }
         }
         inside *= 1.0 - 0.35 * (1.0 - smoothstep(0.0, 1.4, -sd));
-        float3 outside = _PIO_OutsideColor.rgb * (1.0 + fine * 0.06) * (1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.8, sd)));
-        ground = lerp(outside, inside, inArena);
-        // The glow: soft, stronger above each fire (light rises), brighter while the fire spreads.
-        float glowT = 0.5 * exp(-6.0 * max(d, 0.0)) * fadeO * lerp(0.75, 1.3, up01) * ownerKnown;
-        float3 glowCol = flameO * glowT * (1.0 + 0.8 * gate);
-        [branch] if (rich)
+        // Wave D-2 scorched ground (header): one LOD 0 fetch, only while a scorch exists (uniform gate), none past the
+        // grid border; then the ash in its own branch.
+        float scorch = 0.0;
+        [branch] if (_PIO_ScorchOn > 0.5)
         {
-            float2 off = float2(0.0, -0.14);
-            float4 aG = SAMPLE_TEXTURE2D_LOD(_PIO_ActorField, sampler_PIO_ActorField, uvA + off / _PIO_ActorRect.zw, 0) / actorScale;
-            glowCol += PIO_FireColorOf(PIO_FireArgmax(aG)) * smoothstep(0.0, 0.7, saturate(PIO_FireMax4(aG)));
+            scorch = SAMPLE_TEXTURE2D_LOD(_PIO_RevealTime, sampler_PIO_RevealTime, uvT, 0).g * saturate(0.5 - dB / pix);
         }
+        [branch] if (scorch > 0.002)
+        {
+            inside = PIO_FireAsh(inside, scorch, w, time, pix);
+        }
+        ground = PIO_ArenaFrame(inside, sd, pix, time);         // flat light grey outside, yellow neon edge (shared)
+        // The glow: soft, stronger above each fire (light rises), brighter while the fire spreads (or grows).
+        float glowT = 0.5 * exp(-6.0 * max(d, 0.0)) * fadeO * lerp(0.75, 1.3, up01) * ownerKnown;
+        float3 glowCol = flameO * glowT * (1.0 + 0.8 * gate + 0.5 * growO);
+        // Actors light the ground around them (Medium, High). Wave D-2: from the actor fetch at the pixel (the offset
+        // tap's slot now serves the scorch).
+        glowCol += rich ? PIO_FireColorOf(mk) * smoothstep(0.0, 0.7, saturate(maxA)) : float3(0.0, 0.0, 0.0);
         ground += glowCol * 0.2;
     }
     float3 color = lerp(ground, bed, bedCover) + flameAdd;

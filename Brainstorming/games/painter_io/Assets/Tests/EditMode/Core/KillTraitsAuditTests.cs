@@ -404,15 +404,19 @@ namespace PainterIO.Tests
         /// (a) Classic bot rounds at every rate: on every tick every player keeps SpeedMultiplier 1.0 and no shield,
         /// ExitWasCut equals "has a spark", every spark runs at exactly SimConfig.SparkSpeed (bit for bit) and no event
         /// has a trait type or a Value. (b) The three kill traits present but DISABLED with parameters that would be
-        /// invalid, with SparkFollowsVictimSpeed false, reproduce the pre-trait rolling hash 8CB763231AC73608.
+        /// invalid, with SparkFollowsVictimSpeed false, reproduce the classic rolling hash (C042710F17995DCB since rule v1.5,
+        /// the pre-trait 8CB763231AC73608 with SeveredTerritory = Off).
         /// </summary>
         [Test]
         public void KillAudit_1_ClassicRoundsNeverTouchTheKillStateAndKeepThePreTraitHash()
         {
             int sparkTicks = 0;
+            // Rule v1.8 (contract 32) changed the seed 5 rounds (no spark any more in their first 45 s): seeds 6 and 7 are
+            // added so the non-vacuity floor below still has sparks to check.
+            foreach (ulong seed in new[] { 5UL, 6UL, 7UL })
             foreach (int rate in BotRates)
             {
-                Simulation sim = TraitTestKit.BotRound(5UL, RuleTraits.Classic, true, rate, -1, BotSeconds);
+                Simulation sim = TraitTestKit.BotRound(seed, RuleTraits.Classic, true, rate, -1, BotSeconds);
                 double sparkSpeed = sim.Config.SparkSpeed;
                 while (!sim.Ended)
                 {
@@ -433,7 +437,10 @@ namespace PainterIO.Tests
                     IReadOnlyList<SimEvent> events = sim.LastEvents;
                     for (int k = 0; k < events.Count; k++)
                     {
-                        if (events[k].Type >= SimEventType.TerritoryGrew || events[k].Value != 0.0)
+                        // TerritorySevered (appended after the trait events) is the core rule v1.5 (contract 29), not a trait
+                        // event: it belongs to classic rounds too.
+                        bool traitType = events[k].Type >= SimEventType.TerritoryGrew && events[k].Type != SimEventType.TerritorySevered;
+                        if (traitType || events[k].Value != 0.0)
                             Assert.Fail(rate + " Hz tick " + sim.Tick + ": trait event in a classic round: " + events[k]);
                     }
                 }
@@ -455,8 +462,12 @@ namespace PainterIO.Tests
             var config = new SimConfig { Seed = 1UL, TickRate = 60, LassoEnabled = true, Traits = disabled, SparkFollowsVictimSpeed = false };
             var round = new Simulation(config, controllers, new SimSetup { HumanIndex = -1 });
             Assert.AreEqual(0, round.KillTraitCount(), "no kill trait attached");
-            Assert.AreEqual("8CB763231AC73608", TraitTestKit.RollingRoundHash(round, 30, false).ToString("X16"),
-                            "disabled kill traits must reproduce the pre-trait rolling hash");
+            // Rule v1.5 (contract 29): the default SeveredTerritory (Neutral) severs territory in this round, so the classic
+            // rolling hash is C042710F17995DCB; with SeveredTerritory = Off it is the pre-trait 8CB763231AC73608
+            // (TraitsClassicTests pins both). Rule v1.8 (contract 32): C042710F17995DCB is now the value with SingleDomain =
+            // Off; the default is TraitsClassicTests.ClassicSeed1V18.
+            Assert.AreEqual(TraitsClassicTests.ClassicSeed1V18.ToString("X16"), TraitTestKit.RollingRoundHash(round, 30, false).ToString("X16"),
+                            "disabled kill traits must reproduce the classic rolling hash");
         }
 
         // ============================================================================================================
@@ -594,7 +605,13 @@ namespace PainterIO.Tests
                 Assert.AreEqual(0, sim.Players[loser].Kills);
                 Assert.AreEqual(1.0, sim.Players[loser].SpeedMultiplier);
                 Assert.IsFalse(sim.View.IsShielded(loser));
-                Assert.AreEqual(1024, TraitTestKit.CountOwned(sim.Grid, dead.Cells, sim.Players[winner].Id));
+                // Rule v1.6 (contract 30): the victim's trail was teleported away from its land (DebugSetTrail), so the kill
+                // line does not reach the inherited land: no bridge, the single-domain rule severs it from the winner.
+                Assert.AreEqual(0, run.Log.Count(SimEventType.InheritanceBridged), at + "no bridge");
+                SimEvent severed = run.Log.Single(SimEventType.TerritorySevered, winner);
+                Assert.AreEqual(-1, severed.Other, at + "severed by the single-domain rule");
+                Assert.IsTrue(SameCells(dead.Cells, severed.Cells), at + "the inherited land is severed");
+                Assert.AreEqual(1024, TraitTestKit.CountOwned(sim.Grid, dead.Cells, OwnerGrid.Neutral));
             });
         }
 
@@ -606,10 +623,14 @@ namespace PainterIO.Tests
         /// eliminated by TerritoryLost. With catchIn &gt; 0, B's spark catches V (player 2, land [20, 24] x [-24, -20])
         /// catchIn seconds after t = 0. Player 3 idles.
         /// </summary>
-        private static Simulation KillerCaptured(int rate, RuleTraits traits, double catchIn)
+        private static Simulation KillerCaptured(int rate, RuleTraits traits, double catchIn,
+                                                 InheritanceBridgeRule bridge = InheritanceBridgeRule.Bridge)
         {
             var b = new SimBuilder(rate);
             b.Config.Traits = traits;
+            b.Config.InheritanceBridge = bridge;
+            // Rule v1.8 (contract 32): the pre-v1.6 island (InheritanceBridge = Off) needs SingleDomain = Off.
+            if (bridge == InheritanceBridgeRule.Off) b.Config.SingleDomain = SingleDomainRule.Off;
             b.AddRect(-8, -8, 0, 8, V(-4, H), West, new ConstantHeadingController(West));
             b.AddRect(6, -3, 9, 3, V(7 + H, -2.4375), North, new ConstantHeadingController(North));
             b.AddRect(20, -24, 24, -20, V(22 + H, -22 + H), East, new ConstantHeadingController(East));
@@ -658,8 +679,10 @@ namespace PainterIO.Tests
             });
 
             // (iii) Control: the kill comes first (t = 0.2). B inherits V's land, so A's capture of its own land no longer
-            // eliminates it: its home cell is stolen, it exits and survives with the inherited land.
-            CrossRateAudit("killer rewarded before the capture", rate => KillerCaptured(rate, AllKillScorched, 0.2), 0.6, run =>
+            // eliminates it: its home cell is stolen, it exits and survives with the inherited land. Run with the pre-v1.6
+            // island behaviour (InheritanceBridge = Off): under rule v1.6 the far inherited land (a forced cut makes no
+            // bridge) is severed at once and A's capture then eliminates B, which would remove the control.
+            CrossRateAudit("killer rewarded before the capture", rate => KillerCaptured(rate, AllKillScorched, 0.2, InheritanceBridgeRule.Off), 0.6, run =>
             {
                 string at = At(run) + "control: ";
                 Simulation sim = run.Sim;
@@ -723,9 +746,11 @@ namespace PainterIO.Tests
                 int first = run.Log.IndexOf(run.Log.Single(SimEventType.SparkCaught, 1));
                 for (int k = first; k < run.Log.All.Count && run.Log.All[k].Time == d1.Time; k++)
                     order.Add(run.Log.All[k].Type + "(" + run.Log.All[k].Player + "," + run.Log.All[k].Other + ")");
+                // Rule v1.6 (contract 30): victim 1's land touches the killer's, victim 2's does not and a forced cut makes
+                // no bridge, so it is severed right after its rewards (TerritorySevered, Other = -1).
                 Assert.AreEqual(
                     "SparkCaught(1,0) Eliminated(1,0) SparkCaught(2,0) Eliminated(2,0) TerritoryInherited(0,1) SpeedBoosted(0,1) "
-                    + "ShieldStarted(0,1) TerritoryInherited(0,2) SpeedBoosted(0,2)", string.Join(" ", order),
+                    + "ShieldStarted(0,1) TerritoryInherited(0,2) SpeedBoosted(0,2) TerritorySevered(0,-1)", string.Join(" ", order),
                     at + "every elimination of the group, then the rewards in kill order and TraitId order");
                 List<SimEvent> boosts = run.Log.Of(SimEventType.SpeedBoosted, 0);
                 Assert.AreEqual(1.1, boosts[0].Value, 1e-12);
@@ -734,7 +759,8 @@ namespace PainterIO.Tests
                 SimEvent shield = run.Log.Single(SimEventType.ShieldStarted, 0);
                 Assert.AreEqual(d1.Time + 3.0, shield.Value, 1e-12, at + "one shield, t_kill + Duration");
                 Assert.AreEqual(d1.Cells.Length, TraitTestKit.CountOwned(sim.Grid, d1.Cells, sim.Players[0].Id), at + "land of 1");
-                Assert.AreEqual(d2.Cells.Length, TraitTestKit.CountOwned(sim.Grid, d2.Cells, sim.Players[0].Id), at + "land of 2");
+                Assert.IsTrue(SameCells(d2.Cells, run.Log.Single(SimEventType.TerritorySevered, 0).Cells), at + "land of 2 severed (v1.6)");
+                Assert.AreEqual(d2.Cells.Length, TraitTestKit.CountOwned(sim.Grid, d2.Cells, OwnerGrid.Neutral), at + "land of 2 neutral");
                 Assert.AreEqual(2, sim.Players[0].Kills);
             });
         }
@@ -812,9 +838,13 @@ namespace PainterIO.Tests
                 Assert.That(second.Time, Is.EqualTo(2.0 + Eps).Within(1e-6));
                 int[] kLand = TraitTestKit.RectCells(sim.Grid, -10, -4, 0, 4), vLand = TraitTestKit.RectCells(sim.Grid, 0, -4, 8, 4);
                 Assert.AreEqual(kLand.Length + vLand.Length, second.Cells.Length, at + "K's land plus V's former land");
-                Assert.AreEqual(vLand.Length, TraitTestKit.CountOwned(sim.Grid, vLand, sim.Players[2].Id), at + "V's land ends with X");
-                Assert.AreEqual(kLand.Length, TraitTestKit.CountOwned(sim.Grid, kLand, sim.Players[2].Id));
-                foreach (int c in second.Cells) Assert.IsFalse(sim.View.IsScorched(c), at + "nothing stayed neutral");
+                // Rule v1.6 (contract 30): K inherits V's adjacent land (one domain); X's inheritance lies far from X's land
+                // and X's spark was forced (no bridge): the single-domain rule severs all of it, plain neutral.
+                Assert.AreEqual(0, run.Log.Count(SimEventType.TerritorySevered, 0), at + "K's domain stayed one piece");
+                Assert.IsTrue(SameCells(second.Cells, run.Log.Single(SimEventType.TerritorySevered, 2).Cells), at + "X's inheritance is severed");
+                Assert.AreEqual(vLand.Length, TraitTestKit.CountOwned(sim.Grid, vLand, OwnerGrid.Neutral), at + "V's former land is neutral");
+                Assert.AreEqual(kLand.Length, TraitTestKit.CountOwned(sim.Grid, kLand, OwnerGrid.Neutral));
+                foreach (int c in second.Cells) Assert.IsFalse(sim.View.IsScorched(c), at + "severed cells are never scorched");
             });
         }
 
@@ -826,10 +856,14 @@ namespace PainterIO.Tests
         /// Victim (player 0) owns [0, 8] x [-4, 4] and is teleported to a trail East on y = -15 + H (L = length) with a spark
         /// of the killer (player 1, home circling in [-10, 0] x [-4, 4]) that catches it at catchTime. Players 2, 3 idle.
         /// </summary>
-        private static Simulation HomeKiller(int rate, RuleTraits traits, double catchTime, double length = 10.0, double fromX = -15 + H)
+        private static Simulation HomeKiller(int rate, RuleTraits traits, double catchTime, double length = 10.0, double fromX = -15 + H,
+                                             InheritanceBridgeRule bridge = InheritanceBridgeRule.Bridge)
         {
             var sb = new SimBuilder(rate);
             sb.Config.Traits = traits;
+            sb.Config.InheritanceBridge = bridge;
+            // Rule v1.8 (contract 32): the pre-v1.6 island (InheritanceBridge = Off) needs SingleDomain = Off.
+            if (bridge == InheritanceBridgeRule.Off) sb.Config.SingleDomain = SingleDomainRule.Off;
             sb.AddRect(0, -4, 8, 4, V(4 + H, H), East, new ConstantHeadingController(East));
             sb.AddRect(-10, -4, 0, 4, V(-5 + H, H), North, new HomeCirclerController(V(-5, 0)));
             sb.AddIdle(IdleCorners[2]);
@@ -844,9 +878,10 @@ namespace PainterIO.Tests
         {
             // Share 0.5: the core of the land goes to the killer (owned, never scorched), the rim stays neutral and
             // scorched; the Propagation ring at t = 4 grows the killer's land (inherited core included) but never into a
-            // scorched rim cell.
+            // scorched rim cell. With the pre-v1.6 island behaviour (InheritanceBridge = Off): under rule v1.6 the core,
+            // which does not touch the killer's land, is severed at once (KillInheritanceTraitTests covers that case).
             RuleTraits traits = RuleTraits.Parse("Propagation(4,1);ScorchedEarth(15);KillInheritance(0.5)");
-            CrossRateAudit("share + scorch + propagation", rate => HomeKiller(rate, traits, KillTime), 4.2, run =>
+            CrossRateAudit("share + scorch + propagation", rate => HomeKiller(rate, traits, KillTime, 10.0, -15 + H, InheritanceBridgeRule.Off), 4.2, run =>
             {
                 string at = At(run);
                 Simulation sim = run.Sim;
@@ -909,10 +944,14 @@ namespace PainterIO.Tests
         /// land from t = 4.344 to 4.677; it returns at x = 0 at PocketReturnTime. B is killed by A's spark at killAt
         /// (teleported far away, caught at that tick start).
         /// </summary>
-        private static Simulation PocketKill(int rate, RuleTraits traits, double killAt)
+        private static Simulation PocketKill(int rate, RuleTraits traits, double killAt,
+                                             InheritanceBridgeRule bridge = InheritanceBridgeRule.Bridge)
         {
             var sb = new SimBuilder(rate);
             sb.Config.Traits = traits;
+            sb.Config.InheritanceBridge = bridge;
+            // Rule v1.8 (contract 32): the pre-v1.6 island (InheritanceBridge = Off) needs SingleDomain = Off.
+            if (bridge == InheritanceBridgeRule.Off) sb.Config.SingleDomain = SingleDomainRule.Off;
             sb.AddRect(-12, -4, 0, 4, V(-1 + H, H), East,
                        Legs((East, 9), (South, 4), (West, 4), (North, 5), (East, 2), (South, 4), (West, 7)));
             sb.AddRect(6, -6, 13, -1, V(10.5, -3.5), West, new HomeCirclerController(V(10.5, -3.5)));
@@ -930,8 +969,10 @@ namespace PainterIO.Tests
         {
             // 5.0: A is off B's land, it inherits and returns later at x = 0 with its pocket. 4.5: A's head is inside B's
             // land, so the inheritance returns it at that instant (7.2) with its trail and its pocket. Either way the
-            // Return never lists a cell A already owned, and the whole pocket square ends up A's.
-            CrossRateAudit("pocket kill at " + killAt, rate => PocketKill(rate, TraitTestKit.One(TraitId.KillInheritance), killAt), 5.9, run =>
+            // Return never lists a cell A already owned, and the whole pocket square ends up A's. With the pre-v1.6 island
+            // behaviour (InheritanceBridge = Off): B's land does not touch A's and the forced kill makes no bridge, so under
+            // rule v1.6 it would be severed at the kill (InheritanceBridgeTests covers the bridge and the severance).
+            CrossRateAudit("pocket kill at " + killAt, rate => PocketKill(rate, TraitTestKit.One(TraitId.KillInheritance), killAt, InheritanceBridgeRule.Off), 5.9, run =>
             {
                 string at = At(run);
                 Simulation sim = run.Sim;
@@ -1253,8 +1294,9 @@ namespace PainterIO.Tests
         public void KillAudit_6_AShieldSavesACutKillerButItsPendingPocketIsStillErased()
         {
             // 7.2 (Liquide): the chased killer loses its spark and survives, its loop stays lost (ExitWasCut) and the pending
-            // lasso pocket of the cut exit is erased at the return. With KillInheritance too, the inherited cells stay A's
-            // (an inheritance is not a capture) while every other pocket cell stays unowned.
+            // lasso pocket of the cut exit is erased at the return. With KillInheritance too: rule v1.6 (contract 30), B's
+            // land does not touch A's and a cut exit can never become a bridge, so the inherited land is severed at the
+            // kill and no pocket cell ends up A's.
             CrossRateAudit("pocket of a cut exit", rate => PocketCutKill(rate, RuleTraits.Parse("KillInheritance;KillShield")), 5.9, run =>
             {
                 string at = At(run);
@@ -1274,7 +1316,10 @@ namespace PainterIO.Tests
                 int[] inherited = run.Log.Single(SimEventType.TerritoryInherited, 0).Cells;
                 int inheritedInPocket = TraitTestKit.CountIn(inherited, pocket);
                 Assert.That(inheritedInPocket, Is.GreaterThan(0));
-                Assert.AreEqual(inheritedInPocket, TraitTestKit.CountOwned(sim.Grid, pocket, sim.Players[0].Id), at + "only the inherited pocket cells are A's");
+                Assert.AreEqual(0, run.Log.Count(SimEventType.InheritanceBridged), at + "a cut exit makes no bridge");
+                SimEvent severed = run.Log.Single(SimEventType.TerritorySevered, 0);
+                Assert.IsTrue(SameCells(inherited, severed.Cells), at + "the inherited land is severed at the kill");
+                Assert.AreEqual(0, TraitTestKit.CountOwned(sim.Grid, pocket, sim.Players[0].Id), at + "no pocket cell is A's");
             });
             Simulation classic = PocketCutKill(60, RuleTraits.Classic);
             var log = new EventLog(classic);

@@ -115,6 +115,126 @@ namespace PainterIO.Core
             return Vec2d.Distance(start, target) > Vec2d.Distance(start, direct) ? target : direct;
         }
 
+        /// <summary>
+        /// Smallest step of StopBeforeBorder (u). Rule v1.7 fix: it was 1e-4, so a head sliding along the border (clearance
+        /// about 0) advanced 48 x 1e-4 u per tick, about 0.3 u/s instead of PawnSpeed, and the rim of a country could hardly
+        /// be painted. 0.01 u is far below the 2 x margin a step would need to skip over an inlet, and a step that would leave
+        /// the inset shape is still refused (the head then stops at most this far before the inset line).
+        /// </summary>
+        public const double MinBorderStep = 0.01;
+
+        /// <summary>Rule v1.9 border ride: an edge whose distance is within margin + this (u) constrains the riding tangent.</summary>
+        public const double RideActiveTolerance = 0.02;
+
+        /// <summary>Rule v1.9 border ride: the ride keeps the head this far (u) inside the inset line.</summary>
+        public const double RideBias = 1e-6;
+
+        /// <summary>
+        /// Rule v1.9 (contract 33, Arena.FollowBorder): moves along the inset line {Distance = -margin} for 'length' (u) in the
+        /// direction sign x outward.Perp(). Each sub-step takes the tangent of one ACTIVE edge (within margin +
+        /// RideActiveTolerance): the one that points least into the other active edges, so at a convex vertex (a pocket,
+        /// where a plain slide is held) the head turns onto the next edge instead of pushing into it, and around a reflex
+        /// vertex the nearest feature is the vertex itself and the head follows the arc of radius margin around it. The
+        /// sub-step end is projected back onto the line (RideBias inside); a projection that cannot get inside falls back to
+        /// StopBeforeBorder, so the result is always in the inset shape. A ride that makes no progress for four sub-steps in
+        /// a row (a dead end narrower than the head) stops there.
+        /// </summary>
+        public Vec2d Follow(Vec2d start, double length, int sign, double margin, out Vec2d direction)
+        {
+            double s = sign < 0 ? -1.0 : 1.0;
+            Vec2d q = OntoRideLine(start, start, margin);
+            direction = RideTangent(q, s, margin);
+            if (!(length > 0.0)) return q;
+            int steps = (int)Math.Ceiling(length / Arena.RideSubStep);
+            if (steps < 1) steps = 1;
+            if (steps > Arena.RideMaxSubSteps) steps = Arena.RideMaxSubSteps;
+            double h = length / steps;
+            int stalled = 0;
+            for (int k = 0; k < steps; k++)
+            {
+                Vec2d t = RideTangent(q, s, margin);
+                if (t.LengthSq == 0.0) break;
+                direction = t;
+                Vec2d c = OntoRideLine(q + t * h, q, margin);
+                bool slow = Vec2d.Distance(q, c) < 0.25 * h;
+                q = c;
+                if (!slow) stalled = 0;
+                else if (++stalled >= 4) break;
+            }
+            return q;
+        }
+
+        /// <summary>
+        /// Rule v1.9: the riding tangent at q (unit, or zero when no edge is near). Among the edges within margin +
+        /// RideActiveTolerance of q, each gives the outward normal n_i (toward its closest point) and the tangent t_i =
+        /// sign x n_i.Perp(); the tangent with the smallest max_j dot(t_i, n_j) wins (it does not push into any active edge),
+        /// ties to the nearest edge.
+        /// </summary>
+        private Vec2d RideTangent(Vec2d q, double s, double margin)
+        {
+            Span<Vec2d> normals = stackalloc Vec2d[8];
+            Span<double> dists = stackalloc double[8];
+            int count = 0;
+            double limit = margin + RideActiveTolerance;
+            for (int i = 0; i < vertices.Length && count < 8; i++)
+            {
+                Vec2d a = vertices[i];
+                double along = Vec2d.Dot(q - a, edges[i]) * inverseLengthSquared[i];
+                Vec2d closest = a + edges[i] * Math.Max(0, Math.Min(1, along));
+                Vec2d toward = closest - q;
+                double d = toward.Length;
+                if (!(d <= limit) || d <= 1e-12) continue;
+                normals[count] = toward / d;
+                dists[count] = d;
+                count++;
+            }
+            if (count == 0)
+            {
+                Distance(q, out Vec2d outward);
+                return outward.Perp() * s;
+            }
+            int best = 0;
+            double bestScore = double.PositiveInfinity;
+            for (int i = 0; i < count; i++)
+            {
+                Vec2d t = normals[i].Perp() * s;
+                double score = double.NegativeInfinity;
+                for (int j = 0; j < count; j++)
+                {
+                    if (j == i) continue;
+                    double push = Vec2d.Dot(t, normals[j]);
+                    if (push > score) score = push;
+                }
+                if (score == double.NegativeInfinity) score = 0.0;
+                if (score < bestScore - 1e-9 || (Math.Abs(score - bestScore) <= 1e-9 && dists[i] < dists[best]))
+                {
+                    bestScore = score;
+                    best = i;
+                }
+            }
+            return normals[best].Perp() * s;
+        }
+
+        /// <summary>
+        /// Rule v1.9: projects p onto the inset line (RideBias inside) along the nearest feature's normal, a few times (two
+        /// lines meeting at a convex vertex are reached by alternating projections); if the point is still outside the
+        /// inset shape, StopBeforeBorder from 'from' (inside) keeps it inside.
+        /// </summary>
+        private Vec2d OntoRideLine(Vec2d p, Vec2d from, double margin)
+        {
+            Vec2d c = p;
+            for (int k = 0; k < 6; k++)
+            {
+                double d = Distance(c, out Vec2d outward);
+                double f = d + margin + RideBias;
+                if (Math.Abs(f) <= 1e-12) break;
+                c = c - outward * f;
+            }
+            if (Distance(c, out _) <= -margin) return c;
+            if (Distance(from, out _) > -margin) return ClampInside(c, margin);
+            return StopBeforeBorder(from, c, margin);
+        }
+
         private Vec2d StopBeforeBorder(Vec2d start, Vec2d end, double margin)
         {
             Vec2d delta = end - start;
@@ -127,7 +247,7 @@ namespace PainterIO.Core
             {
                 double clearance = -Distance(safe, out _) - margin;
                 if (clearance >= length - travelled) return end;
-                double step = Math.Max(clearance * 0.9, 0.0001);
+                double step = Math.Max(clearance * 0.9, MinBorderStep);
                 travelled = Math.Min(length, travelled + step);
                 Vec2d next = Vec2d.Lerp(start, end, travelled / length);
                 if (Distance(next, out _) > -margin) break;

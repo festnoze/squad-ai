@@ -4,8 +4,13 @@ Designer request: "once a win on a country unlocks the right to select 2 new cou
 possible; the other countries stay disabled; for unlocked countries not yet won, make a 3D animated flag float, printed
 with the colors of that country's flag."
 
-The normal **JOUER** button of the main menu is not affected: it still starts the classic square arena
-(`MenuScreen` calls `GameDirector.StartCountry(null)`). The progression only governs the **Pays** screen.
+**Countries first (rule change v1.7, docs/CONTRACT.md section 31).** The countries are the core of the game: the main menu
+has no **Pays** button any more, and **JOUER** opens the country screen (`MenuScreen.OnPlay` calls `UiRoot.OpenEurope`).
+"Jouer ce pays" starts the round (`GameDirector.StartCountry`); a country round lasts at most 15 minutes and its goal is
+to conquer 100 % of the land (`RoundEndReason.Conquest`; after the 15 minutes the largest land wins). The results always
+offer **PAYS SUIVANT** (main button and Escape / back: `GameDirector.ToCountryScreen`, the country screen over the attract
+match, where a win plays the reveal of the newly unlocked flags) and **REJOUER** (the same country again). The classic
+square arena is no longer reachable from the menu (only `StartRound` with no country: probe, DevShot, launch flags, tests).
 
 ## Rules
 
@@ -35,7 +40,8 @@ in `GameDirector.RecordStats`: a real round (`GameSession.CountsForStats`, so no
 sessions), stats-valid settings (no modified hidden test settings, no command line tuning override), and the human
 ranked first (`HumanOutcome.Rank == 1`, shared first place included). `GameDirector.ShowResults` calls
 `EuropeProgress.OnRoundResults(session, outcome, selectedCountry)` right after `RecordStats`; nothing happens for the
-classic arena (no country).
+classic arena (no country). Rank 1 covers every winning end of rule v1.7: Conquest, last survivor, and first (or shared
+first) at the 15 min limit. The default round time (15 min) is not a "modified test setting"; 5 or 10 min is.
 
 **Invariant**: the playable pool (unlocked, not won) never becomes empty before all 46 countries are won. Each first win
 removes one country from the pool and adds `min(2, locked)`; the full campaign walk test wins the first pool country 46
@@ -49,6 +55,8 @@ times in a row.
 | `Assets/Scripts/Core/Europe/EuropeProgression.cs` | Pure C#. `CountryProgress` (Locked, Unlocked, Won), the campaign state, `RecordWin`, `PickUnlocks`, `Reset`, `UnlockAll`, the pending reveal list, `ToData` / `FromData` (`EuropeProgressData`). |
 | `Assets/Scripts/Runtime/Game/EuropeProgress.cs` | Unity side: builds the graph once from `EuropeCatalog`, loads and saves the JSON under its own PlayerPrefs key, the win hook, the command line flags, the `Changed` event. |
 | `Assets/Scripts/Runtime/View/EuropeMapView.cs` | The 3D map: state tints, floating flags, medals, selection lift and ring, focus camera, reveal, close-up. |
+| `Assets/Scripts/Runtime/UI/MenuScreen.cs` | JOUER opens the country screen (rule v1.7; no Pays button). |
+| `Assets/Scripts/Runtime/UI/ResultsScreen.cs` | PAYS SUIVANT (`GameDirector.ToCountryScreen`) and REJOUER (same country). |
 | `Assets/Scripts/Runtime/UI/EuropeScreen.cs` | The Pays screen: progress line, status line, locked hint, arrows that skip locked countries, "Jouer ce pays" gating, reveal on open, hidden reset. |
 | `Assets/Resources/Shaders/EuropeMap.shader` | Land, poles and cloth. `_Wave` animates the cloth in the vertex shader, `_Phase` shifts each flag, `_Cutout` cuts the medal. |
 | `Assets/Scripts/Runtime/Game/GameDirector.cs` | Two lines: the `EuropeShot` factory and the `EuropeProgress.OnRoundResults` call in `ShowResults`. |
@@ -125,6 +133,9 @@ pwsh -NoProfile -File tools/europe_shots.ps1 -Plan "progress,flags" -Sizes "540x
 - `Assets/Tests/EditMode/Runtime/EuropeProgressTests.cs` (real map): adjacency symmetry and expected neighbors, land
   connectivity, FR unlocks ES and CH, GB and IS fallbacks, replay, full 46-country campaign (twice, identical), JSON and
   PlayerPrefs round trip, win definition.
-- `Assets/Tests/PlayMode/EuropeMenuTests.cs`: a new campaign shows one flag (France), arrows skip locked countries, a
-  locked country cannot start, a first win shows two rising flags and a medal on the next opening, the hidden reset,
-  then a France round, Rejouer and Menu.
+- `Assets/Tests/PlayMode/EuropeMenuTests.cs`: no Pays button and JOUER opens the country screen, a new campaign shows one
+  flag (France), arrows skip locked countries, a locked country cannot start, a first win shows two rising flags and a
+  medal on the next opening, the hidden reset, then a France round (900 s, goal 100 %), REJOUER keeps France, PAYS SUIVANT
+  shows the country screen over the attract match.
+- `Assets/Tests/EditMode/Runtime/FlowV17Tests.cs` and `EuropeLevelsTests.EveryCountryHasAReachableConquestGoal`: the
+  round time setting and its migration, the conquest texts, every winning end counted, every level's conquest goal.

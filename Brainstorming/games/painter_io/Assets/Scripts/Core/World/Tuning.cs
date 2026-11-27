@@ -30,7 +30,8 @@ namespace PainterIO.Core
         public const double SparkSpeedFactor = 1.8;    // spark speed = 1.8 x PawnSpeed
 
         // Round (R19).
-        public const double RoundDuration = 90.0;
+        public const double RoundDuration = 90.0;      // Core default (tests); country rounds last 900 s (SaveData.DefaultRoundSeconds)
+        // The conquest goal constants (rule v1.7, contract 31) live in Conquest (DefaultShare, DisplaySlack, LazyFloor).
 
         // Le Lasso (R15 to R17).
         public const bool LassoEnabled = true;         // Core default (tests); the runtime default is OFF (SaveData.LassoOn)

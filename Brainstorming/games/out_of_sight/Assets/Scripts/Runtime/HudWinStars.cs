@@ -16,6 +16,8 @@ namespace OutOfSight
     /// (<see cref="InputReader.SkipPressed"/>), and a menu opened over the panel settles it silently. The buttons are up and
     /// usable from the panel's first frame, keyboard and gamepad focus as before (Menu selects the end screen's Menu
     /// principal and the fail panel's Retry; the win panel selects nothing, Enter loads the next level through GameState).
+    /// CONFETTI (2026-11-27): a three star result fires a confetti shower (<see cref="WinConfettiView"/>) as its third star
+    /// lands, or at once when a skip completes the reveal; once per win, never on a refresh, stopped when the panel goes.
     /// </summary>
     public sealed partial class Hud
     {
@@ -49,9 +51,23 @@ namespace OutOfSight
         private Text winStarsNew;
         private float columnLift;
         private float columnLaidFor;
+        // CONFETTI (docs/next/progress/STARSANIM.md "Confetti"): the three star shower over the panel, under its buttons.
+        private WinConfettiView winConfetti;
 
         /// <summary>STARSANIM: the win panel's hero star row (tests read its count, images, reveal state and timeline).</summary>
         public WinStarsView WinStars => winStars;
+
+        /// <summary>CONFETTI: the three star shower (tests read <see cref="WinConfettiView.Playing"/>, its bursts and pieces).</summary>
+        public WinConfettiView WinConfetti => winConfetti;
+
+        /// <summary>CONFETTI: the confetti falls over the visible win panel (or end screen) now.</summary>
+        public bool ConfettiPlaying => WinVisible && winConfetti != null && winConfetti.Playing;
+
+        /// <summary>CONFETTI: ends the shower at once (tests, shots); it never affects the stars nor the ad.</summary>
+        public void CompleteConfetti()
+        {
+            winConfetti?.Stop();
+        }
 
         /// <summary>The star row shows on screen: a visible win panel with stars set for the win just recorded.</summary>
         public bool WinStarsVisible => WinVisible && winStars != null && winStars.Shown;
@@ -80,6 +96,9 @@ namespace OutOfSight
             winStars = new WinStarsView(winCanvas.transform, "WinStars", OnStarFilled, OnStarMissed);
             winStarsNew = NewText(winCanvas.transform, "WinStarsNew", Strings.StarsNewBest, ColumnNewStarsSize, TextAnchor.MiddleCenter, Stars.Gold);
             winStarsNew.enabled = false;
+            // CONFETTI: built here, before the panel's button groups (Hud.Init builds them next): the shower draws over the
+            // dim, the texts and the stars, and under every button.
+            winConfetti = new WinConfettiView(winCanvas.transform, "WinConfetti");
         }
 
         /// <summary>
@@ -97,6 +116,8 @@ namespace OutOfSight
             }
             if (!winStars.Shown || winStars.Count != Mathf.Clamp(count, 0, Tuning.StarsPerLevel))
             {
+                // CONFETTI: a new reveal (a new win, another count) never keeps the last one's shower.
+                winConfetti?.Stop();
                 winStars.Set(count, true);
             }
             LayoutWinColumn();
@@ -114,6 +135,7 @@ namespace OutOfSight
         private void HideWinStars()
         {
             winStars?.Hide();
+            winConfetti?.Stop();
             if (winStarsNew != null)
             {
                 winStarsNew.enabled = false;
@@ -123,12 +145,14 @@ namespace OutOfSight
         /// <summary>
         /// Every frame (unscaled <paramref name="dt"/>): the column follows the canvas's height, and the reveal advances. A
         /// skip press completes it; a menu over the panel (the HUD hidden) settles it silently, so it never replays nor rings
-        /// over the menu.
+        /// over the menu. CONFETTI: the shower falls on with the panel and stops when the panel goes, a menu covers it or an
+        /// ad opens.
         /// </summary>
         private void UpdateWinStars(float dt)
         {
             if (!winOn || winStars == null)
             {
+                winConfetti?.Stop();
                 return;
             }
             if (Mathf.Abs(CanvasUnitsHeight() - columnLaidFor) > 0.5f)
@@ -141,13 +165,19 @@ namespace OutOfSight
                 {
                     winStars.Silence();
                 }
+                winConfetti?.Stop();
                 return;
+            }
+            if (winConfetti != null && winConfetti.Playing && AdService.Showing)
+            {
+                winConfetti.Stop();
             }
             if (winStars.Revealing && InputReader.SkipPressed())
             {
                 winStars.Complete(true);
             }
             winStars.Animate(dt);
+            winConfetti?.Animate(dt);
             if (winStarsNew != null && winStarsNew.enabled)
             {
                 Color c = winStarsNew.color;
@@ -233,13 +263,37 @@ namespace OutOfSight
             }
         }
 
-        /// <summary>A star filled: its chime, higher for each star, the third a chord.</summary>
+        /// <summary>
+        /// A star filled: its chime, higher for each star, the third a chord. CONFETTI: the third star of a three star result
+        /// (its fill during the reveal, or the one chime a skip or a completion owes, on the next frame) fires the shower.
+        /// </summary>
         private void OnStarFilled(int index)
         {
             Sfx sfx = StarsSfx;
             if (sfx != null)
             {
                 sfx.PlayStarChime(index);
+            }
+            if (winStars != null && index == Tuning.StarsPerLevel - 1 && winStars.Count >= Tuning.StarsPerLevel)
+            {
+                StartConfetti(sfx);
+            }
+        }
+
+        /// <summary>
+        /// CONFETTI: fires the shower and its party popper, only on the visible win panel with no ad up, and never under
+        /// <see cref="ReducedMotion"/> (the accessibility hook: no flying paper, no pop).
+        /// </summary>
+        private void StartConfetti(Sfx sfx)
+        {
+            if (winConfetti == null || ReducedMotion || !Visible || !winOn || AdService.Showing)
+            {
+                return;
+            }
+            winConfetti.Play();
+            if (sfx != null)
+            {
+                sfx.PlayConfettiPop();
             }
         }
 

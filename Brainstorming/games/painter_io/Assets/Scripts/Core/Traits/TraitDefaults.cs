@@ -42,6 +42,12 @@ namespace PainterIO.Core
         /// <summary>KillInheritance P1: share of the victim's cells that go to a surviving killer (section 7, 1.0 = all).</summary>
         public const double KillInheritanceShare = 1.0;
 
+        /// <summary>
+        /// KillInheritance bridge (rule v1.6, contract 30): default SimConfig.InheritanceBandHalfWidth in u (the band is
+        /// twice as wide: 0.9 u, the pearl's diameter, about 7 cells, never a one-cell line).
+        /// </summary>
+        public const double KillInheritanceBandHalfWidth = 0.45;
+
         /// <summary>KillSpeedBoost P1: added to the killer's SpeedMultiplier per kill (section 7).</summary>
         public const double KillSpeedBoostPerKill = 0.10;
 

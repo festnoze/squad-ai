@@ -17,6 +17,19 @@ namespace PainterIO.Core
         ShieldStarted,        // KillShield: Player = killer, Other = victim, Value = the shield end time, Chased = a spark
                               // on the killer's trail was extinguished (its loop stays lost: ExitWasCut)
         ShieldEnded,          // KillShield: Player, Value = the end time (= Time)
+
+        // Rule v1.5 (contract 29), appended at the END. Raised in section 6 step a right after the Return events of the
+        // group whose captures cut the territory: Player = the victim, Other = the cutter (the lowest-index returner that
+        // took cells of the split territory), Recipient = the player that received the severed cells (Other with
+        // SeveredTerritoryRule.Capturer) or -1 when they became neutral, Cells = the severed cells (ascending).
+        TerritorySevered,
+
+        // Rule v1.6 (contract 30, KillInheritance bridge), appended at the END. Raised in section 6 step b right after the
+        // kill rewards of a kill (TerritoryInherited first) when the inherited land was joined to the killer's domain by
+        // the bridge band: Player = the killer, Other = the victim, Point = the victim's head at the kill (as
+        // TerritoryInherited), Cells = the band cells that became the killer's (ascending; cells it already owned are not
+        // listed). The single-domain rule severs whatever stays apart with TerritorySevered (Other = -1, Recipient = -1).
+        InheritanceBridged,
     }
 
     /// <summary>One resolved event of a Step (section 6), raised in resolution order.</summary>
@@ -33,7 +46,8 @@ namespace PainterIO.Core
         public double S;              // Cut: s_cut
         public int[] Cells;           // Return: captured (applied) cells, always empty when Chased (contract 24, R13 v1.4);
                                       // Eliminated: freed cells; LassoPocket: pocket cells added; TerritoryGrew: grown
-                                      // cells (all ascending)
+                                      // cells; TerritorySevered: severed cells; InheritanceBridged: band cells (all
+                                      // ascending)
         public bool Chased;           // Return: the exit was cut (PlayerState.ExitWasCut, docs/BIOME_TRAITS.md 7.1; classic:
                                       // the player had a spark at the return instant): saved, captures nothing.
                                       // ShieldStarted: the shield extinguished a spark on the killer's trail
@@ -43,6 +57,8 @@ namespace PainterIO.Core
         public EliminationCause Cause;
         public double Value;          // api addition (docs/BIOME_TRAITS.md section 7): SpeedBoosted: the new SpeedMultiplier;
                                       // ShieldStarted / ShieldEnded: the shield end time. Otherwise 0
+        public int Recipient = -1;    // api addition (rule v1.5, contract 29): TerritorySevered: the player index that
+                                      // received the severed cells, -1 when they became neutral. Otherwise -1
 
         public override string ToString()
         {

@@ -29,8 +29,12 @@
 # ShaderCheck), editmode and playmode (Unity tests, JUnit counts, zero tests refused), buildwindows (Build/Windows), probe
 # (player probe in the liquid biome at -fps 30 and -fps 144: both PASS, equal [ProbeHash], no exception in the player logs),
 # probe-fire and probe-electric (one probe run per biome at -fps 60: PASS, screenshots, no exception, same hash as liquid
-# since the Core is identical in every biome), and with -Android the APK build (Build/Android) with the VIBRATE permission
-# read back from the APK manifest, always LAST.
+# since the Core is identical in every biome), traits-liquid, traits-fire and traits-electric (wave D-2, docs/BIOME_TRAITS.md
+# section 6: the probe with "-traits default", i.e. the biome's default trait line, at -fps 30 and -fps 144: both PASS, equal
+# [ProbeHash] per biome, a hash different from the classic one and a non-classic [ProbeTraits] line), and with -Android the
+# APK build (Build/Android) with the VIBRATE permission read back from the APK manifest, always LAST.
+# Wave D-2: the probe step also requires the classic hash to be -ExpectedClassicHash (default 246577239DE179C4, the
+# bit-identity guard of "Regles classiques"; pass -ExpectedClassicHash "" to skip that comparison).
 #
 # Every step prints exactly one line "PASS <step>: <detail>" or "FAIL <step>: <detail>" (or "SKIP <step>: ..." when an
 # earlier step failed and -KeepGoing is not set). The exit code is 1 when any step failed, else 0. A summary of the run
@@ -51,6 +55,7 @@ param(
     [string]$ProbeExe = "Build/Windows/PainterIO.exe",
     [int]$ProbeTimeoutSeconds = 420,
     [int]$PerfRuns = 2,
+    [string]$ExpectedClassicHash = "246577239DE179C4",
     [switch]$KeepGoing,
     [switch]$Android,
     [switch]$List
@@ -63,6 +68,7 @@ $logs = Join-Path $root "Logs"
 $results = Join-Path $root "TestResults"
 foreach ($dir in @($logs, $results)) { if (-not (Test-Path -LiteralPath $dir)) { [void](New-Item -ItemType Directory -Path $dir) } }
 $script:LiquidHash = $null
+$script:ClassicHash = $null
 
 function New-StepResult([bool]$ok, [string]$detail) {
     return [pscustomobject]@{ Ok = $ok; Detail = $detail }
@@ -218,10 +224,10 @@ function Get-OtherPlayers([int]$exceptPid) {
 }
 
 function Invoke-PlayerProbe([string]$label, [int]$fps, [string]$biome, [int]$width = 540, [int]$height = 960,
-    [string]$quality = "", [string]$dirName = "", [string]$logPath = "", [bool]$watchOthers = $false) {
+    [string]$quality = "", [string]$dirName = "", [string]$logPath = "", [bool]$watchOthers = $false, [string[]]$extraArgs = @()) {
     $exe = Resolve-ProjectPath $ProbeExe
     $run = [pscustomobject]@{ Label = $label; Ok = $false; Code = $null; Result = ""; Hash = ""; Perf = ""; Shots = 0;
-        Exceptions = @(); Problems = @(); Dir = ""; Log = ""; Contended = $false }
+        Exceptions = @(); Problems = @(); Dir = ""; Log = ""; Contended = $false; Traits = "" }
     if (-not (Test-Path -LiteralPath $exe)) { $run.Problems += "no player at $exe (run buildwindows first)"; return $run }
     if (-not $dirName) { $dirName = "${Agent}_probe_$label" }
     $dir = Join-Path $results $dirName
@@ -234,6 +240,7 @@ function Invoke-PlayerProbe([string]$label, [int]$fps, [string]$biome, [int]$wid
     $argv = @("-probe", "-shotdir", $dir, "-fps", "$fps", "-mute", "-biome", $biome,
         "-screen-width", "$width", "-screen-height", "$height", "-screen-fullscreen", "0", "-logFile", $log)
     if ($quality) { $argv += @("-quality", $quality) }
+    if ($extraArgs -and $extraArgs.Count -gt 0) { $argv += $extraArgs }
     $p = Start-Process -FilePath $exe -ArgumentList (($argv | ForEach-Object { Format-Arg $_ }) -join ' ') -PassThru
     $null = $p.Handle   # keeps the exit code readable after the process ends
     $finished = $false
@@ -262,6 +269,8 @@ function Invoke-PlayerProbe([string]$label, [int]$fps, [string]$biome, [int]$wid
     if ($m.Count -gt 0) { $run.Hash = $m[$m.Count - 1].Groups[1].Value }
     $m = [regex]::Matches($text, '(?m)^\[ProbePerf\] (.*?)\s*$')
     if ($m.Count -gt 0) { $run.Perf = $m[$m.Count - 1].Groups[1].Value }
+    $m = [regex]::Matches($text, '(?m)^\[ProbeTraits\] (.*?)\s*$')
+    if ($m.Count -gt 0) { $run.Traits = $m[$m.Count - 1].Groups[1].Value }
     $run.Shots = @(Get-ChildItem -LiteralPath $dir -Filter *.png -File -ErrorAction SilentlyContinue).Count
     # Exceptions, crashes and subsystem failures written by the player itself (the probe's own lines are excluded: they
     # quote what it caught, and its verdict covers them).
@@ -290,16 +299,47 @@ function Format-ProbeRun($run) {
 }
 
 # Step: probe - liquid biome at -fps 30 and -fps 144: both PASS and the same [ProbeHash] (display-rate independence).
+# Wave D-2: no trait flag, so the demo runs the classic rules: [ProbeTraits] must say "classic" and the hash must be
+# -ExpectedClassicHash (the "Regles classiques" bit-identity guard of docs/BIOME_TRAITS.md section 1).
 function Invoke-ProbeStep {
     $a = Invoke-PlayerProbe "liquid_fps30" 30 "liquid"
     $b = Invoke-PlayerProbe "liquid_fps144" 144 "liquid"
     $ok = $a.Ok -and $b.Ok
     $detail = "$(Format-ProbeRun $a); $(Format-ProbeRun $b)"
     if ($a.Hash -ne "" -and $b.Hash -ne "") {
-        if ($a.Hash -eq $b.Hash) { $detail += "; hashes equal"; $script:LiquidHash = $a.Hash }
+        if ($a.Hash -eq $b.Hash) { $detail += "; hashes equal"; $script:LiquidHash = $a.Hash; $script:ClassicHash = $a.Hash }
         else { $ok = $false; $detail += "; HASHES DIFFER" }
     }
+    foreach ($r in @($a, $b)) {
+        if ($r.Traits -and $r.Traits -ne "classic") { $ok = $false; $detail += "; $($r.Label) ran traits '$($r.Traits)' (must be classic by default)" }
+    }
+    if ($ExpectedClassicHash -and $a.Hash -ne "" -and $a.Hash -ne $ExpectedClassicHash) {
+        $ok = $false; $detail += "; CLASSIC HASH $($a.Hash) IS NOT $ExpectedClassicHash (the classic simulation changed)"
+    }
+    elseif ($ExpectedClassicHash -and $a.Hash -eq $ExpectedClassicHash) { $detail += "; classic hash $ExpectedClassicHash" }
     $detail += " (shots in TestResults/${Agent}_probe_liquid_fps30, _fps144)"
+    return New-StepResult $ok $detail
+}
+
+# Steps: traits-liquid, traits-fire, traits-electric (wave D-2, BIOME_TRAITS 6) - the probe with the biome's default trait
+# line (-traits default) at -fps 30 and -fps 144: both PASS, equal hashes, a non-classic [ProbeTraits] line and a hash that
+# differs from the classic one (the traits really applied). Shots in TestResults/<agent>_probe_traits_<biome>_fps30 / _fps144.
+function Invoke-TraitProbeStep([string]$biome) {
+    $flags = @("-traits", "default")
+    $a = Invoke-PlayerProbe "traits_${biome}_fps30" 30 $biome -extraArgs $flags
+    $b = Invoke-PlayerProbe "traits_${biome}_fps144" 144 $biome -extraArgs $flags
+    $ok = $a.Ok -and $b.Ok
+    $detail = "$(Format-ProbeRun $a); $(Format-ProbeRun $b); traits '$($a.Traits)'"
+    if ($a.Hash -ne "" -and $b.Hash -ne "") {
+        if ($a.Hash -eq $b.Hash) { $detail += "; hashes equal" }
+        else { $ok = $false; $detail += "; HASHES DIFFER" }
+    }
+    if (-not $a.Traits -or $a.Traits -eq "classic" -or $a.Traits -ne $b.Traits) {
+        $ok = $false; $detail += "; the probe did not report the biome's trait set ([ProbeTraits] '$($a.Traits)' / '$($b.Traits)')"
+    }
+    $classic = if ($script:ClassicHash) { $script:ClassicHash } else { $ExpectedClassicHash }
+    if ($classic -and $a.Hash -ne "" -and $a.Hash -eq $classic) { $ok = $false; $detail += "; HASH EQUALS THE CLASSIC ONE: the traits were not applied" }
+    $detail += " (shots in TestResults/${Agent}_probe_traits_${biome}_fps30, _fps144)"
     return New-StepResult $ok $detail
 }
 
@@ -557,11 +597,15 @@ $StepTable = [ordered]@{
     "probe"          = { Invoke-ProbeStep }
     "probe-fire"     = { Invoke-BiomeProbeStep "fire" }
     "probe-electric" = { Invoke-BiomeProbeStep "electric" }
+    "traits-liquid"  = { Invoke-TraitProbeStep "liquid" }
+    "traits-fire"    = { Invoke-TraitProbeStep "fire" }
+    "traits-electric" = { Invoke-TraitProbeStep "electric" }
     "perfslope"      = { Invoke-PerfSlopeStep }
     "android"        = { Invoke-AndroidStep }
 }
 # perfslope is opt-in (about 10 minutes of measurement): registered above, never in the default run.
-$DefaultSteps = @("dotnet", "setup", "editmode", "playmode", "buildwindows", "probe", "probe-fire", "probe-electric")
+$DefaultSteps = @("dotnet", "setup", "editmode", "playmode", "buildwindows", "probe", "probe-fire", "probe-electric",
+    "traits-liquid", "traits-fire", "traits-electric")
 $AndroidStep = "android"   # appended last when -Android is given (or when named in -Steps)
 
 if ($List) {

@@ -122,7 +122,7 @@ namespace PainterIO.Tests
                     Thread.CurrentThread.CurrentCulture = new CultureInfo(name);
                     Assert.AreEqual("3.4%", Strings.Area(3.44, En), name);
                     Assert.AreEqual("3,4 %", Strings.Area(3.44, Fr), name);
-                    Assert.AreEqual("01:30", Strings.Clock(90.0), name);
+                    Assert.AreEqual("1:30", Strings.Clock(90.0), name);
                 }
             }
             finally
@@ -134,12 +134,13 @@ namespace PainterIO.Tests
         [Test]
         public void Format_ClockDurationCountsAndRanks()
         {
-            Assert.AreEqual("01:30", Strings.Clock(90.0));
-            Assert.AreEqual("01:30", Strings.Clock(89.2), "seconds rounded up");
-            Assert.AreEqual("00:37", Strings.Clock(36.01));
-            Assert.AreEqual("00:00", Strings.Clock(0.0));
-            Assert.AreEqual("00:00", Strings.Clock(-3.0));
-            Assert.AreEqual("02:00", Strings.Clock(120.0));
+            Assert.AreEqual("1:30", Strings.Clock(90.0), "rule v1.7: m:ss");
+            Assert.AreEqual("1:30", Strings.Clock(89.2), "seconds rounded up");
+            Assert.AreEqual("0:37", Strings.Clock(36.01));
+            Assert.AreEqual("0:00", Strings.Clock(0.0));
+            Assert.AreEqual("0:00", Strings.Clock(-3.0));
+            Assert.AreEqual("2:00", Strings.Clock(120.0));
+            Assert.AreEqual("15:00", Strings.Clock(900.0));
             Assert.AreEqual("1:12", Strings.Duration(72.9));
             Assert.AreEqual("0:05", Strings.Duration(5.0));
 

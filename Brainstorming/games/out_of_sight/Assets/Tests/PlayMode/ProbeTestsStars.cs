@@ -18,6 +18,10 @@ namespace OutOfSight.Tests
     /// the time, the record line, the hint and every button; their reveal (empty slots popping in, then each earned star
     /// filling one by one with a chime, a burst of sparkles and a shake) settles within about 1.9 s; a skip press completes
     /// it at once with a single chime; a refresh never replays it; a one star win fills once and ticks twice.
+    /// CONFETTI (STARSANIM.md "Confetti"): a three star result fires one confetti shower with its party popper as the third
+    /// star lands (none before it), drawn under the buttons and never catching a raycast; a refresh never fires it again;
+    /// Replay stops it; a skip on a three star result fires it at once; it ends by itself; a one star result never fires it.
+    /// STAR3D: the earned stars settle untinted (<see cref="WinStarsView.FilledTint"/>, the 3D sprite has its own gold).
     /// </summary>
     public sealed class ProbeTestsStars
     {
@@ -160,6 +164,11 @@ namespace OutOfSight.Tests
             Assert.AreEqual(3, sfx.StarChimes.Length, "one chime per star");
             Assert.Greater(sfx.StarChimes[2].length, sfx.StarChimes[0].length, "the third chime (the chord) does not ring longer");
             int chimes = sfx.StarChimesPlayed;
+            WinConfettiView confetti = Hud.WinConfetti;
+            Assert.IsNotNull(confetti, "premise: the HUD built no confetti");
+            Assert.IsNotNull(sfx.ConfettiPop, "the party popper was not synthesized");
+            int bursts = confetti.Bursts;
+            int pops = sfx.ConfettiPopsPlayed;
 
             yield return WinCurrentLevel();
             Assert.LessOrEqual(Game.Elapsed, Stars.ThreeStarsUpTo(reference), "premise: the scripted win is a three star time");
@@ -191,6 +200,37 @@ namespace OutOfSight.Tests
             {
                 Assert.IsFalse(view.Images[2].enabled, "the third star filled with the first");
             }
+            if (view.FillsFired < 3)
+            {
+                Assert.IsFalse(Hud.ConfettiPlaying, "the confetti burst before the third star");
+                Assert.AreEqual(bursts, confetti.Bursts, "the confetti fired before the third star");
+            }
+
+            // CONFETTI: the third star lands, and the shower bursts with it (one, with one party popper).
+            yield return Frames(() => view.FillsFired >= 3, 3f);
+            Assert.AreEqual(3, view.FillsFired, "premise: the third star never filled");
+            Assert.AreEqual(bursts + 1, confetti.Bursts, "the third star did not fire the confetti exactly once");
+            Assert.IsTrue(Hud.ConfettiPlaying, "the confetti does not fall after the third star");
+            Assert.AreEqual(pops + 1, sfx.ConfettiPopsPlayed, "the confetti did not pop exactly once");
+            Assert.IsTrue(confetti.Canvas.enabled, "the confetti's canvas is off while it falls");
+            Assert.That(confetti.PieceCount, Is.InRange(60, 120), "the shower is not 60 to 120 pieces");
+            Assert.That(confetti.Duration, Is.InRange(2.5f, 3.6f), "the shower does not last about three seconds");
+            Texture atlas = confetti.Images[0].sprite.texture;
+            foreach (Image piece in confetti.Images)
+            {
+                Assert.IsFalse(piece.raycastTarget, $"{piece.name} catches raycasts (it would block the buttons)");
+                Assert.AreSame(atlas, piece.sprite.texture, $"{piece.name} is not in the confetti atlas (one draw call)");
+            }
+            int under = confetti.Root.GetSiblingIndex();
+            foreach (Button button in new[] { Hud.WinNextLevelButton, Hud.WinReplayButton, Hud.WinMenuButton })
+            {
+                Transform group = button.transform;
+                while (group.parent != null && group.parent != confetti.Root.parent)
+                {
+                    group = group.parent;
+                }
+                Assert.Less(under, group.GetSiblingIndex(), $"the confetti draws over {button.name}");
+            }
 
             // The reveal settles within its timeline: three fills, three rising chimes, every star at scale 1 in gold.
             yield return Frames(() => !view.Revealing, 3f);
@@ -205,7 +245,7 @@ namespace OutOfSight.Tests
             {
                 Assert.IsTrue(view.Images[i].enabled, $"star {i + 1} is not shown");
                 Assert.AreEqual(1f, view.Images[i].rectTransform.localScale.x, 1e-4f, $"star {i + 1} did not settle at scale 1");
-                Assert.AreEqual(Stars.Gold, view.Images[i].color, $"star {i + 1} is not gold");
+                Assert.AreEqual(WinStarsView.FilledTint, view.Images[i].color, $"star {i + 1} is not shown in its own gold");
                 Assert.AreEqual(1f, view.Slots[i].rectTransform.localScale.x, 1e-4f, $"slot {i + 1} did not settle at scale 1");
             }
 
@@ -242,19 +282,26 @@ namespace OutOfSight.Tests
             yield return null;
             Assert.IsFalse(view.Revealing, "a refresh replayed the reveal");
             Assert.AreEqual(chimes + 3, sfx.StarChimesPlayed, "a refresh chimed again");
+            Assert.AreEqual(bursts + 1, confetti.Bursts, "a refresh fired the confetti again");
+            Assert.AreEqual(pops + 1, sfx.ConfettiPopsPlayed, "a refresh popped again");
 
             // A second, equal win: the count stays, and it is no longer new. A skip press completes its reveal at once, with
-            // exactly one chime (the third star's), on the next frame.
+            // exactly one chime (the third star's), on the next frame. CONFETTI: Replay stops the first win's shower.
             Hud.WinReplayButton.onClick.Invoke();
             yield return Until(() => Game.State == PlayState.Playing, 10);
             Assert.IsFalse(Hud.WinStarsVisible, "the star row stayed up after the replay");
+            Assert.IsFalse(confetti.Playing, "the confetti kept falling after Replay");
+            Assert.IsFalse(confetti.Canvas.enabled, "the confetti's canvas stayed on after Replay");
+            Assert.AreEqual(0, confetti.LivePieces, "confetti pieces stayed on screen after Replay");
             yield return WinCurrentLevel();
             Assert.AreEqual(3, Menu.RecordLine.LastStars);
             Assert.IsFalse(Menu.RecordLine.LastStarsNew, "an equal star count counts as new");
             Assert.IsTrue(Hud.WinStarsVisible, "the star row is not shown on the second win");
             Assert.IsFalse(Hud.WinStarsNewVisible, "\"Nouvelles étoiles !\" shows on an equal win");
             Assert.IsTrue(view.Revealing, "premise: the second win's reveal did not start");
+            Assert.IsFalse(Hud.ConfettiPlaying, "the second win's confetti fell before its third star");
             int before = sfx.StarChimesPlayed;
+            int burstsBefore = confetti.Bursts;
             InputReader.InjectSkipPress();
             yield return null;
             Assert.IsFalse(view.Revealing, "a skip press did not complete the reveal");
@@ -262,14 +309,26 @@ namespace OutOfSight.Tests
             Assert.IsFalse(Hud.StarsAnimating);
             for (int i = 0; i < 3; i++)
             {
-                Assert.IsTrue(view.Images[i].enabled && view.Images[i].color == Stars.Gold, $"star {i + 1} is not filled after the skip");
+                Assert.IsTrue(view.Images[i].enabled && view.Images[i].color == WinStarsView.FilledTint, $"star {i + 1} is not filled after the skip");
             }
             yield return null;
             yield return null;
+            // CONFETTI: the skip on a three star result fires the shower at once (with the chime it owes, the next frame).
+            Assert.AreEqual(burstsBefore + 1, confetti.Bursts, "the skip on a three star result did not fire the confetti once");
+            Assert.IsTrue(Hud.ConfettiPlaying, "the confetti does not fall after the skip");
             yield return new WaitForSecondsRealtime(0.5f);
             Assert.AreEqual(before + 1, sfx.StarChimesPlayed, "the skip did not chime exactly once");
             Assert.AreEqual(2, sfx.LastStarChime, "the skip's chime is not the highest earned star's");
             Assert.IsTrue(Hud.WinVisible, "the skip left the win panel");
+            Assert.Greater(confetti.LivePieces, 30, "the shower shows too few pieces half a second in");
+
+            // The shower ends by itself within its length: every piece gone, its canvas off, the panel still up.
+            yield return Frames(() => !confetti.Playing, 4.5f);
+            Assert.IsFalse(confetti.Playing, "the confetti never ended");
+            Assert.AreEqual(0, confetti.LivePieces, "confetti pieces outlived the shower");
+            Assert.IsFalse(confetti.Canvas.enabled, "the confetti's canvas stayed on after the shower");
+            Assert.AreEqual(burstsBefore + 1, confetti.Bursts, "the confetti fired again by itself");
+            Assert.IsTrue(Hud.WinVisible, "the win panel went with the confetti");
             Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
         }
 
@@ -288,7 +347,13 @@ namespace OutOfSight.Tests
             yield return null;
             int chimes = sfx.StarChimesPlayed;
             int dulls = sfx.StarDullsPlayed;
+            WinConfettiView confetti = Hud.WinConfetti;
+            Assert.IsNotNull(confetti, "premise: the HUD built no confetti");
             Hud.ShowWinStars(1, false, false);
+            // CONFETTI: the new count's reveal stops the three star result's shower, and a one star result never fires one.
+            Assert.IsFalse(Hud.ConfettiPlaying, "the three star confetti outlived the new one star result");
+            int bursts = confetti.Bursts;
+            int pops = sfx.ConfettiPopsPlayed;
             WinStarsView view = Hud.WinStars;
             Assert.AreEqual(1, view.Count, "premise: the row does not hold one star");
             Assert.IsTrue(view.Revealing, "a new count did not start its reveal");
@@ -299,10 +364,18 @@ namespace OutOfSight.Tests
             Assert.AreEqual(chimes + 1, sfx.StarChimesPlayed, "a one star win did not chime exactly once");
             Assert.AreEqual(0, sfx.LastStarChime, "the one star's chime is not the first");
             Assert.AreEqual(dulls + 2, sfx.StarDullsPlayed, "the empty stars did not tick twice");
-            Assert.IsTrue(view.Images[0].enabled && view.Images[0].color == Stars.Gold, "the earned star is not gold");
+            Assert.IsTrue(view.Images[0].enabled && view.Images[0].color == WinStarsView.FilledTint, "the earned star is not shown");
             Assert.IsFalse(view.Images[1].enabled, "the second star filled on a one star win");
             Assert.IsFalse(view.Images[2].enabled, "the third star filled on a one star win");
             Assert.IsTrue(view.Slots[1].enabled && view.Slots[2].enabled, "the empty slots do not show");
+            // A skip after the settle owes nothing either: still no confetti, no pop.
+            Hud.CompleteStarsAnimation();
+            yield return null;
+            yield return null;
+            Assert.AreEqual(bursts, confetti.Bursts, "a one star result fired the confetti");
+            Assert.AreEqual(pops, sfx.ConfettiPopsPlayed, "a one star result popped the party popper");
+            Assert.IsFalse(Hud.ConfettiPlaying, "confetti falls on a one star result");
+            Assert.AreEqual(0, confetti.LivePieces, "confetti pieces show on a one star result");
             Assert.AreEqual(0, exceptions, "logged errors: " + string.Join(" | ", logged));
         }
 

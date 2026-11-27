@@ -1,6 +1,8 @@
 # Painter IO - Biome traits (wave D spec, normative)
 
-Status: v1.1, 2026-11-26 (section 7 adds the kill rewards). Requested by the user after the biome proposal: "tu pourras ajouter les comportements specifiques prevus pour
+Status: v1.3, 2026-11-27 (section 7 adds the kill rewards; v1.2 adds 7.3, the single domain rule and the inheritance bridge of
+KillInheritance, rule v1.6, contract section 30; v1.3: the single domain is a core rule of every round type, rule v1.8, contract
+section 32, and 7.3 keeps only what is specific to KillInheritance). Requested by the user after the biome proposal: "tu pourras ajouter les comportements specifiques prevus pour
 chaque biome, mais code-le de facon a ce que ce soit facilement debrayable individuellement ou interchangeable entre les biomes facilement."
 This file is folded into docs/CONTRACT.md as section 27 once wave C-2 has written section 26. It overrides older text where they disagree.
 
@@ -124,7 +126,7 @@ killer reward (the last cell already went to the capturer). Three new traits, sa
 
 | Id | Params (default) | Effect |
 |---|---|---|
-| KillInheritance (9) | Share = 1.0 | When the killer is alive after the eliminating group, the victim's cells go to the killer instead of becoming neutral (Paper.io 2). Applied in the elimination step, before the round-end check. If the killer is dead (or eliminated in the same group), the cells become neutral as today. Emits TerritoryInherited (Player = killer, Other = victim, Cells) |
+| KillInheritance (9) | Share = 1.0 | When the killer is alive after the eliminating group, the victim's cells go to the killer instead of becoming neutral (Paper.io 2). Applied in the elimination step, before the round-end check. If the killer is dead (or eliminated in the same group), the cells become neutral as today. Emits TerritoryInherited (Player = killer, Other = victim, Cells). Since v1.2 (7.3) the inherited land is always part of ONE domain: joined by the bridge band of the kill line (InheritanceBridged), or severed when no bridge can be made (TerritorySevered) |
 | KillSpeedBoost (10) | PerKill = 0.10, Cap = 0.30 | Each kill adds +PerKill to the killer's permanent speed multiplier for the rest of the round, capped at 1 + Cap (Paper.io 4). Emits SpeedBoosted (Player, value) |
 | KillShield (11) | Duration = 3.0 s | After a kill, the killer is invincible until t_kill + Duration: enemy heads cannot cut its trail (no Cut, no spark), and a spark already on its trail is extinguished at the kill instant. Territory loss to 0 cells still eliminates. Emits ShieldStarted / ShieldEnded (Player) |
 
@@ -148,7 +150,8 @@ Default assignment (section 3 table gains a column): Feu + KillInheritance, Éle
   off or moved) but its gameplay weight in Feu becomes small. Propagation then grows the inherited land too: Feu becomes the strongest
   snowball biome (deadlier cuts 2.1x + kills that pay + passive growth). The balance report must measure the swing (round decided by one kill).
   Inheritance can put the killer's own trailing head on its own cell: it then returns at that instant through the normal section 6 state
-  check (an unchased return captures with its trail; a chased one captures nothing). Intended.
+  check (an unchased return captures with its trail; a chased one captures nothing). Intended. Since v1.2 (7.3) the inherited land is
+  never an island: with the bridge, driving the trail from the old domain into the conquered land is a normal closure.
 - Électricité: KillSpeedBoost stacks with Conduction (up to 1.3 x 1.3 = 1.69 x base at home). Because the spark follows the victim's
   multiplier, a boosted player stays catchable at the same ratio (1.5x of its own speed). Faster pawns also turn wider (turn rate unchanged).
 - Liquide: KillShield gives a comeback: a chased player who kills during its flight loses its spark and survives, but its loop stays lost
@@ -159,3 +162,34 @@ Default assignment (section 3 table gains a column): Feu + KillInheritance, Éle
   SpeedBoosted shows "+10 % vitesse" and a stronger pearl aura per level; the shield shows a glossy film around the pearl and a shimmering,
   uncuttable trail with a small timer ring; toasts "Tu as pris le terrain de Safran !", "Vitesse +10 %", "Invincible 3 s".
 - Rule texts on the biome cards and in the trait matrix gain the three traits.
+
+### 7.3 KillInheritance: single domain and the inheritance bridge (v1.2, rule v1.6, contract section 30, normative)
+Designer, 2026-11-27: the conquered land must be part of the killer's domain, closing a loop into it must work, and "the line you make
+to kill the enemy should be turned into a line of your domain (not only as a line), so that your domain stay connected" (your domain
+must be one single domain). Contract section 30 is the full rule; summary for this trait:
+- Scope (v1.3, rule v1.8, contract section 32): the single domain itself is no longer a Feu rule. With the default
+  `SimConfig.SingleDomain = On`, every round type (classic, Liquide, Feu, Électricité) keeps every living player's territory ONE
+  8-connected domain at the end of every resolution step. What stays specific to KillInheritance (enabled with Share > 0) is the
+  bridge below. With `SingleDomain = On`, `InheritanceBridge = Off` behaves as AnchorOnly (an island is never kept); with
+  `SingleDomain = Off` (the pre-v1.8 rules) the v1.6 scope applies: rounds with KillInheritance and Share > 0 unless
+  `InheritanceBridge = Off`, and classic, Liquide and Électricité have no guarantee.
+- Right after the kill traits of a kill, if the inherited land does not touch the killer's domain, the kill line becomes a band of the
+  killer's territory: the killer's trail from its exit to its head at the cut (Q) when it is still out on that exit (which then
+  restarts at Q: the part before it is territory now), else Q itself when it still lies on the killer's land (the killer closed or was
+  home), then the link to the cut point P and the victim's trail from P back to its land. Band = cells within
+  `SimConfig.InheritanceBandHalfWidth` (0.45 u: about 7 cells wide) of the line plus the line's supercover raster. Applied when it
+  joins the killer's anchor piece to the inherited land; third players' cells under it are a capture for them (rule v1.5, R9).
+  Emits InheritanceBridged (Player = killer, Other = victim, Point = the kill point, Cells = band cells).
+- No bridge (the killer's exit was cut, a forced cut, the killer's line was taken since, or the band reaches nothing): the killer keeps
+  the piece of its anchor (pawn cell at home, exit cell when out, else the largest) and every other piece becomes plain neutral (not
+  scorched), TerritorySevered with Other = -1. `InheritanceBridge = AnchorOnly` always does this (no band).
+- Closures: a capture that would leave a part apart from the domain also takes its trail (before Coalescence), so a trail from one
+  piece into another, or a detached lasso pocket, joins the domain. Ordinary closures are unchanged. Since v1.3 this is the core rule
+  v1.8 (contract section 32) in every round type, and the trail is taken as a band (the same half width and supercover raster as the
+  bridge), no longer as its one-cell footprint (the footprint stays the behaviour of `SingleDomain = Off`).
+- Interplay checked: ScorchedEarth never scorches severed inherited land; Propagation grows the joined domain (the band included) and
+  still excludes the killer's remaining trail; KillShield's extinguished spark keeps ExitWasCut, so a saved killer makes no bridge;
+  KillSpeedBoost is independent. Share < 1 inherits the core near the centroid, which the band (ending on the rim) usually misses:
+  that core is then severed (open question).
+- Bots treat every own cell as home (NearestOwned) and re-pick their closure target after a bridge. Presentation: the band joins the
+  inherited fire sweep of the same kill (TerritoryField); severed cells leave the pending sweep.

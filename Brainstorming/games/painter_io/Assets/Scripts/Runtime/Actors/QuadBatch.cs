@@ -13,7 +13,8 @@ namespace PainterIO.Runtime
 {
     /// <summary>Overlay shape ids understood by Overlay.hlsl (UV1.x). Ids 0-5 are shared by every biome overlay shader.
     /// Ids 6-15 are RESERVED for biome effects (FireFx uses 10-12, ElectricFx 6-10, each with its own overlay shader):
-    /// a future shared shape takes id 16 or above.</summary>
+    /// a future shared shape takes id 16 or above. Wave D-2 (traits-fx): ids 16-21 are the shared trait shapes drawn by
+    /// TraitFxView (Streak and Shimmer use their own vertex layouts, see Overlay.hlsl).</summary>
     public enum OverlayShape
     {
         Ring = 0,
@@ -22,6 +23,12 @@ namespace PainterIO.Runtime
         Glint = 3,
         Flash = 4,
         Disc = 5,
+        Streak = 16,
+        Arc = 17,
+        Aura = 18,
+        Film = 19,
+        Timer = 20,
+        Shimmer = 21,
     }
 
     /// <summary>What a QuadBatch draws, so a biome change can give it the biome's matching shader.</summary>

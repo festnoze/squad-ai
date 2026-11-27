@@ -68,7 +68,11 @@ namespace PainterIO.Tests
         [Test]
         public void TraitsAudit_1_NullParsedAndDisabledInvalidSetsAreBitIdenticalToClassic()
         {
-            const ulong expected = 0x8CB763231AC73608UL;
+            // Rule v1.5 (contract 29): the default SeveredTerritory (Neutral) severs territory in this round; the pre-trait
+            // 8CB763231AC73608 is now the value with SeveredTerritory = Off (TraitsClassicTests pins both).
+            // Rule v1.8 (contract 32): C042710F17995DCB is now the value with SingleDomain = Off; the default is
+            // TraitsClassicTests.ClassicSeed1V18.
+            const ulong expected = TraitsClassicTests.ClassicSeed1V18;
             var disabled = new RuleTraits(new[]
             {
                 new TraitSpec(TraitId.Inertia, -5.0, double.NaN, false), new TraitSpec(TraitId.Coalescence, -1.0, double.NaN, false),
@@ -1096,9 +1100,19 @@ namespace PainterIO.Tests
                 TraitSpec spec = traits.Get(TraitId.Coalescence);
                 if (spec == null || traits.Has(TraitId.Propagation)) return;
                 SimEvent ret = null;
+                // Rule v1.5 (contract 29): a split severed by this return makes the severed cells neutral AFTER Coalescence
+                // filled the holes of the capture (step a order), so a hole made of severed cells may remain until the
+                // returner's next unchased return. Such holes are exempt; every other hole is still checked.
+                HashSet<int> severed = null;
                 foreach (SimEvent e in sim.LastEvents)
                 {
                     if (e.Type == SimEventType.Eliminated || e.Type == SimEventType.TerritoryGrew) return;
+                    if (e.Type == SimEventType.TerritorySevered)
+                    {
+                        if (severed == null) severed = new HashSet<int>();
+                        severed.UnionWith(e.Cells);
+                        continue;
+                    }
                     if (e.Type != SimEventType.Return) continue;
                     if (ret != null) return;
                     ret = e;
@@ -1121,7 +1135,7 @@ namespace PainterIO.Tests
                                       || (sj + 1 < size && cells[seed + size] == id) || (sj > 0 && cells[seed - size] == id);
                     if (!nextToLand) continue;
                     int count = 0;
-                    bool enclosed = true, unscorched = false;
+                    bool enclosed = true, unscorched = false, severedHole = false;
                     seen[seed] = true;
                     stack.Push(seed);
                     while (stack.Count > 0)
@@ -1129,6 +1143,7 @@ namespace PainterIO.Tests
                         int c = stack.Pop();
                         count++;
                         if (!(sim.View.ScorchEndTime(c) > ret.Time)) unscorched = true;
+                        if (severed != null && severed.Contains(c)) severedHole = true;
                         int ci = c % size, cj = c / size;
                         for (int d = 0; d < 4; d++)
                         {
@@ -1153,7 +1168,7 @@ namespace PainterIO.Tests
                             }
                         }
                     }
-                    if (enclosed && unscorched && count * cellArea < spec.P1)
+                    if (enclosed && unscorched && !severedHole && count * cellArea < spec.P1)
                         Assert.Fail(At + "player " + ret.Player + " returned unchased but still encloses a neutral hole of " + count
                                     + " cells (" + count * cellArea + " u^2 < " + spec.P1 + ")");
                 }
