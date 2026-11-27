@@ -1,0 +1,9 @@
+mode=probe exe=C:/Dev/squad-ai/Brainstorming/games/painter_io/Build/infra-perf/PainterIO.exe suspendAt=8 suspendMs=1500 noSuspend=False
+bot round seen=True at t=23.5 s
+suspended 1500 ms at t=31,6 s after launch
+exit=0
+watchdog lines: 0 
+[ProbeResult] PASS
+[ProbeHash] 246577239DE179C4
+[ProbePerf] avgMs=18.60 p95Ms=17.05 tier=High
+[PainterIO] render scale 1.000 (tier High, height 960)

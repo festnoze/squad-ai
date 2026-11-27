@@ -1,0 +1,7 @@
+{
+    "name": "PainterIO.Core",
+    "rootNamespace": "PainterIO.Core",
+    "references": [],
+    "noEngineReferences": true,
+    "autoReferenced": true
+}

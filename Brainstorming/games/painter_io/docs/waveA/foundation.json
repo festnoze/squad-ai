@@ -1,0 +1,72 @@
+{
+  "package": "A1 foundation",
+  "summary": "Math (Vec2d, Geo with a division-free SweepCircleSegment that handles zero-length and parallel motion and the half-open ProperIntersect of 5.1, xorshift64* Rng), World (Arena with the exact rounded-square SDF, OutwardNormal, ClampInside, R4 Step slide and hold, ShapeArea; Tuning; SimConfig) and Grid/CellMask are fully implemented. Every other Core file of sections 1 and 20 exists as a compiling stub with the exact section 5 surface; pure data types (enums, CellEntry, SelfCrossing, SimEvent, Spark, Ring, PlayerState, RoundResult, SimSetup, IController, ExternalController, BotPersonality with the 5.7 presets) are written completely. The dotnet fast loop (tools/CoreTests) isolates parallel agents through --artifacts-path, verified with two concurrent full runs. tools/verify.ps1 has the Core steps (dotnet with TRX counts, Unity EditMode with JUnit counts, zero tests refused) in a named-step table. 53 tests green in dotnet and in Unity EditMode (JUnit tests=53 failures=0 errors=0, no compiler warning in the Editor log).",
+  "files": [
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Math/Vec2d.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Math/Geo.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Math/Rng.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/World/Arena.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/World/Tuning.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/World/SimConfig.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Grid/CellMask.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Grid/OwnerGrid.cs (stub, A2)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Grid/GridRaster.cs (stub, A2; CellVisitor and CellEntry final)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Grid/CaptureSolver.cs (stub, A2)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Grid/GridQueries.cs (stub, A2)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Trail/Trail.cs (stub, A3; SelfCrossing final)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Trail/LoopErase.cs (stub, A3)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Trail/LassoGeometry.cs (stub, A3)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/Simulation.cs (stub, A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/SimView.cs (stub, A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/PlayerState.cs (complete data: PlayerState, Spark; A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/SimEvents.cs (complete data: EliminationCause, SimEventType, SimEvent; A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/RoundResult.cs (complete data: RoundEndReason, RoundResult; A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/Ring.cs (complete data; A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/IController.cs (complete; A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/SimSetup.cs (complete data; A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/EventResolver.cs (empty internal class, A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Sim/RingSpawner.cs (empty internal class, A4)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Controllers/ScriptedControllers.cs (stub, A4; ExternalController complete)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Bots/BotController.cs (stub, A5)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Bots/BotPersonality.cs (complete data with 5.7 presets; A5)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Core/Bots/BotSenses.cs (empty internal class, A5)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Runtime/AssemblyMarker.cs (placeholder, B0 may delete)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Scripts/Editor/AssemblyMarker.cs (placeholder, B0 may delete)",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/Assets/Tests/EditMode/Core/MathWorldTests.cs",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/tools/CoreTests/PainterIO.Core.csproj",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/tools/CoreTests/PainterIO.CoreTests.csproj",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/tools/CoreTests/Directory.Build.props",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/tools/CoreTests/README.md",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/tools/verify.ps1",
+    "C:/Dev/squad-ai/Brainstorming/games/painter_io/docs/waveA/foundation.json"
+  ],
+  "api_additions": [
+    "Vec2d: operator == and operator != (exact component comparison), Equals(object), GetHashCode(), ToString() (invariant culture, round-trip format).",
+    "Rng.ZeroSeedReplacement: public const ulong 0x9E3779B97F4A7C15, the state used when the seed is 0.",
+    "Arena.ClampBias: public const double 1e-12; ClampInside lands this far inside the inset boundary so SignedDistance(result) <= -Margin holds despite rounding.",
+    "SimConfig.TurnRateRad (TurnRateDeg in rad/s, for R3), SimConfig.BorderHoldAngleRad (the holdAngleRad argument of Arena.Step), SimConfig.GridSize (round(2 ArenaHalfSize / CellSize) = 512): derived read-only properties.",
+    "SimEvent.ToString() override (type, time, player, other, cause) for readable test failure messages."
+  ],
+  "contract_issues": [
+    "Contract 2.2 puts PainterIO.Core.csproj and PainterIO.CoreTests.csproj in tools/CoreTests, but games/painter_io/.gitignore line 9 ignores *.csproj (checked with git check-ignore): the two projects are invisible to git until an exception is added (see needs).",
+    "5.2 Arena.Step does not say where the outward normal is taken. A1 uses OutwardNormal(p0 + d): identical to the normal at p0 on straight walls, under 0.1 degree apart on the corner arcs at 60 Hz. A hold returns p0 unchanged; a slide is p0 + tangent * |d| then ClampInside, so on a corner arc the head follows the arc and stops once the normal enters the hold cone. A start outside the inset shape moving inward is simply clamped (keeps DebugSetTrail states sane).",
+    "5.3 CellMask.Version 'increments on every mutation' is implemented as 'on every content change': a Set of a set cell, an Unset of a clear cell, a Clear of an empty mask and a UnionWith that adds nothing leave Version unchanged. CopyIndices clears the output list before appending (the contract does not say).",
+    "5.1 ProperIntersect is evaluated in floating point exactly as written (no vertex snapping). It is exact for axis-aligned and dyadic data (all test scenarios on cell-center lines); a non-axis-aligned head path through an existing trail vertex could in theory be counted twice or missed by rounding (probability zero in general position).",
+    "5.1 MoveTowardsAngle returns target exactly as given (not wrapped) when maxDelta <= 0 or the target is within reach; only a partial turn is wrapped to (-pi, pi]. An exact half turn goes counter-clockwise. Vec2d.Lerp is unclamped and returns b bit for bit at t == 1 (a + (b - a) can miss b by one ulp)."
+  ],
+  "tests": {
+    "added": 53,
+    "passing": 53,
+    "failing": []
+  },
+  "open_issues": [
+    "Stub behaviour classes (OwnerGrid, GridRaster, CaptureSolver, GridQueries, Trail members, LoopErase, LassoGeometry, Simulation, SimView, the scripted controllers except ExternalController, BotController) throw NotImplementedException, constructors included, so any test touching them fails until the owner lands. Exception: the Trail constructor is empty because PlayerState initializes Trail = new Trail().",
+    "RingSpawner, EventResolver and BotSenses are empty internal classes: the contract defines no public surface for them; owners shape them freely.",
+    "IDE design-time builds write into tools/CoreTests/.art/default; every agent must pass its own --artifacts-path tools/CoreTests/.art/<package> (README.md).",
+    "Unity generated .meta files for the new folders and scripts on the EditMode run; files other agents create later get theirs on the next Unity run.",
+    "tools/verify.ps1 currently registers the steps dotnet and editmode (the default order); B6 registers setup, playmode, buildwindows, probe and android in $StepTable and $DefaultSteps (instructions in the script header; Invoke-UnityTests already takes the mode, so playmode is one line)."
+  ],
+  "needs": [
+    "games/painter_io/.gitignore (no package owns it; user or B6): add the line '!/tools/CoreTests/*.csproj' after '*.csproj' so tools/CoreTests/PainterIO.Core.csproj and PainterIO.CoreTests.csproj are versioned."
+  ]
+}

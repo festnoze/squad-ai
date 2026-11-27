@@ -1,0 +1,366 @@
+{
+  "summary": "Wave C triage of 34 surviving findings (5 major, 29 minor, no blocker). Merged duplicates: robust-07 + visuals-shader-time-wrap-pop (shader clock wrap), robust-03 + perf-07 (first biome tap freeze), robust-02 + perf-03 (FPS watchdog), robust-01 + robust-08 (UI fit at non 9:16 aspects, both solved by CanvasScaler Expand), perf-09 + the frame pacing part of perf-03, visuals-fire-fill-not-spreading + the fire part of visuals-reveal-age-staircase, visuals-fire-low-tier-lattice + the fire Low cliff of perf-03. visuals-chase-front-not-brightest (major) is split by file ownership into an actors part (glint size, flicker floor, halo), a fire part (FireOverlay shape 3) and an electric part (packet halo, bead dots). The fix wave takes all 5 majors (rules-01 self-crossing explained after the return, visuals-chase-front-not-brightest, robust-01 UI layouts at wide aspects, perf-01 FireComposite cost on Medium, perf-02 render height cap per tier) plus 24 cheap and visible minors, in 7 packages with disjoint file ownership: game-flow (4 runtime files), ui (7), actors (4), biome-fire (4 shaders/fx), biome-electric-liquid (5), audio (7), infra-perf (6). Deferred: rules-03 (lasso is OFF by default), feel-01 (needs a contract 11.1/15.5 amendment, sent to the user), and sub-parts that are beyond the contract, unmeasured or already accepted at Gate B. RULES FOR EVERY PACKAGE: (1) edit only your owner_files; if a fix needs a change in another package's file, write it under needs in your report instead of editing; (2) new EditMode tests go in a new file Assets/Tests/EditMode/Runtime/WaveC_<PackageKey>Tests.cs owned by your package, test names prefixed WaveC_; existing test files are edited only by the package that owns them (listed in owner_files); every existing test must stay green; (3) never edit docs/CONTRACT.md: list each contract amendment your change implies under contract_issues in your report (the contract owner folds them in); (4) shaders: keep the 12.2 item 4 fetch budget, keep every ddx/ddy/fwidth and every implicit-LOD texture sample OUTSIDE dynamic branches (use SAMPLE_TEXTURE2D_LOD inside), and make sure both the target 4.5 and the GLES3 target 2.0 subshaders compile (ShaderCheck only compiles the active one; BuildWindows and BuildAndroid catch the rest); (5) the sim must stay bit-identical: the probe hash 246577239DE179C4 must not change; (6) English comments, no em dash anywhere (code, strings, reports); (7) screenshot acceptance uses the release player per the harness rules (DevShot: Build/Windows/PainterIO.exe -devshot <abs dir> -biome liquid|fire|electric [-quality high|medium|low] -screen-width W -screen-height H -screen-fullscreen 0 -logFile <dir>/p.log; probe: -probe -shotdir <abs dir> -biome ... -fps N -mute ...); if your package cannot build, state the acceptance checks as pending for the gate. Cross-package couplings (no shared file, only an agreed value): the actors package sets the spark glint quad half size to 0.5 u, and the fire and electric overlay shape 3 interiors are designed for that size; the infra-perf opt-in verify step 'perfslope' is the measurement tool for the fire, electric and liquid performance acceptance (the same numbers can be taken by hand with the method in docs/waveC/perf/probe_matrix.txt). Baselines (Iris Xe, docs/waveC/perf/probe_matrix.txt, -quality medium, uncapped): liquid 2.11, electric 2.91, fire 4.34 ms per Mpix.",
+  "user_decisions": [
+    {
+      "id": "feel-01",
+      "question": "After a cut close behind the pearl, the spark catches the player in about 0.2-0.3 s of real time (32 of 33 simulated human spark deaths came under 0.6 s after the cut), so the chase presentation (vignette, zoom, tension loop) never has time to read and the results line talks about distance home. Do you want: (a) a longer slow motion on every cut received whose SparkCatchEta is below 0.8 s, SlowMo(0.3, 0.5, 0.25) instead of SlowMo(0.25, 0.12, 0.08) (sim outcomes unchanged); (b) a results variant 'Safran t'a coupé juste derrière toi : rattrapé en 0,2 s.' / 'Safran cut right behind you: caught in 0.2 s.' when the chase lasted under 0.5 s; (c) a victim toast 'Safran t'a coupé !' during the 1.0 s death beat? These amend contract 11.1 (slow-motion table) and 15.5 (caught line).",
+      "recommendation": "Yes to (a) and (b), as a small follow-up (GameDirector slow motion and HumanOutcome.ChaseSeconds, ResultsScreen line choice, two Strings keys), ideally confirmed during the device playtest of brief 7.7. (c) is optional. Not scheduled in wave C because it changes contract text the user owns."
+    },
+    {
+      "id": "feel-11-standings",
+      "question": "The results screen shows the rank ('4e') but not who won or with what share. Add a 4-row final standings list (color dot, name, % or 'éliminé') between the stats line and REJOUER? Contract 15.5 does not ask for it.",
+      "recommendation": "Optional and cheap (ResultsScreen plus ranks and areas captured in HumanOutcome when it is built). Recommend deciding after the device playtest: add it if players lack a 'beat Safran next time' goal; the in-round leaderboard already gives the information during play."
+    }
+  ],
+  "packages": [
+    {
+      "key": "game-flow",
+      "area": "game-flow",
+      "owner_files": [
+        "Assets/Scripts/Runtime/UI/TutorialOverlay.cs",
+        "Assets/Scripts/Runtime/Game/Strings.cs",
+        "Assets/Scripts/Runtime/Game/SaveData.cs",
+        "Assets/Scripts/Runtime/Game/GameDirector.cs",
+        "Assets/Tests/EditMode/Runtime/WaveC_GameFlowTests.cs"
+      ],
+      "items": [
+        {
+          "id": "rules-01",
+          "severity": "major",
+          "title": "Crossing your own trail without a charge silently throws away the loop: explain it once, at the next unchased return",
+          "fix": "Keep rules R8 and R16 untouched (nothing visible at the crossing itself). (1) SaveData.cs: add a persisted bool TutSelfCrossDone (default false), stored, loaded and reset exactly like TutCutDone and TutLassoDone (same key style, same reset path if a tutorial reset exists). (2) Strings.cs: add key tut.selfcross, FR 'Recroiser ton fil ouvre ta boucle : rentre sans le recroiser pour tout peindre.' EN 'Crossing your own thread breaks the loop: come home without crossing it to paint it all.' (no em dash, FR spacing before the colon like the other FR strings). (3) TutorialOverlay.cs: add Bubble.SelfCross and fields selfCrossPending, selfCrossShown, selfCrossActive, selfCrossTime (all reset in Bind). In OnSimEvent, for events whose Player is the human: LassoCrossNoCharge -> if !SaveData.TutSelfCrossDone && !selfCrossShown then selfCrossPending = true. Return -> if selfCrossPending: when e.Chased just clear it (the saved toast already explains the loss); otherwise start the bubble (selfCrossActive = true, selfCrossShown = true, selfCrossTime = 0, and if Persist(s) set SaveData.TutSelfCrossDone = true), then clear selfCrossPending. Exit (a new exit of the human), SparkCaught and Eliminated -> clear selfCrossPending and selfCrossActive. In Tick: bubble priority Cut > Lasso > SelfCross > Exit; selfCrossTime advances only while the bubble is really visible (same CountsAsVisible rule as the rules-05 item); hide it after SelfCrossSeconds = 4.0 s; no pointer for this bubble; SetBubbleText maps Bubble.SelfCross to tut.selfcross. Expose a read-only internal property (for example WantedBubbleName) if tests need it. (4) Report under contract_issues: 15.4 gains the step 'first unchased return after an uncharged self-crossing: bubble tut.selfcross, then SaveData.TutSelfCrossDone = true'; 11.5 gains the flag. Acceptance: WaveC_GameFlowTests (UiRoot.Create(null) as in UiStringsTests, or a minimal overlay instance): human LassoCrossNoCharge then unchased Return -> SelfCross is the wanted bubble; human LassoCrossNoCharge then chased Return -> no bubble; once the flag is set a second occurrence shows nothing; a bot's LassoCrossNoCharge does nothing; an Exit between the crossing and the return cancels it. Strings_EveryKeyExistsInBothTables and Strings_ValuesAreNonEmptyWithoutEmDashAndWithMatchingPlaceholders stay green."
+        },
+        {
+          "id": "rules-05",
+          "severity": "minor",
+          "title": "The first-cut lesson is consumed while the bubble is hidden (pause, ready gate, death beat)",
+          "fix": "TutorialOverlay.Tick: compute want and shown first, then accumulate cutVisible only when shown == Bubble.Cut && want == Bubble.Cut && bubbleAlpha >= 0.95f, so time behind the pause panel, the ready gate after a pause and the death beat never counts toward the 2.5 s of contract 15.4. Factor the condition as internal static bool CountsAsVisible(Bubble shown, Bubble want, float alpha) and reuse it for the SelfCross timer. Keep the chased Return path (Return with Chased -> MarkCutDone) unchanged. The slow motion that runs out during a pause is cosmetic and not changed. Acceptance: WaveC_GameFlowTests: CountsAsVisible is false when want is None (paused) or alpha < 0.95 and true when shown and want are Cut with alpha 1; if a paused director can be built in EditMode, ticking 3 s while paused leaves SaveData.TutCutDone false (use a non-persisting session)."
+        },
+        {
+          "id": "robust-04",
+          "severity": "minor",
+          "title": "The screen never sleeps and renders at 60 fps while the pause panel is up (also after an automatic pause)",
+          "fix": "GameDirector.cs: (1) add internal static SleepTimeout SleepTimeoutFor(GameState state, bool paused) returning SleepTimeout.NeverSleep only when state == Playing && !paused, else SleepTimeout.SystemSetting, and use it in ApplySleepTimeout. (2) Call ApplySleepTimeout from SetPaused (both directions), ForceUnpause and any other path that changes IsPaused. (3) Android only (#if UNITY_ANDROID && !UNITY_EDITOR) and only when LaunchArgs.Fps <= 0: while paused set Application.targetFrameRate = 30, and restore 60 when the pause ends (SetPaused(false), ForceUnpause, StartRound, ToMenu). Put this in an ApplyTargetFrameRate(bool paused) helper also used by ApplyFrameSettings; never re-run the renderScale lines of ApplyFrameSettings from it. Windows stays on vSync, unchanged. Report under contract_issues: 11.1 'NeverSleep while Playing and not paused; 30 fps while paused on Android'. Acceptance: WaveC_GameFlowTests checks SleepTimeoutFor for the four combinations of Playing/Menu x paused/not paused; RuntimeSkeletonTests and PlayMode BootTests stay green."
+        }
+      ]
+    },
+    {
+      "key": "ui",
+      "area": "ui",
+      "owner_files": [
+        "Assets/Scripts/Runtime/UI/UiKit.cs",
+        "Assets/Scripts/Runtime/UI/Hud.cs",
+        "Assets/Scripts/Runtime/UI/MenuScreen.cs",
+        "Assets/Scripts/Runtime/UI/ResultsScreen.cs",
+        "Assets/Scripts/Runtime/UI/PausePanel.cs",
+        "Assets/Scripts/Runtime/UI/BiomePreview.cs",
+        "Assets/Scripts/Runtime/View/CameraRig.cs",
+        "Assets/Tests/EditMode/Runtime/UiStringsTests.cs",
+        "Assets/Tests/EditMode/Runtime/InputCameraMathTests.cs",
+        "Assets/Tests/EditMode/Runtime/WaveC_UiTests.cs"
+      ],
+      "items": [
+        {
+          "id": "robust-01, robust-08",
+          "severity": "major",
+          "title": "Menu, Results and Pause layouts collide at any aspect wider than about 0.63, and the biome card row touches the edge on 20:9 and clips on 21:9",
+          "fix": "(1) UiKit.CreateCanvas (lines 116-121): scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand, keep ScaleWithScreenSize and referenceResolution 1080x1920. The whole 1080x1920 design box is then always visible: portrait phones taller than 16:9 get a canvas exactly 1080 wide (taller than 1920), landscape or square windows get a canvas exactly 1920 tall (wider than 1080), and at exactly 9:16 (540x960, the Windows default) the layout is identical to today. Update or remove the MatchWidthOrHeight constant (UiKit.cs:17) and change UiStringsTests.UiRoot_FollowsTheUguiRules (line 210) to assert screenMatchMode == Expand instead of matchWidthOrHeight == 0.5. (2) MenuScreen: protect the card row against horizontal safe-area insets (robust-08): parent the three cards to a 'CardRow' RectTransform scaled by min(1, (Safe.rect.width - 32) / 962), recomputed in Tick when Safe.rect.width changes (with Expand the canvas half width is 540 against 481 needed, so the scale is 1 on every phone without insets). (3) Review Menu (title TopCenter -340 vs biome label BottomCenter +1327), Results (stats TopCenter -1150 vs REJOUER BottomCenter +440) and Pause (title Center +470 vs the HUD timer): with a canvas height >= 1920 they no longer collide, so keep the positions; check the HUD board, toasts and tutorial pointer still sit inside Safe in landscape. (4) Report under contract_issues: 15.1 'CanvasScaler reference 1080 x 1920, screenMatchMode Expand' replaces 'match 0.5'. Acceptance after the build: release probe (menu.png, results.png) and DevShot (CutDroplets) for liquid at 540x960, 540x1200, 432x960, 1280x720 and 1080x1200: in menu.png the title, 'Biome' label, cards, swatches and JOUER never overlap and every card rim is at least 8 px from the screen edge; in results.png REJOUER and MENU cover neither the stats line nor the cause line; in the 1280x720 CutDroplets shot the Pause title does not overlap the HUD timer; the 540x960 shots keep the layout of docs/waveB/shots/gate/liquid_menu.png and liquid_results.png. Compare with the failing shots in docs/waveC/robustness/p_1280x720 and p_1080x2400."
+        },
+        {
+          "id": "rules-02",
+          "severity": "minor",
+          "title": "Toasts (incl. the v1.4 'boucle perdue' line) shrink to about 1 mm text while the leaderboard is open",
+          "fix": "Hud.TickToasts (lines 476-486): (1) never scale a toast below MinToastScale = 0.85f; (2) with the board open, stop squeezing the toast into the column left of the board: center it (x = 0) just below the board's bottom edge (board bottom in Safe coordinates minus 24 px minus half the toast height) at s = max(0.85, min(1, (width - 40) / w)); (3) if w * 0.85 > width - 40 (long saved line on a narrow phone, EN text), switch the toast text to two lines: horizontalOverflow Wrap, toast size (width - 64, 150), s = 1; ShowToast restores single-line sizing for the next toast. Factor the scale and position into an internal static helper (for example ToastLayout(float safeWidth, float toastWidth, bool boardOpen)). Acceptance: WaveC_UiTests: the helper never returns a scale below 0.85 and never returns a rectangle overlapping the board when it is open. After the build, reproduce docs/waveC/rules-and-flow/fr_fire_tall/fire_SavedReturn.png (432x960, board open) and en_liquid/liquid_SavedReturn.png (540x960) with the same command as that critic (see the p.log in those folders): the saved line is fully on screen, does not cover the board, and its text bounding box is at least 12 px tall at 960 px window height (was 7 px)."
+        },
+        {
+          "id": "visuals-hud-contrast-over-bright-beds",
+          "severity": "minor",
+          "title": "The rival button chevron disappears over gold, neon-yellow and saffron beds",
+          "fix": "Hud.cs, rival chevron (lines 127-129): alpha 0.55 -> 0.9, size 24x16 -> 28x18, and add a UnityEngine.UI.Outline (or Shadow) component in navy #151D38 alpha 0.8 with effectDistance (2, -2). Do not move any HUD element (contract 25.5: layout unchanged). The area labels already have their navy shadow and stay as they are. Acceptance: DevShot fire and electric at 1080 px width, PocketPending checkpoint: the chevron is clearly visible over a bright bed (compare docs/waveC/visuals/zoom_fire_hud_over_bed_1080.png and zoom_electric_hud_over_bed_1080.png)."
+        },
+        {
+          "id": "feel-06",
+          "severity": "minor",
+          "title": "Menu: attract puddles show through the unselected biome cards and the swatch row, where there is no dimming",
+          "fix": "(1) MenuScreen: add a 'CardsScrim' Image (UiKit.Navy, alpha 0.45, a soft sprite with about 60 units of feathering at top and bottom, raycastTarget false) spanning the full canvas width from 40 units below the swatch row to 30 units above the 'Biome' label, anchored to the same BottomCenter references as the cards and swatches (not to screen fractions), placed just above the TopShade and BottomShade and below every content element. (2) TickCards (line ~198): unselected card face = UiKit.PanelNavy fully opaque (was alpha 0.88). (3) CameraRig: add public const float AttractZoom = 1.4f and use it as the view-scale target in CameraMode.Attract, so attract puddles become background texture (AttractHalfLife unchanged); add an InputCameraMathTests case for the attract scale target. Keep the coral title (contract 15.2). Acceptance: release probe menu.png in the three biomes at 540x960 and 540x1200: no puddle shows through an unselected card face, the selected card (rim, scale 1.06) and the selected swatch ring stay the most salient elements; existing InputCameraMathTests stay green."
+        },
+        {
+          "id": "rules-11",
+          "severity": "minor",
+          "title": "The attract match behind the menu freezes for 2 s, then pops back to four discs",
+          "fix": "MenuScreen only (GameSession is not edited): add a full-screen navy 'AttractCover' Image (UiKit.Navy, raycastTarget false) as the first sibling of the menu canvas (over the world, under the shades and content). In Tick while the menu is visible: s = Director.Session; if s != null && s.IsAttract && s.Sim.Ended, fade the cover alpha toward 0.85 over 0.5 s; remember the Simulation reference, and when s.Sim becomes a different object (GameSession.RestartAttract swapped it), wait 0.2 s (the territory field rebuilds) then fade to 0 over 0.5 s. When the menu is shown from another state the cover starts at 0. Put the timing in an internal static helper (for example AttractCoverAlpha(bool ended, float secondsSinceRestart, float current, float dt)). Acceptance: WaveC_UiTests covers the helper (rises while ended, holds, falls after the restart delay); manual check with the release player idle in the menu for about 95 s: the end board fades to navy and the new match fades in, with no single-frame pop."
+        },
+        {
+          "id": "feel-11",
+          "severity": "minor",
+          "title": "Results: bright puddles behind the key numbers and an empty 100 px band when there is no WHY line",
+          "fix": "ResultsScreen: (1) background dim 0.74 -> 0.86 (line 30); (2) when the WHY line is empty (caught, territory lost, time up without a chased return), do not keep its slot: move the stats line and the tuning tag up by the WHY slot height (compute the vertical positions in Show from which lines are non-empty); (3) narrow the cause and WHY paragraphs from 940 to 880 reference units (wrap on). Text content is unchanged, so UiStringsTests.Results_CauseAndWhyLines stays green. The standings list (user decision feel-11-standings) and a ResultsZoom change are not part of this item. Acceptance: release probe results.png at 540x960 and 540x1200 for a caught round: no empty band taller than 40 px (at 960 px height) between the cause line and the stats line; the area number sits on a visibly darker backdrop than docs/waveB/shots/gate/liquid_results.png."
+        },
+        {
+          "id": "perf-08",
+          "severity": "minor",
+          "title": "Menu biome previews are repainted in C# 30 times per second (10 Hz each, choppy and costly on the first screen)",
+          "fix": "MenuScreen.TickCards (lines 203-209) and BiomePreview: animate only the selected card, at PreviewRepaintsPerSecond = 15 (one Paint of the selected card per tick); paint each unselected card once at creation and once when it becomes unselected, so it shows a still frame. BiomePreview: compute the RoundCorners alpha mask once (per instance or static cache) instead of on every Paint. Keep the 128x80 tile. Acceptance: WaveC_UiTests: after 1 s of TickCards at 60 fps the selected painter received 15 Paint calls and each unselected painter 0 (count through an internal counter); menu shots unchanged apart from feel-06."
+        }
+      ]
+    },
+    {
+      "key": "actors",
+      "area": "actors",
+      "owner_files": [
+        "Assets/Scripts/Runtime/Actors/RetractionView.cs",
+        "Assets/Scripts/Runtime/Actors/HomeArrow.cs",
+        "Assets/Scripts/Runtime/Actors/SparkEdgeIndicator.cs",
+        "Assets/Scripts/Runtime/Actors/ActorViews.cs",
+        "Assets/Tests/EditMode/Runtime/ActorViewsTests.cs",
+        "Assets/Tests/EditMode/Runtime/WaveC_ActorsTests.cs"
+      ],
+      "items": [
+        {
+          "id": "visuals-chase-front-not-brightest (actors part)",
+          "severity": "major",
+          "title": "The spark / packet glint flickers down to 25 % opacity a third of the time and is too small to be the brightest moving thing (25.5)",
+          "fix": "RetractionView.DrawGlint (lines 204-211), all three biomes: (1) glint half size 0.3 u -> 0.5 u (the fire and electric packages design their overlay shape 3 interior for this size); (2) replace the 15 Hz flicker that drops opacity to 0.25 on about 35 % of the steps by a steady flicker between 0.8 and 1.0 (absolute floor 0.7); (3) draw under the glint a soft halo quad of 1.2 u half size, opacity 0.35, in the front color, reusing the soft glow shape id that SparkEdgeIndicator or CutFlash already uses (every biome overlay implements the shared shape ids; do not invent a new id); (4) make sure the halo and glint sort above droplets, threads and pearls. Acceptance: WaveC_ActorsTests: the glint opacity over 120 consecutive flicker steps never drops below 0.7 and the glint half size is 0.5 u; ActorViewsTests stay green. After the build, DevShot -quality medium at 540x960, CutDroplets checkpoint, in each biome: pixels with luma >= 235 within 1.5 u of the front outnumber those within 1.5 u of the human pearl by at least 1.5x (compare docs/waveC/refute-visuals/crop_fire_cut_medium.png)."
+        },
+        {
+          "id": "feel-08",
+          "severity": "minor",
+          "title": "The home arrow is a thin white chevron sized in world units that shrinks to about 12x8 px with the chase zoom",
+          "fix": "HomeArrow (lines 13-14 and 69-75): draw at constant screen size: half size = 0.62 u x ViewScale and distance from the pearl rim = 0.65 u x ViewScale, where ViewScale is CameraRig.Current.ViewScale (fallback 1 when there is no rig); if HomeArrow cannot reach the rig, add ViewScale to the ActorContext that ActorViews builds (next to ctx.UiScale, ActorViews.cs:476). Draw in this order: a halo disc in the human color (alpha 0.45, radius 1.3x the chevron half size, same soft glow shape as above), a navy drop-shadow chevron offset by (0.05, -0.05) u x ViewScale at alpha 0.6, then the white chevron. No off-screen home edge indicator (deferred). Acceptance: WaveC_ActorsTests: the chevron size divided by the view width is the same at ViewScale 1.0 and 1.44. After the build, DevShot liquid at 540x960, cut checkpoint: the chevron spans at least 20x14 px (today about 12x8, docs/waveC/feel/zoom_liquid_cut_front.png) and stays visible over the red vignette."
+        }
+      ]
+    },
+    {
+      "key": "biome-fire",
+      "area": "biomes",
+      "owner_files": [
+        "Assets/Resources/Shaders/FireComposite.hlsl",
+        "Assets/Resources/Shaders/FireOverlay.hlsl",
+        "Assets/Resources/Shaders/FireBead.hlsl",
+        "Assets/Scripts/Runtime/Biomes/FireFx.cs"
+      ],
+      "items": [
+        {
+          "id": "perf-01",
+          "severity": "major",
+          "title": "FireComposite runs its whole noise stack on every pixel at Medium (fire costs 2.06x liquid per pixel)",
+          "fix": "FireComposite.hlsl (keep the fetch budget, keep derivatives and implicit-LOD samples outside branches): (1) [branch] if (cT > 0) around the ember bed: PIO_FireCells, breath, slow, zone, twinkle, both PIO_FireRamp calls, sheet, ash, dissolve (cT is computed outside; this block uses no derivatives). (2) [branch] the flame noise (warp x2 + 3-octave fbm, lines 311-314) on (flameRoot * (1 - cT) > 0 && uFlame < 0.97) || (cT > 0 && burning > 0.01). (3) Where twRaw == 0 (no bed within about 0.7 u) skip the two jitter noises and the jittered reveal fetch (lines 252-256); the age is unused there. (4) Compute the crack width without fwidth of the noise (crackW = 0.012 + k * pix) so the two crack noises can move inside a rich && cT < 1 branch. (5) Tier split without touching QualityTier: _PIO_Quality.z (bicubic) is 1 only on High and _PIO_Quality.y (shadows) is 1 on High and Medium. High keeps today's full stack; Medium (.y = 1, .z = 0) uses a 2-octave fbm, a 2x2 jittered Worley (4 cells instead of 9) and no twinkle noise; Low is the visuals-fire-low-tier-lattice item. (6) Only if the target below is missed after 1-5: replace PIO_FireHash's three 32-bit integer multiplies by a float hash (Hoskins hash12, highp) at the same noise frequencies. Do steps 1-5 together with the flame and fill items of this package and measure at the end. Acceptance: tools/verify.ps1 -Steps setup PASS (ShaderCheck) and both builds compile (GLES3 target 2.0 subshader included); per-pixel slope at -quality medium uncapped (verify -Steps perfslope from infra-perf, or by hand: probe -fps 1000 -mute at 1080x1200 and 540x600, 2 interleaved runs each, slope = (avgMs_big - avgMs_small) / 0.972 Mpix): fire slope <= 2.95 ms/Mpix on the critic's machine (1.4x the baseline liquid 2.11; today 4.34), numbers recorded in the report; High and Medium fire DevShots (menu, MidFill, PocketPending, CutDroplets) match docs/waveB/shots/gate/fire_*.png and gate/medium/fire_* apart from the intended flame and fill changes."
+        },
+        {
+          "id": "visuals-chase-front-not-brightest (fire part)",
+          "severity": "major",
+          "title": "Fire spark (FireOverlay shape 3) clips to plain white without bloom and drowns among fireballs and ember droplets on Medium",
+          "fix": "FireOverlay.hlsl shape 3 (lines 135-156), designed for the 0.5 u quad half size set by the actors package: add an LDR-safe signature so the spark is the brightest moving thing without bloom (Medium and Low, the Android tiers): a solid white disc of radius about 0.12 u at alpha 1 over a saturated orange halo (#FF8A2A, radius about 0.45 u, alpha 0.8 with a smooth falloff) and rays 1.5x longer than today; keep the HDR boost (5.2, 4.6, 3.6) for High with bloom. Optional and cheap: FireFx emits a small spark shower at the live front (at most 20 live particles, inside the 200 cap; FireBiomeTests.Fire_EffectsRespectTheParticleCap must stay green; that test file belongs to the audio package, do not edit it). Acceptance: DevShot -quality medium fire CutDroplets at 540x960: the luma >= 235 pixel count near the spark is at least 1.5x that of the human fireball."
+        },
+        {
+          "id": "visuals-fire-reads-as-lava-tiles",
+          "severity": "minor",
+          "title": "Fire edge flames are 0-8 px at 1080 and absent on bottom edges (25.3 asks for a band of live flames licking outward)",
+          "fix": "FireComposite.hlsl flame band (lines 305-320): (1) express the flame coordinate in world units from the wide relief field: turn t_wide into an approximate outward distance (inverse-erfc fit for sigma 0.26, or a cheap polynomial fit) instead of the normalized coordinate that spans only about 0.3 u (lines 235, 305); (2) reach 0.35-0.9 u on top edges and at least 0.25 u on bottom edges: up = 0.6 + 0.4 * nOut.y (today 0.62 + 0.38 * nOut.y, 0.24 at the bottom), and widen flameRoot (line 307) to cover the new reach; (3) add an inward flame band: upward-scrolling tongues over the outer 0.5 u inside the bed, so the rim is not a uniform white line. Keep the cellular coal mosaic (contract 25.3; demoting it is deferred), keep pocket stripes 'glowing ember stripes without flames', four distinct colors, and the fetch budget. Acceptance: DevShot fire at 1080 px width (60 px/u), MidFill checkpoint: tongues rise at least 18 px above top edges and at least 8 px below bottom edges (today 4-11 px on top, 0 at the bottom, docs/waveC/visuals/ds_1080_fire/fire_MidFill.png); PocketPending still shows home, pocket and rival clearly apart."
+        },
+        {
+          "id": "visuals-fire-fill-not-spreading, visuals-reveal-age-staircase (fire part)",
+          "severity": "minor",
+          "title": "The fire fill reads as a pale patch behind a jagged seam, with no flame front (and cell blocks on GLES3)",
+          "fix": "FireComposite.hlsl reveal front (lines 250-260, 344-360): (1) replace the 45 ms flash front = exp(-age/0.045) by a moving BAND: a gaussian of age centered at 0.08 s with width 0.08 s, zero outside [0, 0.3 s]; (2) raise flame tongues from the band with the existing flame noise, reach 0.5-1.0 u scaled by the band, white-hot at the base; shape the flame sheets with the tongue threshold; let fresh embers settle by about 0.8 s (FillDuration 0.60 s unchanged); (3) compute the reveal age BEFORE any jitter, clamp each sample's age to about 0.4 s before interpolating (so old cells and never-revealed -1000 cells do not create texel steps), then jitter by at most 0.05 u (today 0.16 u); (4) take nOut from the territory height gradient (_PIO_TerritoryHeight .yz, already fetched) instead of ddx/ddy, which shifts per 2x2 quad; (5) take the band position from the wide contour field and use the age only as an on/off gate, the approach LIQ documents at LiquidComposite.hlsl 296-302, so the GLES3 path without Gather draws the same front (today it shows cell blocks). Do not change TerritoryField or the -1000 sentinel (contract 25.2). Optional: FireFx spawns a few sparks along the advancing front (CPU side from TerritoryField.RevealTimeOf, inside the particle cap). Acceptance: DevShot fire 1080 MidFill and a 12 fps frame grab of a capture at 540x960 High (method of docs/waveC/visuals/seq_fire_fill_540_high.png): a visible bright band with tongues sweeps the captured area within about 0.6 s; no hard jagged seam between fresh and old coals at 1080 (compare docs/waveC/visuals/zoom_fire_fill_front_1080.png)."
+        },
+        {
+          "id": "visuals-fire-low-tier-lattice, perf-03 (fire Low cliff)",
+          "severity": "minor",
+          "title": "Fire on Low renders value-noise lattice artefacts (rounded squares, contour rings, axis-aligned dashes)",
+          "fix": "FireComposite.hlsl Low path (lines 331-336) and twinkle (line 342): (1) Low: replace the single value noise thresholded into crust bands by a cheap cellular look, a 2x2-neighbourhood Voronoi with jittered points (4 hashes, static feature points allowed, no sin animation) feeding the same coal and crust ramp as Medium; never threshold bilinear value noise into hard bands. (2) Twinkle on every tier: pick sparkles per coal cell (cells.z hash combined with a time slot floor(time * 3)) instead of smoothstep(0.86, 1.0, valueNoise(w * 6.5)), so no axis-aligned 1 px dashes remain. Acceptance: DevShot -quality low fire at 540x960, PocketPending: coals read as cells like Medium, with no rounded squares, contour rings or 1 px dashes (compare docs/waveC/visuals/ds_540_low_fire/fire_PocketPending.png and docs/waveC/perf/matrix/fire_low_540x600/fill.png); Low avgMs at 1080x1200 uncapped is not above Medium avgMs."
+        }
+      ]
+    },
+    {
+      "key": "biome-electric-liquid",
+      "area": "biomes, render-liquid",
+      "owner_files": [
+        "Assets/Resources/Shaders/ElectricComposite.hlsl",
+        "Assets/Resources/Shaders/ElectricOverlay.hlsl",
+        "Assets/Resources/Shaders/ElectricBead.hlsl",
+        "Assets/Scripts/Runtime/Biomes/ElectricFx.cs",
+        "Assets/Resources/Shaders/LiquidComposite.hlsl"
+      ],
+      "items": [
+        {
+          "id": "visuals-chase-front-not-brightest (electric part)",
+          "severity": "major",
+          "title": "Electric current packet: faint halo, and the dead-cable spark dots are as white as the packet",
+          "fix": "ElectricFx.cs (packet halo, lines 427-428): halo opacity 0.4 -> 0.8 and head size 1.5x. ElectricOverlay.hlsl shape 3 (if it draws the packet head): an LDR-safe white-blue core (solid white center of radius about 0.1 u) designed for the 0.5 u quad half size set by the actors package. ElectricBead.hlsl small-bead branch (droplet spark dots, line 123): remove the white core, cap the dot at about 1.1x the player color (replace hot * 1.7 toward white by a saturated color), so the dots never clip to white like the packet. Acceptance: DevShot -quality medium electric CutDroplets at 540x960: the packet's luma >= 235 area is at least 1.5x that of any pearl; the dead-cable dots show their color, not white (compare docs/waveC/visuals/zoom_electric_cut_540_high.png)."
+        },
+        {
+          "id": "visuals-reveal-age-staircase",
+          "severity": "minor",
+          "title": "The electric fill discharge ends in 0.125 u square staircases on every capture",
+          "fix": "ElectricComposite.hlsl (single bilinear _PIO_RevealTime fetch line 197, fresh = exp(-age/0.075) line 245, frontBand line 266): stop deriving the discharge edge from interpolated ages. Clamp the age to [0, 0.4 s], take the discharge front position from the wide contour field (crest distance, as LiquidComposite.hlsl 296-302 does) and use the age only as an on/off gate with a smooth fade; no new texture fetch. Do not change TerritoryField or the -1000 sentinel (contract 25.2). Acceptance: DevShot electric at 1080 px width, MidFill: no 7.5 px square steps along the edge of the bright discharge zone (compare docs/waveC/visuals/zoom_electric_fill_staircase_1080.png); the branching discharge still spreads from the return point in about 0.25 s and the hex pattern still pulses once."
+        },
+        {
+          "id": "perf-04",
+          "severity": "minor",
+          "title": "ElectricComposite shades the plasma surface, rim and micro arcs on every pixel",
+          "fix": "ElectricComposite.hlsl: [branch] if (cT > 0) around the plasma hex tiling, flow noise and sin (lines 233-241) and the surface and rim (268-285), keeping the lerp result identical; [branch] the micro arcs (288-297) on tj in [0.12, 0.75] with the AA width computed outside the branch (fwA = 1.4 * fwidth(tj) + 2 * pix instead of fwidth(arcT)). The discharge block is already branched. Do not shrink the bolt quads (deferred: the path amplitude needs the height). Acceptance: electric per-pixel slope (perfslope step or the manual method) at least 15 % below the baseline 2.91 ms/Mpix of docs/waveC/perf/probe_matrix.txt; electric DevShots unchanged at a glance."
+        },
+        {
+          "id": "perf-06",
+          "severity": "minor",
+          "title": "LiquidComposite shades both ground and puddle on every pixel",
+          "fix": "LiquidComposite.hlsl (lines 336-341): [branch] if (cT > 0) around PIO_ShadeLiquid, PIO_InnerStreak and the puddle ripple; [branch] if (cT < 1) around PIO_Ground, the vignette and the ground shadow; the wobble stays outside (it displaces uvT before the territory fetch), and so do the fwidth calls; pocket and actor blocks unchanged. Acceptance: liquid per-pixel slope at least 12 % below the baseline 2.11 ms/Mpix; liquid DevShots (menu, MidFill, PocketPending, CutDroplets) at 540x960 High and Medium visually identical to docs/waveB/shots/gate/liquid_* and gate/medium/liquid_* (V1-V8 still met)."
+        },
+        {
+          "id": "visuals-liquid-crease-speckle",
+          "severity": "minor",
+          "title": "The crease where two puddles touch renders as a 1 px dotted white and dark line",
+          "fix": "LiquidComposite.hlsl only (LiquidCommon.hlsl is shared by every shader and owned by infra-perf): near a contact (H -> 0, where the sqrt height profile has an unbounded slope, amplified by PIO_RELIEF_GAIN 1.7 at line 285), compute crease = 1 - saturate(gap / (2 * max(fwidth(gap), 1e-4))) from the existing gap, multiply the relief gradient fed to the lighting by (1 - crease) before PIO_ShadeLiquid (streak, specular and Fresnel rim go flat at the crease), clamp the gradient magnitude to h0 / (2 * pix) so no slope steeper than one pixel is represented, and draw the crease as an antialiased dark groove (albedo * (1 - 0.25 * crease)). Acceptance: DevShot liquid at 540x960 Medium and High, PocketPending: the saffron-lilac contact shows a soft dark line with no alternating white and dark single pixels (compare docs/waveC/visuals/zoom_liquid_crease_540_medium.png); V1-V8 still met."
+        }
+      ]
+    },
+    {
+      "key": "audio",
+      "area": "audio",
+      "owner_files": [
+        "Assets/Scripts/Runtime/Audio/Sfx.cs",
+        "Assets/Scripts/Runtime/Audio/SfxSynth.cs",
+        "Assets/Scripts/Runtime/Audio/FireSfx.cs",
+        "Assets/Scripts/Runtime/Audio/ElectricSfx.cs",
+        "Assets/Scripts/Runtime/Audio/LiquidSfx.cs",
+        "Assets/Scripts/Runtime/Audio/ISfxClipSet.cs",
+        "Assets/Scripts/Runtime/Audio/Haptics.cs",
+        "Assets/Tests/EditMode/Runtime/SfxTests.cs",
+        "Assets/Tests/EditMode/Runtime/FireBiomeTests.cs",
+        "Assets/Tests/EditMode/Runtime/WaveC_AudioTests.cs"
+      ],
+      "items": [
+        {
+          "id": "robust-03, perf-07",
+          "severity": "minor",
+          "title": "The first tap on Feu or Electricite freezes the menu for 120-280 ms while the clip set is synthesized on the main thread",
+          "fix": "Sfx.cs (SetFor lines 413-431, OnBiomeChanged line 442): build all three ISfxClipSets at startup (contract 25.2 'synthesized at startup') without blocking: the current biome synchronously as today, the two others in the background. Preferred: synthesize the float[] sample buffers on a worker thread (System.Threading.Tasks.Task.Run) once FireSfx, ElectricSfx and SfxSynth synthesis is verified pure C# (no UnityEngine API except Mathf, no shared mutable static buffers; make it so if needed), then create each AudioClip (AudioClip.Create + SetData, about 1 ms) on the main thread from Update when its buffers are ready. If a thread-safe split is not possible, fall back to a coroutine that synthesizes one clip per frame while the game is in Menu. If the player picks a biome whose set is not ready yet, finish it synchronously then. ISfxClipSet changes must be additive (the 25.2 signature stays). Output must stay deterministic and identical to the synchronous path. Shader warm-up is deferred. Acceptance: WaveC_AudioTests: the background-built fire and electric sets have exactly the same samples (hash) as Build(sampleRate); SfxTests and FireBiomeTests stay green; release player log: both background sets report ready within a few seconds of boot, and no 'clip set built in N ms' line appears on the first Feu or Electricite card tap."
+        },
+        {
+          "id": "feel-04",
+          "severity": "minor",
+          "title": "Phone speakers swallow the low clips: Fire exit/return pops, Electric return and hum, lose jingle",
+          "fix": "FireSfx.cs, ElectricSfx.cs, SfxSynth.cs (and LiquidSfx.cs where a liquid clip is built): add energy between 500 Hz and 4 kHz to every clip that loses more than 4 dB through a 400 Hz 24 dB/oct high-pass (docs/waveC/feel/audio_metrics.txt): F.Pop (Fire exit, -13.1 dB), F.Fwump (Fire return, -10.1), E.Return (-8.9), E.Ambient (-14.4), L.LoseJingle (-8.8), L.CaughtSplat (-6.8), L.ReturnGloop (-5.8), F.Burst (-5.6). Means: soft-saturate the low voices (tanh, drive about 2.5) to create 2nd-4th harmonics; layer a 1.5-3 kHz band-passed crackle or click at about -10 dB on Pop, Fwump, Burst, the electric return thunk and CaughtSplat; rebuild AmbientHum as a 120 Hz buzz with 240/360/480/600 Hz partials (still a low hum, still a seamless loop); double LoseJingle an octave up at -6 dB. Keep Fire Fwump and the Electric return distinct (12-band profile distance after the high-pass at least 12 dB, today 8.2). Keep every existing constraint: lengths, peaks under the test limits (0.95), silence at one-shot ends, seamless loops, determinism. Acceptance: re-run docs/waveC/feel/tools/audio_analyze (dotnet run; it compiles the real sources) and put the new table in the report: phone loss <= 4 dB for every one-shot and <= 6 dB for the ambience loops, win and lose jingle effective loudness within 3 dB of each other; SfxTests and FireBiomeTests green."
+        },
+        {
+          "id": "feel-13",
+          "severity": "minor",
+          "title": "Dying by territory loss gives no haptic, unlike dying to the spark",
+          "fix": "Sfx.cs (TerritoryLost branch, lines 660-668): when the human is eliminated with Cause TerritoryLost, request Haptics.CaughtMs (120 ms) through the same pulse path the SparkCaught branch uses (line 654, recorded by the pulse log at line 138). Contract 16 durations and createOneShot stay as they are (predefined effects deferred). Report under contract_issues: 16 'caught 120 ms' also covers an elimination by territory loss. Acceptance: WaveC_AudioTests: a human TerritoryLost elimination records exactly one 120 ms pulse, a bot's records none; Sfx_DemoRoundPlaysTheHumanCuesAndHapticsInOrder stays green."
+        }
+      ]
+    },
+    {
+      "key": "infra-perf",
+      "area": "infra-perf",
+      "owner_files": [
+        "Assets/Scripts/Runtime/Render/QualityTier.cs",
+        "Assets/Scripts/Runtime/Render/LiquidRenderer.cs",
+        "Assets/Scripts/Runtime/Render/ActorFieldCamera.cs",
+        "Assets/Resources/Shaders/LiquidCommon.hlsl",
+        "Assets/Scripts/Editor/Builder.cs",
+        "ProjectSettings/ProjectSettings.asset",
+        "tools/verify.ps1",
+        "Assets/Tests/EditMode/Runtime/LiquidRenderTests.cs",
+        "Assets/Tests/EditMode/Runtime/WaveC_InfraTests.cs"
+      ],
+      "items": [
+        {
+          "id": "perf-02",
+          "severity": "major",
+          "title": "Android renders the full-screen composite at 864x1920 and no tier ever lowers the resolution",
+          "fix": "(1) QualityTier: add public const int MediumRenderHeight = 1600 and LowRenderHeight = 1280, and public static float RenderScaleFor(int screenHeight, RenderTier tier, bool android): cap = Medium ? 1600 : Low ? 1280 : (android ? 1920 : 0); return cap > 0 && screenHeight > cap ? cap / (float)screenHeight : 1f. (2) LiquidRenderer: ApplyRenderScale() sets the active UniversalRenderPipelineAsset.renderScale = RenderScaleFor(Screen.height, QualityTier.Current, Application.platform == RuntimePlatform.Android) at Create, in OnTierChanged and when Screen.height changes (cheap check in LateUpdate); player only (#if !UNITY_EDITOR) so the asset on disk is never dirtied; log once per change, for example '[PainterIO] render scale 0.667 (tier Medium, height 2400)'. GameDirector's existing 1920 cap (owned by game-flow, runs earlier in Awake) stays; this code runs after it and computes from scratch. (3) ActorFieldCamera (line 141-153): derive ppu from the rendered height (main.pixelHeight x the current URP renderScale, clamped 0.1-1) so the actor field RT shrinks with the render scale; keep the RtQuantum rounding. URP's bilinear upscale stays; the overlay HUD stays native. (4) Report under contract_issues: 12.4 'tiers carry a render height cap: Medium 1600 px, Low 1280 px, High none (1920 on Android as 11.1)'. Acceptance: WaveC_InfraTests (or B1_QualityTier_Table extended): RenderScaleFor(2400, Medium, true) = 0.6667, (2400, Low, true) = 0.5333, (2400, High, true) = 0.8, (1920, Medium, true) = 0.8333, (960, Medium, false) = 1, (1200, High, false) = 1; Gate_ActorFieldSizeStaysPutDuringTheChaseZoom stays green; a release run with -quality low -screen-height 1600 (if the monitor allows) logs render scale 0.8; probe PASS with the unchanged sim hash."
+        },
+        {
+          "id": "robust-02, perf-03",
+          "severity": "minor",
+          "title": "The FPS watchdog steps the tier down for the whole app session after one hitch, and it measures the attract menu",
+          "fix": "(1) QualityTier.Tick (lines 111-138): a frame with unscaledDeltaTime > max(0.1 s, 4 / target) is an outlier: call ResetWindow and do not count it. (2) LiquidRenderer.LateUpdate (line 185): running additionally requires !s.IsAttract and director.State == GameState.Playing (the menu attract and Results are never measured). (3) LiquidRenderer.OnSessionStarted (line 134): call QualityTier.BeginSession() only for non-attract sessions, so attract restarts no longer re-arm a step. Keep contract 12.4 otherwise: ignore 5 s, 3 s window, 0.83 x target, at most one step per real session. Persisting the auto tier, a weak-GPU start tier and stepping back up are deferred. Report under contract_issues: 12.4 'frames longer than max(0.1 s, 4 frame budgets) reset the window; only real rounds in Playing are measured'. Acceptance: WaveC_InfraTests drive QualityTier.Tick directly: (a) 60 fps with one 1.5 s frame at t = 12 s -> no step; (b) a steady 40 fps for 9 s -> exactly one step High -> Medium; (c) running = false frames never step; reset the static state between tests (add an internal ResetForTests if needed). Release check: repeat the critic's hitch run (docs/waveC/robustness/hitch: process suspended for 1.5 s at t = 12 s) and the idle menu run (docs/waveC/robust-refute/minimize): no 'quality watchdog' line in p.log."
+        },
+        {
+          "id": "visuals-shader-time-wrap-pop, robust-07",
+          "severity": "minor",
+          "title": "_PIO_Time wraps every 1024 s of app time, so every animated biome pattern jumps in one frame",
+          "fix": "LiquidRenderer.PublishFrameGlobals (line 219): send _PIO_Time = (float)((Time.unscaledTimeAsDouble - timeEpoch) % 4096.0), where the double timeEpoch is reset to Time.unscaledTimeAsDouble in OnSessionStarted (round start, REJOUER, menu return and attract restart all rebuild the territory field, so the reset is never seen). Factor it as internal static float ShaderTimeFor(double now, double epoch). LiquidCommon.hlsl: update only the _PIO_Time comment (line 60) to 'seconds since the current session started (unscaled), wraps at 4096 s'; no other change to that shared file. No shader and no other C# code needs a change (only LiquidRenderer sets _PIO_Time; no effect stores absolute shader times). Fast flicker pre-reduction in FireOverlay/FireBead is not needed once time stays small. Acceptance: WaveC_InfraTests: ShaderTimeFor(e, e) = 0 and ShaderTimeFor(e + 5000, e) < 4096; probe PASS with the unchanged sim hash."
+        },
+        {
+          "id": "perf-09, perf-03 (frame pacing)",
+          "severity": "minor",
+          "title": "Android adds a full-resolution blit every frame and leaves frame pacing off",
+          "fix": "Builder.ApplyProjectSettings (lines 392-410): PlayerSettings.Android.blitType = AndroidBlitType.Auto and PlayerSettings.Android.optimizedFramePacing = true. ProjectSettings.asset is rewritten by the Builder (androidBlitType 2, androidUseSwappy 1); never hand-edit it. Report under contract_issues: 17 gains both settings. Acceptance: verify -Steps setup PASS and ProjectSettings.asset shows the two values; the verify android step PASSes; add both settings to the list of things the device playtest should watch (in the report's needs)."
+        },
+        {
+          "id": "robust-09",
+          "severity": "minor",
+          "title": "The Windows build keeps simulating and rendering the attract match while minimized",
+          "fix": "Builder.ApplyProjectSettings (line 388): PlayerSettings.runInBackground = false. PlayerProbe (line 156), DevShot (line 53) and RenderLab (line 57) already set Application.runInBackground = true at runtime, so verify and the tools are unaffected, and GameDirector already auto-pauses a round on focus loss. Report under contract_issues: 17 'runInBackground off (the probe and DevShot turn it on at runtime)'. Acceptance: verify probe steps PASS; the release player minimized in the menu uses under 5 % of one core (measure as docs/waveC/robust-refute/minimize/result.txt)."
+        },
+        {
+          "id": "perf-01 (verify step)",
+          "severity": "minor",
+          "title": "Verify cannot see per-pixel shader cost (it only measures High at 540x960 with a 60 fps cap)",
+          "fix": "tools/verify.ps1: add an opt-in step 'perfslope' (registered in $StepTable, NOT added to $DefaultSteps): for liquid, fire and electric, run the release probe with -quality medium -fps 1000 -mute -screen-fullscreen 0 at 1080x1200 and at 540x600, 2 interleaved runs each, read avgMs from the probe output (same source as the existing probe steps), compute slope = (avgMs_big - avgMs_small) / 0.972 ms per Mpix, print the three slopes and the fire/liquid and electric/liquid ratios on the PASS/FAIL line, and FAIL when fire/liquid > 1.6 or electric/liquid > 1.4 (a regression guard; today 2.06 and 1.38; see docs/waveC/perf/probe_matrix.txt). Follow the step conventions (one PASS/FAIL line, logs under Logs/<agent>_perfslope*.log). Acceptance: 'pwsh -NoProfile -File tools/verify.ps1 -Steps perfslope' runs on the current Build/Windows and prints the baseline slopes (fire expected to FAIL), and the default verify run is unchanged."
+        }
+      ]
+    }
+  ],
+  "deferred": [
+    {
+      "id": "rules-03",
+      "reason": "A pending pocket keeps its stripes and full zip during a chase although v1.4 dooms it. The lasso is OFF by default (SaveData), a chased player races home anyway, and the saved toast explains the loss on arrival. The fix spans TerritoryField, the three composites, Sfx and TutorialOverlay across four packages. Schedule it together with turning the lasso back on (second trial of the brief): doomed stripes greyed via a per-player global, muted zip, lasso bubble delayed until the chase ends. The '1 poche' stat is contract 15.5 and not a defect."
+    },
+    {
+      "id": "feel-01",
+      "reason": "Longer slow motion on near-head cuts, a 'cut right behind you' results line and a victim toast amend contract 11.1 and 15.5: sent to the user as decision feel-01."
+    },
+    {
+      "id": "feel-11 (standings list, ResultsZoom 1.6)",
+      "reason": "The standings list is not required by contract 15.5 (user decision feel-11-standings). The ResultsZoom change is not needed once the dim is raised to 0.86."
+    },
+    {
+      "id": "feel-08 (home edge indicator)",
+      "reason": "Beyond the contract ('small chevron'); the chevron at the pearl already points toward the nearest owned cell even when home is off screen. Revisit after the device playtest."
+    },
+    {
+      "id": "feel-13 (predefined haptic effects)",
+      "reason": "Durations and createOneShot are contract 16; motor perception claims are device-dependent and unmeasured. Revisit with the device playtest. Only the missing TerritoryLost pulse is fixed."
+    },
+    {
+      "id": "feel-06 (title in the biome color)",
+      "reason": "Contract 15.2 fixes a coral title."
+    },
+    {
+      "id": "visuals-fire-reads-as-lava-tiles (mosaic demotion, menu preview refresh)",
+      "reason": "Contract 25.3 asks for cellular coals with a dark crust and Gate B accepted the look; only the flame band deviation is fixed. The menu BiomePreview can be refreshed after the fire look settles."
+    },
+    {
+      "id": "visuals-reveal-age-staircase (TerritoryField finite sentinel)",
+      "reason": "Contradicts the -1000 sentinel of contract 25.2 and is not sufficient on its own (old territory keeps finite reveal times). Replaced by the contour-based front in the fire and electric composites."
+    },
+    {
+      "id": "robust-03, perf-07 (shader warm-up)",
+      "reason": "The first-use shader compile cost is unmeasured (the measured freeze is the clip synthesis, fixed by the audio package), and the watchdog outlier rejection removes its side effect on the render tier. Revisit with a GraphicsStateCollection recorded on a device."
+    },
+    {
+      "id": "perf-03 (persisted auto tier, weak-GPU start tier, step back up, several steps per session)",
+      "reason": "Contract 12.4 design (one step per session) and no device data yet; the player can force Low in Settings (persisted). Revisit after the device playtest with real frame times."
+    },
+    {
+      "id": "perf-04 (smaller bolt quads)",
+      "reason": "ElectricOverlay's path amplitude (0.7 x halfY) and branch drift need the current quad height; shrinking would clip the bolts, and the fill spike was never measured."
+    },
+    {
+      "id": "perf-01 (noise LUT texture)",
+      "reason": "Needs a new texture asset and a contract 12.2 item 4 note; branching and the Medium detail split come first, the float hash is the fallback."
+    },
+    {
+      "id": "rules-05 (slow-motion clock frozen during pause)",
+      "reason": "Cosmetic: the cut bubble comes back after the pause as long as the spark lives; only the 2.5 s visibility rule is fixed."
+    },
+    {
+      "id": "rules-01 (soft fizz sound on the explaining return)",
+      "reason": "Optional and would couple TutorialOverlay to Sfx across packages; the bubble alone carries the lesson."
+    }
+  ]
+}

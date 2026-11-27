@@ -1,0 +1,8 @@
+spark=1,8 medianCatchDelay=0,21s p90CatchDelay=0,36s
+human=balancedProxy  botHumanScale=1,0  alive=73%  first=21%  meanFinalArea=12,5%  exits/round=30,3  cuts/round=0,78  cut%ofExits=3%  captures/round=22,9 savedChases/round=0,51 deaths=33 medianDeathT=61s caughtWithin0.6s=32/33 cutBy[B,G,A]=37,12,45 medianGapAtCut=6,5u
+spark=1,8 medianCatchDelay=0,21s p90CatchDelay=0,49s
+human=balancedProxy  botHumanScale=0,3  alive=79%  first=27%  meanFinalArea=12,6%  exits/round=30,3  cuts/round=0,53  cut%ofExits=2%  captures/round=23,4 savedChases/round=0,33 deaths=25 medianDeathT=58s caughtWithin0.6s=24/25 cutBy[B,G,A]=26,9,29 medianGapAtCut=3,1u
+spark=1,5 medianCatchDelay=0,33s p90CatchDelay=0,40s
+human=balancedProxy  botHumanScale=1,0  alive=77%  first=22%  meanFinalArea=12,6%  exits/round=31,9  cuts/round=0,94  cut%ofExits=3%  captures/round=23,9 savedChases/round=0,71 deaths=28 medianDeathT=69s caughtWithin0.6s=27/28 cutBy[B,G,A]=52,8,53 medianGapAtCut=4,9u
+spark=1,5 medianCatchDelay=0,33s p90CatchDelay=0,33s
+human=balancedProxy  botHumanScale=0,3  alive=83%  first=24%  meanFinalArea=12,8%  exits/round=31,4  cuts/round=0,53  cut%ofExits=2%  captures/round=24,2 savedChases/round=0,35 deaths=21 medianDeathT=59s caughtWithin0.6s=19/21 cutBy[B,G,A]=28,9,26 medianGapAtCut=3,0u

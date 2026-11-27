@@ -1,0 +1,62 @@
+LA REVANCHE — RÈGLES DU JEU
+Brief de conception pour le premier prototype mobile · v0.1 · 26 novembre 2026
+
+1. L'expérience à reproduire
+
+Le joueur pilote un pion en continu, dessine une courbe libre hors de sa couleur et revient chez lui pour peindre la surface entourée. Quand un rival coupe son trait, une étincelle part du point de coupe et remonte le trait vers lui. Il peut encore sauver toute sa prise en rentrant à temps. Le lasso est un bonus occasionnel qui permet de dessiner une poche en pleine sortie.
+
+Texte du premier tutoriel :
+« Sors de ta couleur et reviens pour agrandir ton terrain. »
+« On a coupé ton trait ! Rentre avant l’étincelle pour sauver ta boucle. »
+Présenter le lasso uniquement lors de sa première collecte.
+
+2. Manche et commandes
+
+• Arène 2D plane à bords arrondis, vue du dessus. Un joueur et trois adversaires pilotés par le jeu. Chacun commence au centre d’un petit disque de sa couleur. Les quatre disques ont la même surface et sont espacés symétriquement.
+• Le pion avance à vitesse constante. Un glissement du pouce oriente le pion relativement au geste, où que le doigt touche l’écran. Lever le doigt conserve le cap. Le joueur peut dessiner une grande courbe ou tourner court. Les adversaires suivent les mêmes règles physiques et de capture.
+• Au bord de l’arène, le pion glisse le long de la limite. Un ordre directement vers l’extérieur le maintient contre le bord jusqu’au prochain changement de cap. Le bord ne tue pas et ne ferme pas un territoire.
+• La manche se joue en une vie. Le dernier survivant gagne immédiatement. Après 90 secondes, le survivant qui possède la plus grande surface gagne. En cas d’égalité exacte, la première place est partagée. Si les derniers survivants sont éliminés au même instant, ils sont ex æquo. Le joueur éliminé voit sa surface finale juste avant élimination et peut relancer immédiatement.
+
+3. Territoire et capture ordinaire
+
+• Chez soi, le déplacement ne laisse aucun trait vulnérable. Dès la sortie, une traînée continue relie le point de départ à la tête. Traverser une couleur adverse est autorisé.
+• Revenir sur n’importe quelle surface déjà acquise de sa couleur ferme la sortie. Les zones nouvellement enfermées par la combinaison du territoire acquis et du trait deviennent immédiatement celles du joueur, y compris le terrain pris à un rival. Si la sortie ne délimite aucune surface, elle se termine tout de même en sécurité.
+• Pour déterminer l’intérieur, considérer l’extérieur de la carte comme accessible et comparer les zones encloses avant et après ajout du trait. Une simple excursion le long du bord ne permet donc pas de peindre la carte entière. Le trait a une largeur de collision visible. Une simple ligne aller-retour ne rapporte aucune surface.
+• Le territoire peut être repris. Si un rival reprend le sol sous un pion jusque-là en sécurité, une nouvelle sortie démarre à cet endroit. Pour rentrer, le pion doit atteindre sa couleur actuelle. La perte de son dernier morceau de terrain élimine le joueur.
+• Une tête peut traverser une autre tête. Seul le contact d’une tête adverse avec la partie exposée d’un trait déclenche une coupure. Deux traînées qui se croisent après leur pose n’ont aucun effet supplémentaire. Recroiser son propre trait est permis.
+
+4. La Revanche, règle centrale
+
+• À la première coupure d’une sortie, faire apparaître une étincelle exactement au point touché. Elle poursuit uniquement le propriétaire du trait. L’attaquant continue de jouer.
+• L’étincelle suit le chemin réellement parcouru par la victime, du point touché vers la tête, y compris les nouveaux segments dessinés pendant la fuite. À un croisement, elle suit l’ordre de passage sur le trait. Un virage ou un lasso ne lui offre aucun raccourci.
+• Vitesse de départ à tester : étincelle à 1,8 fois la vitesse du pion. Elle avance à vitesse constante. Une coupure près de la tête est donc particulièrement dangereuse. Une coupure loin derrière laisse le temps de rentrer.
+• Si la tête retrouve sa couleur avant l’impact, résoudre la capture normale, éteindre l’étincelle et effacer le trait. Tout le gain est conservé. Si l’étincelle rejoint la tête en premier, éliminer le joueur, annuler sa sortie et rendre neutre son territoire. L’attaquant ne reçoit pas automatiquement les terres libérées.
+• Une sortie porte au maximum une étincelle. Les coupes suivantes ne l’accélèrent pas et ne la rapprochent pas. Elle poursuit sa route même si l’attaquant est éliminé. Le propriétaire peut encore couper un adversaire pendant sa fuite.
+• Lisibilité : au moment de la coupe, faire clignoter le point d’impact et donner un bref signal sonore ou haptique. L’étincelle doit se distinguer des pions par sa forme et son mouvement. Garder la tête et la direction du retour lisibles pendant l’alerte.
+
+5. Le Lasso, bonus à une charge
+
+• Un anneau apparaît sur terrain neutre. Le premier pion qui le touche transporte une charge, signalée par un anneau autour de sa tête. Capacité maximale : une. Un joueur déjà chargé laisse l’objet en place. Commencer avec une apparition à 15 secondes, puis 15 secondes après chaque collecte. Un seul objet est présent sur la carte à la fois. Une charge inutilisée se conserve entre les sorties.
+• Hors de son territoire, un joueur chargé peut recroiser son propre trait et fermer une poche. Au premier croisement avec un ancien segment qui enferme une surface, consommer la charge et remplir cette poche de hachures à sa couleur. Un simple contact avec le segment que le pion vient de poser, une tangence ou un demi-tour superposé ne suffit pas.
+• La poche est une prise en attente. Elle ne compte pas au score et les propriétaires du sol conservent leurs droits jusqu’au retour. La traverser ne met pas à l’abri. Le fil reste vulnérable sur toute la sortie, y compris le contour de la poche.
+• Rentrer chez soi valide d’un coup la poche et la capture ordinaire, en comptant chaque portion une seule fois. Être éliminé efface les hachures. Un lasso fonctionne aussi pendant une poursuite et ne remet à zéro ni la position ni la vitesse de l’étincelle.
+• Sans charge, le même croisement laisse le trait ouvert et n’affiche aucune poche. Le joueur peut toujours terminer sa sortie normalement. Aucun bouton supplémentaire.
+
+6. Arbitrage des cas limites
+
+• Résoudre les contacts dans leur ordre réel le long du mouvement, même si deux contacts tombent dans la même image. En cas d’égalité exacte entre retour sur sa couleur et impact de l’étincelle, le retour gagne. Une coupe au moment exact où le trait se referme est sans effet.
+• Les retours au même instant sont jugés sur les territoires possédés juste avant cet instant. Si deux captures simultanées revendiquent la même parcelle, celle-ci garde sa couleur précédente ou reste neutre. Chaque joueur gagne le reste de sa prise.
+• Si un adversaire touche plusieurs passages superposés du même trait au même point, démarrer l’étincelle sur le passage le plus récent. Si deux adversaires coupent le même trait au même instant en deux points différents, retenir la coupe la plus proche de la tête en distance parcourue sur le trait.
+• Si plusieurs joueurs touchent le même bonus exactement au même instant, le bonus reste au sol jusqu’à ce qu’un seul joueur éligible soit en contact. Au terme du chronomètre, résoudre d’abord les événements de cet instant, puis prendre les surfaces acquises pour le classement. Une poche encore hachurée ne compte jamais.
+
+7. Vérification du prototype
+
+1. Une grande courbe fermée sans opposition recolore son intérieur. Couper à travers une couleur adverse sans rentrer ne change aucun propriétaire.
+2. Couper le trait près de son origine alors que la victime est presque rentrée déclenche une poursuite qu’elle peut gagner. La surface prévue est alors entièrement capturée.
+3. Couper le même trait juste derrière une victime éloignée de sa zone permet à l’étincelle de la rattraper. Une seconde coupe pendant la poursuite ne déplace pas l’étincelle.
+4. Un retour strictement avant l’impact sauve le joueur, un retour strictement après entraîne l’élimination, une égalité exacte le sauve. Vérifier les trois cas à deux fréquences d’affichage différentes.
+5. Faire un lasso chargé, retraverser sa poche, puis rentrer. Le score ne monte qu’au retour. Rejouer en se laissant rattraper : la poche disparaît et les parcelles adverses restent à leur propriétaire.
+6. Dessiner la même trajectoire sans charge. Aucune poche provisoire. Déclencher ensuite une poursuite sur un tracé en huit : l’étincelle suit bien l’ordre des segments.
+7. Vérifier sur téléphone qu’après sa première coupure le joueur comprend d’où vient le danger, essaie de rentrer et sait expliquer pourquoi il a survécu ou perdu.
+
+Les valeurs de 90 secondes, 1,8 fois la vitesse et 15 secondes entre bonus sont des réglages initiaux ajustables. Pour le premier essai de la Revanche, désactiver les apparitions de lasso. Les réactiver pour vérifier que le bonus enrichit les trajectoires et que le refuge reste identifiable.

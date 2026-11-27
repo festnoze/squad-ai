@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Runs Assets/Tests/EditMode/Core with NUnit outside Unity (contract 2.2). The assembly is named like the Unity test
+    assembly (PainterIO.Tests.EditMode) so an InternalsVisibleTo in Core would behave the same in both worlds.
+    Unity ships NUnit 3.5: tests must use only features that exist there (Test, TestCase, SetUp, Assert.That,
+    Assert.AreEqual, Assert.IsTrue, Assert.Throws...; no Assert.Multiple).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>PainterIO.Tests.EditMode</AssemblyName>
+    <RootNamespace>PainterIO.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Tests/EditMode/Core/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="PainterIO.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+</Project>

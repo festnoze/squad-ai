@@ -1,0 +1,20 @@
+<Project>
+  <!--
+    Build isolation for parallel agents (contract 2.2). Every output (obj and bin) goes under an artifacts root:
+    each agent passes the dotnet "artifacts-path" option with tools/CoreTests/.art/<package> (exact command in
+    README.md), so two agents never share obj/bin. Without the option the root is tools/CoreTests/.art/default.
+    This file also stops MSBuild from looking further up the tree for other Directory.Build.props files.
+  -->
+  <PropertyGroup>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath Condition="'$(ArtifactsPath)' == ''">$(MSBuildThisFileDirectory).art/default</ArtifactsPath>
+    <!-- Sources come only from the explicit Compile globs in each project, never from this folder (it holds .art). -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <!-- Same language rules as Unity: C# 9, no implicit usings, no nullable context. -->
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>

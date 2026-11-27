@@ -1,0 +1,85 @@
+{
+  "feature": "Europe levels and country progression (Painter.io)",
+  "date": "2026-11-27",
+  "phases": {
+    "phase1_finish_and_verify": {
+      "status": "done",
+      "playmode_resume": { "report": "TestResults/europe-play.xml", "device": "Direct3D 11", "tests": 1, "passed": 1, "failed": 0, "skipped": 0 },
+      "fixes": [
+        "Map camera eases to a regional framing of the selected country (was the whole continent: tiny countries, flags and micro-states in portrait)",
+        "Map render texture follows the viewport aspect (tall phones use their height)",
+        "Pulsing selection ring on micro-states",
+        "EuropeShot command line (-europeshot) and tools/europe_shots.ps1 for built-player screenshots, round plan driving the human to the border"
+      ],
+      "editmode_full": { "report": "TestResults/europe-phase1-edit.xml", "tests": 663, "passed": 658, "failed": 1, "skipped": 4, "errors": 0,
+                         "known_failure": "WaveC_BiomeElectricLiquidTests.WaveC_Composites_KeepTheirFetchCount (13 expected, 14 found), pre-existing, owned by the rendering agent, not touched" },
+      "playmode_after_map_changes": { "report": "TestResults/europe-phase1-play.xml", "tests": 1, "passed": 1, "failed": 0, "skipped": 0 }
+    },
+    "phase2_progression": {
+      "status": "done",
+      "editmode_full": { "report": "TestResults/europe-final-edit-full.xml", "tests": 680, "passed": 675, "failed": 1, "skipped": 4, "errors": 0,
+                         "known_failure": "WaveC_BiomeElectricLiquidTests.WaveC_Composites_KeepTheirFetchCount (13 expected, 14 found)",
+                         "europe_tests": { "total": 19, "passed": 19 } },
+      "core_dotnet_loop": { "filter": "EuropeProgressionTests", "tests": 10, "passed": 10, "failed": 0 },
+      "playmode": { "report": "TestResults/europe-final-play.xml", "tests": 1, "passed": 1, "failed": 0, "skipped": 0 }
+    }
+  },
+  "rules": {
+    "start_country": "FR (EuropeProgression.StartCountry)",
+    "unlocks_per_first_win": "2 (EuropeProgression.UnlocksPerFirstWin)",
+    "unlock_order": "locked land neighbors by shared border length desc, centroid distance, ISO code; then other locked countries by centroid distance, ISO code (EuropeProgression.PickUnlocks)",
+    "win": "same as SaveData.Wins: CountsForStats round, no modified test settings or command line tuning override, HumanOutcome.Rank == 1 (EuropeProgress.IsCountedWin)",
+    "replay": "a won country unlocks nothing",
+    "save": "PlayerPrefs key pio.europe.progress, JSON {version, won, unlocked, reveal}; SaveData untouched"
+  },
+  "files_created": [
+    "Assets/Scripts/Core/Europe/EuropeGraph.cs",
+    "Assets/Scripts/Core/Europe/EuropeProgression.cs",
+    "Assets/Scripts/Runtime/Game/EuropeProgress.cs",
+    "Assets/Scripts/Runtime/Probe/EuropeShot.cs",
+    "Assets/Tests/EditMode/Core/EuropeProgressionTests.cs",
+    "Assets/Tests/EditMode/Runtime/EuropeProgressTests.cs",
+    "tools/europe_shots.ps1",
+    "docs/europe/PROGRESSION.md",
+    "docs/europe/progression.json",
+    "docs/europe/shots/ (phase 1 and progression screenshots)"
+  ],
+  "files_modified": [
+    "Assets/Scripts/Runtime/View/EuropeMapView.cs (rewritten: states, flags, medals, focus camera, reveal, close-up)",
+    "Assets/Scripts/Runtime/UI/EuropeScreen.cs (rewritten: progression, locked hint, arrow skipping, reveal on open, hidden reset, test hooks)",
+    "Assets/Resources/Shaders/EuropeMap.shader (_Phase per flag, _Cutout for the medal)",
+    "Assets/Scripts/Runtime/Game/GameDirector.cs (2 lines: EuropeShot factory, EuropeProgress.OnRoundResults in ShowResults)",
+    "Assets/Tests/PlayMode/EuropeMenuTests.cs (progression, reveal and reset checks)",
+    "docs/europe/REPRISE.md (final status)"
+  ],
+  "screenshots": {
+    "phase1": [
+      "docs/europe/shots/540x960/map_open.png", "docs/europe/shots/540x960/map_monaco.png", "docs/europe/shots/540x960/map_va.png",
+      "docs/europe/shots/540x960/map_no.png", "docs/europe/shots/540x960/map_tr.png", "docs/europe/shots/540x960/map_gb.png",
+      "docs/europe/shots/540x960/{liquid,fire,electric}_round_fr_{capture,border}.png",
+      "docs/europe/shots/1080x2400/ (same set)"
+    ],
+    "phase2": [
+      "docs/europe/shots/progression/0_start/{540x960,1080x2400}/progress_map.png",
+      "docs/europe/shots/progression/0_start/{540x960,1080x2400}/progress_locked_de.png",
+      "docs/europe/shots/progression/1_win/{540x960,1080x2400}/progress_reveal_rise.png, progress_reveal.png, progress_map.png",
+      "docs/europe/shots/progression/3_wins/{540x960,1080x2400}/progress_reveal.png, progress_map.png, progress_locked_gb.png",
+      "docs/europe/shots/progression/3_wins/{540x960,1080x2400}/flags_closeup_0.png, flags_closeup_1.png, flags_closeup_2.png",
+      "docs/europe/shots/progression/unlock_all/{540x960,1080x2400}/progress_map.png"
+    ]
+  },
+  "known_limits": [
+    "Android not verified: touch on the map, arrows and hidden title taps, map frame rate with many flags on a device",
+    "A real won round in the player was not played end to end; the hook is tested on its inputs and -europe-wins uses the same RecordWin",
+    "Flags use MaterialPropertyBlock: they are not SRP-batched (up to 46 cloths and 46 poles, about 140 draws on the map screen in the worst case)",
+    "The country border in rounds is the biome arena edge of the composite shaders (owned by wave D), not changed here",
+    "Test flags (-europe-reset, -europe-wins, -europe-unlockall) write the saved campaign of the machine; the screenshot runs end with -europe-reset",
+    "docs/EUROPE_CONTOURS.md still describes the map before the progression"
+  ],
+  "open_decisions": [
+    "Win with modified hidden test settings or command line tuning: currently not counted (mirrors SaveData.Wins); IsCountedWin is the one place to change it",
+    "Unlock order prefers the longest shared border, so micro-states (MC, AD, SM, VA, LI) open late, when they are the last locked neighbors or the nearest by centroid",
+    "Results screen does not announce the unlocked countries (it belongs to wave D); the announcement happens on the map (reveal, 'Nouveau ! A conquerir')",
+    "No badge on the main menu Pays button when a reveal is pending (MenuScreen belongs to wave D)"
+  ]
+}

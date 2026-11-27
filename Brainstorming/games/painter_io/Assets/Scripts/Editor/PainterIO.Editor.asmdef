@@ -1,0 +1,6 @@
+{
+    "name": "PainterIO.Editor",
+    "rootNamespace": "PainterIO.Editor",
+    "references": ["PainterIO.Core", "PainterIO.Runtime", "UnityEngine.UI", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+    "includePlatforms": ["Editor"]
+}

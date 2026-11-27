@@ -1,0 +1,1 @@
+frames 245 span 4.00-16.00 s mean interval 49.2 ms (20.3 fps)

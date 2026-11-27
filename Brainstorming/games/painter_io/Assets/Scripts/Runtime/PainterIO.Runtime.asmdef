@@ -1,0 +1,6 @@
+{
+    "name": "PainterIO.Runtime",
+    "rootNamespace": "PainterIO.Runtime",
+    "references": ["PainterIO.Core", "Unity.InputSystem", "UnityEngine.UI", "Unity.RenderPipelines.Universal.Runtime", "Unity.RenderPipelines.Core.Runtime"],
+    "autoReferenced": true
+}

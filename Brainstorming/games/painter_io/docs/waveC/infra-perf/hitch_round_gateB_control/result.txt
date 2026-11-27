@@ -1,0 +1,8 @@
+mode=probe exe=C:/Dev/squad-ai/Brainstorming/games/painter_io/Build/Windows/PainterIO.exe suspendAt=8 suspendMs=1500 noSuspend=False
+bot round seen=True at t=23 s
+suspended 1500 ms at t=31,0 s after launch
+exit=0
+watchdog lines: 1 [PainterIO] quality watchdog: 29,9 fps < 49,8, tier High -> Medium
+[ProbeResult] PASS
+[ProbeHash] 246577239DE179C4
+[ProbePerf] avgMs=18.13 p95Ms=17.03 tier=Medium

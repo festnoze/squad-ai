@@ -1,0 +1,84 @@
+=== Liquid / shared (SfxSynth) ===
+L.ExitPlop             dur=0,16s peak=0,89 rmsDb=-15,5 L100=-13,6 L400=-15,6 play(L100+gain)=-21,1 phonePlay=-21,6 phoneLoss=0,5dB cen=1204Hz hf>4k=0% hf>8k=0%
+L.ReturnGloop          dur=0,34s peak=0,89 rmsDb=-12,3 L100=-8,3 L400=-13,0 play(L100+gain)=-14,7 phonePlay=-18,2 phoneLoss=3,5dB cen=526Hz hf>4k=0% hf>8k=0%
+L.FillSwell            dur=0,55s peak=0,89 rmsDb=-13,6 L100=-9,9 L400=-12,5 play(L100+gain)=-17,9 phonePlay=-19,0 phoneLoss=1,1dB cen=837Hz hf>4k=1% hf>8k=0%
+L.CutSnap              dur=0,18s peak=0,89 rmsDb=-14,2 L100=-10,0 L400=-12,5 play(L100+gain)=-12,5 phonePlay=-12,6 phoneLoss=0,1dB cen=1472Hz hf>4k=1% hf>8k=0%
+L.SparkLoop            dur=0,50s peak=0,89 rmsDb=-15,1 L100=-12,4 L400=-14,4 play(L100+gain)=-25,1 phonePlay=-28,9 phoneLoss=3,8dB cen=1118Hz hf>4k=10% hf>8k=1% seamJump=0,0266 p50diff=0,0251 p99diff=0,1719 jumpPercentile=52,6
+L.CaughtSplat          dur=0,50s peak=0,89 rmsDb=-12,9 L100=-8,6 L400=-12,8 play(L100+gain)=-10,5 phonePlay=-13,8 phoneLoss=3,3dB cen=610Hz hf>4k=0% hf>8k=0%
+L.RingChime            dur=0,90s peak=0,89 rmsDb=-14,6 L100=-8,9 L400=-11,0 play(L100+gain)=-14,9 phonePlay=-15,0 phoneLoss=0,1dB cen=1354Hz hf>4k=1% hf>8k=0%
+L.LassoZip             dur=0,42s peak=0,89 rmsDb=-11,8 L100=-8,8 L400=-11,0 play(L100+gain)=-13,2 phonePlay=-13,2 phoneLoss=0,0dB cen=1331Hz hf>4k=3% hf>8k=0%
+L.ToastTick            dur=0,09s peak=0,89 rmsDb=-15,3 L100=-13,7 L400=-13,7 play(L100+gain)=-23,6 phonePlay=-23,6 phoneLoss=0,0dB cen=1772Hz hf>4k=0% hf>8k=0%
+L.UiClick              dur=0,07s peak=0,89 rmsDb=-13,7 L100=-13,7 L400=-13,7 play(L100+gain)=-20,7 phonePlay=-20,9 phoneLoss=0,2dB cen=1232Hz hf>4k=0% hf>8k=0%
+L.CountdownTick        dur=0,13s peak=0,89 rmsDb=-13,0 L100=-11,5 L400=-12,6 play(L100+gain)=-17,6 phonePlay=-17,7 phoneLoss=0,1dB cen=1311Hz hf>4k=0% hf>8k=0%
+L.WinJingle            dur=1,50s peak=0,89 rmsDb=-13,8 L100=-8,6 L400=-10,4 play(L100+gain)=-12,7 phonePlay=-13,1 phoneLoss=0,3dB cen=897Hz hf>4k=0% hf>8k=0%
+L.LoseJingle           dur=1,40s peak=0,89 rmsDb=-10,1 L100=-6,8 L400=-8,0 play(L100+gain)=-11,5 phonePlay=-14,8 phoneLoss=3,3dB cen=491Hz hf>4k=0% hf>8k=0%
+L.LoopLost             dur=0,62s peak=0,89 rmsDb=-12,5 L100=-7,8 L400=-11,2 play(L100+gain)=-13,8 phonePlay=-16,6 phoneLoss=2,8dB cen=507Hz hf>4k=1% hf>8k=0%
+=== Fire ===
+F.Pop                  dur=0,16s peak=0,89 rmsDb=-14,2 L100=-12,6 L400=-14,6 play(L100+gain)=-20,1 phonePlay=-23,3 phoneLoss=3,2dB cen=639Hz hf>4k=3% hf>8k=0%
+F.Fwump                dur=0,34s peak=0,89 rmsDb=-14,6 L100=-10,8 L400=-15,3 play(L100+gain)=-17,2 phonePlay=-20,2 phoneLoss=3,1dB cen=594Hz hf>4k=0% hf>8k=0%
+F.Whoosh               dur=0,85s peak=0,89 rmsDb=-13,8 L100=-8,0 L400=-9,2 play(L100+gain)=-15,9 phonePlay=-16,1 phoneLoss=0,2dB cen=2552Hz hf>4k=19% hf>8k=2%
+F.Ignite               dur=0,26s peak=0,89 rmsDb=-13,7 L100=-8,2 L400=-11,6 play(L100+gain)=-10,7 phonePlay=-11,5 phoneLoss=0,8dB cen=3579Hz hf>4k=42% hf>8k=10%
+F.FuseHiss             dur=0,50s peak=0,89 rmsDb=-14,3 L100=-10,1 L400=-11,1 play(L100+gain)=-22,8 phonePlay=-23,0 phoneLoss=0,1dB cen=5235Hz hf>4k=68% hf>8k=16% seamJump=0,0228 p50diff=0,1042 p99diff=0,4057 jumpPercentile=11,9
+F.Burst                dur=0,62s peak=0,89 rmsDb=-12,4 L100=-9,0 L400=-13,7 play(L100+gain)=-10,9 phonePlay=-13,3 phoneLoss=2,4dB cen=393Hz hf>4k=3% hf>8k=0%
+F.Fizzle               dur=0,62s peak=0,89 rmsDb=-16,2 L100=-9,8 L400=-13,7 play(L100+gain)=-15,8 phonePlay=-17,6 phoneLoss=1,8dB cen=1346Hz hf>4k=9% hf>8k=0%
+F.Crackle              dur=4,00s peak=0,89 rmsDb=-16,5 L100=-14,4 L400=-16,6 play(L100+gain)=-27,5 phonePlay=-29,4 phoneLoss=1,9dB cen=409Hz hf>4k=3% hf>8k=1% seamJump=0,0106 p50diff=0,0015 p99diff=0,1495 jumpPercentile=89,8
+=== Electric ===
+E.Exit                 dur=0,14s peak=0,89 rmsDb=-13,7 L100=-12,1 L400=-13,5 play(L100+gain)=-19,6 phonePlay=-20,1 phoneLoss=0,5dB cen=1371Hz hf>4k=2% hf>8k=0%
+E.Return               dur=0,30s peak=0,89 rmsDb=-13,4 L100=-9,8 L400=-14,4 play(L100+gain)=-16,2 phonePlay=-19,4 phoneLoss=3,2dB cen=527Hz hf>4k=1% hf>8k=0%
+E.Fill                 dur=0,48s peak=0,89 rmsDb=-18,1 L100=-11,4 L400=-15,6 play(L100+gain)=-19,3 phonePlay=-19,8 phoneLoss=0,5dB cen=2847Hz hf>4k=32% hf>8k=6%
+E.Cut                  dur=0,22s peak=0,89 rmsDb=-11,4 L100=-7,2 L400=-10,5 play(L100+gain)=-9,7 phonePlay=-10,2 phoneLoss=0,5dB cen=1119Hz hf>4k=3% hf>8k=0%
+E.TensionLoop          dur=0,50s peak=0,89 rmsDb=-13,7 L100=-12,5 L400=-13,8 play(L100+gain)=-25,2 phonePlay=-28,8 phoneLoss=3,5dB cen=719Hz hf>4k=5% hf>8k=0% seamJump=0,0719 p50diff=0,0090 p99diff=0,2168 jumpPercentile=93,8
+E.Caught               dur=0,65s peak=0,89 rmsDb=-13,6 L100=-7,5 L400=-12,5 play(L100+gain)=-9,5 phonePlay=-12,4 phoneLoss=3,0dB cen=452Hz hf>4k=2% hf>8k=0%
+E.LoopLost             dur=0,62s peak=0,89 rmsDb=-13,5 L100=-8,4 L400=-12,0 play(L100+gain)=-14,4 phonePlay=-15,8 phoneLoss=1,3dB cen=662Hz hf>4k=3% hf>8k=0%
+E.Ambient              dur=4,00s peak=0,60 rmsDb=-16,0 L100=-15,5 L400=-15,6 play(L100+gain)=-28,7 phonePlay=-33,7 phoneLoss=5,1dB cen=400Hz hf>4k=0% hf>8k=0% seamJump=0,0036 p50diff=0,0041 p99diff=0,0381 jumpPercentile=45,4
+=== Spectral distance between biomes per slot (rms dB over 12 log bands) ===
+L.ExitPlop       L-F=40,1 L-E=30,6 F-E=23,9
+L.ReturnGloop    L-F=20,6 L-E=29,3 F-E=15,4
+L.FillSwell      L-F=16,5 L-E=15,6 F-E=6,2
+L.CutSnap        L-F=23,5 L-E=14,3 F-E=16,8
+L.SparkLoop      L-F=10,9 L-E=6,5 F-E=12,6
+L.CaughtSplat    L-F=11,5 L-E=9,8 F-E=8,4
+L.LoopLost       L-F=9,9 L-E=12,4 F-E=9,4
+=== Same distances after the phone high-pass (400 Hz, 24 dB/oct) ===
+L.ExitPlop       L-F=41,1 L-E=30,7 F-E=21,2
+L.ReturnGloop    L-F=22,4 L-E=29,9 F-E=14,6
+L.FillSwell      L-F=14,2 L-E=15,2 F-E=5,7
+L.CutSnap        L-F=22,4 L-E=15,6 F-E=14,7
+L.SparkLoop      L-F=12,5 L-E=7,8 F-E=14,7
+L.CaughtSplat    L-F=12,6 L-E=10,5 F-E=8,0
+L.LoopLost       L-F=8,3 L-E=10,0 F-E=8,9
+=== Acceptance (feel-04) ===
+max phone loss: one-shots 3,5 dB (limit 4), loops 5,1 dB (limit 6)
+win vs lose: play -12,7 / -11,5 (diff 1,2), phonePlay -13,1 / -14,8 (diff 1,8) limit 3
+F.Fwump vs E.Return distance: full 15,4 dB, after the high-pass 14,6 dB (limit 12)
+=== Band profiles (dB rel total) 60..16k ===
+L.ExitPlop              -61  -47  -15  -17  -48  -19   -0  -27  -28  -90  -90  -90
+L.ReturnGloop           -39  -12  -21  -14   -2   -6  -20  -31  -48  -71  -90  -90
+L.FillSwell             -46  -40  -35  -29   -4   -3  -13  -12  -17  -21  -27  -39
+L.CutSnap               -60  -47  -45  -42  -10   -9   -6   -3  -19  -23  -28  -39
+L.SparkLoop             -23   -4  -12   -6  -30  -14  -16  -17  -10  -11  -17  -30
+L.CaughtSplat            -5   -7  -11  -19  -18  -15   -7   -9  -20  -29  -40  -57
+L.RingChime             -90  -89  -88  -87  -81  -46   -2   -5  -15  -22  -37  -90
+L.LassoZip              -55  -52  -50  -35   -7   -6   -6   -6  -14  -17  -21  -34
+L.ToastTick             -90  -90  -90  -89  -87  -81  -67   -0  -76  -23  -90  -90
+L.UiClick               -79  -77  -74  -69  -56  -29   -0  -30  -37  -90  -90  -90
+L.CountdownTick         -89  -89  -87  -83  -49  -15   -0  -69  -90  -25  -90  -90
+L.WinJingle             -74  -64  -61  -51  -10   -4   -3  -16  -35  -57  -88  -90
+L.LoseJingle            -36  -34  -12   -6   -4   -7  -14  -21  -34  -49  -69  -90
+L.LoopLost              -64  -52  -20   -5   -2  -26  -26  -18  -19  -23  -32  -47
+F.Pop                    -9   -2  -17  -20  -21  -17  -12  -11  -13  -17  -22  -32
+F.Fwump                 -26   -3  -14  -16  -15  -12   -9  -10  -18  -33  -52  -77
+F.Whoosh                -16  -14  -15  -19  -21  -13   -8   -6   -6   -9  -13  -23
+F.Ignite                -32   -8   -8  -21  -31  -27  -22  -13   -7   -6   -8  -15
+F.FuseHiss              -19  -15  -26  -29  -27  -22  -16  -10   -9   -4   -6  -13
+F.Burst                  -6  -19  -21  -25  -21  -20  -18  -15  -16  -17  -22  -32
+F.Fizzle                -51  -44  -11   -4   -8  -23  -18  -11   -8  -11  -19  -32
+F.Crackle                -5   -6  -11  -20  -31  -31  -24  -20  -17  -17  -20  -24
+E.Exit                  -63  -48  -14  -21  -45  -18   -0  -40  -17  -17  -28  -48
+E.Return                 -7   -7  -27  -16   -8   -4  -24  -15  -24  -23  -29  -41
+E.Fill                  -28  -10  -17  -15   -8  -10  -14  -12   -9   -7   -9  -19
+E.Cut                   -60  -29  -15   -9   -8   -7   -6   -8  -17  -17  -22  -32
+E.TensionLoop           -14   -6   -4  -15  -15   -9  -18  -17  -14  -14  -20  -34
+E.Caught                 -7  -10  -10   -9   -7   -9  -19  -18  -19  -19  -25  -39
+E.LoopLost              -56  -22  -11   -7   -3   -8  -16  -19  -21  -18  -20  -33
+E.Ambient               -28   -9   -7   -6   -5  -10  -34  -34  -26  -34  -47  -62
